@@ -75,10 +75,10 @@ export interface LayoutPreset {
  * preset bodies are code, so "Save changes" cannot mutate them in place; the
  * override is what the drift comparison and `Revert to saved layout` read.
  */
-export type LayoutPresetOverrides = Record<string, LayoutPresetSnapshot>;
+export type LayoutPresetOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetSnapshot>>;
 
 /** Per-account edits to the default routes shipped with built-in presets. */
-export type LayoutPresetRouteOverrides = Record<string, LayoutPresetRoute>;
+export type LayoutPresetRouteOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetRoute>>;
 
 /** Per-account edits to the identity shipped with a built-in preset. */
 export interface LayoutPresetMetadataOverride {
@@ -86,4 +86,4 @@ export interface LayoutPresetMetadataOverride {
   label?: string;
 }
 
-export type LayoutPresetMetadataOverrides = Record<string, LayoutPresetMetadataOverride>;
+export type LayoutPresetMetadataOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetMetadataOverride>>;

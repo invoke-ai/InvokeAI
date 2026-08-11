@@ -94,7 +94,13 @@ const createSnapshot = ({
 export interface BuiltInLayoutPresetDescriptor {
   defaultKeys: readonly string[];
   hotkeyId: string;
-  preset: LayoutPreset;
+  preset: BuiltInLayoutPreset;
+}
+
+export interface BuiltInLayoutPreset extends LayoutPreset {
+  defaultRoute: LayoutPresetRoute;
+  id: BuiltInLayoutPresetId;
+  isBuiltIn: true;
 }
 
 const createPresetDescriptor = ({
@@ -238,9 +244,9 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   }),
 ];
 
-export const layoutPresets: LayoutPreset[] = builtInLayoutPresetDescriptors.map(({ preset }) => preset);
+export const layoutPresets: BuiltInLayoutPreset[] = builtInLayoutPresetDescriptors.map(({ preset }) => preset);
 
-export const defaultLayoutPreset = layoutPresets[0];
+export const defaultLayoutPreset = layoutPresets[0]!;
 
 /**
  * Preset ids persisted before the three-preset model. `gallery` had no successor
@@ -261,7 +267,7 @@ const legacyLayoutPresetIds: Record<string, BuiltInLayoutPresetId> = {
  */
 export const resolveLayoutPresetId = (presetId: string): string => legacyLayoutPresetIds[presetId] ?? presetId;
 
-export const getLayoutPreset = (presetId: string) =>
+export const getLayoutPreset = (presetId: string): BuiltInLayoutPreset =>
   layoutPresets.find((preset) => preset.id === resolveLayoutPresetId(presetId)) ?? defaultLayoutPreset;
 
 export const isBuiltInLayoutPresetId = (presetId: string): presetId is BuiltInLayoutPresetId =>

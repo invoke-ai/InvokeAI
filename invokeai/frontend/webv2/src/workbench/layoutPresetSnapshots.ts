@@ -9,7 +9,7 @@ import type {
 import type { AccountState, Project } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { getLayoutPreset } from '@workbench/layoutPresets';
+import { getLayoutPreset, isBuiltInLayoutPresetId, resolveLayoutPresetId } from '@workbench/layoutPresets';
 
 const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
 
@@ -21,13 +21,16 @@ const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
  * would appear to do nothing.
  */
 export const resolveSavedLayoutPreset = (account: AccountState, presetId: LayoutPresetId): LayoutPreset => {
-  const customPreset = account.customLayoutPresets?.find((preset) => preset.id === presetId);
+  const resolvedPresetId = resolveLayoutPresetId(presetId);
+  const customPreset = isBuiltInLayoutPresetId(resolvedPresetId)
+    ? undefined
+    : account.customLayoutPresets?.find((preset) => preset.id === presetId);
 
   if (customPreset) {
     return customPreset;
   }
 
-  const builtInPreset = getLayoutPreset(presetId);
+  const builtInPreset = getLayoutPreset(resolvedPresetId);
   const metadata = account.layoutPresetMetadataOverrides?.[builtInPreset.id];
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
   const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;

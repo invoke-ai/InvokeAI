@@ -12,6 +12,7 @@ import type { DeveloperLogNamespace } from '@workbench/diagnostics/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
 import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 import type {
+  BuiltInLayoutPresetId,
   CenterViewId,
   LayoutPreset,
   LayoutPresetId,
@@ -19,6 +20,7 @@ import type {
   LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
   LayoutPresetRoute,
+  LayoutPresetRouteOverrides,
   LayoutPresetSnapshot,
   ProjectLayoutState,
   WidgetRegion,
@@ -1603,6 +1605,8 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
     return [];
   }
 
+  const seenIds = new Set<string>();
+
   return presets.flatMap((preset): LayoutPreset[] => {
     if (!preset || typeof preset !== 'object') {
       return [];
@@ -1614,13 +1618,21 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
       return [];
     }
 
+    const id = record.id.trim();
+
+    if (!id || isBuiltInLayoutPresetId(resolveLayoutPresetId(id)) || seenIds.has(id)) {
+      return [];
+    }
+
+    seenIds.add(id);
+
     const defaultRoute = normalizeLayoutPresetRoute(record.defaultRoute);
 
     return [
       {
         ...(defaultRoute ? { defaultRoute } : {}),
         ...(typeof record.iconId === 'string' ? { iconId: record.iconId } : {}),
-        id: record.id,
+        id,
         label: record.label,
         snapshot: cloneLayoutPresetSnapshot(record.snapshot),
       },
@@ -1628,16 +1640,17 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
   });
 };
 
-const normalizeLayoutPresetRouteOverrides = (overrides: unknown) => {
+const normalizeLayoutPresetRouteOverrides = (overrides: unknown): LayoutPresetRouteOverrides => {
   if (!overrides || typeof overrides !== 'object') {
     return {};
   }
 
   return Object.fromEntries(
     Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, route]) => {
+      const resolvedPresetId = resolveLayoutPresetId(presetId);
       const normalizedRoute = normalizeLayoutPresetRoute(route);
 
-      return normalizedRoute ? [[resolveLayoutPresetId(presetId), normalizedRoute]] : [];
+      return isBuiltInLayoutPresetId(resolvedPresetId) && normalizedRoute ? [[resolvedPresetId, normalizedRoute]] : [];
     })
   );
 };
@@ -1673,17 +1686,27 @@ const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrid
   }
 
   return Object.fromEntries(
-    Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, snapshot]) =>
-      isLayoutPresetSnapshot(snapshot) ? [[resolveLayoutPresetId(presetId), cloneLayoutPresetSnapshot(snapshot)]] : []
-    )
+    Object.entries(overrides as Record<string, unknown>).flatMap(([presetId, snapshot]) => {
+      const resolvedPresetId = resolveLayoutPresetId(presetId);
+
+      return isBuiltInLayoutPresetId(resolvedPresetId) && isLayoutPresetSnapshot(snapshot)
+        ? [[resolvedPresetId, cloneLayoutPresetSnapshot(snapshot)]]
+        : [];
+    })
   );
 };
 
 const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefined): WorkbenchState['account'] => {
   const customLayoutPresets = normalizeCustomLayoutPresets(account?.customLayoutPresets);
+  const resolvedActivePresetId = resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id);
+  const activeLayoutPresetId =
+    isBuiltInLayoutPresetId(resolvedActivePresetId) ||
+    customLayoutPresets.some((preset) => preset.id === resolvedActivePresetId)
+      ? resolvedActivePresetId
+      : defaultLayoutPreset.id;
 
   return {
-    activeLayoutPresetId: resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id),
+    activeLayoutPresetId,
     customLayoutPresets,
     layoutPresetMetadataOverrides: normalizeLayoutPresetMetadataOverrides(account?.layoutPresetMetadataOverrides),
     layoutPresetOrder: normalizeLayoutPresetOrder(account?.layoutPresetOrder, [
@@ -1732,7 +1755,7 @@ const getAvailableLayoutPreset = (state: WorkbenchState, presetId: LayoutPresetI
 
 const setBuiltInLayoutPresetMetadata = (
   state: WorkbenchState,
-  presetId: LayoutPresetId,
+  presetId: BuiltInLayoutPresetId,
   metadata: Required<LayoutPresetMetadataOverride>
 ): WorkbenchState => {
   const shippedPreset = getLayoutPreset(presetId);
@@ -2684,8 +2707,9 @@ export const __workbenchReducerInternal = (
     }
     case 'addLayoutPreset': {
       const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+      const presetId = action.presetId.trim();
 
-      if (!activeProject) {
+      if (!activeProject || !presetId || isBuiltInLayoutPresetId(resolveLayoutPresetId(presetId))) {
         return state;
       }
 
@@ -2701,12 +2725,12 @@ export const __workbenchReducerInternal = (
                   },
             }),
         iconId: action.iconId,
-        id: action.presetId,
+        id: presetId,
         label: action.label.trim() || 'Custom layout',
         snapshot: createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)),
       };
       const customLayoutPresets = [
-        ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== action.presetId),
+        ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== presetId),
         preset,
       ];
       const layoutPresetOrder = [
@@ -2750,6 +2774,10 @@ export const __workbenchReducerInternal = (
       return { ...state, account: { ...state.account, customLayoutPresets } };
     }
     case 'restoreLayoutPresetDefault': {
+      if (!isBuiltInLayoutPresetId(action.presetId)) {
+        return state;
+      }
+
       const { [action.presetId]: removedMetadata, ...layoutPresetMetadataOverrides } =
         state.account.layoutPresetMetadataOverrides ?? {};
       const { [action.presetId]: removed, ...layoutPresetOverrides } = state.account.layoutPresetOverrides ?? {};

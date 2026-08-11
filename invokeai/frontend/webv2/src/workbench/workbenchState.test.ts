@@ -905,6 +905,77 @@ describe('workbench layout presets', () => {
     expect(state.account.layoutPresetOrder).toEqual(['automate', 'compose', 'edit', 'custom-layout-1']);
   });
 
+  it('rejects reserved, empty, and duplicate custom preset ids during hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const customPreset = (id: string, label: string) => ({ id, label, snapshot: layoutPresets[0]!.snapshot });
+    const state = workbenchReducer(initial, {
+      state: {
+        ...initial,
+        account: {
+          ...initial.account,
+          activeLayoutPresetId: 'missing',
+          customLayoutPresets: [
+            customPreset('   ', 'Empty'),
+            customPreset('compose', 'Built in'),
+            customPreset(' canvas ', 'Legacy alias'),
+            customPreset('custom-duplicate', 'First'),
+            customPreset('custom-duplicate', 'Second'),
+            customPreset(' custom-valid ', 'Valid'),
+          ],
+        },
+      },
+      type: 'hydrateWorkbench',
+    });
+
+    expect(state.account.activeLayoutPresetId).toBe('compose');
+    expect(state.account.customLayoutPresets?.map(({ id, label }) => ({ id, label }))).toEqual([
+      { id: 'custom-duplicate', label: 'First' },
+      { id: 'custom-valid', label: 'Valid' },
+    ]);
+  });
+
+  it('does not create a custom preset in a built-in or legacy id namespace', () => {
+    const initial = createInitialWorkbenchState();
+    const builtInCollision = workbenchReducer(initial, {
+      label: 'Shadow Compose',
+      presetId: 'compose',
+      type: 'addLayoutPreset',
+    });
+    const legacyCollision = workbenchReducer(initial, {
+      label: 'Shadow Edit',
+      presetId: 'canvas',
+      type: 'addLayoutPreset',
+    });
+
+    expect(builtInCollision).toBe(initial);
+    expect(legacyCollision).toBe(initial);
+  });
+
+  it('keeps only built-in preset overrides during hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const snapshot = layoutPresets[0]!.snapshot;
+    const route = { destination: 'canvas' as const, sourceId: 'canvas' as const };
+    const state = workbenchReducer(initial, {
+      state: {
+        ...initial,
+        account: {
+          ...initial.account,
+          layoutPresetMetadataOverrides: {
+            canvas: { label: 'Editing' },
+            unknown: { label: 'Unknown' },
+          },
+          layoutPresetOverrides: { canvas: snapshot, unknown: snapshot },
+          layoutPresetRouteOverrides: { canvas: route, unknown: route },
+        },
+      } as unknown as WorkbenchState,
+      type: 'hydrateWorkbench',
+    });
+
+    expect(state.account.layoutPresetMetadataOverrides).toEqual({ edit: { label: 'Editing' } });
+    expect(state.account.layoutPresetOverrides).toEqual({ edit: snapshot });
+    expect(state.account.layoutPresetRouteOverrides).toEqual({ edit: route });
+  });
+
   it('captures the live source and destination without routing locks when creating a custom preset', () => {
     let state = createInitialWorkbenchState();
 
