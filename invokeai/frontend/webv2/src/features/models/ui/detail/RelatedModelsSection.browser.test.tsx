@@ -39,6 +39,7 @@ const createModel = (overrides: Partial<ModelConfig>): ModelConfig =>
   }) as ModelConfig;
 
 const fluxMain = createModel({ base: 'flux', key: 'flux-main', name: 'FLUX Dev', type: 'main' });
+const fluxMainSibling = createModel({ base: 'flux', key: 'flux-main-2', name: 'FLUX Krea', type: 'main' });
 const fluxLora = createModel({ base: 'flux', key: 'flux-lora', name: 'FLUX LoRA', type: 'lora' });
 const sdxlLora = createModel({ base: 'sdxl', key: 'sdxl-lora', name: 'SDXL LoRA', type: 'lora' });
 const t5Encoder = createModel({ base: 'any', key: 't5-xxl', name: 'T5 XXL', type: 't5_encoder' });
@@ -58,7 +59,7 @@ describe('RelatedModelsSection', () => {
     accountLifecycle.activate('related-models', ':user:related-models');
     setModelsSnapshotForTests({
       error: null,
-      models: [fluxMain, fluxLora, sdxlLora, t5Encoder, externalMain],
+      models: [fluxMain, fluxMainSibling, fluxLora, sdxlLora, t5Encoder, externalMain],
       status: 'loaded',
     });
     host = document.createElement('div');
@@ -110,6 +111,8 @@ describe('RelatedModelsSection', () => {
     expect(options).not.toContain('GPT Image');
     // The subject model never offers itself.
     expect(options).not.toContain('FLUX Dev');
+    // Single-slot types never offer their own type: no second main.
+    expect(options).not.toContain('FLUX Krea');
   });
 
   it('links a model and renders it without refetching', async () => {

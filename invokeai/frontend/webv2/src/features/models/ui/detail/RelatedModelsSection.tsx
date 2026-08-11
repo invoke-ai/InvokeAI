@@ -3,7 +3,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
-import { hasLinkableBase, isBaseCompatible, LINKABLE_TYPES } from '@features/models/core/relationships';
+import { hasLinkableBase, isLinkablePair, LINKABLE_TYPES } from '@features/models/core/relationships';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import {
@@ -127,7 +127,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
       {canAddLinks ? (
         <ModelSelect
           excludeKeys={excludeKeys}
-          filter={(candidate) => isBaseCompatible(model, candidate)}
+          filter={(candidate) => isLinkablePair(model, candidate)}
           modelTypes={LINKABLE_TYPES}
           placeholder={t('models.searchCompatibleToLink')}
           showManagerButton={false}

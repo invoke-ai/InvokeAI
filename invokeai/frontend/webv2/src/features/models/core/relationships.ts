@@ -122,3 +122,33 @@ export const isBaseCompatible = (a: RelatableModel, b: RelatableModel): boolean 
 
   return isAllowedHelperFor(a, b) || isAllowedHelperFor(b, a);
 };
+
+/**
+ * Types that occupy exactly one slot in a pipeline, so linking two of them is
+ * never a meaningful "used together" hint. Mirrors legacy's
+ * `DISALLOWED_RELATIONSHIPS` self-pairs, extended to the single-slot helper
+ * types made linkable since. Stackable types (lora, embedding, ip_adapter,
+ * t2i_adapter) stay self-linkable.
+ */
+const SINGLETON_LINK_TYPES: ReadonlySet<ModelTaxonomyType> = new Set<ModelTaxonomyType>([
+  'main',
+  'vae',
+  'controlnet',
+  'control_lora',
+  'clip_embed',
+  'clip_vision',
+  'siglip',
+  'flux_redux',
+  'pid_decoder',
+  't5_encoder',
+  'wan_t5_encoder',
+  'qwen3_encoder',
+  'qwen_vl_encoder',
+  'qwen3_vl_encoder',
+  'mistral_encoder',
+  'gemma2_encoder',
+]);
+
+/** The full candidate rule for the link picker: compatible bases, and no same-type pair of a single-slot type. */
+export const isLinkablePair = (a: RelatableModel, b: RelatableModel): boolean =>
+  isBaseCompatible(a, b) && !(a.type === b.type && SINGLETON_LINK_TYPES.has(a.type));

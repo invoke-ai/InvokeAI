@@ -7,6 +7,7 @@ import {
   CROSS_BASE_ALLOWANCES,
   hasLinkableBase,
   isBaseCompatible,
+  isLinkablePair,
   isLinkableType,
   LINKABLE_TYPES,
   NULL_BASE_ALLOWANCES,
@@ -108,6 +109,29 @@ describe('isBaseCompatible', () => {
 
   it('never links two null-base models', () => {
     expect(isBaseCompatible(model('any', 't5_encoder'), model('any', 'clip_embed'))).toBe(false);
+  });
+});
+
+describe('isLinkablePair', () => {
+  it('blocks same-type pairs of single-slot types', () => {
+    // A pipeline runs exactly one of each; two are never "used together".
+    expect(isLinkablePair(model('sdxl', 'main'), model('sdxl', 'main'))).toBe(false);
+    expect(isLinkablePair(model('sdxl', 'vae'), model('sdxl', 'vae'))).toBe(false);
+    expect(isLinkablePair(model('any', 't5_encoder'), model('any', 't5_encoder'))).toBe(false);
+    expect(isLinkablePair(model('flux', 'pid_decoder'), model('flux', 'pid_decoder'))).toBe(false);
+  });
+
+  it('keeps stackable same-type pairs linkable', () => {
+    expect(isLinkablePair(model('sdxl', 'lora'), model('sdxl', 'lora'))).toBe(true);
+    expect(isLinkablePair(model('sdxl', 'embedding'), model('sdxl', 'embedding'))).toBe(true);
+    expect(isLinkablePair(model('sdxl', 'ip_adapter'), model('sdxl', 'ip_adapter'))).toBe(true);
+    expect(isLinkablePair(model('sdxl', 't2i_adapter'), model('sdxl', 't2i_adapter'))).toBe(true);
+  });
+
+  it('defers to base compatibility for cross-type pairs', () => {
+    expect(isLinkablePair(model('sdxl', 'main'), model('sdxl', 'vae'))).toBe(true);
+    expect(isLinkablePair(model('z-image', 'main'), model('flux', 'vae'))).toBe(true);
+    expect(isLinkablePair(model('sdxl', 'main'), model('flux', 'vae'))).toBe(false);
   });
 });
 
