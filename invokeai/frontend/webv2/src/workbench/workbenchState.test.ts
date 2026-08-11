@@ -22,7 +22,7 @@ import { layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
-import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory } from './workbenchState';
+import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory, normalizeWorkbenchAccount } from './workbenchState';
 import {
   createInitialWorkbenchState,
   nextLayerName,
@@ -660,6 +660,41 @@ describe('workbench layout presets', () => {
     expect(project.layout).toMatchObject({ centerViewId: 'gallery', presetId: 'compose' });
   });
 
+  it('repairs a stale saved Compose route when its source is absent from the saved layout', () => {
+    const initial = createInitialWorkbenchState();
+    const compose = layoutPresets[0]!;
+    const left = compose.snapshot.widgetRegions.left;
+    const { upscale: _removedUpscale, ...widgetInstances } = compose.snapshot.widgetInstances;
+    const customized: WorkbenchState = {
+      ...initial,
+      account: {
+        ...initial.account,
+        layoutPresetOverrides: {
+          compose: {
+            ...compose.snapshot,
+            widgetInstances,
+            widgetRegions: {
+              ...compose.snapshot.widgetRegions,
+              left: { ...left, instanceIds: left.instanceIds.filter((id) => id !== 'upscale') },
+            },
+          },
+        },
+        layoutPresetRouteOverrides: {
+          compose: { destination: 'gallery', sourceId: 'upscale' },
+        },
+      },
+    };
+
+    const withNewProject = workbenchReducer(customized, { type: 'createProject' });
+
+    expect(getProject(withNewProject, withNewProject.activeProjectId).invocation).toEqual({
+      destination: 'canvas',
+      destinationLocked: false,
+      sourceId: 'generate',
+      sourceLocked: false,
+    });
+  });
+
   it('applies each built-in preset default route with its layout', () => {
     let state = createInitialWorkbenchState();
 
@@ -974,6 +1009,64 @@ describe('workbench layout presets', () => {
     expect(state.account.layoutPresetMetadataOverrides).toEqual({ edit: { label: 'Editing' } });
     expect(state.account.layoutPresetOverrides).toEqual({ edit: snapshot });
     expect(state.account.layoutPresetRouteOverrides).toEqual({ edit: route });
+  });
+
+  it('preserves a saved preset with an empty side region during hydration', () => {
+    const initial = createInitialWorkbenchState();
+    const snapshot = layoutPresets[0]!.snapshot;
+    const emptyRightSnapshot = {
+      ...snapshot,
+      widgetRegions: {
+        ...snapshot.widgetRegions,
+        right: { ...snapshot.widgetRegions.right, instanceIds: [] },
+      },
+    };
+    const state = workbenchReducer(initial, {
+      state: {
+        ...initial,
+        account: {
+          ...initial.account,
+          layoutPresetOverrides: { compose: emptyRightSnapshot },
+        },
+      },
+      type: 'hydrateWorkbench',
+    });
+
+    expect(state.account.layoutPresetOverrides).toEqual({ compose: emptyRightSnapshot });
+  });
+
+  it('drops preset snapshots with invalid widget and layout references', () => {
+    const snapshot = layoutPresets[0]!.snapshot;
+    const invalidSnapshots = [
+      { ...snapshot, layout: { ...snapshot.layout, centerViewId: 'retired-view' } },
+      {
+        ...snapshot,
+        widgetInstances: { ...snapshot.widgetInstances, generate: true },
+      },
+      {
+        ...snapshot,
+        widgetRegions: {
+          ...snapshot.widgetRegions,
+          left: {
+            ...snapshot.widgetRegions.left,
+            instanceIds: [...snapshot.widgetRegions.left.instanceIds, 'missing'],
+          },
+        },
+      },
+      {
+        ...snapshot,
+        widgetRegions: {
+          ...snapshot.widgetRegions,
+          right: { ...snapshot.widgetRegions.right, sizePx: Number.POSITIVE_INFINITY },
+        },
+      },
+    ];
+
+    for (const invalidSnapshot of invalidSnapshots) {
+      expect(
+        normalizeWorkbenchAccount({ layoutPresetOverrides: { compose: invalidSnapshot } }).layoutPresetOverrides
+      ).toEqual({});
+    }
   });
 
   it('captures the live source and destination without routing locks when creating a custom preset', () => {

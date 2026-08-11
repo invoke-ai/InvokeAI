@@ -11,6 +11,7 @@ import {
 import {
   createDraftProject,
   createInitialWorkbenchState,
+  normalizeWorkbenchAccount,
   normalizeWorkbenchProject,
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
@@ -637,6 +638,11 @@ const loadFromBackend = async (
   // First contact: a backend with no projects adopts the browser's existing
   // workbench (one-time import of the pre-backend localStorage data).
   if (summaries.length === 0 && local && local.state.projects.length > 0) {
+    const importedState: WorkbenchState = {
+      ...local.state,
+      account: normalizeWorkbenchAccount(sessionBlob?.account ?? local.state.account),
+    };
+
     for (const project of local.state.projects) {
       if (!(await pushNewProject(syncState, project))) {
         assertOwner(syncState);
@@ -649,11 +655,25 @@ const loadFromBackend = async (
       upsertProjectSummary({ id: project.id, name: project.name, revision: entry?.revision ?? null }, syncState.owner);
     }
 
-    await pushSessionState(syncState, local.state);
+    await pushSessionState(syncState, importedState);
     assertOwner(syncState);
     persistSyncMap(syncState);
 
-    return local;
+    if (!options?.createNew) {
+      return { ...local, state: importedState };
+    }
+
+    const draft = createDraftProject(importedState.projects, importedState.account);
+    syncState.hasPending = true;
+
+    return {
+      ...local,
+      state: {
+        ...importedState,
+        activeProjectId: draft.id,
+        projects: [...importedState.projects, draft],
+      },
+    };
   }
 
   // The session blob says which projects are open as tabs; blobs from before
@@ -721,7 +741,7 @@ const loadFromBackend = async (
   }
 
   const base = local?.state ?? createInitialWorkbenchState();
-  const account = sessionBlob?.account ?? base.account;
+  const account = normalizeWorkbenchAccount(sessionBlob?.account ?? base.account);
   let activeProjectId =
     options?.openProjectId && projects.some((project) => project.id === options.openProjectId)
       ? options.openProjectId

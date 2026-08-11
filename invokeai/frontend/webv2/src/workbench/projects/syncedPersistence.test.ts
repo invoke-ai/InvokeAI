@@ -2,7 +2,7 @@ import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { createWorkbenchPersistenceRuntime, type PersistenceClock } from '@workbench/persistenceRuntime';
-import { createDraftProject, createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createDraftProject, createInitialWorkbenchState, normalizeWorkbenchAccount } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -237,11 +237,50 @@ describe('loadWorkbench session hydration', () => {
     expect(api.getProject).not.toHaveBeenCalled();
   });
 
+  it('honors a new-project request while importing legacy local projects', async () => {
+    const state = createInitialWorkbenchState();
+    const existingProjectId = state.activeProjectId;
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state, version: 1 })
+    );
+
+    const snapshot = await service.loadWorkbench({ createNew: true });
+
+    expect(snapshot?.state.projects).toHaveLength(state.projects.length + 1);
+    expect(snapshot?.state.activeProjectId).not.toBe(existingProjectId);
+    expect(service.hasPendingChanges()).toBe(true);
+  });
+
+  it('keeps the server account while importing legacy local projects', async () => {
+    const local = createInitialWorkbenchState();
+    const serverAccount = {
+      ...local.account,
+      layoutPresetMetadataOverrides: { compose: { label: 'Writing' } },
+      layoutPresetRouteOverrides: { compose: { destination: 'canvas' as const, sourceId: 'canvas' as const } },
+    };
+    storage.set(
+      'invokeai:v7:webv2:workbench',
+      JSON.stringify({ savedAt: '2026-07-19T00:00:00.000Z', state: local, version: 1 })
+    );
+    seedSessionBlob({ account: serverAccount, activeProjectId: '', openProjectIds: [] });
+
+    const snapshot = await service.loadWorkbench({ createNew: true });
+
+    expect(snapshot?.state.account).toMatchObject(serverAccount);
+    expect(
+      snapshot?.state.projects.find((project) => project.id === snapshot.state.activeProjectId)?.invocation
+    ).toMatchObject({
+      destination: 'canvas',
+      sourceId: 'canvas',
+    });
+  });
+
   it('hydrates only the open set and seeds the full library', async () => {
     const first = seedServerProject('First');
     const second = seedServerProject('Second');
     const third = seedServerProject('Third');
-    const account = createInitialWorkbenchState().account;
+    const account = normalizeWorkbenchAccount(createInitialWorkbenchState().account);
 
     seedSessionBlob({ account, activeProjectId: second.id, openProjectIds: [second.id] });
 
@@ -292,6 +331,22 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.projects[0].id).not.toBe(existing.id);
     expect(snapshot?.state.activeProjectId).toBe(snapshot?.state.projects[0].id);
     expect(service.hasPendingChanges()).toBe(true);
+  });
+
+  it('normalizes malformed account preset data before creating an empty-session draft', async () => {
+    const account = {
+      ...createInitialWorkbenchState().account,
+      layoutPresetOverrides: { compose: { malformed: true } },
+    };
+
+    seedSessionBlob({ account, activeProjectId: '', openProjectIds: [] });
+
+    const snapshot = await service.loadWorkbench();
+
+    expect(snapshot?.state.projects).toHaveLength(1);
+    expect(snapshot?.state.account.layoutPresetOverrides).toEqual({});
+    expect(snapshot?.state.projects[0]?.layout.presetId).toBe('compose');
+    expect(snapshot?.state.projects[0]?.invocation).toMatchObject({ destination: 'gallery', sourceId: 'generate' });
   });
 
   it('joins a deep-linked project into the open set and focuses it', async () => {

@@ -1427,7 +1427,7 @@ const createProject = (index: number, id: string, preset: LayoutPreset): Project
       ],
       graphHistory: [],
       id,
-      invocation: { ...defaultInvocationRoute, ...preset.defaultRoute },
+      invocation: getInvocationAfterLayoutPreset(defaultInvocationRoute, preset),
       layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
       name: `Project Name #${index}`,
       promptHistory: [],
@@ -1457,7 +1457,7 @@ export const createDraftProject = (projects: Project[], account?: WorkbenchState
   createProject(
     getNextProjectIndex(projects),
     createId('project'),
-    account ? resolveSavedLayoutPreset(account, defaultLayoutPreset.id) : defaultLayoutPreset
+    account ? resolveSavedLayoutPreset(normalizeWorkbenchAccount(account), defaultLayoutPreset.id) : defaultLayoutPreset
   );
 
 const updateActiveProject = (state: WorkbenchState, getProject: (project: Project) => Project): WorkbenchState => {
@@ -1539,19 +1539,47 @@ const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPreset
   widgetRegions: cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
 });
 
-const isWidgetRegionState = (value: unknown): value is WidgetRegionState => {
+const centerViewIds = new Set<CenterViewId>(['canvas', 'gallery', 'preview', 'workflow']);
+
+const isLayoutPresetWidgetInstance = (instanceId: string, value: unknown): boolean => {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const record = value as { id?: unknown; title?: unknown; typeId?: unknown };
+
+  return (
+    instanceId.length > 0 &&
+    record.id === instanceId &&
+    typeof record.typeId === 'string' &&
+    record.typeId.length > 0 &&
+    (record.title === undefined || typeof record.title === 'string')
+  );
+};
+
+const isWidgetRegionState = (
+  value: unknown,
+  widgetInstances: Readonly<Record<string, unknown>>
+): value is WidgetRegionState => {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
   const record = value as Partial<WidgetRegionState>;
+  const instanceIds = record.instanceIds;
 
   return (
     typeof record.activeInstanceId === 'string' &&
-    Array.isArray(record.instanceIds) &&
-    record.instanceIds.every((instanceId) => typeof instanceId === 'string') &&
+    record.activeInstanceId.length > 0 &&
+    Array.isArray(instanceIds) &&
+    instanceIds.every((instanceId) => typeof instanceId === 'string' && instanceId in widgetInstances) &&
+    new Set(instanceIds).size === instanceIds.length &&
+    record.activeInstanceId in widgetInstances &&
+    (instanceIds.length === 0 || instanceIds.includes(record.activeInstanceId)) &&
     typeof record.isCollapsed === 'boolean' &&
-    typeof record.sizePx === 'number'
+    typeof record.sizePx === 'number' &&
+    Number.isFinite(record.sizePx) &&
+    record.sizePx >= 0
   );
 };
 
@@ -1562,22 +1590,31 @@ const isLayoutPresetSnapshot = (value: unknown): value is LayoutPresetSnapshot =
 
   const snapshot = value as Partial<LayoutPresetSnapshot>;
   const layout = snapshot.layout as Partial<ProjectLayoutState> | undefined;
+  const widgetInstances = snapshot.widgetInstances as Record<string, unknown> | undefined;
 
   return (
     !!layout &&
     typeof layout.presetId === 'string' &&
+    layout.presetId.length > 0 &&
     typeof layout.centerViewId === 'string' &&
+    centerViewIds.has(layout.centerViewId as CenterViewId) &&
     !!layout.panels &&
     typeof layout.panels.isBottomOpen === 'boolean' &&
     typeof layout.panels.isLeftOpen === 'boolean' &&
     typeof layout.panels.isRightOpen === 'boolean' &&
-    !!snapshot.widgetInstances &&
-    typeof snapshot.widgetInstances === 'object' &&
+    !!widgetInstances &&
+    typeof widgetInstances === 'object' &&
+    !Array.isArray(widgetInstances) &&
+    Object.keys(widgetInstances).length > 0 &&
+    Object.entries(widgetInstances).every(([instanceId, instance]) =>
+      isLayoutPresetWidgetInstance(instanceId, instance)
+    ) &&
     !!snapshot.widgetRegions &&
-    isWidgetRegionState(snapshot.widgetRegions.left) &&
-    isWidgetRegionState(snapshot.widgetRegions.right) &&
-    isWidgetRegionState(snapshot.widgetRegions.bottom) &&
-    isWidgetRegionState(snapshot.widgetRegions.center)
+    typeof snapshot.widgetRegions === 'object' &&
+    isWidgetRegionState(snapshot.widgetRegions.left, widgetInstances) &&
+    isWidgetRegionState(snapshot.widgetRegions.right, widgetInstances) &&
+    isWidgetRegionState(snapshot.widgetRegions.bottom, widgetInstances) &&
+    isWidgetRegionState(snapshot.widgetRegions.center, widgetInstances)
   );
 };
 
@@ -1696,7 +1733,8 @@ const normalizeLayoutPresetOverrides = (overrides: unknown): LayoutPresetOverrid
   );
 };
 
-const normalizeAccount = (account: Partial<WorkbenchState['account']> | undefined): WorkbenchState['account'] => {
+export const normalizeWorkbenchAccount = (value: unknown): WorkbenchState['account'] => {
+  const account = value && typeof value === 'object' ? (value as Partial<WorkbenchState['account']>) : undefined;
   const customLayoutPresets = normalizeCustomLayoutPresets(account?.customLayoutPresets);
   const resolvedActivePresetId = resolveLayoutPresetId(account?.activeLayoutPresetId ?? defaultLayoutPreset.id);
   const activeLayoutPresetId =
@@ -1723,7 +1761,7 @@ const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => ({
   backendConnection: { status: 'connecting' },
   // Built explicitly: legacy snapshots carried preferences inside the account
   // (they live in the settings store now) and must not resurface here.
-  account: normalizeAccount(state.account),
+  account: normalizeWorkbenchAccount(state.account),
   notifications: [],
   projects: state.projects.map(normalizeWorkbenchProject),
 });
