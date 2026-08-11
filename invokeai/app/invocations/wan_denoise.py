@@ -65,7 +65,7 @@ WAN_MAX_RESIDENT_TRANSFORMER_BYTES = 2 * 2**30
 
 
 def _get_wan_transformer_working_mem_bytes(device: torch.device, *, enabled: bool) -> int | None:
-    """Reserve all but 2 GiB of VRAM so Wan weights use aggressive layer streaming."""
+    """Reserve all but 2 GiB of VRAM so partial-load Wan weights target about 2 GiB resident."""
     if not enabled or device.type != "cuda":
         return None
 
@@ -208,6 +208,7 @@ class _ExpertSwapper:
         self._active_device_ctx: Any | None = None
         self._active_lora_ctx: Any | None = None
         self._active_model: Any | None = None
+        self._warned_partial_loading_unavailable = False
 
     def get(self, label: str) -> Any:
         if label not in (self.HIGH, self.LOW):
@@ -266,7 +267,8 @@ class _ExpertSwapper:
         # always fresh — see class docstring for the cache-eviction reasoning.
         model_id = self._high_model if label == self.HIGH else self._low_model
         info = self._context.models.load(model_id)
-        if self._working_mem_bytes is None:
+        supports_partial_loading = getattr(info, "supports_partial_loading", None)
+        if self._working_mem_bytes is None or supports_partial_loading is False:
             device_ctx = info.model_on_device()
         else:
             device_ctx = info.model_on_device(working_mem_bytes=self._working_mem_bytes)
@@ -284,15 +286,23 @@ class _ExpertSwapper:
         self._active_model = model
 
         if self._max_resident_model_bytes is not None:
-            cache_record = getattr(info, "_cache_record", None)
-            cached_model = getattr(cache_record, "cached_model", None)
-            cur_vram_bytes = getattr(cached_model, "cur_vram_bytes", None)
-            unload_from_vram = getattr(info, "unload_from_vram", None)
-            if callable(cur_vram_bytes) and callable(unload_from_vram):
-                vram_bytes_to_free = max(0, cur_vram_bytes() - self._max_resident_model_bytes)
-                if vram_bytes_to_free > 0:
-                    unload_from_vram(vram_bytes_to_free, keep_required_weights_in_vram=True)
-                    TorchDevice.empty_cache()
+            if supports_partial_loading is False:
+                if not self._warned_partial_loading_unavailable:
+                    self._context.logger.warning(
+                        "Wan memory optimization cannot limit resident transformer weights because "
+                        "partial model loading is disabled."
+                    )
+                    self._warned_partial_loading_unavailable = True
+            else:
+                cache_record = getattr(info, "_cache_record", None)
+                cached_model = getattr(cache_record, "cached_model", None)
+                cur_vram_bytes = getattr(cached_model, "cur_vram_bytes", None)
+                unload_from_vram = getattr(info, "unload_from_vram", None)
+                if callable(cur_vram_bytes) and callable(unload_from_vram):
+                    vram_bytes_to_free = max(0, cur_vram_bytes() - self._max_resident_model_bytes)
+                    if vram_bytes_to_free > 0:
+                        unload_from_vram(vram_bytes_to_free, keep_required_weights_in_vram=True)
+                        TorchDevice.empty_cache()
 
         # Apply LoRA patches for this expert. GGUF transformers need sidecar
         # patching since direct patching of GGMLTensors isn't supported.
@@ -642,7 +652,10 @@ class WanDenoiseInvocation(BaseInvocation):
         optimize_memory = context.config.get().wan_memory_optimization
         working_mem_bytes = _get_wan_transformer_working_mem_bytes(device, enabled=optimize_memory)
         if working_mem_bytes is not None:
-            context.logger.info("Wan memory optimization: limiting resident transformer weights to about 2 GiB")
+            context.logger.info(
+                "Wan memory optimization: targeting about 2 GiB of resident transformer weights when partial "
+                "loading is available"
+            )
         with ExitStack() as exit_stack:
             swapper = _ExpertSwapper(
                 context=context,

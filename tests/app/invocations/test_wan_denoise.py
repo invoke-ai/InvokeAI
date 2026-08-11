@@ -283,6 +283,7 @@ class TestWanDenoiseShapes:
     def test_expert_swapper_passes_aggressive_working_memory_to_model_cache(self) -> None:
         transformer = _ZeroTransformer()
         loaded = MagicMock()
+        loaded.supports_partial_loading = True
         cached_model = MagicMock()
         cached_model.cur_vram_bytes.return_value = 5 * 2**30
         loaded._cache_record.cached_model = cached_model
@@ -308,6 +309,62 @@ class TestWanDenoiseShapes:
 
         loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
         loaded.unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
+
+    def test_expert_swapper_does_not_trim_when_residency_is_already_targeted(self) -> None:
+        transformer = _ZeroTransformer()
+        loaded = MagicMock()
+        loaded.supports_partial_loading = True
+        loaded._cache_record.cached_model.cur_vram_bytes.return_value = 2 * 2**30
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        working_mem_bytes = 22 * 2**30
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=working_mem_bytes,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            assert swapper.get(_ExpertSwapper.HIGH) is transformer
+        finally:
+            swapper.close()
+
+        loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
+        loaded.unload_from_vram.assert_not_called()
+
+    def test_expert_swapper_skips_residency_trim_without_partial_loading(self) -> None:
+        transformer = _ZeroTransformer()
+        loaded = MagicMock()
+        loaded.supports_partial_loading = False
+        loaded._cache_record.cached_model.cur_vram_bytes.return_value = 5 * 2**30
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=22 * 2**30,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            assert swapper.get(_ExpertSwapper.HIGH) is transformer
+        finally:
+            swapper.close()
+
+        loaded.model_on_device.assert_called_once_with()
+        loaded.unload_from_vram.assert_not_called()
+        context.logger.warning.assert_called_once()
 
     def test_cfg_doubles_transformer_calls(self, fake_model_root) -> None:
         """With cfg_scale != 1.0 and a negative prompt, each step runs the model twice."""

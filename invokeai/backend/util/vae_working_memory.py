@@ -9,6 +9,10 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 
+_WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT = 2900
+_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B = 6500
+_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_TI2V = 7000
+
 
 def estimate_vae_working_memory_sd15_sdxl(
     operation: Literal["encode", "decode"],
@@ -136,19 +140,32 @@ def estimate_vae_working_memory_wan(
 ) -> int:
     """Estimate the working memory required to encode or decode with a Wan VAE.
 
-    Generalizes the single-frame Wan 2.1 calibration (see
-    estimate_vae_working_memory_anima) to multi-frame clips and to the TI2V-5B VAE's
-    16x spatial compression — callers pass *pixel-space* dimensions, so the VAE's
-    spatial scale factor is already applied. The Wan VAE processes the clip causally,
-    one latent frame at a time with cached features, so the conv working set scales
-    with a single frame's pixels; what grows with clip length is the full RGB clip,
-    which diffusers keeps resident on the execution device for the whole operation.
+    Callers pass pixel-space dimensions, so the VAE's spatial scale factor is already
+    applied. Single-frame decode and encode use the original Wan 2.1 calibration;
+    multi-frame decode uses conservative, VAE-variant-specific calibrations because
+    causal-convolution state makes the single-frame value unsafe at video resolutions.
+    The Wan VAE processes the clip causally, one latent frame at a time with cached
+    features. In streaming mode, only one temporal-upscale chunk of the RGB output is
+    kept on the execution device; otherwise the full output clip and its transient copy
+    are budgeted.
     """
     element_size = next(vae.parameters()).element_size()
 
-    # Per-frame conv working set: ~2900 bytes per output pixel per element byte for a
-    # full-frame decode, encode ~50% (calibrated empirically on a Wan 2.1 fp16 decode).
-    scaling_constant = 2900 if operation == "decode" else 1450
+    # The original 2900-byte calibration covers a single Wan 2.1 frame. Multi-frame video
+    # decodes retain causal-convolution state that makes that constant unsafe at video
+    # resolutions. These conservative constants are based on measured reserved-memory peaks:
+    # 6500 for the z_dim=16 A14B VAE and 7000 for the larger z_dim=48 TI2V VAE. Keep the
+    # single-frame value for image decode and the existing encode calibration.
+    if operation == "decode" and pixel_frames > 1:
+        try:
+            z_dim = int(getattr(vae.config, "z_dim", 16))
+        except (TypeError, ValueError):
+            z_dim = 48
+        scaling_constant = (
+            _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_TI2V if z_dim >= 32 else _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B
+        )
+    else:
+        scaling_constant = _WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT if operation == "decode" else 1450
     if tile_size is not None:
         # Add 25% for tile overlap.
         per_frame = tile_size * tile_size * element_size * scaling_constant * 1.25

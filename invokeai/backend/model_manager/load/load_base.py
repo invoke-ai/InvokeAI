@@ -131,6 +131,11 @@ class LoadedModelWithoutConfig:
         """
         return self._cache_record.cached_model.compute_device
 
+    @property
+    def supports_partial_loading(self) -> bool:
+        """Whether this model can stream individual weights between RAM and the compute device."""
+        return isinstance(self._cache_record.cached_model, CachedModelWithPartialLoad)
+
     def repair_required_tensors_on_device(self) -> int:
         """Repair required tensors that should be resident on the cached model's execution device."""
         cached_model = self._cache_record.cached_model

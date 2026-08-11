@@ -158,6 +158,9 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
             decoded: torch.Tensor | None = None
             num_frames = 0
 
+            # Keep the VAE cache lock while the MP4 writer consumes chunks. The causal decoder's
+            # feature cache and weights must remain live for the whole sequence; releasing the
+            # lock would require a separate bounded decode/encode queue and would add buffering.
             with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
                 assert isinstance(vae, AutoencoderKLWan)
                 context.logger.info(
