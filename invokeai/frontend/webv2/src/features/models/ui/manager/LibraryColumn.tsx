@@ -19,10 +19,12 @@ import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
+
+const EMPTY_KEYS: string[] = [];
 
 /** The persistent master list: header, search/filter bar, and bulk actions. */
 export const LibraryColumn = () => {
@@ -51,11 +53,16 @@ export const LibraryColumn = () => {
 
   const availableTypes = useMemo(() => collectTypes(models), [models]);
   const availableBases = useMemo(() => collectBases(models), [models]);
-  // The same filter logic the list renders with, so "Select all" matches
-  // exactly what the user sees (search, type/base, missing-only).
+  const hasSelection = selectedKeys.size > 0;
+  const deferredFilters = useDeferredValue(filters);
+  // The same filter logic the list renders with (deferred identically), so
+  // "Select all" matches exactly what the user sees (search, type/base,
+  // missing-only). The bulk bar is the only consumer — skip it until a
+  // selection exists rather than re-filtering on every search keystroke.
   const filteredKeys = useMemo(
-    () => filterModels(models, filters, missingModelKeys).map((model) => model.key),
-    [filters, missingModelKeys, models]
+    () =>
+      hasSelection ? filterModels(models, deferredFilters, missingModelKeys).map((model) => model.key) : EMPTY_KEYS,
+    [deferredFilters, hasSelection, missingModelKeys, models]
   );
   const hasUnselectedFiltered = useMemo(
     () => filteredKeys.some((key) => !selectedKeys.has(key)),
