@@ -15,6 +15,8 @@ vi.mock('react-i18next', () => ({
     t: (key: string) =>
       ({
         'topbar.presets.layoutPreset': 'Layout preset',
+        'topbar.presets.reorderInstructions':
+          'To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.',
         'topbar.presets.saveAsTooltip': 'Save this layout as a new preset',
         'topbar.presets.unsaved': 'Unsaved changes',
       })[key] ?? key,
@@ -86,19 +88,26 @@ const mouse = (type: string, target: EventTarget, clientX: number, clientY: numb
   );
 };
 
-const touch = (type: string, target: EventTarget, touchTarget: EventTarget, clientX: number, clientY: number): void => {
+const touch = (
+  type: string,
+  target: EventTarget,
+  touchTarget: EventTarget,
+  clientX: number,
+  clientY: number
+): TouchEvent => {
   const point = new Touch({ clientX, clientY, identifier: 1, target: touchTarget });
   const isEnd = type === 'touchend' || type === 'touchcancel';
+  const event = new TouchEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    changedTouches: [point],
+    targetTouches: isEnd ? [] : [point],
+    touches: isEnd ? [] : [point],
+  });
 
-  target.dispatchEvent(
-    new TouchEvent(type, {
-      bubbles: true,
-      cancelable: true,
-      changedTouches: [point],
-      targetTouches: isEnd ? [] : [point],
-      touches: isEnd ? [] : [point],
-    })
-  );
+  target.dispatchEvent(event);
+
+  return event;
 };
 
 beforeEach(() => {
@@ -149,6 +158,39 @@ describe('LayoutPresetStrip', () => {
 
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'automate', 'compose']);
     expect(store.getSnapshot().activeProject.layout.presetId).toBe(activeBeforeDrag);
+  });
+
+  it('supports keyboard reordering with sortable drag semantics', async () => {
+    store.commands.layout.applyPreset('compose');
+    await renderStrip();
+    const source = presetTab('compose');
+    expect(source).not.toBeNull();
+    expect(source).toHaveAttribute('aria-roledescription', 'sortable');
+    const instructions = document.getElementById(source!.getAttribute('aria-describedby') ?? '');
+    expect(instructions?.textContent).toContain('press Space');
+    expect(instructions?.textContent).not.toContain('Enter');
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>('[role="tab"]')).filter((tab) => tab.tabIndex === 0)
+    ).toEqual([source]);
+    source!.focus();
+
+    await act(() => userEvent.keyboard('{Space}'));
+    await act(() => userEvent.keyboard('{End}'));
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+    await act(() => userEvent.keyboard('{Space}'));
+
+    expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'compose', 'edit', 'automate']);
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+    expect(store.getSnapshot().account.activeLayoutPresetId).toBe('compose');
+
+    const movedSource = presetTab('compose');
+    movedSource?.focus();
+    await act(() => userEvent.keyboard('{Space}'));
+    expect(movedSource?.style.opacity).toBe('0.5');
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(movedSource?.style.opacity).not.toBe('0.5');
   });
 
   it('keeps a non-overflowing strip stationary while dragging near its right edge', async () => {
@@ -257,5 +299,31 @@ describe('LayoutPresetStrip', () => {
 
     expect(source!.style.opacity).not.toBe('0.5');
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'automate', 'compose']);
+  });
+
+  it('leaves a short horizontal touch gesture to an overflowing scroll strip', async () => {
+    for (let index = 2; index <= 8; index += 1) {
+      store.commands.layout.createPreset(`custom-${index}`, `Custom ${index}`, 'star');
+    }
+    await renderStrip();
+    const scrollContainer = document.querySelector<HTMLElement>('[data-layout-preset-scroll]');
+    const source = presetTab('compose');
+    expect(scrollContainer).not.toBeNull();
+    expect(source).not.toBeNull();
+    expect(scrollContainer!.scrollWidth).toBeGreaterThan(scrollContainer!.clientWidth);
+    const orderBeforePan = store.getSnapshot().account.layoutPresetOrder;
+    const start = source!.getBoundingClientRect();
+    const startX = start.left + start.width / 2;
+    const startY = start.top + start.height / 2;
+
+    await act(() => touch('touchstart', source!, source!, startX, startY));
+    const move = touch('touchmove', source!, source!, startX - 40, startY);
+    scrollContainer!.scrollLeft = 40;
+    await act(() => touch('touchend', source!, source!, startX - 40, startY));
+
+    expect(move.defaultPrevented).toBe(false);
+    expect(scrollContainer!.scrollLeft).toBe(40);
+    expect(source!.style.opacity).not.toBe('0.5');
+    expect(store.getSnapshot().account.layoutPresetOrder).toBe(orderBeforePan);
   });
 });

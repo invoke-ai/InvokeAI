@@ -9,7 +9,25 @@ import type {
 import type { AccountState, Project } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { getLayoutPreset, isBuiltInLayoutPresetId, resolveLayoutPresetId } from '@workbench/layoutPresets';
+import {
+  builtInLayoutPresetDescriptors,
+  getLayoutPreset,
+  isBuiltInLayoutPresetId,
+  resolveLayoutPresetId,
+} from '@workbench/layoutPresets';
+
+/** Palette labels follow account-owned preset names without making command registration reactive. */
+export const getLayoutPresetCommandTitleOverrides = (
+  account: AccountState,
+  formatTitle: (presetName: string) => string
+): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    builtInLayoutPresetDescriptors.flatMap(({ hotkeyId, preset }) => {
+      const savedLabel = resolveSavedLayoutPreset(account, preset.id).label;
+
+      return savedLabel === preset.label ? [] : [[`app.${hotkeyId}`, formatTitle(savedLabel)]];
+    })
+  );
 
 const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
 

@@ -1,6 +1,5 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 import type { ResultDestination } from '@workbench/invocationContracts';
-import type { AccountState } from '@workbench/projectContracts';
 
 import { invalidateGallery } from '@features/gallery/queries';
 import {
@@ -21,37 +20,19 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
-import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import {
-  useWorkbenchCommands,
-  useWorkbenchExtensions,
-  useWorkbenchQueries,
-  useWorkbenchSelector,
-} from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent } from 'react';
+import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
 
-/** ⌥1 / ⌥2 / ⌥3 — the three shipped layout presets, in strip order. */
 const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
   id: `app.${hotkeyId}`,
   presetId: preset.id,
+  title: `${preset.label} layout`,
 }));
-
-export const getLayoutPresetCommands = (account: AccountState) =>
-  layoutPresetCommands.map((command) => ({
-    ...command,
-    title: `${resolveSavedLayoutPreset(account, command.presetId).label} layout`,
-  }));
-
-const areLayoutPresetCommandsEqual = (
-  left: ReturnType<typeof getLayoutPresetCommands>,
-  right: ReturnType<typeof getLayoutPresetCommands>
-): boolean => left.length === right.length && left.every((command, index) => command.title === right[index]?.title);
 
 const imageRecallCommands: Record<string, ImageRecallKind> = {
   'gallery.remix': 'remix',
@@ -103,10 +84,6 @@ export const useRegisterFirstPartyCommands = () => {
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { layout, notifications, queue, widgets } = commands;
-  const currentLayoutPresetCommands = useWorkbenchSelector(
-    (snapshot) => getLayoutPresetCommands(snapshot.account),
-    areLayoutPresetCommandsEqual
-  );
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
@@ -118,11 +95,11 @@ export const useRegisterFirstPartyCommands = () => {
    * is never written back to the project — "just this once, send it to the
    * gallery" must not silently retarget every subsequent invoke.
    */
-  const submitInvocation = useEffectEvent(async (destinationOverride?: ResultDestination) => {
+  const submitInvocation = async (destinationOverride?: ResultDestination) => {
     await submitActiveInvocation({ commands, destinationOverride, getModels: getAvailableModels, queries });
-  });
+  };
 
-  const recallSelectedImage = useEffectEvent(async (kind: ImageRecallKind) => {
+  const recallSelectedImage = async (kind: ImageRecallKind) => {
     const owner = captureAccountScope();
 
     try {
@@ -170,7 +147,7 @@ export const useRegisterFirstPartyCommands = () => {
 
       throw error;
     }
-  });
+  };
 
   useMountEffect(() =>
     commandApi.register({
@@ -180,7 +157,7 @@ export const useRegisterFirstPartyCommands = () => {
     })
   );
 
-  useEffect(() => {
+  useMountEffect(() => {
     const disposers = [
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invokeFront', title: 'Invoke front' }),
@@ -203,7 +180,7 @@ export const useRegisterFirstPartyCommands = () => {
         id: 'app.saveLayoutPreset',
         title: 'Save changes to the active layout preset',
       }),
-      ...currentLayoutPresetCommands.map(({ id, presetId, title }) =>
+      ...layoutPresetCommands.map(({ id, presetId, title }) =>
         commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
       ),
       commandApi.register({
@@ -376,5 +353,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [commandApi, commands, currentLayoutPresetCommands, layout, notifications, queries, queryClient, queue, widgets]);
+  });
 };

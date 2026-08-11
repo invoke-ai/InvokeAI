@@ -4,9 +4,22 @@ import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
-import { closestCenter, DndContext, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  closestCenter,
+  DndContext,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
-import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
+import {
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+  SortableContext,
+  useSortable,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
@@ -40,7 +53,12 @@ import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
 const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
+const PRESET_TAB_KEYS_BLOCKED_DURING_DRAG = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'End', 'Home']);
 const DND_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
+const KEYBOARD_SENSOR_OPTIONS = {
+  coordinateGetter: sortableKeyboardCoordinates,
+  keyboardCodes: { cancel: ['Escape'], end: ['Space', 'Tab'], start: ['Space'] },
+};
 const MOUSE_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
 const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 } } as const;
 
@@ -66,9 +84,14 @@ export const LayoutPresetStrip = () => {
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
   const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
+  const dndAccessibility = useMemo(
+    () => ({ screenReaderInstructions: { draggable: t('topbar.presets.reorderInstructions') } }),
+    [t]
+  );
   const sensors = useSensors(
     useSensor(MouseSensor, MOUSE_SENSOR_OPTIONS),
-    useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS)
+    useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS),
+    useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS)
   );
   const autoScroll = useMemo<AutoScrollOptions>(
     () => ({
@@ -131,6 +154,7 @@ export const LayoutPresetStrip = () => {
           overflowX="auto"
         >
           <DndContext
+            accessibility={dndAccessibility}
             autoScroll={autoScroll}
             collisionDetection={closestCenter}
             modifiers={DND_MODIFIERS}
@@ -223,7 +247,10 @@ const PresetTab = ({
 }) => {
   const { t } = useTranslation();
   const icon = resolveLayoutPresetIcon(preset.iconId);
-  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: preset.id });
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    attributes: { role: 'tab', roleDescription: 'sortable', tabIndex: isActive ? 0 : -1 },
+    id: preset.id,
+  });
   const dndStyle = useMemo(
     () => ({
       opacity: isDragging ? 0.5 : undefined,
@@ -267,6 +294,16 @@ const PresetTab = ({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (isDragging && PRESET_TAB_KEYS_BLOCKED_DURING_DRAG.has(event.key)) {
+        event.preventDefault();
+      }
+
+      listeners?.onKeyDown?.(event);
+
+      if (event.defaultPrevented) {
+        return;
+      }
+
       if (!isActive || event.key !== 'ArrowDown') {
         return;
       }
@@ -274,12 +311,13 @@ const PresetTab = ({
       event.preventDefault();
       onOpenMenu({ anchor: event.currentTarget.getBoundingClientRect(), preset });
     },
-    [isActive, onOpenMenu, preset]
+    [isActive, isDragging, listeners, onOpenMenu, preset]
   );
 
   return (
     <Tabs.Trigger
       ref={setNodeRef}
+      {...attributes}
       {...listeners}
       aria-label={showDrift ? `${preset.label}, ${t('topbar.presets.unsaved')}` : preset.label}
       aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}

@@ -118,4 +118,41 @@ describe('LayoutPresetDialog', () => {
     );
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  it('makes the fallback icon selected and keyboard-focusable for a retired icon id', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <LayoutPresetDialog
+            defaultRoute={BUILT_IN_DEFAULT_ROUTE}
+            iconId="retired-icon"
+            isOpen
+            name="Legacy preset"
+            sourceOptions={BUILT_IN_SOURCE_OPTIONS}
+            submitLabel="Save preset"
+            title="Edit layout preset"
+            onClose={vi.fn()}
+            onSubmit={vi.fn()}
+          />
+        </ChakraProvider>
+      );
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 50);
+      });
+    });
+
+    const fallback = document.querySelector<HTMLButtonElement>('[role="radio"][data-icon-id="layout-grid"]');
+    expect(fallback).toHaveAttribute('aria-checked', 'true');
+    expect(fallback?.tabIndex).toBe(0);
+    fallback?.focus();
+    await act(() => userEvent.keyboard('{ArrowRight}'));
+
+    const next = document.querySelector<HTMLButtonElement>('[role="radio"][data-icon-id="layout-dashboard"]');
+    expect(next).toHaveAttribute('aria-checked', 'true');
+    expect(next).toHaveFocus();
+  });
 });

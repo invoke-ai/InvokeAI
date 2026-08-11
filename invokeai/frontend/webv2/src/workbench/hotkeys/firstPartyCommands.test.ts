@@ -1,3 +1,4 @@
+import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it } from 'vitest';
 
@@ -6,7 +7,6 @@ import {
   FIRST_PARTY_APP_COMMAND_IDS,
   FIRST_PARTY_COMMAND_IDS,
   FIRST_PARTY_IMAGE_RECALL_COMMAND_IDS,
-  getLayoutPresetCommands,
 } from './firstPartyCommands';
 
 const centrallyOwnedCommandIds = new Set(FIRST_PARTY_COMMAND_IDS);
@@ -19,11 +19,9 @@ describe('first-party hotkey commands', () => {
       layoutPresetMetadataOverrides: { compose: { label: 'Writing' } },
     };
 
-    expect(getLayoutPresetCommands(account).map(({ title }) => title)).toEqual([
-      'Writing layout',
-      'Edit layout',
-      'Automate layout',
-    ]);
+    expect(getLayoutPresetCommandTitleOverrides(account, (name) => `${name} layout`)).toEqual({
+      'app.selectComposePreset': 'Writing layout',
+    });
   });
 
   it('registers handlers for implemented app and shared image recall commands', () => {

@@ -4,6 +4,7 @@
     "buttonLabel": "Command palette",
     "buttonTooltip": "Command palette ({{hotkey}})",
     "inputLabel": "Search commands and settings",
+    "layoutPresetCommand": "{{name}} layout",
     "resultsLabel": "Command palette results",
     "placeholders": {
       "root": "Search commands, settings, and more…",
@@ -354,6 +355,7 @@
       "name": "Preset name",
       "none": "No custom presets yet. Arrange the dock, then choose Save as new preset.",
       "noInvocationSource": "This layout does not contain an invocation source.",
+      "reorderInstructions": "To reorder a layout preset, press Space. Use the Left and Right arrow keys to move it, then press Space to drop or Escape to cancel.",
       "reorderNamed": "Reorder {{name}}",
       "restore": "Restore shipped preset defaults",
       "restoreNamed": "Restore {{name}} defaults",

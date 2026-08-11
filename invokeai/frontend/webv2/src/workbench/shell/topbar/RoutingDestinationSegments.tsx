@@ -6,11 +6,6 @@ import { getDestinationLabel, resultDestinations } from '@workbench/invocation';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useCallback } from 'react';
 
-const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
-  canvas: 'canvas',
-  gallery: 'gallery',
-};
-
 export const RoutingDestinationSegments = ({
   ariaLabel,
   disabled,
@@ -38,7 +33,7 @@ export const RoutingDestinationSegments = ({
         <SegmentGroup.Item key={destination.id} flex="1" justifyContent="center" value={destination.id}>
           <SegmentGroup.ItemHiddenInput />
           <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
-            <WidgetIcon boxSize="3.5" icon={getWidgetById(destinationWidgetTypeIds[destination.id])?.manifest.icon} />
+            <WidgetIcon boxSize="3.5" icon={getWidgetById(destination.id)?.manifest.icon} />
             {getDestinationLabel(destination.id)}
           </SegmentGroup.ItemText>
         </SegmentGroup.Item>

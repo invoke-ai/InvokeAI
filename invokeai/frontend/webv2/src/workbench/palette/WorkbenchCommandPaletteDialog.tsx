@@ -9,6 +9,7 @@ import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
+import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -17,6 +18,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchExtensions,
   useWorkbenchQueries,
+  useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -75,12 +77,17 @@ const WorkbenchCommandPaletteDialog = ({
   const notify = useNotify();
   const workbenchQueries = useWorkbenchQueries();
   const projectId = useActiveProjectSelector((project) => project.id);
+  const account = useWorkbenchSelector((snapshot) => snapshot.account);
   const promptHistory = useActiveProjectSelector((project) => project.promptHistory);
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
   const paletteStore = extensions.stores.palette;
   const paletteContributions = useSyncExternalStore(paletteStore.subscribe, paletteStore.list, paletteStore.list);
+  const commandTitleOverrides = useMemo(
+    () => getLayoutPresetCommandTitleOverrides(account, (name) => t('commandPalette.layoutPresetCommand', { name })),
+    [account, t]
+  );
 
   const executeCommand = useCallback(
     (commandId: string) => {
@@ -102,6 +109,7 @@ const WorkbenchCommandPaletteDialog = ({
         formatHotkey,
         presentWidgetTypeIds: new Set(presentWidgetTypeIds),
         t,
+        titleOverrides: commandTitleOverrides,
       }),
       ...paletteContributions.map((contribution) =>
         buildExtensionPaletteEntry(contribution, extensions.commands.executeForSource)
@@ -111,6 +119,7 @@ const WorkbenchCommandPaletteDialog = ({
     ],
     [
       catalog,
+      commandTitleOverrides,
       executeCommand,
       extensions,
       formatHotkey,

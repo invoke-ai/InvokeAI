@@ -19,11 +19,6 @@ import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
-const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
-  canvas: 'canvas',
-  gallery: 'gallery',
-};
-
 export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const { generation } = useWorkbenchCommands();
@@ -33,7 +28,6 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const hasSource = placedTypeIds.has(getWidgetTypeIdForSourceId(invocation.sourceId));
   const sourceTypeId = getWidgetTypeIdForSourceId(invocation.sourceId);
-  const destinationTypeId = destinationWidgetTypeIds[invocation.destination];
   const accessibleName = describeRoute({
     destination: invocation.destination,
     destinationLocked: invocation.destinationLocked,
@@ -47,7 +41,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
     boxSize: '3.5',
     color: 'fg.muted',
     [`data-routing-${type}-icon`]: '',
-    icon: getWidgetById(type === 'source' ? sourceTypeId : destinationTypeId)?.manifest.icon,
+    icon: getWidgetById(type === 'source' ? sourceTypeId : invocation.destination)?.manifest.icon,
     position: 'absolute',
     top: type === 'source' ? '4px' : undefined,
     left: type === 'source' ? '4px' : undefined,
