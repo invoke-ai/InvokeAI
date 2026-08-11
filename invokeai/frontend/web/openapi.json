@@ -79396,6 +79396,18 @@
             ],
             "title": "Field Values",
             "description": "The batch field values used for this queue item"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id",
+            "description": "The ID of the parent queue item, if this is a child item"
           }
         },
         "type": "object",
@@ -79411,7 +79423,8 @@
           "user_id",
           "user_display_name",
           "user_email",
-          "field_values"
+          "field_values",
+          "parent_item_id"
         ],
         "title": "SessionQueueItemSummary",
         "description": "Queue item fields needed to render the queue list."
