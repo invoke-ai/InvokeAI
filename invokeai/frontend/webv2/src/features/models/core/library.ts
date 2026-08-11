@@ -68,18 +68,15 @@ export interface ModelPickerResult {
   groups: ModelPickerGroup[];
 }
 
-const matchesSearch = (model: ModelConfig, searchTerm: string): boolean => {
-  if (!searchTerm) {
+const matchesSearchTerms = (model: ModelConfig, terms: readonly string[]): boolean => {
+  if (terms.length === 0) {
     return true;
   }
 
   const haystack =
     `${model.name} ${model.description ?? ''} ${model.base} ${model.type} ${model.format} ${(model.trigger_phrases ?? []).join(' ')}`.toLowerCase();
 
-  return searchTerm
-    .toLowerCase()
-    .split(/\s+/)
-    .every((term) => haystack.includes(term));
+  return terms.every((term) => haystack.includes(term));
 };
 
 const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortField): number => {
@@ -108,7 +105,8 @@ export const filterModels = (
   filters: ModelLibraryFilters,
   missingModelKeys: ReadonlySet<string>
 ): ModelConfig[] => {
-  const searchTerm = filters.searchTerm.trim();
+  // Split once per pass, not once per model.
+  const terms = filters.searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const directionFactor = filters.sortDirection === 'desc' ? -1 : 1;
 
   return models
@@ -117,7 +115,7 @@ export const filterModels = (
         (!filters.missingOnly || missingModelKeys.has(model.key)) &&
         (filters.typeFilter === null || model.type === filters.typeFilter) &&
         (filters.baseFilter === null || model.base === filters.baseFilter) &&
-        matchesSearch(model, searchTerm)
+        matchesSearchTerms(model, terms)
     )
     .sort((a, b) => compareBySortField(a, b, filters.sortField) * directionFactor);
 };
@@ -201,15 +199,15 @@ const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'un
  * registry order from `baseIdentity`, unknown bases come next, and the
  * meaningless `any`/`external`/`unknown` bases are pushed to the very end.
  */
+const KNOWN_BASE_RANKS = new Map<string, number>(KNOWN_MODEL_BASES.map((base, index) => [base, index]));
+
 /** Display rank for a base: registry order, unknown bases next, meaningless bases last. */
 const getBaseDisplayRank = (base: string): number => {
   if (DEPRIORITIZED_BASES.has(base)) {
     return KNOWN_MODEL_BASES.length + 1;
   }
 
-  const index = KNOWN_MODEL_BASES.indexOf(base as (typeof KNOWN_MODEL_BASES)[number]);
-
-  return index === -1 ? KNOWN_MODEL_BASES.length : index;
+  return KNOWN_BASE_RANKS.get(base) ?? KNOWN_MODEL_BASES.length;
 };
 
 export const collectBasesForDisplay = (models: Pick<ModelConfig, 'base'>[]): string[] => {

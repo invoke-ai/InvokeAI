@@ -52,12 +52,13 @@ export const getModelTypeLabel = (type: ModelTaxonomyType): string =>
 export const getModelTypePluralLabel = (type: ModelTaxonomyType): string =>
   categoryByType.get(type)?.pluralLabel ?? `${toTitleCase(type)} Models`;
 
-/** Sort rank of a category for grouped views; unknown types sort last. */
-export const getModelCategoryRank = (type: ModelTaxonomyType): number => {
-  const index = MODEL_CATEGORIES.findIndex((category) => category.type === type);
+const categoryRankByType = new Map<ModelTaxonomyType, number>(
+  MODEL_CATEGORIES.map((category, index) => [category.type, index])
+);
 
-  return index === -1 ? MODEL_CATEGORIES.length : index;
-};
+/** Sort rank of a category for grouped views; unknown types sort last. */
+export const getModelCategoryRank = (type: ModelTaxonomyType): number =>
+  categoryRankByType.get(type) ?? MODEL_CATEGORIES.length;
 
 const FORMAT_LABELS: Record<string, string> = {
   bnb_quantized_int8b: 'BnB int8',
