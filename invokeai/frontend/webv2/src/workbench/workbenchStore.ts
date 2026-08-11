@@ -61,13 +61,9 @@ export type ProjectCommandResult =
 const createCommands = (
   dispatch: WorkbenchDispatch,
   getState: () => WorkbenchState,
-  loadPresetWidgets: (preset: LayoutPreset) => Promise<unknown>
+  activateLayoutPreset: ReturnType<typeof createLayoutPresetActivator>['activate']
 ) => {
   const command = createCommandFactory(dispatch);
-  const activateLayoutPreset = createLayoutPresetActivator({
-    apply: (presetId) => dispatch({ presetId, type: 'applyPreset' }),
-    load: loadPresetWidgets,
-  });
 
   return {
     account: {
@@ -612,6 +608,7 @@ export const createWorkbenchStore = (
   let state = initialState;
   let hasHydrated = false;
   let persistedRevision = 0;
+  let invalidateLayoutPresetActivation = (): void => undefined;
   const snapshotStore = createExternalStore(createSnapshot(state, hasHydrated));
 
   const setSnapshotState = (nextState: WorkbenchState, nextHasHydrated = hasHydrated): void => {
@@ -634,14 +631,34 @@ export const createWorkbenchStore = (
       autoSwitchInvocationRoute: getWorkbenchPreferences().autoSwitchInvocationRoute,
     });
 
+    if (
+      action.type === 'applyPreset' ||
+      action.type === 'hydrateWorkbench' ||
+      previousState.activeProjectId !== nextState.activeProjectId
+    ) {
+      invalidateLayoutPresetActivation();
+    }
+
     setSnapshotState(nextState);
     recordDiagnosticForAction(action, previousState, nextState);
   };
 
   const getState = (): WorkbenchState => state;
+  const layoutPresetActivator = createLayoutPresetActivator({
+    apply: (presetId) => dispatch({ presetId, type: 'applyPreset' }),
+    getActiveProjectId: () => state.activeProjectId,
+    isCurrent: (preset) => {
+      const current = resolveSavedLayoutPreset(state.account, preset.id);
+
+      return current.id === preset.id && current.snapshot === preset.snapshot;
+    },
+    load: options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets,
+  });
+  invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;
+  const commands = createCommands(dispatch, getState, layoutPresetActivator.activate);
 
   return {
-    commands: createCommands(dispatch, getState, options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets),
+    commands,
     getPersistedRevision: () => persistedRevision,
     getSnapshot: snapshotStore.getSnapshot,
     getState,

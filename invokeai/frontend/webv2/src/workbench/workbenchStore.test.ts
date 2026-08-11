@@ -82,6 +82,64 @@ describe('createWorkbenchStore', () => {
     expect(store.getSnapshot().activeProject.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
   });
 
+  it('discards a pending preset when project focus changes before loading finishes', async () => {
+    let resolve!: () => void;
+    const loadLayoutPresetWidgets = (): Promise<void> =>
+      new Promise<void>((next) => {
+        resolve = next;
+      });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+    const firstProjectId = store.getSnapshot().activeProject.id;
+    const secondProject = store.commands.projects.create();
+
+    store.commands.projects.switchTo(firstProjectId);
+    const activation = store.commands.layout.activatePreset('edit');
+    store.commands.projects.switchTo(secondProject.id);
+    store.commands.projects.switchTo(firstProjectId);
+    resolve();
+    await activation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+  });
+
+  it('keeps a synchronous preset application newer than a pending activation', async () => {
+    let resolve!: () => void;
+    const loadLayoutPresetWidgets = (): Promise<void> =>
+      new Promise<void>((next) => {
+        resolve = next;
+      });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+
+    const activation = store.commands.layout.activatePreset('edit');
+    store.commands.layout.applyPreset('automate');
+    resolve();
+    await activation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('automate');
+    expect(store.getSnapshot().activeProject.invocation).toMatchObject({
+      destination: 'gallery',
+      sourceId: 'workflow',
+    });
+  });
+
+  it('discards a pending custom preset after its saved snapshot is removed', async () => {
+    let resolve!: () => void;
+    const loadLayoutPresetWidgets = (): Promise<void> =>
+      new Promise<void>((next) => {
+        resolve = next;
+      });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+
+    store.commands.layout.applyPreset('edit');
+    store.commands.layout.createPreset('custom-pending', 'Pending');
+    const activation = store.commands.layout.activatePreset('custom-pending');
+    store.commands.layout.deletePreset('custom-pending');
+    resolve();
+    await activation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+  });
+
   it('notifies subscribers once for reducer changes and not for no-op reducer results', () => {
     const store = createWorkbenchStore();
     const listener = vi.fn();
