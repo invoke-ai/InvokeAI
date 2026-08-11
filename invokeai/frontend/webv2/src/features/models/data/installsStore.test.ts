@@ -75,11 +75,26 @@ describe('model install event interpretation', () => {
       modelName: 'Installed Model',
       source: 'org/model',
     });
-    expect(dependencies.refreshModels).toHaveBeenCalledTimes(1);
-    expect(dependencies.refreshStartersIfLoaded).toHaveBeenCalledTimes(1);
+    // Catalog refreshes ride the same coalescing window as the jobs list.
+    expect(dependencies.refreshModels).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(250);
+    expect(dependencies.refreshModels).toHaveBeenCalledTimes(1);
+    expect(dependencies.refreshStartersIfLoaded).toHaveBeenCalledTimes(1);
     expect(dependencies.listModelInstalls).toHaveBeenCalledTimes(1);
+  });
+
+  it('coalesces a burst of completions into one library refetch', async () => {
+    const store = await import('./installsStore');
+
+    for (const id of [1, 2, 3, 4]) {
+      store.handleModelInstallSocketEvent('model_install_complete', { config: {}, id, source: 'org/model' });
+    }
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(dependencies.refreshModels).toHaveBeenCalledTimes(1);
+    expect(dependencies.refreshStartersIfLoaded).toHaveBeenCalledTimes(1);
   });
 
   it('drops a stale refresh without releasing the replacement account refresh', async () => {

@@ -85,12 +85,18 @@ const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgres
 
 const refreshFlight = createTrailingSingleFlight();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let catalogRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 registerAccountOwnedResource({
   clear: () => {
     if (refreshTimer !== null) {
       clearTimeout(refreshTimer);
       refreshTimer = null;
+    }
+
+    if (catalogRefreshTimer !== null) {
+      clearTimeout(catalogRefreshTimer);
+      catalogRefreshTimer = null;
     }
 
     refreshFlight.reset();
@@ -151,6 +157,23 @@ const scheduleRefresh = (): void => {
   refreshTimer = setTimeout(() => {
     refreshTimer = null;
     void refreshInstalls();
+  }, REFRESH_COALESCE_MS);
+};
+
+/**
+ * Revalidate the library + starter flags after installs land. Coalesced like
+ * `scheduleRefresh`: a bundle whose jobs complete in a burst triggers one
+ * full-library refetch, not one per completion event.
+ */
+const scheduleCatalogRefresh = (): void => {
+  if (catalogRefreshTimer !== null) {
+    return;
+  }
+
+  catalogRefreshTimer = setTimeout(() => {
+    catalogRefreshTimer = null;
+    void refreshModels();
+    refreshStartersIfLoaded();
   }, REFRESH_COALESCE_MS);
 };
 
@@ -248,8 +271,7 @@ export const handleModelInstallSocketEvent = (
       modelName: data.config?.name ?? null,
       source: getInstallSourceLabel(data.source),
     });
-    void refreshModels();
-    refreshStartersIfLoaded();
+    scheduleCatalogRefresh();
   } else if (event === 'model_install_error') {
     recordOutcome({
       error: data.error ?? data.error_type ?? 'Unknown install error.',
