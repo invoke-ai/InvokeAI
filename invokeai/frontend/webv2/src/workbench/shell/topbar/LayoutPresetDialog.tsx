@@ -1,15 +1,49 @@
+import type { GraphWidgetSource } from '@workbench/graphWidgets';
+import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
+import type { LayoutPresetRoute } from '@workbench/layoutContracts';
 import type { FormEvent, KeyboardEvent } from 'react';
 
-import { chakra, Dialog, Icon, Input, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
+import {
+  chakra,
+  createListCollection,
+  Dialog,
+  HStack,
+  Icon,
+  Input,
+  Portal,
+  SegmentGroup,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
 import { Field } from '@platform/ui/Field';
+import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { useCallback, useRef, useState } from 'react';
+import { getNaturalDestination } from '@workbench/graphWidgets';
+import { WidgetIcon } from '@workbench/iconResolver';
+import { getDestinationLabel, resultDestinations } from '@workbench/invocation';
+import { getWidgetById } from '@workbench/widgetRegistry';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getInitialLayoutPresetRoute } from './layoutPresetDialogModel';
 import { DEFAULT_LAYOUT_PRESET_ICON_ID, layoutPresetIconGroups } from './layoutPresetIcons';
 
 const layoutPresetIconIds = layoutPresetIconGroups.flatMap((group) => group.options.map((option) => option.id));
+const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
+  canvas: 'canvas',
+  gallery: 'gallery',
+};
+
+type SourceSelectItem = GraphWidgetSource & { value: InvocationSourceId };
+
+const renderSourceOption = (source: SourceSelectItem) => (
+  <HStack gap="1.5">
+    <WidgetIcon boxSize="3.5" icon={getWidgetById(source.typeId)?.manifest.icon} />
+    <Text as="span">{source.label}</Text>
+  </HStack>
+);
 
 const getNextIconId = (currentIconId: string, key: string): string | null => {
   if (key === 'Home') {
@@ -39,26 +73,46 @@ const getNextIconId = (currentIconId: string, key: string): string | null => {
  * own layouts apart at a glance, not to browse an icon library.
  */
 export const LayoutPresetDialog = ({
+  defaultRoute: initialDefaultRoute,
   iconId: initialIconId,
+  isBuiltIn = false,
   isOpen,
   name: initialName,
   onClose,
   onSubmit,
+  sourceOptions,
   submitLabel,
   title,
 }: {
+  defaultRoute?: LayoutPresetRoute;
   iconId?: string;
+  isBuiltIn?: boolean;
   isOpen: boolean;
   name: string;
   onClose: () => void;
-  onSubmit: (value: { iconId: string; name: string }) => void;
+  onSubmit: (value: { defaultRoute: LayoutPresetRoute | null; iconId: string; name: string }) => void;
+  sourceOptions: readonly GraphWidgetSource[];
   submitLabel: string;
   title: string;
 }) => {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [iconId, setIconId] = useState(initialIconId ?? DEFAULT_LAYOUT_PRESET_ICON_ID);
+  const [defaultRoute, setDefaultRoute] = useState(() =>
+    getInitialLayoutPresetRoute(initialDefaultRoute, sourceOptions)
+  );
   const nameRef = useRef<HTMLInputElement>(null);
+  const sourceCollection = useMemo(
+    () =>
+      createListCollection<SourceSelectItem>({
+        items: sourceOptions.map((source) => ({ ...source, value: source.sourceId })),
+      }),
+    [sourceOptions]
+  );
+  const sourceTriggerProps = useMemo(() => ({ 'aria-label': t('topbar.presets.defaultSource') }), [t]);
+  const selectedSource = sourceOptions.find((source) => source.sourceId === defaultRoute?.sourceId);
+  const sourceValue = useMemo(() => (defaultRoute ? [defaultRoute.sourceId] : []), [defaultRoute]);
+  const canSubmit = (isBuiltIn || name.trim().length > 0) && (sourceOptions.length === 0 || defaultRoute !== undefined);
 
   // Without this the focus trap lands on the header's close button, so opening
   // the dialog and typing does nothing. `initialFocusEl` rather than `autoFocus`
@@ -88,10 +142,10 @@ export const LayoutPresetDialog = ({
         return;
       }
 
-      onSubmit({ iconId, name: trimmed });
+      onSubmit({ defaultRoute: defaultRoute ?? null, iconId, name: trimmed });
       onClose();
     },
-    [iconId, name, onClose, onSubmit]
+    [defaultRoute, iconId, name, onClose, onSubmit]
   );
   const handleIconKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -110,9 +164,34 @@ export const LayoutPresetDialog = ({
     },
     [iconId]
   );
+  const handleSourceChange = useCallback((event: { value: string[] }) => {
+    const sourceId = event.value[0] as InvocationSourceId | undefined;
+
+    if (!sourceId) {
+      return;
+    }
+
+    setDefaultRoute((route) => ({
+      destination: route?.destination ?? getNaturalDestination(sourceId),
+      sourceId,
+    }));
+  }, []);
+  const handleDestinationChange = useCallback((event: { value: string | null }) => {
+    if (!event.value) {
+      return;
+    }
+
+    setDefaultRoute((route) => (route ? { ...route, destination: event.value as ResultDestination } : route));
+  }, []);
 
   return (
-    <Dialog.Root initialFocusEl={initialFocusEl} open={isOpen} lazyMount unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      initialFocusEl={isBuiltIn ? undefined : initialFocusEl}
+      open={isOpen}
+      lazyMount
+      unmountOnExit
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -126,53 +205,99 @@ export const LayoutPresetDialog = ({
               </Dialog.Header>
               <Dialog.Body>
                 <Stack gap="4">
-                  <Field label={t('topbar.presets.name')}>
-                    <Input
-                      ref={nameRef}
-                      autoComplete="off"
-                      name="layout-preset-name"
+                  {isBuiltIn ? null : (
+                    <>
+                      <Field label={t('topbar.presets.name')}>
+                        <Input
+                          ref={nameRef}
+                          autoComplete="off"
+                          name="layout-preset-name"
+                          size="sm"
+                          value={name}
+                          onChange={handleNameChange}
+                        />
+                      </Field>
+                      <Stack
+                        aria-label={t('topbar.presets.iconPicker')}
+                        gap="3"
+                        role="radiogroup"
+                        tabIndex={-1}
+                        onKeyDown={handleIconKeyDown}
+                      >
+                        <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                          {t('topbar.presets.icon')}
+                        </Text>
+                        {layoutPresetIconGroups.map((group) => (
+                          <Stack key={group.label} gap="1.5">
+                            <Text color="fg.muted" fontSize="2xs">
+                              {group.label}
+                            </Text>
+                            <SimpleGrid columns={8} gap="1">
+                              {group.options.map((entry) => (
+                                <IconOption
+                                  key={entry.id}
+                                  icon={entry.icon}
+                                  iconId={entry.id}
+                                  isSelected={entry.id === iconId}
+                                  label={entry.label}
+                                  onSelect={setIconId}
+                                />
+                              ))}
+                            </SimpleGrid>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </>
+                  )}
+                  <Field
+                    helpText={sourceOptions.length === 0 ? t('topbar.presets.noInvocationSource') : undefined}
+                    label={t('topbar.presets.defaultSource')}
+                  >
+                    <Select
+                      collection={sourceCollection}
+                      disabled={sourceOptions.length === 0}
+                      renderItem={renderSourceOption}
                       size="sm"
-                      value={name}
-                      onChange={handleNameChange}
+                      triggerProps={sourceTriggerProps}
+                      value={sourceValue}
+                      valueText={
+                        selectedSource
+                          ? renderSourceOption({ ...selectedSource, value: selectedSource.sourceId })
+                          : undefined
+                      }
+                      onValueChange={handleSourceChange}
                     />
                   </Field>
-                  <Stack
-                    aria-label={t('topbar.presets.iconPicker')}
-                    gap="3"
-                    role="radiogroup"
-                    tabIndex={-1}
-                    onKeyDown={handleIconKeyDown}
-                  >
-                    <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
-                      {t('topbar.presets.icon')}
-                    </Text>
-                    {layoutPresetIconGroups.map((group) => (
-                      <Stack key={group.label} gap="1.5">
-                        <Text color="fg.muted" fontSize="2xs">
-                          {group.label}
-                        </Text>
-                        <SimpleGrid columns={8} gap="1">
-                          {group.options.map((entry) => (
-                            <IconOption
-                              key={entry.id}
-                              icon={entry.icon}
-                              iconId={entry.id}
-                              isSelected={entry.id === iconId}
-                              label={entry.label}
-                              onSelect={setIconId}
+                  <Field disabled={!defaultRoute} label={t('topbar.presets.defaultDestination')}>
+                    <SegmentGroup.Root
+                      aria-label={t('topbar.presets.defaultDestination')}
+                      disabled={!defaultRoute}
+                      size="xs"
+                      value={defaultRoute?.destination ?? null}
+                      onValueChange={handleDestinationChange}
+                    >
+                      <SegmentGroup.Indicator />
+                      {resultDestinations.map((destination) => (
+                        <SegmentGroup.Item key={destination.id} flex="1" justifyContent="center" value={destination.id}>
+                          <SegmentGroup.ItemHiddenInput />
+                          <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
+                            <WidgetIcon
+                              boxSize="3.5"
+                              icon={getWidgetById(destinationWidgetTypeIds[destination.id])?.manifest.icon}
                             />
-                          ))}
-                        </SimpleGrid>
-                      </Stack>
-                    ))}
-                  </Stack>
+                            {getDestinationLabel(destination.id)}
+                          </SegmentGroup.ItemText>
+                        </SegmentGroup.Item>
+                      ))}
+                    </SegmentGroup.Root>
+                  </Field>
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
                 <Button size="sm" type="button" variant="outline" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={name.trim().length === 0} size="sm" type="submit">
+                <Button disabled={!canSubmit} size="sm" type="submit">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>

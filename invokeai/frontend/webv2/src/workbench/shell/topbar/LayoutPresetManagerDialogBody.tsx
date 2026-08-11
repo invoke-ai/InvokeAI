@@ -24,7 +24,12 @@ export const LayoutPresetManagerDialogBody = () => {
   const { t } = useTranslation();
   const customPresets = useWorkbenchSelector((snapshot) => snapshot.account.customLayoutPresets ?? []);
   const overriddenPresetIds = useWorkbenchSelector((snapshot) =>
-    Object.keys(snapshot.account.layoutPresetOverrides ?? {})
+    Array.from(
+      new Set([
+        ...Object.keys(snapshot.account.layoutPresetOverrides ?? {}),
+        ...Object.keys(snapshot.account.layoutPresetRouteOverrides ?? {}),
+      ])
+    )
   );
 
   const handleOpenChange = useCallback((event: { open: boolean }) => {
@@ -56,6 +61,7 @@ export const LayoutPresetManagerDialogBody = () => {
                       key={preset.id}
                       isOverridden={overriddenPresetIds.includes(preset.id)}
                       preset={preset}
+                      onEdit={openLayoutPresetEdit}
                     />
                   ))}
                 </Stack>
@@ -92,12 +98,21 @@ export const LayoutPresetManagerDialogBody = () => {
   );
 };
 
-const BuiltInPresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: LayoutPreset }) => {
+const BuiltInPresetRow = ({
+  isOverridden,
+  onEdit,
+  preset,
+}: {
+  isOverridden: boolean;
+  onEdit: (presetId: string) => void;
+  preset: LayoutPreset;
+}) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const { icon, tooltip } = getLayoutPresetPresentation(preset);
-  // Clearing the override restores the shipped arrangement. Saving the shipped
-  // snapshot back is exactly that, and needs no second reducer path.
+  const edit = useCallback(() => onEdit(preset.id), [onEdit, preset.id]);
+  // One restore action clears both independently persisted built-in edits: the
+  // spatial arrangement and its default invocation route.
   const restoreDefault = useCallback(() => layout.restorePresetDefault(preset.id), [layout, preset.id]);
 
   return (
@@ -111,6 +126,14 @@ const BuiltInPresetRow = ({ isOverridden, preset }: { isOverridden: boolean; pre
           {isOverridden ? `${tooltip} · edited` : tooltip}
         </Text>
       </Stack>
+      <IconButton
+        aria-label={t('topbar.presets.editNamed', { name: preset.label })}
+        size="2xs"
+        variant="ghost"
+        onClick={edit}
+      >
+        <Icon as={PencilIcon} boxSize="3.5" />
+      </IconButton>
       {isOverridden ? (
         <Tooltip content={t('topbar.presets.restore')} showArrow>
           <IconButton

@@ -1,4 +1,5 @@
-import type { LayoutPreset } from '@workbench/layoutContracts';
+import type { LayoutPreset, LayoutPresetRoute } from '@workbench/layoutContracts';
+import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
@@ -6,13 +7,14 @@ import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import {
   createLayoutPresetActivator,
   loadLayoutPresetWidgets,
   preloadLayoutPresetWidgets,
 } from '@workbench/layoutPresetActivation';
 import { layoutPresets } from '@workbench/layoutPresets';
-import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightIcon,
   ChevronDownIcon,
@@ -39,6 +41,12 @@ const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollb
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
+const selectPlacedGraphWidgetSources = (project: Project) => {
+  const placedTypeIds = getPlacedWidgetTypeIds(project);
+
+  return graphWidgetSources.filter((source) => placedTypeIds.has(source.typeId));
+};
+
 export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
   const { activePreset, hasDrifted } = useLayoutDrift();
@@ -47,7 +55,13 @@ export const LayoutPresetStrip = () => {
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
 
   const customPresets = useWorkbenchSelector((snapshot) => snapshot.account.customLayoutPresets ?? []);
+  const invocation = useActiveProjectSelector((project) => project.invocation);
+  const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
   const presets = useMemo(() => [...layoutPresets, ...customPresets], [customPresets]);
+  const saveAsDefaultRoute = useMemo(
+    () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
+    [invocation.destination, invocation.sourceId]
+  );
   const activatePreset = useMemo(
     () => createLayoutPresetActivator({ apply: layout.applyPreset, load: loadLayoutPresetWidgets }),
     [layout.applyPreset]
@@ -74,7 +88,8 @@ export const LayoutPresetStrip = () => {
   const openSaveAsDialog = useCallback(() => setIsSaveAsOpen(true), []);
   const closeSaveAsDialog = useCallback(() => setIsSaveAsOpen(false), []);
   const saveAsNewPreset = useCallback(
-    ({ iconId, name }: { iconId: string; name: string }) => layout.createPreset(createCustomPresetId(), name, iconId),
+    ({ defaultRoute, iconId, name }: { defaultRoute: LayoutPresetRoute | null; iconId: string; name: string }) =>
+      layout.createPreset(createCustomPresetId(), name, iconId, defaultRoute),
     [layout]
   );
   const closeMenu = useCallback(() => setMenuTarget(null), []);
@@ -139,14 +154,18 @@ export const LayoutPresetStrip = () => {
         onEdit={requestEdit}
       />
 
-      <LayoutPresetDialog
-        isOpen={isSaveAsOpen}
-        name={`${activePreset.label} copy`}
-        submitLabel={t('topbar.presets.save')}
-        title={t('topbar.presets.saveAs')}
-        onClose={closeSaveAsDialog}
-        onSubmit={saveAsNewPreset}
-      />
+      {isSaveAsOpen ? (
+        <LayoutPresetDialog
+          defaultRoute={saveAsDefaultRoute}
+          isOpen
+          name={`${activePreset.label} copy`}
+          sourceOptions={sourceOptions}
+          submitLabel={t('topbar.presets.save')}
+          title={t('topbar.presets.saveAs')}
+          onClose={closeSaveAsDialog}
+          onSubmit={saveAsNewPreset}
+        />
+      ) : null}
     </>
   );
 };
@@ -361,17 +380,15 @@ const PresetMenu = ({
                 </>
               ) : null}
 
+              <Menu.Item value="edit-preset" onClick={edit}>
+                <Icon as={PencilIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
+              </Menu.Item>
               {isCustom ? (
-                <>
-                  <Menu.Item value="edit-preset" onClick={edit}>
-                    <Icon as={PencilIcon} boxSize="3.5" />
-                    <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
-                  </Menu.Item>
-                  <Menu.Item color="fg.error" value="delete-preset" _hover={DELETE_HOVER_PROPS} onClick={remove}>
-                    <Icon as={Trash2Icon} boxSize="3.5" />
-                    <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
-                  </Menu.Item>
-                </>
+                <Menu.Item color="fg.error" value="delete-preset" _hover={DELETE_HOVER_PROPS} onClick={remove}>
+                  <Icon as={Trash2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
+                </Menu.Item>
               ) : null}
 
               <Menu.Separator />
