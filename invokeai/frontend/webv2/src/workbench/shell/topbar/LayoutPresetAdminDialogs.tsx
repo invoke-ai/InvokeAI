@@ -8,6 +8,8 @@ import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/Workbench
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
+
 import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { closeLayoutPresetAdmin, layoutPresetManagerStore } from './layoutPresetManagerStore';
 
@@ -37,15 +39,7 @@ export const LayoutPresetAdminDialogs = () => {
   const sourceOptions = useMemo(() => (editTarget ? getLayoutPresetSourceOptions(editTarget) : []), [editTarget]);
 
   const submitEdit = useCallback(
-    ({
-      defaultRoute,
-      iconId,
-      name,
-    }: {
-      defaultRoute: Parameters<typeof layout.setPresetRoute>[1];
-      iconId: string;
-      name: string;
-    }) => {
+    ({ defaultRoute, iconId, name }: LayoutPresetDialogValue) => {
       if (editTarget) {
         layout.setPresetRoute(editTarget.id, defaultRoute);
         layout.renamePreset(editTarget.id, name);

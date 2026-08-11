@@ -1,5 +1,5 @@
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { LayoutPreset, LayoutPresetId, LayoutPresetRoute } from '@workbench/layoutContracts';
+import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent } from 'react';
 
@@ -28,6 +28,8 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
 
 import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
@@ -88,7 +90,7 @@ export const LayoutPresetStrip = () => {
   const openSaveAsDialog = useCallback(() => setIsSaveAsOpen(true), []);
   const closeSaveAsDialog = useCallback(() => setIsSaveAsOpen(false), []);
   const saveAsNewPreset = useCallback(
-    ({ defaultRoute, iconId, name }: { defaultRoute: LayoutPresetRoute | null; iconId: string; name: string }) =>
+    ({ defaultRoute, iconId, name }: LayoutPresetDialogValue) =>
       layout.createPreset(createCustomPresetId(), name, iconId, defaultRoute),
     [layout]
   );

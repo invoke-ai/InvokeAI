@@ -27,8 +27,10 @@ import { getWidgetById } from '@workbench/widgetRegistry';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getInitialLayoutPresetRoute } from './layoutPresetDialogModel';
-import { DEFAULT_LAYOUT_PRESET_ICON_ID, layoutPresetIconGroups } from './layoutPresetIcons';
+import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
+
+import { getInitialLayoutPresetIconId, getInitialLayoutPresetRoute } from './layoutPresetDialogModel';
+import { layoutPresetIconGroups } from './layoutPresetIcons';
 
 const layoutPresetIconIds = layoutPresetIconGroups.flatMap((group) => group.options.map((option) => option.id));
 const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
@@ -86,14 +88,14 @@ export const LayoutPresetDialog = ({
   isOpen: boolean;
   name: string;
   onClose: () => void;
-  onSubmit: (value: { defaultRoute: LayoutPresetRoute | null; iconId: string; name: string }) => void;
+  onSubmit: (value: LayoutPresetDialogValue) => void;
   sourceOptions: readonly GraphWidgetSource[];
   submitLabel: string;
   title: string;
 }) => {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
-  const [iconId, setIconId] = useState(initialIconId ?? DEFAULT_LAYOUT_PRESET_ICON_ID);
+  const [iconId, setIconId] = useState(() => getInitialLayoutPresetIconId(initialIconId));
   const [defaultRoute, setDefaultRoute] = useState(() =>
     getInitialLayoutPresetRoute(initialDefaultRoute, sourceOptions)
   );
