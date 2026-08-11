@@ -32,6 +32,12 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
 
+# Upper bound on the number of item ids a client may ask about in one request. Without it a
+# caller can post tens of thousands of ids, which the SQLite layer would either expand past the
+# per-statement bind limit or grind through in a long-running query. The list is meant to cover
+# the rows a client actually has on screen, so this is far above any legitimate use.
+MAX_QUEUE_ITEM_IDS_PER_REQUEST = 1000
+
 
 class SessionQueueAndProcessorStatus(BaseModel):
     """The overall status of session queue and processor"""
@@ -237,7 +243,9 @@ def get_queue_item_summaries_by_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(
-        embed=True, description="Object containing list of queue item ids to fetch summaries for"
+        embed=True,
+        max_length=MAX_QUEUE_ITEM_IDS_PER_REQUEST,
+        description="Object containing list of queue item ids to fetch summaries for",
     ),
 ) -> list[SessionQueueItemSummary]:
     """Gets lightweight queue item summaries for specified IDs in requested order."""

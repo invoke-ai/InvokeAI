@@ -16129,6 +16129,7 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Item Ids",
             "description": "Object containing list of queue item ids to fetch summaries for"
           }

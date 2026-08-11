@@ -43,6 +43,11 @@ from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
+# Maximum number of ids bound into a single `IN (...)` clause. SQLite's compile-time bind limit is
+# 999 on builds older than 3.32 and 32766 on newer ones; staying under the lower figure (leaving
+# room for the other bind params in the statement) keeps the queries portable across both.
+SQLITE_MAX_BIND_PARAMS_PER_CHUNK = 900
+
 # Round-robin dequeue (multiuser fairness): pick the next pending item from the user who was
 # least-recently served.
 #
@@ -1366,31 +1371,37 @@ class SqliteSessionQueue(SessionQueueBase):
         if not item_ids:
             return []
 
-        placeholders = ", ".join("?" for _ in item_ids)
+        rows: list[sqlite3.Row] = []
         with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""--sql
-                SELECT
-                    sq.item_id,
-                    sq.created_at,
-                    sq.status,
-                    sq.device,
-                    sq.started_at,
-                    sq.completed_at,
-                    sq.origin,
-                    sq.destination,
-                    sq.batch_id,
-                    sq.user_id,
-                    u.display_name AS user_display_name,
-                    u.email AS user_email,
-                    sq.field_values
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
-                """,
-                (queue_id, *item_ids),
-            )
-            rows = cast(list[sqlite3.Row], cursor.fetchall())
+            # Each id becomes one bind parameter, so a single IN (...) would blow past SQLite's
+            # per-statement variable limit for large id lists. Query in chunks instead - callers
+            # are bounded at the API layer, but this keeps any caller from hitting that ceiling.
+            for chunk_start in range(0, len(item_ids), SQLITE_MAX_BIND_PARAMS_PER_CHUNK):
+                chunk = item_ids[chunk_start : chunk_start + SQLITE_MAX_BIND_PARAMS_PER_CHUNK]
+                placeholders = ", ".join("?" for _ in chunk)
+                cursor.execute(
+                    f"""--sql
+                    SELECT
+                        sq.item_id,
+                        sq.created_at,
+                        sq.status,
+                        sq.device,
+                        sq.started_at,
+                        sq.completed_at,
+                        sq.origin,
+                        sq.destination,
+                        sq.batch_id,
+                        sq.user_id,
+                        u.display_name AS user_display_name,
+                        u.email AS user_email,
+                        sq.field_values
+                    FROM session_queue sq
+                    LEFT JOIN users u ON sq.user_id = u.user_id
+                    WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
+                    """,
+                    (queue_id, *chunk),
+                )
+                rows.extend(cast(list[sqlite3.Row], cursor.fetchall()))
 
         summaries_by_id = {
             row["item_id"]: SessionQueueItemSummary.queue_item_summary_from_dict(dict(row)) for row in rows
