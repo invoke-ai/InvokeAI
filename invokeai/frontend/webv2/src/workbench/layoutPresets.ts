@@ -94,9 +94,7 @@ const createSnapshot = ({
 export interface BuiltInLayoutPresetDescriptor {
   defaultKeys: readonly string[];
   hotkeyId: string;
-  iconId: string;
   preset: LayoutPreset;
-  tooltip: string;
 }
 
 const createPresetDescriptor = ({
@@ -108,7 +106,6 @@ const createPresetDescriptor = ({
   iconId,
   label,
   panels,
-  tooltip,
   widgetRegions,
 }: {
   centerViewId: CenterViewId;
@@ -119,12 +116,10 @@ const createPresetDescriptor = ({
   iconId: string;
   label: string;
   panels: PanelState;
-  tooltip: string;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
 }): BuiltInLayoutPresetDescriptor => ({
   defaultKeys,
   hotkeyId,
-  iconId,
   preset: {
     defaultRoute,
     iconId,
@@ -133,7 +128,6 @@ const createPresetDescriptor = ({
     label,
     snapshot: createSnapshot({ centerViewId, panels, presetId: id, widgetRegions }),
   },
-  tooltip,
 });
 
 /**
@@ -152,7 +146,6 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     iconId: 'type',
     label: 'Compose',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    tooltip: 'Text to image',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'gallery:bottom',
@@ -186,7 +179,6 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     iconId: 'layers',
     label: 'Edit',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    tooltip: 'Canvas editing',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'gallery:bottom',
@@ -220,7 +212,6 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     iconId: 'workflow',
     label: 'Automate',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    tooltip: 'Node workflows',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'workflow:bottom',

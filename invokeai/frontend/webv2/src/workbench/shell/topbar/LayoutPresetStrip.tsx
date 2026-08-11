@@ -1,8 +1,13 @@
-import type { LayoutPreset, LayoutPresetRoute } from '@workbench/layoutContracts';
+import type { DragEndEvent } from '@dnd-kit/core';
+import type { LayoutPreset, LayoutPresetId, LayoutPresetRoute } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { KeyboardEvent, MouseEvent } from 'react';
 
 import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
+import { closestCenter, DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { horizontalListSortingStrategy, SortableContext, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
@@ -13,7 +18,7 @@ import {
   loadLayoutPresetWidgets,
   preloadLayoutPresetWidgets,
 } from '@workbench/layoutPresetActivation';
-import { layoutPresets } from '@workbench/layoutPresets';
+import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightIcon,
@@ -29,14 +34,16 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LayoutPresetDialog } from './LayoutPresetDialog';
+import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
-import { getLayoutPresetPresentation } from './layoutPresetPresentation';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 import { useLayoutDrift } from './useLayoutDrift';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
 const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
+const DND_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
+const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 6 } } as const;
 
 const createCustomPresetId = (): string =>
   `custom-layout-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -54,10 +61,12 @@ export const LayoutPresetStrip = () => {
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
 
-  const customPresets = useWorkbenchSelector((snapshot) => snapshot.account.customLayoutPresets ?? []);
+  const account = useWorkbenchSelector((snapshot) => snapshot.account);
   const invocation = useActiveProjectSelector((project) => project.invocation);
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
-  const presets = useMemo(() => [...layoutPresets, ...customPresets], [customPresets]);
+  const presets = getOrderedLayoutPresets(account);
+  const presetIds = presets.map(({ id }) => id);
+  const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS));
   const saveAsDefaultRoute = useMemo(
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
     [invocation.destination, invocation.sourceId]
@@ -95,47 +104,66 @@ export const LayoutPresetStrip = () => {
   const closeMenu = useCallback(() => setMenuTarget(null), []);
   const requestEdit = useCallback((preset: LayoutPreset) => openLayoutPresetEdit(preset.id), []);
   const requestDelete = useCallback((preset: LayoutPreset) => openLayoutPresetDelete(preset.id), []);
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      if (!event.over || event.active.id === event.over.id) {
+        return;
+      }
+
+      layout.reorderPresets(event.active.id as LayoutPresetId, event.over.id as LayoutPresetId);
+    },
+    [layout]
+  );
 
   return (
     <>
       <HStack gap="1" justify="center" maxW="min(36vw, 44rem)" minW="0">
         <Box css={PRESET_SCROLL_CSS} data-layout-preset-scroll="" maxW="full" minW="0" overflowX="auto">
-          <Tabs.Root
-            minW="max-content"
-            size="xs"
-            value={activePreset.id}
-            variant="subtle"
-            onValueChange={handleValueChange}
+          <DndContext
+            collisionDetection={closestCenter}
+            modifiers={DND_MODIFIERS}
+            sensors={sensors}
+            onDragEnd={handleDragEnd}
           >
-            {/* The name belongs on the tablist, not the root — the root is a plain
-                container and carries no role for it to name. */}
-            <Tabs.List aria-label={t('topbar.presets.layoutPreset')} gap="0.5">
+            <Tabs.Root
+              minW="max-content"
+              size="xs"
+              value={activePreset.id}
+              variant="subtle"
+              onValueChange={handleValueChange}
+            >
+              {/* The name belongs on the tablist, not the root — the root is a plain
+                  container and carries no role for it to name. */}
+              <SortableContext items={presetIds} strategy={horizontalListSortingStrategy}>
+                <Tabs.List aria-label={t('topbar.presets.layoutPreset')} gap="0.5">
+                  {presets.map((preset) => (
+                    <PresetTab
+                      key={preset.id}
+                      hasDrifted={hasDrifted}
+                      isActive={preset.id === activePreset.id}
+                      preset={preset}
+                      onOpenMenu={setMenuTarget}
+                    />
+                  ))}
+                </Tabs.List>
+              </SortableContext>
+              {/* The real "panel" is the dock itself, which lives outside this
+                  component and is shared by every preset. These stand in for it so
+                  each tab's `aria-controls` resolves to something that describes
+                  what selecting it did. */}
               {presets.map((preset) => (
-                <PresetTab
-                  key={preset.id}
-                  hasDrifted={hasDrifted}
-                  isActive={preset.id === activePreset.id}
-                  preset={preset}
-                  onOpenMenu={setMenuTarget}
-                />
+                <Tabs.Content key={preset.id} value={preset.id} asChild>
+                  <VisuallyHidden>{`${preset.label} layout`}</VisuallyHidden>
+                </Tabs.Content>
               ))}
-            </Tabs.List>
-            {/* The real "panel" is the dock itself, which lives outside this
-                component and is shared by every preset. These stand in for it so
-                each tab's `aria-controls` resolves to something that describes
-                what selecting it did. */}
-            {presets.map((preset) => (
-              <Tabs.Content key={preset.id} value={preset.id} asChild>
-                <VisuallyHidden>{getLayoutPresetPresentation(preset).tooltip}</VisuallyHidden>
-              </Tabs.Content>
-            ))}
-          </Tabs.Root>
+            </Tabs.Root>
+          </DndContext>
         </Box>
 
         <Tooltip content={t('topbar.presets.saveAsTooltip')} showArrow>
           <IconButton
             aria-label={t('topbar.presets.saveAsTooltip')}
-            size="sm"
+            size="xs"
             variant="ghost"
             onClick={openSaveAsDialog}
           >
@@ -182,7 +210,18 @@ const PresetTab = ({
   onOpenMenu: (target: { anchor: DOMRect; preset: LayoutPreset }) => void;
 }) => {
   const { t } = useTranslation();
-  const { icon, tooltip } = getLayoutPresetPresentation(preset);
+  const icon = resolveLayoutPresetIcon(preset.iconId);
+  const { isDragging, listeners, setNodeRef, transform, transition } = useSortable({ id: preset.id });
+  const dndStyle = useMemo(
+    () => ({
+      opacity: isDragging ? 0.5 : undefined,
+      position: 'relative' as const,
+      transform: CSS.Translate.toString(transform),
+      transition,
+      zIndex: isDragging ? 1 : undefined,
+    }),
+    [isDragging, transform, transition]
+  );
   const handlePreload = useCallback(() => preloadLayoutPresetWidgets(preset), [preset]);
   const showDrift = isActive && hasDrifted;
 
@@ -227,41 +266,44 @@ const PresetTab = ({
   );
 
   return (
-    <Tooltip content={`${preset.label} — ${tooltip}`} showArrow>
-      <Tabs.Trigger
-        aria-label={showDrift ? `${preset.label}, ${t('topbar.presets.unsaved')}` : preset.label}
-        aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}
-        gap="1.5"
-        value={preset.id}
-        onClick={handleClick}
-        onContextMenu={handleContextMenu}
-        onFocus={handlePreload}
-        onKeyDown={handleKeyDown}
-        onPointerEnter={handlePreload}
-      >
-        <Icon as={icon} boxSize="3.5" flexShrink={0} />
-        <Text as="span" css={HIDE_BELOW_PRESET_LABEL_WIDTH}>
-          {preset.label}
-        </Text>
-        {showDrift ? <DriftDot /> : null}
-        {isActive ? (
-          <Box
-            {...{ [PRESET_MENU_ATTRIBUTE]: '' }}
-            alignItems="center"
-            aria-hidden="true"
-            as="span"
-            color="fg.subtle"
-            display="inline-flex"
-            me="-1"
-            p="0.5"
-            rounded="sm"
-            _hover={MENU_AFFORDANCE_HOVER_PROPS}
-          >
-            <Icon as={ChevronDownIcon} boxSize="3.5" />
-          </Box>
-        ) : null}
-      </Tabs.Trigger>
-    </Tooltip>
+    <Tabs.Trigger
+      ref={setNodeRef}
+      {...listeners}
+      aria-label={showDrift ? `${preset.label}, ${t('topbar.presets.unsaved')}` : preset.label}
+      aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}
+      cursor={isDragging ? 'grabbing' : 'pointer'}
+      data-layout-preset-id={preset.id}
+      gap="1.5"
+      style={dndStyle}
+      value={preset.id}
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onFocus={handlePreload}
+      onKeyDown={handleKeyDown}
+      onPointerEnter={handlePreload}
+    >
+      <Icon as={icon} boxSize="3.5" flexShrink={0} />
+      <Text as="span" css={HIDE_BELOW_PRESET_LABEL_WIDTH}>
+        {preset.label}
+      </Text>
+      {showDrift ? <DriftDot /> : null}
+      {isActive ? (
+        <Box
+          {...{ [PRESET_MENU_ATTRIBUTE]: '' }}
+          alignItems="center"
+          aria-hidden="true"
+          as="span"
+          color="fg.subtle"
+          display="inline-flex"
+          me="-1"
+          p="0.5"
+          rounded="sm"
+          _hover={MENU_AFFORDANCE_HOVER_PROPS}
+        >
+          <Icon as={ChevronDownIcon} boxSize="3.5" />
+        </Box>
+      ) : null}
+    </Tabs.Trigger>
   );
 };
 
@@ -290,7 +332,7 @@ const PresetMenu = ({
   const { layout } = useWorkbenchCommands();
   const saveShortcut = useTopbarShortcut('app.saveLayoutPreset');
   const preset = target?.preset;
-  const isCustom = preset ? !layoutPresets.some((builtIn) => builtIn.id === preset.id) : false;
+  const isCustom = preset ? preset.isBuiltIn !== true : false;
   const showDrift = isActive && hasDrifted;
 
   const apply = useCallback(() => {

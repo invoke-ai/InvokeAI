@@ -5,14 +5,13 @@ import { builtInLayoutPresetDescriptors, layoutPresets } from './layoutPresets';
 describe('built-in layout preset descriptors', () => {
   it('owns the preset, presentation, and command metadata in strip order', () => {
     expect(
-      builtInLayoutPresetDescriptors.map(({ defaultKeys, hotkeyId, preset, tooltip }) => ({
+      builtInLayoutPresetDescriptors.map(({ defaultKeys, hotkeyId, preset }) => ({
         defaultKeys,
         defaultRoute: preset.defaultRoute,
         hotkeyId,
         iconId: preset.iconId,
         label: preset.label,
         presetId: preset.id,
-        tooltip,
       }))
     ).toEqual([
       {
@@ -22,7 +21,6 @@ describe('built-in layout preset descriptors', () => {
         iconId: 'type',
         label: 'Compose',
         presetId: 'compose',
-        tooltip: 'Text to image',
       },
       {
         defaultKeys: ['alt+2'],
@@ -31,7 +29,6 @@ describe('built-in layout preset descriptors', () => {
         iconId: 'layers',
         label: 'Edit',
         presetId: 'edit',
-        tooltip: 'Canvas editing',
       },
       {
         defaultKeys: ['alt+3'],
@@ -40,7 +37,6 @@ describe('built-in layout preset descriptors', () => {
         iconId: 'workflow',
         label: 'Automate',
         presetId: 'automate',
-        tooltip: 'Node workflows',
       },
     ]);
     expect(layoutPresets).toEqual(builtInLayoutPresetDescriptors.map(({ preset }) => preset));
