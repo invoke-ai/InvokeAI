@@ -7,6 +7,9 @@ import threading
 from typing import Any, Generator
 
 import pytest
+import requests
+from requests import Request
+from requests.models import PreparedRequest
 from requests.utils import select_proxy
 
 from invokeai.app.util import ssrf
@@ -44,6 +47,7 @@ def fake_dns(monkeypatch: Any):
         "http://[::ffff:10.0.0.1]/x",
         "http://[2002:7f00:0001::]/x",  # 6to4-wrapped 127.0.0.1
         "http://0177.0.0.1/x",  # legacy octal IPv4 literal for 127.0.0.1
+        "http://0177.0.0.1./x",  # trailing-dot legacy octal literal
         "http://2130706433/x",  # integer literal
         "http://100.64.0.1/x",  # RFC 6598 shared address space -- not is_private
         "http://198.18.0.1/x",  # benchmarking range -- not is_reserved
@@ -92,7 +96,7 @@ def test_rejects_hostname_resolving_to_loopback(fake_dns: dict[str, list[str]]):
         validate_download_url("http://localtest.me/x")
 
 
-@pytest.mark.parametrize("host", ["0177.0.0.1", "2130706433", "0x7f000001"])
+@pytest.mark.parametrize("host", ["0177.0.0.1", "0177.0.0.1.", "2130706433", "0x7f000001", "127.0.0.1."])
 def test_rejects_legacy_ipv4_literal_without_dns(monkeypatch: Any, host: str):
     """Legacy numeric IPv4 spellings must not depend on resolver normalization."""
 
@@ -244,13 +248,56 @@ def test_guarded_session_ignores_environment_proxy(monkeypatch: Any, caplog: Any
     """Ambient proxies must not move destination resolution outside the socket guard."""
     monkeypatch.setenv("HTTP_PROXY", "http://proxy.internal:3128")
     session = build_guarded_session()
-    assert session.trust_env is False
+    assert session.trust_env is True
     assert ssrf.proxies_in_effect(session) == {}
+    assert session.merge_environment_settings("https://example.com", {}, None, None, None)["proxies"] == {}
 
     logger = logging.getLogger("test-ssrf-proxy")
     with caplog.at_level(logging.WARNING, logger="test-ssrf-proxy"):
         ssrf.warn_if_proxied(session, logger)
     assert "proxy settings are ignored" in caplog.text
+
+
+def test_guarded_session_preserves_environment_ca_bundle(monkeypatch: Any):
+    ca_bundle = "/tmp/invokeai-test-ca.pem"
+    monkeypatch.setenv("REQUESTS_CA_BUNDLE", ca_bundle)
+    session = build_guarded_session()
+    settings = session.merge_environment_settings("https://example.com", {}, None, None, None)
+    assert settings["verify"] == ca_bundle
+
+
+def test_guarded_session_preserves_environment_netrc(monkeypatch: Any, tmp_path: Any):
+    netrc = tmp_path / "netrc"
+    netrc.write_text("machine example.com login netrc-user password netrc-pass\n")
+    monkeypatch.setenv("NETRC", str(netrc))
+    prepared = build_guarded_session().prepare_request(Request("GET", "https://example.com/file.bin"))
+    assert prepared.headers["Authorization"] == "Basic bmV0cmMtdXNlcjpuZXRyYy1wYXNz"
+
+
+def test_guarded_session_supports_explicit_proxy(monkeypatch: Any):
+    monkeypatch.setenv("HTTPS_PROXY", "http://ambient.internal:3128")
+    session = build_guarded_session(proxy="http://proxy.internal:3128")
+    assert ssrf.proxies_in_effect(session) == {
+        "http": "http://proxy.internal:3128",
+        "https": "http://proxy.internal:3128",
+    }
+    assert session.merge_environment_settings("https://example.com", {}, None, None, None)["proxies"] == {
+        "http": "http://proxy.internal:3128",
+        "https": "http://proxy.internal:3128",
+    }
+    request = PreparedRequest()
+    request.prepare(method="GET", url="https://example.com/file.bin")
+    assert session.rebuild_proxies(request, {}) == {}
+    assert session.rebuild_proxies(request, session.proxies) == session.proxies
+
+    captured: dict[str, Any] = {}
+
+    def capture_send(_session: requests.Session, _request: PreparedRequest, **kwargs: Any) -> None:
+        captured.update(kwargs)
+
+    monkeypatch.setattr(requests.Session, "send", capture_send)
+    session.send(request)
+    assert captured["proxies"] == session.proxies
 
 
 def test_no_warning_without_a_proxy(monkeypatch: Any, caplog: Any):

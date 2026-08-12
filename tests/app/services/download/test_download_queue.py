@@ -517,7 +517,7 @@ def test_production_queue_uses_guarded_session_by_default() -> None:
     queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=False))
     try:
         assert isinstance(queue._requests.get_adapter("https://example.com"), ssrf.SsrfGuardedAdapter)
-        assert queue._requests.trust_env is False
+        assert queue._requests.trust_env is True
     finally:
         queue._requests.close()
 
@@ -526,6 +526,22 @@ def test_production_queue_allows_explicit_private_download_opt_in() -> None:
     queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=True))
     try:
         assert not isinstance(queue._requests.get_adapter("https://example.com"), ssrf.SsrfGuardedAdapter)
+    finally:
+        queue._requests.close()
+
+
+def test_production_queue_accepts_explicit_download_proxy() -> None:
+    queue = DownloadQueueService(
+        app_config=InvokeAIAppConfig(
+            allow_private_download_urls=False,
+            download_proxy="http://proxy.internal:3128",
+        )
+    )
+    try:
+        assert ssrf.proxies_in_effect(queue._requests) == {
+            "http": "http://proxy.internal:3128",
+            "https": "http://proxy.internal:3128",
+        }
     finally:
         queue._requests.close()
 

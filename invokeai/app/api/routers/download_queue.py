@@ -27,6 +27,14 @@ def _download_queue_path(cache_dir: FsPath) -> FsPath:
     return cache_dir.parent / f"{cache_dir.name}.downloads"
 
 
+def _api_job(job: DownloadJob) -> DownloadJob:
+    """Keep the API destination relative while the queued job retains its absolute path."""
+    queue_root = _download_queue_path(ApiDependencies.invoker.services.configuration.download_cache_path).resolve()
+    if job.dest.is_relative_to(queue_root):
+        return job.model_copy(update={"dest": job.dest.relative_to(queue_root)})
+    return job
+
+
 def _validate_dest(dest: str) -> FsPath:
     """Resolve `dest` to an absolute path inside the API download directory.
 
@@ -77,7 +85,7 @@ def _validate_dest(dest: str) -> FsPath:
 async def list_downloads(current_admin: AdminUserOrDefault) -> List[DownloadJob]:
     """Get a list of active and inactive jobs."""
     queue = ApiDependencies.invoker.services.download_queue
-    return queue.list_jobs()
+    return [_api_job(job) for job in queue.list_jobs()]
 
 
 @download_queue_router.patch(
@@ -116,7 +124,7 @@ async def download(
     except UnsafeDownloadURLException:
         raise HTTPException(status_code=400, detail="Download URL resolves to a non-public address.")
     queue = ApiDependencies.invoker.services.download_queue
-    return queue.download(source, validated_dest, priority, access_token)
+    return _api_job(queue.download(source, validated_dest, priority, access_token))
 
 
 @download_queue_router.get(
@@ -134,7 +142,7 @@ async def get_download_job(
     """Get a download job using its ID."""
     try:
         job = ApiDependencies.invoker.services.download_queue.id_to_job(id)
-        return job
+        return _api_job(job)
     except UnknownJobIDException as e:
         raise HTTPException(status_code=404, detail=str(e))
 

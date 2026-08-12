@@ -269,11 +269,12 @@ addresses in `invokeai.yaml`:
 allow_private_download_urls: true
 ```
 
-For security, the guarded download queue ignores `HTTP_PROXY`, `HTTPS_PROXY`,
-and `ALL_PROXY` environment settings. A proxy resolves destinations outside
-InvokeAI, so its socket cannot be checked against the public-address policy.
-Use direct outbound access for guarded downloads, or explicitly enable private
-download URLs only when the proxy's destination policy is trusted.
+For security, the guarded download queue ignores ambient `HTTP_PROXY`, `HTTPS_PROXY`,
+and `ALL_PROXY` settings. It still honors `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`,
+and `.netrc`. If direct outbound access is unavailable, set `download_proxy` to an
+explicit proxy whose destination policy blocks private addresses; proxy-side DNS
+cannot be checked by InvokeAI. Do not enable `allow_private_download_urls` merely to
+make an untrusted proxy work.
 
 
 :::note[Strict Password Checking]

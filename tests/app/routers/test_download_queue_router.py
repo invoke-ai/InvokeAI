@@ -13,17 +13,17 @@ Covers:
 
 import asyncio
 import threading
-import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
-from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.api.routers import download_queue as download_queue_router
+from invokeai.app.api_app import app
 from invokeai.app.services.download import DownloadJob
 from invokeai.app.services.invoker import Invoker
 
@@ -139,50 +139,74 @@ def test_download_rejects_unsafe_dest_before_service_call(
 
 
 def test_download_accepts_relative_dest(client: TestClient, admin_token: str, mock_invoker: Invoker):
-    mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
+    cache_root = mock_invoker.services.configuration.download_cache_path.resolve()
+    queue_root = cache_root.parent / f"{cache_root.name}.downloads"
+    mock_invoker.services.download_queue.download = MagicMock(
+        return_value=DownloadJob(
+            id=1,
+            source="http://example.com/file.bin",
+            dest=queue_root / "models/sd15.safetensors",
+        )
+    )
     r = client.post(
         "/api/v1/download_queue/i/",
         json={"source": "http://example.com/file.bin", "dest": "models/sd15.safetensors"},
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert r.status_code == status.HTTP_200_OK
+    assert r.json()["dest"] == "models/sd15.safetensors"
     mock_invoker.services.download_queue.download.assert_called_once()
 
 
 @pytest.mark.anyio
 async def test_download_validation_does_not_block_event_loop(
-    enable_multiuser: Any, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path
+    enable_multiuser: Any, admin_token: str, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path
 ):
-    """Slow URL validation must not stall unrelated async work."""
+    """Slow path and URL validation must not stall unrelated async work."""
     mock_invoker.services.configuration.download_cache_dir = tmp_path / "model-cache"
     mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
-    started = threading.Event()
-    release = threading.Event()
+    dest_started = threading.Event()
+    url_started = threading.Event()
+    dest_release = threading.Event()
+    url_release = threading.Event()
 
-    def slow_validate(*args: Any, **kwargs: Any) -> None:
-        started.set()
-        assert release.wait(timeout=2)
+    def slow_dest(*args: Any, **kwargs: Any) -> Path:
+        dest_started.set()
+        assert dest_release.wait(timeout=2)
+        return tmp_path / "model-cache.downloads" / "file.bin"
 
-    monkeypatch.setattr(download_queue_router, "validate_download_url", slow_validate)
-    release_timer = threading.Timer(0.5, release.set)
-    release_timer.start()
-    start = time.monotonic()
-    task = asyncio.create_task(
-        download_queue_router.download(
-            current_admin=None,
-            source=AnyHttpUrl("http://example.com/file.bin"),
-            dest="file.bin",
+    def slow_url(*args: Any, **kwargs: Any) -> None:
+        url_started.set()
+        assert url_release.wait(timeout=2)
+
+    monkeypatch.setattr(download_queue_router, "_validate_dest", slow_dest)
+    monkeypatch.setattr(download_queue_router, "validate_download_url", slow_url)
+
+    async def assert_event_loop_runs() -> None:
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+            response = await client.get("/api/v1/app/version")
+            assert response.status_code == status.HTTP_200_OK
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://testserver") as client:
+        task = asyncio.create_task(
+            client.post(
+                "/api/v1/download_queue/i/",
+                json={"source": "http://example.com/file.bin", "dest": "file.bin"},
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
         )
-    )
-    try:
-        assert await asyncio.to_thread(started.wait, 1)
-        await asyncio.wait_for(asyncio.sleep(0), timeout=0.1)
-        assert time.monotonic() - start < 0.4
-        release.set()
-        await asyncio.wait_for(task, timeout=2)
-    finally:
-        release.set()
-        release_timer.cancel()
+        try:
+            assert await asyncio.to_thread(dest_started.wait, 1)
+            await assert_event_loop_runs()
+            dest_release.set()
+            assert await asyncio.to_thread(url_started.wait, 1)
+            await assert_event_loop_runs()
+            url_release.set()
+            response = await asyncio.wait_for(task, timeout=2)
+            assert response.status_code == status.HTTP_200_OK
+        finally:
+            dest_release.set()
+            url_release.set()
 
 
 # ------------------- Advisory regression: dest confinement + SSRF -------------------

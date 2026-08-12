@@ -23,8 +23,9 @@ so it must never be relied on alone.
 
 Ambient `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` settings are ignored by the guarded session.
 That keeps destination resolution inside this process, where the socket-level policy can
-inspect the connected peer. A caller that explicitly adds a proxy to a session accepts the
-proxy's destination policy instead; `warn_if_proxied()` reports that weaker configuration.
+inspect the connected peer, while Requests' CA-bundle and netrc environment support remains
+enabled. A caller that explicitly adds a proxy to a session accepts the proxy's destination
+policy instead; `warn_if_proxied()` reports that weaker configuration.
 """
 
 from __future__ import annotations
@@ -39,6 +40,9 @@ from urllib.request import getproxies
 
 import requests
 from requests.adapters import HTTPAdapter
+from requests.auth import _basic_auth_str
+from requests.models import PreparedRequest
+from requests.utils import get_auth_from_url, resolve_proxies
 from urllib3.connection import HTTPConnection, HTTPSConnection
 from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
@@ -65,9 +69,10 @@ def _candidates(ip: IpAddress) -> Iterator[IpAddress]:
     address. `IPv6Address("::ffff:127.0.0.1").is_loopback` is False, so the inner address
     has to be pulled out and judged on its own.
 
-    Both the wrapper and what it wraps must be acceptable, which is why this yields rather
-    than substitutes: a Teredo address whose embedded client is public is still a Teredo
-    address.
+    An IPv4-mapped IPv6 address is an alternate spelling of its embedded IPv4 address, so
+    only the embedded address is judged. Other wrappers must be acceptable themselves and
+    what they wrap, which is why those addresses are yielded rather than substituted: a
+    Teredo address whose embedded client is public is still a Teredo address.
 
     Only wrappers identifiable from the address alone are enumerated: v4-mapped, 6to4,
     Teredo and ISATAP. The NAT64 well-known prefixes (`64:ff9b::/96`, `64:ff9b:1::/48`)
@@ -78,14 +83,19 @@ def _candidates(ip: IpAddress) -> Iterator[IpAddress]:
     excluded — its "IPv4 in the low 32 bits" layout is what an ordinary hand-assigned
     address looks like, so screening for it would reject a great deal of real traffic.
     """
-    yield ip
     if isinstance(ip, ipaddress.IPv6Address):
+        if ip.ipv4_mapped is not None:
+            yield ip.ipv4_mapped
+            return
+        yield ip
         teredo = ip.teredo
-        for inner in (ip.ipv4_mapped, ip.sixtofour, teredo[1] if teredo else None):
+        for inner in (ip.sixtofour, teredo[1] if teredo else None):
             if inner is not None:
                 yield inner
         if (int(ip) >> 32) & 0xFFFFFFFF in _ISATAP_MARKERS:
             yield ipaddress.IPv4Address(int(ip) & 0xFFFFFFFF)
+    else:
+        yield ip
 
 
 def _is_blocked(ip: IpAddress) -> bool:
@@ -125,6 +135,7 @@ def _host_spellings(host: str) -> list[str]:
 
 def _parse_ipv4_literal(host: str) -> IpAddress | None:
     """Parse dotted and legacy numeric IPv4 spellings accepted by HTTP clients."""
+    host = host.removesuffix(".")
     try:
         return ipaddress.ip_address(host)
     except ValueError:
@@ -265,13 +276,60 @@ class SsrfGuardedAdapter(HTTPAdapter):
         }
 
 
-def build_guarded_session() -> requests.Session:
+class _SsrfGuardedSession(requests.Session):
+    """Session that keeps Requests environment support but drops ambient proxies."""
+
+    _ignore_environment_proxies = True
+
+    def merge_environment_settings(
+        self,
+        url: str,
+        proxies: dict[str, str] | None,
+        stream: bool | None,
+        verify: bool | str | None,
+        cert: str | tuple[str, str] | None,
+    ) -> dict[str, Any]:
+        request_proxies = dict(proxies or {})
+        settings = super().merge_environment_settings(url, proxies, stream, verify, cert)
+        # `super()` supplies CA-bundle and netrc environment settings, which we want to
+        # retain. Replace only the merged proxy map so ambient proxies cannot bypass the
+        # peer-address check. Explicit session/request proxies remain supported but weaker.
+        effective_proxies = dict(self.proxies)
+        effective_proxies.update(request_proxies)
+        settings["proxies"] = effective_proxies
+        return settings
+
+    def rebuild_proxies(self, prepared_request: PreparedRequest, proxies: dict[str, str] | None) -> dict[str, str]:
+        """Rebuild explicit proxies across redirects without consulting the environment."""
+        new_proxies = resolve_proxies(prepared_request, proxies, trust_env=False)
+        headers = prepared_request.headers
+        if "Proxy-Authorization" in headers:
+            del headers["Proxy-Authorization"]
+
+        scheme = urlsplit(prepared_request.url).scheme
+        try:
+            username, password = get_auth_from_url(new_proxies[scheme])
+        except KeyError:
+            username, password = None, None
+
+        # urllib3 handles proxy authorization for HTTPS tunnels. Avoid putting these
+        # credentials in the tunneled request headers.
+        if not scheme.startswith("https") and username and password:
+            headers["Proxy-Authorization"] = _basic_auth_str(username, password)
+        return new_proxies
+
+    def send(self, request: PreparedRequest, **kwargs: Any) -> requests.Response:
+        """Keep direct `send()` calls from reintroducing ambient proxies."""
+        if kwargs.get("proxies") is None:
+            kwargs["proxies"] = dict(self.proxies)
+        return super().send(request, **kwargs)
+
+
+def build_guarded_session(proxy: str | None = None) -> requests.Session:
     """A `requests.Session` that will not open a connection to a non-public address."""
-    session = requests.Session()
-    # A proxy resolves the destination outside this process, so the socket guard cannot
-    # enforce the destination policy. Ignore ambient proxy settings rather than silently
-    # accepting proxy-side DNS as a security boundary.
-    session.trust_env = False
+    session = _SsrfGuardedSession()
+    if proxy:
+        session.proxies.update({"http": proxy, "https": proxy})
     adapter = SsrfGuardedAdapter()
     session.mount("http://", adapter)
     session.mount("https://", adapter)
@@ -281,7 +339,7 @@ def build_guarded_session() -> requests.Session:
 def proxies_in_effect(session: requests.Session) -> dict[str, str]:
     """Proxies this session would use, including ones inherited from the environment."""
     proxies = dict(session.proxies)
-    if session.trust_env:
+    if session.trust_env and not getattr(session, "_ignore_environment_proxies", False):
         # Every key, not just http/https: `ALL_PROXY` arrives as the key "all", which
         # `requests.utils.select_proxy` honours as a catch-all. Filtering by scheme would
         # miss the form most egress-proxy setups actually use.
@@ -299,5 +357,5 @@ def warn_if_proxied(session: requests.Session, logger: logging.Logger) -> None:
             "against loopback/private addresses at the socket; restrict outbound access at the proxy.",
             ", ".join(sorted(proxies)),
         )
-    elif not session.trust_env and getproxies():
+    elif getattr(session, "_ignore_environment_proxies", False) and getproxies():
         logger.warning("Ambient HTTP proxy settings are ignored for guarded downloads.")

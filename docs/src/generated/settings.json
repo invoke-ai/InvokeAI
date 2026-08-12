@@ -767,6 +767,17 @@
     },
     {
       "category": "MODEL INSTALL",
+      "default": null,
+      "description": "Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.",
+      "env_var": "INVOKEAI_DOWNLOAD_PROXY",
+      "literal_values": [],
+      "name": "download_proxy",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
       "default": false,
       "description": "UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.",
       "env_var": "INVOKEAI_UNSAFE_DISABLE_PICKLESCAN",

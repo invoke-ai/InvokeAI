@@ -81,7 +81,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         elif self._app_config.allow_private_download_urls:
             self._requests = requests.Session()
         else:
-            self._requests = build_guarded_session()
+            self._requests = build_guarded_session(proxy=self._app_config.download_proxy)
             warn_if_proxied(self._requests, self._logger)
         self._accept_download_requests = False
         self._max_parallel_dl = max_parallel_dl
