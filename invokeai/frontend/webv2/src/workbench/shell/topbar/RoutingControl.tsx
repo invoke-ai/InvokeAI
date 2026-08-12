@@ -28,6 +28,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
   const hasSource = placedTypeIds.has(getWidgetTypeIdForSourceId(invocation.sourceId));
   const sourceTypeId = getWidgetTypeIdForSourceId(invocation.sourceId);
+  const isSameRoute = hasSource && sourceTypeId === invocation.destination;
   const accessibleName = describeRoute({
     destination: invocation.destination,
     destinationLocked: invocation.destinationLocked,
@@ -67,22 +68,34 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
             w="34px"
             display="grid"
           >
-            {hasSource ? (
-              <WidgetIcon {...getWidgetIconProps('source')} />
-            ) : (
-              <Box
-                borderColor="border.emphasized"
-                borderStyle="dashed"
-                borderWidth="1px"
+            {isSameRoute ? (
+              <WidgetIcon
                 boxSize="3.5"
-                data-routing-source-icon=""
-                left="4px"
-                position="absolute"
-                rounded="xs"
-                top="4px"
+                color="fg.muted"
+                data-routing-shared-icon=""
+                icon={getWidgetById(sourceTypeId)?.manifest.icon}
+                placeSelf="center"
               />
+            ) : (
+              <>
+                {hasSource ? (
+                  <WidgetIcon {...getWidgetIconProps('source')} />
+                ) : (
+                  <Box
+                    borderColor="border.emphasized"
+                    borderStyle="dashed"
+                    borderWidth="1px"
+                    boxSize="3.5"
+                    data-routing-source-icon=""
+                    left="4px"
+                    position="absolute"
+                    rounded="xs"
+                    top="4px"
+                  />
+                )}
+                <WidgetIcon {...getWidgetIconProps('destination')} />
+              </>
             )}
-            <WidgetIcon {...getWidgetIconProps('destination')} />
             {isLocked ? (
               <Status.Root
                 colorPalette="accent"
