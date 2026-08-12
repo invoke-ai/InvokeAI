@@ -33,6 +33,7 @@ import { userEvent } from 'vitest/browser';
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryActions, GalleryWidgetContextValue } from './GalleryWidgetContext';
 
+import { GALLERY_GRID_GAP_PX } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 
@@ -498,6 +499,18 @@ describe('GalleryImageGrid mixed item cells', () => {
     await act(() => userEvent.hover(trigger));
 
     expect(getComputedStyle(trigger).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  });
+
+  it('adds a compact section gap after the last starred row', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    const options = mocks.virtualizerOptions.at(-1);
+
+    expect(options?.estimateSize(1)).toBe((options?.estimateSize(2) ?? 0) + GALLERY_GRID_GAP_PX);
   });
 
   it('collapses only the starred items and omits the disclosure when no stars are loaded', async () => {

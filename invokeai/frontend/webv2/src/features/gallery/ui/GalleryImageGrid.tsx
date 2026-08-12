@@ -143,7 +143,22 @@ export const GalleryImageGrid = () => {
   const cellSizePx = getGalleryCellSizePx({ columnCount, widthPx: viewportWidth });
   const rowHeightPx = cellSizePx + GALLERY_GRID_GAP_PX;
   const estimateRowSize = useCallback(
-    (index: number) => (rows[index]?.kind === 'starred-header' ? STARRED_HEADER_HEIGHT_PX : rowHeightPx),
+    (index: number) => {
+      const row = rows[index];
+
+      if (row?.kind === 'starred-header') {
+        return STARRED_HEADER_HEIGHT_PX;
+      }
+
+      const nextRow = rows[index + 1];
+      const endsStarredSection =
+        row?.kind === 'cells' &&
+        row.section === 'starred' &&
+        nextRow?.kind === 'cells' &&
+        nextRow.section === 'regular';
+
+      return rowHeightPx + (endsStarredSection ? GALLERY_GRID_GAP_PX : 0);
+    },
     [rowHeightPx, rows]
   );
   const getScrollElement = useCallback(() => viewportRef.current, []);
