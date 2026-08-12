@@ -33,7 +33,6 @@ import { userEvent } from 'vitest/browser';
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryActions, GalleryWidgetContextValue } from './GalleryWidgetContext';
 
-import { GALLERY_GRID_GAP_PX } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 
@@ -501,16 +500,31 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(getComputedStyle(trigger).backgroundColor).toBe('rgba(0, 0, 0, 0)');
   });
 
-  it('adds a compact section gap after the last starred row', async () => {
+  it('spaces the whole starred accordion away from the regular image grid', async () => {
     await renderGallery(
       createGallery({
         items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
       })
     );
 
-    const options = mocks.virtualizerOptions.at(-1);
+    const listRect = host?.querySelector('[role="list"]')?.getBoundingClientRect();
+    const headerRect = getButton('Collapse starred items').parentElement?.getBoundingClientRect();
+    const starredRect = getButton('Select starred.png for preview').getBoundingClientRect();
+    const regularRect = getButton('Select regular.png for preview').getBoundingClientRect();
 
-    expect(options?.estimateSize(1)).toBe((options?.estimateSize(2) ?? 0) + GALLERY_GRID_GAP_PX);
+    expect((headerRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(8, 0);
+    expect(starredRect.top - (headerRect?.bottom ?? 0)).toBeLessThan(4);
+    expect(regularRect.top - starredRect.bottom).toBeCloseTo(8, 0);
+
+    await click(getButton('Collapse starred items'));
+
+    const collapsedHeaderRect = getButton('Expand starred items').parentElement?.getBoundingClientRect();
+    const collapsedRegularRect = getButton('Select regular.png for preview').getBoundingClientRect();
+    const collapsedSectionGap = collapsedRegularRect.top - (collapsedHeaderRect?.bottom ?? 0);
+
+    expect((collapsedHeaderRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(8, 0);
+    expect(collapsedSectionGap).toBeGreaterThanOrEqual(8);
+    expect(collapsedSectionGap).toBeLessThan(12);
   });
 
   it('collapses only the starred items and omits the disclosure when no stars are loaded', async () => {

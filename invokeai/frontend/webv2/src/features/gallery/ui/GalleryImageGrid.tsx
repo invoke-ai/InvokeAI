@@ -34,6 +34,7 @@ import { useGalleryGridSelection } from './useGalleryGridSelection';
  */
 const viewportWidthCache = new Map<string, number>();
 const STARRED_HEADER_HEIGHT_PX = 24;
+const STARRED_SECTION_GAP_PX = 8;
 const STARRED_TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
@@ -147,17 +148,13 @@ export const GalleryImageGrid = () => {
       const row = rows[index];
 
       if (row?.kind === 'starred-header') {
-        return STARRED_HEADER_HEIGHT_PX;
+        const nextRow = rows[index + 1];
+        const isCollapsed = nextRow?.kind !== 'cells' || nextRow.section !== 'starred';
+
+        return STARRED_SECTION_GAP_PX + STARRED_HEADER_HEIGHT_PX + (isCollapsed ? STARRED_SECTION_GAP_PX : 0);
       }
 
-      const nextRow = rows[index + 1];
-      const endsStarredSection =
-        row?.kind === 'cells' &&
-        row.section === 'starred' &&
-        nextRow?.kind === 'cells' &&
-        nextRow.section === 'regular';
-
-      return rowHeightPx + (endsStarredSection ? GALLERY_GRID_GAP_PX : 0);
+      return rowHeightPx;
     },
     [rowHeightPx, rows]
   );
@@ -332,7 +329,7 @@ export const GalleryImageGrid = () => {
                         position="absolute"
                         px="1"
                         top="0"
-                        transform={`translateY(${virtualRow.start}px)`}
+                        transform={`translateY(${virtualRow.start + STARRED_SECTION_GAP_PX}px)`}
                         w="full"
                       >
                         <chakra.button
