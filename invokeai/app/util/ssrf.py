@@ -127,6 +127,45 @@ def _host_spellings(host: str) -> list[str]:
     return spellings
 
 
+def _parse_ipv4_literal(host: str) -> IpAddress | None:
+    """Parse dotted and legacy numeric IPv4 spellings accepted by HTTP clients."""
+    try:
+        return ipaddress.ip_address(host)
+    except ValueError:
+        pass
+
+    parts = host.split(".")
+    if not 1 <= len(parts) <= 4:
+        return None
+
+    values: list[int] = []
+    for part in parts:
+        if not part or part[0] in "+-" or not part.isascii():
+            return None
+        if part.lower().startswith("0x"):
+            base, digits = 16, part[2:]
+        elif len(part) > 1 and part.startswith("0"):
+            base, digits = 8, part[1:]
+        else:
+            base, digits = 10, part
+        alphabet = "0123456789abcdef"[:base]
+        if not digits or any(char.lower() not in alphabet for char in digits):
+            return None
+        try:
+            values.append(int(digits, base))
+        except ValueError:
+            return None
+
+    widths = {1: (32,), 2: (8, 24), 3: (8, 8, 16), 4: (8, 8, 8, 8)}[len(values)]
+    if any(value >= 1 << width for value, width in zip(values, widths, strict=True)):
+        return None
+
+    address = 0
+    for value, width in zip(values, widths, strict=True):
+        address = (address << width) | value
+    return ipaddress.IPv4Address(address)
+
+
 def check_address(ip: IpAddress, host: str) -> None:
     """Raise if `ip` is not an address we are willing to connect to."""
     if _is_blocked(ip):
@@ -160,9 +199,10 @@ def validate_download_url(url: str, allow_private_urls: bool = False) -> None:
         return
 
     for spelling in _host_spellings(host):
-        try:
-            candidates = [ipaddress.ip_address(spelling)]
-        except ValueError:
+        literal = _parse_ipv4_literal(spelling)
+        if literal is not None:
+            candidates = [literal]
+        else:
             try:
                 candidates = _resolve(spelling, parts.port)
             except (OSError, UnicodeError, ValueError):

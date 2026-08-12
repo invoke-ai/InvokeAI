@@ -43,7 +43,7 @@ def fake_dns(monkeypatch: Any):
         "http://[::ffff:127.0.0.1]/x",  # IPv4-mapped loopback
         "http://[::ffff:10.0.0.1]/x",
         "http://[2002:7f00:0001::]/x",  # 6to4-wrapped 127.0.0.1
-        "http://0177.0.0.1/x",  # octal literal
+        "http://0177.0.0.1/x",  # legacy octal IPv4 literal for 127.0.0.1
         "http://2130706433/x",  # integer literal
         "http://100.64.0.1/x",  # RFC 6598 shared address space -- not is_private
         "http://198.18.0.1/x",  # benchmarking range -- not is_reserved
@@ -81,6 +81,18 @@ def test_rejects_hostname_resolving_to_loopback(fake_dns: dict[str, list[str]]):
     fake_dns["localtest.me"] = ["127.0.0.1"]
     with pytest.raises(UnsafeDownloadURLException):
         validate_download_url("http://localtest.me/x")
+
+
+@pytest.mark.parametrize("host", ["0177.0.0.1", "2130706433", "0x7f000001"])
+def test_rejects_legacy_ipv4_literal_without_dns(monkeypatch: Any, host: str):
+    """Legacy numeric IPv4 spellings must not depend on resolver normalization."""
+
+    def fail_resolve(host: str, port: int | None) -> list[ipaddress.IPv4Address]:
+        raise AssertionError(f"unexpected DNS lookup for numeric host {host}")
+
+    monkeypatch.setattr(ssrf, "_resolve", fail_resolve)
+    with pytest.raises(UnsafeDownloadURLException):
+        validate_download_url(f"http://{host}/x")
 
 
 def test_rejects_hostname_with_any_non_public_record(fake_dns: dict[str, list[str]]):
