@@ -42,7 +42,7 @@ const mocks = vi.hoisted(() => ({
   scrollToIndex: vi.fn(),
   virtualizerOptions: [] as Array<{
     count: number;
-    estimateSize: () => number;
+    estimateSize: (index: number) => number;
     getScrollElement: () => Element | null;
     overscan: number;
   }>,
@@ -62,23 +62,24 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
 vi.mock('react-hook-tanstack-virtual', () => ({
   useVirtualizer: (options: {
     count: number;
-    estimateSize: () => number;
+    estimateSize: (index: number) => number;
     getScrollElement: () => Element | null;
     overscan: number;
   }) => {
     mocks.virtualizerOptions.push(options);
-    const size = options.estimateSize();
+    const sizes = Array.from({ length: options.count }, (_, index) => options.estimateSize(index));
+    const starts = sizes.map((_, index) => sizes.slice(0, index).reduce((total, size) => total + size, 0));
 
     return {
       measure: mocks.measure,
       scrollToIndex: mocks.scrollToIndex,
-      totalSize: options.count * size,
+      totalSize: sizes.reduce((total, size) => total + size, 0),
       virtualItems: Array.from({ length: options.count }, (_, index) => ({
-        end: (index + 1) * size,
+        end: (starts[index] ?? 0) + (sizes[index] ?? 0),
         index,
         key: index,
-        size,
-        start: index * size,
+        size: sizes[index] ?? 0,
+        start: starts[index] ?? 0,
       })),
     };
   },
@@ -115,11 +116,14 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             noImagesMatch: 'No items',
+            collapseStarredItems: 'Collapse starred items',
             dropMediaToUploadToBoard: 'Drop media to {{name}}',
+            expandStarredItems: 'Expand starred items',
             selectImageForPreview: 'Select {{name}} for preview',
             selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
             selectedBoardFallback: 'selected board',
             starImage: 'Star {{name}}',
+            starredItems: 'Starred',
             unstarImage: 'Unstar {{name}}',
             uncategorized: 'Uncategorized',
             windowLimit: 'Limited to {{count}}',
@@ -455,6 +459,47 @@ afterEach(async () => {
 });
 
 describe('GalleryImageGrid mixed item cells', () => {
+  it('separates starred items into an expanded disclosure above regular items', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    const trigger = getButton('Collapse starred items');
+    const starredSection = host?.querySelector('[data-gallery-section="starred"]');
+    const regularSection = host?.querySelector('[data-gallery-section="regular"]');
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.textContent).toContain('Starred');
+    expect(starredSection?.querySelector('button[aria-label="Select starred.png for preview"]')).not.toBeNull();
+    expect(regularSection?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
+    expect(
+      Array.from(host?.querySelectorAll('[data-gallery-section]') ?? []).map((row) =>
+        row.getAttribute('data-gallery-section')
+      )
+    ).toEqual(['starred', 'regular']);
+  });
+
+  it('collapses only the starred items and omits the disclosure when no stars are loaded', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    await click(getButton('Collapse starred items'));
+
+    expect(getButton('Expand starred items').getAttribute('aria-expanded')).toBe('false');
+    expect(host?.querySelector('button[aria-label="Select starred.png for preview"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
+
+    await renderGallery(createGallery({ items: [createItem('image', 'regular.png')] }));
+
+    expect(host?.querySelector('button[aria-label="Expand starred items"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Collapse starred items"]')).toBeNull();
+  });
+
   it('renders same-name media independently and gives a video a static accessible poster', async () => {
     const gallery = createGallery({
       items: [createItem('image', 'shared'), createItem('video', 'shared')],
@@ -831,7 +876,7 @@ describe('GalleryImageGrid virtualization', () => {
     expect(options?.count).toBe(renderedRows);
     expect(renderedCells).toBe(items.length);
     expect(options?.overscan).toBe(4);
-    expect(options?.estimateSize()).toBe(options?.estimateSize());
+    expect(options?.estimateSize(0)).toBe(options?.estimateSize(0));
     expect(host?.querySelector('[role="listitem"]')).toHaveStyle({ aspectRatio: '1 / 1' });
   });
 });

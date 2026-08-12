@@ -18,15 +18,10 @@ const SORT_POSITIONING = { placement: 'bottom-end' } as const;
 export const GalleryItemSortMenu = () => {
   const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
-  const { imageOrderDir, starredFirst } = gallery.settings;
+  const { imageOrderDir } = gallery.settings;
 
   const handleOrderDirChange = useCallback(
     (event: { value: string }) => actions.updateSettings({ imageOrderDir: event.value as GalleryOrderDir }),
-    [actions]
-  );
-
-  const handleStarredFirstChange = useCallback(
-    (starredFirst: boolean) => actions.updateSettings({ starredFirst }),
     [actions]
   );
 
@@ -59,18 +54,6 @@ export const GalleryItemSortMenu = () => {
                 <Menu.ItemText>{t('widgets.gallery.oldest')}</Menu.ItemText>
               </Menu.RadioItem>
             </Menu.RadioItemGroup>
-            <Menu.Separator />
-            {/* A real checkbox item rather than a Switch smuggled into a menu
-                item, which needed closeOnSelect + a click-swallower to behave. */}
-            <Menu.CheckboxItem
-              checked={starredFirst}
-              closeOnSelect={false}
-              value="starred-first"
-              onCheckedChange={handleStarredFirstChange}
-            >
-              <Menu.ItemIndicator />
-              <Menu.ItemText>{t('widgets.gallery.showStarredImagesFirst')}</Menu.ItemText>
-            </Menu.CheckboxItem>
           </MenuContent>
         </Menu.Positioner>
       </Portal>

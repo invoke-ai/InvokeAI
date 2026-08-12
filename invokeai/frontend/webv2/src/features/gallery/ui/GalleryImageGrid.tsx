@@ -1,8 +1,8 @@
-import { Box, Flex, ScrollArea, Spinner, Text } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, ScrollArea, Spinner, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem } from '@features/gallery/core/items';
-import { DropZone } from '@platform/ui';
-import { UploadIcon } from 'lucide-react';
+import { Button, DropZone } from '@platform/ui';
+import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -33,12 +33,29 @@ import { useGalleryGridSelection } from './useGalleryGridSelection';
  * tiles before the ResizeObserver reports.
  */
 const viewportWidthCache = new Map<string, number>();
+const STARRED_HEADER_HEIGHT_PX = 28;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
 
 type GridCell =
   | { kind: 'item'; item: GalleryItem; itemIndex: number }
   | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
+
+type GridSection = 'regular' | 'starred';
+
+type GridRow =
+  | { kind: 'cells'; cells: GridCell[]; section: GridSection }
+  | { kind: 'starred-header'; itemCount: number };
+
+const chunkCellsIntoRows = (cells: GridCell[], columnCount: number, section: GridSection): GridRow[] => {
+  const rows: GridRow[] = [];
+
+  for (let index = 0; index < cells.length; index += columnCount) {
+    rows.push({ cells: cells.slice(index, index + columnCount), kind: 'cells', section });
+  }
+
+  return rows;
+};
 
 /**
  * The virtualized thumbnail grid. Column count comes from the measured
@@ -50,11 +67,11 @@ export const GalleryImageGrid = () => {
   const { actions, gallery, isWindowTruncated, itemActions, region } = useGalleryWidget();
   const { account, antialiasProgressImages, ImageContextMenu } = useGalleryUi();
   const [isDropActive, setIsDropActive] = useState(false);
+  const [isStarredOpen, setIsStarredOpen] = useState(true);
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(region) ?? 0);
   const dragDepthRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
-    gallery.settings;
+  const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, thumbnailFit } = gallery.settings;
 
   const {
     actionSelectionRefs,
@@ -80,30 +97,54 @@ export const GalleryImageGrid = () => {
     : t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.items.length === 0 && gallery.pendingPlaceholders.length === 0;
 
-  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(gallery.items, imageOrderDir, starredFirst);
+  const rows = useMemo<GridRow[]>(() => {
+    const regularItemCells: GridCell[] = [];
+    const regularItems: GalleryItem[] = [];
+    const starredItemCells: GridCell[] = [];
 
-  const cells = useMemo<GridCell[]>(() => {
-    const itemCells: GridCell[] = gallery.items.map((item, itemIndex) => ({
-      item,
-      itemIndex,
-      kind: 'item',
-    }));
+    gallery.items.forEach((item, itemIndex) => {
+      const cell: GridCell = { item, itemIndex, kind: 'item' };
+
+      if (item.starred) {
+        starredItemCells.push(cell);
+      } else {
+        regularItemCells.push(cell);
+        regularItems.push(item);
+      }
+    });
+
     const placeholderCells: GridCell[] = gallery.pendingPlaceholders.map((placeholder) => ({
       kind: 'placeholder',
       placeholder,
     }));
-
-    return [
-      ...itemCells.slice(0, placeholderInsertionIndex),
+    const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(regularItems, imageOrderDir, false);
+    const regularCells = [
+      ...regularItemCells.slice(0, placeholderInsertionIndex),
       ...placeholderCells,
-      ...itemCells.slice(placeholderInsertionIndex),
+      ...regularItemCells.slice(placeholderInsertionIndex),
     ];
-  }, [gallery.items, gallery.pendingPlaceholders, placeholderInsertionIndex]);
+    const nextRows: GridRow[] = [];
 
-  const rowCount = Math.ceil(cells.length / columnCount);
+    if (starredItemCells.length > 0) {
+      nextRows.push({ itemCount: starredItemCells.length, kind: 'starred-header' });
+
+      if (isStarredOpen) {
+        nextRows.push(...chunkCellsIntoRows(starredItemCells, columnCount, 'starred'));
+      }
+    }
+
+    nextRows.push(...chunkCellsIntoRows(regularCells, columnCount, 'regular'));
+
+    return nextRows;
+  }, [columnCount, gallery.items, gallery.pendingPlaceholders, imageOrderDir, isStarredOpen]);
+
+  const rowCount = rows.length;
   const cellSizePx = getGalleryCellSizePx({ columnCount, widthPx: viewportWidth });
   const rowHeightPx = cellSizePx + GALLERY_GRID_GAP_PX;
-  const estimateRowSize = useCallback(() => rowHeightPx, [rowHeightPx]);
+  const estimateRowSize = useCallback(
+    (index: number) => (rows[index]?.kind === 'starred-header' ? STARRED_HEADER_HEIGHT_PX : rowHeightPx),
+    [rowHeightPx, rows]
+  );
   const getScrollElement = useCallback(() => viewportRef.current, []);
 
   const virtualizer = useVirtualizer({
@@ -122,10 +163,13 @@ export const GalleryImageGrid = () => {
   // identity would buy nothing and pinning the mutable virtualizer into a
   // dependency array defeats the compiler's own memoization.
   const scrollToItemIndex = (itemIndex: number) => {
-    const cellIndex =
-      itemIndex >= placeholderInsertionIndex ? itemIndex + gallery.pendingPlaceholders.length : itemIndex;
+    const rowIndex = rows.findIndex(
+      (row) => row.kind === 'cells' && row.cells.some((cell) => cell.kind === 'item' && cell.itemIndex === itemIndex)
+    );
 
-    virtualizer.scrollToIndex(Math.floor(cellIndex / columnCount));
+    if (rowIndex >= 0) {
+      virtualizer.scrollToIndex(rowIndex);
+    }
   };
 
   useGalleryGridHotkeys({ actionSelectionRefs, columnCount, scrollToItemIndex });
@@ -220,6 +264,10 @@ export const GalleryImageGrid = () => {
     account.enableLiveFollow();
   }, [account]);
 
+  const handleToggleStarredSection = useCallback(() => {
+    setIsStarredOpen((isOpen) => !isOpen);
+  }, []);
+
   const handleToggleStarred = useCallback(
     (item: GalleryItem) => void itemActions.setItemsStarred([{ kind: item.kind, name: item.name }], !item.starred),
     [itemActions]
@@ -250,22 +298,82 @@ export const GalleryImageGrid = () => {
           <ScrollArea.Viewport ref={viewportRef} h="full" outline="none" w="full">
             <ScrollArea.Content aria-label={t('widgets.gallery.itemsAriaLabel')} role="list">
               <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
-                {virtualRows.map((virtualRow) => (
-                  <Box
-                    key={virtualRow.key}
-                    display="grid"
-                    gap={`${GALLERY_GRID_GAP_PX}px`}
-                    gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
-                    left="0"
-                    position="absolute"
-                    role="presentation"
-                    top="0"
-                    transform={`translateY(${virtualRow.start}px)`}
-                    w="full"
-                  >
-                    {cells
-                      .slice(virtualRow.index * columnCount, (virtualRow.index + 1) * columnCount)
-                      .map((cell) =>
+                {virtualRows.map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+
+                  if (!row) {
+                    return null;
+                  }
+
+                  if (row.kind === 'starred-header') {
+                    return (
+                      <Flex
+                        key={virtualRow.key}
+                        align="center"
+                        h={`${STARRED_HEADER_HEIGHT_PX}px`}
+                        left="0"
+                        position="absolute"
+                        top="0"
+                        transform={`translateY(${virtualRow.start}px)`}
+                        w="full"
+                      >
+                        <Button
+                          aria-expanded={isStarredOpen}
+                          aria-label={t(
+                            isStarredOpen
+                              ? 'widgets.gallery.collapseStarredItems'
+                              : 'widgets.gallery.expandStarredItems'
+                          )}
+                          color="fg.muted"
+                          h="6"
+                          justifyContent="flex-start"
+                          px="1"
+                          size="xs"
+                          variant="ghost"
+                          w="full"
+                          onClick={handleToggleStarredSection}
+                        >
+                          <Icon
+                            as={ChevronRightIcon}
+                            boxSize="3"
+                            transform={isStarredOpen ? 'rotate(90deg)' : undefined}
+                            transition="transform var(--wb-motion-duration-medium) ease"
+                          />
+                          <Icon as={StarIcon} boxSize="3" fill="currentColor" />
+                          <HStack gap="1">
+                            <Text
+                              as="span"
+                              fontSize="2xs"
+                              fontWeight="600"
+                              letterSpacing="wide"
+                              textTransform="uppercase"
+                            >
+                              {t('widgets.gallery.starredItems')}
+                            </Text>
+                            <Text as="span" color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums">
+                              {row.itemCount}
+                            </Text>
+                          </HStack>
+                        </Button>
+                      </Flex>
+                    );
+                  }
+
+                  return (
+                    <Box
+                      key={virtualRow.key}
+                      data-gallery-section={row.section}
+                      display="grid"
+                      gap={`${GALLERY_GRID_GAP_PX}px`}
+                      gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
+                      left="0"
+                      position="absolute"
+                      role="presentation"
+                      top="0"
+                      transform={`translateY(${virtualRow.start}px)`}
+                      w="full"
+                    >
+                      {row.cells.map((cell) =>
                         cell.kind === 'placeholder' ? (
                           <GalleryQueuePlaceholderCell
                             key={cell.placeholder.id}
@@ -301,8 +409,9 @@ export const GalleryImageGrid = () => {
                           />
                         )
                       )}
-                  </Box>
-                ))}
+                    </Box>
+                  );
+                })}
               </Box>
               {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
                 <Flex align="center" justify="center" py="2">
