@@ -18933,6 +18933,7 @@ export type components = {
          *         remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.
          *         scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
          *         allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.
+         *         download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
          *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
@@ -19350,6 +19351,11 @@ export type components = {
              * @default false
              */
             allow_private_download_urls?: boolean;
+            /**
+             * Download Proxy
+             * @description Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.
+             */
+            download_proxy?: string | null;
             /**
              * Unsafe Disable Picklescan
              * @description UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
