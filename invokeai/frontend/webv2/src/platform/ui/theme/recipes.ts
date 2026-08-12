@@ -327,6 +327,8 @@ export const dropdownGroupLabel = {
   fontSize: '2xs',
   fontWeight: '600',
   letterSpacing: '0.02em',
+  lineHeight: 'shorter',
+  py: '1',
   textTransform: 'uppercase',
 };
 
