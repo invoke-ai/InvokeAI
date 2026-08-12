@@ -1,11 +1,17 @@
 """Router-level tests for /api/v1/download_queue.
 
 Covers:
-- Auth gating (CurrentUserOrDefault on read/per-job, AdminUserOrDefault on prune & cancel-all).
+- Auth gating. Every route is AdminUserOrDefault: the queue is a single server-wide
+  queue whose jobs expose remote URLs and local filesystem paths, and cancelling one
+  affects whoever started it.
 - Bug regression: `dest` path validation must reject absolute paths and '..' segments
   BEFORE the queue service is invoked.
+- Security regression: `dest` is anchored inside `download_cache_path` (never the
+  process working directory) and `source` is rejected when it resolves to a
+  non-public address.
 """
 
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -42,9 +48,34 @@ def test_routes_require_auth_in_multiuser_mode(enable_multiuser: Any, client: Te
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_list_downloads_as_regular_user(client: TestClient, user1_token: str, mock_invoker: Invoker):
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/api/v1/download_queue/"),
+        ("PATCH", "/api/v1/download_queue/"),
+        ("POST", "/api/v1/download_queue/i/"),
+        ("GET", "/api/v1/download_queue/i/1"),
+        ("DELETE", "/api/v1/download_queue/i/1"),
+        ("DELETE", "/api/v1/download_queue/i"),
+    ],
+)
+def test_routes_forbidden_for_regular_user(
+    client: TestClient, user1_token: str, mock_invoker: Invoker, method: str, path: str
+):
+    """No download_queue route is reachable by a non-admin in multiuser mode."""
+    r = client.request(
+        method,
+        path,
+        json={"source": "http://example.com/file.bin", "dest": "x"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    mock_invoker.services.download_queue.download.assert_not_called()
+
+
+def test_list_downloads_as_admin(client: TestClient, admin_token: str, mock_invoker: Invoker):
     mock_invoker.services.download_queue.list_jobs = MagicMock(return_value=[])
-    r = client.get("/api/v1/download_queue/", headers={"Authorization": f"Bearer {user1_token}"})
+    r = client.get("/api/v1/download_queue/", headers={"Authorization": f"Bearer {admin_token}"})
     assert r.status_code == status.HTTP_200_OK
     assert r.json() == []
 
@@ -85,28 +116,98 @@ def test_cancel_all_allowed_for_admin(client: TestClient, admin_token: str, mock
         "..",
         "",
         "   ",
+        "models/x\x00.bin",
     ],
 )
 def test_download_rejects_unsafe_dest_before_service_call(
-    client: TestClient, user1_token: str, mock_invoker: Invoker, bad_dest: str
+    client: TestClient, admin_token: str, mock_invoker: Invoker, bad_dest: str
 ):
     """Absolute paths, '..' segments, and empty strings must produce 400 and
     must NOT invoke the download_queue service."""
     r = client.post(
         "/api/v1/download_queue/i/",
         json={"source": "http://example.com/file.bin", "dest": bad_dest},
-        headers={"Authorization": f"Bearer {user1_token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert r.status_code == status.HTTP_400_BAD_REQUEST
     mock_invoker.services.download_queue.download.assert_not_called()
 
 
-def test_download_accepts_relative_dest(client: TestClient, user1_token: str, mock_invoker: Invoker):
+def test_download_accepts_relative_dest(client: TestClient, admin_token: str, mock_invoker: Invoker):
     mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
     r = client.post(
         "/api/v1/download_queue/i/",
         json={"source": "http://example.com/file.bin", "dest": "models/sd15.safetensors"},
-        headers={"Authorization": f"Bearer {user1_token}"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+    mock_invoker.services.download_queue.download.assert_called_once()
+
+
+# ------------------- Advisory regression: dest confinement + SSRF -------------------
+
+
+def test_dest_is_anchored_in_download_cache_not_cwd(
+    client: TestClient, admin_token: str, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path
+):
+    """A relative `dest` must resolve under `download_cache_path`, not the process CWD.
+
+    Before the fix, `dest="nodes/pwn/__init__.py"` landed in the working directory --
+    which holds the custom-nodes directory in a source install and the application's own
+    Python package in the container image.
+    """
+    cwd = tmp_path / "server_cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
+
+    mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
+    r = client.post(
+        "/api/v1/download_queue/i/",
+        json={"source": "http://example.com/file.bin", "dest": "nodes/pwn/__init__.py"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r.status_code == status.HTTP_200_OK
+
+    passed_dest = mock_invoker.services.download_queue.download.call_args.args[1]
+    cache_root = mock_invoker.services.configuration.download_cache_path.resolve()
+    assert passed_dest.is_absolute()
+    assert passed_dest.is_relative_to(cache_root)
+    assert not passed_dest.is_relative_to(cwd)
+
+
+@pytest.mark.parametrize(
+    "unsafe_source",
+    [
+        "http://127.0.0.1:19191/proof.txt",
+        "http://localhost:19191/proof.txt",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://10.0.0.5/internal",
+        "http://[::1]:8080/proof.txt",
+        "http://0177.0.0.1/proof.txt",  # octal literal for 127.0.0.1
+        "http://2130706433/proof.txt",  # integer literal for 127.0.0.1
+    ],
+)
+def test_download_rejects_non_public_sources(
+    client: TestClient, admin_token: str, mock_invoker: Invoker, unsafe_source: str
+):
+    r = client.post(
+        "/api/v1/download_queue/i/",
+        json={"source": unsafe_source, "dest": "models/x.bin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
+    assert "non-public address" in r.json()["detail"]
+    mock_invoker.services.download_queue.download.assert_not_called()
+
+
+def test_download_allows_non_public_sources_when_opted_in(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    """Operators with a model mirror on their LAN can opt back in."""
+    mock_invoker.services.configuration.allow_private_download_urls = True
+    mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
+    r = client.post(
+        "/api/v1/download_queue/i/",
+        json={"source": "http://10.0.0.5/mirror/sd15.safetensors", "dest": "models/x.bin"},
+        headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert r.status_code == status.HTTP_200_OK
     mock_invoker.services.download_queue.download.assert_called_once()

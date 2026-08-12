@@ -247,7 +247,26 @@ Manager](/concepts/models) and can install, edit and delete
 models just as in single-user mode. Unprivileged users, however, can
 view the models previously installed, but cannot add or modify them.
 
+The download queue (`/api/v1/download_queue`) is likewise administrator-only,
+and downloads are written inside the configured `download_cache_dir`.
+
 ## Security
+
+### Download URL Restrictions
+
+Downloads are refused when the URL resolves to a loopback, link-local or
+private-network address. This stops a download URL from being used to reach
+services that only the server can see, such as an admin interface bound to
+`127.0.0.1` or a cloud instance-metadata endpoint. Redirects are checked at
+every hop, so a public URL cannot bounce the server onto a private address.
+
+If you install models from a mirror on your own network, re-enable those
+addresses in `invokeai.yaml`:
+
+```yaml
+allow_private_download_urls: true
+```
+
 
 :::note[Strict Password Checking]
 It is recommended that you enable strict password checking.  This will
