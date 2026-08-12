@@ -20,6 +20,7 @@ import {
   getRegionDropState,
   isWidgetDndData,
   isWidgetInstanceDragData,
+  measureDroppableVisibleRect,
   resolveWidgetDragEnd,
   type ActiveWidgetDrag,
   widgetCollisionDetection,
@@ -57,6 +58,12 @@ const DND_MODIFIERS = [restrictToWindowEdges];
  * rows legible while it does.
  */
 const DND_AUTO_SCROLL = { acceleration: 3, threshold: { x: 0.08, y: 0.08 } };
+
+/**
+ * Droppables are measured clipped to their scroll containers so targets
+ * scrolled out of view cannot catch drags (see measureDroppableVisibleRect).
+ */
+const DND_MEASURING = { droppable: { measure: measureDroppableVisibleRect } };
 
 export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
@@ -226,6 +233,7 @@ export const WorkbenchShell = () => {
       <DndContext
         autoScroll={DND_AUTO_SCROLL}
         collisionDetection={widgetCollisionDetection}
+        measuring={DND_MEASURING}
         modifiers={DND_MODIFIERS}
         sensors={sensors}
         onDragCancel={handleDragCancel}

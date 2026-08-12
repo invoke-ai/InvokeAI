@@ -1,8 +1,50 @@
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { WidgetIconComponent, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-import { closestCenter, pointerWithin, type CollisionDetection } from '@dnd-kit/core';
+import { closestCenter, getClientRect, pointerWithin, type CollisionDetection, type ClientRect } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
+
+const clipsOverflow = (value: string): boolean => value !== 'visible';
+
+/**
+ * Measures a droppable clipped by its overflow ancestors.
+ *
+ * dnd-kit's default measure is the raw client rect, which for a droppable
+ * scrolled out of a scroll container extends invisibly across whatever is
+ * rendered below — a gallery board row below the fold overlays the entire
+ * image grid. `pointerWithin` then reports drags as "over" that hidden row,
+ * and the auto-scroller races its scroll container to the bottom. Clipping
+ * the rect to what is actually visible removes the phantom targets: a fully
+ * clipped droppable collapses to a zero-size rect no pointer can be within.
+ */
+export const measureDroppableVisibleRect = (element: HTMLElement): ClientRect => {
+  const rect = { ...getClientRect(element) };
+  let ancestor = element.parentElement;
+
+  while (ancestor && ancestor !== document.body) {
+    const style = getComputedStyle(ancestor);
+
+    if (clipsOverflow(style.overflowX) || clipsOverflow(style.overflowY)) {
+      const clip = ancestor.getBoundingClientRect();
+
+      if (clipsOverflow(style.overflowY)) {
+        rect.top = Math.min(Math.max(rect.top, clip.top), clip.bottom);
+        rect.bottom = Math.min(Math.max(rect.bottom, clip.top), clip.bottom);
+      }
+      if (clipsOverflow(style.overflowX)) {
+        rect.left = Math.min(Math.max(rect.left, clip.left), clip.right);
+        rect.right = Math.min(Math.max(rect.right, clip.left), clip.right);
+      }
+    }
+
+    ancestor = ancestor.parentElement;
+  }
+
+  rect.width = Math.max(0, rect.right - rect.left);
+  rect.height = Math.max(0, rect.bottom - rect.top);
+
+  return rect;
+};
 
 export interface WidgetDndProject {
   widgetInstances: Record<WidgetInstanceId, { typeId: WidgetTypeId; title?: string }>;
