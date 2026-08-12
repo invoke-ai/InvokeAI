@@ -47,6 +47,17 @@ import { TopBar } from './topbar';
 
 const DND_MODIFIERS = [restrictToWindowEdges];
 
+/**
+ * dnd-kit's defaults (20% edge zones, acceleration 10) are tuned for lists
+ * that fill the screen. The gallery's board list in the side layout is under
+ * 250px tall, so a fifth of it is edge zone — and an image dragged up from
+ * the grid enters through the bottom zone at maximum scroll strength, racing
+ * the list away from the board being aimed at. Narrow zones mean only a
+ * deliberate hover at the edge scrolls, and the gentler acceleration keeps
+ * rows legible while it does.
+ */
+const DND_AUTO_SCROLL = { acceleration: 3, threshold: { x: 0.08, y: 0.08 } };
+
 export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
   const { t } = useTranslation();
@@ -213,6 +224,7 @@ export const WorkbenchShell = () => {
   return (
     <FocusRegionProvider>
       <DndContext
+        autoScroll={DND_AUTO_SCROLL}
         collisionDetection={widgetCollisionDetection}
         modifiers={DND_MODIFIERS}
         sensors={sensors}
