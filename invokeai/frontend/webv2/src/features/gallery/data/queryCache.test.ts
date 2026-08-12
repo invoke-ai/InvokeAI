@@ -66,13 +66,14 @@ const createData = (pages: GalleryItem[][]): GalleryItemsData => {
   };
 };
 
-const getItemsKey = (boardId: string, owner: AccountScope = captureAccountScope()) =>
+const getItemsKey = (boardId: string, owner: AccountScope = captureAccountScope(), starredFirst = false) =>
   galleryKeys.items(
     owner,
     canonicalizeGalleryItemsFilter({
       boardId,
       galleryView: 'images',
       searchTerm: '',
+      starredFirst,
     })
   );
 
@@ -129,6 +130,22 @@ describe('Gallery item cache patches', () => {
     expect(rolledBack.pageParams).toBe(pageParamsBefore);
     expect(rolledBack.pages[1]).toBe(untouchedPageBefore);
     expect(rolledBack.pages[0]?.items[1]).toBe(samePageUntouched);
+  });
+
+  it('patches star state immediately when the active list sorts starred items first', () => {
+    const client = createClient();
+    const target = createItem('target.png');
+    const key = getItemsKey('board-1', captureAccountScope(), true);
+
+    client.setQueryData(key, createData([[target]]));
+
+    patchGalleryItemCaches(client, {
+      kind: 'star',
+      result: getResult([{ kind: 'image', name: target.name }]),
+      starred: true,
+    });
+
+    expect(getData(client, key).pages[0]?.items[0]).toEqual({ ...target, starred: true });
   });
 
   it('deletes matching qualified items across pages and keeps each page total consistent', () => {

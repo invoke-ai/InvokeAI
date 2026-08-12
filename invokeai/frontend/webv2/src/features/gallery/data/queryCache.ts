@@ -169,10 +169,6 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
       continue;
     }
 
-    if (patch.kind === 'star' && filter.starredFirst) {
-      continue;
-    }
-
     const after = patchItemsInfiniteData(before, filter, patch, itemKeys);
 
     if (after === before) {
