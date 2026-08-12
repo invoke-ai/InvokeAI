@@ -43,6 +43,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { Invocation } from 'services/api/types';
+import { isSelfContainedSDNQFlux1Pipeline } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -85,7 +86,11 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const kleinQwen3EncoderModel = selectKleinQwen3EncoderModel(state);
   const flux2DevMistralEncoderModel = selectFlux2DevMistralEncoderModel(state);
 
-  if (!isFlux2) {
+  // A complete SDNQ FLUX.1 pipeline supplies its own T5, CLIP and VAE; the model loader node falls
+  // back to them when the corresponding input is omitted. Asserting here regardless would make that
+  // path unreachable, which is what readiness now also allows for.
+  const flux1PipelineSuppliesComponents = !isFlux2 && isSelfContainedSDNQFlux1Pipeline(model);
+  if (!isFlux2 && !flux1PipelineSuppliesComponents) {
     assert(t5EncoderModel, 'No T5 Encoder model found in state');
     assert(clipEmbedModel, 'No CLIP Embed model found in state');
     assert(fluxVAE, 'No FLUX VAE model found in state');
@@ -277,9 +282,16 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'flux_model_loader',
       id: getPrefixedId('flux_model_loader'),
       model,
-      t5_encoder_model: t5EncoderModel!,
-      clip_embed_model: clipEmbedModel!,
-      vae_model: fluxVAE,
+      // Omitted when the pipeline supplies them itself — the node then resolves each from the main
+      // model. Sending an explicit `null` would be indistinguishable, but leaving the keys off keeps
+      // the graph honest about what the user actually chose.
+      ...(flux1PipelineSuppliesComponents
+        ? {}
+        : {
+            t5_encoder_model: t5EncoderModel!,
+            clip_embed_model: clipEmbedModel!,
+            vae_model: fluxVAE,
+          }),
     });
 
     posCond = g.addNode({
