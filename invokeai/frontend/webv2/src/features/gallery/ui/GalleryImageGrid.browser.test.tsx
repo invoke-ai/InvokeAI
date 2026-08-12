@@ -901,6 +901,32 @@ describe('GalleryImageGrid virtualization', () => {
     expect(secondOptions?.getScrollElement).toBe(firstOptions?.getScrollElement);
   });
 
+  it('re-measures when the row model changes without a resize, and only then', async () => {
+    const gallery = createGallery({
+      items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+    });
+
+    await renderGallery(gallery);
+
+    // Collapsing starred keeps the visible range identical, so without an
+    // explicit measure() the virtualizer would keep serving the expanded
+    // offsets — the new rows would paint below a stale starred-sized hole.
+    mocks.measure.mockClear();
+    await click(getButton('Collapse starred items'));
+    expect(mocks.measure).toHaveBeenCalled();
+
+    // Swapping the item list (e.g. the media/assets view switch) is the same
+    // structural change arriving through props.
+    mocks.measure.mockClear();
+    await renderGallery(createGallery({ items: [createItem('image', 'other.png')] }));
+    expect(mocks.measure).toHaveBeenCalled();
+
+    // An equivalent render leaves the row model alone and must not thrash.
+    mocks.measure.mockClear();
+    await renderGallery({ ...currentGallery });
+    expect(mocks.measure).not.toHaveBeenCalled();
+  });
+
   it('retains constant row estimates, overscan, and the near-end infinite-load trigger', async () => {
     const items = Array.from({ length: 14 }, (_, index) => createItem('image', `image-${index}.png`));
 

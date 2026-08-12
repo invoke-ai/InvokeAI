@@ -16,11 +16,16 @@ import {
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
-import type { GalleryQueuePlaceholder } from './galleryStateView';
-
-import { GALLERY_GRID_GAP_PX, getGalleryCellSizePx, getGalleryColumnCount } from './galleryGridLayout';
+import {
+  buildGalleryGridRows,
+  GALLERY_GRID_GAP_PX,
+  GALLERY_STARRED_HEADER_HEIGHT_PX,
+  getGalleryCellSizePx,
+  getGalleryColumnCount,
+  getGalleryGridRowHeightPx,
+  getGalleryGridRowIndexForItem,
+} from './galleryGridLayout';
 import { GalleryQueuePlaceholderCell } from './GalleryQueuePlaceholderCell';
-import { getGalleryPlaceholderInsertionIndex } from './galleryStateView';
 import { GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -33,31 +38,76 @@ import { useGalleryGridSelection } from './useGalleryGridSelection';
  * tiles before the ResizeObserver reports.
  */
 const viewportWidthCache = new Map<string, number>();
-const STARRED_HEADER_HEIGHT_PX = 24;
-const STARRED_SECTION_GAP_PX = GALLERY_GRID_GAP_PX;
 const STARRED_TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
 
-type GridCell =
-  | { kind: 'item'; item: GalleryItem; itemIndex: number }
-  | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
+/** The disclosure row above the starred items, styled to match board rows. */
+const GalleryStarredSectionHeader = ({
+  isOpen,
+  itemCount,
+  offsetPx,
+  onToggle,
+}: {
+  isOpen: boolean;
+  itemCount: number;
+  offsetPx: number;
+  onToggle: () => void;
+}) => {
+  const { t } = useTranslation();
 
-type GridSection = 'regular' | 'starred';
-
-type GridRow =
-  | { kind: 'cells'; cells: GridCell[]; section: GridSection }
-  | { kind: 'starred-gap' }
-  | { kind: 'starred-header'; itemCount: number };
-
-const chunkCellsIntoRows = (cells: GridCell[], columnCount: number, section: GridSection): GridRow[] => {
-  const rows: GridRow[] = [];
-
-  for (let index = 0; index < cells.length; index += columnCount) {
-    rows.push({ cells: cells.slice(index, index + columnCount), kind: 'cells', section });
-  }
-
-  return rows;
+  return (
+    <Flex
+      align="center"
+      h={`${GALLERY_STARRED_HEADER_HEIGHT_PX}px`}
+      left="0"
+      position="absolute"
+      px="1"
+      top="0"
+      transform={`translateY(${offsetPx}px)`}
+      w="full"
+    >
+      <chakra.button
+        aria-expanded={isOpen}
+        aria-label={t(isOpen ? 'widgets.gallery.collapseStarredItems' : 'widgets.gallery.expandStarredItems')}
+        alignItems="center"
+        color="fg.muted"
+        cursor="pointer"
+        display="flex"
+        flex="1"
+        gap="1"
+        minW="0"
+        transition="color var(--wb-motion-duration-fast) ease"
+        type="button"
+        _hover={STARRED_TRIGGER_HOVER_STYLES}
+        onClick={onToggle}
+      >
+        <Icon
+          as={ChevronRightIcon}
+          boxSize="3"
+          transform={isOpen ? 'rotate(90deg)' : undefined}
+          transition="transform var(--wb-motion-duration-medium) ease"
+        />
+        <Icon as={StarIcon} boxSize="3" fill="currentColor" />
+        <HStack gap="1">
+          <Text
+            as="span"
+            fontSize="2xs"
+            fontWeight="600"
+            letterSpacing="wide"
+            lineHeight="1"
+            textTransform="uppercase"
+            truncate
+          >
+            {t('widgets.gallery.starredItems')}
+          </Text>
+          <Text as="span" color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1">
+            {itemCount}
+          </Text>
+        </HStack>
+      </chakra.button>
+    </Flex>
+  );
 };
 
 /**
@@ -100,50 +150,17 @@ export const GalleryImageGrid = () => {
     : t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.items.length === 0 && gallery.pendingPlaceholders.length === 0;
 
-  const rows = useMemo<GridRow[]>(() => {
-    const regularItemCells: GridCell[] = [];
-    const regularItems: GalleryItem[] = [];
-    const starredItemCells: GridCell[] = [];
-
-    gallery.items.forEach((item, itemIndex) => {
-      const cell: GridCell = { item, itemIndex, kind: 'item' };
-
-      if (item.starred) {
-        starredItemCells.push(cell);
-      } else {
-        regularItemCells.push(cell);
-        regularItems.push(item);
-      }
-    });
-
-    const placeholderCells: GridCell[] = gallery.pendingPlaceholders.map((placeholder) => ({
-      kind: 'placeholder',
-      placeholder,
-    }));
-    const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(regularItems, imageOrderDir, false);
-    const regularCells = [
-      ...regularItemCells.slice(0, placeholderInsertionIndex),
-      ...placeholderCells,
-      ...regularItemCells.slice(placeholderInsertionIndex),
-    ];
-    const nextRows: GridRow[] = [];
-
-    if (starredItemCells.length > 0) {
-      nextRows.push({ itemCount: starredItemCells.length, kind: 'starred-header' });
-
-      if (isStarredOpen) {
-        nextRows.push(...chunkCellsIntoRows(starredItemCells, columnCount, 'starred'));
-      }
-
-      if (regularCells.length > 0) {
-        nextRows.push({ kind: 'starred-gap' });
-      }
-    }
-
-    nextRows.push(...chunkCellsIntoRows(regularCells, columnCount, 'regular'));
-
-    return nextRows;
-  }, [columnCount, gallery.items, gallery.pendingPlaceholders, imageOrderDir, isStarredOpen]);
+  const rows = useMemo(
+    () =>
+      buildGalleryGridRows({
+        columnCount,
+        imageOrderDir,
+        isStarredOpen,
+        items: gallery.items,
+        pendingPlaceholders: gallery.pendingPlaceholders,
+      }),
+    [columnCount, gallery.items, gallery.pendingPlaceholders, imageOrderDir, isStarredOpen]
+  );
 
   const rowCount = rows.length;
   const cellSizePx = getGalleryCellSizePx({ columnCount, widthPx: viewportWidth });
@@ -152,23 +169,17 @@ export const GalleryImageGrid = () => {
     (index: number) => {
       const row = rows[index];
 
-      if (row?.kind === 'starred-header') {
-        return STARRED_HEADER_HEIGHT_PX;
-      }
-
-      if (row?.kind === 'starred-gap') {
-        return STARRED_SECTION_GAP_PX;
-      }
-
-      return rowHeightPx;
+      return row ? getGalleryGridRowHeightPx(row, rowHeightPx) : rowHeightPx;
     },
     [rowHeightPx, rows]
   );
+  const getRowKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
   const getScrollElement = useCallback(() => viewportRef.current, []);
 
   const virtualizer = useVirtualizer({
     count: rowCount,
     estimateSize: estimateRowSize,
+    getItemKey: getRowKey,
     getScrollElement,
     overscan: 4,
   });
@@ -182,9 +193,7 @@ export const GalleryImageGrid = () => {
   // identity would buy nothing and pinning the mutable virtualizer into a
   // dependency array defeats the compiler's own memoization.
   const scrollToItemIndex = (itemIndex: number) => {
-    const rowIndex = rows.findIndex(
-      (row) => row.kind === 'cells' && row.cells.some((cell) => cell.kind === 'item' && cell.itemIndex === itemIndex)
-    );
+    const rowIndex = getGalleryGridRowIndexForItem(rows, itemIndex);
 
     if (rowIndex >= 0) {
       virtualizer.scrollToIndex(rowIndex);
@@ -223,9 +232,16 @@ export const GalleryImageGrid = () => {
     return () => observer.disconnect();
   }, [isEmpty, region]);
 
-  useEffect(() => {
+  // The virtualizer only recomputes offsets lazily and only notifies
+  // subscribers when the visible index range changes, so a row-model change
+  // that keeps the range identical — collapsing the starred section, items
+  // moving between sections, a view switch swapping the item list — would
+  // paint the new rows at the previous rows' offsets. measure() recomputes
+  // from the current estimates and notifies unconditionally; running it as a
+  // layout effect keeps the stale frame from ever reaching the screen.
+  useLayoutEffect(() => {
     measureVirtualizer();
-  }, [rowHeightPx]);
+  }, [rowHeightPx, rows]);
 
   const virtualRows = virtualizer.virtualItems;
   const lastVisibleRowIndex = virtualRows[virtualRows.length - 1]?.index ?? 0;
@@ -321,78 +337,20 @@ export const GalleryImageGrid = () => {
                 {virtualRows.map((virtualRow) => {
                   const row = rows[virtualRow.index];
 
-                  if (!row) {
+                  if (!row || row.kind === 'starred-gap') {
                     return null;
                   }
 
                   if (row.kind === 'starred-header') {
                     return (
-                      <Flex
+                      <GalleryStarredSectionHeader
                         key={virtualRow.key}
-                        align="center"
-                        h={`${STARRED_HEADER_HEIGHT_PX}px`}
-                        left="0"
-                        position="absolute"
-                        px="1"
-                        top="0"
-                        transform={`translateY(${virtualRow.start}px)`}
-                        w="full"
-                      >
-                        <chakra.button
-                          aria-expanded={isStarredOpen}
-                          aria-label={t(
-                            isStarredOpen
-                              ? 'widgets.gallery.collapseStarredItems'
-                              : 'widgets.gallery.expandStarredItems'
-                          )}
-                          alignItems="center"
-                          color="fg.muted"
-                          cursor="pointer"
-                          display="flex"
-                          flex="1"
-                          gap="1"
-                          minW="0"
-                          transition="color var(--wb-motion-duration-fast) ease"
-                          type="button"
-                          _hover={STARRED_TRIGGER_HOVER_STYLES}
-                          onClick={handleToggleStarredSection}
-                        >
-                          <Icon
-                            as={ChevronRightIcon}
-                            boxSize="3"
-                            transform={isStarredOpen ? 'rotate(90deg)' : undefined}
-                            transition="transform var(--wb-motion-duration-medium) ease"
-                          />
-                          <Icon as={StarIcon} boxSize="3" fill="currentColor" />
-                          <HStack gap="1">
-                            <Text
-                              as="span"
-                              fontSize="2xs"
-                              fontWeight="600"
-                              letterSpacing="wide"
-                              lineHeight="1"
-                              textTransform="uppercase"
-                              truncate
-                            >
-                              {t('widgets.gallery.starredItems')}
-                            </Text>
-                            <Text
-                              as="span"
-                              color="fg.subtle"
-                              fontSize="2xs"
-                              fontVariantNumeric="tabular-nums"
-                              lineHeight="1"
-                            >
-                              {row.itemCount}
-                            </Text>
-                          </HStack>
-                        </chakra.button>
-                      </Flex>
+                        isOpen={isStarredOpen}
+                        itemCount={row.itemCount}
+                        offsetPx={virtualRow.start}
+                        onToggle={handleToggleStarredSection}
+                      />
                     );
-                  }
-
-                  if (row.kind === 'starred-gap') {
-                    return null;
                   }
 
                   return (
