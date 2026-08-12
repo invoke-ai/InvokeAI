@@ -1,4 +1,5 @@
 import type { GalleryItem, GalleryItemMutationResult, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryBoard } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -7,7 +8,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ALL_READABLE_BOARDS_ID } from './backend';
 import { canonicalizeGalleryItemsFilter, galleryKeys } from './queries';
-import { invalidateGallery, invalidateGalleryItems, patchGalleryItemCaches } from './queryCache';
+import {
+  getGalleryItemBoardIdsFromCaches,
+  invalidateGallery,
+  invalidateGalleryItems,
+  patchGalleryBoardCaches,
+  patchGalleryItemCaches,
+} from './queryCache';
 
 type GalleryItemsData = InfiniteData<GalleryItemsPage, number>;
 
@@ -242,6 +249,106 @@ describe('Gallery item cache patches', () => {
       name: target.name,
       starred: true,
     });
+  });
+});
+
+describe('getGalleryItemBoardIdsFromCaches', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('gallery-query-cache-test');
+  });
+
+  it('reads each requested item’s current board from whichever list holds it', () => {
+    const client = createClient();
+
+    client.setQueryData(getItemsKey('board-1'), createData([[createItem('a.png', 'board-1')]]));
+    client.setQueryData(
+      getItemsKey(ALL_READABLE_BOARDS_ID),
+      createData([[createItem('b.mp4', 'board-2', false, 'video')]])
+    );
+
+    const boardIds = getGalleryItemBoardIdsFromCaches(client, [
+      { kind: 'image', name: 'a.png' },
+      { kind: 'video', name: 'b.mp4' },
+      { kind: 'image', name: 'unloaded.png' },
+    ]);
+
+    expect(boardIds.get('image:a.png')).toBe('board-1');
+    expect(boardIds.get('video:b.mp4')).toBe('board-2');
+    expect(boardIds.has('image:unloaded.png')).toBe(false);
+  });
+});
+
+const createBoard = (id: string, overrides: Partial<GalleryBoard> = {}): GalleryBoard => ({
+  archived: false,
+  assetCount: 0,
+  id,
+  imageCount: 1,
+  kind: 'board',
+  name: `Board ${id}`,
+  projectId: null,
+  videoCount: 0,
+  ...overrides,
+});
+
+describe('patchGalleryBoardCaches', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('gallery-query-cache-test');
+  });
+
+  const getBoardsKey = (owner: AccountScope = captureAccountScope()) =>
+    galleryKeys.boards(owner, {
+      includeArchived: false,
+      includeDateBoards: true,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    });
+
+  it('patches the board in every cached list and rolls back to the prior lists', () => {
+    const client = createClient();
+    const key = getBoardsKey();
+    const untouched = createBoard('board-2');
+
+    client.setQueryData(key, [createBoard('board-1'), untouched]);
+    const before = client.getQueryData<GalleryBoard[]>(key);
+
+    const rollback = patchGalleryBoardCaches(client, 'board-1', { archived: true, name: 'Renamed' });
+    const after = client.getQueryData<GalleryBoard[]>(key);
+
+    expect(after?.[0]).toEqual({ ...createBoard('board-1'), archived: true, name: 'Renamed' });
+    expect(after?.[1]).toBe(untouched);
+
+    rollback();
+
+    // Structural sharing rebuilds the array, so compare by value and keep the
+    // untouched board's identity.
+    expect(client.getQueryData(key)).toEqual(before);
+    expect(client.getQueryData<GalleryBoard[]>(key)?.[1]).toBe(untouched);
+  });
+
+  it('does not let rollback clobber a later concurrent boards update', () => {
+    const client = createClient();
+    const key = getBoardsKey();
+
+    client.setQueryData(key, [createBoard('board-1')]);
+    const rollback = patchGalleryBoardCaches(client, 'board-1', { name: 'Renamed' });
+    const concurrent = client.setQueryData<GalleryBoard[]>(key, (boards) =>
+      boards?.map((board) => ({ ...board, imageCount: 9 }))
+    );
+
+    rollback();
+
+    expect(client.getQueryData(key)).toBe(concurrent);
+  });
+
+  it('leaves lists without the board untouched', () => {
+    const client = createClient();
+    const key = getBoardsKey();
+    const boards = [createBoard('board-2')];
+
+    client.setQueryData(key, boards);
+    patchGalleryBoardCaches(client, 'board-1', { archived: true });
+
+    expect(client.getQueryData(key)).toBe(boards);
   });
 });
 

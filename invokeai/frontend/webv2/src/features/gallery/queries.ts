@@ -16,5 +16,10 @@ export type {
   GalleryItemsListQueryKey,
   GalleryItemsWindow,
 } from './data/queries';
-export { invalidateGallery, invalidateGalleryItems, patchGalleryItemCaches } from './data/queryCache';
+export {
+  getGalleryItemBoardIdsFromCaches,
+  invalidateGallery,
+  invalidateGalleryItems,
+  patchGalleryItemCaches,
+} from './data/queryCache';
 export type { GalleryItemCachePatch } from './data/queryCache';

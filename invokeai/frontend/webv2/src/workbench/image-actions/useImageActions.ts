@@ -16,7 +16,7 @@ import {
   type GalleryItemRef,
 } from '@features/gallery';
 import { getGalleryBoardLabel } from '@features/gallery/contracts';
-import { invalidateGallery, patchGalleryItemCaches } from '@features/gallery/queries';
+import { getGalleryItemBoardIdsFromCaches, invalidateGallery, patchGalleryItemCaches } from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -232,7 +232,13 @@ export const useImageActions = ({
       reportMutationOutcome(action, requested.length, result, boardId);
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      let deletionContext: GalleryItemActionContext | null = null;
+      // Optimistic: the items vanish immediately. Capture the action context
+      // first — successor selection reasons about the pre-removal item list —
+      // and keep a snapshot rollback so a failed delete resurrects the lists
+      // before the confirmed subset is re-applied. Recent-image overlay
+      // entries cannot be restored the same way; the trailing invalidation
+      // brings a failed ref back from the backend list instead.
+      const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
         if (!deletionContext || !getItemActionContext) {
@@ -247,10 +253,20 @@ export const useImageActions = ({
           current.selectedItemKey === deletionContext.selectedItemKey
         );
       };
+      const rollbackCaches = patchGalleryItemCaches(queryClient, {
+        kind: 'delete',
+        result: { failed: [], succeeded: items },
+      });
+
+      gallery.removeItems(items.map(toGalleryItemKey));
 
       return runItemMutation({
         action: 'delete',
         applyConfirmed: async (result, signal) => {
+          if (result.failed.length > 0) {
+            rollbackCaches();
+          }
+
           if (result.succeeded.length === 0) {
             return;
           }
@@ -327,8 +343,6 @@ export const useImageActions = ({
           onImagesDeleted?.(result.succeeded.filter((item) => item.kind === 'image').map((item) => item.name));
         },
         mutate: async (signal) => {
-          deletionContext = getItemActionContext?.() ?? null;
-
           if (
             deletionContext?.selectedItemKey &&
             items.some((item) => toGalleryItemKey(item) === deletionContext?.selectedItemKey)
@@ -350,21 +364,45 @@ export const useImageActions = ({
       confirmImageDeletion
         ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
         : deleteItemsConfirmed(items);
-    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> =>
-      runItemMutation({
+    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
+      // Optimistic: the items leave the current board view immediately. A
+      // vanished item cannot be restored by another patch, so the failure
+      // path rolls the lists back wholesale and re-applies the confirmed
+      // subset; the trailing invalidation reconciles anything the rollback
+      // had to skip as conflicted.
+      const previousBoardIds = getGalleryItemBoardIdsFromCaches(queryClient, items);
+      const rollbackCaches = patchGalleryItemCaches(queryClient, {
+        boardId,
+        kind: 'move',
+        result: { failed: [], succeeded: items },
+      });
+
+      gallery.patchItems(items.map(toGalleryItemKey), { boardId });
+
+      return runItemMutation({
         action: 'move',
         applyConfirmed: (result) => {
-          if (result.succeeded.length === 0) {
+          if (result.failed.length === 0) {
             return;
           }
 
+          rollbackCaches();
           patchGalleryItemCaches(queryClient, { boardId, kind: 'move', result });
-          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { boardId });
+
+          for (const ref of result.failed) {
+            const key = toGalleryItemKey(ref);
+            const previousBoardId = previousBoardIds.get(key);
+
+            if (previousBoardId !== undefined) {
+              gallery.patchItems([key], { boardId: previousBoardId });
+            }
+          }
         },
         boardId,
         mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
         requested: items,
       });
+    };
     const patchItemsStarred = (refs: GalleryItemRef[], starred: boolean): void => {
       if (refs.length === 0) {
         return;

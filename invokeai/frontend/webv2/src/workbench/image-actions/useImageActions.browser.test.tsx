@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   downloadBlob: vi.fn(),
   galleryRemoveItems: vi.fn(),
   galleryPatchItems: vi.fn(),
+  getItemBoardIds: vi.fn((..._args: unknown[]) => new Map<string, string>()),
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
   imageMetadata: vi.fn(),
@@ -56,6 +57,7 @@ vi.mock('@features/gallery', () => ({
 }));
 
 vi.mock('@features/gallery/queries', () => ({
+  getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
   invalidateGalleryItems: (...args: unknown[]) => mocks.invalidateGalleryItems(...args),
   patchGalleryItemCaches: (...args: unknown[]) => mocks.patchGalleryItemCaches(...args),
@@ -280,7 +282,8 @@ describe('image recall capability cancellation', () => {
 });
 
 describe('partial image mutation outcomes', () => {
-  it('moves and patches only images confirmed by the backend', async () => {
+  it('moves optimistically, then rolls back and re-applies only backend-confirmed images', async () => {
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:locked.png', 'board-0']]));
     mocks.itemMoveToBoard.mockResolvedValue({
       affectedBoardIds: ['board-1'],
       failed: [{ kind: 'image', name: 'locked.png' }],
@@ -291,18 +294,39 @@ describe('partial image mutation outcomes', () => {
       await actionsRef.current?.moveImagesToBoard(['moved.png', 'locked.png'], 'board-1');
     });
 
-    const result = {
-      affectedBoardIds: ['board-1'],
-      failed: [{ kind: 'image', name: 'locked.png' }],
-      succeeded: [{ kind: 'image', name: 'moved.png' }],
-    };
-
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+    // The whole selection moves before the transport is even asked.
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
       boardId: 'board-1',
       kind: 'move',
-      result,
+      result: {
+        failed: [],
+        succeeded: [
+          { kind: 'image', name: 'moved.png' },
+          { kind: 'image', name: 'locked.png' },
+        ],
+      },
     });
-    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:moved.png'], { boardId: 'board-1' });
+    expect(mocks.patchGalleryItemCaches.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.itemMoveToBoard.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:moved.png', 'image:locked.png'], {
+      boardId: 'board-1',
+    });
+
+    // Partial failure: the optimistic patch is rolled back wholesale, the
+    // confirmed subset re-applied, and the rejected ref returns to the board
+    // it was captured on.
+    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
+      boardId: 'board-1',
+      kind: 'move',
+      result: {
+        affectedBoardIds: ['board-1'],
+        failed: [{ kind: 'image', name: 'locked.png' }],
+        succeeded: [{ kind: 'image', name: 'moved.png' }],
+      },
+    });
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['image:locked.png'], { boardId: 'board-0' });
   });
 
   it('stars optimistically before the request and reverts only backend-rejected images', async () => {
@@ -416,7 +440,7 @@ describe('mixed item mutation outcomes', () => {
     });
   });
 
-  it('moves mixed refs through the common organization result and patches only confirmed qualified keys', async () => {
+  it('moves mixed refs optimistically and reverts only the failed qualified key', async () => {
     const refs = [
       { kind: 'image' as const, name: 'shared' },
       { kind: 'video' as const, name: 'shared' },
@@ -426,6 +450,7 @@ describe('mixed item mutation outcomes', () => {
       failed: [refs[1]],
       succeeded: [refs[0]],
     };
+    mocks.getItemBoardIds.mockReturnValue(new Map([['video:shared', 'board-1']]));
     mocks.itemMoveToBoard.mockResolvedValue(result);
 
     await act(async () => {
@@ -433,12 +458,15 @@ describe('mixed item mutation outcomes', () => {
     });
 
     expect(mocks.itemMoveToBoard).toHaveBeenCalledWith(refs, 'board-2', expect.any(AbortSignal));
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:shared', 'video:shared'], {
+      boardId: 'board-2',
+    });
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
       boardId: 'board-2',
       kind: 'move',
       result,
     });
-    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:shared'], { boardId: 'board-2' });
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['video:shared'], { boardId: 'board-1' });
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
@@ -470,7 +498,7 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
 
-  it('deletes only confirmed refs and does not prune an ambiguous failed ref', async () => {
+  it('deletes optimistically, then rolls back and re-removes only confirmed refs on partial failure', async () => {
     const refs = [
       { kind: 'video' as const, name: 'gone.mp4' },
       { kind: 'image' as const, name: 'locked.png' },
@@ -486,8 +514,21 @@ describe('mixed item mutation outcomes', () => {
       await getItemActions().deleteItems(refs);
     });
 
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), { kind: 'delete', result });
-    expect(mocks.galleryRemoveItems).toHaveBeenCalledWith(['video:gone.mp4']);
+    // Everything requested vanishes before the transport is asked.
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
+      kind: 'delete',
+      result: { failed: [], succeeded: refs },
+    });
+    expect(mocks.patchGalleryItemCaches.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.itemDelete.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['video:gone.mp4', 'image:locked.png']);
+
+    // The failed ref is resurrected by the rollback, then only the confirmed
+    // ref is removed again.
+    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), { kind: 'delete', result });
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(2, ['video:gone.mp4']);
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
@@ -767,8 +808,14 @@ describe('primary successor after confirmed deletion', () => {
     resolveItem(successor);
     await act(() => deletion);
 
-    expect(mocks.patchGalleryItemCaches).not.toHaveBeenCalled();
-    expect(mocks.galleryRemoveItems).not.toHaveBeenCalled();
+    // The optimistic removal happened up front, on the account that asked for
+    // it; nothing further may apply once the account has changed.
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledOnce();
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'delete',
+      result: { failed: [], succeeded: [{ kind: 'image', name: primary.name }] },
+    });
+    expect(mocks.galleryRemoveItems).toHaveBeenCalledOnce();
     expect(mocks.gallerySelectItem).not.toHaveBeenCalled();
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
