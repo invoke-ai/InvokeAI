@@ -7,6 +7,7 @@ import io
 import pathlib
 import threading
 import traceback
+from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
 from tempfile import TemporaryDirectory
@@ -31,7 +32,7 @@ from invokeai.app.services.model_records import (
     ModelRecordOrderBy,
     UnknownModelException,
 )
-from invokeai.app.services.orphaned_models import OrphanedModelInfo
+from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
@@ -62,10 +63,36 @@ model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 # Conversion loads a model, writes a diffusers copy, then swaps the record. As an `async def`
 # body with no `await` it could not overlap with another request; running in the threadpool it
 # can, and two conversions in flight means two models resident at once with nothing bounding the
-# RAM/VRAM that takes - plus, for the same key, a second conversion reading a record the first is
-# midway through replacing. Held non-blocking: an admin gets a 409 telling them to wait rather
-# than an HTTP request that hangs for the minutes a conversion takes.
+# RAM/VRAM that takes. Held non-blocking: an admin gets a 409 telling them to wait rather than
+# an HTTP request that hangs for the minutes a conversion takes.
 _MODEL_CONVERSION_LOCK = threading.Lock()
+
+# Bounding conversions against each other is not enough: deletion runs in the threadpool too, and
+# conversion is a read-modify-replace spanning many service calls. Interleaved on one key, a
+# delete removes the source a conversion is still reading, the conversion's own final
+# `installer.delete` then fails, and the converted copy it already installed survives - so the
+# admin is told 204 and the model reappears under a new key. Claiming the key makes operations on
+# one model serialize while leaving different models free to run in parallel.
+_MODEL_KEY_CLAIM_LOCK = threading.Lock()
+_CLAIMED_MODEL_KEYS: set[str] = set()
+
+
+@contextlib.contextmanager
+def _claim_model_key(key: str) -> Generator[None, None, None]:
+    """Hold the exclusive claim on one model key, or raise 409 if another request holds it."""
+    with _MODEL_KEY_CLAIM_LOCK:
+        if key in _CLAIMED_MODEL_KEYS:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another operation on model {key} is already in progress. Wait for it to finish and try again.",
+            )
+        _CLAIMED_MODEL_KEYS.add(key)
+    try:
+        yield
+    finally:
+        with _MODEL_KEY_CLAIM_LOCK:
+            _CLAIMED_MODEL_KEYS.discard(key)
+
 
 # The HF token is process-global state backed by a file in the HF cache. Concurrent writers would
 # interleave set/reset with the status read that follows it, so the reported status need not
@@ -616,14 +643,15 @@ def delete_model(
     """
     logger = ApiDependencies.invoker.services.logger
 
-    try:
-        installer = ApiDependencies.invoker.services.model_manager.install
-        installer.delete(key)
-        logger.info(f"Deleted model: {key}")
-        return Response(status_code=204)
-    except UnknownModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+    with _claim_model_key(key):
+        try:
+            installer = ApiDependencies.invoker.services.model_manager.install
+            installer.delete(key)
+            logger.info(f"Deleted model: {key}")
+            return Response(status_code=204)
+        except UnknownModelException as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=404, detail=str(e))
 
 
 class BulkDeleteModelsRequest(BaseModel):
@@ -679,9 +707,15 @@ def bulk_delete_models(
 
     for key in request.keys:
         try:
-            installer.delete(key)
+            # Per key, so one model busy elsewhere is reported as a failure for that key rather
+            # than aborting the whole request or racing the operation that holds it.
+            with _claim_model_key(key):
+                installer.delete(key)
             deleted.append(key)
             logger.info(f"Deleted model: {key}")
+        except HTTPException as e:
+            logger.error(f"Failed to delete model {key}: {e.detail}")
+            failed.append({"key": key, "error": e.detail})
         except UnknownModelException as e:
             logger.error(f"Failed to delete model {key}: {str(e)}")
             failed.append({"key": key, "error": str(e)})
@@ -1181,7 +1215,11 @@ def convert_model(
             detail="Another model conversion is already in progress. Wait for it to finish and try again.",
         )
     try:
-        return _convert_model(key, user_id=current_admin.user_id)
+        # Claimed for the whole conversion, so a delete arriving mid-way is refused rather than
+        # pulling the source out from under it. Deletion never takes the conversion lock, so the
+        # two are ordered consistently and cannot deadlock.
+        with _claim_model_key(key):
+            return _convert_model(key, user_id=current_admin.user_id)
     finally:
         _MODEL_CONVERSION_LOCK.release()
 
@@ -1213,7 +1251,14 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
         logger.error(msg)
         raise HTTPException(400, msg)
 
-    with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
+    # Under the models root so `install_path` below moves the result rather than copying it across
+    # a filesystem boundary, but inside the scratch directory the orphan scan skips: a half-written
+    # diffusers copy is model files with no database record, which is exactly what that scan hunts
+    # for, and `DELETE /sync/orphaned` would rmtree it while it is still being written.
+    scratch_dir = ApiDependencies.invoker.services.configuration.models_path / CONVERSION_SCRATCH_DIRNAME
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+
+    with TemporaryDirectory(dir=scratch_dir) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
         converted_model = loader.load_model(model_config, user_id=user_id)
         # write the converted file to the convert path

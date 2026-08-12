@@ -327,3 +327,95 @@ def test_convert_model_releases_the_lock_when_the_conversion_fails() -> None:
         with pytest.raises(HTTPException) as exc_info:
             convert_model(MagicMock(), key="some-key")
     assert exc_info.value.status_code == 424
+
+
+def test_delete_is_refused_while_the_same_model_is_being_converted() -> None:
+    """A delete landing mid-conversion must not pull the source out from under it.
+
+    Conversion is a read-modify-replace spanning many service calls: it loads the model, writes a
+    diffusers copy, installs that copy, then deletes the original. As `async def` bodies with no
+    `await` neither route could interleave with the other; in the threadpool they can. A delete
+    slipping into the middle removes the record the conversion is still working from, the
+    conversion's own final delete then fails, and the copy it already installed survives — so the
+    admin is answered 204 and the model reappears under a new key.
+    """
+    import threading
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers.model_manager import convert_model, delete_model
+
+    conversion_running = threading.Event()
+    release_conversion = threading.Event()
+    installer = MagicMock()
+
+    def blocking_conversion(key: str, user_id: str) -> object:
+        conversion_running.set()
+        assert release_conversion.wait(timeout=30)
+        return MagicMock()
+
+    with patch("invokeai.app.api.routers.model_manager.ApiDependencies") as deps:
+        deps.invoker.services.model_manager.install = installer
+        with patch("invokeai.app.api.routers.model_manager._convert_model", side_effect=blocking_conversion):
+            conversion = threading.Thread(target=convert_model, args=(MagicMock(),), kwargs={"key": "model-key"})
+            conversion.start()
+            try:
+                assert conversion_running.wait(timeout=30)
+
+                with pytest.raises(HTTPException) as exc_info:
+                    delete_model(MagicMock(), key="model-key")
+
+                assert exc_info.value.status_code == 409
+                # The refusal has to happen before the installer is touched, not after.
+                installer.delete.assert_not_called()
+
+                # A different model is untouched by the claim.
+                delete_model(MagicMock(), key="other-key")
+                installer.delete.assert_called_once_with("other-key")
+            finally:
+                release_conversion.set()
+                conversion.join(timeout=30)
+                assert not conversion.is_alive()
+
+        # Once the conversion is done the key is free again.
+        delete_model(MagicMock(), key="model-key")
+    assert installer.delete.call_args_list[-1].args == ("model-key",)
+
+
+def test_bulk_delete_reports_a_busy_key_instead_of_racing_it() -> None:
+    """Bulk deletion claims each key separately, so one busy model does not stall or corrupt the rest."""
+    import threading
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers.model_manager import BulkDeleteModelsRequest, bulk_delete_models, convert_model
+
+    conversion_running = threading.Event()
+    release_conversion = threading.Event()
+    installer = MagicMock()
+
+    def blocking_conversion(key: str, user_id: str) -> object:
+        conversion_running.set()
+        assert release_conversion.wait(timeout=30)
+        return MagicMock()
+
+    with patch("invokeai.app.api.routers.model_manager.ApiDependencies") as deps:
+        deps.invoker.services.model_manager.install = installer
+        with patch("invokeai.app.api.routers.model_manager._convert_model", side_effect=blocking_conversion):
+            conversion = threading.Thread(target=convert_model, args=(MagicMock(),), kwargs={"key": "busy-key"})
+            conversion.start()
+            try:
+                assert conversion_running.wait(timeout=30)
+
+                response = bulk_delete_models(
+                    MagicMock(), request=BulkDeleteModelsRequest(keys=["free-key", "busy-key"])
+                )
+            finally:
+                release_conversion.set()
+                conversion.join(timeout=30)
+                assert not conversion.is_alive()
+
+    assert response.deleted == ["free-key"]
+    assert [entry["key"] for entry in response.failed] == ["busy-key"]
+    assert "already in progress" in response.failed[0]["error"]
+    installer.delete.assert_called_once_with("free-key")
