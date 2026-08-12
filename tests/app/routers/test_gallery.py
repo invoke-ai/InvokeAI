@@ -49,6 +49,18 @@ def test_gallery_list_endpoints_parse_and_forward_created_ranges(
 
 
 @pytest.mark.parametrize("path", ["/api/v1/gallery/items/", "/api/v1/gallery/items/names"])
+def test_gallery_list_endpoints_disable_browser_caching(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str
+) -> None:
+    _prepare_gallery_router_test(monkeypatch, mock_invoker)
+
+    response = client.get(path)
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "private, no-store"
+
+
+@pytest.mark.parametrize("path", ["/api/v1/gallery/items/", "/api/v1/gallery/items/names"])
 @pytest.mark.parametrize("param", ["created_from", "created_to"])
 def test_gallery_list_endpoints_reject_invalid_created_range_dates(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str, param: str
