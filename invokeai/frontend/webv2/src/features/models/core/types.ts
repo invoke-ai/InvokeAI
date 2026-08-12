@@ -45,6 +45,7 @@ export type ModelTaxonomyType =
   | 'qwen_vl_encoder'
   | 'qwen3_vl_encoder'
   | 'wan_t5_encoder'
+  | 'mistral_encoder'
   | 'gemma2_encoder'
   | 'pid_decoder'
   | 'siglip'
@@ -98,6 +99,8 @@ export interface MainModelDefaultSettings {
 
 export interface LoraModelDefaultSettings {
   weight?: number | null;
+  weight_min?: number | null;
+  weight_max?: number | null;
 }
 
 export interface ControlAdapterDefaultSettings {
@@ -135,12 +138,20 @@ export interface ModelConfig {
   trigger_phrases?: string[] | null;
   default_settings?: AnyModelDefaultSettings | null;
   submodels?: Record<string, unknown> | null;
+  /** Diffusers-format repos: precision sub-folder variant; '' = default. */
+  repo_variant?: string | null;
+  /** InvokeAI-format IP adapters: the paired image encoder's model id. */
+  image_encoder_model_id?: string;
+  /** External API models. */
+  provider_id?: string;
+  provider_model_id?: string;
   [key: string]: unknown;
 }
 
 /** Body for PATCH `/api/v2/models/i/{key}` — all fields optional. */
 export interface ModelRecordChanges {
   name?: string;
+  path?: string;
   description?: string | null;
   source_url?: string | null;
   base?: ModelBase;
@@ -246,6 +257,11 @@ export interface OrphanedModelInfo {
 
 export interface BulkDeleteModelsResponse {
   deleted: string[];
+  failed: { key: string; error: string }[];
+}
+
+export interface BulkReidentifyModelsResponse {
+  succeeded: string[];
   failed: { key: string; error: string }[];
 }
 

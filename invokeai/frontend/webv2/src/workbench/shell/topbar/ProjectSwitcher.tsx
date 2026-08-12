@@ -151,7 +151,7 @@ export const ProjectSwitcher = () => {
         <Menu.Trigger asChild>
           <Button
             aria-label={t('topbar.projectSwitcher.trigger', { name: activeProjectName })}
-            size="sm"
+            size="xs"
             variant="ghost"
           >
             <Text css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" truncate>
@@ -171,6 +171,7 @@ export const ProjectSwitcher = () => {
                   {activeProjectName}
                 </Text>
               </Stack>
+              <Menu.Separator />
               <Menu.Item value="rename-project" onClick={renameActiveProject}>
                 <Icon as={PencilIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('projects.renameWithEllipsis')}</Menu.ItemText>

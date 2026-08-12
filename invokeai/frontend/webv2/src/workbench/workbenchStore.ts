@@ -1,4 +1,5 @@
 import type { ProjectGraphAction } from '@features/workflow/utility';
+import type { LayoutPreset } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
@@ -12,6 +13,8 @@ import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { recordDiagnosticEntry } from './diagnostics/logger';
+import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
+import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { getWorkbenchPreferences } from './settings/store';
 import {
   createInitialWorkbenchState,
@@ -55,7 +58,11 @@ export type ProjectCommandResult =
   | { ok: true }
   | { ok: false; reason: 'invalid-name' | 'last-project' | 'project-not-found' };
 
-const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchState) => {
+const createCommands = (
+  dispatch: WorkbenchDispatch,
+  getState: () => WorkbenchState,
+  activateLayoutPreset: ReturnType<typeof createLayoutPresetActivator>['activate']
+) => {
   const command = createCommandFactory(dispatch);
 
   return {
@@ -240,18 +247,40 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       toggleSourceLock: command('toggleSourceLock'),
     },
     layout: {
+      activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) =>
+        activateLayoutPreset(resolveSavedLayoutPreset(getState().account, presetId)),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
         'addLayoutPreset',
-        (presetId: ActionPayload<'addLayoutPreset'>['presetId'], label: string, iconId?: string) => ({
+        (
+          presetId: ActionPayload<'addLayoutPreset'>['presetId'],
+          label: string,
+          iconId?: string,
+          defaultRoute?: ActionPayload<'addLayoutPreset'>['defaultRoute']
+        ) => ({
+          defaultRoute,
           iconId,
           label,
           presetId,
         })
       ),
+      reorderPresets: command(
+        'reorderLayoutPresets',
+        (
+          activeId: ActionPayload<'reorderLayoutPresets'>['activeId'],
+          overId: ActionPayload<'reorderLayoutPresets'>['overId']
+        ) => ({ activeId, overId })
+      ),
       setPresetIcon: command(
         'setLayoutPresetIcon',
         (presetId: ActionPayload<'setLayoutPresetIcon'>['presetId'], iconId: string) => ({ iconId, presetId })
+      ),
+      setPresetRoute: command(
+        'setLayoutPresetRoute',
+        (
+          presetId: ActionPayload<'setLayoutPresetRoute'>['presetId'],
+          defaultRoute: ActionPayload<'setLayoutPresetRoute'>['defaultRoute']
+        ) => ({ defaultRoute, presetId })
       ),
       deletePreset: command('deleteLayoutPreset', (presetId: ActionPayload<'deleteLayoutPreset'>['presetId']) => ({
         presetId,
@@ -266,7 +295,7 @@ const createCommands = (dispatch: WorkbenchDispatch, getState: () => WorkbenchSt
       savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
         presetId,
       })),
-      /** Drops saved edits to a built-in preset, restoring its shipped arrangement. */
+      /** Drops saved arrangement, identity, and route edits from a built-in preset. */
       restorePresetDefault: command(
         'restoreLayoutPresetDefault',
         (presetId: ActionPayload<'restoreLayoutPresetDefault'>['presetId']) => ({ presetId })
@@ -482,6 +511,10 @@ export interface WorkbenchInternalStore {
   subscribe: (listener: () => void) => () => void;
 }
 
+export interface WorkbenchStoreOptions {
+  loadLayoutPresetWidgets?: (preset: LayoutPreset) => Promise<unknown>;
+}
+
 const getActiveProject = (state: WorkbenchState): Project =>
   state.projects.find((project) => project.id === state.activeProjectId) ?? state.projects[0];
 
@@ -568,10 +601,14 @@ const recordDiagnosticForAction = (
   }
 };
 
-export const createWorkbenchStore = (initialState = createInitialWorkbenchState()): WorkbenchInternalStore => {
+export const createWorkbenchStore = (
+  initialState = createInitialWorkbenchState(),
+  options: WorkbenchStoreOptions = {}
+): WorkbenchInternalStore => {
   let state = initialState;
   let hasHydrated = false;
   let persistedRevision = 0;
+  let invalidateLayoutPresetActivation = (): void => undefined;
   const snapshotStore = createExternalStore(createSnapshot(state, hasHydrated));
 
   const setSnapshotState = (nextState: WorkbenchState, nextHasHydrated = hasHydrated): void => {
@@ -594,14 +631,34 @@ export const createWorkbenchStore = (initialState = createInitialWorkbenchState(
       autoSwitchInvocationRoute: getWorkbenchPreferences().autoSwitchInvocationRoute,
     });
 
+    if (
+      action.type === 'applyPreset' ||
+      action.type === 'hydrateWorkbench' ||
+      previousState.activeProjectId !== nextState.activeProjectId
+    ) {
+      invalidateLayoutPresetActivation();
+    }
+
     setSnapshotState(nextState);
     recordDiagnosticForAction(action, previousState, nextState);
   };
 
   const getState = (): WorkbenchState => state;
+  const layoutPresetActivator = createLayoutPresetActivator({
+    apply: (presetId) => dispatch({ presetId, type: 'applyPreset' }),
+    getActiveProjectId: () => state.activeProjectId,
+    isCurrent: (preset) => {
+      const current = resolveSavedLayoutPreset(state.account, preset.id);
+
+      return current.id === preset.id && current.snapshot === preset.snapshot;
+    },
+    load: options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets,
+  });
+  invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;
+  const commands = createCommands(dispatch, getState, layoutPresetActivator.activate);
 
   return {
-    commands: createCommands(dispatch, getState),
+    commands,
     getPersistedRevision: () => persistedRevision,
     getSnapshot: snapshotStore.getSnapshot,
     getState,

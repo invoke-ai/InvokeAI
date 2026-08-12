@@ -2,6 +2,7 @@ import type {
   BuiltInLayoutPresetId,
   CenterViewId,
   LayoutPreset,
+  LayoutPresetRoute,
   LayoutPresetSnapshot,
   LayoutPresetWidgetInstanceSnapshot,
   PanelState,
@@ -93,60 +94,63 @@ const createSnapshot = ({
 export interface BuiltInLayoutPresetDescriptor {
   defaultKeys: readonly string[];
   hotkeyId: string;
-  iconId: string;
-  preset: LayoutPreset;
-  tooltip: string;
+  preset: BuiltInLayoutPreset;
+}
+
+export interface BuiltInLayoutPreset extends LayoutPreset {
+  defaultRoute: LayoutPresetRoute;
+  id: BuiltInLayoutPresetId;
+  isBuiltIn: true;
 }
 
 const createPresetDescriptor = ({
   centerViewId,
   defaultKeys,
+  defaultRoute,
   hotkeyId,
   id,
   iconId,
   label,
   panels,
-  tooltip,
   widgetRegions,
 }: {
   centerViewId: CenterViewId;
   defaultKeys: readonly string[];
+  defaultRoute: LayoutPresetRoute;
   hotkeyId: string;
   id: BuiltInLayoutPresetId;
   iconId: string;
   label: string;
   panels: PanelState;
-  tooltip: string;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
 }): BuiltInLayoutPresetDescriptor => ({
   defaultKeys,
   hotkeyId,
-  iconId,
   preset: {
+    defaultRoute,
+    iconId,
     id,
     isBuiltIn: true,
     label,
     snapshot: createSnapshot({ centerViewId, panels, presetId: id, widgetRegions }),
   },
-  tooltip,
 });
 
 /**
- * The three shipped presets. Each is an arrangement, named for the work it
- * supports rather than the widget it happens to open — several graph widgets
- * are placed in every one of them, which is exactly why a preset can never
- * imply an invocation source.
+ * The three shipped presets. Each combines an arrangement with an editable
+ * default route. The route is explicit preset data rather than something
+ * inferred from whichever graph widgets happen to be placed in the layout.
  */
 export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
     centerViewId: 'preview',
     defaultKeys: ['alt+1'],
+    defaultRoute: { destination: 'gallery', sourceId: 'generate' },
     hotkeyId: 'selectComposePreset',
     id: 'compose',
     iconId: 'type',
     label: 'Compose',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    tooltip: 'Text to image',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'gallery:bottom',
@@ -174,12 +178,12 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
     centerViewId: 'canvas',
     defaultKeys: ['alt+2'],
+    defaultRoute: { destination: 'canvas', sourceId: 'canvas' },
     hotkeyId: 'selectEditPreset',
     id: 'edit',
     iconId: 'layers',
     label: 'Edit',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    tooltip: 'Canvas editing',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'gallery:bottom',
@@ -207,12 +211,12 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   createPresetDescriptor({
     centerViewId: 'workflow',
     defaultKeys: ['alt+3'],
+    defaultRoute: { destination: 'gallery', sourceId: 'workflow' },
     hotkeyId: 'selectAutomatePreset',
     id: 'automate',
     iconId: 'workflow',
     label: 'Automate',
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-    tooltip: 'Node workflows',
     widgetRegions: {
       bottom: createRegion({
         activeInstanceId: 'workflow:bottom',
@@ -239,9 +243,9 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
   }),
 ];
 
-export const layoutPresets: LayoutPreset[] = builtInLayoutPresetDescriptors.map(({ preset }) => preset);
+export const layoutPresets: BuiltInLayoutPreset[] = builtInLayoutPresetDescriptors.map(({ preset }) => preset);
 
-export const defaultLayoutPreset = layoutPresets[0];
+export const defaultLayoutPreset = layoutPresets[0]!;
 
 /**
  * Preset ids persisted before the three-preset model. `gallery` had no successor
@@ -262,7 +266,7 @@ const legacyLayoutPresetIds: Record<string, BuiltInLayoutPresetId> = {
  */
 export const resolveLayoutPresetId = (presetId: string): string => legacyLayoutPresetIds[presetId] ?? presetId;
 
-export const getLayoutPreset = (presetId: string) =>
+export const getLayoutPreset = (presetId: string): BuiltInLayoutPreset =>
   layoutPresets.find((preset) => preset.id === resolveLayoutPresetId(presetId)) ?? defaultLayoutPreset;
 
 export const isBuiltInLayoutPresetId = (presetId: string): presetId is BuiltInLayoutPresetId =>

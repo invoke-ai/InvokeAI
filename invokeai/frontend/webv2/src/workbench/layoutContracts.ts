@@ -1,3 +1,4 @@
+import type { InvocationSourceId, ResultDestination } from './invocationContracts';
 import type { WidgetInstanceId, WidgetTypeId } from './widgetContracts';
 
 /**
@@ -45,10 +46,21 @@ export interface LayoutPresetSnapshot {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
 }
 
+/**
+ * The route a preset establishes when it is activated. Locks belong to the
+ * live project controller and are intentionally never persisted on a preset.
+ */
+export interface LayoutPresetRoute {
+  sourceId: InvocationSourceId;
+  destination: ResultDestination;
+}
+
 export interface LayoutPreset {
   id: LayoutPresetId;
   label: string;
   isBuiltIn?: boolean;
+  /** Missing only on legacy or source-less custom presets. */
+  defaultRoute?: LayoutPresetRoute;
   /**
    * Icon identifier, not a component: presets are persisted verbatim, so this
    * has to survive a round trip through storage. Resolved against the picker's
@@ -63,4 +75,15 @@ export interface LayoutPreset {
  * preset bodies are code, so "Save changes" cannot mutate them in place; the
  * override is what the drift comparison and `Revert to saved layout` read.
  */
-export type LayoutPresetOverrides = Record<string, LayoutPresetSnapshot>;
+export type LayoutPresetOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetSnapshot>>;
+
+/** Per-account edits to the default routes shipped with built-in presets. */
+export type LayoutPresetRouteOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetRoute>>;
+
+/** Per-account edits to the identity shipped with a built-in preset. */
+export interface LayoutPresetMetadataOverride {
+  iconId?: string;
+  label?: string;
+}
+
+export type LayoutPresetMetadataOverrides = Partial<Record<BuiltInLayoutPresetId, LayoutPresetMetadataOverride>>;

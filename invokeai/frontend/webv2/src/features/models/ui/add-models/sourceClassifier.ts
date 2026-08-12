@@ -1,16 +1,38 @@
 /** owner/repo with optional :variant[:path] qualifiers - the HF repo shape. */
 const HF_REPO_PATTERN = /^[\w.-]+\/[\w.-]+(:[\w./-]*)*$/;
-const FILE_EXTENSION_PATTERN = /\.[A-Za-z0-9]{1,10}$/;
+// 12 covers the longest real model extension, ".safetensors" (11 letters).
+const FILE_EXTENSION_PATTERN = /\.[A-Za-z0-9]{1,12}$/;
+/**
+ * Extensions that mark a relative path as a model file rather than an HF repo
+ * id. Deliberately narrower than FILE_EXTENSION_PATTERN: real repo ids end in
+ * dot-suffixes too ("stabilityai/stable-diffusion-2.1").
+ */
+const MODEL_FILE_EXTENSION_PATTERN = /\.(safetensors|ckpt|pt|pth|bin|gguf|onnx|pkl)$/i;
+const RELATIVE_PATH_PATTERN = /^\.{1,2}[\\/]/;
 
-export interface SourceKind {
-  looksLocal: boolean;
-  looksUrl: boolean;
-  looksRepo: boolean;
-  isInstallable: boolean;
-  localKind: 'file' | 'folder' | null;
-  /** Human label of the detected source kind, or null when it reads as a search. */
-  label: string | null;
-}
+/**
+ * Discriminated on `isInstallable`: an installable source always carries a
+ * label key, and a search never looks like any source shape — so consumers
+ * need no null fallbacks inside an installable branch.
+ */
+export type SourceKind =
+  | {
+      isInstallable: true;
+      looksLocal: boolean;
+      looksUrl: boolean;
+      looksRepo: boolean;
+      localKind: 'file' | 'folder' | null;
+      /** i18n key for the detected source kind. */
+      labelKey: string;
+    }
+  | {
+      isInstallable: false;
+      looksLocal: false;
+      looksUrl: false;
+      looksRepo: false;
+      localKind: null;
+      labelKey: null;
+    };
 
 const classifyLocalPath = (value: string): 'file' | 'folder' => {
   if (/[\\/]$/.test(value)) {
@@ -26,13 +48,36 @@ const classifyLocalPath = (value: string): 'file' | 'folder' => {
 export const classifySource = (value: string): SourceKind => {
   const looksLocal = value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value);
   const looksUrl = /^https?:\/\//i.test(value);
-  const looksRepo = !looksLocal && !looksUrl && HF_REPO_PATTERN.test(value);
-  const isInstallable = looksLocal || looksUrl || looksRepo;
+  // "models/foo.safetensors" and "./repo" satisfy the HF repo shape but are
+  // clearly path-like; they fall through to search, since a relative path is
+  // not an installable source. The extension check runs on the pre-colon
+  // portion so "owner/repo:fp16:path/file.safetensors" stays a repo.
+  const looksRelativePath =
+    RELATIVE_PATH_PATTERN.test(value) || MODEL_FILE_EXTENSION_PATTERN.test(value.split(':', 1)[0] ?? '');
+  const looksRepo = !looksLocal && !looksUrl && !looksRelativePath && HF_REPO_PATTERN.test(value);
+
+  if (!looksLocal && !looksUrl && !looksRepo) {
+    return {
+      isInstallable: false,
+      labelKey: null,
+      localKind: null,
+      looksLocal: false,
+      looksRepo: false,
+      looksUrl: false,
+    };
+  }
+
   const localKind = looksLocal ? classifyLocalPath(value) : null;
 
   return {
-    isInstallable,
-    label: looksLocal ? `${localKind} path` : looksUrl ? 'URL' : looksRepo ? 'Hugging Face repo' : null,
+    isInstallable: true,
+    labelKey: looksLocal
+      ? localKind === 'file'
+        ? 'models.sourceKind.filePath'
+        : 'models.sourceKind.folderPath'
+      : looksUrl
+        ? 'models.sourceKind.url'
+        : 'models.sourceKind.hfRepo',
     localKind,
     looksLocal,
     looksRepo,
