@@ -347,32 +347,39 @@ def reidentify_model(
 ) -> AnyModelConfig:
     """Attempt to reidentify a model by re-probing its weights file."""
     try:
-        config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
-        models_path = ApiDependencies.invoker.services.configuration.models_path
-        if pathlib.Path(config.path).is_relative_to(models_path):
-            model_path = pathlib.Path(config.path)
-        else:
-            model_path = models_path / config.path
-        mod = ModelOnDisk(model_path)
-        result = ModelConfigFactory.from_model_on_disk(mod)
-        if result.config is None:
-            raise InvalidModelException("Unable to identify model format")
-
-        # Retain user-editable fields from the original config
-        result.config.path = config.path
-        result.config.key = config.key
-        result.config.name = config.name
-        result.config.description = config.description
-        result.config.cover_image = config.cover_image
-        if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
-            result.config.trigger_phrases = config.trigger_phrases
-        result.config.source = config.source
-        result.config.source_type = config.source_type
-
-        new_config = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
-        return new_config
+        with _claim_model_key(key):
+            return _reidentify_model(key)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except InvalidModelException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def _reidentify_model(key: str) -> AnyModelConfig:
+    """Re-probe one model and rewrite its record. Callers must hold the key claim."""
+    config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+    if pathlib.Path(config.path).is_relative_to(models_path):
+        model_path = pathlib.Path(config.path)
+    else:
+        model_path = models_path / config.path
+    mod = ModelOnDisk(model_path)
+    result = ModelConfigFactory.from_model_on_disk(mod)
+    if result.config is None:
+        raise InvalidModelException("Unable to identify model format")
+
+    # Retain user-editable fields from the original config
+    result.config.path = config.path
+    result.config.key = config.key
+    result.config.name = config.name
+    result.config.description = config.description
+    result.config.cover_image = config.cover_image
+    if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
+        result.config.trigger_phrases = config.trigger_phrases
+    result.config.source = config.source
+    result.config.source_type = config.source_type
+
+    return ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
 
 
 class FoundModel(BaseModel):
@@ -498,37 +505,41 @@ async def update_model_record(
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
-    try:
-        previous_config = record_store.get_model(key)
-        config = record_store.update_model(key, changes=changes, allow_class_change=True)
-        # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
-        # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
-        # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-        if _load_settings_changed(previous_config, config):
-            # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
-            # Hold the model-load write lock so no worker is mid-construction while we invalidate:
-            # a concurrent load could otherwise peek the old shared CPU weights before the drop and
-            # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
-            # load/VRAM transfer, so do it off the event loop.
-            def _drop_from_all_caches() -> int:
-                with MODEL_LOAD_LOCK.write_lock():
-                    return sum(
-                        cache.drop_model(key)
-                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
-                    )
+    # Claimed for the whole update: a conversion running on this key carries a snapshot of the
+    # record taken before it started and writes it into the replacement, so an edit accepted
+    # meanwhile would be reported as saved and then silently dropped.
+    with _claim_model_key(key):
+        try:
+            previous_config = record_store.get_model(key)
+            config = record_store.update_model(key, changes=changes, allow_class_change=True)
+            # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
+            # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
+            # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
+            if _load_settings_changed(previous_config, config):
+                # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
+                # Hold the model-load write lock so no worker is mid-construction while we invalidate:
+                # a concurrent load could otherwise peek the old shared CPU weights before the drop and
+                # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
+                # load/VRAM transfer, so do it off the event loop.
+                def _drop_from_all_caches() -> int:
+                    with MODEL_LOAD_LOCK.write_lock():
+                        return sum(
+                            cache.drop_model(key)
+                            for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
+                        )
 
-            dropped = await asyncio.to_thread(_drop_from_all_caches)
-            if dropped:
-                logger.info(
-                    f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
-                )
-        config = prepare_model_config_for_response(config, ApiDependencies)
-        logger.info(f"Updated model: {key}")
-    except UnknownModelException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+                dropped = await asyncio.to_thread(_drop_from_all_caches)
+                if dropped:
+                    logger.info(
+                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
+                    )
+            config = prepare_model_config_for_response(config, ApiDependencies)
+            logger.info(f"Updated model: {key}")
+        except UnknownModelException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=409, detail=str(e))
     return config
 
 
@@ -613,12 +624,15 @@ async def update_model_image(
 
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-    try:
-        model_images.save(pil_image, key)
-        logger.info(f"Updated image for model: {key}")
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+    # A conversion moves this model's image to the replacement's key when it finishes, so an
+    # upload accepted in the meantime would be attached to the record about to be deleted.
+    with _claim_model_key(key):
+        try:
+            model_images.save(pil_image, key)
+            logger.info(f"Updated image for model: {key}")
+        except ValueError as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=409, detail=str(e))
     return
 
 
@@ -745,38 +759,22 @@ def bulk_reidentify_models(
     Returns a list of successfully reidentified keys and failed reidentifications with error messages.
     """
     logger = ApiDependencies.invoker.services.logger
-    store = ApiDependencies.invoker.services.model_manager.store
-    models_path = ApiDependencies.invoker.services.configuration.models_path
 
     succeeded = []
     failed = []
 
     for key in request.keys:
         try:
-            config = store.get_model(key)
-            if pathlib.Path(config.path).is_relative_to(models_path):
-                model_path = pathlib.Path(config.path)
-            else:
-                model_path = models_path / config.path
-            mod = ModelOnDisk(model_path)
-            result = ModelConfigFactory.from_model_on_disk(mod)
-            if result.config is None:
-                raise InvalidModelException("Unable to identify model format")
-
-            # Retain user-editable fields from the original config
-            result.config.path = config.path
-            result.config.key = config.key
-            result.config.name = config.name
-            result.config.description = config.description
-            result.config.cover_image = config.cover_image
-            if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
-                result.config.trigger_phrases = config.trigger_phrases
-            result.config.source = config.source
-            result.config.source_type = config.source_type
-
-            store.replace_model(config.key, result.config)
+            # Same claim and the same implementation as the single-model route: this loop used to
+            # carry its own copy of the retain-these-fields logic, which is one edit away from the
+            # two disagreeing about what a reidentification preserves.
+            with _claim_model_key(key):
+                _reidentify_model(key)
             succeeded.append(key)
             logger.info(f"Reidentified model: {key}")
+        except HTTPException as e:
+            logger.error(f"Failed to reidentify model {key}: {e.detail}")
+            failed.append({"key": key, "error": e.detail})
         except UnknownModelException as e:
             logger.error(f"Failed to reidentify model {key}: {str(e)}")
             failed.append({"key": key, "error": str(e)})
@@ -803,13 +801,16 @@ def delete_model_image(
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-    try:
-        model_images.delete(key)
-        logger.info(f"Deleted model image: {key}")
-        return
-    except UnknownModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+    # Claimed for the same reason as the upload: a conversion carries this model's image over to
+    # the replacement's key, so a delete accepted meanwhile is undone by that copy.
+    with _claim_model_key(key):
+        try:
+            model_images.delete(key)
+            logger.info(f"Deleted model image: {key}")
+            return
+        except UnknownModelException as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=404, detail=str(e))
 
 
 @model_manager_router.post(

@@ -419,3 +419,116 @@ def test_bulk_delete_reports_a_busy_key_instead_of_racing_it() -> None:
     assert [entry["key"] for entry in response.failed] == ["busy-key"]
     assert "already in progress" in response.failed[0]["error"]
     installer.delete.assert_called_once_with("free-key")
+
+
+@pytest.fixture
+def conversion_in_flight():
+    """Hold a conversion of `busy-key` at a barrier for the duration of the test.
+
+    Yields the mocked installer/store/model_images so a test can assert what the racing request
+    did or did not reach.
+    """
+    import threading
+    from contextlib import contextmanager
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers.model_manager import convert_model
+
+    @contextmanager
+    def _run(key: str = "busy-key"):
+        running = threading.Event()
+        release = threading.Event()
+
+        def blocking_conversion(key: str, user_id: str) -> object:
+            running.set()
+            assert release.wait(timeout=30)
+            return MagicMock()
+
+        with patch("invokeai.app.api.routers.model_manager.ApiDependencies") as deps:
+            with patch("invokeai.app.api.routers.model_manager._convert_model", side_effect=blocking_conversion):
+                conversion = threading.Thread(target=convert_model, args=(MagicMock(),), kwargs={"key": key})
+                conversion.start()
+                try:
+                    assert running.wait(timeout=30)
+                    yield deps
+                finally:
+                    release.set()
+                    conversion.join(timeout=30)
+                    assert not conversion.is_alive()
+
+    return _run
+
+
+def test_reidentify_is_refused_while_the_same_model_is_being_converted(conversion_in_flight) -> None:
+    """Reidentification rewrites the record a conversion is about to replace from its own snapshot."""
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers.model_manager import reidentify_model
+
+    with conversion_in_flight() as deps:
+        with pytest.raises(HTTPException) as exc_info:
+            reidentify_model(key="busy-key", current_admin=MagicMock())
+
+        assert exc_info.value.status_code == 409
+        deps.invoker.services.model_manager.store.replace_model.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_update_model_record_is_refused_while_the_same_model_is_being_converted(
+    conversion_in_flight,
+) -> None:
+    """An edit accepted mid-conversion would be reported as saved and then dropped.
+
+    The conversion writes the name, description, hash and source it read *before* it started into
+    the replacement record, so anything written in between never reaches the new key.
+    """
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers.model_manager import update_model_record
+    from invokeai.app.services.model_records import ModelRecordChanges
+
+    with conversion_in_flight() as deps:
+        with pytest.raises(HTTPException) as exc_info:
+            await update_model_record(
+                key="busy-key", changes=ModelRecordChanges(name="renamed"), current_admin=MagicMock()
+            )
+
+        assert exc_info.value.status_code == 409
+        deps.invoker.services.model_manager.store.update_model.assert_not_called()
+
+
+def test_model_image_writes_are_refused_while_the_same_model_is_being_converted(conversion_in_flight) -> None:
+    """A conversion moves the image to the replacement's key, so writes in between are lost."""
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers.model_manager import delete_model_image
+
+    with conversion_in_flight() as deps:
+        with pytest.raises(HTTPException) as exc_info:
+            delete_model_image(MagicMock(), key="busy-key")
+
+        assert exc_info.value.status_code == 409
+        deps.invoker.services.model_images.delete.assert_not_called()
+
+
+def test_bulk_reidentify_reports_a_busy_key_instead_of_racing_it(conversion_in_flight) -> None:
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers.model_manager import BulkReidentifyModelsRequest, bulk_reidentify_models
+
+    with conversion_in_flight():
+        with patch("invokeai.app.api.routers.model_manager._reidentify_model") as reidentify:
+            response = bulk_reidentify_models(
+                MagicMock(), request=BulkReidentifyModelsRequest(keys=["free-key", "busy-key"])
+            )
+
+    assert response.succeeded == ["free-key"]
+    assert [entry["key"] for entry in response.failed] == ["busy-key"]
+    assert "already in progress" in response.failed[0]["error"]
+    reidentify.assert_called_once_with("free-key")
