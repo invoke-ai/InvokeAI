@@ -39,7 +39,7 @@ import { useTranslation } from 'react-i18next';
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
-import { getWorkflowNodeChromeProps } from './nodeChrome';
+import { getWorkflowNodeChromeProps, WORKFLOW_NODE_DENSITY } from './nodeChrome';
 
 const NODE_WIDTH = '18rem';
 const HANDLE_SIZE = 12;
@@ -295,7 +295,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
       justify="space-between"
       minH="8"
       px="2.5"
-      py="1"
+      py={WORKFLOW_NODE_DENSITY.rowPaddingY}
     >
       <HStack gap="4">
         {canUseCache ? (
@@ -358,7 +358,7 @@ const InputFieldRow = ({
 
   if (isSkeleton) {
     return (
-      <Box px="3" py="1.5">
+      <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
         <HStack gap="1.5" h="5" position="relative">
           {template.input !== 'direct' ? (
             <Tooltip content={handleTooltip} showArrow>
@@ -378,7 +378,7 @@ const InputFieldRow = ({
   }
 
   return (
-    <Box px="3" py="1.5" w="full">
+    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY} w="full">
       <Field.Root gap="0" invalid={isInvalid} minW="0" w="full">
         {/* The handle lives inside the label row so it stays centered on the
             label even when the value control below grows the row. */}
@@ -488,7 +488,7 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
   const handleTooltip = getHandleTypeTooltip(template.type);
 
   return (
-    <Box px="3" py="1">
+    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
       <Flex align="center" h="5" justify="flex-end" position="relative">
         <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
           <Handle
@@ -589,8 +589,8 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
     color="fg.muted"
     fontSize="2xs"
     gap="2"
-    px="3"
-    py="2"
+    px={WORKFLOW_NODE_DENSITY.rowPaddingX}
+    py={WORKFLOW_NODE_DENSITY.bodyPaddingY}
   >
     <Text>
       {inputCount} input{inputCount === 1 ? '' : 's'}
@@ -620,7 +620,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
         borderTopRadius="lg"
         gap="1"
         px="3"
-        py="2"
+        py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
         <Text fontSize="sm" fontWeight="700" minW="0" title={title} truncate>
           {title}
@@ -690,7 +690,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
         gap="1"
         ps="1.5"
         pe="2"
-        py="1.5"
+        py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
         <IconButton
           aria-label={isOpen ? 'Collapse node' : 'Expand node'}
@@ -721,7 +721,11 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
         </>
       ) : isOpen ? (
-        <Box bg="bg.muted" borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'} py="1">
+        <Box
+          bg="bg.muted"
+          borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'}
+          py={WORKFLOW_NODE_DENSITY.bodyPaddingY}
+        >
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
           ))}

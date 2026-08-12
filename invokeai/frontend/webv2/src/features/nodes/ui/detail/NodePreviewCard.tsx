@@ -7,7 +7,7 @@ import type {
 } from '@features/workflow/contracts';
 
 import { Box, Flex, Icon, Stack, Text } from '@chakra-ui/react';
-import { getWorkflowNodeChromeProps } from '@features/workflow/preview';
+import { getWorkflowNodeChromeProps, WORKFLOW_NODE_DENSITY } from '@features/workflow/preview';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
 import { InfoIcon } from 'lucide-react';
@@ -71,7 +71,7 @@ const FieldTooltip = ({
 };
 
 const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
-  <Box position="relative" px="3" py="0.5">
+  <Box position="relative" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
     <Tooltip
       content={<FieldTooltip description={template.description} direction="output" template={template} />}
       positioning={{ placement: 'top-end' }}
@@ -87,7 +87,7 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
 );
 
 const InputRow = ({ template }: { template: FieldInputTemplate }) => (
-  <Box position="relative" px="3" py="0.5">
+  <Box position="relative" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
     <Tooltip
       content={<FieldTooltip description={template.description} direction="input" template={template} />}
       positioning={{ placement: 'top-start' }}
@@ -136,7 +136,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
         gap="2"
         pe="2"
         ps="2.5"
-        py="1.5"
+        py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
         <Text fontWeight="700" minW="0" title={template.title} truncate>
           {template.title}
@@ -151,7 +151,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
           />
         </Tooltip>
       </Flex>
-      <Stack bg="bg.muted" borderBottomRadius="lg" gap="0" py="1">
+      <Stack bg="bg.muted" borderBottomRadius="lg" gap="0" py={WORKFLOW_NODE_DENSITY.bodyPaddingY}>
         {hasFields ? (
           <>
             {outputTemplates.map((output) => (
