@@ -617,7 +617,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if response.is_redirect or response.is_permanent_redirect:
             location = response.headers.get("location")
             if location:
-                self._validate_url(urljoin(response.url, location))
+                try:
+                    self._validate_url(urljoin(response.url, location))
+                except Exception:
+                    response.close()
+                    raise
         return response
 
     def _validate_filename(self, directory: str, filename: str) -> bool:

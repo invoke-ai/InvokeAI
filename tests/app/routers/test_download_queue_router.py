@@ -6,11 +6,14 @@ Covers:
   affects whoever started it.
 - Bug regression: `dest` path validation must reject absolute paths and '..' segments
   BEFORE the queue service is invoked.
-- Security regression: `dest` is anchored inside `download_cache_path` (never the
-  process working directory) and `source` is rejected when it resolves to a
-  non-public address.
+- Security regression: `dest` is anchored inside a separate download directory
+  (never the model cache or process working directory) and `source` is rejected
+  when it resolves to a non-public address.
 """
 
+import asyncio
+import threading
+import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -18,7 +21,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from pydantic.networks import AnyHttpUrl
 
+from invokeai.app.api.routers import download_queue as download_queue_router
 from invokeai.app.services.download import DownloadJob
 from invokeai.app.services.invoker import Invoker
 
@@ -144,13 +149,49 @@ def test_download_accepts_relative_dest(client: TestClient, admin_token: str, mo
     mock_invoker.services.download_queue.download.assert_called_once()
 
 
+@pytest.mark.anyio
+async def test_download_validation_does_not_block_event_loop(
+    enable_multiuser: Any, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path
+):
+    """Slow URL validation must not stall unrelated async work."""
+    mock_invoker.services.configuration.download_cache_dir = tmp_path / "model-cache"
+    mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_validate(*args: Any, **kwargs: Any) -> None:
+        started.set()
+        assert release.wait(timeout=2)
+
+    monkeypatch.setattr(download_queue_router, "validate_download_url", slow_validate)
+    release_timer = threading.Timer(0.5, release.set)
+    release_timer.start()
+    start = time.monotonic()
+    task = asyncio.create_task(
+        download_queue_router.download(
+            current_admin=None,
+            source=AnyHttpUrl("http://example.com/file.bin"),
+            dest="file.bin",
+        )
+    )
+    try:
+        assert await asyncio.to_thread(started.wait, 1)
+        await asyncio.wait_for(asyncio.sleep(0), timeout=0.1)
+        assert time.monotonic() - start < 0.4
+        release.set()
+        await asyncio.wait_for(task, timeout=2)
+    finally:
+        release.set()
+        release_timer.cancel()
+
+
 # ------------------- Advisory regression: dest confinement + SSRF -------------------
 
 
 def test_dest_is_anchored_in_download_cache_not_cwd(
     client: TestClient, admin_token: str, mock_invoker: Invoker, monkeypatch: Any, tmp_path: Path
 ):
-    """A relative `dest` must resolve under `download_cache_path`, not the process CWD.
+    """A relative `dest` must resolve under the API download directory, not the model cache or CWD.
 
     Before the fix, `dest="nodes/pwn/__init__.py"` landed in the working directory --
     which holds the custom-nodes directory in a source install and the application's own
@@ -170,9 +211,33 @@ def test_dest_is_anchored_in_download_cache_not_cwd(
 
     passed_dest = mock_invoker.services.download_queue.download.call_args.args[1]
     cache_root = mock_invoker.services.configuration.download_cache_path.resolve()
+    queue_root = cache_root.parent / f"{cache_root.name}.downloads"
     assert passed_dest.is_absolute()
-    assert passed_dest.is_relative_to(cache_root)
+    assert passed_dest.is_relative_to(queue_root)
+    assert not passed_dest.is_relative_to(cache_root)
     assert not passed_dest.is_relative_to(cwd)
+
+
+def test_download_dest_cannot_poison_model_cache(
+    client: TestClient, admin_token: str, mock_invoker: Invoker, tmp_path: Path
+):
+    """An arbitrary admin download must not land in the model cache consumed by inference."""
+    mock_invoker.services.configuration.download_cache_dir = tmp_path / "model-cache"
+    mock_invoker.services.download_queue.download = MagicMock(return_value=_make_job())
+    model_cache = mock_invoker.services.configuration.download_cache_path.resolve()
+    model_cache.mkdir(parents=True)
+    (model_cache / "https-example-com-model").mkdir()
+
+    r = client.post(
+        "/api/v1/download_queue/i/",
+        json={"source": "http://example.com/model", "dest": "https-example-com-model/payload.pt"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert r.status_code == status.HTTP_200_OK, r.text
+    passed_dest = mock_invoker.services.download_queue.download.call_args.args[1]
+    assert passed_dest.parent != model_cache / "https-example-com-model"
+    assert passed_dest.is_relative_to(model_cache.parent / "model-cache.downloads")
 
 
 @pytest.mark.parametrize(
@@ -196,7 +261,7 @@ def test_download_rejects_non_public_sources(
         headers={"Authorization": f"Bearer {admin_token}"},
     )
     assert r.status_code == status.HTTP_400_BAD_REQUEST, r.text
-    assert "non-public address" in r.json()["detail"]
+    assert r.json()["detail"] == "Download URL resolves to a non-public address."
     mock_invoker.services.download_queue.download.assert_not_called()
 
 

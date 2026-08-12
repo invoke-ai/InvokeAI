@@ -21,15 +21,10 @@ before any packet is sent — which keeps the API's error messages useful and st
 socket layer being used as a port-existence oracle — but it resolves the host itself,
 so it must never be relied on alone.
 
-One case gets only the weaker layer: when a request goes through an HTTP proxy (including
-one picked up from ambient `HTTP_PROXY`/`ALL_PROXY`), the socket goes to the proxy and the
-proxy resolves the destination, so there is no peer address for us to inspect. Address
-policy belongs to the proxy there. This is decided per request — a host excluded by
-`no_proxy` is still fully guarded — and IP-literal URLs are still rejected up front,
-because those need no DNS. What is left uncovered is hostnames that resolve differently
-for us than for the proxy, or that only resolve proxy-side and so hit the fail-open path.
-`warn_if_proxied()` says this out loud at startup rather than letting the control look
-stronger than it is.
+Ambient `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY` settings are ignored by the guarded session.
+That keeps destination resolution inside this process, where the socket-level policy can
+inspect the connected peer. A caller that explicitly adds a proxy to a session accepts the
+proxy's destination policy instead; `warn_if_proxied()` reports that weaker configuration.
 """
 
 from __future__ import annotations
@@ -48,6 +43,7 @@ from urllib3.connection import HTTPConnection, HTTPSConnection
 from urllib3.connectionpool import HTTPConnectionPool, HTTPSConnectionPool
 
 ALLOWED_SCHEMES = ("http", "https")
+logger = logging.getLogger(__name__)
 
 IpAddress = ipaddress.IPv4Address | ipaddress.IPv6Address
 
@@ -169,8 +165,9 @@ def _parse_ipv4_literal(host: str) -> IpAddress | None:
 def check_address(ip: IpAddress, host: str) -> None:
     """Raise if `ip` is not an address we are willing to connect to."""
     if _is_blocked(ip):
+        logger.warning("Blocked download host %s resolving to non-public address %s", host, ip)
         raise UnsafeDownloadURLException(
-            f"Refusing to download from '{host}': it resolves to the non-public address {ip}. "
+            f"Refusing to download from '{host}': it resolves to a non-public address. "
             "Set `allow_private_download_urls` in invokeai.yaml to permit downloads from loopback "
             "and private-network addresses."
         )
@@ -195,6 +192,11 @@ def validate_download_url(url: str, allow_private_urls: bool = False) -> None:
     if not host:
         raise UnsafeDownloadURLException(f"Download URL '{url}' has no host.")
 
+    try:
+        port = parts.port
+    except ValueError as e:
+        raise UnsafeDownloadURLException(f"Download URL '{url}' has an invalid port.") from e
+
     if allow_private_urls:
         return
 
@@ -204,7 +206,7 @@ def validate_download_url(url: str, allow_private_urls: bool = False) -> None:
             candidates = [literal]
         else:
             try:
-                candidates = _resolve(spelling, parts.port)
+                candidates = _resolve(spelling, port)
             except (OSError, UnicodeError, ValueError):
                 continue
         for candidate in candidates:
@@ -262,14 +264,14 @@ class SsrfGuardedAdapter(HTTPAdapter):
             "https": _GuardedHTTPSConnectionPool,
         }
 
-    # `proxy_manager_for` is deliberately left alone. When an HTTP proxy is configured the
-    # socket goes to the proxy, so guarding it would only reject proxies on the local
-    # network; address selection is the proxy's business in that setup.
-
 
 def build_guarded_session() -> requests.Session:
     """A `requests.Session` that will not open a connection to a non-public address."""
     session = requests.Session()
+    # A proxy resolves the destination outside this process, so the socket guard cannot
+    # enforce the destination policy. Ignore ambient proxy settings rather than silently
+    # accepting proxy-side DNS as a security boundary.
+    session.trust_env = False
     adapter = SsrfGuardedAdapter()
     session.mount("http://", adapter)
     session.mount("https://", adapter)
@@ -289,17 +291,13 @@ def proxies_in_effect(session: requests.Session) -> dict[str, str]:
 
 
 def warn_if_proxied(session: requests.Session, logger: logging.Logger) -> None:
-    """Say plainly when the socket-level guard cannot apply.
-
-    `trust_env` is deliberately left on: an operator behind a mandatory egress proxy would
-    otherwise lose the ability to download models at all, and their DNS may well only
-    resolve proxy-side, so failing closed here would break them rather than protect them.
-    """
+    """Report explicit proxies or ignored ambient proxy settings."""
     proxies = proxies_in_effect(session)
     if proxies:
         logger.warning(
-            "An HTTP proxy is configured (%s). Downloads that are not excluded by no_proxy "
-            "are resolved by the proxy, so they cannot be checked against loopback/private "
-            "addresses at the socket. Restrict outbound access at the proxy instead.",
+            "An explicit HTTP proxy is configured (%s). Downloads through it cannot be checked "
+            "against loopback/private addresses at the socket; restrict outbound access at the proxy.",
             ", ".join(sorted(proxies)),
         )
+    elif not session.trust_env and getproxies():
+        logger.warning("Ambient HTTP proxy settings are ignored for guarded downloads.")

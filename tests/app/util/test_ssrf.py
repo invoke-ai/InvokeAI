@@ -77,6 +77,15 @@ def test_allows_public_literals(url: str):
     validate_download_url(url)
 
 
+def test_allows_public_ipv4_mapped_ipv6_literal():
+    validate_download_url("http://[::ffff:8.8.8.8]/x")
+
+
+def test_rejects_invalid_port_before_dns():
+    with pytest.raises(UnsafeDownloadURLException, match="invalid port"):
+        validate_download_url("http://example.com:65536/x")
+
+
 def test_rejects_hostname_resolving_to_loopback(fake_dns: dict[str, list[str]]):
     fake_dns["localtest.me"] = ["127.0.0.1"]
     with pytest.raises(UnsafeDownloadURLException):
@@ -100,6 +109,15 @@ def test_rejects_hostname_with_any_non_public_record(fake_dns: dict[str, list[st
     fake_dns["mixed.example.com"] = ["93.184.216.34", "127.0.0.1"]
     with pytest.raises(UnsafeDownloadURLException):
         validate_download_url("http://mixed.example.com/x")
+
+
+def test_blocked_address_error_hides_resolved_ip(fake_dns: dict[str, list[str]], caplog: Any):
+    fake_dns["private.example.com"] = ["10.0.0.7"]
+    with pytest.raises(UnsafeDownloadURLException) as excinfo:
+        validate_download_url("http://private.example.com/x")
+
+    assert "10.0.0.7" not in str(excinfo.value)
+    assert "10.0.0.7" in caplog.text
 
 
 def test_allows_hostname_resolving_to_public_address(fake_dns: dict[str, list[str]]):
@@ -222,16 +240,17 @@ def test_public_neighbours_of_blocked_ranges_still_allowed(url: str):
 # ----------------------------- Proxy visibility -----------------------------
 
 
-def test_warns_when_a_proxy_would_bypass_the_socket_guard(monkeypatch: Any, caplog: Any):
-    """Behind a proxy the socket goes to the proxy, so the peer check cannot apply."""
+def test_guarded_session_ignores_environment_proxy(monkeypatch: Any, caplog: Any):
+    """Ambient proxies must not move destination resolution outside the socket guard."""
     monkeypatch.setenv("HTTP_PROXY", "http://proxy.internal:3128")
     session = build_guarded_session()
-    assert "http" in ssrf.proxies_in_effect(session)
+    assert session.trust_env is False
+    assert ssrf.proxies_in_effect(session) == {}
 
     logger = logging.getLogger("test-ssrf-proxy")
     with caplog.at_level(logging.WARNING, logger="test-ssrf-proxy"):
         ssrf.warn_if_proxied(session, logger)
-    assert "proxy is configured" in caplog.text
+    assert "proxy settings are ignored" in caplog.text
 
 
 def test_no_warning_without_a_proxy(monkeypatch: Any, caplog: Any):
@@ -257,7 +276,7 @@ def test_proxy_detection_covers_every_env_spelling(monkeypatch: Any, var: str):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv(var, "http://proxy.internal:3128")
 
-    session = build_guarded_session()
+    session = ssrf.requests.Session()
     detected = ssrf.proxies_in_effect(session)
     assert detected, f"{var} was not detected"
     assert select_proxy("http://example.com/x", detected) == "http://proxy.internal:3128"

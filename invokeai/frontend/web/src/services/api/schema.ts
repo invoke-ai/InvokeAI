@@ -4845,7 +4845,7 @@ export type components = {
             source: string;
             /**
              * Dest
-             * @description download destination, relative to the download cache directory
+             * @description download destination, relative to the separate download queue directory
              */
             dest: string;
             /**

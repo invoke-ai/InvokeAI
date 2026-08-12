@@ -1,6 +1,7 @@
 # Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for the download queue."""
 
+import asyncio
 from pathlib import Path as FsPath
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import List, Optional
@@ -21,21 +22,24 @@ from invokeai.app.util.ssrf import UnsafeDownloadURLException, validate_download
 download_queue_router = APIRouter(prefix="/v1/download_queue", tags=["download_queue"])
 
 
+def _download_queue_path(cache_dir: FsPath) -> FsPath:
+    """Return the untrusted API-download directory beside the model cache."""
+    return cache_dir.parent / f"{cache_dir.name}.downloads"
+
+
 def _validate_dest(dest: str) -> FsPath:
-    """Resolve `dest` to an absolute path inside the configured download cache directory.
+    """Resolve `dest` to an absolute path inside the API download directory.
 
     `dest` is a relative POSIX- or Windows-style path. It is anchored to
-    `download_cache_path` and the result is checked for containment, so a caller can
+    a separate directory beside `download_cache_path` and the result is checked for containment, so a caller can
     never choose where on the filesystem the download lands. Anchoring matters on its
     own: a bare relative path handed to the download service resolves against the
     server process's working directory, which in a source or container install holds
     the application's own code.
 
-    Containment is not the same as harmlessness: entries under the download cache are
-    handed to `torch.load`/`torch.jit.load` by `download_and_cache_model`, so a write in
-    here can still poison a cached model. That is why this route is admin-only — an
-    administrator can already install arbitrary models — and why the containment check
-    must not be treated as the whole defence.
+    The API download directory is intentionally separate from the model cache. Model
+    loading trusts files under `download_cache_path`, while this route accepts arbitrary
+    administrator-selected URLs and filenames.
 
     Raises 400 on suspicious input so the download service never sees it.
     """
@@ -54,14 +58,14 @@ def _validate_dest(dest: str) -> FsPath:
         raise HTTPException(status_code=400, detail="Download destination must not contain null bytes.")
 
     cache_dir = ApiDependencies.invoker.services.configuration.download_cache_path
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_root = cache_dir.resolve()
-    # `resolve()` follows symlinks, so a link planted inside the cache cannot be used to
-    # step outside it either. `is_relative_to` is true for the cache directory itself,
-    # which is the ordinary "download into the cache" case.
-    resolved = (cache_root / FsPath(dest)).resolve()
-    if not resolved.is_relative_to(cache_root):
-        raise HTTPException(status_code=400, detail="Download destination must be inside the download cache directory.")
+    queue_dir = _download_queue_path(cache_dir)
+    queue_dir.mkdir(parents=True, exist_ok=True)
+    queue_root = queue_dir.resolve()
+    # `resolve()` follows symlinks, so a link planted inside the queue directory cannot be
+    # used to step outside it either.
+    resolved = (queue_root / FsPath(dest)).resolve()
+    if not resolved.is_relative_to(queue_root):
+        raise HTTPException(status_code=400, detail="Download destination must be inside the download queue directory.")
 
     return resolved
 
@@ -98,17 +102,19 @@ async def prune_downloads(current_admin: AdminUserOrDefault) -> Response:
 async def download(
     current_admin: AdminUserOrDefault,
     source: AnyHttpUrl = Body(description="download source"),
-    dest: str = Body(description="download destination, relative to the download cache directory"),
+    dest: str = Body(description="download destination, relative to the separate download queue directory"),
     priority: int = Body(default=10, description="queue priority"),
     access_token: Optional[str] = Body(default=None, description="token for authorization to download"),
 ) -> DownloadJob:
     """Download the source URL to the file or directory indicted in dest."""
-    validated_dest = _validate_dest(dest)
+    validated_dest = await asyncio.to_thread(_validate_dest, dest)
     config = ApiDependencies.invoker.services.configuration
     try:
-        validate_download_url(str(source), allow_private_urls=config.allow_private_download_urls)
-    except UnsafeDownloadURLException as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        await asyncio.to_thread(
+            validate_download_url, str(source), allow_private_urls=config.allow_private_download_urls
+        )
+    except UnsafeDownloadURLException:
+        raise HTTPException(status_code=400, detail="Download URL resolves to a non-public address.")
     queue = ApiDependencies.invoker.services.download_queue
     return queue.download(source, validated_dest, priority, access_token)
 

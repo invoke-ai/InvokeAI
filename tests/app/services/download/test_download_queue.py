@@ -5,14 +5,15 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Generator, Optional
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic.networks import AnyHttpUrl
+from requests import Response
 from requests.sessions import Session
 from requests_testadapter import TestAdapter, TestSession
 
-from invokeai.app.services.config import get_config
+from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.app.services.config.config_default import URLRegexTokenPair
 from invokeai.app.services.download import DownloadJob, DownloadJobStatus, DownloadQueueService, MultiFileDownloadJob
 from invokeai.app.services.events.events_common import (
@@ -22,6 +23,8 @@ from invokeai.app.services.events.events_common import (
     DownloadProgressEvent,
     DownloadStartedEvent,
 )
+from invokeai.app.util import ssrf
+from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.metadata import HuggingFaceMetadataFetch, ModelMetadataWithFiles, RemoteModelFile
 from tests.test_nodes import TestEventService
 
@@ -510,6 +513,23 @@ def test_tokens(tmp_path: Path, mm2_session: Session):
 # ---------------- Advisory regression: SSRF guard in the download worker ----------------
 
 
+def test_production_queue_uses_guarded_session_by_default() -> None:
+    queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=False))
+    try:
+        assert isinstance(queue._requests.get_adapter("https://example.com"), ssrf.SsrfGuardedAdapter)
+        assert queue._requests.trust_env is False
+    finally:
+        queue._requests.close()
+
+
+def test_production_queue_allows_explicit_private_download_opt_in() -> None:
+    queue = DownloadQueueService(app_config=InvokeAIAppConfig(allow_private_download_urls=True))
+    try:
+        assert not isinstance(queue._requests.get_adapter("https://example.com"), ssrf.SsrfGuardedAdapter)
+    finally:
+        queue._requests.close()
+
+
 @pytest.mark.timeout(timeout=10, method="thread")
 def test_download_refuses_non_public_source(tmp_path: Path) -> None:
     """A job whose source points at loopback errors out without issuing the request."""
@@ -540,6 +560,48 @@ def test_download_refuses_redirect_to_non_public_address(tmp_path: Path) -> None
         TestAdapter(b"", status=302, headers={"Location": "http://169.254.169.254/latest/meta-data/"}),
     )
     session.mount("http://169.254.169.254/", TestAdapter(b"cloud-credentials", status=200))
+
+    queue = DownloadQueueService(requests_session=session)
+    queue.start()
+    try:
+        job = queue.download(source=source, dest=tmp_path)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.ERROR
+    assert "UnsafeDownloadURLException" in (job.error_type or "")
+    assert not any(tmp_path.iterdir())
+
+
+def test_rejected_redirect_closes_streamed_response() -> None:
+    queue = DownloadQueueService(requests_session=TestSession())
+    response = Response()
+    response.status_code = 302
+    response.url = "https://public.example/redirect"
+    response.headers["Location"] = "http://127.0.0.1/private"
+    response.raw = MagicMock()
+
+    with pytest.raises(UnsafeDownloadURLException):
+        queue._reject_unsafe_redirect(response)
+
+    response.raw.close.assert_called_once()
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_download_refuses_multi_hop_redirect_to_non_public_address(tmp_path: Path) -> None:
+    """Every redirect response must be checked, not only the first hop."""
+    source = AnyHttpUrl("https://test.com/redirector-1")
+    second_hop = "https://test.com/redirector-2"
+    session = TestSession()
+    session.mount(
+        str(source),
+        TestAdapter(b"", status=302, headers={"Location": second_hop}),
+    )
+    session.mount(
+        second_hop,
+        TestAdapter(b"", status=302, headers={"Location": "http://169.254.169.254/latest/meta-data/"}),
+    )
 
     queue = DownloadQueueService(requests_session=session)
     queue.start()

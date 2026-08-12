@@ -15899,7 +15899,7 @@
           "dest": {
             "type": "string",
             "title": "Dest",
-            "description": "download destination, relative to the download cache directory"
+            "description": "download destination, relative to the separate download queue directory"
           },
           "priority": {
             "type": "integer",
