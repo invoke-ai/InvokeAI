@@ -59,6 +59,7 @@ import {
   type LayerType,
 } from './layerContextActions';
 import {
+  getLayerContextMenuGroupLayout,
   getLayerContextMenuLayerLabelKey,
   getLayerContextMenuLayout,
   getLayerContextMenuRenderEntries,
@@ -711,12 +712,7 @@ const LayerMenu = ({
     [actionState, effects, notify, t]
   );
   const menuRenderEntries = getLayerContextMenuRenderEntries(menuLayout, Boolean(beforeDangerItems));
-  const beforeDangerSlotIndex = menuRenderEntries.findIndex((entry) => entry.kind === 'slot');
-  const isGroupedSurfaceMenu = Boolean(showGroupLabels && beforeDangerItems && beforeDangerSlotIndex >= 0);
-  const layerRenderEntries = isGroupedSurfaceMenu
-    ? menuRenderEntries.slice(0, beforeDangerSlotIndex)
-    : menuRenderEntries;
-  const dangerRenderEntries = isGroupedSurfaceMenu ? menuRenderEntries.slice(beforeDangerSlotIndex + 1) : [];
+  const groupLayout = showGroupLabels ? getLayerContextMenuGroupLayout(menuLayout, Boolean(beforeDangerItems)) : null;
 
   return (
     <>
@@ -743,22 +739,26 @@ const LayerMenu = ({
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="14rem" py="1">
-              {isGroupedSurfaceMenu ? (
+              {groupLayout ? (
                 <>
                   <Menu.ItemGroup>
                     <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                       {t(getLayerContextMenuLayerLabelKey(layer.type))}
                     </Menu.ItemGroupLabel>
-                    {renderLayerMenuEntries({ entries: layerRenderEntries, runAction, t })}
+                    {renderLayerMenuEntries({ entries: groupLayout.layerEntries, runAction, t })}
                   </Menu.ItemGroup>
-                  <Menu.Separator borderColor="border.subtle" />
-                  <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                      {t('widgets.labels.canvas')}
-                    </Menu.ItemGroupLabel>
-                    {beforeDangerItems}
-                  </Menu.ItemGroup>
-                  {renderLayerMenuEntries({ entries: dangerRenderEntries, runAction, t })}
+                  {groupLayout.hasCanvasGroup ? (
+                    <>
+                      <Menu.Separator borderColor="border.subtle" />
+                      <Menu.ItemGroup>
+                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                          {t('widgets.labels.canvas')}
+                        </Menu.ItemGroupLabel>
+                        {beforeDangerItems}
+                      </Menu.ItemGroup>
+                    </>
+                  ) : null}
+                  {renderLayerMenuEntries({ entries: groupLayout.trailingEntries, runAction, t })}
                 </>
               ) : (
                 renderLayerMenuEntries({
@@ -804,7 +804,7 @@ interface LayerRowMenuProps {
 
 /** The layers-panel per-row context menu: a ⋯ trigger button, opened below it. */
 export const LayerContextMenu = (props: LayerRowMenuProps) => (
-  <LayerMenu {...props} positioning={PANEL_POSITIONING} withTrigger />
+  <LayerMenu {...props} positioning={PANEL_POSITIONING} showGroupLabels withTrigger />
 );
 
 /** The layer + pointer position a canvas right-click resolved to. */
