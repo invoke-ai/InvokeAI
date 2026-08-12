@@ -481,6 +481,25 @@ describe('GalleryImageGrid mixed item cells', () => {
     ).toEqual(['starred', 'regular']);
   });
 
+  it('matches board disclosure chrome while retaining the star marker', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    const trigger = getButton('Collapse starred items');
+    const header = trigger.parentElement;
+
+    expect(header?.getBoundingClientRect().height).toBe(24);
+    expect(trigger.querySelector('svg.lucide-star')).not.toBeNull();
+    expect(getComputedStyle(trigger).transitionProperty).toBe('color');
+
+    await act(() => userEvent.hover(trigger));
+
+    expect(getComputedStyle(trigger).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  });
+
   it('collapses only the starred items and omits the disclosure when no stars are loaded', async () => {
     await renderGallery(
       createGallery({

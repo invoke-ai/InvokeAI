@@ -1,7 +1,7 @@
 import { Box, Flex, HStack, Icon, ScrollArea, Spinner, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem } from '@features/gallery/core/items';
-import { Button, DropZone } from '@platform/ui';
+import { DropZone } from '@platform/ui';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
   useCallback,
@@ -33,7 +33,8 @@ import { useGalleryGridSelection } from './useGalleryGridSelection';
  * tiles before the ResizeObserver reports.
  */
 const viewportWidthCache = new Map<string, number>();
-const STARRED_HEADER_HEIGHT_PX = 28;
+const STARRED_HEADER_HEIGHT_PX = 24;
+const STARRED_TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
 
@@ -314,24 +315,29 @@ export const GalleryImageGrid = () => {
                         h={`${STARRED_HEADER_HEIGHT_PX}px`}
                         left="0"
                         position="absolute"
+                        px="1"
                         top="0"
                         transform={`translateY(${virtualRow.start}px)`}
                         w="full"
                       >
-                        <Button
+                        <Box
+                          as="button"
                           aria-expanded={isStarredOpen}
                           aria-label={t(
                             isStarredOpen
                               ? 'widgets.gallery.collapseStarredItems'
                               : 'widgets.gallery.expandStarredItems'
                           )}
+                          alignItems="center"
                           color="fg.muted"
-                          h="6"
-                          justifyContent="flex-start"
-                          px="1"
-                          size="xs"
-                          variant="ghost"
-                          w="full"
+                          cursor="pointer"
+                          display="flex"
+                          flex="1"
+                          gap="1"
+                          minW="0"
+                          transition="color var(--wb-motion-duration-fast) ease"
+                          type="button"
+                          _hover={STARRED_TRIGGER_HOVER_STYLES}
                           onClick={handleToggleStarredSection}
                         >
                           <Icon
@@ -347,15 +353,23 @@ export const GalleryImageGrid = () => {
                               fontSize="2xs"
                               fontWeight="600"
                               letterSpacing="wide"
+                              lineHeight="1"
                               textTransform="uppercase"
+                              truncate
                             >
                               {t('widgets.gallery.starredItems')}
                             </Text>
-                            <Text as="span" color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums">
+                            <Text
+                              as="span"
+                              color="fg.subtle"
+                              fontSize="2xs"
+                              fontVariantNumeric="tabular-nums"
+                              lineHeight="1"
+                            >
                               {row.itemCount}
                             </Text>
                           </HStack>
-                        </Button>
+                        </Box>
                       </Flex>
                     );
                   }
