@@ -49,15 +49,15 @@ import { TopBar } from './topbar';
 const DND_MODIFIERS = [restrictToWindowEdges];
 
 /**
- * dnd-kit's defaults (20% edge zones, acceleration 10) are tuned for lists
- * that fill the screen. The gallery's board list in the side layout is under
- * 250px tall, so a fifth of it is edge zone — and an image dragged up from
- * the grid enters through the bottom zone at maximum scroll strength, racing
- * the list away from the board being aimed at. Narrow zones mean only a
- * deliberate hover at the edge scrolls, and the gentler acceleration keeps
- * rows legible while it does.
+ * Default 20% edge zones, at half the default scroll speed. The zones must
+ * stay full-size: in the side layout the board list is under 250px tall, so
+ * a narrower band excludes the first and last visible rows — the places an
+ * image is actually held to scroll the list. Speed is halved because at
+ * dnd-kit's default a list this small dumps its full range in under half a
+ * second, far too fast to pick a row. Phantom off-screen targets triggering
+ * scrolls from afar are prevented by DND_MEASURING, not by shrinking zones.
  */
-const DND_AUTO_SCROLL = { acceleration: 3, threshold: { x: 0.08, y: 0.08 } };
+const DND_AUTO_SCROLL = { acceleration: 5 };
 
 /**
  * Droppables are measured clipped to their scroll containers so targets
