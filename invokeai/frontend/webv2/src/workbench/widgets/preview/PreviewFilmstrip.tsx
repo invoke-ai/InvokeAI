@@ -114,8 +114,8 @@ const FilmstripThumb = ({
       as="button"
       aria-current={isSelected || undefined}
       aria-label={item.kind === 'video' ? `Video ${item.name}` : item.name}
-      borderColor={isSelected ? 'border.emphasized' : 'border.subtle'}
-      borderWidth="1px"
+      borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
+      borderWidth="2px"
       boxSize={size}
       cursor="pointer"
       flexShrink={0}
@@ -130,7 +130,6 @@ const FilmstripThumb = ({
       ) : (
         <Box aria-hidden bg="bg.muted" h="full" w="full" />
       )}
-      {isSelected ? <Box bg="accent.solid" bottom="0" h="2px" left="0" position="absolute" right="0" /> : null}
     </Box>
   );
 };
