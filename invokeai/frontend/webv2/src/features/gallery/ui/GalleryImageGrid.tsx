@@ -34,7 +34,7 @@ import { useGalleryGridSelection } from './useGalleryGridSelection';
  */
 const viewportWidthCache = new Map<string, number>();
 const STARRED_HEADER_HEIGHT_PX = 24;
-const STARRED_SECTION_GAP_PX = 8;
+const STARRED_SECTION_GAP_PX = GALLERY_GRID_GAP_PX;
 const STARRED_TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
@@ -47,6 +47,7 @@ type GridSection = 'regular' | 'starred';
 
 type GridRow =
   | { kind: 'cells'; cells: GridCell[]; section: GridSection }
+  | { kind: 'starred-gap' }
   | { kind: 'starred-header'; itemCount: number };
 
 const chunkCellsIntoRows = (cells: GridCell[], columnCount: number, section: GridSection): GridRow[] => {
@@ -133,6 +134,10 @@ export const GalleryImageGrid = () => {
       if (isStarredOpen) {
         nextRows.push(...chunkCellsIntoRows(starredItemCells, columnCount, 'starred'));
       }
+
+      if (regularCells.length > 0) {
+        nextRows.push({ kind: 'starred-gap' });
+      }
     }
 
     nextRows.push(...chunkCellsIntoRows(regularCells, columnCount, 'regular'));
@@ -148,10 +153,11 @@ export const GalleryImageGrid = () => {
       const row = rows[index];
 
       if (row?.kind === 'starred-header') {
-        const nextRow = rows[index + 1];
-        const isCollapsed = nextRow?.kind !== 'cells' || nextRow.section !== 'starred';
+        return STARRED_HEADER_HEIGHT_PX;
+      }
 
-        return STARRED_SECTION_GAP_PX + STARRED_HEADER_HEIGHT_PX + (isCollapsed ? STARRED_SECTION_GAP_PX : 0);
+      if (row?.kind === 'starred-gap') {
+        return STARRED_SECTION_GAP_PX;
       }
 
       return rowHeightPx;
@@ -329,7 +335,7 @@ export const GalleryImageGrid = () => {
                         position="absolute"
                         px="1"
                         top="0"
-                        transform={`translateY(${virtualRow.start + STARRED_SECTION_GAP_PX}px)`}
+                        transform={`translateY(${virtualRow.start}px)`}
                         w="full"
                       >
                         <chakra.button
@@ -383,6 +389,10 @@ export const GalleryImageGrid = () => {
                         </chakra.button>
                       </Flex>
                     );
+                  }
+
+                  if (row.kind === 'starred-gap') {
+                    return null;
                   }
 
                   return (

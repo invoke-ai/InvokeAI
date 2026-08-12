@@ -500,7 +500,7 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(getComputedStyle(trigger).backgroundColor).toBe('rgba(0, 0, 0, 0)');
   });
 
-  it('spaces the whole starred accordion away from the regular image grid', async () => {
+  it('keeps the starred label and grid together before a dedicated trailing gap', async () => {
     await renderGallery(
       createGallery({
         items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
@@ -512,9 +512,9 @@ describe('GalleryImageGrid mixed item cells', () => {
     const starredRect = getButton('Select starred.png for preview').getBoundingClientRect();
     const regularRect = getButton('Select regular.png for preview').getBoundingClientRect();
 
-    expect((headerRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(8, 0);
+    expect((headerRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(0, 0);
     expect(starredRect.top - (headerRect?.bottom ?? 0)).toBeLessThan(4);
-    expect(regularRect.top - starredRect.bottom).toBeCloseTo(8, 0);
+    expect(regularRect.top - starredRect.bottom).toBeCloseTo(12, 0);
 
     await click(getButton('Collapse starred items'));
 
@@ -522,9 +522,9 @@ describe('GalleryImageGrid mixed item cells', () => {
     const collapsedRegularRect = getButton('Select regular.png for preview').getBoundingClientRect();
     const collapsedSectionGap = collapsedRegularRect.top - (collapsedHeaderRect?.bottom ?? 0);
 
-    expect((collapsedHeaderRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(8, 0);
-    expect(collapsedSectionGap).toBeGreaterThanOrEqual(8);
-    expect(collapsedSectionGap).toBeLessThan(12);
+    expect((collapsedHeaderRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(0, 0);
+    expect(collapsedSectionGap).toBeGreaterThanOrEqual(4);
+    expect(collapsedSectionGap).toBeLessThan(8);
   });
 
   it('collapses only the starred items and omits the disclosure when no stars are loaded', async () => {
