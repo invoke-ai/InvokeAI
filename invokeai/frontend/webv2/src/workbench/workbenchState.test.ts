@@ -357,13 +357,21 @@ const submitGenerate = (state: WorkbenchState) =>
   workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
 
 describe('workbench widget region defaults', () => {
-  it('enables Diagnostics in the right side panel rail', () => {
+  it('starts new projects from the curated Compose widget defaults', () => {
     const state = createInitialWorkbenchState();
+    const project = getActiveProject(state);
 
-    expect(getActiveProject(state).widgetRegions.right.instanceIds).toContain('diagnostics');
+    expect(project.widgetRegions.left.instanceIds).toEqual(['generate', 'upscale']);
+    expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+    expect(project.widgetRegions.bottom.instanceIds).toEqual([
+      'server-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
   });
 
-  it('hydrates the old default right rail with Diagnostics while preserving customized rails', () => {
+  it('hydrates the old default right rail to the curated Compose defaults while preserving customized rails', () => {
     const initial = createInitialWorkbenchState();
     const legacyDefault = {
       ...initial,
@@ -389,14 +397,7 @@ describe('workbench widget region defaults', () => {
     const hydratedLegacyDefault = workbenchReducer(initial, { state: legacyDefault, type: 'hydrateWorkbench' });
     const hydratedCustomized = workbenchReducer(initial, { state: customized, type: 'hydrateWorkbench' });
 
-    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
-      'gallery',
-      'preview',
-      'queue',
-      'layers',
-      'diagnostics',
-      'project',
-    ]);
+    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
   });
 
@@ -643,7 +644,7 @@ describe('workbench layout presets', () => {
           },
         },
         layoutPresetRouteOverrides: {
-          compose: { destination: 'canvas', sourceId: 'canvas' },
+          compose: { destination: 'canvas', sourceId: 'upscale' },
         },
       },
     };
@@ -654,7 +655,7 @@ describe('workbench layout presets', () => {
     expect(project.invocation).toEqual({
       destination: 'canvas',
       destinationLocked: false,
-      sourceId: 'canvas',
+      sourceId: 'upscale',
       sourceLocked: false,
     });
     expect(project.layout).toMatchObject({ centerViewId: 'gallery', presetId: 'compose' });
@@ -712,13 +713,13 @@ describe('workbench layout presets', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, {
-      defaultRoute: { destination: 'canvas', sourceId: 'workflow' },
+      defaultRoute: { destination: 'canvas', sourceId: 'upscale' },
       presetId: 'compose',
       type: 'setLayoutPresetRoute',
     });
     state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
 
-    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'canvas', sourceId: 'workflow' });
+    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'canvas', sourceId: 'upscale' });
   });
 
   it('applies preset routing with the edit preference off in the same undo entry as the layout', () => {
@@ -838,33 +839,25 @@ describe('workbench layout presets', () => {
     expect(project.layout.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
     expect(project.widgetRegions.left).toMatchObject({
       activeInstanceId: 'generate',
-      instanceIds: ['generate', 'workflow', 'upscale'],
+      instanceIds: ['generate', 'upscale'],
       isCollapsed: false,
       sizePx: 450,
     });
     expect(project.widgetRegions.center).toMatchObject({
       activeInstanceId: 'preview',
-      instanceIds: ['preview', 'canvas', 'gallery:center', 'workflow:center'],
+      instanceIds: ['preview'],
       isCollapsed: false,
       sizePx: 0,
     });
     expect(project.widgetRegions.right).toMatchObject({
       activeInstanceId: 'gallery',
-      instanceIds: ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+      instanceIds: ['gallery', 'queue'],
       isCollapsed: false,
       sizePx: 450,
     });
     expect(project.widgetRegions.bottom).toMatchObject({
       activeInstanceId: 'gallery:bottom',
-      instanceIds: [
-        'server-status',
-        'diagnostics:bottom',
-        'gallery:bottom',
-        'notifications',
-        'autosave-status',
-        'version-status',
-        'workflow:bottom',
-      ],
+      instanceIds: ['server-status', 'gallery:bottom', 'notifications', 'autosave-status'],
       isCollapsed: true,
       sizePx: 180,
     });

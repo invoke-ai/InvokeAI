@@ -38,18 +38,17 @@ describe('graph widget sources', () => {
     expect(graphWidgetSources.map((source) => source.sourceId)).toEqual(['generate', 'canvas', 'upscale', 'workflow']);
   });
 
-  it('separates what the layout is showing from what it has placed', () => {
+  it('separates active widgets from placed secondary widgets', () => {
     const project = applyPreset('edit');
 
     // Edit shows Generate on the left and Canvas in the centre...
     expect([...getVisibleWidgetTypeIds(project)]).toEqual(expect.arrayContaining(['generate', 'canvas']));
     expect(getVisibleWidgetTypeIds(project).has('workflow')).toBe(false);
 
-    // ...while Upscale and Workflow are still placed in the same left rail, so
-    // routing to them needs no new placement, only revealing.
-    expect([...getPlacedWidgetTypeIds(project)]).toEqual(
-      expect.arrayContaining(['generate', 'canvas', 'upscale', 'workflow'])
-    );
+    // ...while Upscale is still placed second in the left rail, so routing to
+    // it needs no new placement, only revealing. Workflow belongs to Automate.
+    expect([...getPlacedWidgetTypeIds(project)]).toEqual(expect.arrayContaining(['generate', 'canvas', 'upscale']));
+    expect(getPlacedWidgetTypeIds(project).has('workflow')).toBe(false);
   });
 
   it('maps each source to its natural output target', () => {
