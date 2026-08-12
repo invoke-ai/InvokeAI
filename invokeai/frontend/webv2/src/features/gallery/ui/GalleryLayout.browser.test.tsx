@@ -45,12 +45,12 @@ const board: GalleryBoard = {
 
 const createItem = (name: string) => ({
   boardId: 'dogs',
-  category: 'general',
+  category: 'general' as const,
   createdAt: '2026-07-30T00:00:00.000Z',
   fullUrl: `/full/${name}`,
   height: 64,
   isIntermediate: false,
-  kind: 'image',
+  kind: 'image' as const,
   name,
   starred: false,
   thumbnailUrl: `/thumb/${name}`,

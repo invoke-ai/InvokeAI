@@ -1,4 +1,4 @@
-import { Box, Flex, HStack, Icon, ScrollArea, Spinner, Text } from '@chakra-ui/react';
+import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem } from '@features/gallery/core/items';
 import { DropZone } from '@platform/ui';
@@ -320,8 +320,7 @@ export const GalleryImageGrid = () => {
                         transform={`translateY(${virtualRow.start}px)`}
                         w="full"
                       >
-                        <Box
-                          as="button"
+                        <chakra.button
                           aria-expanded={isStarredOpen}
                           aria-label={t(
                             isStarredOpen
@@ -369,7 +368,7 @@ export const GalleryImageGrid = () => {
                               {row.itemCount}
                             </Text>
                           </HStack>
-                        </Box>
+                        </chakra.button>
                       </Flex>
                     );
                   }
