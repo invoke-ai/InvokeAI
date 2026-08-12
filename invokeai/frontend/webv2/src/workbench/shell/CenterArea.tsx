@@ -199,7 +199,7 @@ export const CenterArea = () => {
           </ChromeIsland>
 
           {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
-            <ChromeIsland>
+            <ChromeIsland flexShrink={0}>
               {centerToolbarItems.map((toolbarItem) => (
                 <WidgetRendererById
                   key={toolbarItem.id}
@@ -220,11 +220,12 @@ export const CenterArea = () => {
   );
 };
 
-const ChromeIsland = ({ children }: { children: ReactNode }) => (
+const ChromeIsland = ({ children, flexShrink = 1 }: { children: ReactNode; flexShrink?: 0 | 1 }) => (
   <HStack
     bg="bg.subtle"
     borderColor="border.subtle"
     borderWidth="1px"
+    flexShrink={flexShrink}
     gap="0.5"
     h="8"
     minW="0"
