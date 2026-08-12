@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { LayoutPreset, LayoutPresetRoute } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
 import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } from './diagnostics/logger';
@@ -54,6 +55,89 @@ describe('createWorkbenchStore', () => {
     expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
     expect(snapshot.projects).toHaveLength(1);
+  });
+
+  it('coordinates layout preset activation across every command caller', async () => {
+    const deferred = new Map<string, { promise: Promise<void>; resolve: () => void }>();
+    const loadLayoutPresetWidgets = (preset: LayoutPreset): Promise<void> => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((next) => {
+        resolve = next;
+      });
+
+      deferred.set(preset.id, { promise, resolve });
+      return promise;
+    };
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+
+    const stripActivation = store.commands.layout.activatePreset('compose');
+    const hotkeyActivation = store.commands.layout.activatePreset('edit');
+
+    deferred.get('edit')?.resolve();
+    await hotkeyActivation;
+    deferred.get('compose')?.resolve();
+    await stripActivation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+    expect(store.getSnapshot().activeProject.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+  });
+
+  it('discards a pending preset when project focus changes before loading finishes', async () => {
+    let resolve!: () => void;
+    const loadLayoutPresetWidgets = (): Promise<void> =>
+      new Promise<void>((next) => {
+        resolve = next;
+      });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+    const firstProjectId = store.getSnapshot().activeProject.id;
+    const secondProject = store.commands.projects.create();
+
+    store.commands.projects.switchTo(firstProjectId);
+    const activation = store.commands.layout.activatePreset('edit');
+    store.commands.projects.switchTo(secondProject.id);
+    store.commands.projects.switchTo(firstProjectId);
+    resolve();
+    await activation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
+  });
+
+  it('keeps a synchronous preset application newer than a pending activation', async () => {
+    let resolve!: () => void;
+    const loadLayoutPresetWidgets = (): Promise<void> =>
+      new Promise<void>((next) => {
+        resolve = next;
+      });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+
+    const activation = store.commands.layout.activatePreset('edit');
+    store.commands.layout.applyPreset('automate');
+    resolve();
+    await activation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('automate');
+    expect(store.getSnapshot().activeProject.invocation).toMatchObject({
+      destination: 'gallery',
+      sourceId: 'workflow',
+    });
+  });
+
+  it('discards a pending custom preset after its saved snapshot is removed', async () => {
+    let resolve!: () => void;
+    const loadLayoutPresetWidgets = (): Promise<void> =>
+      new Promise<void>((next) => {
+        resolve = next;
+      });
+    const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
+
+    store.commands.layout.applyPreset('edit');
+    store.commands.layout.createPreset('custom-pending', 'Pending');
+    const activation = store.commands.layout.activatePreset('custom-pending');
+    store.commands.layout.deletePreset('custom-pending');
+    resolve();
+    await activation;
+
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
   });
 
   it('notifies subscribers once for reducer changes and not for no-op reducer results', () => {
@@ -127,6 +211,38 @@ describe('createWorkbenchStore', () => {
     store.commands.gallery.setSearchTerm('positional form', projectId);
 
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
+  });
+
+  it('edits a preset default route through the layout capability', () => {
+    const store = createWorkbenchStore();
+
+    store.commands.layout.setPresetRoute('compose', { destination: 'canvas', sourceId: 'upscale' });
+
+    expect(store.getSnapshot().account.layoutPresetRouteOverrides?.compose).toEqual({
+      destination: 'canvas',
+      sourceId: 'upscale',
+    });
+  });
+
+  it('reorders presets through the layout capability', () => {
+    const store = createWorkbenchStore();
+
+    store.commands.layout.reorderPresets('compose', 'edit');
+
+    expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['edit', 'compose', 'automate']);
+  });
+
+  it('creates a custom preset with an explicitly selected default route in one command', () => {
+    const store = createWorkbenchStore();
+    const defaultRoute: LayoutPresetRoute = { destination: 'gallery', sourceId: 'workflow' };
+
+    store.commands.layout.createPreset('custom-explicit-route', 'Workflow layout', 'workflow', defaultRoute);
+    defaultRoute.destination = 'canvas';
+
+    expect(store.getSnapshot().account.customLayoutPresets?.[0]?.defaultRoute).toEqual({
+      destination: 'gallery',
+      sourceId: 'workflow',
+    });
   });
 
   it('dispatches nullary commands with no payload', () => {

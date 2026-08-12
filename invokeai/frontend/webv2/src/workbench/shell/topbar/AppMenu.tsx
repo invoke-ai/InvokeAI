@@ -54,7 +54,7 @@ export const AppMenu = () => {
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={t('topbar.appMenu.open')} className="group" size="sm" variant="ghost">
+        <IconButton aria-label={t('topbar.appMenu.open')} className="group" size="xs" variant="ghost">
           <AppMenuGlyph />
         </IconButton>
       </Menu.Trigger>

@@ -9,7 +9,25 @@ import type {
 import type { AccountState, Project } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { getLayoutPreset } from '@workbench/layoutPresets';
+import {
+  builtInLayoutPresetDescriptors,
+  getLayoutPreset,
+  isBuiltInLayoutPresetId,
+  resolveLayoutPresetId,
+} from '@workbench/layoutPresets';
+
+/** Palette labels follow account-owned preset names without making command registration reactive. */
+export const getLayoutPresetCommandTitleOverrides = (
+  account: AccountState,
+  formatTitle: (presetName: string) => string
+): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    builtInLayoutPresetDescriptors.flatMap(({ hotkeyId, preset }) => {
+      const savedLabel = resolveSavedLayoutPreset(account, preset.id).label;
+
+      return savedLabel === preset.label ? [] : [[`app.${hotkeyId}`, formatTitle(savedLabel)]];
+    })
+  );
 
 const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
 
@@ -21,16 +39,23 @@ const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
  * would appear to do nothing.
  */
 export const resolveSavedLayoutPreset = (account: AccountState, presetId: LayoutPresetId): LayoutPreset => {
-  const customPreset = account.customLayoutPresets?.find((preset) => preset.id === presetId);
+  const resolvedPresetId = resolveLayoutPresetId(presetId);
+  const customPreset = isBuiltInLayoutPresetId(resolvedPresetId)
+    ? undefined
+    : account.customLayoutPresets?.find((preset) => preset.id === presetId);
 
   if (customPreset) {
     return customPreset;
   }
 
-  const builtInPreset = getLayoutPreset(presetId);
+  const builtInPreset = getLayoutPreset(resolvedPresetId);
+  const metadata = account.layoutPresetMetadataOverrides?.[builtInPreset.id];
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
+  const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;
 
-  return override ? { ...builtInPreset, snapshot: override } : builtInPreset;
+  return metadata || override || defaultRoute !== builtInPreset.defaultRoute
+    ? { ...builtInPreset, ...metadata, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
+    : builtInPreset;
 };
 
 export const cloneLayoutPresetWidgetRegions = (

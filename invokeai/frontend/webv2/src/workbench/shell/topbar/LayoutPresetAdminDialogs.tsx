@@ -1,10 +1,19 @@
+import type { LayoutPreset } from '@workbench/layoutContracts';
+
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { getLayoutPresetSourceOptions } from '@workbench/layoutPresetRouting';
+import { layoutPresets } from '@workbench/layoutPresets';
+import { resolveSavedLayoutPreset } from '@workbench/layoutPresetSnapshots';
 import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
 
 import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { closeLayoutPresetAdmin, layoutPresetManagerStore } from './layoutPresetManagerStore';
+
+const EMPTY_LAYOUT_PRESETS: LayoutPreset[] = [];
 
 /**
  * Hosts the edit and delete dialogs shared by every preset-management surface.
@@ -14,14 +23,25 @@ import { closeLayoutPresetAdmin, layoutPresetManagerStore } from './layoutPreset
 export const LayoutPresetAdminDialogs = () => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
-  const customPresets = useWorkbenchSelector((snapshot) => snapshot.account.customLayoutPresets ?? []);
+  const account = useWorkbenchSelector((snapshot) => snapshot.account);
+  const customPresets = account.customLayoutPresets ?? EMPTY_LAYOUT_PRESETS;
   const { deletePresetId, editPresetId } = layoutPresetManagerStore.useSelector((snapshot) => snapshot);
-  const editTarget = customPresets.find((preset) => preset.id === editPresetId) ?? null;
+  const editTarget = useMemo(() => {
+    if (!editPresetId) {
+      return null;
+    }
+
+    const exists = [...layoutPresets, ...customPresets].some((preset) => preset.id === editPresetId);
+
+    return exists ? resolveSavedLayoutPreset(account, editPresetId) : null;
+  }, [account, customPresets, editPresetId]);
   const deleteTarget = customPresets.find((preset) => preset.id === deletePresetId) ?? null;
+  const sourceOptions = useMemo(() => (editTarget ? getLayoutPresetSourceOptions(editTarget) : []), [editTarget]);
 
   const submitEdit = useCallback(
-    ({ iconId, name }: { iconId: string; name: string }) => {
+    ({ defaultRoute, iconId, name }: LayoutPresetDialogValue) => {
       if (editTarget) {
+        layout.setPresetRoute(editTarget.id, defaultRoute);
         layout.renamePreset(editTarget.id, name);
         layout.setPresetIcon(editTarget.id, iconId);
       }
@@ -38,9 +58,12 @@ export const LayoutPresetAdminDialogs = () => {
     <>
       {editTarget ? (
         <LayoutPresetDialog
+          key={editTarget.id}
+          defaultRoute={editTarget.defaultRoute}
           iconId={editTarget.iconId}
           isOpen
           name={editTarget.label}
+          sourceOptions={sourceOptions}
           submitLabel={t('topbar.presets.save')}
           title={t('topbar.presets.edit')}
           onClose={closeLayoutPresetAdmin}
