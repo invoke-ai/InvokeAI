@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Optional
 
-from fastapi import HTTPException, Query, Response
+from fastapi import HTTPException, Query
 from fastapi.routing import APIRouter
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
@@ -13,7 +13,6 @@ from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginat
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
-GALLERY_CACHE_CONTROL = "private, no-store"
 
 
 @gallery_router.get(
@@ -23,7 +22,6 @@ GALLERY_CACHE_CONTROL = "private, no-store"
 )
 async def list_gallery_items(
     current_user: CurrentUserOrDefault,
-    response: Response,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
         default=None,
@@ -49,8 +47,6 @@ async def list_gallery_items(
     ),
 ) -> OffsetPaginatedResults[GalleryItem]:
     """Returns a paginated, time-sorted stream of polymorphic gallery items (images + videos)."""
-    response.headers["Cache-Control"] = GALLERY_CACHE_CONTROL
-
     if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)
 
@@ -78,7 +74,6 @@ async def list_gallery_items(
 )
 async def get_gallery_item_names(
     current_user: CurrentUserOrDefault,
-    response: Response,
     origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of items to list."),
     categories: Optional[list[ImageCategory]] = Query(
         default=None,
@@ -100,8 +95,6 @@ async def get_gallery_item_names(
     ),
 ) -> GalleryItemNamesResult:
     """Returns an ordered (kind, name) list — used to drive virtualized gallery selection."""
-    response.headers["Cache-Control"] = GALLERY_CACHE_CONTROL
-
     if board_id is not None and board_id != "none":
         _assert_board_read_access(board_id, current_user)
 
