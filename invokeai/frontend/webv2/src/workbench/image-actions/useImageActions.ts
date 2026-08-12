@@ -365,20 +365,28 @@ export const useImageActions = ({
         mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
         requested: items,
       });
-    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> =>
-      runItemMutation({
-        action: starred ? 'star' : 'unstar',
-        applyConfirmed: (result) => {
-          if (result.succeeded.length === 0) {
-            return;
-          }
+    const patchItemsStarred = (refs: GalleryItemRef[], starred: boolean): void => {
+      if (refs.length === 0) {
+        return;
+      }
 
-          patchGalleryItemCaches(queryClient, { kind: 'star', result, starred });
-          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { starred });
-        },
+      patchGalleryItemCaches(queryClient, { kind: 'star', result: { failed: [], succeeded: refs }, starred });
+      gallery.patchItems(refs.map(toGalleryItemKey), { starred });
+    };
+    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> => {
+      // Optimistic: a star toggle's outcome is the request itself except for
+      // the rare rejected ref, so paint the whole selection immediately and
+      // flip back only what the backend refuses. The trailing gallery
+      // invalidation reconciles either path with the server.
+      patchItemsStarred(items, starred);
+
+      return runItemMutation({
+        action: starred ? 'star' : 'unstar',
+        applyConfirmed: (result) => patchItemsStarred(result.failed, !starred),
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
       });
+    };
     const fetchItemBlob = async (item: GalleryItem, signal: AbortSignal): Promise<Blob> => {
       const response = await fetch(item.fullUrl, { signal });
 

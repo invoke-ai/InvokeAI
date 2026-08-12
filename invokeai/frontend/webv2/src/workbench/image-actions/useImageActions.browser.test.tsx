@@ -305,7 +305,7 @@ describe('partial image mutation outcomes', () => {
     expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:moved.png'], { boardId: 'board-1' });
   });
 
-  it('stars and patches only images confirmed by the backend', async () => {
+  it('stars optimistically before the request and reverts only backend-rejected images', async () => {
     mocks.itemSetStarred.mockResolvedValue({
       affectedBoardIds: [],
       failed: [{ kind: 'image', name: 'locked.png' }],
@@ -316,18 +316,32 @@ describe('partial image mutation outcomes', () => {
       await actionsRef.current?.setImagesStarred(['starred.png', 'locked.png'], true);
     });
 
-    const result = {
-      affectedBoardIds: [],
-      failed: [{ kind: 'image', name: 'locked.png' }],
-      succeeded: [{ kind: 'image', name: 'starred.png' }],
-    };
-
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+    // The whole selection paints before the transport is even asked.
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(1, expect.anything(), {
       kind: 'star',
-      result,
+      result: {
+        failed: [],
+        succeeded: [
+          { kind: 'image', name: 'starred.png' },
+          { kind: 'image', name: 'locked.png' },
+        ],
+      },
       starred: true,
     });
-    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:starred.png'], { starred: true });
+    expect(mocks.patchGalleryItemCaches.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.itemSetStarred.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:starred.png', 'image:locked.png'], {
+      starred: true,
+    });
+
+    // Only the rejected ref flips back once the backend answers.
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
+      kind: 'star',
+      result: { failed: [], succeeded: [{ kind: 'image', name: 'locked.png' }] },
+      starred: false,
+    });
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['image:locked.png'], { starred: false });
   });
 });
 
@@ -429,28 +443,28 @@ describe('mixed item mutation outcomes', () => {
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
   });
 
-  it('stars same-name media independently and preserves a failed selected item', async () => {
+  it('stars same-name media independently and reverts only the failed qualified key', async () => {
     const refs = [
       { kind: 'image' as const, name: 'shared' },
       { kind: 'video' as const, name: 'shared' },
     ];
-    const result = {
+    mocks.itemSetStarred.mockResolvedValue({
       affectedBoardIds: [],
       failed: [refs[0]],
       succeeded: [refs[1]],
-    };
-    mocks.itemSetStarred.mockResolvedValue(result);
+    });
 
     await act(async () => {
       await getItemActions().setItemsStarred(refs, true);
     });
 
-    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:shared', 'video:shared'], { starred: true });
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
       kind: 'star',
-      result,
-      starred: true,
+      result: { failed: [], succeeded: [refs[0]] },
+      starred: false,
     });
-    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['video:shared'], { starred: true });
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(2, ['image:shared'], { starred: false });
     expect(mocks.galleryRemoveItems).not.toHaveBeenCalled();
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
