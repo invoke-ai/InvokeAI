@@ -166,6 +166,23 @@ afterEach(async () => {
 });
 
 describe('gallery layout shells', () => {
+  it('keeps the center gallery scroll area above the selection actions', async () => {
+    const items = Array.from({ length: 80 }, (_, index) => createItem(`image-${index}.png`));
+
+    setGallery(createGallery({ items }));
+    await renderLayout(GalleryWideLayout);
+
+    const list = host?.querySelector<HTMLElement>('[role="list"]');
+    const viewport = list?.closest<HTMLElement>('[data-part="viewport"]');
+    const selectionActions = host?.querySelector<HTMLElement>('[role="toolbar"]');
+
+    if (!viewport || !selectionActions) {
+      throw new Error('gallery viewport or selection actions did not render');
+    }
+
+    expect(viewport.getBoundingClientRect().bottom).toBeLessThanOrEqual(selectionActions.getBoundingClientRect().top);
+  });
+
   it('keeps a long board list inside the board panel instead of spilling it over the grid', async () => {
     const boards = Array.from({ length: 40 }, (_, index) => ({
       ...board,

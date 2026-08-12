@@ -277,6 +277,7 @@ export const GalleryImageGrid = () => {
     <Box
       ref={syncRangeInteractionContext}
       flex="1"
+      h="full"
       maxW="full"
       minH="0"
       minW="0"
