@@ -161,7 +161,9 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     root: {
       ...chakraSlotRecipes.segmentGroup.base?.root,
       '--segment-radius': 'radii.sm',
-      '--segment-indicator-bg': 'colors.bg.emphasized',
+      // A neutral fill disappears against the lighter section surfaces these
+      // controls sit on, so the selection reads through the accent palette.
+      '--segment-indicator-bg': 'colors.accent.solid',
       '--segment-indicator-shadow': 'none',
       bg: 'transparent',
       borderColor: 'border.subtle',
@@ -176,12 +178,12 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       transitionDuration: 'faster',
       transitionProperty: 'background, color',
       _before: { display: 'none' },
-      _checked: { color: 'fg' },
+      _checked: { color: 'accent.contrast' },
       _hover: {
         '&:not([data-state=checked])': { color: 'fg' },
       },
       '&[data-state=checked][data-ssr]': {
-        bg: 'bg.emphasized',
+        bg: 'accent.solid',
         shadow: 'none',
       },
     },
