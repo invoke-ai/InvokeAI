@@ -2,7 +2,7 @@
 title: LLM Prompt Tools
 sidebar:
   order: 3
-lastUpdated: 2026-05-23
+lastUpdated: 2026-08-14
 ---
 
 InvokeAI includes two built-in tools that use local language models to help you write better prompts. Both tools appear as small buttons in the top-right corner of the positive prompt area and are only visible when you have a compatible model installed.
@@ -28,6 +28,10 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 | TinyLlama Chat | ~2 GB | `TinyLlama/TinyLlama-1.1B-Chat-v1.0` |
 
 Install by pasting the HuggingFace ID into the Model Manager. The model is automatically detected as a **Text LLM** type.
+
+### Reasoning ("thinking") models
+
+Reasoning models such as Qwen3 or the DeepSeek-R1 distills normally write out a chain of thought before their answer. Prompt expansion returns the generated text as-is, so that reasoning would end up in your prompt. InvokeAI therefore renders the chat template with thinking disabled, which makes these models answer directly. Models whose chat template does not support the switch are unaffected, and models that always reason (with no way to turn it off) are not suitable for prompt expansion.
 
 ## Image to Prompt
 
