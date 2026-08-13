@@ -3,8 +3,8 @@
 Note: This conftest intentionally does NOT redefine `mock_services` / `mock_invoker`
 to avoid shadowing the project-level fixtures in `tests/conftest.py`. Instead, the
 `enable_multiuser` fixture below injects MagicMock services for the routers that
-have no real backing service in the default mock_services (download_queue,
-style_preset_image_files, model_relationships, model_manager).
+have no real backing service in the default mock_services (style_preset_image_files,
+model_relationships, model_manager).
 
 WARNING for future authors: `enable_multiuser` *unconditionally* replaces several
 services on `mock_invoker.services` with MagicMocks. If you add a router test that
@@ -50,7 +50,6 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api_app",
     "invokeai.app.api.auth_dependencies",
     "invokeai.app.api.routers.auth",
-    "invokeai.app.api.routers.download_queue",
     "invokeai.app.api.routers.style_presets",
     "invokeai.app.api.routers.model_relationships",
     "invokeai.app.api.routers.utilities",
@@ -106,7 +105,6 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     mock_invoker.services.configuration.multiuser = True
 
     # Replace services that are None in the default mock_services with MagicMocks.
-    mock_invoker.services.download_queue = MagicMock()
     mock_invoker.services.style_preset_image_files = MagicMock()
     mock_invoker.services.model_relationships = MagicMock()
     mock_invoker.services.model_manager = MagicMock()

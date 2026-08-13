@@ -542,12 +542,92 @@ export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config i
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev_fill';
 };
 
+/**
+ * The submodels an SDNQ pipeline install must expose before it can act as a component source.
+ * Mirrors `_REQUIRED_PIPELINE_SUBMODELS` / `is_self_contained_sdnq_pipeline()` in
+ * `invokeai/app/invocations/model.py` — the frontend and the backend must agree on what "complete"
+ * means, or the graph builders offer a source the invocation validation then rejects.
+ */
+const SDNQ_PIPELINE_REQUIRED_SUBMODELS = ['transformer', 'vae', 'text_encoder', 'tokenizer'] as const;
+
+/**
+ * True if an SDNQ pipeline config ships every component its loaders read from a fixed subfolder.
+ *
+ * A truthy `submodels` map is not enough: a partial pipeline can expose only the transformer, and a
+ * malformed model_index.json can expose the components while omitting the transformer. Either would
+ * otherwise be offered in the source pickers, auto-selected by the graph builders, and only rejected
+ * by the backend after graph construction.
+ */
+export const isSelfContainedSDNQPipeline = (config: AnyModelConfig): boolean => {
+  return hasSubmodels(config, SDNQ_PIPELINE_REQUIRED_SUBMODELS);
+};
+
+/**
+ * FLUX.1 drives two text encoders, so a pipeline install can only replace the standalone components
+ * if it also ships the T5 pair on top of the CLIP one. Mirrors
+ * `_REQUIRED_FLUX1_PIPELINE_SUBMODELS` / `is_self_contained_sdnq_flux1_pipeline()` in
+ * `invokeai/app/invocations/model.py`; if the two disagree, the UI either blocks a model the node
+ * would have accepted or builds a graph the node then rejects.
+ */
+const SDNQ_FLUX1_PIPELINE_REQUIRED_SUBMODELS = [
+  ...SDNQ_PIPELINE_REQUIRED_SUBMODELS,
+  'text_encoder_2',
+  'tokenizer_2',
+] as const;
+
+const hasSubmodels = (config: AnyModelConfig, required: readonly string[]): boolean => {
+  const submodels = (config as { submodels?: unknown }).submodels;
+  if (typeof submodels !== 'object' || submodels === null) {
+    return false;
+  }
+  return required.every((submodel) => Boolean((submodels as Record<string, unknown>)[submodel]));
+};
+
+/**
+ * True for a FLUX.1 SDNQ pipeline that ships every component the FLUX graph needs, so the
+ * standalone T5 / CLIP / VAE selections are not required.
+ */
+export const isSelfContainedSDNQFlux1Pipeline = (config: AnyModelConfig): boolean => {
+  if ((config as { format?: unknown }).format !== 'sdnq_quantized') {
+    return false;
+  }
+  return hasSubmodels(config, SDNQ_FLUX1_PIPELINE_REQUIRED_SUBMODELS);
+};
+
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'z-image') {
+    return false;
+  }
+  // Read `format` and `submodels` as plain strings/unknown so TS doesn't narrow away the
+  // `sdnq_quantized` branch. The OpenAPI schema is regenerated separately and currently
+  // doesn't list the `sdnq_quantized` Z-Image format variant.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  // SDNQ-quantized ZImagePipeline folders carry the same submodels layout (transformer, vae,
+  // text_encoder, ...) as a plain diffusers ZImagePipeline. Single-file SDNQ Z-Image
+  // checkpoints have no submodels and must not match here, and neither may a partial pipeline.
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  return isSelfContainedSDNQPipeline(config);
 };
 
 export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'flux2') {
+    return false;
+  }
+  // Same reasoning as isZImageDiffusersMainModelConfig: an SDNQ FLUX.2 pipeline folder ships
+  // the same submodels (transformer/text_encoder/tokenizer/vae) and qualifies as a source model.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  return isSelfContainedSDNQPipeline(config);
 };
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
