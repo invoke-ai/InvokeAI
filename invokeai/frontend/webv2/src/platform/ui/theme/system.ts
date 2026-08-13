@@ -4,6 +4,7 @@ import {
   buttonRecipe,
   colorPickerSlotRecipe,
   comboboxSlotRecipe,
+  dataListSlotRecipe,
   dialogSlotRecipe,
   hoverCardSlotRecipe,
   inputRecipe,
@@ -288,6 +289,7 @@ const config = defineConfig({
     slotRecipes: {
       colorPicker: colorPickerSlotRecipe,
       combobox: comboboxSlotRecipe,
+      dataList: dataListSlotRecipe,
       dialog: dialogSlotRecipe,
       hoverCard: hoverCardSlotRecipe,
       menu: menuSlotRecipe,

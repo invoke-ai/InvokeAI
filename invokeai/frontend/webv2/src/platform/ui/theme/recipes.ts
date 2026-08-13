@@ -730,3 +730,27 @@ export const themeCardRecipe = defineSlotRecipe({
   },
   defaultVariants: { selected: false },
 });
+
+/**
+ * Hairline dividers between rows. Metadata lists carry values of very
+ * different heights — a seed next to a wrapped prompt — and a bare row gap
+ * stops reading as separation once values grow tall; the rule keeps each
+ * label/value pair visually bound. `paddingTop` mirrors the 1.5-unit row gap
+ * the metadata lists use, so the line sits centered between rows.
+ */
+export const dataListSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.dataList,
+  base: {
+    ...chakraSlotRecipes.dataList.base,
+    item: {
+      ...chakraSlotRecipes.dataList.base?.item,
+      '&:not(:first-child)': {
+        // `borderColor` + top-only width, like the chrome islands: the
+        // side-specific color property does not resolve the semantic token.
+        borderColor: 'border.subtle',
+        borderTopWidth: '1px',
+        paddingTop: '1.5',
+      },
+    },
+  },
+});
