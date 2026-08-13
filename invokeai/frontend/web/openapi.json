@@ -34018,7 +34018,7 @@
           "cpu_only"
         ],
         "title": "Gemma2Encoder_GGUF_Config",
-        "description": "Single-file GGUF-quantized Gemma-2-2b encoder for PiD (llama.cpp GGUF, e.g. gemma-2-2b-it-Q4_K_M.gguf).\n\nUnlike the diffusers-directory config, this is a single ``.gguf`` file. transformers dequantizes it\n(``gemma2`` is in its GGUF config mapping) and reads the tokenizer from the GGUF metadata, so no\ncompanion config.json / tokenizer files are required. Only Gemma-2-2b (2304-dim) is accepted, matching\nPiD's fixed caption projection; 9B/27B GGUFs are rejected here as for the directory config."
+        "description": "Single-file GGUF-quantized Gemma-2-2b encoder for PiD (llama.cpp GGUF, e.g. gemma-2-2b-it-Q4_K_M.gguf).\n\nUnlike the diffusers-directory config, this is a single ``.gguf`` file: the model config and the\ntokenizer are read from the GGUF metadata, so no companion config.json / tokenizer files are required.\nThe weights are loaded natively by ``Gemma2EncoderGGUFLoader`` \u2014 the large 2D projections stay\nquantized as ``GGMLTensor`` and are dequantized on demand by the model cache, rather than being fully\ndequantized into memory at load time. Only Gemma-2-2b (2304-dim) is accepted, matching PiD's fixed\ncaption projection; 9B/27B GGUFs are rejected here as for the directory config."
       },
       "Gemma2Encoder_Gemma2Encoder_Config": {
         "properties": {

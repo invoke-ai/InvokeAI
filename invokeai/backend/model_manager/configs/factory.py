@@ -34,7 +34,7 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
     Gemma2Encoder_Gemma2Encoder_Config,
     Gemma2Encoder_GGUF_Config,
 )
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_FLUX_Config,
     IPAdapter_Checkpoint_SD1_Config,
@@ -474,6 +474,15 @@ class ModelClassificationResult:
         """Returns the number of matching model configs found."""
         return len(self.all_matches)
 
+    @property
+    def invalid_matches(self) -> list[InvalidMatchError]:
+        """Rejections from config classes that recognised the model but found it unusable.
+
+        Non-empty means `config` is None because the file is broken, not because it is unidentifiable
+        — callers can report the specific reason instead of a generic "could not identify".
+        """
+        return [r for r in self.details.values() if isinstance(r, InvalidMatchError)]
+
 
 class ModelConfigFactory:
     @staticmethod
@@ -687,6 +696,11 @@ class ModelConfigFactory:
             except NotAMatchError as e:
                 # This means the model didn't match this config class. It's not an error, just no match.
                 details[candidate_name] = e
+            except InvalidMatchError as e:
+                # This means the model *is* this config class' kind of model, but is unusable (e.g. a
+                # truncated checkpoint). Recorded like any other result here; the fallback below is
+                # what treats it differently from a plain no-match.
+                details[candidate_name] = e
             except ValidationError as e:
                 # This means the model matched, but we couldn't create the pydantic model instance for the config.
                 # Maybe invalid overrides were provided?
@@ -699,6 +713,11 @@ class ModelConfigFactory:
         matches = [r for r in details.values() if isinstance(r, Config_Base)]
 
         if not matches:
+            if any(isinstance(r, InvalidMatchError) for r in details.values()):
+                # A config class recognised the model and rejected it as unusable. That is not the same
+                # as "unidentifiable": falling back to Unknown_Config here would register a file we know
+                # to be broken as a normal model record, so the rejection wins over allow_unknown.
+                return ModelClassificationResult(config=None, details=details)
             if not allow_unknown:
                 # No matches and we are not allowed to fall back to Unknown_Config
                 return ModelClassificationResult(config=None, details=details)
