@@ -192,13 +192,34 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
   },
   variants: {
     ...chakraSlotRecipes.segmentGroup.variants,
+    // Item heights are the button height of the same size name minus the
+    // root's 1px border, so a segment group's outer box lands exactly on the
+    // buttons it sits beside — Chakra's defaults run one size-name small
+    // (their `xs` item is button-`2xs` height). Text styles mirror the
+    // button recipe's `xs` cap.
     size: {
       ...chakraSlotRecipes.segmentGroup.variants?.size,
       xs: {
-        item: { ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item, px: '2.5' },
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
+          height: 'calc({sizes.8} - 2px)',
+          px: '2.5',
+        },
       },
       sm: {
-        item: { ...chakraSlotRecipes.segmentGroup.variants?.size?.sm?.item, px: '3', textStyle: 'xs' },
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.sm?.item,
+          height: 'calc({sizes.9} - 2px)',
+          px: '3.5',
+          textStyle: 'xs',
+        },
+      },
+      md: {
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.md?.item,
+          height: 'calc({sizes.10} - 2px)',
+          textStyle: 'xs',
+        },
       },
     },
   } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
