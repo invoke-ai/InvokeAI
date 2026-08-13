@@ -118,6 +118,100 @@ def test_shutdown_releases_shared_weights_synchronously(mock_logger):
     assert store._deferred_releases.qsize() == 0
 
 
+def test_shutdown_evicts_unlocked_records(mock_logger):
+    """shutdown() must route resident records through eviction, not merely release their
+    shared-store references: a released-but-retained record keeps its tensors alive while the
+    store (and budget) report zero — accounting that no longer describes reality."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    record = _use_and_release(cache, "m")
+    wrapper_ref = weakref.ref(record.cached_model)
+    del record
+
+    cache.shutdown()
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+    # The record is gone, so the tensors really are released: the zero accounting is true.
+    assert _collect_until(lambda: wrapper_ref() is None)
+
+
+def test_shutdown_retains_locked_records_with_their_accounting(mock_logger):
+    """A record locked by an in-flight generation at shutdown() keeps its shared-store reference:
+    its tensors really are resident, so the store and budget must keep saying so. unlock() then
+    evicts it through the ordinary stale path, releasing exactly once."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    record = cache.get("m")
+    cache.lock(record, None)
+
+    cache.shutdown()
+    # Still locked: ownership and accounting are retained.
+    assert "m" in cache._cached_models
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    cache.unlock(record)
+    # The last unlock evicts the stale-marked record and returns the accounting to zero.
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_shutdown_retains_admission_window_records(mock_logger):
+    """A record inside the put()->lock() admission window (awaiting_first_use) at shutdown() is
+    retained like a locked one: its loader is about to lock it, and evicting it would release
+    shared ownership while the loader still holds the tensors. The post-use unlock evicts it."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())  # not yet locked: awaiting_first_use is set
+    assert cache._cached_models["m"].awaiting_first_use
+
+    cache.shutdown()
+    assert "m" in cache._cached_models
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    _use_and_release(cache, "m")
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_no_duplicate_canonical_when_peer_reloads_after_shutdown(mock_logger):
+    """The canonical entry must survive while a locked holder retains it, so a peer cache
+    reloading the key after this cache's shutdown() adopts the SAME canonical tensors instead of
+    registering a second copy alongside the still-resident one."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("m", DummyModule())
+        record_a = cache_a.get("m")
+        cache_a.lock(record_a, None)
+        canonical_before = store.peek("m")
+
+        cache_a.shutdown()
+        cache_b.put("m", DummyModule())
+        _use_and_release(cache_b, "m")
+        # cache_b adopted the existing canonical: one copy in RAM, referenced by both holders.
+        assert store.peek("m") is canonical_before
+        assert store.refcount("m") == 2
+        assert budget.total_in_use() == S
+
+        cache_a.unlock(record_a)
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+    finally:
+        cache_b.shutdown()
+
+
 def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
     """A cache dropped without shutdown() must not strand its shared-weights references:
     the store's refcount and bytes — and therefore the budget total — must return to zero once the

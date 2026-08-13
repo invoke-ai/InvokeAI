@@ -534,7 +534,7 @@ class ModelCache:
 
     @synchronized
     def shutdown(self) -> None:
-        """Shutdown the model cache, cancelling any pending timers."""
+        """Shutdown the model cache: cancel any pending timers and evict the resident records."""
         if self._shutdown_event.is_set():
             return
         self._shutdown_event.set()
@@ -542,13 +542,32 @@ class ModelCache:
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
             self._timeout_timer = None
-        # Release the resident records' shared-weights references now, synchronously. A shut-down
-        # cache serves no more loads, and waiting for collection would leave the store's refcounts
-        # (and canonical tensors) to the wrappers' finalizers — which only ENQUEUE, and at teardown
-        # there may be no later store operation to drain the queue. shutdown() runs in a normal
-        # thread context, so the direct (locking) release is safe here.
-        for cache_entry in self._cached_models.values():
-            cache_entry.cached_model.release_shared_weights()
+        # Evict the resident records now rather than merely releasing their shared-store
+        # references. Releasing while retaining the records would make the accounting lie two
+        # ways: the store stops counting bytes whose tensors the retained wrappers still hold (so
+        # a post-shutdown load of the same key on a peer cache registers a duplicate canonical
+        # alongside the still-resident released copy), and a later eviction of such a record —
+        # put() after shutdown() is reachable, see the note in put() — reads uses_shared_weights
+        # as already-False and debits the non-shared budget for bytes that were admitted as
+        # shared. Routing through _delete_cache_entry() keeps store ownership until the record
+        # itself goes away, so the accounting stays truthful at every point. The release must be
+        # synchronous regardless: waiting for collection would leave the refcounts to the
+        # wrappers' finalizers — which only ENQUEUE, and at teardown there may be no later store
+        # operation to drain the queue. shutdown() runs in a normal thread context, so the direct
+        # (locking) release inside _delete_cache_entry() is safe here.
+        #
+        # Records still in use keep their references: entries locked by an in-flight generation
+        # (Invoker.stop() stops the model manager before the session processor, whose workers are
+        # cancelled but not joined) and entries inside the put()->lock() admission window
+        # (awaiting_first_use) are marked stale instead, and unlock() evicts them through this
+        # same path once the generation lets go. A record never unlocked keeps its bytes — and
+        # its accounting — until process exit, which is the truthful description of a model that
+        # really is still resident.
+        for cache_entry in list(self._cached_models.values()):
+            if cache_entry.is_locked or cache_entry.awaiting_first_use:
+                cache_entry.is_stale = True
+            else:
+                self._delete_cache_entry(cache_entry)
 
     @synchronized
     @record_activity
