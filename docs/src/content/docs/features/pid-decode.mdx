@@ -81,6 +81,16 @@ This node is a **prototype** and FLUX-only in both directions: it requires Invok
 
 ## Tips & limitations
 
+On GPUs with limited VRAM, enable the experimental PiD memory optimizations in `invokeai.yaml`, then restart InvokeAI:
+
+```yaml
+pid_memory_optimization: true
+```
+
+This setting applies to every supported PiD decoder. It reduces peak activation and sampler memory by processing parts of the pixel pathway in chunks and by running the sampler's intermediates in float32 instead of float64 — measured on an RTX 4090, a 2048px decode peaks at ~1.5 GB of activations instead of ~3.7 GB. Decoding speed is roughly unchanged.
+
+It is disabled by default because it **changes the decoded image**. Neither the chunked pathway nor the float32 sampler math is bit-exact with the default path, and the few-step sampler amplifies that into a small but real difference (~43 dB PSNR — visually indistinguishable, numerically not identical). A seed that reproduced an image with the setting off will not reproduce it exactly with the setting on, and because this is a server-wide `invokeai.yaml` option it is not recorded in image metadata — each decode logs that it ran optimized instead.
+
 - **Turn off "Scale Before Processing"** on the Canvas when using PiD — PiD already decodes at 4×, so pre-scaling would inflate the work and is blocked.
 - **Inpaint / Outpaint** are not supported with PiD yet; use text-to-image or image-to-image.
 - **SDXL Refiner** cannot be combined with PiD — disable one of them.
