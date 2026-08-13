@@ -13,6 +13,7 @@ import weakref
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
@@ -89,6 +90,273 @@ def test_shared_model_counts_once_in_global_budget(mock_logger):
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
+
+
+def _collect_until(predicate, attempts: int = 5) -> bool:
+    """gc.collect() until predicate() holds — finalizer chains can need more than one pass."""
+    for _ in range(attempts):
+        gc.collect()
+        if predicate():
+            return True
+    return predicate()
+
+
+def test_shutdown_releases_shared_weights_synchronously(mock_logger):
+    """shutdown() must release its resident records' shared references itself: the finalizer
+    fallback only enqueues, and at teardown there may be no later store operation to drain the
+    queue — so relying on collection would leave the canonical tensors pinned indefinitely."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    assert store.refcount("m") == 1
+
+    cache.shutdown()
+    # No gc, no further store activity needed: the release was synchronous.
+    assert store._entries.get("m") is None
+    assert store._deferred_releases.qsize() == 0
+
+
+def test_shutdown_evicts_unlocked_records(mock_logger):
+    """shutdown() must route resident records through eviction, not merely release their
+    shared-store references: a released-but-retained record keeps its tensors alive while the
+    store (and budget) report zero — accounting that no longer describes reality."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    record = _use_and_release(cache, "m")
+    wrapper_ref = weakref.ref(record.cached_model)
+    del record
+
+    cache.shutdown()
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+    # The record is gone, so the tensors really are released: the zero accounting is true.
+    assert _collect_until(lambda: wrapper_ref() is None)
+
+
+def test_shutdown_retains_locked_records_with_their_accounting(mock_logger):
+    """A record locked by an in-flight generation at shutdown() keeps its shared-store reference:
+    its tensors really are resident, so the store and budget must keep saying so. unlock() then
+    evicts it through the ordinary stale path, releasing exactly once."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    record = cache.get("m")
+    cache.lock(record, None)
+
+    cache.shutdown()
+    # Still locked: ownership and accounting are retained.
+    assert "m" in cache._cached_models
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    cache.unlock(record)
+    # The last unlock evicts the stale-marked record and returns the accounting to zero.
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_shutdown_retains_admission_window_records(mock_logger):
+    """A record inside the put()->lock() admission window (awaiting_first_use) at shutdown() is
+    retained like a locked one: its loader is about to lock it, and evicting it would release
+    shared ownership while the loader still holds the tensors. The post-use unlock evicts it."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())  # not yet locked: awaiting_first_use is set
+    assert cache._cached_models["m"].awaiting_first_use
+
+    cache.shutdown()
+    assert "m" in cache._cached_models
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    _use_and_release(cache, "m")
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_stale_eviction_ignores_a_readmitted_record_under_the_same_key(mock_logger):
+    """A stale-marked record can be detached while still locked (the VRAM-move error paths call
+    _delete_cache_entry on a locked record) and the key re-admitted before its last unlock().
+    The stale eviction must match the record by IDENTITY: a key-only match would pop the new
+    record — detaching it from all accounting — and debit the budget for the old record's bytes."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    record_1 = cache.get("m")
+    cache.lock(record_1, None)
+
+    cache.shutdown()  # marks the locked record stale
+    # Simulate the error-path delete of the locked record (see _move_model_to_vram/_ram), then a
+    # post-shutdown re-admission of the same key (reachable: see the put()-after-shutdown() note).
+    cache._delete_cache_entry(record_1)
+    cache.put("m", DummyModule())
+    record_2 = cache._cached_models["m"]
+    assert record_2 is not record_1
+    in_use_after_readmission = budget.total_in_use()
+    assert in_use_after_readmission == S
+
+    # The detached record's last unlock must not evict the re-admitted record or touch the budget.
+    cache.unlock(record_1)
+    assert cache._cached_models.get("m") is record_2
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == in_use_after_readmission
+
+
+def test_no_duplicate_canonical_when_peer_reloads_after_shutdown(mock_logger):
+    """The canonical entry must survive while a locked holder retains it, so a peer cache
+    reloading the key after this cache's shutdown() adopts the SAME canonical tensors instead of
+    registering a second copy alongside the still-resident one."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("m", DummyModule())
+        record_a = cache_a.get("m")
+        cache_a.lock(record_a, None)
+        canonical_before = store.peek("m")
+
+        cache_a.shutdown()
+        cache_b.put("m", DummyModule())
+        _use_and_release(cache_b, "m")
+        # cache_b adopted the existing canonical: one copy in RAM, referenced by both holders.
+        assert store.peek("m") is canonical_before
+        assert store.refcount("m") == 2
+        assert budget.total_in_use() == S
+
+        cache_a.unlock(record_a)
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+    finally:
+        cache_b.shutdown()
+
+
+def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
+    """A cache dropped without shutdown() must not strand its shared-weights references:
+    the store's refcount and bytes — and therefore the budget total — must return to zero once the
+    cache is collected."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)  # keep_ram_copy=True -> shared weights
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _collect_until(lambda: cache_ref() is None)
+    assert store.refcount("m") == 0
+    assert store.total_bytes_in_use() == 0
+    assert budget.total_in_use() == 0
+
+
+def test_collection_release_is_deferred_not_taken_under_the_store_lock(mock_logger):
+    """The collection-time release must only ENQUEUE: it runs in GC context, where taking the
+    store's non-reentrant lock (e.g. while another frame on the same thread is inside acquire())
+    would self-deadlock the process. The queue is drained by the next store operation."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _collect_until(lambda: cache_ref() is None)
+    # The finalizer has fired, but it must not have touched the entries directly: the refcount is
+    # still 1 when read without the public (draining) API, and the release sits in the queue.
+    assert store._entries["m"].refcount == 1
+    assert store._deferred_releases.qsize() == 1
+    # The next public operation applies it.
+    assert store.refcount("m") == 0
+    assert store._deferred_releases.qsize() == 0
+
+
+def test_normal_eviction_and_collection_release_exactly_once(mock_logger):
+    """An entry evicted through _delete_cache_entry (which calls release_shared_weights) must not
+    be released AGAIN when its wrapper is later collected — the second device's reference would be
+    freed out from under it."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    cache_a.put("m", DummyModule())
+    cache_b.put("m", DummyModule())
+    _use_and_release(cache_a, "m")
+    _use_and_release(cache_b, "m")
+    assert store.refcount("m") == 2
+
+    # Normal eviction on cache_a releases its reference synchronously (and detaches the fallback).
+    assert cache_a.evict_unlocked_for_peer(lambda: False) == 1
+    assert store.refcount("m") == 1
+
+    # Collecting cache_a afterwards must not decrement again on cache_b's behalf.
+    ref_a = weakref.ref(cache_a)
+    del cache_a
+    assert _collect_until(lambda: ref_a() is None)
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    ref_b = weakref.ref(cache_b)
+    del cache_b
+    assert _collect_until(lambda: ref_b() is None)
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_dropped_cache_releases_a_retired_shared_entry(mock_logger):
+    """invalidate() moves a still-referenced entry to the retired list, matched later by state-dict
+    identity. A holder that is collected (rather than evicted) must still free the retired entry's
+    accounting via the deferred release."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    assert store.invalidate("m") == 1
+    assert store.retired_bytes() == S
+
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _collect_until(lambda: cache_ref() is None)
+    assert store.retired_bytes() == 0
+    assert store.total_bytes_in_use() == 0
+    assert budget.total_in_use() == 0
+
+
+def test_collected_partial_load_wrapper_releases_shared_weights(mock_logger):
+    """CachedModelWithPartialLoad (the partial-loading wrapper) has the same collection-time
+    release as CachedModelOnlyFullLoad."""
+    from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+        CachedModelWithPartialLoad,
+    )
+
+    store = SharedCpuWeightsStore()
+    wrapped = CachedModelWithPartialLoad(
+        model=DummyModule(),
+        compute_device=torch.device("cpu"),
+        keep_ram_copy=True,
+        shared_store=store,
+        cache_key="m",
+    )
+    assert store.refcount("m") == 1
+
+    wrapped_ref = weakref.ref(wrapped)
+    del wrapped
+    assert _collect_until(lambda: wrapped_ref() is None)
+    assert store.refcount("m") == 0
+    assert store.total_bytes_in_use() == 0
 
 
 def test_non_shared_model_counts_per_device(mock_logger):

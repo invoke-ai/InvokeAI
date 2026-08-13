@@ -534,7 +534,7 @@ class ModelCache:
 
     @synchronized
     def shutdown(self) -> None:
-        """Shutdown the model cache, cancelling any pending timers."""
+        """Shutdown the model cache: cancel any pending timers and evict the resident records."""
         if self._shutdown_event.is_set():
             return
         self._shutdown_event.set()
@@ -542,6 +542,32 @@ class ModelCache:
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
             self._timeout_timer = None
+        # Evict the resident records now rather than merely releasing their shared-store
+        # references. Releasing while retaining the records would make the accounting lie two
+        # ways: the store stops counting bytes whose tensors the retained wrappers still hold (so
+        # a post-shutdown load of the same key on a peer cache registers a duplicate canonical
+        # alongside the still-resident released copy), and a later eviction of such a record —
+        # put() after shutdown() is reachable, see the note in put() — reads uses_shared_weights
+        # as already-False and debits the non-shared budget for bytes that were admitted as
+        # shared. Routing through _delete_cache_entry() keeps store ownership until the record
+        # itself goes away, so the accounting stays truthful at every point. The release must be
+        # synchronous regardless: waiting for collection would leave the refcounts to the
+        # wrappers' finalizers — which only ENQUEUE, and at teardown there may be no later store
+        # operation to drain the queue. shutdown() runs in a normal thread context, so the direct
+        # (locking) release inside _delete_cache_entry() is safe here.
+        #
+        # Records still in use keep their references: entries locked by an in-flight generation
+        # (Invoker.stop() stops the model manager before the session processor, whose workers are
+        # cancelled but not joined) and entries inside the put()->lock() admission window
+        # (awaiting_first_use) are marked stale instead, and unlock() evicts them through this
+        # same path once the generation lets go. A record never unlocked keeps its bytes — and
+        # its accounting — until process exit, which is the truthful description of a model that
+        # really is still resident.
+        for cache_entry in list(self._cached_models.values()):
+            if cache_entry.is_locked or cache_entry.awaiting_first_use:
+                cache_entry.is_stale = True
+            else:
+                self._delete_cache_entry(cache_entry)
 
     @synchronized
     @record_activity
@@ -957,7 +983,14 @@ class ModelCache:
         # If `drop_model()` marked this entry stale (e.g. settings changed while a generation
         # was using it), evict now so the next load rebuilds with the new settings rather than
         # silently reusing the pre-change cached module.
-        if cache_entry.is_stale and not cache_entry.is_locked and cache_entry.key in self._cached_models:
+        # Identity check, not key membership: if this record was already detached (error-path
+        # delete) and the key re-admitted, the occupant is a different, non-stale record that must
+        # not be evicted — and no cleared-callback should fire for a no-op.
+        if (
+            cache_entry.is_stale
+            and not cache_entry.is_locked
+            and self._cached_models.get(cache_entry.key) is cache_entry
+        ):
             bytes_freed = cache_entry.cached_model.total_bytes()
             self._delete_cache_entry(cache_entry)
             if self.stats:
@@ -1571,22 +1604,29 @@ class ModelCache:
             # Satisfied: loop back to retire the flag via the guarded clear above.
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
-        """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
-        was_present = cache_entry.key in self._cached_models
+        """Delete cache_entry from the cache if it is the record currently held under its key.
+        No exception is thrown if it is absent (or the key is now held by a different record)."""
+        # Identity, not key membership: a record can be deleted while still locked (the VRAM-move
+        # error paths) and the key re-admitted before the record's last unlock() runs the
+        # stale-eviction path. A key-only check would pop the NEW record from the cache — detaching
+        # it from all accounting — and, the old record's shared release having already happened,
+        # read uses_shared_weights as False and debit the non-shared budget for bytes that were
+        # admitted as shared. The identity guard makes a delete of a detached record a full no-op,
+        # which also keeps the release exactly-once for double-deletes (release_shared_weights is
+        # itself idempotent, but the budget debit is not).
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
+            return
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
-        self._cached_models.pop(cache_entry.key, None)
+        del self._cached_models[cache_entry.key]
         # Drop this device's reference to the shared canonical CPU weights so they can be freed once
-        # the last device releases them. Guard on was_present so a double-delete doesn't
-        # double-release (release_shared_weights is itself idempotent, but a re-added entry under the
-        # same key must not be released by a stale delete).
-        if was_present:
-            uses_shared = cache_entry.cached_model.uses_shared_weights
-            total_bytes = cache_entry.cached_model.total_bytes()
-            cache_entry.cached_model.release_shared_weights()
-            # Drop the matching non-shared contribution from the global budget (shared weights are
-            # released via the store above). Captured before release_shared_weights() flips the flag.
-            if self._ram_budget is not None and not uses_shared:
-                self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        # the last device releases them.
+        uses_shared = cache_entry.cached_model.uses_shared_weights
+        total_bytes = cache_entry.cached_model.total_bytes()
+        cache_entry.cached_model.release_shared_weights()
+        # Drop the matching non-shared contribution from the global budget (shared weights are
+        # released via the store above). Captured before release_shared_weights() flips the flag.
+        if self._ram_budget is not None and not uses_shared:
+            self._ram_budget.remove_non_shared(total_bytes, cache=self)
 
     @synchronized
     def drop_model(self, model_key: str) -> int:
