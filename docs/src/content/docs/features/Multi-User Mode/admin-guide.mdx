@@ -247,14 +247,14 @@ Manager](/concepts/models) and can install, edit and delete
 models just as in single-user mode. Unprivileged users, however, can
 view the models previously installed, but cannot add or modify them.
 
-The download queue (`/api/v1/download_queue`) is likewise administrator-only.
-Its downloads are written to a separate sibling directory beside the configured
-`download_cache_dir`; this keeps arbitrary administrator-selected downloads out
-of the trusted model cache.
-
 ## Security
 
 ### Download URL Restrictions
+
+These restrictions apply to every download the server performs on your behalf —
+model installs from URLs are the main case. (The old general-purpose
+`/api/v1/download_queue` REST endpoint, which accepted an arbitrary URL and
+destination path, has been removed.)
 
 Downloads are refused when the URL resolves to a loopback, link-local or
 private-network address. This stops a download URL from being used to reach
@@ -269,7 +269,7 @@ addresses in `invokeai.yaml`:
 allow_private_download_urls: true
 ```
 
-For security, the guarded download queue ignores ambient `HTTP_PROXY`, `HTTPS_PROXY`,
+For security, the guarded downloader ignores ambient `HTTP_PROXY`, `HTTPS_PROXY`,
 and `ALL_PROXY` settings. It still honors `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`,
 and `.netrc`. If direct outbound access is unavailable, set `download_proxy` to an
 explicit proxy whose destination policy blocks private addresses; proxy-side DNS
