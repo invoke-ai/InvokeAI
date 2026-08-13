@@ -1816,8 +1816,30 @@ def _is_native_wan_layout(state_dict: dict[str | int, Any]) -> bool:
     return any((p + "text_embedding.0.weight") in keys for p in prefixes)
 
 
-def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType | None:
-    """Determine A14B (T2V vs I2V) vs TI2V-5B from the GGUF state dict.
+_WAN_KEY_PREFIXES = ("", "model.diffusion_model.", "diffusion_model.")
+
+
+def _wan_patch_embedding_shape(state_dict: dict[str | int, Any]) -> tuple[int, ...] | None:
+    """Return the shape of ``patch_embedding.weight``, tolerating ComfyUI prefixes.
+
+    Works for both plain tensors and GGMLTensors (which carry the logical shape on
+    ``tensor_shape`` because their storage is the packed quantized blob).
+    """
+    for prefix in _WAN_KEY_PREFIXES:
+        tensor = state_dict.get(prefix + "patch_embedding.weight")
+        if tensor is None:
+            continue
+        shape = getattr(tensor, "tensor_shape", None)
+        if shape is None:
+            shape = getattr(tensor, "shape", None)
+        if shape is None:
+            return None
+        return tuple(int(dim) for dim in shape)
+    return None
+
+
+def _detect_wan_variant_from_state_dict(state_dict: dict[str | int, Any]) -> WanVariantType | None:
+    """Determine A14B (T2V vs I2V) vs TI2V-5B from the transformer state dict.
 
     ``patch_embedding.weight`` has shape ``[inner_dim, in_channels, T, H, W]``;
     ``in_channels`` uniquely identifies the Wan 2.2 variant:
@@ -1830,40 +1852,80 @@ def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType
 
     Returns None if the tensor is missing or the channel count is unrecognised.
     """
-    candidates = (
-        "patch_embedding.weight",
-        "model.diffusion_model.patch_embedding.weight",
-        "diffusion_model.patch_embedding.weight",
-    )
-    for key in candidates:
-        if key in state_dict:
-            tensor = state_dict[key]
-            shape = getattr(tensor, "tensor_shape", None) or getattr(tensor, "shape", None)
-            if shape is None or len(shape) < 2:
-                return None
-            in_channels = int(shape[1])
-            if in_channels == 16:
-                return WanVariantType.T2V_A14B
-            if in_channels == 36:
-                return WanVariantType.I2V_A14B
-            if in_channels == 48:
-                return WanVariantType.TI2V_5B
-            return None
+    shape = _wan_patch_embedding_shape(state_dict)
+    if shape is None or len(shape) < 2:
+        return None
+    in_channels = shape[1]
+    if in_channels == 16:
+        return WanVariantType.T2V_A14B
+    if in_channels == 36:
+        return WanVariantType.I2V_A14B
+    if in_channels == 48:
+        return WanVariantType.TI2V_5B
     return None
 
 
-def _detect_wan_gguf_expert(filename: str) -> Literal["high", "low", "none"]:
+def _find_wan_2_1_marker(state_dict: dict[str | int, Any]) -> str | None:
+    """Return a human-readable reason if the state dict is architecturally Wan 2.1.
+
+    Wan 2.1 and Wan 2.2 share a key layout, so the two families can only be told
+    apart by architecture. Three markers are decisive, and all three describe
+    things Wan 2.2 never ships:
+
+    * **CLIP image embedder** (``img_emb.proj.*`` / ``condition_embedder.image_embedder.*``).
+      Wan 2.1 I2V conditioned on CLIP-vision features via ``image_dim``. Wan 2.2
+      I2V-A14B dropped that entirely and concatenates VAE latents instead, so any
+      36-channel model carrying an image embedder is Wan 2.1.
+    * **1536-dim inner width** — the Wan 2.1 T2V-1.3B model. The Wan 2.2 family is
+      5120 (A14B) or 3072 (TI2V-5B).
+    * **VACE blocks** (``vace_blocks.*``) — the Wan 2.1 VACE editing variant, which
+      needs a control branch InvokeAI's Wan pipeline doesn't drive.
+
+    Wan 2.1 T2V-14B is *not* detectable this way: it is shape-identical to a single
+    Wan 2.2 A14B expert. Callers that care fall back to the filename/metadata gate.
+    """
+    keys = state_dict.keys()
+    image_embedder_markers = ("img_emb.proj.0.weight", "condition_embedder.image_embedder.norm1.weight")
+    if any((prefix + marker) in keys for prefix in _WAN_KEY_PREFIXES for marker in image_embedder_markers):
+        return (
+            "state dict has a CLIP image embedder (img_emb), which is a Wan 2.1 I2V feature; "
+            "Wan 2.2 I2V conditions on VAE latents instead"
+        )
+
+    shape = _wan_patch_embedding_shape(state_dict)
+    if shape is not None and len(shape) >= 1 and shape[0] == 1536:
+        return "state dict has a 1536-dim transformer, which is the Wan 2.1 T2V-1.3B architecture"
+
+    if any(isinstance(key, str) and "vace_blocks." in key for key in keys):
+        return "state dict has VACE control blocks, which are a Wan 2.1 VACE feature"
+
+    return None
+
+
+def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
     """Filename heuristic for the A14B dual-expert MoE.
 
-    Community releases tag each expert in the filename — typically
-    ``high_noise`` / ``low_noise`` (or hyphenated/concatenated variants).
+    Community releases tag each expert in the filename — usually ``high_noise`` /
+    ``low_noise`` and their hyphenated/concatenated/camel-cased spellings, but
+    plenty of CivitAI fine-tunes shorten it to a bare ``HIGH`` / ``low`` token.
+
+    The name is first split at camelCase boundaries so ``HighNoise`` normalises to
+    ``high_noise``. The bare-token fallback matches only whole tokens, so it can't
+    fire on a substring like the "low" inside "slow" or "flow".
+
     Returns 'none' when neither marker is present (single-expert model or
-    ambiguous filename).
+    an untagged filename).
     """
-    name = filename.lower()
+    name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", filename).lower()
     if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
         return "high"
     if any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+        return "low"
+
+    tokens = set(re.split(r"[^a-z0-9]+", name))
+    if "high" in tokens:
+        return "high"
+    if "low" in tokens:
         return "low"
     return "none"
 
@@ -1902,16 +1964,82 @@ class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base
         )
         if "wan21" in normalized_identity:
             raise NotAMatchError("Wan 2.1 GGUF models are not supported by the Wan 2.2 loader")
+        # A misnamed Wan 2.1 GGUF slips past the name check above; the architectural
+        # markers don't care what the file is called.
+        wan_2_1_reason = _find_wan_2_1_marker(sd)
+        if wan_2_1_reason is not None:
+            raise NotAMatchError(f"Wan 2.1 GGUF models are not supported by the Wan 2.2 loader: {wan_2_1_reason}")
 
         explicit_variant = override_fields.pop("variant", None)
-        variant = explicit_variant or _detect_wan_gguf_variant(sd)
+        variant = explicit_variant or _detect_wan_variant_from_state_dict(sd)
         if variant is None:
             raise NotAMatchError("could not determine Wan variant from state dict")
         if variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and "wan22" not in normalized_identity:
             raise NotAMatchError("Wan A14B GGUF filename or metadata must identify the model as Wan 2.2")
 
         explicit_expert = override_fields.pop("expert", None)
-        expert = explicit_expert or _detect_wan_gguf_expert(mod.path.stem)
+        expert = explicit_expert or _detect_wan_expert(mod.path.stem)
+
+        return cls(**override_fields, variant=variant, expert=expert)
+
+
+class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for single-file Wan 2.2 transformer checkpoints (safetensors).
+
+    This is the format the community ships on CivitAI and in ComfyUI-oriented
+    Hugging Face repos: one ``.safetensors`` per transformer, in either the native
+    upstream key layout or the diffusers one, optionally under a
+    ``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``
+    quantized. The loader normalises all of those.
+
+    As with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``
+    records which one this is so the Wan model loader invocation can pair them.
+    TI2V-5B is single-transformer and stores ``expert='none'``.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: WanVariantType = Field()
+    expert: Literal["high", "low", "none"] = Field(
+        default="none",
+        description="For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, "
+        "'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_wan_keys(sd):
+            raise NotAMatchError("state dict does not look like a Wan transformer")
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+        # Wan 2.1 shares Wan 2.2's key layout, so reject it on architecture rather
+        # than on the filename. Unlike the GGUF probe we deliberately do *not*
+        # require the name to say "wan2.2": community fine-tunes routinely drop the
+        # version from the filename, and rejecting them was the whole complaint in
+        # #9463. The residual ambiguity is Wan 2.1 T2V-14B, which is shape-identical
+        # to a Wan 2.2 A14B expert — that one is caught by the explicit "wan2.1" name
+        # check below, and otherwise imports as A14B.
+        wan_2_1_reason = _find_wan_2_1_marker(sd)
+        if wan_2_1_reason is not None:
+            raise NotAMatchError(f"Wan 2.1 models are not supported by the Wan 2.2 loader: {wan_2_1_reason}")
+
+        normalized_identity = "".join(character for character in mod.path.stem.lower() if character.isalnum())
+        if "wan21" in normalized_identity:
+            raise NotAMatchError("Wan 2.1 models are not supported by the Wan 2.2 loader")
+
+        explicit_variant = override_fields.pop("variant", None)
+        variant = explicit_variant or _detect_wan_variant_from_state_dict(sd)
+        if variant is None:
+            raise NotAMatchError("could not determine Wan variant from state dict")
+
+        explicit_expert = override_fields.pop("expert", None)
+        expert = explicit_expert or _detect_wan_expert(mod.path.stem)
 
         return cls(**override_fields, variant=variant, expert=expert)
 

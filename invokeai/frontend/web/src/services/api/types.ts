@@ -638,12 +638,16 @@ export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'wan' && config.format === 'diffusers';
 };
 
-/** Wan GGUF main models marked as the low-noise expert (the second half
- *  of the A14B MoE pair). Suitable for the Transformer (Low Noise) picker;
- *  also used to filter low-noise GGUFs out of the primary main dropdown. */
-export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+/** Wan single-file main models (GGUF or safetensors checkpoint) marked as the
+ *  low-noise expert — the second half of the A14B MoE pair. Suitable for the
+ *  Transformer (Low Noise) picker. The two experts don't have to share a format;
+ *  both load into the same transformer class. */
+export const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return (
-    config.type === 'main' && config.base === 'wan' && config.format === 'gguf_quantized' && config.expert === 'low'
+    config.type === 'main' &&
+    config.base === 'wan' &&
+    (config.format === 'gguf_quantized' || config.format === 'checkpoint') &&
+    config.expert === 'low'
   );
 };
 
