@@ -9,13 +9,14 @@ admin room.
 """
 
 import asyncio
+import threading
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
 
-from invokeai.app.api.sockets import SocketIO
+from invokeai.app.api.sockets import SOCKET_REVALIDATION_FAILURE_LIMIT, SocketIO
 from invokeai.app.services.events.events_common import UserAccessChangedEvent
 
 
@@ -118,7 +119,7 @@ class TestConnectDerivesRoleFromDatabase:
 class TestUserAccessChangedHandler:
     """_handle_user_access_changed re-authorizes already-connected sockets."""
 
-    def _connected_socketio(self) -> SocketIO:
+    def _connected_socketio(self, monkeypatch: pytest.MonkeyPatch, event: UserAccessChangedEvent) -> SocketIO:
         socketio = SocketIO(FastAPI())
         socketio._sio.enter_room = AsyncMock()
         socketio._sio.leave_room = AsyncMock()
@@ -129,12 +130,41 @@ class TestUserAccessChangedHandler:
             "sid-user-b": {"user_id": "user-1", "is_admin": False, "token_epoch": 0},
             "sid-other": {"user_id": "user-2", "is_admin": False, "token_epoch": 0},
         }
+        self._patch_record_agreeing_with(monkeypatch, event)
         return socketio
 
+    def _patch_record_agreeing_with(self, monkeypatch: pytest.MonkeyPatch, event: UserAccessChangedEvent) -> None:
+        """Back the event with a database record that says the same thing.
+
+        The handler re-reads and applies the *record*, so a test that leaves
+        `ApiDependencies` unbound is not testing what it looks like: the read raises, and
+        the handler falls to its failure path. That path deliberately refuses to grant
+        privileges, so an unbound promotion test would fail — and, before that refusal
+        existed, passed for the wrong reason. The disagreeing cases live in
+        `TestHandlerRereadsAtThePointOfDecision`.
+        """
+        record = (
+            None
+            if not event.is_active
+            else SimpleNamespace(
+                user_id=event.user_id,
+                is_admin=event.is_admin,
+                is_active=True,
+                token_epoch=event.token_epoch,
+            )
+        )
+        invoker = SimpleNamespace(
+            services=SimpleNamespace(
+                configuration=SimpleNamespace(multiuser=True),
+                users=SimpleNamespace(get=lambda user_id: record),
+            )
+        )
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
     @pytest.mark.anyio
-    async def test_demoted_admin_sockets_leave_admin_room(self) -> None:
-        socketio = self._connected_socketio()
+    async def test_demoted_admin_sockets_leave_admin_room(self, monkeypatch: pytest.MonkeyPatch) -> None:
         event = UserAccessChangedEvent.build(user_id="admin-1", is_admin=False, is_active=True)
+        socketio = self._connected_socketio(monkeypatch, event)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -143,11 +173,13 @@ class TestUserAccessChangedHandler:
         socketio._sio.disconnect.assert_not_awaited()
 
     @pytest.mark.anyio
-    async def test_demoted_admin_cannot_rejoin_admin_room_via_queue_subscription(self) -> None:
+    async def test_demoted_admin_cannot_rejoin_admin_room_via_queue_subscription(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """After demotion, the cached is_admin is False, so _handle_sub_queue does not
         re-add the socket to the admin room."""
-        socketio = self._connected_socketio()
         event = UserAccessChangedEvent.build(user_id="admin-1", is_admin=False, is_active=True)
+        socketio = self._connected_socketio(monkeypatch, event)
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
         await socketio._handle_sub_queue("sid-admin", {"queue_id": "default"})
@@ -156,9 +188,9 @@ class TestUserAccessChangedHandler:
         assert "admin" not in rooms_entered
 
     @pytest.mark.anyio
-    async def test_deactivated_user_sockets_are_disconnected(self) -> None:
-        socketio = self._connected_socketio()
+    async def test_deactivated_user_sockets_are_disconnected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
+        socketio = self._connected_socketio(monkeypatch, event)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -166,10 +198,10 @@ class TestUserAccessChangedHandler:
         assert disconnected == {"sid-user-a", "sid-user-b"}
 
     @pytest.mark.anyio
-    async def test_deleted_user_sockets_are_disconnected(self) -> None:
+    async def test_deleted_user_sockets_are_disconnected(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Deletion is emitted as is_active=False and disconnects the user's sockets."""
-        socketio = self._connected_socketio()
         event = UserAccessChangedEvent.build(user_id="user-2", is_admin=False, is_active=False)
+        socketio = self._connected_socketio(monkeypatch, event)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -177,9 +209,9 @@ class TestUserAccessChangedHandler:
         assert disconnected == {"sid-other"}
 
     @pytest.mark.anyio
-    async def test_promoted_user_sockets_join_admin_room(self) -> None:
-        socketio = self._connected_socketio()
+    async def test_promoted_user_sockets_join_admin_room(self, monkeypatch: pytest.MonkeyPatch) -> None:
         event = UserAccessChangedEvent.build(user_id="user-1", is_admin=True, is_active=True)
+        socketio = self._connected_socketio(monkeypatch, event)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -189,11 +221,11 @@ class TestUserAccessChangedHandler:
         assert socketio._socket_users["sid-user-a"]["is_admin"] is True
 
     @pytest.mark.anyio
-    async def test_other_users_sockets_are_untouched(self) -> None:
+    async def test_other_users_sockets_are_untouched(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Positive case: an access change for one user does not affect other users'
         sockets — an unchanged administrator keeps receiving admin-room events."""
-        socketio = self._connected_socketio()
         event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
+        socketio = self._connected_socketio(monkeypatch, event)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -204,7 +236,9 @@ class TestUserAccessChangedHandler:
         assert socketio._socket_users["sid-admin"]["is_admin"] is True
 
     @pytest.mark.anyio
-    async def test_a_socket_dropping_mid_loop_is_skipped_not_redisconnected(self) -> None:
+    async def test_a_socket_dropping_mid_loop_is_skipped_not_redisconnected(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """A socket that goes away while the loop is suspended is skipped on its turn.
 
         The deactivation branch never indexed `_socket_users`, so it did not raise on a
@@ -212,7 +246,8 @@ class TestUserAccessChangedHandler:
         branch that did. What this pins is the weaker half: the loop's snapshot is not
         treated as still-live, so an already-disconnected socket is not disconnected twice.
         """
-        socketio = self._connected_socketio()
+        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
+        socketio = self._connected_socketio(monkeypatch, event)
         socketio._socket_users["sid-user-c"] = {"user_id": "user-1", "is_admin": True, "token_epoch": 0}
 
         async def disconnect(sid: str) -> None:
@@ -223,7 +258,6 @@ class TestUserAccessChangedHandler:
             await socketio._handle_disconnect(sid)
 
         socketio._sio.disconnect = AsyncMock(side_effect=disconnect)
-        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -234,11 +268,13 @@ class TestUserAccessChangedHandler:
         assert "sid-user-c" not in socketio._socket_users
 
     @pytest.mark.anyio
-    async def test_demotion_survives_a_socket_dropping_mid_loop(self) -> None:
+    async def test_demotion_survives_a_socket_dropping_mid_loop(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Same interleaving on the demotion path, where an abandoned socket is worse: it
         stays in the admin room *and* keeps a cached is_admin of True, which
         `_handle_sub_queue` would use to re-add it on the next subscription."""
-        socketio = self._connected_socketio()
+        # Epoch 1: sid-a and sid-c hold superseded tokens, sid-b is current.
+        event = UserAccessChangedEvent.build(user_id="admin-1", is_admin=False, is_active=True, token_epoch=1)
+        socketio = self._connected_socketio(monkeypatch, event)
         socketio._socket_users = {
             "sid-a": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
             "sid-b": {"user_id": "admin-1", "is_admin": True, "token_epoch": 1},
@@ -251,8 +287,6 @@ class TestUserAccessChangedHandler:
             await socketio._handle_disconnect(sid)
 
         socketio._sio.disconnect = AsyncMock(side_effect=disconnect)
-        # Epoch 1: sid-a and sid-c hold superseded tokens, sid-b is current.
-        event = UserAccessChangedEvent.build(user_id="admin-1", is_admin=False, is_active=True, token_epoch=1)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
@@ -296,9 +330,16 @@ class TestTokenEpochOnSockets:
         assert socketio._socket_users["sid-1"]["token_epoch"] == 3
 
     @pytest.mark.anyio
-    async def test_password_change_disconnects_superseded_sockets_only(self) -> None:
+    async def test_password_change_disconnects_superseded_sockets_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The account stays active, so the deactivation branch does not fire — the epoch
         is what identifies which of the user's sockets are now holding dead tokens."""
+        # Bind the record the handler re-reads. Without this the read raises
+        # (`ApiDependencies.invoker` is an unset annotation) and the whole re-read block
+        # could be deleted with this test still green — it would be pinning the failure
+        # path, not the epoch logic it is named for.
+        _patch_multiuser_context(
+            monkeypatch, user_id="user-1", token_is_admin=False, db_is_admin=False, db_epoch=1, token_epoch=1
+        )
         socketio = SocketIO(FastAPI())
         socketio._sio.enter_room = AsyncMock()
         socketio._sio.leave_room = AsyncMock()
@@ -328,6 +369,7 @@ class TestRevalidationSweep:
 
     def _socketio(self, socket_users: dict[str, dict]) -> SocketIO:
         socketio = SocketIO(FastAPI())
+        socketio._sio.leave_room = AsyncMock()
         socketio._socket_users = socket_users
         return socketio
 
@@ -441,16 +483,255 @@ class TestRevalidationSweep:
 
     @pytest.mark.anyio
     async def test_an_unreadable_record_is_left_for_the_next_sweep(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Opposite of the queue gate's fail-closed policy, deliberately: nothing runs on the
-        user's behalf because a socket stays open one more interval, whereas tearing down
-        every live session on a transient database error would be a self-inflicted outage —
-        and `_handle_connect` fails closed, so the clients would not get back in."""
+        """Below the failure limit the socket is left alone, opposite to the queue gate's
+        fail-closed policy and deliberately so: nothing runs on the user's behalf because a
+        socket stays open one more interval, whereas tearing down every live session on a
+        transient database error would be a self-inflicted outage — and `_handle_connect`
+        fails closed, so the clients would not get back in."""
         socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
         emitted = self._patch_services(monkeypatch, {"user-1": RuntimeError("database is locked")})
 
-        await socketio._revalidate_socket_users()
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT - 1):
+            await socketio._revalidate_socket_users()
 
         assert emitted == []
+        assert socketio._socket_users["sid-1"]["is_admin"] is True
+        socketio._sio.leave_room.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_repeated_failures_drop_the_admin_room(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The retry cannot be unbounded. A CLI demotion during a database outage would
+        otherwise leave the socket in the admin room — reading every other user's private
+        events — for as long as the reads kept failing."""
+        socketio = self._socketio(
+            {
+                "sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+                "sid-2": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+            }
+        )
+        self._patch_services(monkeypatch, {"admin-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT):
+            await socketio._revalidate_socket_users()
+
+        assert socketio._socket_users["sid-1"]["is_admin"] is False
+        assert socketio._socket_users["sid-2"]["is_admin"] is False
+        assert sorted(call.args for call in socketio._sio.leave_room.await_args_list) == [
+            ("sid-1", "admin"),
+            ("sid-2", "admin"),
+        ]
+
+    @pytest.mark.anyio
+    async def test_the_dropped_privilege_is_restored_once_the_record_reads_again(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Revocation on failure is only safe because it is self-healing: a still-genuine
+        admin now has a cached `is_admin` the record disagrees with, which is precisely
+        what the staleness check publishes."""
+        socketio = self._socketio({"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}})
+        users: dict[str, object] = {"admin-1": RuntimeError("database is locked")}
+        emitted = self._patch_services(monkeypatch, users)
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT):
+            await socketio._revalidate_socket_users()
+        assert socketio._socket_users["sid-1"]["is_admin"] is False
+
+        users["admin-1"] = self._user("admin-1", is_admin=True)
+        await socketio._revalidate_socket_users()
+
+        assert emitted == [{"user_id": "admin-1", "is_admin": True, "is_active": True, "token_epoch": 0}]
+
+    @pytest.mark.anyio
+    async def test_a_successful_read_resets_the_failure_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`SOCKET_REVALIDATION_FAILURE_LIMIT` counts *consecutive* failures. A database
+        that fails one sweep in two is being read successfully in between, so nothing is
+        stale and there is nothing to revoke."""
+        socketio = self._socketio({"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}})
+        users: dict[str, object] = {"admin-1": RuntimeError("database is locked")}
+        self._patch_services(monkeypatch, users)
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT * 3):
+            await socketio._revalidate_socket_users()
+            users["admin-1"] = (
+                self._user("admin-1", is_admin=True)
+                if isinstance(users["admin-1"], Exception)
+                else RuntimeError("database is locked")
+            )
+
+        assert socketio._socket_users["sid-1"]["is_admin"] is True
+        socketio._sio.leave_room.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_a_reconnecting_user_does_not_inherit_the_old_failure_count(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The counter is keyed by user, but it stands in for the state of *sockets*. A user
+        whose last socket closed mid-outage and who reconnected onto a healthy database must
+        not be one failed read away from losing the admin room."""
+        socket_users: dict[str, dict] = {"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}}
+        socketio = self._socketio(socket_users)
+        self._patch_services(monkeypatch, {"admin-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT - 1):
+            await socketio._revalidate_socket_users()
+
+        # Disconnect for real rather than reaching into the dict: `_revalidation_loop`
+        # skips the sweep entirely while no sockets are open, so the sweep's own orphan
+        # cleanup never runs in this window. The counter has to be dropped at the
+        # disconnect or it survives to meet the returning socket.
+        await socketio._handle_disconnect("sid-1")
+        assert socketio._revalidation_failures == {}
+
+        socket_users["sid-2"] = {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}
+        await socketio._revalidate_socket_users()
+
+        assert socketio._socket_users["sid-2"]["is_admin"] is True
+        socketio._sio.leave_room.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_a_disconnect_during_the_lookup_does_not_resurrect_the_counter(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The lookup awaits, and the failure is recorded after it returns. A last socket
+        closing inside that window runs the disconnect's cleanup *before* the write, so a
+        naive write puts back a counter for a user with no sockets — and nothing would ever
+        collect it, because the loop skips sweeps entirely while none are open."""
+        socket_users: dict[str, dict] = {"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}}
+        socketio = self._socketio(socket_users)
+
+        # The lookup runs on a worker thread via `run_in_threadpool`, so the event loop is
+        # genuinely free while it is in flight. Park it there, run the real disconnect
+        # handler in that window, and only then let it fail — the actual interleaving,
+        # rather than a simulation of it.
+        lookup_entered = threading.Event()
+        release_lookup = threading.Event()
+
+        def get(user_id: str):
+            lookup_entered.set()
+            assert release_lookup.wait(5), "test deadlock: the disconnect never ran"
+            raise RuntimeError("database is locked")
+
+        invoker = SimpleNamespace(
+            services=SimpleNamespace(
+                configuration=SimpleNamespace(multiuser=True),
+                users=SimpleNamespace(get=get),
+                events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: None),
+            )
+        )
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
+        sweep = asyncio.create_task(socketio._revalidate_socket_users())
+        await asyncio.to_thread(lookup_entered.wait, 5)
+        await socketio._handle_disconnect("sid-1")
+        assert socketio._revalidation_failures == {}, "precondition: the disconnect cleared the count"
+        release_lookup.set()
+        await sweep
+
+        assert socketio._socket_users == {}
+        assert socketio._revalidation_failures == {}
+
+    @pytest.mark.anyio
+    async def test_a_successful_connect_time_read_clears_the_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """`_handle_connect` resolves the same record the sweep does. A socket admitted as
+        an administrator by a read that succeeded must get the full retry budget, not
+        inherit a count from an outage that had demonstrably ended before it connected."""
+        socketio = self._socketio({"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}})
+        self._patch_services(monkeypatch, {"admin-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT - 1):
+            await socketio._revalidate_socket_users()
+        assert socketio._revalidation_failures["admin-1"] == SOCKET_REVALIDATION_FAILURE_LIMIT - 1
+
+        # The database recovers and the admin opens a second tab.
+        socketio._sio.enter_room = AsyncMock()
+        _patch_multiuser_context(monkeypatch, user_id="admin-1", token_is_admin=True, db_is_admin=True)
+        assert await socketio._handle_connect("sid-2", {}, {"token": "valid-token"}) is True
+
+        assert socketio._revalidation_failures == {}
+
+    @pytest.mark.anyio
+    async def test_a_successful_handler_reread_clears_the_count(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Same rule for the other reader. A promotion applied from a re-read that
+        succeeded must not be one failed sweep away from being taken back."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0}})
+        socketio._sio.enter_room = AsyncMock()
+        self._patch_services(monkeypatch, {"user-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT):
+            await socketio._revalidate_socket_users()
+        assert socketio._revalidation_failures["user-1"] == SOCKET_REVALIDATION_FAILURE_LIMIT
+
+        _patch_multiuser_context(monkeypatch, user_id="user-1", token_is_admin=False, db_is_admin=True)
+        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=True, is_active=True)
+        await socketio._handle_user_access_changed(("user_access_changed", event))
+
+        assert socketio._socket_users["sid-1"]["is_admin"] is True
+        assert socketio._revalidation_failures == {}
+
+    @pytest.mark.anyio
+    async def test_the_sweep_drops_a_counter_whose_user_has_no_sockets(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Backstop for anything that removes sockets without going through
+        `_handle_disconnect`. Exercised directly because no path through the public API
+        should be able to leave such an entry behind in the first place."""
+        socketio = self._socketio({"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}})
+        self._patch_services(monkeypatch, {"admin-1": self._user("admin-1", is_admin=True)})
+        socketio._revalidation_failures["ghost-user"] = 2
+
+        await socketio._revalidate_socket_users()
+
+        assert socketio._revalidation_failures == {}
+
+    @pytest.mark.anyio
+    async def test_one_of_several_sockets_closing_keeps_the_failure_count(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The counter is dropped when the user's *last* socket goes, not the first. A user
+        with three tabs who closes one has not had their remaining sockets checked any more
+        recently than before."""
+        socket_users: dict[str, dict] = {
+            "sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+            "sid-2": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0},
+        }
+        socketio = self._socketio(socket_users)
+        self._patch_services(monkeypatch, {"admin-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT - 1):
+            await socketio._revalidate_socket_users()
+        await socketio._handle_disconnect("sid-1")
+
+        assert socketio._revalidation_failures["admin-1"] == SOCKET_REVALIDATION_FAILURE_LIMIT - 1
+
+        await socketio._revalidate_socket_users()
+
+        assert socketio._socket_users["sid-2"]["is_admin"] is False
+
+    @pytest.mark.anyio
+    async def test_repeated_failures_do_not_disconnect(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The privilege is dropped, not the connection. Disconnecting every socket because
+        the database is unreadable is the outage this sweep exists to avoid, and
+        `_handle_connect` fails closed, so the clients could not get back in."""
+        socketio = self._socketio({"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}})
+        socketio._sio.disconnect = AsyncMock()
+        self._patch_services(monkeypatch, {"admin-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT * 2):
+            await socketio._revalidate_socket_users()
+
+        socketio._sio.disconnect.assert_not_awaited()
+        assert "sid-1" in socketio._socket_users
+
+    @pytest.mark.anyio
+    async def test_a_non_admin_users_failures_revoke_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """There is no privilege to drop, and dropping the connection is not the policy."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0}})
+        emitted = self._patch_services(monkeypatch, {"user-1": RuntimeError("database is locked")})
+
+        for _ in range(SOCKET_REVALIDATION_FAILURE_LIMIT * 2):
+            await socketio._revalidate_socket_users()
+
+        assert emitted == []
+        socketio._sio.leave_room.assert_not_awaited()
+        assert "sid-1" in socketio._socket_users
 
     @pytest.mark.anyio
     async def test_one_unreadable_record_does_not_abandon_the_others(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -564,12 +845,7 @@ class TestHandlerRereadsAtThePointOfDecision:
 
         socketio._sio.disconnect.assert_awaited_once_with("sid-1")
 
-    @pytest.mark.anyio
-    async def test_an_unreadable_record_leaves_the_event_standing(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """The event is evidence of a committed change; a read that cannot contradict it
-        does not get to override it."""
-        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
-
+    def _patch_unreadable_users(self, monkeypatch: pytest.MonkeyPatch) -> None:
         def explode(user_id: str):
             raise RuntimeError("database is locked")
 
@@ -580,8 +856,46 @@ class TestHandlerRereadsAtThePointOfDecision:
             )
         )
         monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
+    @pytest.mark.anyio
+    async def test_an_unreadable_record_leaves_a_revoking_event_standing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The event is evidence of a committed change; a read that cannot contradict it
+        does not get to override it — in the direction that takes privileges away."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
+        self._patch_unreadable_users(monkeypatch)
         event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
         socketio._sio.disconnect.assert_awaited_once_with("sid-1")
+
+    @pytest.mark.anyio
+    async def test_an_unreadable_record_never_grants_the_admin_room(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The superseded-promotion case again, with no record to check it against. A sweep
+        read `is_admin=True`, a demotion committed while it was suspended, and the re-read
+        that would have caught it fails. Honoring the payload here would put a demoted user
+        back in the admin room; the handler may demote on an unreadable database, never
+        promote."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0}})
+        self._patch_unreadable_users(monkeypatch)
+        stale = UserAccessChangedEvent.build(user_id="user-1", is_admin=True, is_active=True)
+
+        await socketio._handle_user_access_changed(("user_access_changed", stale))
+
+        socketio._sio.enter_room.assert_not_awaited()
+        socketio._sio.leave_room.assert_awaited_once_with("sid-1", "admin")
+        assert socketio._socket_users["sid-1"]["is_admin"] is False
+
+    @pytest.mark.anyio
+    async def test_an_unreadable_record_demotes_a_currently_admin_socket(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Same rule seen from the other side: a socket already holding the admin room does
+        not get to keep it just because the payload said so and the read failed."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
+        self._patch_unreadable_users(monkeypatch)
+        stale = UserAccessChangedEvent.build(user_id="user-1", is_admin=True, is_active=True)
+
+        await socketio._handle_user_access_changed(("user_access_changed", stale))
+
+        socketio._sio.enter_room.assert_not_awaited()
+        socketio._sio.leave_room.assert_awaited_once_with("sid-1", "admin")
+        assert socketio._socket_users["sid-1"]["is_admin"] is False

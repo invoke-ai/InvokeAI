@@ -300,6 +300,10 @@ The tokens include the user's ID, email, admin status, and a revocation counter,
 
 Changes made through the web UI apply to open connections immediately. Changes made with the `invoke-usermod` and `invoke-userdel` commands run in a separate process from the server: everything the server derives per request (above) still changes the instant the command commits, but connections that are already open are re-checked on a periodic sweep, so closing them can take up to about a minute.
 
+If that sweep cannot read the database at all — the server is under enough load that its reads keep timing out, say — it does not assume the connections it cannot check are still entitled to what they hold. After a few consecutive failures, open connections lose their administrator privileges and stop receiving other users' events, while staying connected; the privilege comes back on its own once the record can be read again. An administrator who sees admin-only updates go quiet during a period of database trouble is seeing this, not a change to their account.
+
+That safeguard covers administrator privileges specifically. Closing a deactivated or deleted account's connection still waits for a successful read, so while the database is unreadable such a connection keeps receiving that account's *own* events until the sweep can confirm the change — every HTTP request it makes is rejected in the meantime, and it is closed as soon as a read succeeds.
+
 Two limits are worth stating plainly. Revocation is enforced by this server, so a token remains cryptographically valid until it expires — anything that accepts these tokens without consulting the database would still honor it. And a session already in flight is stopped, not rewound: media already delivered to the client and outputs already written stay written.
 
 ### Secret Key Management

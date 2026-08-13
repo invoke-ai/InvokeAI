@@ -67,6 +67,15 @@ logger = InvokeAILogger.get_logger()
 # authorization it was granted under. See `SocketIO._revalidate_socket_users`.
 SOCKET_REVALIDATION_INTERVAL_SECONDS = 30.0
 
+# How many consecutive sweeps may fail to read a user's record before that user's sockets
+# lose their administrator privileges. A single failed read is retried rather than acted on
+# — a busy-timeout on the shared SQLite connection is transient, and a demotion is far more
+# likely to arrive as a clean read on the next sweep than to coincide with an outage — but
+# the retry cannot be unbounded, or an unreadable database would preserve a stale admin
+# socket indefinitely. At the interval above this bounds stale admin access to ~90 seconds.
+# See `SocketIO._note_revalidation_failure`.
+SOCKET_REVALIDATION_FAILURE_LIMIT = 3
+
 
 class QueueSubscriptionEvent(BaseModel):
     """Event data for subscribing to the socket.io queue room.
@@ -143,6 +152,12 @@ class SocketIO:
         # Periodic re-derivation of that cached state from the database; see `start`.
         self._revalidation_task: asyncio.Task[None] | None = None
 
+        # Consecutive failed lookups per user id, for the sweep's bounded-retry policy.
+        # Only written by `_revalidate_socket_users`, which the loop runs one call at a
+        # time; entries are cleared on a successful read and dropped when the user's last
+        # socket goes away, so this cannot grow with reconnect churn.
+        self._revalidation_failures: dict[str, int] = {}
+
         # Set up authentication middleware
         self._sio.on("connect", handler=self._handle_connect)
         self._sio.on("disconnect", handler=self._handle_disconnect)
@@ -207,6 +222,7 @@ class SocketIO:
                         # without re-login.
                         is_admin = user.is_admin
                         token_epoch = user.token_epoch
+                        self._note_revalidation_success(token_data.user_id)
                     except Exception:
                         # If user service is unavailable, fail closed
                         logger.warning(f"Rejecting socket {sid}: unable to verify user record")
@@ -264,7 +280,18 @@ class SocketIO:
     async def _handle_disconnect(self, sid: str) -> None:
         """Handle socket disconnection and cleanup user info."""
         if sid in self._socket_users:
+            user_id = self._socket_users[sid].get("user_id")
             del self._socket_users[sid]
+            # Forget the user's revalidation failures once their last socket is gone. The
+            # count stands in for how long *these* sockets have gone unchecked, so a user
+            # who reconnects must start over. The sweep drops orphaned counters too, but it
+            # cannot be relied on here: `_revalidation_loop` skips the sweep entirely while
+            # no sockets are open, which is precisely the state a departing last socket
+            # creates. Without this, a user whose only socket closed part-way through a
+            # database outage would come back one failed read away from losing the admin
+            # room.
+            if user_id is not None and not any(info.get("user_id") == user_id for info in self._socket_users.values()):
+                self._revalidation_failures.pop(user_id, None)
             logger.debug(f"Socket {sid} disconnected and cleaned up")
 
     def start(self) -> None:
@@ -309,12 +336,34 @@ class SocketIO:
         means" — sockets re-authorize *and* the session processor cancels the user's running
         items — instead of a second copy that drifts from the first.
 
-        A lookup that fails leaves the socket alone and is retried on the next sweep. That
-        is the opposite of the queue gate's fail-closed policy, deliberately: nothing runs
-        on the user's behalf because a socket stays open for another interval, whereas
-        tearing down every live session on a transient database error would be an outage
-        this sweep caused by itself — and `_handle_connect` fails closed, so the clients
-        would not get back in.
+        A lookup that fails is retried on the next sweep, but only
+        `SOCKET_REVALIDATION_FAILURE_LIMIT` times; after that the user's sockets lose the
+        admin room and their cached `is_admin`. Retrying at all is the opposite of the
+        queue gate's fail-closed policy, deliberately: nothing runs on the user's behalf
+        because a socket stays open for another interval, whereas tearing down every live
+        session on a transient database error would be an outage this sweep caused by
+        itself — and `_handle_connect` fails closed, so the clients would not get back in.
+        But retrying *forever* is what makes an unreadable database indistinguishable from
+        a quiet one: a socket demoted by the CLI would sit in the admin room, reading every
+        other user's private events, for as long as the reads kept failing. Dropping the
+        privilege rather than the connection bounds that without causing the outage —
+        the socket keeps working, it just stops being an administrator's.
+
+        That revocation is self-healing, and deliberately relies on the staleness check
+        below to be: once reads succeed again, a still-genuine admin's cached `is_admin` is
+        `False` while the record says `True`, so the sweep sees a difference and publishes
+        it, and `_handle_user_access_changed` re-reads and rejoins the admin room. Nothing
+        re-grants privileges on the failure path itself.
+
+        What the bound covers is `is_admin`, and only that. A deactivation, deletion or
+        password change made out-of-process is still preserved for the whole outage, since
+        acting on those means disconnecting and that is the outage this avoids. So during
+        an outage a deleted user's socket stops seeing *other* users' events but keeps
+        receiving its own, while every HTTP request it makes is already refused. Bounding
+        that too would mean disconnecting on an unreadable database — for the epoch case
+        specifically the replacement session is by definition already connected, so the
+        argument is weaker there — but it is a policy change beyond this one, not an
+        oversight.
 
         Scope: only users with an open socket are swept, which leaves one gap. An
         out-of-process deletion of a user with no socket does not reach
@@ -336,12 +385,22 @@ class SocketIO:
         for info in list(self._socket_users.values()):
             cached_by_user.setdefault(info["user_id"], []).append(info)
 
+        # Forget the failure history of anyone who no longer has a socket. Without this the
+        # dict would accumulate an entry per user across reconnect churn, and — worse — a
+        # user who disconnected mid-outage and came back on a healthy database would be
+        # judged against failures their current sockets never experienced.
+        for tracked_user_id in list(self._revalidation_failures):
+            if tracked_user_id not in cached_by_user:
+                del self._revalidation_failures[tracked_user_id]
+
         for user_id, cached_infos in cached_by_user.items():
             try:
                 user = await run_in_threadpool(services.users.get, user_id)
             except Exception:
-                logger.warning(f"Could not revalidate socket user {user_id}; will retry", exc_info=True)
+                await self._note_revalidation_failure(user_id)
                 continue
+
+            self._note_revalidation_success(user_id)
 
             if user is None:
                 # Deleted. `_handle_user_access_changed` only reads `is_active` on this
@@ -368,6 +427,84 @@ class SocketIO:
                 is_active=is_active,
                 token_epoch=token_epoch,
             )
+
+    def _note_revalidation_success(self, user_id: str) -> None:
+        """Forget a user's failure history, because their record was just read successfully.
+
+        The counter answers one question: how long have this user's sockets gone unchecked?
+        So *any* successful read of the record answers it, not only the sweep's own. The
+        sweep is simply not the only reader — `_handle_connect` resolves the same record
+        through `resolve_authorized_user`, and `_handle_user_access_changed` re-reads it —
+        and a counter that ignored those would punish a socket for an outage that had
+        demonstrably ended before it connected: admitted as an administrator by a read that
+        succeeded, then demoted by the single next failure rather than by three.
+        """
+        self._revalidation_failures.pop(user_id, None)
+
+    async def _note_revalidation_failure(self, user_id: str) -> None:
+        """Record a failed sweep lookup, and revoke admin rooms once the retries run out.
+
+        Called only from `_revalidate_socket_users`'s exception path. The privilege is
+        dropped, not the connection: see that method's docstring for why an unreadable
+        database must not become a self-inflicted outage, and why this is safe to leave to
+        the ordinary staleness check to undo.
+        """
+        # The caller's lookup awaited, so the user may have closed their last socket while
+        # it was suspended — in which case `_handle_disconnect` has already dropped their
+        # counter and recording this failure would resurrect it. Nothing would ever collect
+        # it again: the sweep's orphan cleanup only runs from a sweep, and the loop skips
+        # sweeps entirely while no sockets are open. There is also nothing left to revoke.
+        if not any(info.get("user_id") == user_id for info in self._socket_users.values()):
+            self._revalidation_failures.pop(user_id, None)
+            return
+
+        failures = self._revalidation_failures.get(user_id, 0) + 1
+        self._revalidation_failures[user_id] = failures
+
+        if failures < SOCKET_REVALIDATION_FAILURE_LIMIT:
+            logger.warning(
+                f"Could not revalidate socket user {user_id} (failure {failures} of "
+                f"{SOCKET_REVALIDATION_FAILURE_LIMIT}); will retry",
+                exc_info=True,
+            )
+            return
+
+        # Re-read `_socket_users` rather than using the caller's snapshot: this coroutine
+        # awaits, so a socket in that snapshot may already have disconnected and been
+        # removed. Leaving a room for a dead sid is harmless, but mutating the dict of a
+        # socket that is gone would silently resurrect nothing and hide a real one.
+        stale_admin_sids = [
+            sid for sid, info in self._socket_users.items() if info.get("user_id") == user_id and info.get("is_admin")
+        ]
+        if not stale_admin_sids:
+            # Nothing privileged to drop: the user has sockets, but none of them holds the
+            # admin room. The counter still stands rather than being cleared, because the
+            # reads are still failing and that is what it counts. It cannot strand a later
+            # promotion at one-failure-from-revocation — every route that could promote
+            # this user emits an event whose successful re-read clears the counter, and a
+            # new socket only becomes an admin via a successful read at connect.
+            logger.warning(
+                f"Could not revalidate socket user {user_id} after {failures} attempts; "
+                "it holds no admin sockets, so there is nothing to revoke",
+                exc_info=True,
+            )
+            return
+
+        logger.warning(
+            f"Could not revalidate socket user {user_id} after {failures} attempts; "
+            "dropping admin privileges on its sockets until the record can be read again"
+        )
+        for sid in stale_admin_sids:
+            # Re-look-up rather than re-index, the same way `_handle_user_access_changed`
+            # does: `leave_room` yields, so a socket later in the list may have gone away
+            # while this loop was suspended. The user id is re-checked too — a sid is only
+            # reused after its connection is gone, but this way nothing here can demote a
+            # socket that belongs to somebody else.
+            info = self._socket_users.get(sid)
+            if info is None or info.get("user_id") != user_id:
+                continue
+            info["is_admin"] = False
+            await self._sio.leave_room(sid, "admin")
 
     async def _handle_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
         """Re-authorize a user's open sockets when their role or active status changes.
@@ -396,8 +533,16 @@ class SocketIO:
         taken before an await — so an event can arrive already superseded. Acting on it
         would then re-grant the admin room to someone just demoted, or disconnect the
         replacement session a password change had just issued, and nothing would correct
-        either until the next sweep. A read that fails leaves the event standing: it is
-        evidence of a committed change that the re-read could not contradict.
+        either until the next sweep.
+
+        A read that fails leaves the event standing, but only in the direction that takes
+        privileges away. The event is evidence of a committed change that the re-read could
+        not contradict, so its revocations are still applied — but a payload that *grants*
+        the admin room is exactly the superseded-promotion case above, and here there is no
+        record to check it against. So ``is_admin`` is forced to ``False`` on this path:
+        the handler can demote on an unreadable database, never promote. A genuine
+        promotion is not lost, only deferred — the sweep then sees a record saying
+        ``is_admin=True`` against a socket cached as ``False``, and publishes it again.
         """
         _, event_data = event
         is_admin, is_active, token_epoch = event_data.is_admin, event_data.is_active, event_data.token_epoch
@@ -408,10 +553,12 @@ class SocketIO:
         except Exception:
             logger.warning(
                 f"Could not re-read user {event_data.user_id} while re-authorizing its sockets; "
-                "honoring the access-changed event",
+                "honoring the access-changed event, less any privilege it would grant",
                 exc_info=True,
             )
+            is_admin = False
         else:
+            self._note_revalidation_success(event_data.user_id)
             if user is None:
                 is_admin, is_active, token_epoch = False, False, 0
             else:
