@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { ModelDefaultButton } from './shared/ModelDefaultButton';
+import { MODEL_DEFAULT_END_ELEMENT_PROPS, ModelDefaultButton } from './shared/ModelDefaultButton';
 
 interface GenerateDimensionFieldsProps {
   settings: GenerateSettings;
@@ -300,7 +300,7 @@ export const GenerateDimensionFields = ({
                     />
                   ) : undefined
                 }
-                endElementProps={{ pointerEvents: 'auto' }}
+                endElementProps={MODEL_DEFAULT_END_ELEMENT_PROPS}
                 startElementProps={{ pointerEvents: 'auto' }}
                 startElement={
                   <NumberInput.Scrubber>
@@ -337,7 +337,7 @@ export const GenerateDimensionFields = ({
                     />
                   ) : undefined
                 }
-                endElementProps={{ pointerEvents: 'auto' }}
+                endElementProps={MODEL_DEFAULT_END_ELEMENT_PROPS}
                 startElementProps={{ pointerEvents: 'auto' }}
                 startElement={
                   <NumberInput.Scrubber>

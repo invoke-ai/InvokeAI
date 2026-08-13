@@ -4,7 +4,7 @@ import type { SliderMark } from '@platform/ui/Slider';
 import { HStack, InputGroup, NumberInput } from '@chakra-ui/react';
 import { Slider } from '@platform/ui/Slider';
 
-import { ModelDefaultButton } from './ModelDefaultButton';
+import { MODEL_DEFAULT_END_ELEMENT_PROPS, ModelDefaultButton } from './ModelDefaultButton';
 
 interface SliderNumberFieldProps {
   ariaLabel: string;
@@ -96,7 +96,7 @@ export const SliderNumberField = ({
               />
             ) : undefined
           }
-          endElementProps={{ pointerEvents: 'auto' }}
+          endElementProps={MODEL_DEFAULT_END_ELEMENT_PROPS}
         >
           <NumberInput.Input aria-label={ariaLabel} />
         </InputGroup>

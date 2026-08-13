@@ -5,6 +5,13 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
+ * `InputGroup endElementProps` for fields hosting this button: interactive,
+ * and padded for an icon button rather than Chakra's text-glyph default
+ * (`px: 3`), which floats the button too far off the field's end edge.
+ */
+export const MODEL_DEFAULT_END_ELEMENT_PROPS = { pointerEvents: 'auto', px: '1' } as const;
+
+/**
  * Reset-to-model-default affordance. Callers render it only while the value
  * differs from the model default, so its presence itself signals "modified".
  */
