@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 831718,
+        "brotliBytes": 831721,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 831256,
+        "gzipBytes": 831265,
         "imageRawBytes": 156376,
         "initialRawBytes": 1930550,
         "largestAssetRawBytes": 746305,
@@ -280,10 +280,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840036,
+        "brotliBytes": 840039,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 839569,
+        "gzipBytes": 839578,
         "imageRawBytes": 157940,
         "initialRawBytes": 1949856,
         "largestAssetRawBytes": 753769,
@@ -298,15 +298,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1021562,
+        "brotliBytes": 1021766,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1018724,
+        "gzipBytes": 1018904,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2502960,
+        "initialRawBytes": 2503517,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 106627,
+        "ownedRawBytes": 106678,
         "requestCount": 85,
         "scriptRequestCount": 69,
         "sourceOwners": [
@@ -813,15 +813,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1031778,
+        "brotliBytes": 1031984,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1028912,
+        "gzipBytes": 1029094,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2527990,
+        "initialRawBytes": 2528553,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 106627,
+        "ownedRawBytes": 106678,
         "requestCount": 85,
         "scriptRequestCount": 69
       },
