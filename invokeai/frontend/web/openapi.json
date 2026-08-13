@@ -6288,6 +6288,127 @@
         ]
       }
     },
+    "/api/v1/image_map/points": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Points",
+        "description": "Gets the current user's semantic image map.\n\nServes the cached UMAP projection (never blocks on a UMAP fit) and runs\nDBSCAN per request, so `eps` is live-adjustable. If the cache is missing\nor stale, a recompute is enqueued and reflected in `state`/`stale`.",
+        "operationId": "get_image_map_points",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 2.0,
+                  "minimum": 0.01
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span.",
+              "title": "Eps"
+            },
+            "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span."
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 2,
+              "description": "DBSCAN min_samples for clustering",
+              "default": 10,
+              "title": "Min Samples"
+            },
+            "description": "DBSCAN min_samples for clustering"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapPointsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/image_map/refresh": {
+      "post": {
+        "tags": ["image_map"],
+        "summary": "Refresh Image Map",
+        "description": "Requests a recompute of the current user's image map projection.",
+        "operationId": "refresh_image_map",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapRefreshResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_map/status": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Status",
+        "description": "Gets embedding index progress and the user's projection cache status.",
+        "operationId": "get_image_map_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapStatusResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/videos/upload": {
       "post": {
         "tags": ["videos"],
@@ -40870,6 +40991,30 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "ImageIndexStatus": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of gallery images eligible for indexing"
+          },
+          "embedded": {
+            "type": "integer",
+            "title": "Embedded",
+            "description": "Number of eligible images that have an embedding"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "description": "Eligible images that repeatedly failed to embed; excluded from pending so it can drain",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": ["total", "embedded"],
+        "title": "ImageIndexStatus",
+        "description": "Progress of the embedding index for one embedding model."
+      },
       "ImageIndexStatusEvent": {
         "description": "Event model for image_index_status",
         "properties": {
@@ -41222,6 +41367,214 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "ImageMapPoint": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "UMAP x coordinate"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y",
+            "description": "UMAP y coordinate"
+          },
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The image this point represents"
+          },
+          "cluster": {
+            "type": "integer",
+            "title": "Cluster",
+            "description": "DBSCAN cluster label; -1 means unclustered"
+          }
+        },
+        "type": "object",
+        "required": ["x", "y", "image_name", "cluster"],
+        "title": "ImageMapPoint",
+        "description": "One image's position on the 2D semantic map."
+      },
+      "ImageMapPointsResponse": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ImageMapPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "The projected points"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["disabled", "model_missing", "empty", "computing", "ready"],
+            "title": "State",
+            "description": "disabled: indexing is off; model_missing: indexing is enabled but the configured embedding model is not installed; empty: nothing to show; computing: a projection is being built; ready: points are served"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name",
+            "description": "The configured embedding model's name; only set when state is model_missing, so the client can tell the user which model to install"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "True when the accessible image set has changed since this projection was computed; a refresh has been requested"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count",
+            "description": "Number of points returned"
+          },
+          "cluster_eps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Eps",
+            "description": "The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). Pass it back explicitly to get an identical clustering from a later request."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the served projection was computed"
+          }
+        },
+        "type": "object",
+        "required": ["points", "state", "stale", "point_count"],
+        "title": "ImageMapPointsResponse",
+        "description": "The current user's semantic map."
+      },
+      "ImageMapProjectionReadyEvent": {
+        "description": "Event model for image_map_projection_ready",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "user_id": {
+            "description": "The user whose image map projection was recomputed",
+            "title": "User Id",
+            "type": "string"
+          },
+          "point_count": {
+            "description": "Number of points in the recomputed projection",
+            "title": "Point Count",
+            "type": "integer"
+          }
+        },
+        "required": ["timestamp", "user_id", "point_count"],
+        "title": "ImageMapProjectionReadyEvent",
+        "type": "object"
+      },
+      "ImageMapProjectionStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["disabled", "model_missing", "empty", "computing", "ready"],
+            "title": "State",
+            "description": "Projection cache state"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "Whether the cached projection lags the accessible image set"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count",
+            "description": "Points in the cached projection"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the cached projection was computed"
+          }
+        },
+        "type": "object",
+        "required": ["state", "stale", "point_count"],
+        "title": "ImageMapProjectionStatus",
+        "description": "Status of the current user's cached projection."
+      },
+      "ImageMapRefreshResponse": {
+        "properties": {
+          "enqueued": {
+            "type": "boolean",
+            "title": "Enqueued",
+            "description": "True if the recompute was accepted (or already pending)"
+          }
+        },
+        "type": "object",
+        "required": ["enqueued"],
+        "title": "ImageMapRefreshResponse",
+        "description": "Result of a projection refresh request."
+      },
+      "ImageMapStatusResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether the embedding index is running"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name",
+            "description": "The configured embedding model's name; only set when the projection state is model_missing"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageIndexStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Embedding index progress counts. Admin-only: the counts aggregate over all users' images, so they are omitted for regular users."
+          },
+          "projection": {
+            "$ref": "#/components/schemas/ImageMapProjectionStatus",
+            "description": "The user's projection cache status"
+          }
+        },
+        "type": "object",
+        "required": ["enabled", "projection"],
+        "title": "ImageMapStatusResponse",
+        "description": "Combined index + projection status for the current user."
       },
       "ImageMaskToTensorInvocation": {
         "category": "mask",

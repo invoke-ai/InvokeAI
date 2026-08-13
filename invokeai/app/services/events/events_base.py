@@ -17,6 +17,7 @@ from invokeai.app.services.events.events_common import (
     EventBase,
     ImageIndexStatusEvent,
     ImageIndexUpdatedEvent,
+    ImageMapProjectionReadyEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     InvocationProgressEvent,
@@ -328,5 +329,9 @@ class EventServiceBase:
     def emit_image_index_updated(self, user_id: str) -> None:
         """Emitted to one user when their images were just (re)embedded"""
         self.dispatch(ImageIndexUpdatedEvent.build(user_id=user_id))
+
+    def emit_image_map_projection_ready(self, user_id: str, point_count: int) -> None:
+        """Emitted when a user's image map projection has been recomputed"""
+        self.dispatch(ImageMapProjectionReadyEvent.build(user_id=user_id, point_count=point_count))
 
     # endregion
