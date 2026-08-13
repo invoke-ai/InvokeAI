@@ -102,14 +102,14 @@ export const GraphPreviewDialog = ({
                   aria-disabled={!canInvoke}
                   cursor={canInvoke ? undefined : 'not-allowed'}
                   opacity={canInvoke ? undefined : 0.6}
-                  size="sm"
+                  size="xs"
                   title={dialogRoute.validationMessage}
                   onClick={invokeRoute}
                 >
                   {t('graphPreview.invokeRoute', { route: dialogRoute.label })}
                 </Button>
               ) : null}
-              <Button size="sm" variant="outline" onClick={closeDialog}>
+              <Button size="xs" variant="outline" onClick={closeDialog}>
                 {t('common.close')}
               </Button>
             </Dialog.Footer>

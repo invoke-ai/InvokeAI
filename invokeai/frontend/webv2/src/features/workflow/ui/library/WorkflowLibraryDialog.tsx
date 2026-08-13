@@ -345,9 +345,7 @@ export const WorkflowLibraryDialog = ({
                 </Stack>
               ) : null}
               <Dialog.Header>
-                <Dialog.Title fontSize="sm" fontWeight="700">
-                  Workflow Library
-                </Dialog.Title>
+                <Dialog.Title>Workflow Library</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 {preview ? (

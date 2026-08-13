@@ -46,9 +46,7 @@ export const ProfileDialog = ({ isOpen, onClose, user }: { isOpen: boolean; onCl
           <Dialog.Content>
             <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
               <Stack gap="0.5">
-                <Dialog.Title fontSize="md" fontWeight="700">
-                  {t('auth.account')}
-                </Dialog.Title>
+                <Dialog.Title>{t('auth.account')}</Dialog.Title>
                 <Text color="fg.subtle" fontSize="xs">
                   {t('auth.signedInAs', { email: user.email })}
                 </Text>

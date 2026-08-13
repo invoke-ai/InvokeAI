@@ -141,7 +141,7 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
             <Flex alignItems="start" gap="2">
               <Icon as={SettingsIcon} boxSize="5" />
               <Stack gap="1">
-                <Dialog.Title fontSize="md" fontWeight="700" mt="0.5" lineHeight={1}>
+                <Dialog.Title lineHeight={1} mt="0.5">
                   {t('settings.title')}
                 </Dialog.Title>
                 <Text color="fg.subtle" fontSize="xs">

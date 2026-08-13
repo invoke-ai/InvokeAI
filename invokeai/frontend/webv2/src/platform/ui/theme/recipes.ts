@@ -482,6 +482,13 @@ export const dialogSlotRecipe = defineSlotRecipe({
       borderColor: 'border.subtle',
       borderWidth: '1px',
     },
+    // Chakra's stock `lg` title reads as a page heading; dialogs here are
+    // compact tool windows, so titles match the app's `sm`/700 convention.
+    title: {
+      ...chakraSlotRecipes.dialog.base?.title,
+      fontWeight: '700',
+      textStyle: 'sm',
+    },
   },
 });
 

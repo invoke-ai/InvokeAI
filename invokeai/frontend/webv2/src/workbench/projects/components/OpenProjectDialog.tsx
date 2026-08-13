@@ -125,9 +125,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         <Dialog.Positioner>
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title fontSize="sm" fontWeight="700">
-                {t('projects.openProject')}
-              </Dialog.Title>
+              <Dialog.Title>{t('projects.openProject')}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Scrollable maxH="72">
