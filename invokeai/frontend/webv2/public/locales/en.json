@@ -2848,7 +2848,7 @@
       "unstarSelection": "Unstar selection",
       "uploadDateBoardUnavailable": "Uploads are unavailable for date boards.",
       "uploadFailed": "No files uploaded. {{failed}} failed.",
-      "uploadMediaToBoard": "Upload images or videos to {{name}}",
+      "uploadMediaToBoard": "Upload media to {{name}}",
       "uploadPartialTitle": "Uploaded {{succeeded}} of {{total}} files",
       "uploadSplit": "Images appear in Assets; videos appear in Media.",
       "uploadSuccessTitle_one": "Uploaded {{count}} file",
