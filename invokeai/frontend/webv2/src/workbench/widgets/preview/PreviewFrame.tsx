@@ -52,7 +52,7 @@ const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
  *
  * It belongs on the stage rather than on the widget root so the dot grid still
  * runs to every edge and passes *behind* the chrome — the same arrangement that
- * lets `paddingBottom` pass it behind the filmstrip. Because the stage is a size
+ * lets `paddingBottom` pass it behind the footer island. Because the stage is a size
  * container, `getFittedFrameCss` reads the shrunken content box and refits the
  * media with no further change.
  */

@@ -251,18 +251,14 @@ export const getMatchingProgressImage = (
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
 /**
- * Bottom padding the grid surface reserves for the overlaid filmstrip and
- * details island — their collapsed heights plus the 2-unit inset and gap. An
- * expanded Details panel grows over the grid on purpose; it is self-capped at
- * `40cqh` and closes back down.
+ * Bottom padding the grid surface reserves for the overlaid details island —
+ * its collapsed height plus the 2-unit inset and gap. The filmstrip
+ * deliberately reserves nothing: it is a floating overlay above the media's
+ * lower edge, so toggling it never reflows the fitted image. An expanded
+ * Details panel grows over the grid on purpose; it is self-capped at `40cqh`
+ * and closes back down.
  */
-const getPreviewOverlayReserve = (density: PreviewDensity, hasFilmstrip: boolean): string => {
-  if (!hasFilmstrip) {
-    return '5.5rem';
-  }
-
-  return density === 'full' ? '9.75rem' : '8.75rem';
-};
+const PREVIEW_OVERLAY_RESERVE = '5.5rem';
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
@@ -1055,11 +1051,11 @@ const SelectedMediaPreview = ({
   source: Parameters<typeof PreviewFrame>[0]['source'];
 }) => {
   const { t } = useTranslation();
-  const overlayReserve = getPreviewOverlayReserve(density, filmstripItems !== null);
 
   // The grid surface fills; the filmstrip and details float above its lower
-  // edge. The surface reserves matching bottom padding so the fitted media is
-  // never tucked under them — only the dot grid passes behind.
+  // edge. The surface reserves bottom padding for the details island only, so
+  // the fitted media is never tucked under it; the filmstrip floats over the
+  // media itself and steals no height.
   return (
     <Flex direction="column" h="full" minH="0" position="relative" w="full">
       <PreviewFrame
@@ -1072,7 +1068,7 @@ const SelectedMediaPreview = ({
         loupeControlsRef={loupeControlsRef}
         onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
         padding={density === 'full' ? '6' : '3'}
-        paddingBottom={overlayReserve}
+        paddingBottom={PREVIEW_OVERLAY_RESERVE}
         shouldAntialiasLiveImage
         source={source}
         variant="framed"

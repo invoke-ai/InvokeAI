@@ -9,11 +9,13 @@ import { useCallback, useMemo } from 'react';
 import type { PreviewDensity } from './previewDensity';
 
 /**
- * A docked strip of the current board's thumbnails between frame and footer —
- * the same `boardImages` the "N of M" counter is derived from, made spatial.
- * Fixed height (`flexShrink=0`) so the fitted frame's `100cqh` math is never
- * stolen from. Thumbs are standard all-image gallery-item drag sources, so they work
- * with every existing drop target (canvas zones, boards, drop-to-compare).
+ * A floating strip of the current board's thumbnails above the footer — the
+ * same `boardImages` the "N of M" counter is derived from, made spatial. It
+ * overlays the fitted media rather than reserving height from it, so it
+ * carries the same opaque island fill as the footer to stay legible over any
+ * image. Thumbs are standard all-image gallery-item drag sources, so they
+ * work with every existing drop target (canvas zones, boards,
+ * drop-to-compare).
  */
 
 export const PreviewFilmstrip = ({
@@ -41,10 +43,16 @@ export const PreviewFilmstrip = ({
     // its panel (side panels host widgets in a grid ScrollArea.Content that
     // otherwise grows to max-content).
     <ScrollArea.Root
+      bg="bg.subtle"
+      borderColor="border.subtle"
+      borderWidth="1px"
       css={FILMSTRIP_CONTAIN_CSS}
       flexShrink={0}
       h={density === 'full' ? '3.75rem' : '2.75rem'}
       minW="0"
+      px="1.5"
+      rounded="md"
+      shadow="sm"
       size="xs"
       variant="hover"
       w="full"
