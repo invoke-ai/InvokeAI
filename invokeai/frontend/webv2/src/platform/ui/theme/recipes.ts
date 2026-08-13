@@ -496,6 +496,39 @@ export const sliderSlotRecipe = defineSlotRecipe({
       lineHeight: '1',
     },
   },
+  variants: {
+    ...chakraSlotRecipes.slider.variants,
+    size: {
+      // Chakra's thumb sizes are touch targets. With a mouse the track itself
+      // is the drag target, so fine-pointer devices get a much smaller thumb.
+      // `--slider-marker-center` must shrink with it: it is the marker group's
+      // top offset, (thumb - marker) / 2, keeping marks centered on the track.
+      // `--slider-marker-inset` is zeroed at every size: zag already offsets
+      // marks by half the thumb within the group, so any extra inset shifts
+      // the end marks off the thumb positions they label.
+      lg: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.lg?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3.5' },
+        },
+      },
+      md: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.md?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3' },
+        },
+      },
+      sm: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.sm?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '3px', '--slider-thumb-size': 'sizes.2.5' },
+        },
+      },
+    },
+  } as unknown as typeof chakraSlotRecipes.slider.variants,
 });
 
 export const progressCircleSlotRecipe = defineSlotRecipe({

@@ -301,6 +301,7 @@ const NumericSliderField = ({
         marks={marks}
         max={sliderMax}
         min={sliderMin}
+        size="sm"
         step={step}
         value={[Math.min(sliderMax, Math.max(sliderMin, value))]}
         onValueChange={(details) => {
