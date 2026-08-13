@@ -4975,6 +4975,7 @@ export type components = {
         Body_import_style_presets: {
             /**
              * File
+             * Format: binary
              * @description The file to import
              */
             file: Blob;
@@ -5032,6 +5033,7 @@ export type components = {
         Body_set_workflow_thumbnail: {
             /**
              * Image
+             * Format: binary
              * @description The image file to upload
              */
             image: Blob;
@@ -5054,7 +5056,10 @@ export type components = {
         };
         /** Body_update_model_image */
         Body_update_model_image: {
-            /** Image */
+            /**
+             * Image
+             * Format: binary
+             */
             image: Blob;
         };
         /** Body_update_style_preset */
@@ -5085,7 +5090,10 @@ export type components = {
         };
         /** Body_upload_image */
         Body_upload_image: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: Blob;
             /**
              * Resize To
@@ -5101,7 +5109,10 @@ export type components = {
         };
         /** Body_upload_video */
         Body_upload_video: {
-            /** File */
+            /**
+             * File
+             * Format: binary
+             */
             file: Blob;
             /**
              * Metadata
@@ -38291,10 +38302,6 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
         };
         /** VideoBoardArg */
         VideoBoardArg: {
