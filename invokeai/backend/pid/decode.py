@@ -18,9 +18,12 @@ repository for the source of truth.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from typing import Optional
+from functools import lru_cache
+from types import MappingProxyType
+from typing import Any, Optional
 
 import torch
 from torch import Tensor
@@ -206,7 +209,44 @@ def build_pid_net(backbone: BaseModelType) -> PidNet:
     return PidNet(**kwargs)
 
 
-def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> PidNet:
+# The one PidNet parameter whose shape depends on the backbone: a Conv2d whose in-channels are the
+# backbone's latent channel count (4 SDXL / 16 FLUX.1, SD3, Qwen-Image / 128 FLUX.2). Every other
+# parameter is name- and shape-identical across all five, which is what lets model identification
+# hold a checkpoint to one contract before it knows which backbone the checkpoint is for.
+BACKBONE_DISCRIMINATOR_KEY = "lq_proj.latent_proj.0.weight"
+
+# The backbone the contract is probed from. Any of the five would do — see the docstring below.
+_KEY_CONTRACT_BACKBONE = BaseModelType.Flux
+
+
+@lru_cache(maxsize=None)
+def required_pid_net_shapes(backbone: BaseModelType = _KEY_CONTRACT_BACKBONE) -> Mapping[str, tuple[int, ...]]:
+    """Every parameter `PidNet` expects, mapped to its shape.
+
+    This is the contract `load_pid_decoder` enforces — set equality on the keys, plus the shape
+    agreement `load_state_dict` demands — so model identification can accept precisely the files the
+    loader accepts rather than a superset it will later refuse. Checking a subset is not a milder
+    version of the same thing: loaders run under `skip_torch_weight_init()`, so a weight the
+    checkpoint does not supply is uninitialised memory rather than a default.
+
+    Derived from the vendored network itself instead of a hand-written list, and built on the meta
+    device inside a forked RNG state. Meta construction allocates nothing (~0.3 MB, ~250 ms once per
+    process, cached); the fork is the belt to those braces, since it holds regardless of what the
+    vendored constructors do. Identification must not advance the global RNG — an install would
+    otherwise shift the seedless stream by an amount that depends on how many candidate files were
+    probed, making later unseeded randomness depend on install order.
+
+    ``backbone`` exists for `test_pid_decode.py`, which pins that the key set is identical across all
+    five and that `BACKBONE_DISCRIMINATOR_KEY` is the only shape that varies. Identification itself
+    must use the default: it has to validate a checkpoint *before* it can know the backbone, since
+    the backbone is read from one of the weights the contract is there to require.
+    """
+    with torch.random.fork_rng(devices=[]), torch.device("meta"):
+        net = build_pid_net(backbone)
+    return MappingProxyType({k: tuple(v.shape) for k, v in net.state_dict().items()})
+
+
+def load_pid_decoder(state_dict: dict[Any, Tensor], backbone: BaseModelType) -> PidNet:
     """Instantiate a PidNet for *backbone* and populate it with *state_dict*.
 
     The state dict is expected to be the model-manager loader's output, i.e.
@@ -215,9 +255,23 @@ def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> 
     returned net.
     """
     net = build_pid_net(backbone)
-    # strict=False keeps parity with the upstream loader: missing LQ-projection
-    # keys are tolerated when reloading PixDiT_T2I weights into PidNet, and
-    # extra keys (e.g. legacy EMA artefacts) are dropped.
+
+    # A `.pth` unpickles to whatever it contains, and a bare (un-prefixed) checkpoint reaches here
+    # with its keys untouched — see `strip_net_prefix`. `nn.Module.load_state_dict` calls
+    # `.startswith()` on every key, so a non-string one raises AttributeError from inside torch
+    # before any of the reporting below runs. Reject it here instead, so a malformed checkpoint gets
+    # the same kind of message as every other unusable one.
+    if not_strings := sorted((k for k in state_dict if not isinstance(k, str)), key=str):
+        raise RuntimeError(
+            f"PiD checkpoint has {len(not_strings)} keys that are not strings and so cannot name a "
+            f"PidNet parameter: {not_strings[:5]}"
+            + (f" (+ {len(not_strings) - 5} more)" if len(not_strings) > 5 else "")
+        )
+
+    # strict=False so we can report missing and unexpected keys separately; both are fatal. The model
+    # cache builds loaders under `skip_torch_weight_init()`, which no-ops every `reset_parameters()`,
+    # so a key the checkpoint does not supply is left as uninitialised memory rather than a sane
+    # default — a partial checkpoint would decode to garbage / NaNs instead of failing.
     missing, unexpected = net.load_state_dict(state_dict, strict=False)
     if unexpected:
         raise RuntimeError(
@@ -225,15 +279,17 @@ def load_pid_decoder(state_dict: dict[str, Tensor], backbone: BaseModelType) -> 
             + (f" (+ {len(unexpected) - 5} more)" if len(unexpected) > 5 else "")
         )
     if missing:
-        # We tolerate missing `lq_proj.*` (e.g. if the user accidentally
-        # passed a vanilla PixDiT_T2I checkpoint), but anything else points
-        # to a real architecture mismatch.
-        non_lq = [k for k in missing if "lq_proj" not in k]
-        if non_lq:
-            raise RuntimeError(
-                f"PiD checkpoint is missing non-LQ keys required by PidNet: {non_lq[:5]}"
-                + (f" (+ {len(non_lq) - 5} more)" if len(non_lq) > 5 else "")
-            )
+        lq = [k for k in missing if k.startswith("lq_proj.")]
+        detail = (
+            " (the LQ projection is incomplete — this looks like a base PixDiT_T2I checkpoint rather than a "
+            "PiD super-resolution decoder)"
+            if lq and len(lq) == len(missing)
+            else ""
+        )
+        raise RuntimeError(
+            f"PiD checkpoint is missing {len(missing)} keys required by PidNet{detail}: {missing[:5]}"
+            + (f" (+ {len(missing) - 5} more)" if len(missing) > 5 else "")
+        )
     return net
 
 
@@ -593,6 +649,7 @@ def assert_pid_decoder_matches_base(decoder_base: BaseModelType, node_base: Base
 
 
 __all__ = [
+    "BACKBONE_DISCRIMINATOR_KEY",
     "PID_CHI_PROMPT",
     "PID_MODEL_MAX_LENGTH",
     "PID_NEGATIVE_PROMPT",
@@ -602,4 +659,5 @@ __all__ = [
     "build_pid_net",
     "encode_caption_for_pid",
     "load_pid_decoder",
+    "required_pid_net_shapes",
 ]
