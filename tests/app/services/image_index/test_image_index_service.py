@@ -45,6 +45,17 @@ def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
     raise AssertionError("Condition not met within timeout")
 
 
+def _wait_for_spent_retry(service: "ImageIndexService", user_id: str, scope: str) -> None:
+    """Wait until the worker has actually charged a failed scope's retry.
+
+    The budget is spent only once the failed result is durably cached, which is
+    strictly after the fit runs and after the job leaves the request map — so
+    waiting on the fit count or on an empty `_projection_requests` and then
+    asserting the refusal races the worker, and loses on a slow runner.
+    """
+    _wait_until(lambda: service._failed_projection_scopes.get(user_id) == scope, timeout=15)
+
+
 def _unit_vec() -> np.ndarray:
     """A storable embedding: float32, finite, non-zero."""
     v = np.ones(DIM, dtype=np.float32)
@@ -1105,6 +1116,162 @@ def test_a_permanently_failing_projection_is_retried_once_not_every_request(
     _wait_until(lambda: fits["n"] == 2, timeout=15)
     time.sleep(0.5)
     assert fits["n"] == 2, "a permanently failing scope must be retried once per process, not per request"
+
+
+def test_a_cached_row_with_no_finite_points_is_a_failed_fit_not_a_result(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """A row with point_count > 0 and every coordinate non-finite.
+
+    /points drops non-finite rows before serving, so this row is empty to every
+    client while looking populated to the service. Deciding "failed" on the
+    cached count meant /points asked for a retry on this row's behalf, the
+    service granted the request without ever entering the retry branch, the
+    worker short-circuited and emitted projection_ready anyway, and the client —
+    which refetches on that event — asked again. The budget could never be spent,
+    so the refusal that is supposed to break the cycle never fired: a permanent
+    request/emit loop at the worker's poll rate, and a permanent spinner.
+
+    The router's fake service cannot show this: it decides the refusal itself,
+    from the argument alone, with no view of the cached row.
+    """
+    from invokeai.app.services.image_index.projection import projection_params, scope_hash
+
+    fits = {"n": 0}
+
+    def broken_umap(embeddings, seed=42):
+        fits["n"] += 1
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    names = index_records.list_accessible_embedded_images(None, MODEL_ID)
+    current_hash = scope_hash(MODEL_ID, names)
+    index_records.set_projection(
+        "system",
+        MODEL_ID,
+        current_hash,
+        projection_params(n_points=len(names)),
+        names,
+        np.full((len(names), 2), np.nan, dtype=np.float32),
+    )
+
+    # The first request on this row's behalf is granted and spends the budget.
+    assert service.request_projection("system", failed_scope=current_hash) is True
+    _wait_until(lambda: fits["n"] == 1, timeout=15)
+    _wait_for_spent_retry(service, "system", current_hash)
+
+    # And every one after it is refused, so /points settles into "empty".
+    for _ in range(5):
+        assert service.request_projection("system", failed_scope=current_hash) is False
+    time.sleep(0.5)
+    assert fits["n"] == 1, "a row with nothing servable must be retried once, not on every poll"
+
+
+def test_a_lost_projection_write_does_not_burn_the_retry(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """The budget bounds failed fits, so only a failed fit that reached the cache may spend it.
+
+    Spending it before the fit looked safe — nothing between the spend and the
+    fit can return — but it ignored the write. A fit that SUCCEEDS and then loses
+    its set_projection to a locked database re-queues, and the re-queued job finds
+    the old empty row with the budget already gone: minutes of correct work
+    discarded and the map blank for good, without a single failed fit anywhere.
+    """
+    from invokeai.app.services.image_index.projection import projection_params, scope_hash
+
+    monkeypatch.setattr(image_index_default, "compute_umap", lambda matrix, seed=42: np.zeros((matrix.shape[0], 2)))
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    # The empty row a failed fit leaves behind, stamped with the current scope:
+    # what the retry is granted against.
+    names = index_records.list_accessible_embedded_images(None, MODEL_ID)
+    current_hash = scope_hash(MODEL_ID, names)
+    index_records.set_projection(
+        "system",
+        MODEL_ID,
+        current_hash,
+        projection_params(n_points=0),
+        [],
+        np.empty((0, 2), dtype=np.float32),
+    )
+
+    writes = {"n": 0}
+    real_set_projection = index_records.set_projection
+
+    def failing_set_projection(*args, **kwargs):
+        writes["n"] += 1
+        if writes["n"] == 1:
+            raise RuntimeError("database is locked")
+        return real_set_projection(*args, **kwargs)
+
+    monkeypatch.setattr(index_records, "set_projection", failing_set_projection)
+
+    # The fit succeeds; its write is lost. The re-queued job must still be
+    # allowed to run, which means the budget must not have moved.
+    assert service.request_projection("system", failed_scope=current_hash) is True
+    _wait_until(
+        lambda: (r := index_records.get_projection("system", MODEL_ID)) is not None and r.point_count == 1,
+        timeout=20,
+    )
+    assert writes["n"] == 2, "the lost write must be retried, not dropped"
+
+
+def test_an_explicit_refresh_restores_a_spent_retry(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """Otherwise a spent budget is unrecoverable while the server runs.
+
+    /refresh answered `enqueued: true` while the worker was guaranteed to
+    short-circuit — the API reporting that it had accepted work it could not do,
+    with no way back short of a restart.
+    """
+    from invokeai.app.services.image_index.projection import scope_hash
+
+    fits = {"n": 0}
+
+    def broken_umap(embeddings, seed=42):
+        fits["n"] += 1
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    service.request_projection("system")
+    _wait_until(lambda: fits["n"] == 1, timeout=15)
+    current_hash = scope_hash(MODEL_ID, index_records.list_accessible_embedded_images(None, MODEL_ID))
+    assert service.request_projection("system", failed_scope=current_hash) is True
+    _wait_until(lambda: fits["n"] == 2, timeout=15)
+    _wait_for_spent_retry(service, "system", current_hash)
+    assert service.request_projection("system", failed_scope=current_hash) is False, "the budget is spent"
+
+    # A person pressing Refresh gets a real fit, not a short-circuit...
+    assert service.request_projection("system", user_initiated=True) is True
+    _wait_until(lambda: fits["n"] == 3, timeout=15)
+
+    # ...while a poller still cannot, so the loop stays closed.
+    _wait_for_spent_retry(service, "system", current_hash)
+    assert service.request_projection("system", failed_scope=current_hash) is False
 
 
 def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService) -> None:

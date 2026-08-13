@@ -149,7 +149,13 @@ class ImageIndexService(ImageIndexServiceBase):
         status = self._invoker.services.image_index_records.count_index_status(self._model_id)
         return status.model_copy(update={"failed": len(self._failed)})
 
-    def request_projection(self, user_id: str, all_images: bool = False, failed_scope: Optional[str] = None) -> bool:
+    def request_projection(
+        self,
+        user_id: str,
+        all_images: bool = False,
+        failed_scope: Optional[str] = None,
+        user_initiated: bool = False,
+    ) -> bool:
         if self._model_id is None or self._worker is None or not self._worker.is_alive():
             return False
         if failed_scope is not None and not self._failed_scope_retry_available(user_id, failed_scope):
@@ -161,6 +167,15 @@ class ImageIndexService(ImageIndexServiceBase):
             # the life of the process.
             return False
         with self._projection_lock:
+            if user_initiated:
+                # A person asked for this, so give the scope a fresh budget:
+                # without it /refresh answered `enqueued: true` while the worker
+                # was guaranteed to short-circuit, and a user whose retry was
+                # spent had no way back short of restarting the server. NOT for
+                # a bare request — /points' staleness path passes none of this
+                # and is driven by polling, so clearing there would hand a
+                # poller the unlimited retries the budget exists to deny.
+                self._failed_projection_scopes.pop(user_id, None)
             # Last writer wins: the scope reflects the requester's most recent
             # admin status, so a promotion/demotion between requests cannot
             # pin a stale scope.
@@ -293,23 +308,12 @@ class ImageIndexService(ImageIndexServiceBase):
                         self._status_dirty.set()
                         raise
                 if batch is not None:
-                    if self._generation_in_progress():
-                        # Only while a generation actually holds the GPU. The
-                        # embed below is about to park for its whole duration,
-                        # and a projection reads stored embeddings only — no
-                        # encoder, no GPU — so making it wait too left /points
-                        # reporting "computing" for the length of a run.
-                        #
-                        # Deliberately NOT on every pass with embedding work:
-                        # that runs a fit between every backfill batch, each one
-                        # obsolete as soon as the next batch stores, which is
-                        # why projections are otherwise deferred to quiescence.
-                        # (During a generation nothing new can embed, so the
-                        # scope hash holds still and repeat requests
-                        # short-circuit rather than refitting.)
-                        projection_job = self._next_projection_job()
-                        if projection_job is not None:
-                            self._process_projection(*projection_job)
+                    # Projections are serviced from INSIDE this wait (see
+                    # _wait_for_idle_generation), not from a gate before it. A
+                    # gate is only read once per pass, so a request arriving
+                    # after the worker had already parked waited out the whole
+                    # run — the exact "computing for the length of a generation"
+                    # symptom it was added to fix.
                     self._wait_for_idle_generation()
                     if self._stop_event.is_set():
                         break
@@ -585,25 +589,25 @@ class ImageIndexService(ImageIndexServiceBase):
         re-entered). The map stays blank until the accessible image set
         changes, and the row is in SQLite, so restarting does not clear it.
 
-        Retrying once per (user, scope) per process splits the difference the
-        original code could not: a transient failure — a MemoryError while a
-        generation holds RAM, a JIT hiccup, the non-finite guard — heals on the
-        next request, while a permanent one costs one wasted fit per restart
-        instead of one per poll.
+        Retrying a failed scope once splits the difference the original code
+        could not: a transient failure — a MemoryError while a generation holds
+        RAM, a JIT hiccup, the non-finite guard — heals on the next request,
+        while a permanent one costs one wasted fit instead of one per poll.
 
-        A pure check: the budget is spent by _spend_failed_scope_retry, at the
-        point the fit is actually about to run. Spending it here instead meant a
-        "database is locked" on the embedding read — the most designed-for
-        transient error in this file — consumed the retry without ever
-        attempting a fit, leaving the map blank in a process where it would have
-        worked.
+        The bound is one retry per failed fit that reaches the cache, NOT one
+        per (user, scope) for the life of the process: any later fit that
+        produces points clears the marker, so a scope that fails, succeeds after
+        a gallery change, and then fails again is retried again. That is the
+        intent — the budget exists to stop a doomed fit from repeating, and a
+        success in between is evidence the next failure is worth one more try.
+
+        A pure check. The budget is spent in _process_projection, once the
+        failed result is durably cached, so nothing that returns before the
+        write — a "database is locked" on the embedding read, a shutdown, or a
+        successful fit whose own write is lost — can burn a retry.
         """
         with self._projection_lock:
             return self._failed_projection_scopes.get(user_id) != current_hash
-
-    def _spend_failed_scope_retry(self, user_id: str, current_hash: str) -> None:
-        with self._projection_lock:
-            self._failed_projection_scopes[user_id] = current_hash
 
     def _next_projection_job(self) -> Optional[tuple[str, bool]]:
         with self._projection_lock:
@@ -637,7 +641,17 @@ class ImageIndexService(ImageIndexServiceBase):
         retrying_failed_scope = (
             cached is not None
             and cached.scope_hash == current_hash
-            and cached.point_count == 0
+            # "Failed" is *nothing servable*, not point_count == 0. /points
+            # drops non-finite rows before it serves them, so a row with points
+            # but no FINITE points is empty to every client while looking
+            # populated here. Testing the count instead left that row failing
+            # this check while /points kept asking on its behalf: the request
+            # was granted, the branch below short-circuited without spending the
+            # budget, the emit brought the client straight back, and the retry
+            # that was supposed to break the cycle could never be spent. An
+            # empty coords array reduces to False here too, so this subsumes the
+            # count test rather than replacing it.
+            and not np.isfinite(cached.coords).all(axis=1).any()
             and bool(names)
             and self._failed_scope_retry_available(user_id, current_hash)
         )
@@ -666,12 +680,6 @@ class ImageIndexService(ImageIndexServiceBase):
             # now means writing the database after the app has torn down.
             self._requeue_projection(user_id, all_images)
             return
-
-        if retrying_failed_scope:
-            # Spent here, not at the check: every return above this line leaves
-            # the budget intact, so a transient DB error or a shutdown cannot
-            # burn a retry that never ran.
-            self._spend_failed_scope_retry(user_id, current_hash)
 
         try:
             coords = compute_umap(matrix)
@@ -711,12 +719,24 @@ class ImageIndexService(ImageIndexServiceBase):
             logger.exception(f"Image map: could not cache the projection for user '{user_id}'; re-queueing")
             self._requeue_projection(user_id, all_images)
             return
-        if found_names:
-            # A fit that produced points clears the retry marker, so a LATER
-            # failure over some future scope gets its own retry rather than
-            # inheriting this one's spent budget.
-            with self._projection_lock:
+
+        # The budget moves only once the outcome is durable. Spending it before
+        # the fit looked safer — nothing between the spend and compute_umap can
+        # return — but it ignored the write: a fit that SUCCEEDS and then loses
+        # its `set_projection` to a locked database returns above this line, and
+        # the requeued job finds the old empty row with the budget already gone.
+        # That threw away minutes of correct work and left the map permanently
+        # blank without a single failed fit anywhere in the sequence. Spending
+        # here means the budget is charged for exactly what it is meant to
+        # bound: a failed fit that reached the cache.
+        with self._projection_lock:
+            if found_names:
+                # A fit that produced points clears the marker, so a LATER
+                # failure over some future scope gets its own retry rather than
+                # inheriting this one's spent budget.
                 self._failed_projection_scopes.pop(user_id, None)
+            elif retrying_failed_scope:
+                self._failed_projection_scopes[user_id] = current_hash
         try:
             self._invoker.services.events.emit_image_map_projection_ready(user_id=user_id, point_count=len(found_names))
         except Exception:
@@ -731,24 +751,20 @@ class ImageIndexService(ImageIndexServiceBase):
         with self._projection_lock:
             self._projection_requests.setdefault(user_id, all_images)
 
-    def _generation_in_progress(self) -> bool:
-        """Whether a generation currently holds the GPU. Cheap and non-blocking."""
-        assert self._invoker is not None
-        if self._cpu_mode():
-            return False
-        session_queue = self._invoker.services.session_queue
-        if session_queue is None:
-            return False
-        try:
-            return session_queue.get_queue_status(DEFAULT_QUEUE_ID).in_progress > 0
-        except Exception:
-            return False
-
     def _wait_for_idle_generation(self) -> None:
         """Block until no generation is in progress, unless embedding on CPU.
 
         The embedding model shares the model cache (and therefore VRAM) with
         generation; embedding on the GPU mid-generation would thrash both.
+
+        Projection jobs are serviced while parked here. A projection reads
+        stored embeddings only — no encoder, no GPU — so it is exactly the work
+        that can proceed while embedding cannot, and this is the only place it
+        runs alongside pending embedding work: everywhere else projections are
+        deferred to quiescence, because a fit between backfill batches is
+        obsolete as soon as the next batch stores. Nothing new can embed while
+        we are parked, so the accessible set holds still and a repeat request
+        short-circuits on its scope hash rather than refitting.
         """
         assert self._invoker is not None
         if self._cpu_mode():
@@ -763,6 +779,12 @@ class ImageIndexService(ImageIndexServiceBase):
                 return
             if status.in_progress == 0:
                 return
+            projection_job = self._next_projection_job()
+            if projection_job is not None:
+                # No wait before looping: a request that arrived during the fit
+                # is served immediately, and the generation check above is cheap.
+                self._process_projection(*projection_job)
+                continue
             self._stop_event.wait(_POLL_SECONDS)
 
     def _emit_status(self) -> None:

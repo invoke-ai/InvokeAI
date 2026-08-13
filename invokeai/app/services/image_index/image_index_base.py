@@ -25,7 +25,13 @@ class ImageIndexServiceBase(ABC):
         pass
 
     @abstractmethod
-    def request_projection(self, user_id: str, all_images: bool = False, failed_scope: Optional[str] = None) -> bool:
+    def request_projection(
+        self,
+        user_id: str,
+        all_images: bool = False,
+        failed_scope: Optional[str] = None,
+        user_initiated: bool = False,
+    ) -> bool:
         """Ask the worker to (re)compute a user's image map projection.
 
         Requests are deduplicated per user; the projection runs after any
@@ -40,6 +46,10 @@ class ImageIndexServiceBase(ABC):
                 believes to be a failed fit. The request is refused once that
                 scope's single retry has been used, so a caller that asks on
                 every poll cannot drive an endless request/event cycle.
+            user_initiated: This request came from a person rather than from
+                polling, so a spent retry budget is cleared and the failed
+                scope gets another fit. Callers driven by a timer, an event, or
+                a staleness check must leave this False.
 
         Returns:
             True if the request was accepted (or already pending); False if

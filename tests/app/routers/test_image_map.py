@@ -39,7 +39,7 @@ class FakeImageIndexService(ImageIndexServiceBase):
     def __init__(self, model_id: str | None = MODEL_ID) -> None:
         self._model_id = model_id
         self.projection_requests: list[tuple[str, bool]] = []
-        self.spent_failed_scopes: set[str] = set()
+        self.spent_failed_scopes: dict[str, str] = {}
 
     @property
     def model_id(self) -> str | None:
@@ -50,14 +50,28 @@ class FakeImageIndexService(ImageIndexServiceBase):
             return None
         return ImageIndexStatus(total=5, embedded=3)
 
-    def request_projection(self, user_id: str, all_images: bool = False, failed_scope: str | None = None) -> bool:
+    def request_projection(
+        self,
+        user_id: str,
+        all_images: bool = False,
+        failed_scope: str | None = None,
+        user_initiated: bool = False,
+    ) -> bool:
         if self._model_id is None:
             return False
-        # Mirrors the real service: a failed scope gets one retry, then refuses.
-        if failed_scope is not None:
-            if failed_scope in self.spent_failed_scopes:
+        # A stand-in for the refusal, NOT a model of it: the real service decides
+        # from its own view of the cached row and spends the budget on the worker
+        # thread, long after this call returns. These tests pin what the ROUTER
+        # does with an accept and a refusal; that the real service actually
+        # refuses (and for the same rows) is pinned in
+        # tests/app/services/image_index/test_image_index_service.py.
+        if user_initiated:
+            # A person asked, so the budget resets — as the real service does.
+            self.spent_failed_scopes.pop(user_id, None)
+        elif failed_scope is not None:
+            if self.spent_failed_scopes.get(user_id) == failed_scope:
                 return False
-            self.spent_failed_scopes.add(failed_scope)
+            self.spent_failed_scopes[user_id] = failed_scope
         self.projection_requests.append((user_id, all_images))
         return True
 
@@ -551,32 +565,46 @@ def test_cluster_cache_is_bounded(monkeypatch, mock_invoker: Invoker, client: Te
         np.array([[0.0, 0.0], [0.4, 0.0], [30.0, 30.0], [30.4, 30.0]], dtype=np.float32),
     )
 
-    # Distinct eps values are distinct keys; the cache must not grow per request.
-    for i in range(image_map_router_module._CLUSTER_CACHE_ENTRIES * 3):
+    # eps is caller-controlled and unthrottled. Varying it must cost the caller
+    # their OWN entry and nothing else: a shared pool let one client evict every
+    # other user's labels with a handful of requests.
+    for i in range(image_map_router_module._CLUSTER_CACHE_USERS * 3):
         client.get("/api/v1/image_map/points", params={"eps": 0.1 + i * 0.01, "min_samples": 2})
 
-    assert len(image_map_router_module._cluster_cache) == image_map_router_module._CLUSTER_CACHE_ENTRIES
+    assert len(image_map_router_module._cluster_cache) == 1
+    assert set(image_map_router_module._cluster_cache) == {SYSTEM_USER_ID}
 
 
-def test_cluster_cache_never_serves_one_users_labels_to_another(
-    multiuser, mock_invoker: Invoker, client: TestClient
-) -> None:
-    """user_id is in the cache key, so a collision on every other component still cannot cross users."""
-    user1_id = _create_user(mock_invoker, "cacheuser1@test.com")
-    user2_id = _create_user(mock_invoker, "cacheuser2@test.com")
-    user1_headers = _login(client, "cacheuser1@test.com")
-    user2_headers = _login(client, "cacheuser2@test.com")
+def test_cluster_cache_evicts_by_user_and_never_crosses_them() -> None:
+    """The cache is keyed by user, so an identical key for two users is two entries.
 
-    _seed_embedded_image(mock_invoker, "mine.png", user_id=user1_id)
-    _seed_embedded_image(mock_invoker, "theirs.png", user_id=user2_id)
-    _seed_projection(mock_invoker, user1_id, ["mine.png"], np.array([[0.0, 0.0]], dtype=np.float32))
-    _seed_projection(mock_invoker, user2_id, ["theirs.png"], np.array([[0.0, 0.0]], dtype=np.float32))
+    Asserted directly on the helpers: seeding two users whose rows collide on
+    every other key component is not reachable through the API (each user's
+    scope hash and updated_at differ), so a round-trip test of this would pass
+    with the user dimension removed entirely.
+    """
+    from invokeai.app.api.routers import image_map as image_map_router_module
 
-    first = client.get("/api/v1/image_map/points", headers=user1_headers).json()
-    second = client.get("/api/v1/image_map/points", headers=user2_headers).json()
+    key: image_map_router_module._ClusterCacheKey = ("scope", "2026-01-01 00:00:00.000", "current", 0.2, 10)
+    mine = np.array([0, 1], dtype=np.int64)
+    theirs = np.array([1, 0], dtype=np.int64)
 
-    assert [p["image_name"] for p in first["points"]] == ["mine.png"]
-    assert [p["image_name"] for p in second["points"]] == ["theirs.png"]
+    image_map_router_module._cluster_cache_put("user1", key, mine, 0.2)
+    image_map_router_module._cluster_cache_put("user2", key, theirs, 0.2)
+
+    assert image_map_router_module._cluster_cache_get("user1", key)[0] is mine
+    assert image_map_router_module._cluster_cache_get("user2", key)[0] is theirs
+    assert image_map_router_module._cluster_cache_get("user3", key) is None
+
+    # A stale key for a user who has an entry is a miss, not another user's value.
+    assert image_map_router_module._cluster_cache_get("user1", ("other", None, "current", 0.2, 10)) is None
+
+    # One caller varying its own key churns only its own slot, however long it
+    # goes on — this is the eviction a shared pool got wrong.
+    for i in range(image_map_router_module._CLUSTER_CACHE_USERS * 3):
+        image_map_router_module._cluster_cache_put("churn", ("scope", None, "current", 0.1 + i, 10), mine, 0.2)
+    assert len(image_map_router_module._cluster_cache) == 3
+    assert image_map_router_module._cluster_cache_get("user1", key)[0] is mine
 
 
 def test_a_spent_retry_stops_points_from_asking_again(

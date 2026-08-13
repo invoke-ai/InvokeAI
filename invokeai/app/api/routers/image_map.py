@@ -142,25 +142,34 @@ def _release_refresh_slot(user_id: str) -> None:
 
 # /points is polled, and between polls its inputs almost never change, so the
 # clustering it repeats is usually identical work. Caching the labels turns the
-# steady state into a dict lookup; the entries are int64 label arrays (~400KB at
-# the 50k-point clustering cap), so a handful of them costs a few MB.
-_CLUSTER_CACHE_ENTRIES = 8
-_cluster_cache: "OrderedDict[tuple[str, str, Optional[str], Optional[float], int], tuple[np.ndarray, Optional[float]]]" = OrderedDict()
+# steady state into a dict lookup; entries are int64 label arrays, bounded at
+# ~400KB each by the 50k-point clustering cap (only a clustering that actually
+# ran is stored, so the all-noise array returned above the cap — which is free
+# to recompute and unbounded in size — never lands here).
+#
+# ONE entry per user, rather than a shared pool of N. A shared pool made the
+# cache worse than none: with more concurrent map users than slots, strict LRU
+# over a round-robin access pattern misses every time, and any single caller
+# could evict everyone else by varying `eps` across a handful of requests.
+_CLUSTER_CACHE_USERS = 32
+_ClusterCacheKey = tuple[str, Optional[str], str, Optional[float], int]
+_cluster_cache: "OrderedDict[str, tuple[_ClusterCacheKey, np.ndarray, Optional[float]]]" = OrderedDict()
 
 
-def _cluster_cache_get(key) -> Optional[tuple[np.ndarray, Optional[float]]]:
+def _cluster_cache_get(user_id: str, key: _ClusterCacheKey) -> Optional[tuple[np.ndarray, Optional[float]]]:
     with _state_lock:
-        hit = _cluster_cache.get(key)
-        if hit is not None:
-            _cluster_cache.move_to_end(key)
-        return hit
+        entry = _cluster_cache.get(user_id)
+        if entry is None or entry[0] != key:
+            return None
+        _cluster_cache.move_to_end(user_id)
+        return entry[1], entry[2]
 
 
-def _cluster_cache_put(key, value: tuple[np.ndarray, Optional[float]]) -> None:
+def _cluster_cache_put(user_id: str, key: _ClusterCacheKey, labels: np.ndarray, resolved_eps: Optional[float]) -> None:
     with _state_lock:
-        _cluster_cache[key] = value
-        _cluster_cache.move_to_end(key)
-        while len(_cluster_cache) > _CLUSTER_CACHE_ENTRIES:
+        _cluster_cache[user_id] = (key, labels, resolved_eps)
+        _cluster_cache.move_to_end(user_id)
+        while len(_cluster_cache) > _CLUSTER_CACHE_USERS:
             _cluster_cache.popitem(last=False)
 
 
@@ -212,55 +221,51 @@ async def get_image_map_points(
     current_hash = scope_hash(model_id, current_names)
     stale = record.scope_hash != current_hash
 
-    # Computed once, here, because the retry decision below depends on it: a row
-    # can carry point_count > 0 and still contribute nothing, if every one of
-    # its coordinates is non-finite. Deciding on the cached count instead left
-    # exactly that row serving "empty, not stale" with nothing ever asking for a
-    # recompute — the same terminal blankness this retry exists to remove.
-    accessible = set(current_names)
-    visible_mask = np.fromiter(
-        (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
-    )
-    # A NaN cannot be serialized as valid JSON, so one corrupt coordinate would
-    # fail the whole response; rows written before the projection writer grew
-    # its isfinite guard are still out there in existing databases.
-    visible_mask &= np.isfinite(record.coords).all(axis=1)
-
-    retrying = False
     if stale:
         services.image_index.request_projection(user_id, all_images=is_admin)
-    elif current_names and not visible_mask.any():
-        # Nothing servable over a gallery that HAS embedded images: a failed
-        # fit, not a result — and it is stamped with the current scope, so
-        # staleness will never ask for it again. `failed_scope` makes the
-        # service refuse this once the scope's single retry is spent, so a
-        # permanent failure settles into an honest "empty" instead of a
-        # request/event cycle driven by every poll.
-        retrying = services.image_index.request_projection(user_id, all_images=is_admin, failed_scope=current_hash)
 
     # Serve only points still in the user's current accessible set, so images
     # un-shared (or deleted) since the projection was computed never leak out
     # of a stale cache. Filtering happens BEFORE clustering: labels computed
     # over hidden points would let density-chaining through an inaccessible
-    # image leak its existence (and be wrong besides). The clustering and
-    # response assembly are CPU-bound, so they run off the event loop.
-    def build_points() -> tuple[list[ImageMapPoint], Optional[float]]:
+    # image leak its existence (and be wrong besides). All of this is CPU-bound
+    # and O(point count) — including the accessibility mask, which is a Python
+    # membership test per cached point — so it runs off the event loop. Hoisting
+    # the mask into the coroutine to decide the retry first cost 54ms of event
+    # loop time per poll on a 500k-image gallery, stalling every other request
+    # in the process; the retry decision is made below instead, from the one
+    # fact it actually needs.
+    def build_points() -> tuple[list[ImageMapPoint], Optional[float], bool]:
+        accessible = set(current_names)
+        visible_mask = np.fromiter(
+            (name in accessible for name in record.image_names), dtype=bool, count=len(record.image_names)
+        )
+        # A NaN cannot be serialized as valid JSON, so one corrupt coordinate
+        # would fail the whole response; rows written before the projection
+        # writer grew its isfinite guard are still out there in existing
+        # databases.
+        visible_mask &= np.isfinite(record.coords).all(axis=1)
         visible_names = [name for name, keep in zip(record.image_names, visible_mask, strict=True) if keep]
         visible_coords = record.coords[visible_mask]
 
         # Every input to the clustering is pinned by this key: which projection
         # row (its own scope hash plus updated_at, which moves on every rewrite),
         # which subset of it this user can currently see (current_hash), and the
-        # two DBSCAN parameters. user_id is in the key too, so one user's labels
-        # can never be served to another even if the rest collides.
-        cache_key = (user_id, record.scope_hash, record.updated_at, current_hash, eps, min_samples)
-        cached_labels = _cluster_cache_get(cache_key)
+        # two DBSCAN parameters. The cache is keyed by user on top of this, so
+        # one user's labels can never be served to another even if all of these
+        # collide.
+        cache_key: _ClusterCacheKey = (record.scope_hash, record.updated_at, current_hash, eps, min_samples)
+        cached_labels = _cluster_cache_get(user_id, cache_key)
         if cached_labels is not None:
             labels, resolved_eps = cached_labels
-            return [
-                ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
-                for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
-            ], resolved_eps
+            return (
+                [
+                    ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
+                    for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
+                ],
+                resolved_eps,
+                True,
+            )
 
         try:
             if 0 < visible_coords.shape[0] <= MAX_CLUSTERED_POINTS:
@@ -270,6 +275,11 @@ async def get_image_map_points(
                 # 0.01 floor to a budget-shrunk eps — so the value reported
                 # here would not be the value DBSCAN used.
                 labels = cluster_at_eps(visible_coords, resolved_eps, min_samples)
+                # Cached only here. The other branch's labels are a constant
+                # -1 array sized to the full point count — free to recompute,
+                # unbounded in size, and above the cap that is the only array
+                # large enough to matter.
+                _cluster_cache_put(user_id, cache_key, labels, resolved_eps)
             else:
                 resolved_eps = None
                 labels = compute_clusters(visible_coords, eps=eps, min_samples=min_samples)
@@ -278,21 +288,32 @@ async def get_image_map_points(
             # data. sklearn raises on a non-finite cached row (which a build
             # predating the writer's isfinite guard could have left behind),
             # and an unhandled raise here 500s this user on EVERY request until
-            # their gallery changes. Serve the map unclustered instead.
+            # their gallery changes. Serve the map unclustered instead. Nothing
+            # is cached on this path: a one-off failure must not stick.
             services.logger.exception(f"Image map: clustering failed for user '{user_id}'; serving points unclustered")
             resolved_eps = None
             labels = np.full((visible_coords.shape[0],), -1, dtype=np.int64)
-        else:
-            # Only a real result is cached: caching the degraded all-noise
-            # fallback would make a one-off failure stick for as long as the
-            # entry survives.
-            _cluster_cache_put(cache_key, (labels, resolved_eps))
-        return [
-            ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
-            for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
-        ], resolved_eps
+        return (
+            [
+                ImageMapPoint(x=float(x), y=float(y), image_name=name, cluster=int(label))
+                for name, (x, y), label in zip(visible_names, visible_coords, labels, strict=True)
+            ],
+            resolved_eps,
+            bool(visible_mask.any()),
+        )
 
-    points, resolved_eps = await asyncio.to_thread(build_points)
+    points, resolved_eps, any_visible = await asyncio.to_thread(build_points)
+
+    retrying = False
+    if not stale and current_names and not any_visible:
+        # Nothing servable over a gallery that HAS embedded images: a failed
+        # fit, not a result — and it is stamped with the current scope, so
+        # staleness will never ask for it again. `failed_scope` makes the
+        # service refuse this once the scope's single retry is spent, so a
+        # permanent failure settles into an honest "empty" instead of a
+        # request/event cycle driven by every poll.
+        retrying = services.image_index.request_projection(user_id, all_images=is_admin, failed_scope=current_hash)
+
     state: ImageMapState = "ready" if points else ("computing" if retrying else "empty")
     return ImageMapPointsResponse(
         points=points,
@@ -318,7 +339,16 @@ async def refresh_image_map(current_user: CurrentUserOrDefault) -> ImageMapRefre
         # so a client needs no new status code or field to understand it.
         return ImageMapRefreshResponse(enqueued=False)
 
-    enqueued = ApiDependencies.invoker.services.image_index.request_projection(user_id, all_images=is_admin)
+    try:
+        enqueued = ApiDependencies.invoker.services.image_index.request_projection(
+            user_id, all_images=is_admin, user_initiated=True
+        )
+    except Exception:
+        # A raise between the claim and the release (the invoker is absent
+        # during a startup or shutdown window, say) would otherwise leave the
+        # claim held with nothing queued against it.
+        _release_refresh_slot(user_id)
+        raise
     if not enqueued:
         # Nothing was actually queued (the indexer is not running), so this
         # request must not consume the user's interval — otherwise a client
