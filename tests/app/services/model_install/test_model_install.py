@@ -9,6 +9,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict
 
 import pytest
@@ -322,6 +323,56 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
     assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started
     assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_wait_for_installs_waits_for_download_completion_to_enqueue_install(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Do not report all installs done between download-cache removal and install enqueue."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    job = ModelInstallJob(
+        id=123,
+        source=URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors")),
+        local_path=tmp_path,
+    )
+    with mm2_installer._lock:
+        mm2_installer._download_cache[job.id] = job
+    monkeypatch.setattr(mm2_installer, "_signal_job_downloads_done", lambda install_job: None)
+    assert mm2_installer._wait_for_restore_complete(timeout=2)
+
+    wait_finished = threading.Event()
+
+    def wait_for_installs() -> None:
+        mm2_installer.wait_for_installs(timeout=2)
+        wait_finished.set()
+
+    wait_thread = threading.Thread(target=wait_for_installs)
+    wait_thread.start()
+
+    enqueue_started = threading.Event()
+    release_enqueue = threading.Event()
+
+    def blocked_enqueue(install_job: ModelInstallJob) -> None:
+        assert install_job is job
+        enqueue_started.set()
+        assert release_enqueue.wait(timeout=2)
+
+    monkeypatch.setattr(mm2_installer, "_put_in_queue", blocked_enqueue)
+    callback_thread = threading.Thread(
+        target=mm2_installer._download_complete_callback,
+        args=(SimpleNamespace(id=job.id),),
+    )
+    callback_thread.start()
+    assert enqueue_started.wait(timeout=2)
+    assert not wait_finished.wait(timeout=0.5)
+
+    release_enqueue.set()
+    callback_thread.join(timeout=2)
+    wait_thread.join(timeout=2)
+    assert not callback_thread.is_alive()
+    assert not wait_thread.is_alive()
+    assert wait_finished.is_set()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

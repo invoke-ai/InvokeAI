@@ -960,8 +960,12 @@ class SocketIO:
             )
             return
 
-        # Model install / download events remain broadcast to all connected sockets - they feed
-        # the model manager UI, which is not per-user.
+        # Model install and download events contain signed source URLs and server filesystem
+        # paths. They feed the admin-only model manager UI and must not be broadcast to users.
+        if isinstance(event_data, (DownloadEventBase, ModelEventBase)):
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+            return
+
         await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"))
 
     async def _handle_llm_task_event(self, event: FastAPIEvent[LLMTaskEventBase]) -> None:
