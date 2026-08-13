@@ -15,6 +15,7 @@ import { useIsProcessorPaused, useQueueItemProgress } from '@features/queue/reac
 import { Button, IconButton } from '@platform/ui/Button';
 import { Group } from '@platform/ui/Group';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -282,13 +283,9 @@ const QueueTooltip = ({
           {t('topbar.queue.batchImage', { current: activeItemIndex, total: expectedCount })}
           {activeBackendItemId !== undefined ? ` · ${t('topbar.queue.backendItem', { id: activeBackendItemId })}` : ''}
         </Text>
-        <Text fontFamily="mono" truncate>
-          {t('topbar.queue.queueItem', { id: item.id })}
-        </Text>
+        <MiddleTruncate fontFamily="mono" text={t('topbar.queue.queueItem', { id: item.id })} />
         {item.backendBatchId ? (
-          <Text fontFamily="mono" truncate>
-            {t('topbar.queue.backendBatch', { id: item.backendBatchId })}
-          </Text>
+          <MiddleTruncate fontFamily="mono" text={t('topbar.queue.backendBatch', { id: item.backendBatchId })} />
         ) : null}
         <Text truncate>
           {t('topbar.queue.route', {
@@ -326,9 +323,7 @@ const ModelLoadList = ({ modelLoads }: { modelLoads: ModelLoadInfo[] }) => {
   return (
     <Stack gap="0.5" color="fg.muted" fontSize="2xs">
       {modelLoads.slice(0, 3).map((modelLoad, index) => (
-        <Text key={`${modelLoad.label}:${index}`} truncate>
-          {modelLoad.label}
-        </Text>
+        <MiddleTruncate key={`${modelLoad.label}:${index}`} text={modelLoad.label} />
       ))}
       {modelLoads.length > 3 ? <Text>{t('topbar.queue.more', { count: modelLoads.length - 3 })}</Text> : null}
     </Stack>

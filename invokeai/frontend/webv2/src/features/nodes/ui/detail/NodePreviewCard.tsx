@@ -10,6 +10,7 @@ import { Box, Flex, Icon, Stack, Text } from '@chakra-ui/react';
 import { getWorkflowNodeChromeProps, WORKFLOW_NODE_DENSITY } from '@features/workflow/preview';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -77,9 +78,14 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
       positioning={{ placement: 'top-end' }}
     >
       <Flex justify="flex-end">
-        <Text color="fg.muted" fontSize="2xs" lineHeight="shorter" maxW="full" textAlign="end" truncate>
-          {template.title}
-        </Text>
+        <MiddleTruncate
+          color="fg.muted"
+          fontSize="2xs"
+          justifyContent="flex-end"
+          lineHeight="shorter"
+          maxW="full"
+          text={template.title}
+        />
       </Flex>
     </Tooltip>
     <HandleDot side="right" type={template.type} />
@@ -138,9 +144,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
         ps="2.5"
         py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
-        <Text fontWeight="700" minW="0" title={template.title} truncate>
-          {template.title}
-        </Text>
+        <MiddleTruncate fontWeight="700" minW="0" text={template.title} />
         <Box flex="1" />
         <Tooltip content={<NodeInfoTooltip template={template} />} positioning={{ placement: 'top-end' }} showArrow>
           <Icon

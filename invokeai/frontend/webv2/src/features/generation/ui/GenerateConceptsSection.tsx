@@ -16,6 +16,7 @@ import {
   syncGenerateLorasWithModels,
 } from '@features/generation/core/settings';
 import { Field, IconButton, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Trash2Icon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -198,9 +199,13 @@ const LoraRow = ({
       <HStack gap="2" minW="0">
         <Stack flex="1" gap="0.5" minW="0">
           <HStack gap="1.5" minW="0">
-            <Text color={isActive ? 'fg' : 'fg.muted'} fontSize="xs" fontWeight="medium" minW="0" truncate>
-              {lora.model.name}
-            </Text>
+            <MiddleTruncate
+              color={isActive ? 'fg' : 'fg.muted'}
+              fontSize="xs"
+              fontWeight="medium"
+              minW="0"
+              text={lora.model.name}
+            />
             <Badge colorPalette={getBaseColorPalette(lora.model.base)} flexShrink={0} size="xs" variant="surface">
               {getBaseLabel(lora.model.base)}
             </Badge>

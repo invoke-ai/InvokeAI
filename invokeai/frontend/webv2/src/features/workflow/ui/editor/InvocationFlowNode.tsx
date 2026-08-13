@@ -23,6 +23,7 @@ import {
   isModelFieldType,
 } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import {
   ChevronDownIcon,
@@ -166,17 +167,15 @@ const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: strin
   }
 
   return (
-    <Text
+    <MiddleTruncate
       fontWeight="700"
       minW="0"
+      text={title}
       title="Double-click to rename"
-      truncate
       // Editing always starts from the displayed title: an unset label
       // prefills with the template title rather than an empty input.
       onDoubleClick={() => setDraftLabel(title)}
-    >
-      {title}
-    </Text>
+    />
   );
 };
 
@@ -505,18 +504,15 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
         ) : (
           <Box textAlign="end">
             <Tooltip content={<OutputFieldTooltip template={template} />} positioning={{ placement: 'top-end' }}>
-              <Text
+              <MiddleTruncate
                 as="span"
                 color="fg.muted"
-                display="inline-block"
                 fontSize="2xs"
+                justifyContent="flex-end"
                 lineHeight="shorter"
                 maxW="full"
-                textAlign="end"
-                truncate
-              >
-                {template.title}
-              </Text>
+                text={template.title}
+              />
             </Tooltip>
           </Box>
         )}
@@ -622,9 +618,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
         px="3"
         py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
-        <Text fontSize="sm" fontWeight="700" minW="0" title={title} truncate>
-          {title}
-        </Text>
+        <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={title} />
       </Flex>
       {templateView ? (
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
@@ -703,9 +697,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <Icon as={isOpen ? ChevronDownIcon : ChevronRightIcon} boxSize="3.5" />
         </IconButton>
         {isZoomedOut ? (
-          <Text fontSize="sm" fontWeight="700" minW="0" truncate>
-            {node.data.label || template.title}
-          </Text>
+          <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={node.data.label || template.title} />
         ) : (
           <>
             <NodeTitle node={node} title={node.data.label || template.title} />

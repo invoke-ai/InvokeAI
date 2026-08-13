@@ -16,6 +16,7 @@ import {
   parseWorkflowJson,
 } from '@features/workflow/utility';
 import { Button, IconButton, ConfirmDialog, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -84,9 +85,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
           onClick={openWorkflowLibrary}
         >
           <Icon as={LibraryIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-          <Text color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" truncate>
-            {displayName}
-          </Text>
+          <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
         </Button>
       </Tooltip>
     </HStack>
@@ -211,8 +210,8 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
                 {restorableHistory.map((entry) => (
                   <Menu.Item key={entry.id} value={entry.id}>
                     <Stack gap="0" minW="0">
-                      <Menu.ItemText fontSize="xs" truncate>
-                        {entry.label}
+                      <Menu.ItemText fontSize="xs">
+                        <MiddleTruncate as="span" text={entry.label} />
                       </Menu.ItemText>
                       <Text color="fg.subtle" fontSize="2xs">
                         {new Date(entry.createdAt).toLocaleString()}

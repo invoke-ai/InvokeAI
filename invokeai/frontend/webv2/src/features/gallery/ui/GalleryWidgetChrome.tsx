@@ -6,6 +6,7 @@ import { getGallerySettings } from '@features/gallery/core/settings';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { galleryBoardsOptions } from '@features/gallery/data/queries';
 import { Button, IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronsDownUpIcon, ChevronsUpDownIcon, UploadIcon } from 'lucide-react';
@@ -93,9 +94,7 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
         variant="ghost"
         onClick={toggleBoards}
       >
-        <Text fontWeight="600" minW="0" truncate>
-          {boardName}
-        </Text>
+        <MiddleTruncate fontWeight="600" minW="0" text={boardName} />
         <Icon as={isCollapsed ? ChevronsUpDownIcon : ChevronsDownUpIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
       </Button>
     </HStack>

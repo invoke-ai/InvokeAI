@@ -30,6 +30,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
+  // Name/identifier truncation used eagerly by Launchpad project cards and
+  // editor widget chrome alike.
+  '/platform/ui/MiddleTruncate.tsx',
   '/platform/ui/theme/applyTheme.ts',
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',

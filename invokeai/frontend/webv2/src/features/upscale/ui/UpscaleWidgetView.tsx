@@ -64,6 +64,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { Button, Combobox, DropZone, Field, IconButton, Select, Slider, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { toaster } from '@platform/ui/toaster';
 import { DicesIcon, ImagePlusIcon, Trash2Icon, UploadIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -468,9 +469,7 @@ const UpscaleImageField = ({
               />
             </Box>
             <Stack align="start" flex="1" gap="1" justify="center" minW="0">
-              <Text color="fg" fontSize="xs" fontWeight="semibold" truncate>
-                {inputImage.image_name}
-              </Text>
+              <MiddleTruncate color="fg" fontSize="xs" fontWeight="semibold" text={inputImage.image_name} />
               <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
                 {inputImage.width} × {inputImage.height}
               </Text>
@@ -866,9 +865,7 @@ export const UpscaleWidgetView = () => {
                   <Switch.Thumb />
                 </Switch.Control>
               </Switch.Root>
-              <Text flex="1" fontSize="xs" minW="0" truncate>
-                {lora.model.name}
-              </Text>
+              <MiddleTruncate flex="1" fontSize="xs" minW="0" text={lora.model.name} />
               <NumberInput.Root
                 max={10}
                 min={-10}

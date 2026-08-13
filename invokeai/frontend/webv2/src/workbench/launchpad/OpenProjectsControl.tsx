@@ -1,7 +1,8 @@
-import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Link } from '@tanstack/react-router';
 import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { refreshOpenProjects, useOpenProjectsSelector } from '@workbench/projects/openProjects';
@@ -72,7 +73,7 @@ export const OpenProjectsControl = () => {
           variant="subtle"
         >
           <ArrowLeftIcon />
-          <Text truncate>{triggerLabel}</Text>
+          <MiddleTruncate text={triggerLabel} />
         </Button>
       </Menu.Trigger>
       <Portal>

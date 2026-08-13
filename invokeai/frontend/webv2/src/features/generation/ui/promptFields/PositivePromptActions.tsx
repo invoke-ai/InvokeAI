@@ -28,6 +28,7 @@ import { useSystemPrompts } from '@features/generation/ui/promptFields/useSystem
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   EyeIcon,
   EyeOffIcon,
@@ -693,9 +694,7 @@ const ImageToPromptButton = ({
                           rounded="md"
                           src={image.thumbnailUrl || image.imageUrl}
                         />
-                        <Text color="fg.subtle" fontSize="xs" truncate>
-                          {image.imageName}
-                        </Text>
+                        <MiddleTruncate color="fg.subtle" fontSize="xs" text={image.imageName} />
                       </HStack>
                     ) : (
                       <Text color="fg.subtle" fontSize="xs">

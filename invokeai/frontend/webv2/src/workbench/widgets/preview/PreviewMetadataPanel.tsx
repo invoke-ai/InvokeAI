@@ -6,6 +6,7 @@ import { toGalleryItemKey } from '@features/gallery/contracts';
 import { useAuthSession } from '@features/identity';
 import { IconButton, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery } from '@tanstack/react-query';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -272,15 +273,13 @@ const MetadataRow = ({ entry }: { entry: PreviewMetadataEntry }) => {
     <DataList.Item alignItems="start" className="group">
       <DataList.ItemLabel fontSize="2xs">{entry.label}</DataList.ItemLabel>
       <DataList.ItemValue fontSize="2xs" minW="0">
-        <Text
-          flex="1"
-          fontSize="2xs"
-          minW="0"
-          whiteSpace={entry.isMultiline ? 'pre-wrap' : undefined}
-          truncate={!entry.isMultiline}
-        >
-          {entry.value}
-        </Text>
+        {entry.isMultiline ? (
+          <Text flex="1" fontSize="2xs" minW="0" whiteSpace="pre-wrap">
+            {entry.value}
+          </Text>
+        ) : (
+          <MiddleTruncate flex="1" fontSize="2xs" minW="0" text={entry.value} />
+        )}
         <Box
           flexShrink={0}
           opacity={0}

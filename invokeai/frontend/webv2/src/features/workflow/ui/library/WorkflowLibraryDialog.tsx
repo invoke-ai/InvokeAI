@@ -26,6 +26,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, ConfirmDialog, JsonPreview, Scrollable } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -68,9 +69,7 @@ const WorkflowPreviewPane = ({
           <Button size="2xs" variant="ghost" onClick={onBack}>
             ← Back
           </Button>
-          <Text fontSize="xs" fontWeight="600" minW="0" truncate>
-            {preview.item.name || 'Untitled Workflow'}
-          </Text>
+          <MiddleTruncate fontSize="xs" fontWeight="600" minW="0" text={preview.item.name || 'Untitled Workflow'} />
         </HStack>
         <HStack flexShrink={0} gap="2">
           <SegmentGroup.Root
@@ -418,9 +417,11 @@ export const WorkflowLibraryDialog = ({
                               }}
                             >
                               <Stack gap="0" minW="0">
-                                <Text fontSize="xs" fontWeight="600" truncate>
-                                  {item.name || 'Untitled Workflow'}
-                                </Text>
+                                <MiddleTruncate
+                                  fontSize="xs"
+                                  fontWeight="600"
+                                  text={item.name || 'Untitled Workflow'}
+                                />
                                 {item.description ? (
                                   <Text color="fg.subtle" fontSize="2xs" truncate>
                                     {item.description}

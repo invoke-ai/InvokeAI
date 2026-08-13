@@ -10,6 +10,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrarySelector, type ProjectSummary } from '@workbench/projects/library';
 import { useImportProjectFile } from '@workbench/projects/useProjectFileActions';
@@ -185,9 +186,7 @@ const OpenProjectRow = ({
     <Row asChild gap="2.5" px="2.5" py="2" rounded="md" _disabled={disabledRowStyles}>
       <button disabled={isDisabled} type="button" onClick={open}>
         <Stack flex="1" gap="0" minW="0">
-          <Text fontSize="xs" fontWeight="600" truncate>
-            {summary.name}
-          </Text>
+          <MiddleTruncate fontSize="xs" fontWeight="600" text={summary.name} />
           <Text color="fg.muted" fontSize="2xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>
