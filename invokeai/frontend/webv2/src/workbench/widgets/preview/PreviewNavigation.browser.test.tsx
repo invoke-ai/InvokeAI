@@ -181,6 +181,7 @@ vi.mock('@workbench/image-actions', () => ({
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
   getCurrentGenerateValues: () => ({}),
+  getImageRecallVerb: () => ({ icon: () => null, label: '' }),
   getGalleryCanvasImportMenuItems: () => [],
   getImageContextMenuImages: () => [],
   getImageContextMenuRecallRequestKey: () => null,

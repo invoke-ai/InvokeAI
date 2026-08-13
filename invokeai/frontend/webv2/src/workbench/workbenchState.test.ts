@@ -867,7 +867,7 @@ describe('workbench layout presets', () => {
     let state = createInitialWorkbenchState();
     const projectId = state.activeProjectId;
 
-    state = workbenchReducer(state, { region: 'right', sizePx: 336, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { region: 'right', sizePx: 384, type: 'setRegionWidgetSize' });
     state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'queue' });
     state = workbenchReducer(state, { region: 'center', type: 'selectRegionWidget', widgetId: 'preview' });
     state = workbenchReducer(state, {
@@ -883,7 +883,7 @@ describe('workbench layout presets', () => {
 
     expect(state.account.customLayoutPresets).toHaveLength(1);
     expect(state.account.customLayoutPresets?.[0]).toMatchObject({ id: 'custom-layout-1', label: 'Queue review' });
-    expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 336 });
+    expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 384 });
     expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
   });
 
@@ -1246,7 +1246,7 @@ describe('workbench layout presets', () => {
   it('saves the live arrangement onto a built-in preset and restores its shipped default', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
 
-    state = workbenchReducer(state, { region: 'right', sizePx: 320, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { region: 'right', sizePx: 360, type: 'setRegionWidgetSize' });
     state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
     state = workbenchReducer(state, {
       defaultRoute: { destination: 'canvas', sourceId: 'upscale' },
@@ -1254,7 +1254,7 @@ describe('workbench layout presets', () => {
       type: 'setLayoutPresetRoute',
     });
 
-    expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(320);
+    expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(360);
     expect(state.account.layoutPresetRouteOverrides?.compose).toEqual({ destination: 'canvas', sourceId: 'upscale' });
 
     state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
@@ -1264,7 +1264,7 @@ describe('workbench layout presets', () => {
     state = workbenchReducer(state, { region: 'right', sizePx: 500, type: 'setRegionWidgetSize' });
     state = workbenchReducer(state, { type: 'resetActiveLayout' });
 
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(320);
+    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(360);
     expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
 
     state = workbenchReducer(state, { presetId: 'compose', type: 'restoreLayoutPresetDefault' });

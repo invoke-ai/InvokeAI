@@ -378,10 +378,23 @@ type WorkbenchReducerAction =
 const HISTORY_LIMIT = 40;
 export const GRAPH_HISTORY_BYTE_BUDGET = 64 * 1024 * 1024;
 const NOTIFICATION_LIMIT = 100;
-const MIN_PANEL_SIZE_PX = 180;
+// Side panels host real widget UIs (gallery grid, generate form); below
+// ~350px their toolbars and grids collapse into unusable slivers, so that is
+// the floor rather than a merely-rendered 180px. The bottom strip is a
+// status row, not a widget host, and keeps its own bounds.
+const MIN_PANEL_SIZE_PX = 350;
 const MAX_PANEL_SIZE_PX = 520;
 const MIN_STATUS_PANEL_SIZE_PX = 96;
 const MAX_STATUS_PANEL_SIZE_PX = 420;
+
+/** The resize bounds for a widget region — shared with the resize handles. */
+export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
+  if (region === 'bottom') {
+    return { max: MAX_STATUS_PANEL_SIZE_PX, min: MIN_STATUS_PANEL_SIZE_PX };
+  }
+
+  return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
+};
 
 const now = (): string => new Date().toISOString();
 
@@ -1404,11 +1417,9 @@ const recoverProjectUnderNewIdentity = (
   );
 
 const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
-  if (region === 'bottom') {
-    return Math.min(MAX_STATUS_PANEL_SIZE_PX, Math.max(MIN_STATUS_PANEL_SIZE_PX, sizePx));
-  }
+  const { max, min } = getPanelSizeBounds(region);
 
-  return Math.min(MAX_PANEL_SIZE_PX, Math.max(MIN_PANEL_SIZE_PX, sizePx));
+  return Math.min(max, Math.max(min, sizePx));
 };
 
 const createCanvasState = (): CanvasStateContractV2 => createNewCanvasStateV2();
