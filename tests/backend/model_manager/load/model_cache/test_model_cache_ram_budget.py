@@ -183,6 +183,35 @@ def test_shutdown_retains_admission_window_records(mock_logger):
     assert budget.total_in_use() == 0
 
 
+def test_stale_eviction_ignores_a_readmitted_record_under_the_same_key(mock_logger):
+    """A stale-marked record can be detached while still locked (the VRAM-move error paths call
+    _delete_cache_entry on a locked record) and the key re-admitted before its last unlock().
+    The stale eviction must match the record by IDENTITY: a key-only match would pop the new
+    record — detaching it from all accounting — and debit the budget for the old record's bytes."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    record_1 = cache.get("m")
+    cache.lock(record_1, None)
+
+    cache.shutdown()  # marks the locked record stale
+    # Simulate the error-path delete of the locked record (see _move_model_to_vram/_ram), then a
+    # post-shutdown re-admission of the same key (reachable: see the put()-after-shutdown() note).
+    cache._delete_cache_entry(record_1)
+    cache.put("m", DummyModule())
+    record_2 = cache._cached_models["m"]
+    assert record_2 is not record_1
+    in_use_after_readmission = budget.total_in_use()
+    assert in_use_after_readmission == S
+
+    # The detached record's last unlock must not evict the re-admitted record or touch the budget.
+    cache.unlock(record_1)
+    assert cache._cached_models.get("m") is record_2
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == in_use_after_readmission
+
+
 def test_no_duplicate_canonical_when_peer_reloads_after_shutdown(mock_logger):
     """The canonical entry must survive while a locked holder retains it, so a peer cache
     reloading the key after this cache's shutdown() adopts the SAME canonical tensors instead of

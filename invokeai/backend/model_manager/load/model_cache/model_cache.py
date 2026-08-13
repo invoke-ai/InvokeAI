@@ -983,7 +983,14 @@ class ModelCache:
         # If `drop_model()` marked this entry stale (e.g. settings changed while a generation
         # was using it), evict now so the next load rebuilds with the new settings rather than
         # silently reusing the pre-change cached module.
-        if cache_entry.is_stale and not cache_entry.is_locked and cache_entry.key in self._cached_models:
+        # Identity check, not key membership: if this record was already detached (error-path
+        # delete) and the key re-admitted, the occupant is a different, non-stale record that must
+        # not be evicted — and no cleared-callback should fire for a no-op.
+        if (
+            cache_entry.is_stale
+            and not cache_entry.is_locked
+            and self._cached_models.get(cache_entry.key) is cache_entry
+        ):
             bytes_freed = cache_entry.cached_model.total_bytes()
             self._delete_cache_entry(cache_entry)
             if self.stats:
@@ -1597,22 +1604,29 @@ class ModelCache:
             # Satisfied: loop back to retire the flag via the guarded clear above.
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
-        """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
-        was_present = cache_entry.key in self._cached_models
+        """Delete cache_entry from the cache if it is the record currently held under its key.
+        No exception is thrown if it is absent (or the key is now held by a different record)."""
+        # Identity, not key membership: a record can be deleted while still locked (the VRAM-move
+        # error paths) and the key re-admitted before the record's last unlock() runs the
+        # stale-eviction path. A key-only check would pop the NEW record from the cache — detaching
+        # it from all accounting — and, the old record's shared release having already happened,
+        # read uses_shared_weights as False and debit the non-shared budget for bytes that were
+        # admitted as shared. The identity guard makes a delete of a detached record a full no-op,
+        # which also keeps the release exactly-once for double-deletes (release_shared_weights is
+        # itself idempotent, but the budget debit is not).
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
+            return
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
-        self._cached_models.pop(cache_entry.key, None)
+        del self._cached_models[cache_entry.key]
         # Drop this device's reference to the shared canonical CPU weights so they can be freed once
-        # the last device releases them. Guard on was_present so a double-delete doesn't
-        # double-release (release_shared_weights is itself idempotent, but a re-added entry under the
-        # same key must not be released by a stale delete).
-        if was_present:
-            uses_shared = cache_entry.cached_model.uses_shared_weights
-            total_bytes = cache_entry.cached_model.total_bytes()
-            cache_entry.cached_model.release_shared_weights()
-            # Drop the matching non-shared contribution from the global budget (shared weights are
-            # released via the store above). Captured before release_shared_weights() flips the flag.
-            if self._ram_budget is not None and not uses_shared:
-                self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        # the last device releases them.
+        uses_shared = cache_entry.cached_model.uses_shared_weights
+        total_bytes = cache_entry.cached_model.total_bytes()
+        cache_entry.cached_model.release_shared_weights()
+        # Drop the matching non-shared contribution from the global budget (shared weights are
+        # released via the store above). Captured before release_shared_weights() flips the flag.
+        if self._ram_budget is not None and not uses_shared:
+            self._ram_budget.remove_non_shared(total_bytes, cache=self)
 
     @synchronized
     def drop_model(self, model_key: str) -> int:
