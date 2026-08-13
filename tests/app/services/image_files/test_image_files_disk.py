@@ -181,6 +181,26 @@ def test_large_16_bit_png_save_creates_thumbnail(tmp_path: Path):
         image.close()
 
 
+def test_palette_transparency_survives_thumbnail_save(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image = Image.new("P", (32, 32), 0)
+    image.putpalette([255, 0, 0] * 256)
+    image.info["transparency"] = 0
+
+    try:
+        storage.save(image=image, image_name="transparent-palette.png")
+
+        with Image.open(storage.get_path("transparent-palette.png", thumbnail=True)) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.mode == "RGBA"
+            assert thumbnail.getpixel((0, 0))[3] == 0
+    finally:
+        image.close()
+
+
 def test_save_removes_partial_files_when_thumbnail_save_fails(tmp_path: Path):
     storage = DiskImageFileStorage(tmp_path)
     mock_invoker = MagicMock()

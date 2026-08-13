@@ -159,6 +159,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 info_dict["invokeai_graph"] = graph
                 pnginfo.add_text("invokeai_graph", graph)
 
+            thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
+            thumbnail_existed = thumbnail_path.exists()
+
+            # Build the thumbnail before replacing image.info with Invoke metadata. PIL stores
+            # palette transparency there, and it must remain available to make_thumbnail().
+            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            thumbnail_image = make_thumbnail(image, thumbnail_size)
+
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict
             compress_level = self.__invoker.services.configuration.pil_compress_level
@@ -172,13 +180,6 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 **save_options,
             )
 
-            thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
-            thumbnail_existed = thumbnail_path.exists()
-
-            # Ensure thumbnail subfolder directories exist
-            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-
-            thumbnail_image = make_thumbnail(image, thumbnail_size)
             thumbnail_image.save(thumbnail_path)
 
             self.__set_cache(image_path, image)
