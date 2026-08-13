@@ -9,13 +9,13 @@ import type { ChangeEvent } from 'react';
 import {
   Badge,
   Box,
-  ButtonGroup,
   createListCollection,
   DataList,
   HStack,
   Image,
   Input,
   NumberInput,
+  SegmentGroup,
   SimpleGrid,
   Spinner,
   Stack,
@@ -621,6 +621,19 @@ export const UpscaleWidgetView = () => {
     patch({ loras: values.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) });
   const selectedLoraKeys = new Set(values.loras.map((lora) => lora.model.key));
 
+  const activePresetId =
+    Object.entries(UPSCALE_PRESETS).find(
+      ([, preset]) => values.creativity === preset.creativity && values.structure === preset.structure
+    )?.[0] ?? null;
+
+  const applyPreset = ({ value }: { value: string | null }) => {
+    const preset = value ? UPSCALE_PRESETS[value as keyof typeof UPSCALE_PRESETS] : undefined;
+
+    if (preset) {
+      patch({ creativity: preset.creativity, structure: preset.structure });
+    }
+  };
+
   const sharedBadge = (
     <Badge fontFamily="mono" size="xs">
       {t('widgets.upscale.shared')}
@@ -667,31 +680,33 @@ export const UpscaleWidgetView = () => {
             value={values.scale}
             onChange={(scale) => patch({ scale })}
           />
-          <ButtonGroup attached={false} size="xs" variant="outline">
-            <SimpleGrid columns={{ base: 2, md: 4 }} gap="1" w="full">
-              {Object.entries(UPSCALE_PRESETS).map(([id, preset]) => {
-                const active = values.creativity === preset.creativity && values.structure === preset.structure;
-                const tooltipContent = `${t(`widgets.upscale.presetDescriptions.${id}`)} ${t(
-                  'widgets.upscale.presetValues',
-                  { creativity: preset.creativity, structure: preset.structure }
-                )}`;
+          <SegmentGroup.Root
+            aria-label={t('widgets.upscale.presetsLabel')}
+            size="xs"
+            value={activePresetId}
+            w="full"
+            onValueChange={applyPreset}
+          >
+            <SegmentGroup.Indicator />
+            {Object.entries(UPSCALE_PRESETS).map(([id, preset]) => {
+              const tooltipContent = `${t(`widgets.upscale.presetDescriptions.${id}`)} ${t(
+                'widgets.upscale.presetValues',
+                { creativity: preset.creativity, structure: preset.structure }
+              )}`;
 
-                return (
-                  <Tooltip key={id} content={tooltipContent}>
-                    <Button
-                      aria-pressed={active}
-                      colorPalette={active ? 'accent' : 'bg'}
-                      size="xs"
-                      variant={active ? 'solid' : 'outline'}
-                      onClick={() => patch(preset)}
-                    >
-                      {t(`widgets.upscale.presets.${id}`)}
-                    </Button>
+              return (
+                // The tooltip trigger merges onto the text, not the item: both
+                // tooltip and segment item write `data-state`, and the tooltip's
+                // open/closed would clobber the item's checked state.
+                <SegmentGroup.Item key={id} flex="1" minW="0" value={id}>
+                  <SegmentGroup.ItemHiddenInput />
+                  <Tooltip content={tooltipContent}>
+                    <SegmentGroup.ItemText fontSize="xs">{t(`widgets.upscale.presets.${id}`)}</SegmentGroup.ItemText>
                   </Tooltip>
-                );
-              })}
-            </SimpleGrid>
-          </ButtonGroup>
+                </SegmentGroup.Item>
+              );
+            })}
+          </SegmentGroup.Root>
           <NumericSliderField
             error={errors.creativity}
             helpText={t('widgets.upscale.creativityHelp')}

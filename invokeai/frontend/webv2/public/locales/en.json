@@ -1768,6 +1768,7 @@
         "conservative": "Conservative",
         "creative": "Creative"
       },
+      "presetsLabel": "Treatment preset",
       "prompts": "Prompts",
       "random": "Random",
       "ready": "Ready",
