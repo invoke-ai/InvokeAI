@@ -19,6 +19,7 @@ import {
   BookOpenTextIcon,
   BlocksIcon,
   BoxIcon,
+  FolderIcon,
   ListOrderedIcon,
   MenuIcon,
   MessagesSquareIcon,
@@ -42,6 +43,9 @@ export const AppMenu = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
+  const openProjects = useCallback(() => {
+    void navigate({ to: '/projects' });
+  }, [navigate]);
   const openModels = useCallback(() => {
     void navigate({ search: { project: projectId }, to: '/models' });
   }, [navigate, projectId]);
@@ -74,6 +78,10 @@ export const AppMenu = () => {
               <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                 {t('topbar.appMenu.manage')}
               </Menu.ItemGroupLabel>
+              <Menu.Item value="projects" onClick={openProjects}>
+                <Icon as={FolderIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
+              </Menu.Item>
               {canManageModels ? (
                 <Menu.Item value="models" onClick={openModels}>
                   <Icon as={BoxIcon} boxSize="3.5" />
@@ -168,14 +176,16 @@ const SearchMenuAction = () => {
   return <AppMenuAction icon={SearchIcon} label={label} value="command-palette" onClick={openCommandPalette} />;
 };
 
+// Sized like the 2xs icon buttons in widget headers; menu items default to a
+// much roomier padding than an icon-only action needs.
 const FOOTER_ITEM_PROPS = {
   alignItems: 'center',
   flex: '0 0 auto',
-  h: '8',
+  h: '6',
   justifyContent: 'center',
-  minW: '8',
+  minW: '6',
   p: '0',
-  w: '8',
+  w: '6',
 } as const;
 
 const AppMenuAction = ({
