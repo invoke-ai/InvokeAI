@@ -76,10 +76,20 @@ class DownloadQueueService(DownloadQueueServiceBase):
         # transports). Sessions we build ourselves refuse to connect to a non-public
         # address, which is the check that holds against DNS rebinding and against host
         # spellings that `requests` decodes differently from us.
+        self._request_proxies: Optional[Dict[str, str]] = None
         if requests_session is not None:
             self._requests = requests_session
         elif self._app_config.allow_private_download_urls:
+            # The operator has opted out of the address policy, so ambient proxy variables
+            # keep working here exactly as they always have — but an explicitly configured
+            # download_proxy must still be honored rather than silently ignored when both
+            # settings are present. It is applied per request (see the single call site in
+            # _do_download) because that is the only level that takes precedence over
+            # ambient *_PROXY variables in a plain Session.
             self._requests = requests.Session()
+            if self._app_config.download_proxy:
+                proxy = self._app_config.download_proxy
+                self._request_proxies = {"http": proxy, "https": proxy}
         else:
             self._requests = build_guarded_session(proxy=self._app_config.download_proxy)
             warn_if_proxied(self._requests, self._logger)
@@ -437,7 +447,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         # redirect hop — otherwise a public URL could bounce us onto a private address.
         self._validate_url(url)
         resp = self._requests.get(
-            str(url), headers=header, stream=True, hooks={"response": self._reject_unsafe_redirect}
+            str(url),
+            headers=header,
+            stream=True,
+            hooks={"response": self._reject_unsafe_redirect},
+            proxies=self._request_proxies,
         )
         job.final_url = str(resp.url) if resp.url else None
         self._logger.debug(

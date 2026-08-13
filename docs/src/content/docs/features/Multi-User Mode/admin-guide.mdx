@@ -274,7 +274,8 @@ and `ALL_PROXY` settings. It still honors `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`
 and `.netrc`. If direct outbound access is unavailable, set `download_proxy` to an
 explicit proxy whose destination policy blocks private addresses; proxy-side DNS
 cannot be checked by InvokeAI. Do not enable `allow_private_download_urls` merely to
-make an untrusted proxy work.
+make an untrusted proxy work. The two settings are independent: `download_proxy` is
+honored whether or not `allow_private_download_urls` is enabled.
 
 
 :::note[Strict Password Checking]

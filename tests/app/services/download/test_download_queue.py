@@ -546,6 +546,33 @@ def test_production_queue_accepts_explicit_download_proxy() -> None:
         queue._requests.close()
 
 
+def test_private_opt_in_still_honors_explicit_download_proxy(monkeypatch: Any) -> None:
+    """allow_private_download_urls=True must not silently drop an explicitly configured
+    download_proxy: the two settings are independent. The proxy is applied at request
+    level because that is the only level that beats ambient *_PROXY variables in a
+    plain (unguarded) Session."""
+    monkeypatch.setenv("HTTP_PROXY", "http://ambient.invalid:9")
+    monkeypatch.setenv("HTTPS_PROXY", "http://ambient.invalid:9")
+    queue = DownloadQueueService(
+        app_config=InvokeAIAppConfig(
+            allow_private_download_urls=True,
+            download_proxy="http://proxy.internal:3128",
+        )
+    )
+    try:
+        assert queue._request_proxies == {
+            "http": "http://proxy.internal:3128",
+            "https": "http://proxy.internal:3128",
+        }
+        # The explicit proxy must win over the ambient variables in requests' merge order.
+        merged = queue._requests.merge_environment_settings(
+            "https://example.com/x", queue._request_proxies, None, None, None
+        )
+        assert merged["proxies"]["https"] == "http://proxy.internal:3128"
+    finally:
+        queue._requests.close()
+
+
 @pytest.mark.timeout(timeout=10, method="thread")
 def test_download_refuses_non_public_source(tmp_path: Path) -> None:
     """A job whose source points at loopback errors out without issuing the request."""
