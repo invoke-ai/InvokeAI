@@ -134,9 +134,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
         thumbnail_size: int = 256,
         image_subfolder: str = "",
     ) -> None:
+        image_path: Optional[Path] = None
+        thumbnail_path: Optional[Path] = None
+        image_existed = False
+        thumbnail_existed = False
         try:
             self.__validate_storage_folders()
             image_path = self.get_path(image_name, image_subfolder=image_subfolder)
+            image_existed = image_path.exists()
 
             # Ensure subfolder directories exist
             image_path.parent.mkdir(parents=True, exist_ok=True)
@@ -168,6 +173,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             )
 
             thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
+            thumbnail_existed = thumbnail_path.exists()
 
             # Ensure thumbnail subfolder directories exist
             thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
@@ -178,6 +184,16 @@ class DiskImageFileStorage(ImageFileStorageBase):
             self.__set_cache(image_path, image)
             self.__set_cache(thumbnail_path, thumbnail_image)
         except Exception as e:
+            # A thumbnail failure must not leave a full-size image with no thumbnail. The
+            # names are normally new, but preserve any pre-existing files when save() is
+            # used to overwrite an existing image.
+            for path, existed in ((image_path, image_existed), (thumbnail_path, thumbnail_existed)):
+                if path is not None and not existed:
+                    try:
+                        path.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+            self.evict_cache_paths([path for path in (image_path, thumbnail_path) if path is not None])
             raise ImageFileSaveException from e
 
     def delete(self, image_name: str, image_subfolder: str = "") -> None:
