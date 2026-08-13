@@ -150,8 +150,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
     configured.
 
     NOTE: coverage is by convention, not automatic. Only `*_api_key` fields listed in
-    EXTERNAL_PROVIDER_CONFIG_FIELDS plus `remote_api_tokens` are masked. If you add a credential to
-    InvokeAIAppConfig under any other name, you must extend this function or it will be served verbatim.
+    EXTERNAL_PROVIDER_CONFIG_FIELDS plus `remote_api_tokens` and credentials embedded in
+    `download_proxy` are masked. If you add a credential to InvokeAIAppConfig under any other
+    name, you must extend this function or it will be served verbatim.
     """
     updates: dict[str, Any] = {}
 
@@ -165,6 +166,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
         updates["remote_api_tokens"] = [
             pair.model_copy(update={"token": REDACTED_SECRET}) for pair in config.remote_api_tokens
         ]
+
+    if config.download_proxy and "@" in config.download_proxy:
+        updates["download_proxy"] = REDACTED_SECRET
 
     return config.model_copy(update=updates) if updates else config
 

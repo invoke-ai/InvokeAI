@@ -218,6 +218,34 @@ view the models previously installed, but cannot add or modify them.
 
 ## Security
 
+### Download URL Restrictions
+
+These restrictions apply to every download the server performs on your behalf —
+model installs from URLs are the main case. (The old general-purpose
+`/api/v1/download_queue` REST endpoint, which accepted an arbitrary URL and
+destination path, has been removed.)
+
+Downloads are refused when the URL resolves to a loopback, link-local or
+private-network address. This stops a download URL from being used to reach
+services that only the server can see, such as an admin interface bound to
+`127.0.0.1` or a cloud instance-metadata endpoint. Redirects are checked at
+every hop, so a public URL cannot bounce the server onto a private address.
+
+If you install models from a mirror on your own network, re-enable those
+addresses in `invokeai.yaml`:
+
+```yaml
+allow_private_download_urls: true
+```
+
+For security, the guarded downloader ignores ambient `HTTP_PROXY`, `HTTPS_PROXY`,
+and `ALL_PROXY` settings. It still honors `REQUESTS_CA_BUNDLE`, `CURL_CA_BUNDLE`,
+and `.netrc`. If direct outbound access is unavailable, set `download_proxy` to an
+explicit proxy whose destination policy blocks private addresses; proxy-side DNS
+cannot be checked by InvokeAI. Do not enable `allow_private_download_urls` merely to
+make an untrusted proxy work. The two settings are independent: `download_proxy` is
+honored whether or not `allow_private_download_urls` is enabled.
+
 :::note[Strict Password Checking]
 It is recommended that you enable strict password checking.  This will
 force all users to select good passwords that follow the

@@ -260,6 +260,17 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
+    def _admin_sids(self) -> list[str]:
+        """Sockets belonging to administrators, identified at connect time.
+
+        The "admin" room is only entered on queue subscription, so it cannot carry events
+        that are not tied to a queue: a socket that has connected but not yet sent
+        `subscribe_queue` is in no rooms at all and would miss them. `_socket_users` is
+        populated in `_handle_connect`, so addressing those sockets directly covers the
+        window between connect and subscribe.
+        """
+        return [sid for sid, info in self._socket_users.items() if info.get("is_admin")]
+
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         """Handle queue events with user isolation.
 
@@ -354,7 +365,24 @@ class SocketIO:
             logger.error(f"Error handling queue event {event[0]}: {e}", exc_info=True)
 
     async def _handle_model_event(self, event: FastAPIEvent[ModelEventBase | DownloadEventBase]) -> None:
-        await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"))
+        event_name, event_data = event
+
+        # Model load events drive the loading-models spinner in every client, so they stay
+        # broadcast. Their `config` does carry `path` and `source`, but any authenticated user
+        # can already read those for every model from `list_model_records`, so broadcasting
+        # them discloses nothing new. (Upstream routes these to the triggering user's room
+        # instead, which needs a `user_id` on the event that this release line does not have.)
+        if isinstance(event_data, (ModelLoadStartedEvent, ModelLoadCompleteEvent)):
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"))
+            return
+
+        # Model install and download events contain signed source URLs and server filesystem
+        # paths. They feed the admin-only model manager UI and must not be broadcast to users.
+        # Addressed to the admin sockets rather than the "admin" room because that room is only
+        # entered on queue subscription, and these events are not tied to a queue.
+        admin_sids = self._admin_sids()
+        if admin_sids:
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), to=admin_sids)
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event

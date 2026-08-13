@@ -59,9 +59,9 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
 
     if (data.error === 'Unauthorized') {
       if (data.source.type === 'hf') {
-        // Admin-only: model_install_error is broadcast to every connected client, but /hf_login is an
-        // admin-only route and the toast concerns the server-wide HF token that only an admin can fix.
-        // Without this guard every non-admin session fires a doomed request and logs a spurious 403.
+        // Admin-only: the server now addresses model_install_error to admin sockets only, but /hf_login
+        // is an admin-only route and the toast concerns the server-wide HF token that only an admin can
+        // fix. Keep the guard so the client does not depend on that server-side scoping.
         if (getIsAdminFromState(getState)) {
           const hfTokenStatus = await getHFTokenStatus(dispatch);
           if (hfTokenStatus === null) {
