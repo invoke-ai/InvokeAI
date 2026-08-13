@@ -40,7 +40,7 @@ export const QueueCluster = () => {
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const actions = useQueueMenuActions();
+  const actions = useQueueMenuActions({ includeOpenQueue: true });
   const cancelCurrent = actions[0];
 
   const baseSummary = getQueueSummary(queueItems);
