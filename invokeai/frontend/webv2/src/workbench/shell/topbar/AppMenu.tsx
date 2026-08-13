@@ -8,11 +8,8 @@ import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useNavigate } from '@tanstack/react-router';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
-import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
@@ -29,6 +26,8 @@ import {
 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DOCS_URL = 'https://invoke-ai.github.io/InvokeAI/';
@@ -113,7 +112,7 @@ export const AppMenu = () => {
             <Menu.Separator />
             <HStack gap="0.5" px="1" py="0.5">
               <SearchMenuAction />
-              <AppMenuAction icon={SettingsIcon} label={t('common.settings')} value="settings" onClick={openSettings} />
+              <SettingsMenuAction onClick={openSettings} />
               <AppMenuLink
                 href={DOCS_URL}
                 icon={BookOpenTextIcon}
@@ -166,14 +165,29 @@ const AppMenuGlyph = () => (
 
 const SearchMenuAction = () => {
   const { t } = useTranslation();
-  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
-  const firstHotkey = applyCustomHotkeys(OPEN_COMMAND_PALETTE_HOTKEY, customHotkeys).keys[0];
-  const hotkeyLabel = firstHotkey ? formatHotkeyForPlatform(firstHotkey).join('+') : null;
-  const label = hotkeyLabel
-    ? t('commandPalette.buttonTooltip', { hotkey: hotkeyLabel })
-    : t('commandPalette.buttonLabel');
+  // Same formatter as every other shortcut hint in the top bar, so the two
+  // hinted actions in this row read alike (and macOS gets ⌘K, not "cmd+k").
+  const shortcut = useTopbarShortcut(OPEN_COMMAND_PALETTE_HOTKEY.commandId);
+  const label = shortcut ? t('commandPalette.buttonTooltip', { hotkey: shortcut }) : t('commandPalette.buttonLabel');
 
   return <AppMenuAction icon={SearchIcon} label={label} value="command-palette" onClick={openCommandPalette} />;
+};
+
+const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
+  const { t } = useTranslation();
+  // Reads the effective binding, so a remapped or unbound shortcut is never
+  // advertised as one that still works.
+  const shortcut = useTopbarShortcut('app.openSettings');
+  const label = t('common.settings');
+
+  return (
+    <AppMenuAction
+      icon={SettingsIcon}
+      label={shortcut ? `${label} (${shortcut})` : label}
+      value="settings"
+      onClick={onClick}
+    />
+  );
 };
 
 // Sized like the 2xs icon buttons in widget headers; menu items default to a
