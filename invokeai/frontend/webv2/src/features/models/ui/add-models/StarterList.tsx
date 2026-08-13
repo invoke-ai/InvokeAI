@@ -121,7 +121,7 @@ export const StarterList = ({
                 >
                   {getModelBaseLabel(model.base)}
                 </Badge>
-                <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="outline">
+                <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
                   {getModelTypeLabel(model.type)}
                 </Badge>
               </>

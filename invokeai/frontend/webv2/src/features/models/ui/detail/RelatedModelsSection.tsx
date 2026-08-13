@@ -161,7 +161,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
                     >
                       {getModelBaseLabel(relatedModel.base)}
                     </Badge>
-                    <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="outline">
+                    <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
                       {getModelTypeLabel(relatedModel.type)}
                     </Badge>
                   </>
