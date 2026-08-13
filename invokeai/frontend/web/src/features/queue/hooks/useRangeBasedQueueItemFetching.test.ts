@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getItemIdBatches } from './useRangeBasedQueueItemFetching';
+import { getItemIdBatches, getUncachedItemIds } from './useRangeBasedQueueItemFetching';
 
 describe('queue item summary batching', () => {
   it('sends nothing when there is nothing to fetch', () => {
@@ -21,5 +21,11 @@ describe('queue item summary batching', () => {
     expect(batches.map((batch) => batch.length)).toEqual([1000, 1000, 1]);
     // Every id is sent exactly once, in order — a dropped id means a row stuck on its placeholder.
     expect(batches.flat()).toEqual(itemIds);
+  });
+
+  it('does not re-request ids while their bulk request is still in flight', () => {
+    const ranges = [{ startIndex: 0, endIndex: 2 }];
+
+    expect(getUncachedItemIds([11, 12, 13], [], ranges, new Set([12]))).toEqual([11, 13]);
   });
 });

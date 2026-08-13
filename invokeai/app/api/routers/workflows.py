@@ -1,3 +1,4 @@
+import asyncio
 import io
 import math
 import traceback
@@ -274,7 +275,7 @@ async def set_workflow_thumbnail(
 ):
     """Sets a workflow's thumbnail image"""
     try:
-        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        existing = await asyncio.to_thread(ApiDependencies.invoker.services.workflow_records.get, workflow_id)
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -287,14 +288,14 @@ async def set_workflow_thumbnail(
 
     contents = await image.read()
     try:
-        pil_image = Image.open(io.BytesIO(contents))
+        pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
 
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     try:
-        ApiDependencies.invoker.services.workflow_thumbnails.save(workflow_id, pil_image)
+        await asyncio.to_thread(ApiDependencies.invoker.services.workflow_thumbnails.save, workflow_id, pil_image)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -282,6 +282,54 @@ def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClie
     assert response.json() is None
 
 
+@pytest.mark.anyio
+async def test_update_model_record_runs_sync_work_off_the_event_loop(monkeypatch: Any) -> None:
+    """The async cache-invalidation path must not strand DB work on the event loop."""
+    import threading
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    import invokeai.app.api.routers.model_manager as model_manager_router
+
+    event_loop_thread = threading.get_ident()
+    service_threads: list[int] = []
+    previous = SimpleNamespace(
+        cpu_only=False,
+        default_settings=SimpleNamespace(fp8_storage=False, cpu_only=False),
+    )
+    updated = SimpleNamespace(
+        cpu_only=False,
+        default_settings=SimpleNamespace(fp8_storage=False, cpu_only=False),
+    )
+
+    class Store:
+        def get_model(self, key: str) -> Any:
+            service_threads.append(threading.get_ident())
+            return previous
+
+        def update_model(self, key: str, changes: Any, allow_class_change: bool) -> Any:
+            service_threads.append(threading.get_ident())
+            return updated
+
+    services = SimpleNamespace(
+        logger=MagicMock(),
+        model_manager=SimpleNamespace(store=Store(), load=SimpleNamespace(ram_caches={})),
+    )
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _: config)
+
+    result = await model_manager_router.update_model_record(
+        key="model-key",
+        changes=MagicMock(),
+        current_admin=MagicMock(),
+    )
+
+    assert result is updated
+    assert service_threads
+    assert all(thread_id != event_loop_thread for thread_id in service_threads)
+
+
 def test_convert_model_rejects_a_second_conversion_while_one_is_running() -> None:
     """Conversions are serialized, and the loser is told so instead of being made to wait.
 

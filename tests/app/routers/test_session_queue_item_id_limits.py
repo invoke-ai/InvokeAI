@@ -18,6 +18,7 @@ from invokeai.app.api.routers.session_queue import MAX_QUEUE_ITEM_IDS_PER_REQUES
 from invokeai.app.api_app import app
 
 SUMMARIES_ROUTE = "/api/v1/queue/default/item_summaries_by_ids"
+FULL_ITEMS_ROUTE = "/api/v1/queue/default/items_by_ids"
 
 # SQLite's bind-parameter limit on builds >= 3.32. One id over it is what turns the unbounded
 # version of this route into a 500.
@@ -58,3 +59,13 @@ def test_summaries_by_ids_accepts_a_full_size_batch(mock_queue_invoker: MagicMoc
     mock_queue_invoker.services.session_queue.get_queue_item_summaries_by_ids.assert_called_once_with(
         queue_id="default", item_ids=item_ids
     )
+
+
+def test_full_items_by_ids_rejects_oversized_id_lists(mock_queue_invoker: MagicMock) -> None:
+    client = TestClient(app)
+
+    response = client.post(FULL_ITEMS_ROUTE, json={"item_ids": list(range(MAX_QUEUE_ITEM_IDS_PER_REQUEST + 1))})
+
+    assert response.status_code == 422
+    # Validation must reject the request before graph deserialization starts.
+    mock_queue_invoker.services.session_queue.get_queue_item.assert_not_called()

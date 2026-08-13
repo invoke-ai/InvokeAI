@@ -515,6 +515,51 @@ def get_hugging_face_models(
     )
 
 
+def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    """Update a model record and invalidate any cache affected by the change.
+
+    Keep the complete claim and synchronous service work in one worker-thread operation. This
+    route needs to await cache invalidation, but that must not leave the database read/write and
+    response preparation on the event loop before and after that await.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    record_store = ApiDependencies.invoker.services.model_manager.store
+
+    # Claimed for the whole update: a conversion running on this key carries a snapshot of the
+    # record taken before it started and writes it into the replacement, so an edit accepted
+    # meanwhile would be reported as saved and then silently dropped.
+    with _claim_model_key(key):
+        try:
+            previous_config = record_store.get_model(key)
+            config = record_store.update_model(key, changes=changes, allow_class_change=True)
+            # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
+            # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
+            # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
+            if _load_settings_changed(previous_config, config):
+                # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
+                # Hold the model-load write lock so no worker is mid-construction while we invalidate:
+                # a concurrent load could otherwise peek the old shared CPU weights before the drop and
+                # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
+                # load/VRAM transfer, but this entire helper already runs off the event loop.
+                with MODEL_LOAD_LOCK.write_lock():
+                    dropped = sum(
+                        cache.drop_model(key)
+                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
+                    )
+                if dropped:
+                    logger.info(
+                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
+                    )
+            config = prepare_model_config_for_response(config, ApiDependencies)
+            logger.info(f"Updated model: {key}")
+        except UnknownModelException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=409, detail=str(e))
+    return config
+
+
 @model_manager_router.patch(
     "/i/{key}",
     operation_id="update_model_record",
@@ -535,44 +580,7 @@ async def update_model_record(
     current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Update a model's config."""
-    logger = ApiDependencies.invoker.services.logger
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    # Claimed for the whole update: a conversion running on this key carries a snapshot of the
-    # record taken before it started and writes it into the replacement, so an edit accepted
-    # meanwhile would be reported as saved and then silently dropped.
-    with _claim_model_key(key):
-        try:
-            previous_config = record_store.get_model(key)
-            config = record_store.update_model(key, changes=changes, allow_class_change=True)
-            # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
-            # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
-            # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-            if _load_settings_changed(previous_config, config):
-                # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
-                # Hold the model-load write lock so no worker is mid-construction while we invalidate:
-                # a concurrent load could otherwise peek the old shared CPU weights before the drop and
-                # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
-                # load/VRAM transfer, so do it off the event loop.
-                def _drop_from_all_caches() -> int:
-                    with MODEL_LOAD_LOCK.write_lock():
-                        return sum(
-                            cache.drop_model(key)
-                            for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
-                        )
-
-                dropped = await asyncio.to_thread(_drop_from_all_caches)
-                if dropped:
-                    logger.info(
-                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
-                    )
-            config = prepare_model_config_for_response(config, ApiDependencies)
-            logger.info(f"Updated model: {key}")
-        except UnknownModelException as e:
-            raise HTTPException(status_code=404, detail=str(e))
-        except ValueError as e:
-            logger.error(str(e))
-            raise HTTPException(status_code=409, detail=str(e))
-    return config
+    return await asyncio.to_thread(_update_model_record, key, changes)
 
 
 _LOAD_AFFECTING_SETTINGS: tuple[str, ...] = ("fp8_storage", "cpu_only")
@@ -654,14 +662,14 @@ async def update_model_image(
     with _claim_model_key(key):
         contents = await image.read()
         try:
-            pil_image = Image.open(io.BytesIO(contents))
+            pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
 
         except Exception:
             logger.error(traceback.format_exc())
             raise HTTPException(status_code=415, detail="Failed to read image")
 
         try:
-            model_images.save(pil_image, key)
+            await asyncio.to_thread(model_images.save, pil_image, key)
             logger.info(f"Updated image for model: {key}")
         except ValueError as e:
             logger.error(str(e))

@@ -269,6 +269,13 @@ class SqliteSessionQueue(SessionQueueBase):
     async def enqueue_batch(
         self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
     ) -> EnqueueBatchResult:
+        # The route awaits this method, but every operation below is synchronous SQLite/CPU
+        # work. Keep the complete transaction in one worker operation; otherwise the queue-size
+        # check before the first await and the insert/event work after later awaits execute on the
+        # event loop.
+        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id)
+
+    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool, user_id: str) -> EnqueueBatchResult:
         current_queue_size = self._get_current_queue_size(queue_id)
         max_queue_size = self.__invoker.services.configuration.max_queue_size
         max_new_queue_items = max_queue_size - current_queue_size
@@ -277,12 +284,8 @@ class SqliteSessionQueue(SessionQueueBase):
         if prepend:
             priority = self._get_highest_priority(queue_id) + 1
 
-        requested_count = await asyncio.to_thread(
-            calc_session_count,
-            batch=batch,
-        )
-        values_to_insert = await asyncio.to_thread(
-            prepare_values_to_insert,
+        requested_count = calc_session_count(batch=batch)
+        values_to_insert = prepare_values_to_insert(
             queue_id=queue_id,
             batch=batch,
             priority=priority,

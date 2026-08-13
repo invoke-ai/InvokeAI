@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from typing import Any, Optional, TypeVar
 
@@ -130,7 +131,7 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
-    assert_image_move_maintenance_inactive()
+    await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
@@ -201,10 +202,17 @@ def get_queue_items_by_item_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(
-        embed=True, description="Object containing list of queue item ids to fetch queue items for"
+        embed=True,
+        max_length=MAX_QUEUE_ITEM_IDS_PER_REQUEST,
+        description="Object containing list of queue item ids to fetch queue items for",
     ),
 ) -> list[SessionQueueItem]:
-    """Gets queue items for the specified queue item ids. Maintains order of item ids."""
+    """Gets queue items for the specified queue item ids. Maintains order of item ids.
+
+    Bound the legacy full-item endpoint as well as the summary endpoint: callers can otherwise
+    force one graph deserialization and response copy per supplied id, defeating the queue-list
+    optimization with an authenticated memory/CPU exhaustion request.
+    """
     try:
         session_queue_service = ApiDependencies.invoker.services.session_queue
 

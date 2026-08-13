@@ -1,5 +1,5 @@
 import { useAppStore } from 'app/store/storeHooks';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { queueApi, useGetQueueItemSummariesByItemIdsMutation } from 'services/api/endpoints/queue';
 import { useThrottledCallback } from 'use-debounce';
@@ -27,14 +27,19 @@ export const getItemIdBatches = (itemIds: number[]): number[][] => {
   return batches;
 };
 
-const getUncachedItemIds = (itemIds: number[], cachedItemIds: number[], ranges: ListRange[]): number[] => {
+export const getUncachedItemIds = (
+  itemIds: number[],
+  cachedItemIds: number[],
+  ranges: ListRange[],
+  pendingItemIds: Set<number> = new Set()
+): number[] => {
   const uncachedItemIdsSet = new Set<number>();
   const cachedItemIdsSet = new Set(cachedItemIds);
 
   for (const range of ranges) {
     for (let i = range.startIndex; i <= range.endIndex; i++) {
       const n = itemIds[i]!;
-      if (n && !cachedItemIdsSet.has(n)) {
+      if (n && !cachedItemIdsSet.has(n) && !pendingItemIds.has(n)) {
         uncachedItemIdsSet.add(n);
       }
     }
@@ -58,6 +63,7 @@ export const useRangeBasedQueueItemFetching = ({
   const [getQueueItemSummariesByItemIds] = useGetQueueItemSummariesByItemIdsMutation();
   const [lastRange, setLastRange] = useState<ListRange | null>(null);
   const [pendingRanges, setPendingRanges] = useState<ListRange[]>([]);
+  const pendingItemIdsRef = useRef<Set<number>>(new Set());
 
   const fetchQueueItems = useCallback(
     (ranges: ListRange[], itemIds: number[]) => {
@@ -65,12 +71,18 @@ export const useRangeBasedQueueItemFetching = ({
         return;
       }
       const cachedItemIds = queueApi.util.selectCachedArgsForQuery(store.getState(), 'getQueueItemSummary');
-      const uncachedItemIds = getUncachedItemIds(itemIds, cachedItemIds, ranges);
+      const uncachedItemIds = getUncachedItemIds(itemIds, cachedItemIds, ranges, pendingItemIdsRef.current);
       if (uncachedItemIds.length === 0) {
         return;
       }
       for (const item_ids of getItemIdBatches(uncachedItemIds)) {
-        getQueueItemSummariesByItemIds({ item_ids });
+        item_ids.forEach((item_id) => pendingItemIdsRef.current.add(item_id));
+        void getQueueItemSummariesByItemIds({ item_ids })
+          .unwrap()
+          .then(
+            () => item_ids.forEach((item_id) => pendingItemIdsRef.current.delete(item_id)),
+            () => item_ids.forEach((item_id) => pendingItemIdsRef.current.delete(item_id))
+          );
       }
       setPendingRanges([]);
     },
