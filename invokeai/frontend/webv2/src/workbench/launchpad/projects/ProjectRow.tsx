@@ -56,7 +56,7 @@ export const ProjectRow = ({
   const handleTogglePin = useCallback(() => onTogglePin(summary.id), [onTogglePin, summary.id]);
 
   return (
-    <Row className="group" gap="3" position="relative" rounded="md" onContextMenu={handleContextMenu}>
+    <Row className="group" gap="3" h="full" position="relative" rounded="md" onContextMenu={handleContextMenu}>
       <Link
         aria-label={t('projects.openProjectLabel', { name: summary.name })}
         search={projectSearch}
