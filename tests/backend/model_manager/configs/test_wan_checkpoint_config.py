@@ -129,24 +129,31 @@ class TestAccepts:
         assert config.expert == "high"
 
 
+def _ggml(*shape: int) -> GGMLTensor:
+    return GGMLTensor(
+        data=torch.zeros((1,), dtype=torch.uint8),
+        ggml_quantization_type=gguf.GGMLQuantizationType.Q4_0,
+        tensor_shape=torch.Size(shape),
+        compute_dtype=torch.float32,
+    )
+
+
 class TestRejects:
-    def test_gguf_state_dict(self, tmp_path: Path) -> None:
+    def test_gguf_file(self, tmp_path: Path) -> None:
+        """A .gguf goes to Main_GGUF_Wan_Config; the suffix guard turns it away first."""
+        with pytest.raises(NotAMatchError, match="safetensors"):
+            _probe(tmp_path, "wan2.2-t2v-a14b-high_noise-Q4_K_M.gguf", _native_sd(16))
+
+    def test_gguf_tensors(self, tmp_path: Path) -> None:
+        """Belt-and-braces behind the suffix guard: GGML tensors are never a match
+        for this config regardless of what the file is called."""
         sd = {
-            "patch_embedding.weight": GGMLTensor(
-                data=torch.zeros((1,), dtype=torch.uint8),
-                ggml_quantization_type=gguf.GGMLQuantizationType.Q4_0,
-                tensor_shape=torch.Size((A14B_DIM, 16, 1, 2, 2)),
-                compute_dtype=torch.float32,
-            ),
-            "text_embedding.0.weight": GGMLTensor(
-                data=torch.zeros((1,), dtype=torch.uint8),
-                ggml_quantization_type=gguf.GGMLQuantizationType.Q4_0,
-                tensor_shape=torch.Size((A14B_DIM, 4096)),
-                compute_dtype=torch.float32,
-            ),
+            "patch_embedding.weight": _ggml(A14B_DIM, 16, 1, 2, 2),
+            "text_embedding.0.weight": _ggml(A14B_DIM, 4096),
+            "blocks.0.self_attn.q.weight": _ggml(A14B_DIM, A14B_DIM),
         }
         with pytest.raises(NotAMatchError, match="GGUF"):
-            _probe(tmp_path, "wan2.2-t2v-a14b-high_noise-Q4_K_M.gguf", sd)
+            _probe(tmp_path, "wan2.2-t2v-a14b-high_noise.safetensors", sd)
 
     def test_wan_2_1_i2v_via_clip_image_embedder(self, tmp_path: Path) -> None:
         sd = _native_sd(36)
@@ -158,10 +165,12 @@ class TestRejects:
         with pytest.raises(NotAMatchError, match="Wan 2.1"):
             _probe(tmp_path, "renamed-t2v-model.safetensors", _native_sd(16, dim=1536))
 
-    def test_wan_2_1_vace(self, tmp_path: Path) -> None:
+    def test_vace(self, tmp_path: Path) -> None:
+        """VACE exists for both Wan 2.1 and 2.2; either way this loader has no
+        control branch, so it must refuse rather than silently ignore the input."""
         sd = _native_sd(16)
         sd["vace_blocks.0.after_proj.weight"] = _t(A14B_DIM, A14B_DIM)
-        with pytest.raises(NotAMatchError, match="Wan 2.1"):
+        with pytest.raises(NotAMatchError, match="VACE"):
             _probe(tmp_path, "vace-model.safetensors", sd)
 
     def test_wan_2_1_filename(self, tmp_path: Path) -> None:
@@ -171,6 +180,27 @@ class TestRejects:
     def test_unrecognised_state_dict(self, tmp_path: Path) -> None:
         with pytest.raises(NotAMatchError, match="Wan transformer"):
             _probe(tmp_path, "junk.safetensors", {"random.key": _t(4, 4)})
+
+    def test_lora_carrying_a_full_patch_embedding(self, tmp_path: Path) -> None:
+        """Wan I2V adapters bundle a replacement patch_embedding (in_channels 16->36)
+        plus the text projection, which is everything ``_has_wan_keys`` looks for. The
+        main-model probe must not claim them — Main outranks LoRA in
+        ``matches_sort_key``, so it would pull the file out of every LoRA picker."""
+        sd = {
+            "diffusion_model.patch_embedding.weight": _t(A14B_DIM, 36, 1, 2, 2),
+            "diffusion_model.text_embedding.0.weight": _t(A14B_DIM, 4096),
+            "diffusion_model.blocks.0.self_attn.q.lora_A.weight": _t(32, A14B_DIM),
+            "diffusion_model.blocks.0.self_attn.q.lora_B.weight": _t(A14B_DIM, 32),
+        }
+        with pytest.raises(NotAMatchError, match="LoRA"):
+            _probe(tmp_path, "Wan2.2-I2V-A14B-adapter-low_noise.safetensors", sd)
+
+    @pytest.mark.parametrize("suffix", [".ckpt", ".pt", ".pth", ".bin"])
+    def test_non_safetensors_containers(self, tmp_path: Path, suffix: str) -> None:
+        """The loader reads these with safetensors.load_file, so claiming one would
+        install cleanly and then die with an opaque header error at generation time."""
+        with pytest.raises(NotAMatchError, match="safetensors"):
+            _probe(tmp_path, f"Wan2.2-T2V-A14B-HighNoise{suffix}", _native_sd(16))
 
     def test_unknown_channel_count(self, tmp_path: Path) -> None:
         with pytest.raises(NotAMatchError, match="variant"):
@@ -268,6 +298,14 @@ class TestEndToEndIdentification:
 
 
 class TestExpertFilenameHeuristic:
+    """A wrong expert label is worse than no label.
+
+    'none' on an A14B model produces a clear error from the Wan model loader. A
+    *mislabelled* one satisfies the {high, low} pair check, gets swapped into the
+    wrong slot, and silently runs the same expert for both denoise phases. So the
+    heuristic only fires when 'noise' is actually part of the marker.
+    """
+
     @pytest.mark.parametrize(
         "name, expected",
         [
@@ -279,13 +317,27 @@ class TestExpertFilenameHeuristic:
             ("Wan2.2-A14B-LowNoise-Q4", "low"),
             ("wan2.2-ti2v-5b-Q4_K_M", "none"),
             ("wan-A14B-flagship", "none"),
-            # Bare high/low tokens, as used by several CivitAI fine-tunes.
-            ("Wan2.2-A14B-SmoothMix-T2V-HIGH", "high"),
-            ("Wan2.2_Exitium_Victrix_low", "low"),
-            # ...but only as whole tokens: these must not trip the bare-token path.
+            # Separators the old substring check missed, plus reversed order.
+            ("Wan2.2 A14B high noise", "high"),
+            ("wan22.low.noise.v3", "low"),
+            ("wan22_noise_high_expert", "high"),
+            # A bare high/low token is NOT a marker — it almost always describes
+            # something else (VRAM, CFG, step count, resolution, quality).
+            ("Wan2.2-A14B-T2V-lowCFG-merge", "none"),
+            ("wan2.2-a14b-t2v-4step-low-cfg-merge", "none"),
+            ("Wan22_A14B_T2V_low_step_v2", "none"),
+            ("Wan2.2_A14B_highRes_finetune", "none"),
+            ("Wan2.2_TI2V_5B_lowVRAM", "none"),
+            ("Wan2.2-TI2V-5B-Turbo-lowSteps", "none"),
+            ("Wan2.2-TI2V-5B-HighQuality", "none"),
+            ("Wan2.2-A14B-SmoothMix-T2V-HIGH", "none"),
+            # Token matching, so the marker can't fire on a substring. The last two
+            # were mismatched by the original substring-based heuristic as well.
             ("wan22-slow-motion-a14b", "none"),
             ("wan22-highway-lora-merge", "none"),
             ("wan22-flow-shift-tune", "none"),
+            ("wan22-slow-noise-test", "none"),
+            ("wan22_flownoise_v1", "none"),
         ],
     )
     def test_filename_heuristic(self, name: str, expected: str) -> None:

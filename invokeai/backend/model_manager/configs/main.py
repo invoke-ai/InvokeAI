@@ -1865,6 +1865,34 @@ def _detect_wan_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Wan
     return None
 
 
+def _has_wan_transformer_block_weights(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict carries a transformer block's *own* attention weight.
+
+    ``_has_wan_keys`` only looks at the input conv and the text projection, and a
+    Wan LoRA can legitimately ship both: I2V adapters bundle a full replacement
+    ``patch_embedding`` because they change ``in_channels`` from 16 to 36. Such a
+    file matches both the LoRA and the main-model probes, and ``matches_sort_key``
+    ranks Main above LoRA — so it would be pulled out of the LoRA pickers and into
+    the main-model dropdown, where it can only fail to load.
+
+    Requiring a bare ``blocks.0.<attn>.<q>.weight`` separates them positively: a
+    LoRA stores ``...q.lora_A.weight`` / ``...q.lora_down.weight`` and never the
+    undecorated weight. Keys are matched exactly, so a LoRA's decorated key cannot
+    satisfy this.
+
+    Deliberately a *positive* structural test rather than a "reject anything with
+    lora_A keys" exclusion: main models with merged-in LoRA weights sometimes retain
+    those keys (see ``LoRA_LyCORIS_*_Config._validate_looks_like_lora``), and
+    rejecting them would be the same over-restrictiveness this probe exists to fix.
+    """
+    attention_weights = (
+        "blocks.0.self_attn.q.weight",  # native upstream / ComfyUI layout
+        "blocks.0.attn1.to_q.weight",  # diffusers layout
+    )
+    keys = state_dict.keys()
+    return any((prefix + weight) in keys for prefix in _WAN_KEY_PREFIXES for weight in attention_weights)
+
+
 def _find_wan_2_1_marker(state_dict: dict[str | int, Any]) -> str | None:
     """Return a human-readable reason if the state dict is architecturally Wan 2.1.
 
@@ -1897,7 +1925,11 @@ def _find_wan_2_1_marker(state_dict: dict[str | int, Any]) -> str | None:
         return "state dict has a 1536-dim transformer, which is the Wan 2.1 T2V-1.3B architecture"
 
     if any(isinstance(key, str) and "vace_blocks." in key for key in keys):
-        return "state dict has VACE control blocks, which are a Wan 2.1 VACE feature"
+        # Not strictly a 2.1 marker — Wan 2.2 VACE variants exist — but the effect is
+        # the same: this loader builds a plain WanTransformer3DModel, which has no
+        # VACE control branch, so the vace_blocks would be dropped as unexpected keys
+        # and the model would quietly ignore its control input. Refuse instead.
+        return "state dict has VACE control blocks, and VACE models are not supported yet"
 
     return None
 
@@ -1905,28 +1937,38 @@ def _find_wan_2_1_marker(state_dict: dict[str | int, Any]) -> str | None:
 def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
     """Filename heuristic for the A14B dual-expert MoE.
 
-    Community releases tag each expert in the filename — usually ``high_noise`` /
-    ``low_noise`` and their hyphenated/concatenated/camel-cased spellings, but
-    plenty of CivitAI fine-tunes shorten it to a bare ``HIGH`` / ``low`` token.
+    Community releases tag each expert in the filename as some spelling of
+    ``high_noise`` / ``low_noise``: hyphenated, underscored, spaced, concatenated
+    (``highnoise``), camel-cased (``HighNoise``), or occasionally reversed
+    (``noise_high``). The name is split at camelCase boundaries and then on runs of
+    non-alphanumerics, and a match requires ``high``/``low`` to sit *next to* a
+    ``noise`` token — or to be fused with it into one token.
 
-    The name is first split at camelCase boundaries so ``HighNoise`` normalises to
-    ``high_noise``. The bare-token fallback matches only whole tokens, so it can't
-    fire on a substring like the "low" inside "slow" or "flow".
+    The "noise" requirement is deliberate. A bare ``high``/``low`` token is far too
+    common in other roles — ``lowVRAM``, ``low-cfg``, ``lowSteps``, ``highRes``,
+    ``HighQuality`` — and guessing wrong is worse than not guessing. An unlabelled
+    A14B model ('none') raises a clear error in the Wan model loader telling the
+    user to pair or rename it; a *mislabelled* one passes the pair check, gets
+    silently swapped into the wrong slot, and quietly degrades the output.
 
-    Returns 'none' when neither marker is present (single-expert model or
-    an untagged filename).
+    Token matching also stops the marker firing on a substring, so ``slow_noise``
+    and ``flownoise`` are correctly left alone.
+
+    Returns 'none' when no marker is present (single-expert model such as TI2V-5B,
+    or an untagged filename).
     """
     name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", filename).lower()
-    if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
-        return "high"
-    if any(s in name for s in ("low_noise", "low-noise", "lownoise")):
-        return "low"
+    tokens = [token for token in re.split(r"[^a-z0-9]+", name) if token]
 
-    tokens = set(re.split(r"[^a-z0-9]+", name))
-    if "high" in tokens:
-        return "high"
-    if "low" in tokens:
-        return "low"
+    for marker, expert in (("high", "high"), ("low", "low")):
+        if f"{marker}noise" in tokens or f"noise{marker}" in tokens:
+            return expert  # type: ignore[return-value]
+        for index, token in enumerate(tokens):
+            if token != marker:
+                continue
+            neighbours = tokens[max(index - 1, 0) : index] + tokens[index + 1 : index + 2]
+            if "noise" in neighbours:
+                return expert  # type: ignore[return-value]
     return "none"
 
 
@@ -2011,12 +2053,24 @@ class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         raise_if_not_file(mod)
         raise_for_override_fields(cls, override_fields)
 
+        # The loader reads this format with safetensors.torch.load_file, so claiming a
+        # pickle here would let the model install and then fail with an opaque
+        # "header too large" error at first generation. Wan isn't distributed as
+        # .ckpt/.pt/.bin, so refusing them costs nothing.
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"single-file Wan checkpoints must be .safetensors, not {mod.path.suffix or 'None'}")
+
         sd = mod.load_state_dict()
 
         if not _has_wan_keys(sd):
             raise NotAMatchError("state dict does not look like a Wan transformer")
         if _has_ggml_tensors(sd):
             raise NotAMatchError("state dict looks like GGUF quantized")
+        if not _has_wan_transformer_block_weights(sd):
+            raise NotAMatchError(
+                "state dict has no undecorated transformer block weights — it looks like a Wan LoRA "
+                "or adapter rather than a full transformer"
+            )
 
         # Wan 2.1 shares Wan 2.2's key layout, so reject it on architecture rather
         # than on the filename. Unlike the GGUF probe we deliberately do *not*
