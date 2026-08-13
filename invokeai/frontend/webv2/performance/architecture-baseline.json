@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 831002,
+        "brotliBytes": 831527,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 830524,
+        "gzipBytes": 831022,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1928523,
+        "initialRawBytes": 1929537,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66631,
+        "ownedRawBytes": 66621,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -200,6 +200,7 @@
           "source:src/platform/ui/InvokeMark.tsx",
           "source:src/platform/ui/JsonPreview.tsx",
           "source:src/platform/ui/Menu.tsx",
+          "source:src/platform/ui/MiddleTruncate.tsx",
           "source:src/platform/ui/PageShell.tsx",
           "source:src/platform/ui/Panel.tsx",
           "source:src/platform/ui/RenameDialog.tsx",
@@ -279,15 +280,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 839313,
+        "brotliBytes": 839843,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 838830,
+        "gzipBytes": 839333,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1947809,
+        "initialRawBytes": 1948833,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66631,
+        "ownedRawBytes": 66621,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -297,15 +298,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1020673,
+        "brotliBytes": 1021234,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1017636,
+        "gzipBytes": 1018150,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2500024,
+        "initialRawBytes": 2501161,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 105989,
+        "ownedRawBytes": 105892,
         "requestCount": 85,
         "scriptRequestCount": 69,
         "sourceOwners": [
@@ -620,6 +621,7 @@
           "source:src/platform/ui/InvokeMark.tsx",
           "source:src/platform/ui/JsonPreview.tsx",
           "source:src/platform/ui/Menu.tsx",
+          "source:src/platform/ui/MiddleTruncate.tsx",
           "source:src/platform/ui/PageShell.tsx",
           "source:src/platform/ui/Panel.tsx",
           "source:src/platform/ui/RenameDialog.tsx",
@@ -811,15 +813,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1030880,
+        "brotliBytes": 1031447,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1027813,
+        "gzipBytes": 1028332,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2525025,
+        "initialRawBytes": 2526173,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 105989,
+        "ownedRawBytes": 105892,
         "requestCount": 85,
         "scriptRequestCount": 69
       },
@@ -828,7 +830,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-12",
+  "capturedAt": "2026-08-13",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
