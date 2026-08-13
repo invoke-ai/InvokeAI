@@ -4,7 +4,7 @@ import { DataList, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
 import { galleryImages, galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
 import { useAuthSession } from '@features/identity';
-import { IconButton, Tooltip } from '@platform/ui';
+import { IconButton, Scrollable, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery } from '@tanstack/react-query';
@@ -215,33 +215,35 @@ const ImageDetails = ({
   );
 
   return (
-    <Stack gap="2" maxH="40cqh" overflowY="auto" pe="1">
-      {isLoading ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          {t('widgets.preview.loadingMetadata')}
-        </Text>
-      ) : (
-        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
-          {entries.map((entry) => {
-            const recall = ENTRY_RECALL_KINDS[entry.key];
+    <Scrollable maxH="40cqh">
+      <Stack gap="2" pe="1">
+        {isLoading ? (
+          <Text color="fg.subtle" fontSize="2xs">
+            {t('widgets.preview.loadingMetadata')}
+          </Text>
+        ) : (
+          <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+            {entries.map((entry) => {
+              const recall = ENTRY_RECALL_KINDS[entry.key];
 
-            return (
-              <MetadataRow
-                key={entry.key}
-                entry={entry}
-                recallKind={recall && capabilities[recall.capability] ? recall.kind : undefined}
-                onRecall={handleRecall}
-              />
-            );
-          })}
-        </DataList.Root>
-      )}
-      <RecallActionButtons
-        capabilities={capabilities}
-        disabledReason={t('widgets.preview.recallNotAvailable')}
-        onRecall={handleRecall}
-      />
-    </Stack>
+              return (
+                <MetadataRow
+                  key={entry.key}
+                  entry={entry}
+                  recallKind={recall && capabilities[recall.capability] ? recall.kind : undefined}
+                  onRecall={handleRecall}
+                />
+              );
+            })}
+          </DataList.Root>
+        )}
+        <RecallActionButtons
+          capabilities={capabilities}
+          disabledReason={t('widgets.preview.recallNotAvailable')}
+          onRecall={handleRecall}
+        />
+      </Stack>
+    </Scrollable>
   );
 };
 
