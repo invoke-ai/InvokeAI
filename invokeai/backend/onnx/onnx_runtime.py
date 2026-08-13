@@ -189,11 +189,11 @@ class IAIOnnxRuntimeModel(RawModel):
         # return self.io_binding.copy_outputs_to_cpu()
         return self.session.run(None, inputs)
 
-    # compatability with RawModel ABC
+    # compatibility with RawModel ABC
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None) -> None:
         pass
 
-    # compatability with diffusers load code
+    # compatibility with diffusers load code
     @classmethod
     def from_pretrained(
         cls,
