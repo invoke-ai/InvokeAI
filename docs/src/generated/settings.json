@@ -757,6 +757,28 @@
     {
       "category": "MODEL INSTALL",
       "default": false,
+      "description": "Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.",
+      "env_var": "INVOKEAI_ALLOW_PRIVATE_DOWNLOAD_URLS",
+      "literal_values": [],
+      "name": "allow_private_download_urls",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": null,
+      "description": "Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.",
+      "env_var": "INVOKEAI_DOWNLOAD_PROXY",
+      "literal_values": [],
+      "name": "download_proxy",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": false,
       "description": "UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.",
       "env_var": "INVOKEAI_UNSAFE_DISABLE_PICKLESCAN",
       "literal_values": [],

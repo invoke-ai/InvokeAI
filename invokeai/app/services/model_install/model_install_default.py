@@ -387,7 +387,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
         self._clear_pending_jobs()
-        self._download_cache.clear()
+        with self._lock:
+            self._download_cache.clear()
         assert self._install_thread is not None
         self._install_thread.join()
         self._running = False
@@ -579,7 +580,14 @@ class ModelInstallService(ModelInstallServiceBase):
         if not self._wait_for_restore_complete(timeout=restore_timeout):
             raise TimeoutError("Timeout exceeded")
 
-        while len(self._download_cache) > 0:
+        while True:
+            # The completion callback removes a download from this cache while holding
+            # the same lock it uses to enqueue the install. Do not observe the cache
+            # between those two operations.
+            with self._lock:
+                downloads_pending = bool(self._download_cache)
+            if not downloads_pending:
+                break
             if self._downloads_changed_event.wait(timeout=0.25):  # in case we miss an event
                 self._downloads_changed_event.clear()
             if timeout > 0 and time.time() - start > timeout:
@@ -1339,7 +1347,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 part.final_url = meta.get("final_url") or part.final_url
                 if meta.get("download_path"):
                     part.download_path = Path(meta.get("download_path"))
-        self._download_cache[multifile_job.id] = job
+        with self._lock:
+            self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
 
         self._write_install_marker(job, status=InstallStatus.WAITING)
