@@ -2560,6 +2560,9 @@
           "404": {
             "description": "Model not found"
           },
+          "409": {
+            "description": "Another operation on this model is already in progress"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3003,6 +3006,9 @@
           "404": {
             "description": "The model could not be found"
           },
+          "409": {
+            "description": "Another operation on this model is already in progress"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3210,6 +3216,9 @@
           "400": {
             "description": "Bad request"
           },
+          "409": {
+            "description": "Another operation on this model is already in progress"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3250,6 +3259,9 @@
           },
           "404": {
             "description": "Model image not found"
+          },
+          "409": {
+            "description": "Another operation on this model is already in progress"
           },
           "422": {
             "description": "Validation Error",

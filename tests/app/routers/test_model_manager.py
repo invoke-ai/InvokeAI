@@ -517,6 +517,62 @@ def test_model_image_writes_are_refused_while_the_same_model_is_being_converted(
         deps.invoker.services.model_images.delete.assert_not_called()
 
 
+@pytest.mark.anyio
+async def test_model_image_upload_claims_before_read() -> None:
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    async def read() -> bytes:
+        assert "upload-key" in model_manager._CLAIMED_MODEL_KEYS
+        return b"image"
+
+    image.read = read
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = MagicMock()
+        with patch.object(model_manager.Image, "open", return_value=MagicMock()):
+            await model_manager.update_model_image("upload-key", image, MagicMock())
+
+
+def test_converted_model_key_is_claimed_after_install() -> None:
+    from pathlib import Path
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.api.routers.model_manager import delete_model
+
+    installer = MagicMock()
+    installer.install_path.return_value = "replacement-key"
+    install_config = MagicMock()
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_manager.install = installer
+        with model_manager._install_and_claim_model(installer, Path("/tmp/converted"), install_config) as new_key:
+            assert new_key == "replacement-key"
+            with pytest.raises(HTTPException) as exc_info:
+                delete_model(MagicMock(), key="replacement-key")
+
+            assert exc_info.value.status_code == 409
+            installer.delete.assert_not_called()
+
+
+def test_model_mutations_document_claim_conflicts() -> None:
+    from invokeai.app.api.routers.model_manager import model_manager_router
+
+    routes = {route.operation_id: route for route in model_manager_router.routes if route.operation_id}
+
+    for operation_id in ("reidentify_model", "update_model_image", "delete_model", "delete_model_image"):
+        assert 409 in routes[operation_id].responses
+
+
 def test_bulk_reidentify_reports_a_busy_key_instead_of_racing_it(conversion_in_flight) -> None:
     from unittest.mock import MagicMock, patch
 

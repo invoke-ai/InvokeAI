@@ -11,7 +11,7 @@ from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
 from tempfile import TemporaryDirectory
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Type
 
 import huggingface_hub
 from fastapi import Body, Path, Query, Response, UploadFile
@@ -80,18 +80,49 @@ _CLAIMED_MODEL_KEYS: set[str] = set()
 @contextlib.contextmanager
 def _claim_model_key(key: str) -> Generator[None, None, None]:
     """Hold the exclusive claim on one model key, or raise 409 if another request holds it."""
-    with _MODEL_KEY_CLAIM_LOCK:
+    # The lock also guards the short install-and-register transition used by conversion. Do not
+    # block a worker thread behind that transition: reject the request and let the caller retry.
+    if not _MODEL_KEY_CLAIM_LOCK.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409,
+            detail="Another model operation is already in progress. Wait for it to finish and try again.",
+        )
+    try:
         if key in _CLAIMED_MODEL_KEYS:
             raise HTTPException(
                 status_code=409,
                 detail=f"Another operation on model {key} is already in progress. Wait for it to finish and try again.",
             )
         _CLAIMED_MODEL_KEYS.add(key)
+    finally:
+        _MODEL_KEY_CLAIM_LOCK.release()
     try:
         yield
     finally:
         with _MODEL_KEY_CLAIM_LOCK:
             _CLAIMED_MODEL_KEYS.discard(key)
+
+
+@contextlib.contextmanager
+def _install_and_claim_model(
+    installer: Any, model_path: pathlib.Path, config: ModelRecordChanges
+) -> Generator[str, None, None]:
+    """Install a model and claim its key before another request can observe it."""
+    # install_path computes and registers the key internally. Serialize that registration with
+    # request claims so a delete cannot observe the new record before its key is claimed.
+    with _MODEL_KEY_CLAIM_LOCK:
+        new_key = installer.install_path(model_path, config=config)
+        if new_key in _CLAIMED_MODEL_KEYS:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another operation on model {new_key} is already in progress. Wait for it to finish and try again.",
+            )
+        _CLAIMED_MODEL_KEYS.add(new_key)
+    try:
+        yield new_key
+    finally:
+        with _MODEL_KEY_CLAIM_LOCK:
+            _CLAIMED_MODEL_KEYS.discard(new_key)
 
 
 # The HF token is process-global state backed by a file in the HF cache. Concurrent writers would
@@ -339,6 +370,7 @@ def get_model_record(
         },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
 )
 def reidentify_model(
@@ -603,6 +635,7 @@ def get_model_image(
             "description": "The model image was updated successfully",
         },
         400: {"description": "Bad request"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=200,
 )
@@ -614,19 +647,19 @@ async def update_model_image(
     if not image.content_type or not image.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
-    contents = await image.read()
-    try:
-        pil_image = Image.open(io.BytesIO(contents))
-
-    except Exception:
-        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-        raise HTTPException(status_code=415, detail="Failed to read image")
-
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-    # A conversion moves this model's image to the replacement's key when it finishes, so an
-    # upload accepted in the meantime would be attached to the record about to be deleted.
+    # A conversion moves this model's image to the replacement's key when it finishes, so claim
+    # the key before reading the upload and hold it until the image is saved.
     with _claim_model_key(key):
+        contents = await image.read()
+        try:
+            pil_image = Image.open(io.BytesIO(contents))
+
+        except Exception:
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=415, detail="Failed to read image")
+
         try:
             model_images.save(pil_image, key)
             logger.info(f"Updated image for model: {key}")
@@ -642,6 +675,7 @@ async def update_model_image(
     responses={
         204: {"description": "Model deleted successfully"},
         404: {"description": "Model not found"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=204,
 )
@@ -792,6 +826,7 @@ def bulk_reidentify_models(
     responses={
         204: {"description": "Model image deleted successfully"},
         404: {"description": "Model image not found"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=204,
 )
@@ -1274,40 +1309,41 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
         changes = ModelRecordChanges(name=model_config.name)
         store.update_model(key, changes=changes)
 
-        # install the diffusers
-        try:
-            new_key = installer.install_path(
-                convert_path,
-                config=ModelRecordChanges(
-                    name=original_name,
-                    description=model_config.description,
-                    hash=model_config.hash,
-                    source=model_config.source,
-                ),
-            )
-        except Exception as e:
-            logger.error(str(e))
-            store.update_model(key, changes=ModelRecordChanges(name=original_name))
-            raise HTTPException(status_code=409, detail=str(e))
+        # Install and claim the diffusers before allowing another request to observe its key.
+        with contextlib.ExitStack() as conversion_stack:
+            try:
+                new_key = conversion_stack.enter_context(
+                    _install_and_claim_model(
+                        installer,
+                        convert_path,
+                        config=ModelRecordChanges(
+                            name=original_name,
+                            description=model_config.description,
+                            hash=model_config.hash,
+                            source=model_config.source,
+                        ),
+                    )
+                )
+            except Exception as e:
+                logger.error(str(e))
+                store.update_model(key, changes=ModelRecordChanges(name=original_name))
+                raise HTTPException(status_code=409, detail=str(e))
 
-    # Update the model image if the model had one
-    try:
-        model_image = ApiDependencies.invoker.services.model_images.get(key)
-        ApiDependencies.invoker.services.model_images.save(model_image, new_key)
-        ApiDependencies.invoker.services.model_images.delete(key)
-    except ModelImageFileNotFoundException:
-        pass
+            # Update the model image if the model had one.
+            try:
+                model_image = ApiDependencies.invoker.services.model_images.get(key)
+                ApiDependencies.invoker.services.model_images.save(model_image, new_key)
+                ApiDependencies.invoker.services.model_images.delete(key)
+            except ModelImageFileNotFoundException:
+                pass
 
-    # delete the original safetensors file
-    installer.delete(key)
+            # Delete the original safetensors file.
+            installer.delete(key)
 
-    # delete the temporary directory
-    # shutil.rmtree(cache_path)
-
-    # return the config record for the new diffusers directory
-    new_config = store.get_model(new_key)
-    new_config = prepare_model_config_for_response(new_config, ApiDependencies)
-    return new_config
+            # Return the config record for the new diffusers directory.
+            new_config = store.get_model(new_key)
+            new_config = prepare_model_config_for_response(new_config, ApiDependencies)
+            return new_config
 
 
 class StarterModelResponse(BaseModel):

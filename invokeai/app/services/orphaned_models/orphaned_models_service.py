@@ -141,21 +141,30 @@ class OrphanedModelsService:
         Returns:
             Dictionary mapping paths to status messages ("deleted" or error message)
         """
-        models_path = self._config.models_path
+        models_path = self._config.models_path.resolve()
+        conversion_scratch_path = (models_path / CONVERSION_SCRATCH_DIRNAME).resolve()
         results = {}
 
         for rel_path in orphaned_paths:
             try:
-                full_path = models_path / rel_path
-                if not full_path.exists():
-                    results[rel_path] = "error: path does not exist"
-                    continue
-
                 # Safety check: ensure path is under models directory
+                full_path = (models_path / rel_path).resolve()
                 try:
                     full_path.relative_to(models_path)
                 except ValueError:
                     results[rel_path] = "error: path is not under models directory"
+                    continue
+
+                try:
+                    full_path.relative_to(conversion_scratch_path)
+                except ValueError:
+                    pass
+                else:
+                    results[rel_path] = "error: path is reserved for active conversion"
+                    continue
+
+                if not full_path.exists():
+                    results[rel_path] = "error: path does not exist"
                     continue
 
                 # Delete the directory

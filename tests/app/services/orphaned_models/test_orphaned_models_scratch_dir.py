@@ -65,3 +65,12 @@ def test_a_real_orphan_is_still_reported(models_path: Path, db: SqliteDatabase) 
     orphans = _service(models_path, db).find_orphaned_models()
 
     assert [orphan.path for orphan in orphans] == ["some-unregistered-model"]
+
+
+def test_conversion_scratch_directory_cannot_be_deleted(models_path: Path, db: SqliteDatabase) -> None:
+    _write_model_file(models_path / CONVERSION_SCRATCH_DIRNAME / "active-conversion" / "sd-v1-5")
+
+    result = _service(models_path, db).delete_orphaned_models([CONVERSION_SCRATCH_DIRNAME])
+
+    assert result[CONVERSION_SCRATCH_DIRNAME].startswith("error:")
+    assert (models_path / CONVERSION_SCRATCH_DIRNAME).exists()

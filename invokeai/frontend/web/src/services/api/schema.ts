@@ -42636,6 +42636,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Another operation on this model is already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -42774,6 +42781,13 @@ export interface operations {
             };
             /** @description The model could not be found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -42940,6 +42954,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Another operation on this model is already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -42978,6 +42999,13 @@ export interface operations {
             };
             /** @description Bad request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
