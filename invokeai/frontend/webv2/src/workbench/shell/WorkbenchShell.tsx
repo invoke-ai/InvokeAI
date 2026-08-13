@@ -20,7 +20,6 @@ import {
   getRegionDropState,
   isWidgetDndData,
   isWidgetInstanceDragData,
-  measureDroppableVisibleRect,
   resolveWidgetDragEnd,
   type ActiveWidgetDrag,
   widgetCollisionDetection,
@@ -55,15 +54,10 @@ const DND_MODIFIERS = [restrictToWindowEdges];
  * image is actually held to scroll the list. Speed is halved because at
  * dnd-kit's default a list this small dumps its full range in under half a
  * second, far too fast to pick a row. Phantom off-screen targets triggering
- * scrolls from afar are prevented by DND_MEASURING, not by shrinking zones.
+ * scrolls from afar are prevented by the visibility check inside
+ * widgetCollisionDetection, not by shrinking zones.
  */
 const DND_AUTO_SCROLL = { acceleration: 5 };
-
-/**
- * Droppables are measured clipped to their scroll containers so targets
- * scrolled out of view cannot catch drags (see measureDroppableVisibleRect).
- */
-const DND_MEASURING = { droppable: { measure: measureDroppableVisibleRect } };
 
 export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
@@ -233,7 +227,6 @@ export const WorkbenchShell = () => {
       <DndContext
         autoScroll={DND_AUTO_SCROLL}
         collisionDetection={widgetCollisionDetection}
-        measuring={DND_MEASURING}
         modifiers={DND_MODIFIERS}
         sensors={sensors}
         onDragCancel={handleDragCancel}

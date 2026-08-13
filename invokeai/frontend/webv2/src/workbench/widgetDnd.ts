@@ -1,21 +1,28 @@
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { WidgetIconComponent, WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-import { closestCenter, getClientRect, pointerWithin, type CollisionDetection, type ClientRect } from '@dnd-kit/core';
+import {
+  closestCenter,
+  getClientRect,
+  pointerWithin,
+  type Collision,
+  type CollisionDetection,
+  type ClientRect,
+} from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 
 const clipsOverflow = (value: string): boolean => value !== 'visible';
 
 /**
- * Measures a droppable clipped by its overflow ancestors.
+ * Measures a droppable's rect clipped by its overflow ancestors — the part
+ * of it a user can actually see. A fully hidden droppable collapses to a
+ * zero-size rect no pointer can be within.
  *
- * dnd-kit's default measure is the raw client rect, which for a droppable
- * scrolled out of a scroll container extends invisibly across whatever is
- * rendered below — a gallery board row below the fold overlays the entire
- * image grid. `pointerWithin` then reports drags as "over" that hidden row,
- * and the auto-scroller races its scroll container to the bottom. Clipping
- * the rect to what is actually visible removes the phantom targets: a fully
- * clipped droppable collapses to a zero-size rect no pointer can be within.
+ * This must NOT be used as `measuring.droppable.measure`: dnd-kit measures
+ * droppables once at drag start and only shifts the cached rect by ancestor
+ * scroll deltas (width/height stay frozen), so a row hidden at drag start
+ * would keep a zero-size rect even after auto-scroll reveals it. It is
+ * evaluated live at collision time instead (see widgetCollisionDetection).
  */
 export const measureDroppableVisibleRect = (element: HTMLElement): ClientRect => {
   const rect = { ...getClientRect(element) };
@@ -256,6 +263,40 @@ export const resolveWidgetDragEnd = (
   };
 };
 
+/**
+ * Drops pointer collisions with droppables the pointer is not visibly over.
+ *
+ * The rects `pointerWithin` tested against are cached at drag start and never
+ * re-clipped, so a droppable scrolled out of its container extends invisibly
+ * across whatever is rendered below — a gallery board row below the fold
+ * overlays the entire image grid, catching drags and racing the auto-scroller.
+ * Re-checking the pointer against the live visible rect removes those phantom
+ * hits while still letting a row that auto-scroll reveals mid-drag be hit the
+ * moment it appears.
+ */
+const dropOccludedPointerCollisions = (
+  collisions: Collision[],
+  args: Parameters<CollisionDetection>[0]
+): Collision[] => {
+  const pointer = args.pointerCoordinates;
+
+  if (!pointer) {
+    return collisions;
+  }
+
+  return collisions.filter((collision) => {
+    const node = args.droppableContainers.find((container) => container.id === collision.id)?.node.current;
+
+    if (!node) {
+      return true;
+    }
+
+    const rect = measureDroppableVisibleRect(node);
+
+    return pointer.x >= rect.left && pointer.x <= rect.right && pointer.y >= rect.top && pointer.y <= rect.bottom;
+  });
+};
+
 export const widgetCollisionDetection: CollisionDetection = (args) => {
   const activeData = args.active.data.current;
   const collisionArgs = isWidgetInstanceDragData(activeData)
@@ -264,7 +305,7 @@ export const widgetCollisionDetection: CollisionDetection = (args) => {
         ...args,
         droppableContainers: args.droppableContainers.filter((container) => !isWidgetDndData(container.data.current)),
       };
-  const pointerCollisions = pointerWithin(collisionArgs);
+  const pointerCollisions = dropOccludedPointerCollisions(pointerWithin(collisionArgs), args);
 
   if (pointerCollisions.length > 0) {
     const widgetItemCollisions = pointerCollisions.filter((collision) => {
