@@ -579,3 +579,73 @@ describe('buildFLUXGraph (FLUX.2 [dev])', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// FLUX.1: a complete SDNQ pipeline supplies its own T5 / CLIP / VAE
+//
+// The backend model loader falls back to the main model for any omitted component, but the graph
+// builder used to assert all three were selected, so that path was unreachable from the UI.
+// ---------------------------------------------------------------------------
+
+const flux1SdnqPipelineModel = {
+  key: 'flux1-sdnq-pipeline',
+  hash: 'flux1-sdnq-hash',
+  name: 'FLUX.1 dev SDNQ',
+  base: 'flux',
+  type: 'main',
+  format: 'sdnq_quantized',
+  variant: 'dev',
+  submodels: {
+    transformer: {},
+    vae: {},
+    text_encoder: {},
+    tokenizer: {},
+    text_encoder_2: {},
+    tokenizer_2: {},
+  },
+};
+
+const flux1SingleFileModel = {
+  key: 'flux1-gguf',
+  hash: 'flux1-gguf-hash',
+  name: 'FLUX.1 dev GGUF',
+  base: 'flux',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 'dev',
+};
+
+const getFluxModelLoaderNode = async () => {
+  const { g } = await buildFLUXGraph(buildGraphArg());
+  const graph = g.getGraph();
+  const entry = Object.entries(graph.nodes).find(([id]) => id.startsWith('flux_model_loader:'));
+  return entry?.[1] as Record<string, unknown> | undefined;
+};
+
+describe('buildFLUXGraph – self-contained FLUX.1 SDNQ pipeline', () => {
+  it('omits the standalone component inputs when the pipeline ships them', async () => {
+    currentModel = { ...flux1SdnqPipelineModel };
+
+    const loader = await getFluxModelLoaderNode();
+
+    expect(loader).toBeDefined();
+    expect(loader!.t5_encoder_model).toBeUndefined();
+    expect(loader!.clip_embed_model).toBeUndefined();
+    expect(loader!.vae_model).toBeUndefined();
+    // The main model is still wired in — the node resolves the parts from it.
+    expect(loader!.model).toBeDefined();
+  });
+
+  it('still requires the standalone components for a single-file FLUX.1 model', async () => {
+    currentModel = { ...flux1SingleFileModel };
+
+    await expect(buildFLUXGraph(buildGraphArg())).rejects.toThrow(/T5 Encoder/);
+  });
+
+  it('still requires them when the pipeline is missing its T5 pair', async () => {
+    const { text_encoder_2: _te2, tokenizer_2: _tok2, ...withoutT5 } = flux1SdnqPipelineModel.submodels;
+    currentModel = { ...flux1SdnqPipelineModel, submodels: withoutT5 };
+
+    await expect(buildFLUXGraph(buildGraphArg())).rejects.toThrow(/T5 Encoder/);
+  });
+});
