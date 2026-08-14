@@ -144,14 +144,21 @@ class TextLLMPipeline:
         progress_callback: ProgressCallback | None = None,
     ) -> str:
         # Build messages for chat template if supported, otherwise use raw prompt.
-        if hasattr(self._tokenizer, "apply_chat_template") and self._tokenizer.chat_template is not None:
+        used_chat_template = (
+            hasattr(self._tokenizer, "apply_chat_template") and self._tokenizer.chat_template is not None
+        )
+        if used_chat_template:
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
             try:
+                # enable_thinking=False makes reasoning models (Qwen3, DeepSeek-R1 distills and
+                # other templates that honour the flag) emit an empty thinking block instead of a
+                # chain of thought, so prompt expansion returns the prompt rather than the model's
+                # reasoning. Templates that do not know the flag ignore it.
                 formatted_prompt: str = self._tokenizer.apply_chat_template(
-                    messages, tokenize=False, add_generation_prompt=True
+                    messages, tokenize=False, add_generation_prompt=True, enable_thinking=False
                 )
             except Exception as e:  # noqa: BLE001 - jinja2 TemplateError is not importable here
                 # Some chat templates (notably Gemma) reject a dedicated "system" role. Fold the
@@ -159,7 +166,7 @@ class TextLLMPipeline:
                 if system_prompt and "system role" in str(e).lower():
                     merged = [{"role": "user", "content": f"{system_prompt}\n\n{prompt}"}]
                     formatted_prompt = self._tokenizer.apply_chat_template(
-                        merged, tokenize=False, add_generation_prompt=True
+                        merged, tokenize=False, add_generation_prompt=True, enable_thinking=False
                     )
                 else:
                     raise
@@ -169,7 +176,12 @@ class TextLLMPipeline:
             else:
                 formatted_prompt = prompt
 
-        inputs = self._tokenizer(formatted_prompt, return_tensors="pt").to(device=device)
+        # A rendered chat template already carries the model's control tokens, so adding special
+        # tokens again duplicates BOS for the families that use one (Gemma, Llama). The raw
+        # fallback prompt above has no control tokens and still needs them.
+        inputs = self._tokenizer(formatted_prompt, return_tensors="pt", add_special_tokens=not used_chat_template).to(
+            device=device
+        )
 
         streamer = TextIteratorStreamer(
             self._tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=STREAM_TIMEOUT
