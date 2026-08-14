@@ -48,8 +48,25 @@ const flux2GGUF9BModel = {
   variant: 'klein_9b',
 } as unknown as MainModelConfig;
 
-const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
+const flux2VaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
+
+const flux2SdnqPipelineModel = {
+  key: 'flux2-sdnq',
+  hash: 'h',
+  name: 'FLUX.2 Klein 4B SDNQ',
+  base: 'flux2',
+  type: 'main',
+  format: 'sdnq_quantized',
+  variant: 'klein_4b',
+  submodels: { transformer: {}, vae: {}, text_encoder: {}, tokenizer: {} },
+} as unknown as MainModelConfig;
+
+const flux2SdnqPartialModel = {
+  ...flux2SdnqPipelineModel,
+  key: 'flux2-sdnq-partial',
+  submodels: { transformer: {} },
+} as unknown as MainModelConfig;
 
 const baseDynamicPrompts: DynamicPromptsState = {
   _version: 1,
@@ -69,7 +86,7 @@ const baseRefImages: RefImagesState = {
 
 const baseParams = {
   positivePrompt: 'test',
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
 } as unknown as ParamsState;
 
@@ -77,16 +94,17 @@ const baseParams = {
 
 const buildGenerateTabArg = (overrides: {
   model?: MainModelConfig | null;
-  kleinVaeModel?: unknown;
+  flux2VaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
+  hasFlux2DevDiffusersSource?: boolean;
 }) => ({
   isConnected: true,
   model: overrides.model ?? flux2DiffusersModel,
   params: {
     ...baseParams,
-    kleinVaeModel: overrides.kleinVaeModel ?? null,
+    flux2VaeModel: overrides.flux2VaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -94,14 +112,16 @@ const buildGenerateTabArg = (overrides: {
   dynamicPrompts: baseDynamicPrompts,
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
+  hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
 });
 
 const buildCanvasTabArg = (overrides: {
   model?: MainModelConfig | null;
-  kleinVaeModel?: unknown;
+  flux2VaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
+  hasFlux2DevDiffusersSource?: boolean;
 }) => ({
   isConnected: true,
   model: overrides.model ?? flux2DiffusersModel,
@@ -118,7 +138,7 @@ const buildCanvasTabArg = (overrides: {
   },
   params: {
     ...baseParams,
-    kleinVaeModel: overrides.kleinVaeModel ?? null,
+    flux2VaeModel: overrides.flux2VaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -131,6 +151,7 @@ const buildCanvasTabArg = (overrides: {
   canvasIsSelectingObject: false,
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
+  hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
 });
 
 const hasFlux2VaeReason = (reasons: { content: string }[]) =>
@@ -168,7 +189,7 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
 
   it('errors only for Qwen3 when GGUF model with standalone VAE but no Qwen3 and no diffusers source', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildGenerateTabArg({ model: flux2GGUF4BModel, kleinVaeModel: kleinVaeModel })
+      buildGenerateTabArg({ model: flux2GGUF4BModel, flux2VaeModel: flux2VaeModel })
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
@@ -186,7 +207,7 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
       buildGenerateTabArg({
         model: flux2GGUF4BModel,
-        kleinVaeModel: kleinVaeModel,
+        flux2VaeModel: flux2VaeModel,
         kleinQwen3EncoderModel: kleinQwen3Model,
       })
     );
@@ -221,6 +242,129 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
   });
 });
 
+describe('FLUX.2 Klein SDNQ pipeline readiness checks', () => {
+  it('generate: no errors for a full SDNQ pipeline (self-contained) with no component sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux2SdnqPipelineModel }));
+    expect(hasFlux2VaeReason(reasons)).toBe(false);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+
+  it('generate: errors for a partial SDNQ pipeline (only transformer submodel) with no sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux2SdnqPartialModel }));
+    expect(hasFlux2VaeReason(reasons)).toBe(true);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
+  });
+
+  it('canvas: no errors for a full SDNQ pipeline (self-contained) with no component sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildCanvasTabArg({ model: flux2SdnqPipelineModel }) as never);
+    expect(hasFlux2VaeReason(reasons)).toBe(false);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+
+  it('canvas: errors for a partial SDNQ pipeline (only transformer submodel) with no sources', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildCanvasTabArg({ model: flux2SdnqPartialModel }) as never);
+    expect(hasFlux2VaeReason(reasons)).toBe(true);
+    expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
+  });
+});
+
+const zImageSdnqPipelineModel = {
+  key: 'z-image-sdnq',
+  hash: 'h',
+  name: 'Z-Image Turbo SDNQ',
+  base: 'z-image',
+  type: 'main',
+  format: 'sdnq_quantized',
+  submodels: { transformer: {}, vae: {}, text_encoder: {}, tokenizer: {} },
+} as unknown as MainModelConfig;
+
+const zImageGgufModel = {
+  key: 'z-image-gguf',
+  hash: 'h',
+  name: 'Z-Image Turbo GGUF',
+  base: 'z-image',
+  type: 'main',
+  format: 'gguf_quantized',
+} as unknown as MainModelConfig;
+
+const buildZImageTabArg = (overrides: {
+  model?: MainModelConfig | null;
+  zImageVaeModel?: unknown;
+  zImageQwen3EncoderModel?: unknown;
+  zImageQwen3SourceModel?: unknown;
+}) => ({
+  isConnected: true,
+  model: overrides.model ?? zImageGgufModel,
+  params: {
+    ...baseParams,
+    zImageVaeModel: overrides.zImageVaeModel ?? null,
+    zImageQwen3EncoderModel: overrides.zImageQwen3EncoderModel ?? null,
+    zImageQwen3SourceModel: overrides.zImageQwen3SourceModel ?? null,
+  } as unknown as ParamsState,
+  refImages: baseRefImages,
+  loras: [],
+  dynamicPrompts: baseDynamicPrompts,
+  hasFlux2DiffusersVaeSource: false,
+  hasFlux2DiffusersQwen3Source: false,
+  hasFlux2DevDiffusersSource: false,
+});
+
+const hasZImageVaeReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('noZImageVaeSourceSelected'));
+
+const hasZImageQwen3Reason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('noZImageQwen3EncoderSourceSelected'));
+
+describe('Z-Image readiness checks – generate tab', () => {
+  it('no errors when main model is a self-contained SDNQ pipeline (no component source selected)', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildZImageTabArg({ model: zImageSdnqPipelineModel }));
+    expect(hasZImageVaeReason(reasons)).toBe(false);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('errors for both VAE and Qwen3 when GGUF model with no component source selected', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildZImageTabArg({ model: zImageGgufModel }));
+    expect(hasZImageVaeReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(true);
+  });
+
+  it('no errors when GGUF model has a Qwen3 Source (supplies both VAE and encoder)', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({ model: zImageGgufModel, zImageQwen3SourceModel: { key: 'src' } })
+    );
+    expect(hasZImageVaeReason(reasons)).toBe(false);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('errors only for VAE when GGUF model has a standalone Qwen3 encoder but no VAE source', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({ model: zImageGgufModel, zImageQwen3EncoderModel: { key: 'enc' } })
+    );
+    expect(hasZImageVaeReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('does not treat a non-pipeline SDNQ model (no submodels) as self-contained', () => {
+    const zImageSdnqSingleFile = {
+      ...zImageSdnqPipelineModel,
+      submodels: undefined,
+    } as unknown as MainModelConfig;
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildZImageTabArg({ model: zImageSdnqSingleFile }));
+    expect(hasZImageVaeReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(true);
+  });
+
+  it('does not treat a partial SDNQ pipeline (missing vae/text_encoder/tokenizer) as self-contained', () => {
+    const zImageSdnqPartial = {
+      ...zImageSdnqPipelineModel,
+      submodels: { transformer: {} },
+    } as unknown as MainModelConfig;
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildZImageTabArg({ model: zImageSdnqPartial }));
+    expect(hasZImageVaeReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(true);
+  });
+});
+
 describe('FLUX.2 Klein readiness checks – canvas tab', () => {
   it('no errors when main model is diffusers', () => {
     const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildCanvasTabArg({ model: flux2DiffusersModel }) as never);
@@ -250,7 +394,7 @@ describe('FLUX.2 Klein readiness checks – canvas tab', () => {
     const reasons = getReasonsWhyCannotEnqueueCanvasTab(
       buildCanvasTabArg({
         model: flux2GGUF4BModel,
-        kleinVaeModel: kleinVaeModel,
+        flux2VaeModel: flux2VaeModel,
         kleinQwen3EncoderModel: kleinQwen3Model,
       }) as never
     );
@@ -337,6 +481,7 @@ const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
   canvasIsSelectingObject: false,
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
+  hasFlux2DevDiffusersSource: false,
 });
 
 const hasBboxGridReason = (reasons: { content: string }[]) =>
@@ -475,5 +620,72 @@ describe('Ideogram 4 readiness checks - canvas tab', () => {
       }) as never
     );
     expect(hasReasonWith(reasons, 'rgReferenceImagesNotSupported')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FLUX.1: a complete SDNQ pipeline supplies its own T5 / CLIP / VAE
+// ---------------------------------------------------------------------------
+
+// `submodels` is not on MainModelConfig (the generated schema doesn't carry the SDNQ variants), so
+// keep the map as its own const rather than reading it back through the cast.
+const flux1PipelineSubmodels = {
+  transformer: {},
+  vae: {},
+  text_encoder: {},
+  tokenizer: {},
+  text_encoder_2: {},
+  tokenizer_2: {},
+};
+
+const flux1SdnqPipelineModel = {
+  key: 'flux1-sdnq-pipeline',
+  hash: 'flux1-sdnq-hash',
+  name: 'FLUX.1 dev SDNQ',
+  base: 'flux',
+  type: 'main',
+  format: 'sdnq_quantized',
+  variant: 'dev',
+  submodels: flux1PipelineSubmodels,
+} as unknown as MainModelConfig;
+
+const flux1SingleFileModel = {
+  key: 'flux1-gguf',
+  hash: 'flux1-gguf-hash',
+  name: 'FLUX.1 dev GGUF',
+  base: 'flux',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 'dev',
+} as unknown as MainModelConfig;
+
+const flux1ComponentReasons = (reasons: { content: string }[]) =>
+  reasons.filter(
+    (r) =>
+      r.content.includes('noT5EncoderModelSelected') ||
+      r.content.includes('noCLIPEmbedModelSelected') ||
+      r.content.includes('noFLUXVAEModelSelected')
+  );
+
+describe('FLUX.1 readiness – self-contained SDNQ pipeline', () => {
+  it('does not demand standalone T5 / CLIP / VAE when the pipeline ships them', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux1SdnqPipelineModel }));
+
+    expect(flux1ComponentReasons(reasons)).toEqual([]);
+  });
+
+  it('still demands all three for a single-file FLUX.1 model', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: flux1SingleFileModel }));
+
+    expect(flux1ComponentReasons(reasons)).toHaveLength(3);
+  });
+
+  it('still demands them when the pipeline is missing its T5 pair', () => {
+    const { text_encoder_2: _te2, tokenizer_2: _tok2, ...withoutT5 } = flux1PipelineSubmodels;
+    const partial = { ...flux1SdnqPipelineModel, submodels: withoutT5 } as unknown as MainModelConfig;
+
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildGenerateTabArg({ model: partial }));
+
+    expect(flux1ComponentReasons(reasons)).toHaveLength(3);
   });
 });

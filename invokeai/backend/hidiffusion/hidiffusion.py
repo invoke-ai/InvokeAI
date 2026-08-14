@@ -141,6 +141,13 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
         # Save for unpatching later
         _parent = block_class
 
+        # NOTE: `__call__` below builds its control images with `dtype=controlnet.dtype`. That is
+        # unsafe for a ControlNet loaded with fp8_storage: `.dtype` then reports the float8 *storage*
+        # dtype, which has no arithmetic kernels (see `invokeai.backend.util.fp8`). It is inert today
+        # — InvokeAI imports only `apply_hidiffusion` / `remove_hidiffusion` from this vendored file
+        # and never runs this pipeline — but if it is ever wired up, those reads must go through
+        # `get_model_compute_dtype()`.
+
         @torch.no_grad()
         def __call__(
             self,
