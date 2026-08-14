@@ -1924,52 +1924,130 @@ def _find_wan_2_1_marker(state_dict: dict[str | int, Any]) -> str | None:
     if shape is not None and len(shape) >= 1 and shape[0] == 1536:
         return "state dict has a 1536-dim transformer, which is the Wan 2.1 T2V-1.3B architecture"
 
-    if any(isinstance(key, str) and "vace_blocks." in key for key in keys):
-        # Not strictly a 2.1 marker — Wan 2.2 VACE variants exist — but the effect is
-        # the same: this loader builds a plain WanTransformer3DModel, which has no
-        # VACE control branch, so the vace_blocks would be dropped as unexpected keys
-        # and the model would quietly ignore its control input. Refuse instead.
+    return None
+
+
+def _find_unsupported_wan_variant_marker(state_dict: dict[str | int, Any]) -> str | None:
+    """Return a reason if this is a Wan variant the plain transformer can't represent.
+
+    These are Wan 2.2-era models built on extra conditioning branches that
+    ``WanTransformer3DModel`` simply doesn't have. Loading them would not error:
+    ``load_state_dict(strict=False)`` drops the extra modules as unexpected keys and
+    produces a model that silently ignores the conditioning it was built around
+    (real ``wan2.2_animate_14B_bf16.safetensors``: 127 of its 1441 keys are
+    ``face_adapter``/``motion_encoder``). Refusing is the honest outcome.
+
+    Checked before the Wan 2.1 markers because Animate also carries ``img_emb``, so
+    it would otherwise be reported as a Wan 2.1 I2V model.
+    """
+    keys = [key for key in state_dict.keys() if isinstance(key, str)]
+
+    if any("face_adapter." in key or "motion_encoder." in key for key in keys):
+        return (
+            "state dict has face-adapter / motion-encoder branches, which belong to Wan Animate; "
+            "character animation and replacement are not supported yet"
+        )
+
+    if any("vace_blocks." in key for key in keys):
         return "state dict has VACE control blocks, and VACE models are not supported yet"
 
     return None
 
 
+# Tokens that turn an adjacent bare ``high``/``low`` into an adjective about
+# something other than the noise level, so it must not be read as an MoE expert.
+#
+# Deliberately short. Real releases sit expert markers next to plenty of unrelated
+# words — ``..._LOW_lightning_edition``, ``..._high_lighting_fp16`` — so anything
+# broader here starts costing true positives, which is the more damaging error for
+# a checkpoint whose expert can only be recovered from its name.
+_WAN_EXPERT_DISQUALIFIERS = frozenset(
+    {
+        "cfg",
+        "guidance",
+        "vram",
+        "ram",
+        "mem",
+        "memory",
+        "step",
+        "steps",
+        "res",
+        "resolution",
+        "quality",
+        "speed",
+        "fps",
+        "bit",
+        "bits",
+    }
+)
+
+
 def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
     """Filename heuristic for the A14B dual-expert MoE.
 
-    Community releases tag each expert in the filename as some spelling of
-    ``high_noise`` / ``low_noise``: hyphenated, underscored, spaced, concatenated
-    (``highnoise``), camel-cased (``HighNoise``), or occasionally reversed
-    (``noise_high``). The name is split at camelCase boundaries and then on runs of
-    non-alphanumerics, and a match requires ``high``/``low`` to sit *next to* a
-    ``noise`` token — or to be fused with it into one token.
+    Two conventions dominate, and both have to work — the expert is not recoverable
+    from the weights, and single-file releases carry no metadata declaring it
+    (sampled across the Kijai catalogue: no ``__metadata__`` at all):
 
-    The "noise" requirement is deliberate. A bare ``high``/``low`` token is far too
-    common in other roles — ``lowVRAM``, ``low-cfg``, ``lowSteps``, ``highRes``,
-    ``HighQuality`` — and guessing wrong is worse than not guessing. An unlabelled
-    A14B model ('none') raises a clear error in the Wan model loader telling the
-    user to pair or rename it; a *mislabelled* one passes the pair check, gets
-    silently swapped into the wrong slot, and quietly degrades the output.
+    * ``high_noise`` / ``low_noise`` and its spellings — hyphenated, underscored,
+      spaced, fused (``highnoise``), camel-cased (``HighNoise``), reversed
+      (``noise_high``). This is what Comfy-Org's repackaged repos use.
+    * A **bare** ``HIGH`` / ``LOW`` token, e.g.
+      ``Wan2_2-T2V-A14B-HIGH_fp8_e4m3fn_scaled_KJ.safetensors``. This is what the
+      widely-mirrored Kijai fp8 catalogue and many CivitAI fine-tunes use, so
+      refusing to read it would leave most single-file A14B models unpairable.
 
-    Token matching also stops the marker firing on a substring, so ``slow_noise``
-    and ``flownoise`` are correctly left alone.
+    An explicit ``noise`` marker always wins over a bare token found earlier in the
+    name, which settles names carrying both (``..._low_high_noise_...``).
 
-    Returns 'none' when no marker is present (single-expert model such as TI2V-5B,
-    or an untagged filename).
+    A bare token is ignored when a neighbour marks it as an adjective about
+    something else (``lowVRAM``, ``low-cfg``, ``highRes``) — see
+    ``_WAN_EXPERT_DISQUALIFIERS``. TI2V-5B is handled structurally by the callers,
+    which force 'none' because the model is single-transformer, so the common
+    ``...5B-lowVRAM`` style of name can't reach this at all.
+
+    Matching is per token, so a marker can't fire on a substring: ``slow_noise``,
+    ``flownoise`` and ``highway`` are all left alone.
+
+    Returns 'none' for an untagged filename.
     """
     name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", filename).lower()
     tokens = [token for token in re.split(r"[^a-z0-9]+", name) if token]
 
-    for marker, expert in (("high", "high"), ("low", "low")):
-        if f"{marker}noise" in tokens or f"noise{marker}" in tokens:
-            return expert  # type: ignore[return-value]
-        for index, token in enumerate(tokens):
+    bare: Literal["high", "low", "none"] = "none"
+    for index, token in enumerate(tokens):
+        for marker in ("high", "low"):
+            if token in (f"{marker}noise", f"noise{marker}"):
+                return marker  # type: ignore[return-value]
             if token != marker:
                 continue
             neighbours = tokens[max(index - 1, 0) : index] + tokens[index + 1 : index + 2]
             if "noise" in neighbours:
-                return expert  # type: ignore[return-value]
-    return "none"
+                return marker  # type: ignore[return-value]
+            # Bare token: remember it, but keep scanning — an explicit "...noise"
+            # marker later in the name is the better answer.
+            if bare == "none" and not _WAN_EXPERT_DISQUALIFIERS.intersection(neighbours):
+                bare = marker  # type: ignore[assignment]
+    return bare
+
+
+def _resolve_wan_expert(
+    mod: ModelOnDisk, override_fields: dict[str, Any], variant: WanVariantType
+) -> Literal["high", "low", "none"]:
+    """Settle the MoE expert field, consuming any explicit override.
+
+    TI2V-5B is a single-transformer model, so the expert is meaningless there and is
+    pinned to 'none'. That is not cosmetic: the frontend's low-noise expert picker
+    selects on ``expert == 'low'``, so a TI2V-5B file whose name happens to contain a
+    bare ``low`` (``...-5B-lowVRAM``, ``...-Turbo-lowSteps``) would otherwise be
+    offered as an A14B partner expert it can never be.
+    """
+    explicit_expert = override_fields.pop("expert", None)
+    if explicit_expert is not None:
+        return explicit_expert  # type: ignore[no-any-return]
+    if variant == WanVariantType.TI2V_5B:
+        return "none"
+    return _detect_wan_expert(mod.path.stem)
 
 
 class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -2000,6 +2078,14 @@ class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base
             raise NotAMatchError("state dict does not look like GGUF quantized")
         if not _has_wan_keys(sd):
             raise NotAMatchError("state dict does not look like a Wan transformer")
+        if not _has_wan_transformer_block_weights(sd):
+            raise NotAMatchError(
+                "state dict has no undecorated transformer block weights — it looks like a Wan LoRA "
+                "or adapter rather than a full transformer"
+            )
+        unsupported_reason = _find_unsupported_wan_variant_marker(sd)
+        if unsupported_reason is not None:
+            raise NotAMatchError(unsupported_reason)
         gguf_name = mod.metadata().get("general.name", "")
         normalized_identity = "".join(
             character for character in f"{mod.path.stem} {gguf_name}".lower() if character.isalnum()
@@ -2019,8 +2105,7 @@ class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base
         if variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and "wan22" not in normalized_identity:
             raise NotAMatchError("Wan A14B GGUF filename or metadata must identify the model as Wan 2.2")
 
-        explicit_expert = override_fields.pop("expert", None)
-        expert = explicit_expert or _detect_wan_expert(mod.path.stem)
+        expert = _resolve_wan_expert(mod, override_fields, variant)
 
         return cls(**override_fields, variant=variant, expert=expert)
 
@@ -2072,6 +2157,12 @@ class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
                 "or adapter rather than a full transformer"
             )
 
+        # Checked before the Wan 2.1 markers: Animate carries img_emb too, so the
+        # order is what makes the rejection reason accurate.
+        unsupported_reason = _find_unsupported_wan_variant_marker(sd)
+        if unsupported_reason is not None:
+            raise NotAMatchError(unsupported_reason)
+
         # Wan 2.1 shares Wan 2.2's key layout, so reject it on architecture rather
         # than on the filename. Unlike the GGUF probe we deliberately do *not*
         # require the name to say "wan2.2": community fine-tunes routinely drop the
@@ -2092,8 +2183,7 @@ class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         if variant is None:
             raise NotAMatchError("could not determine Wan variant from state dict")
 
-        explicit_expert = override_fields.pop("expert", None)
-        expert = explicit_expert or _detect_wan_expert(mod.path.stem)
+        expert = _resolve_wan_expert(mod, override_fields, variant)
 
         return cls(**override_fields, variant=variant, expert=expert)
 

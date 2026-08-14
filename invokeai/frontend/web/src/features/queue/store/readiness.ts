@@ -50,6 +50,7 @@ import {
   isExternalApiModelConfig,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
+  isWanSingleFileMainModelConfig,
 } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
@@ -401,8 +402,9 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
-    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
+  if (model && isWanSingleFileMainModelConfig(model)) {
+    // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the
+    // transformer; VAE + UMT5-XXL encoder must
     // come from either standalone models or the Component Source (Diffusers).
     // The low-noise A14B partner expert is optional — if omitted, the loader
     // will use the high-noise expert for the whole schedule (lower quality
@@ -1156,8 +1158,9 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
-    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
+  if (model && isWanSingleFileMainModelConfig(model)) {
+    // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the
+    // transformer; VAE + UMT5-XXL encoder must
     // come from either standalone models or the Component Source (Diffusers).
     // The low-noise A14B partner expert is optional — if omitted, the loader
     // will use the high-noise expert for the whole schedule (lower quality

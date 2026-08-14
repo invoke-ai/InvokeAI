@@ -165,6 +165,23 @@ class TestRejects:
         with pytest.raises(NotAMatchError, match="Wan 2.1"):
             _probe(tmp_path, "renamed-t2v-model.safetensors", _native_sd(16, dim=1536))
 
+    def test_animate(self, tmp_path: Path) -> None:
+        """Wan Animate is 36-channel with undecorated block weights and no VACE
+        blocks, so nothing else turns it away. Its face-adapter and motion-encoder
+        branches have no counterpart in WanTransformer3DModel — real
+        wan2.2_animate_14B_bf16.safetensors carries 127 such keys out of 1441 — and
+        strict=False would drop every one of them silently.
+
+        It also carries img_emb, so this must be reported as Animate rather than as
+        a Wan 2.1 I2V model.
+        """
+        sd = _native_sd(36)
+        sd["face_adapter.fuser_blocks.0.k_norm.weight"] = _t(A14B_DIM)
+        sd["motion_encoder.dec.direction.weight"] = _t(512, 512)
+        sd["img_emb.proj.0.bias"] = _t(1280)
+        with pytest.raises(NotAMatchError, match="Animate"):
+            _probe(tmp_path, "wan2.2_animate_14B_bf16.safetensors", sd)
+
     def test_vace(self, tmp_path: Path) -> None:
         """VACE exists for both Wan 2.1 and 2.2; either way this loader has no
         control branch, so it must refuse rather than silently ignore the input."""
@@ -298,47 +315,70 @@ class TestEndToEndIdentification:
 
 
 class TestExpertFilenameHeuristic:
-    """A wrong expert label is worse than no label.
+    """The A14B expert is not recoverable from the weights and single-file releases
+    carry no metadata declaring it, so the filename is the only signal there is.
 
-    'none' on an A14B model produces a clear error from the Wan model loader. A
-    *mislabelled* one satisfies the {high, low} pair check, gets swapped into the
-    wrong slot, and silently runs the same expert for both denoise phases. So the
-    heuristic only fires when 'noise' is actually part of the marker.
+    Two conventions are both common in the wild and both have to work: an explicit
+    ``high_noise``/``low_noise``, and a bare ``HIGH``/``LOW`` token (the whole Kijai
+    fp8 catalogue). Scored against 108 real filenames pulled from the Kijai,
+    Comfy-Org and QuantStack repos, this table's rules give 0 missed and 0
+    mislabelled.
     """
 
     @pytest.mark.parametrize(
         "name, expected",
         [
-            # Pre-existing spellings must keep working.
+            # --- explicit noise markers, all spellings ---
             ("wan2.2-t2v-a14b-high_noise-Q4_K_M", "high"),
             ("Wan2.2-T2V-A14B-High-Noise-Q4_K_M", "high"),
             ("wan_a14b_highnoise_q4", "high"),
             ("wan2.2-t2v-a14b-low_noise-Q4_K_M", "low"),
             ("Wan2.2-A14B-LowNoise-Q4", "low"),
-            ("wan2.2-ti2v-5b-Q4_K_M", "none"),
-            ("wan-A14B-flagship", "none"),
-            # Separators the old substring check missed, plus reversed order.
             ("Wan2.2 A14B high noise", "high"),
             ("wan22.low.noise.v3", "low"),
             ("wan22_noise_high_expert", "high"),
-            # A bare high/low token is NOT a marker — it almost always describes
-            # something else (VRAM, CFG, step count, resolution, quality).
+            ("low_noise14B", "low"),
+            # --- bare HIGH/LOW: real releases that MUST be detected (#9463 follow-up).
+            # Regressing these leaves most single-file A14B models unpairable.
+            ("Wan2_2-T2V-A14B-HIGH_fp8_e4m3fn_scaled_KJ", "high"),
+            ("Wan2_2-I2V-A14B-LOW_fp8_e5m2_scaled_KJ", "low"),
+            ("Wan2_2-Fun-InP-A14B-HIGH_fp8_e4m3fn_scaled_KJ", "high"),
+            ("Wan2_2-T2V-A14B-LOW-HoloCine-full_fp8_e4m3fn_scaled_KJ", "low"),
+            ("SmoothMix_I2V_v2_High-Q4_K_M", "high"),
+            ("smoothMixWan22I2VT2V_t2vHigh-Q6_K", "high"),
+            # A marker sitting next to an unrelated descriptor is still a marker.
+            ("Wan2.2_NSFW_i2v_14b_high_lighting_fp16_v2.1", "high"),
+            ("wan2.2_T2V_fp8_LOW_lightning_edition", "low"),
+            ("wan22EnhancedNSFWSVICamera_nsfwFASTMOVEFP8Low", "low"),
+            # --- bare high/low used as an adjective about something else ---
             ("Wan2.2-A14B-T2V-lowCFG-merge", "none"),
             ("wan2.2-a14b-t2v-4step-low-cfg-merge", "none"),
             ("Wan22_A14B_T2V_low_step_v2", "none"),
             ("Wan2.2_A14B_highRes_finetune", "none"),
-            ("Wan2.2_TI2V_5B_lowVRAM", "none"),
-            ("Wan2.2-TI2V-5B-Turbo-lowSteps", "none"),
-            ("Wan2.2-TI2V-5B-HighQuality", "none"),
-            ("Wan2.2-A14B-SmoothMix-T2V-HIGH", "none"),
-            # Token matching, so the marker can't fire on a substring. The last two
-            # were mismatched by the original substring-based heuristic as well.
+            ("Wan2.2_A14B_lowVRAM", "none"),
+            ("Wan2.2-A14B-HighQuality", "none"),
+            # --- no marker at all ---
+            ("wan2.2-ti2v-5b-Q4_K_M", "none"),
+            ("wan-A14B-flagship", "none"),
+            # --- token matching: a marker must never fire on a substring. The last
+            # two were mismatched by the original substring heuristic as well. ---
             ("wan22-slow-motion-a14b", "none"),
             ("wan22-highway-lora-merge", "none"),
             ("wan22-flow-shift-tune", "none"),
             ("wan22-slow-noise-test", "none"),
             ("wan22_flownoise_v1", "none"),
+            # --- an explicit noise marker outranks a bare token found earlier ---
+            ("wan2.2_t2v_low_high_noise_14B_fp16", "high"),
         ],
     )
     def test_filename_heuristic(self, name: str, expected: str) -> None:
         assert _detect_wan_expert(name) == expected
+
+    @pytest.mark.parametrize("name", ["Wan2.2_TI2V_5B_lowVRAM", "Wan2.2-TI2V-5B-Turbo-lowSteps", "wan22-5b-LOW"])
+    def test_ti2v_5b_never_gets_an_expert(self, tmp_path: Path, name: str) -> None:
+        """TI2V-5B is single-transformer, so the expert field is meaningless — and a
+        stray 'low' would put the model in the Transformer (Low Noise) picker, where
+        it can never be a valid A14B partner."""
+        config = _probe(tmp_path, f"{name}.safetensors", _diffusers_sd(48))
+        assert config.variant == WanVariantType.TI2V_5B
+        assert config.expert == "none"

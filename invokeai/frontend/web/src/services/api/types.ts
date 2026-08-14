@@ -638,17 +638,26 @@ export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'wan' && config.format === 'diffusers';
 };
 
-/** Wan single-file main models (GGUF or safetensors checkpoint) marked as the
- *  low-noise expert — the second half of the A14B MoE pair. Suitable for the
- *  Transformer (Low Noise) picker. The two experts don't have to share a format;
- *  both load into the same transformer class. */
-export const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+/** The single-file Wan main formats. Both are transformer-only: one file holds one
+ *  A14B expert, and the VAE + UMT5-XXL encoder have to come from somewhere else.
+ *  Anything gating on that property must use this, not a bare `=== 'gguf_quantized'`
+ *  — the two formats are interchangeable here and drifting apart has bitten us. */
+export const WAN_SINGLE_FILE_FORMATS = ['gguf_quantized', 'checkpoint'] as const;
+
+export const isWanSingleFileMainModelConfig = (config: { base?: string; type?: string; format?: string }): boolean => {
   return (
     config.type === 'main' &&
     config.base === 'wan' &&
-    (config.format === 'gguf_quantized' || config.format === 'checkpoint') &&
-    config.expert === 'low'
+    WAN_SINGLE_FILE_FORMATS.includes(config.format as (typeof WAN_SINGLE_FILE_FORMATS)[number])
   );
+};
+
+/** Wan single-file main models marked as the low-noise expert — the second half of
+ *  the A14B MoE pair. Suitable for the Transformer (Low Noise) picker, and filtered
+ *  out of the primary main dropdown. The two experts don't have to share a format;
+ *  both load into the same transformer class. */
+export const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return isWanSingleFileMainModelConfig(config) && 'expert' in config && config.expert === 'low';
 };
 
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
