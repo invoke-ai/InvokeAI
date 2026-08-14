@@ -14208,10 +14208,12 @@ export type components = {
          * Gemma2Encoder_GGUF_Config
          * @description Single-file GGUF-quantized Gemma-2-2b encoder for PiD (llama.cpp GGUF, e.g. gemma-2-2b-it-Q4_K_M.gguf).
          *
-         *     Unlike the diffusers-directory config, this is a single ``.gguf`` file. transformers dequantizes it
-         *     (``gemma2`` is in its GGUF config mapping) and reads the tokenizer from the GGUF metadata, so no
-         *     companion config.json / tokenizer files are required. Only Gemma-2-2b (2304-dim) is accepted, matching
-         *     PiD's fixed caption projection; 9B/27B GGUFs are rejected here as for the directory config.
+         *     Unlike the diffusers-directory config, this is a single ``.gguf`` file: the model config and the
+         *     tokenizer are read from the GGUF metadata, so no companion config.json / tokenizer files are required.
+         *     The weights are loaded natively by ``Gemma2EncoderGGUFLoader`` — the large 2D projections stay
+         *     quantized as ``GGMLTensor`` and are dequantized on demand by the model cache, rather than being fully
+         *     dequantized into memory at load time. Only Gemma-2-2b (2304-dim) is accepted, matching PiD's fixed
+         *     caption projection; 9B/27B GGUFs are rejected here as for the directory config.
          */
         Gemma2Encoder_GGUF_Config: {
             /**
@@ -18905,6 +18907,7 @@ export type components = {
          *         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)
          *         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
          *         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+         *         pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
          *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
          *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
@@ -19248,6 +19251,12 @@ export type components = {
              * @default false
              */
             sequential_guidance?: boolean;
+            /**
+             * Pid Memory Optimization
+             * @description Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
+             * @default false
+             */
+            pid_memory_optimization?: boolean;
             /**
              * Attention Type
              * @description Attention type.
