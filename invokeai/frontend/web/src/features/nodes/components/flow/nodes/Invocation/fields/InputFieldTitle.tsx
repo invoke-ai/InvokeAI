@@ -100,6 +100,7 @@ export const InputFieldTitle = memo((props: Props) => {
           className={NO_FIT_ON_DOUBLE_CLICK_CLASS}
           sx={labelSx}
           noOfLines={1}
+          data-node-input-field-title="true"
           data-is-invalid={isInvalid}
           data-is-disabled={isDisabled}
           data-is-added-to-form={isAddedToForm}
