@@ -77,7 +77,7 @@ class _TokenBatch(dict):
 class _TinyTokenizer:
     chat_template = None
 
-    def __call__(self, prompt: str, return_tensors: str) -> _TokenBatch:
+    def __call__(self, prompt: str, return_tensors: str, add_special_tokens: bool = True) -> _TokenBatch:
         return _TokenBatch(input_ids=torch.tensor([[1, 2]], dtype=torch.long))
 
     def encode(self, text: str, add_special_tokens: bool = False) -> list[str]:
