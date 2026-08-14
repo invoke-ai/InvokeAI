@@ -141,6 +141,43 @@ def extract_comfy_quant_hints(sd: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return hints
 
 
+def iter_weight_scale_pairs(sd: Mapping[str, Any]) -> Iterable[tuple[str, str]]:
+    """Yield ``(weight_key, scale_key)`` for every weight scale in ``sd``, in either spelling.
+
+    For loaders that fold the scale into the weight themselves instead of going through
+    :func:`extract_fp8_scaled_layers`. Matching only ``.weight_scale`` is the failure that keeps
+    recurring: a ``.scale_weight`` checkpoint then either loses its scales silently (if the loader
+    strips both spellings afterwards, leaving the weight off by ``1/weight_scale``) or trips
+    ``load_state_dict(..., strict=True)`` on the leftover key. Pairs whose ``.weight`` is absent are
+    skipped, so a stray scale cannot invent one.
+    """
+    for key in list(sd.keys()):
+        if not isinstance(key, str):
+            continue
+        for suffix in WEIGHT_SCALE_SUFFIXES:
+            if key.endswith(suffix):
+                weight_key = f"{key[: -len(suffix)]}.weight"
+                if weight_key in sd:
+                    yield weight_key, key
+                break
+
+
+def is_scale_metadata_key(key: Any) -> bool:
+    """Whether ``key`` is fp8 scale/quantization metadata rather than a model tensor.
+
+    Covers both spellings of the weight and input scales plus the marker keys producers emit, so
+    callers strip exactly what they were able to interpret.
+    """
+    if not isinstance(key, str):
+        return False
+    return (
+        key.endswith(WEIGHT_SCALE_SUFFIXES)
+        or key.endswith(INPUT_SCALE_SUFFIXES)
+        or COMFY_QUANT_SUFFIX.strip(".") in key
+        or key in STRAY_METADATA_KEYS
+    )
+
+
 def _strip_scale_suffix(key: str) -> tuple[str, bool] | None:
     """Return ``(module path, is_input_scale)``, or None if ``key`` is not a scale key."""
     for suffix in WEIGHT_SCALE_SUFFIXES:

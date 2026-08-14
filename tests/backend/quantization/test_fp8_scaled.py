@@ -15,6 +15,8 @@ from invokeai.backend.quantization.fp8_scaled import (
     device_supports_fp8_matmul,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    is_scale_metadata_key,
+    iter_weight_scale_pairs,
     parse_quantization_metadata,
     predict_cast_state_dict_size,
     reset_fp8_matmul_support_cache,
@@ -725,3 +727,46 @@ class TestCustomLinearIntegration:
 
         rel = ((fp8.float() - baseline.float()).norm() / baseline.float().norm()).item()
         assert rel < 0.1, f"fp8 matmul diverges from the dequantized path by {rel:.4f}"
+
+
+class TestScaleSpellingHelpers:
+    """Both spellings of the weight scale must be handled everywhere.
+
+    Reading only `.weight_scale` is the mistake that keeps recurring in the per-loader dequant
+    helpers. Depending on what the loader strips afterwards it either deletes a `.scale_weight`
+    without applying it — leaving the weight off by `1/weight_scale`, silently — or leaves the key
+    behind for `load_state_dict(..., strict=True)` to reject.
+    """
+
+    @pytest.mark.parametrize("spelling", [".weight_scale", ".scale_weight"])
+    def test_pairs_are_found_in_either_spelling(self, spelling: str) -> None:
+        sd = {"blk.weight": torch.ones(2, 2), f"blk{spelling}": torch.tensor(0.5)}
+
+        assert list(iter_weight_scale_pairs(sd)) == [("blk.weight", f"blk{spelling}")]
+
+    def test_a_scale_without_its_weight_is_not_paired(self) -> None:
+        # Pairing it would invent a weight key the checkpoint never had.
+        sd = {"other.weight": torch.ones(1), "blk.weight_scale": torch.tensor(0.5)}
+
+        assert list(iter_weight_scale_pairs(sd)) == []
+
+    def test_non_string_keys_are_ignored(self) -> None:
+        # `.pt`/`.ckpt` sources can carry int keys; `endswith` would raise on them.
+        assert list(iter_weight_scale_pairs({0: torch.ones(1)})) == []
+
+    @pytest.mark.parametrize(
+        "key",
+        [".weight_scale", ".scale_weight", ".input_scale", ".scale_input"],
+    )
+    def test_metadata_keys_are_recognized_in_either_spelling(self, key: str) -> None:
+        assert is_scale_metadata_key(f"blk{key}")
+
+    @pytest.mark.parametrize("key", ["blk.comfy_quant", "scaled_fp8"])
+    def test_marker_keys_are_recognized(self, key: str) -> None:
+        assert is_scale_metadata_key(key)
+
+    @pytest.mark.parametrize("key", ["blk.weight", "blk.bias", "norm.scale", 0])
+    def test_model_tensors_are_not_mistaken_for_metadata(self, key: object) -> None:
+        # `norm.scale` is a real learned parameter in several architectures - stripping it would
+        # delete weights, and it is why this cannot just match "scale" anywhere in the key.
+        assert not is_scale_metadata_key(key)

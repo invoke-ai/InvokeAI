@@ -41,6 +41,8 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    is_scale_metadata_key,
+    iter_weight_scale_pairs,
     parse_quantization_metadata,
     predict_cast_state_dict_size,
     read_safetensors_metadata,
@@ -1079,46 +1081,43 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         # Dequantization formula: dequantized = weight.to(dtype) * weight_scale
         # Reference: https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md
         original_key_count = len(sd)
-        weight_scale_keys = [k for k in sd.keys() if k.endswith(".weight_scale")]
         dequantized_count = 0
 
-        for scale_key in weight_scale_keys:
-            # Get the corresponding weight key (remove "_scale" suffix)
-            weight_key = scale_key.replace(".weight_scale", ".weight")
-            if weight_key in sd:
-                weight = sd[weight_key]
-                scale = sd[scale_key]
-                # Dequantize: convert to float and multiply by scale
-                # Handle block-wise quantization (e.g., FP4 with block_size=8)
-                # where scale has shape [weight_dim / block_size, ...]
-                # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
-                # as PyTorch doesn't support direct type promotion for Float8 types
-                weight_float = weight.float()
-                scale = scale.float()
-                if scale.shape != weight_float.shape and scale.numel() > 1:
-                    # Block-wise quantization: need to expand scale to match weight shape
-                    # Find which dimension differs and repeat scale along that dimension
-                    for dim in range(len(weight_float.shape)):
-                        if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
-                            block_size = weight_float.shape[dim] // scale.shape[dim]
-                            if block_size > 1:
-                                # Repeat scale along this dimension to match weight shape
-                                scale = scale.repeat_interleave(block_size, dim=dim)
-                # Multiply in float32 for precision, but store the compute dtype immediately so the
-                # *whole model* is never materialized in float32. Keeping every dequantized weight as
-                # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs
-                # 1 on disk) and dominates the cold-load RAM peak — enough to swap a 32 GB machine.
-                # Same fix as in the FLUX.2 and Krea-2 loaders.
-                sd[weight_key] = (weight_float * scale).to(model_dtype)
-                del weight_float
-                dequantized_count += 1
+        # Both spellings, because the metadata strip below removes both.
+        for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
+            weight = sd[weight_key]
+            scale = sd[scale_key]
+            # Dequantize: convert to float and multiply by scale
+            # Handle block-wise quantization (e.g., FP4 with block_size=8)
+            # where scale has shape [weight_dim / block_size, ...]
+            # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
+            # as PyTorch doesn't support direct type promotion for Float8 types
+            weight_float = weight.float()
+            scale = scale.float()
+            if scale.shape != weight_float.shape and scale.numel() > 1:
+                # Block-wise quantization: need to expand scale to match weight shape
+                # Find which dimension differs and repeat scale along that dimension
+                for dim in range(len(weight_float.shape)):
+                    if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
+                        block_size = weight_float.shape[dim] // scale.shape[dim]
+                        if block_size > 1:
+                            # Repeat scale along this dimension to match weight shape
+                            scale = scale.repeat_interleave(block_size, dim=dim)
+            # Multiply in float32 for precision, but store the compute dtype immediately so the
+            # *whole model* is never materialized in float32. Keeping every dequantized weight as
+            # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs
+            # 1 on disk) and dominates the cold-load RAM peak — enough to swap a 32 GB machine.
+            # Same fix as in the FLUX.2 and Krea-2 loaders.
+            sd[weight_key] = (weight_float * scale).to(model_dtype)
+            del weight_float
+            dequantized_count += 1
 
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI quantized weights")
 
         # Filter out ComfyUI quantization metadata keys (comfy_quant, weight_scale)
         # These are no longer needed after dequantization
-        comfy_metadata_keys = [k for k in sd.keys() if "comfy_quant" in k or "weight_scale" in k]
+        comfy_metadata_keys = [k for k in sd.keys() if is_scale_metadata_key(k)]
         for k in comfy_metadata_keys:
             del sd[k]
         if comfy_metadata_keys:

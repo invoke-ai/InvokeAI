@@ -83,6 +83,8 @@ from invokeai.backend.model_manager.util.model_util import (
 from invokeai.backend.quantization.fp8_scaled import (
     can_stay_quantized,
     cast_state_dict,
+    is_scale_metadata_key,
+    iter_weight_scale_pairs,
     predict_cast_state_dict_size,
     should_keep_fp8_weights,
 )
@@ -1116,44 +1118,37 @@ class Flux2CheckpointModel(ModelLoader):
         superset: `cast_state_dict` re-applies the same predicate later *with* the model and casts
         whatever turns out not to be an ``nn.Linear`` weight.
         """
-        # Check for ComfyUI-style scale factors
-        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
+        # Check for ComfyUI-style scale factors. Both spellings are folded here, because the
+        # metadata strip below removes both — reading only `.weight_scale` meant a `.scale_weight`
+        # checkpoint had its scales deleted without ever being applied, leaving every quantized
+        # weight off by 1/weight_scale with nothing logged.
+        for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
+            weight = sd[weight_key]
+            scale = sd[scale_key]
 
-        for scale_key in weight_scale_keys:
-            # Get the corresponding weight key
-            weight_key = scale_key.replace(".weight_scale", ".weight")
-            if weight_key in sd:
-                weight = sd[weight_key]
-                scale = sd[scale_key]
+            # Dequantize: convert FP8 to float and multiply by scale
+            # Note: Float8 types require .float() instead of .to(torch.float32)
+            weight_float = weight.float()
+            scale = scale.float()
 
-                # Dequantize: convert FP8 to float and multiply by scale
-                # Note: Float8 types require .float() instead of .to(torch.float32)
-                weight_float = weight.float()
-                scale = scale.float()
+            # Handle block-wise quantization where scale may have different shape
+            if scale.dim() > 0 and scale.shape != weight_float.shape and scale.numel() > 1:
+                for dim in range(len(weight_float.shape)):
+                    if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
+                        block_size = weight_float.shape[dim] // scale.shape[dim]
+                        if block_size > 1:
+                            scale = scale.repeat_interleave(block_size, dim=dim)
 
-                # Handle block-wise quantization where scale may have different shape
-                if scale.dim() > 0 and scale.shape != weight_float.shape and scale.numel() > 1:
-                    for dim in range(len(weight_float.shape)):
-                        if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
-                            block_size = weight_float.shape[dim] // scale.shape[dim]
-                            if block_size > 1:
-                                scale = scale.repeat_interleave(block_size, dim=dim)
-
-                # Do the multiply in float32 for precision, but store bf16 (FLUX.2's compute dtype)
-                # immediately so the *whole* model is never materialized in float32. Holding every
-                # dequantized weight as float32 here doubled RAM transiently (~36GB vs ~17GB for a 9B
-                # model) and was the dominant cold-load spike, especially with two GPUs. The result is
-                # identical to the previous code, which cast the same values to bf16 a few steps later.
-                sd[weight_key] = (weight_float * scale).to(torch.bfloat16)
-                del weight_float
+            # Do the multiply in float32 for precision, but store bf16 (FLUX.2's compute dtype)
+            # immediately so the *whole* model is never materialized in float32. Holding every
+            # dequantized weight as float32 here doubled RAM transiently (~36GB vs ~17GB for a 9B
+            # model) and was the dominant cold-load spike, especially with two GPUs. The result is
+            # identical to the previous code, which cast the same values to bf16 a few steps later.
+            sd[weight_key] = (weight_float * scale).to(torch.bfloat16)
+            del weight_float
 
         # Filter out scale metadata keys and other FP8 metadata
-        keys_to_remove = [
-            k
-            for k in sd.keys()
-            if isinstance(k, str)
-            and (k.endswith(".weight_scale") or k.endswith(".scale_weight") or "comfy_quant" in k or k == "scaled_fp8")
-        ]
+        keys_to_remove = [k for k in sd.keys() if is_scale_metadata_key(k)]
         for k in keys_to_remove:
             del sd[k]
 

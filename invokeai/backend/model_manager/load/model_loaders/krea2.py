@@ -26,12 +26,14 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
+    WEIGHT_SCALE_SUFFIXES,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
+    iter_weight_scale_pairs,
     parse_quantization_metadata,
     predict_cast_state_dict_size,
     read_safetensors_metadata,
@@ -128,18 +130,19 @@ def _dequantize_scaled_fp8(sd: dict[str, Any], dtype: "torch.dtype") -> dict[str
     """
     import torch
 
-    scale_keys = [k for k in sd if isinstance(k, str) and k.endswith(".weight_scale")]
+    scale_keys = [k for k in sd if isinstance(k, str) and k.endswith(WEIGHT_SCALE_SUFFIXES)]
     if not scale_keys:
         return sd
     out = dict(sd)
+    for weight_key, scale_key in iter_weight_scale_pairs(sd):
+        weight = torch.as_tensor(_to_plain_tensor(out[weight_key])).float()
+        scale = torch.as_tensor(_to_plain_tensor(out[scale_key])).float()
+        out[weight_key] = (weight * scale).to(dtype)
+        del weight
+    # Every scale key goes, including one whose `.weight` is missing: there is nothing to fold it
+    # into, and leaving the orphan behind trips `load_state_dict(..., strict=True)`.
     for scale_key in scale_keys:
-        weight_key = scale_key.replace(".weight_scale", ".weight")
-        if weight_key in out:
-            weight = torch.as_tensor(_to_plain_tensor(out[weight_key])).float()
-            scale = torch.as_tensor(_to_plain_tensor(out[scale_key])).float()
-            out[weight_key] = (weight * scale).to(dtype)
-            del weight
-        del out[scale_key]
+        out.pop(scale_key, None)
     return out
 
 

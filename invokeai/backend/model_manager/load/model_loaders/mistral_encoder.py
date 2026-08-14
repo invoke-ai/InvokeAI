@@ -37,6 +37,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import is_scale_metadata_key, iter_weight_scale_pairs
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
@@ -357,12 +358,8 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.
     24B fp8 encoder that difference is tens of GB — enough to OOM machines that can
     otherwise load the model.
     """
-    weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
     dequantized = 0
-    for scale_key in weight_scale_keys:
-        weight_key = scale_key[: -len(".weight_scale")] + ".weight"
-        if weight_key not in sd:
-            continue
+    for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
         weight = sd[weight_key].float()
         scale = sd[scale_key].float()
         if scale.shape != weight.shape and scale.numel() > 1:
@@ -377,11 +374,12 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.
     if dequantized:
         logger.info(f"Dequantized {dequantized} Comfy-Org-style quantized weights")
 
-    drop_suffixes = (".weight_scale", ".input_scale", ".scale")
+    # `is_scale_metadata_key` covers both spellings of the weight and input scales; `.scale` stays
+    # here because it is this producer's own spelling and is not a scaled-fp8 key.
     drop_keys = [
         k
         for k in sd.keys()
-        if isinstance(k, str) and (k.endswith(drop_suffixes) or "comfy_quant" in k or k.startswith("scaled_fp8"))
+        if isinstance(k, str) and (is_scale_metadata_key(k) or k.endswith(".scale") or k.startswith("scaled_fp8"))
     ]
     for k in drop_keys:
         del sd[k]
