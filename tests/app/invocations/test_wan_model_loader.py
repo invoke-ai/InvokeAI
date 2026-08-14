@@ -35,7 +35,7 @@ def _config(
     )
 
 
-def _invoke(
+def _prepare(
     main_config: SimpleNamespace,
     low_config: SimpleNamespace | None = None,
     component_config: SimpleNamespace | None = None,
@@ -44,13 +44,14 @@ def _invoke(
     vae_latent_channels: int | None = None,
     vae_config: SimpleNamespace | None = None,
     t5_config: SimpleNamespace | None = None,
-):
+    low_key: str = "low",
+) -> tuple[WanModelLoaderInvocation, MagicMock]:
     main = _model("main")
-    low = _model("low") if low_config is not None else None
+    low = _model(low_key) if low_config is not None else None
     context = MagicMock()
     configs = {"main": main_config}
     if low_config is not None:
-        configs["low"] = low_config
+        configs[low_key] = low_config
     component = _model("component") if component_config is not None else None
     if component_config is not None:
         configs["component"] = component_config
@@ -78,7 +79,16 @@ def _invoke(
         wan_t5_encoder_model=_model("t5"),
         component_source=component,
     )
+    return invocation, context
+
+
+def _invoke(*args, **kwargs):
+    invocation, context = _prepare(*args, **kwargs)
     return invocation.invoke(context)
+
+
+def _warnings(context: MagicMock) -> list[str]:
+    return [call.args[0] for call in context.logger.warning.call_args_list]
 
 
 @pytest.mark.parametrize("variant", [WanVariantType.T2V_A14B, WanVariantType.I2V_A14B])
@@ -158,10 +168,66 @@ def test_ti2v_5b_main_ignores_wired_low_noise_model(low_variant: WanVariantType)
     assert output.transformer.transformer_low_noise is None
 
 
-@pytest.mark.parametrize("expert", ["low", "none"])
-def test_gguf_loader_rejects_non_high_primary_without_pair(expert: str) -> None:
-    with pytest.raises(ValueError, match="high-noise"):
-        _invoke(_config("main", WanVariantType.T2V_A14B, expert))
+@pytest.mark.parametrize("expert", ["high", "low", "none"])
+def test_gguf_loader_runs_unpaired_primary_whatever_its_tag(expert: str) -> None:
+    """A single wired transformer is explicit intent just like a pair is, and the tag is
+    only a filename guess — so an unpaired A14B runs with a warning rather than aborting."""
+    invocation, context = _prepare(_config("main", WanVariantType.T2V_A14B, expert))
+    output = invocation.invoke(context)
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
+    assert any("only this one expert will run" in warning.lower() for warning in _warnings(context))
+
+
+def test_gguf_loader_hints_at_the_expert_swap_for_an_unpaired_low_noise_model() -> None:
+    invocation, context = _prepare(_config("main", WanVariantType.T2V_A14B, "low"))
+    invocation.invoke(context)
+
+    assert any("high-noise one is usually the better choice" in warning for warning in _warnings(context))
+
+
+def test_gguf_loader_rejects_the_same_model_in_both_transformer_slots() -> None:
+    """Wiring one model twice used to fail the {high, low} pair check. It must stay an error:
+    the denoiser would unload and reload the same multi-GB expert at every boundary crossing."""
+    main_config = _config("main", WanVariantType.T2V_A14B, "high")
+    with pytest.raises(ValueError, match="same model"):
+        _invoke(main_config, main_config, low_key="main")
+
+
+@pytest.mark.parametrize("main_expert,low_expert", [("low", "high"), ("low", "none"), ("none", "high")])
+def test_gguf_loader_warns_when_it_swaps_the_wired_experts(main_expert: str, low_expert: str) -> None:
+    """The swap overrides explicit wiring on the strength of a filename tag, so a mistagged
+    file must not invert the two experts silently."""
+    invocation, context = _prepare(
+        _config("main", WanVariantType.I2V_A14B, main_expert),
+        _config("low", WanVariantType.I2V_A14B, low_expert),
+    )
+    output = invocation.invoke(context)
+
+    assert output.transformer.transformer.key == "low"
+    assert any("swapped" in warning for warning in _warnings(context))
+
+
+@pytest.mark.parametrize("main_expert,low_expert", [("high", "low"), ("high", "none"), ("none", "low")])
+def test_gguf_loader_is_quiet_when_the_wiring_stands(main_expert: str, low_expert: str) -> None:
+    invocation, context = _prepare(
+        _config("main", WanVariantType.I2V_A14B, main_expert),
+        _config("low", WanVariantType.I2V_A14B, low_expert),
+    )
+    invocation.invoke(context)
+
+    assert _warnings(context) == []
+
+
+def test_gguf_loader_warns_when_neither_expert_is_tagged() -> None:
+    invocation, context = _prepare(
+        _config("main", WanVariantType.I2V_A14B, "none"),
+        _config("low", WanVariantType.I2V_A14B, "none"),
+    )
+    invocation.invoke(context)
+
+    assert any("Neither Wan A14B GGUF filename identifies its expert" in warning for warning in _warnings(context))
 
 
 @pytest.mark.parametrize(
