@@ -205,6 +205,8 @@ http_compression_level: 9 # default value
 | `2`–`8` | Progressively slower, marginally smaller.                                                      |
 | `9`    | Smallest output, by far the slowest. This is the default.                                       |
 
+The setting can also be given as the `INVOKEAI_HTTP_COMPRESSION_LEVEL` environment variable.
+
 If the UI feels sluggish while a large library is being browsed, lowering this is one of the cheapest wins available. Measured on the image-name list of a 200,000-image library (8.48 MB of JSON):
 
 | Level | Time    | Output    |

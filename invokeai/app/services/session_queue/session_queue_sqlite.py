@@ -43,6 +43,11 @@ from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
+# Bound-parameter chunk size for `get_queue_item_summaries_by_ids`. SQLite's
+# SQLITE_MAX_VARIABLE_NUMBER is 32766 on modern builds but 999 on older ones; stay under the
+# smaller limit, with room to spare for the queue_id parameter.
+SUMMARY_LOOKUP_CHUNK_SIZE = 900
+
 # Round-robin dequeue (multiuser fairness): pick the next pending item from the user who was
 # least-recently served.
 #
@@ -1366,35 +1371,44 @@ class SqliteSessionQueue(SessionQueueBase):
         if not item_ids:
             return []
 
-        placeholders = ", ".join("?" for _ in item_ids)
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""--sql
-                SELECT
-                    sq.item_id,
-                    sq.created_at,
-                    sq.status,
-                    sq.device,
-                    sq.started_at,
-                    sq.completed_at,
-                    sq.origin,
-                    sq.destination,
-                    sq.batch_id,
-                    sq.user_id,
-                    u.display_name AS user_display_name,
-                    u.email AS user_email,
-                    sq.field_values
-                FROM session_queue sq
-                LEFT JOIN users u ON sq.user_id = u.user_id
-                WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
-                """,
-                (queue_id, *item_ids),
-            )
-            rows = cast(list[sqlite3.Row], cursor.fetchall())
+        # The caller decides how many ids to ask for, so one `IN (...)` over the whole list would
+        # let a large-enough request exceed SQLite's bound-parameter limit and surface as a 500.
+        # Deduplicate first (repeats cost a parameter each but resolve to the same row), then
+        # query in chunks and reassemble in the order the caller asked for.
+        unique_ids = list(dict.fromkeys(item_ids))
+        summaries_by_id: dict[int, SessionQueueItemSummary] = {}
 
-        summaries_by_id = {
-            row["item_id"]: SessionQueueItemSummary.queue_item_summary_from_dict(dict(row)) for row in rows
-        }
+        for start in range(0, len(unique_ids), SUMMARY_LOOKUP_CHUNK_SIZE):
+            chunk = unique_ids[start : start + SUMMARY_LOOKUP_CHUNK_SIZE]
+            placeholders = ", ".join("?" for _ in chunk)
+            with self._db.transaction() as cursor:
+                cursor.execute(
+                    f"""--sql
+                    SELECT
+                        sq.item_id,
+                        sq.created_at,
+                        sq.status,
+                        sq.device,
+                        sq.started_at,
+                        sq.completed_at,
+                        sq.origin,
+                        sq.destination,
+                        sq.batch_id,
+                        sq.user_id,
+                        u.display_name AS user_display_name,
+                        u.email AS user_email,
+                        sq.field_values
+                    FROM session_queue sq
+                    LEFT JOIN users u ON sq.user_id = u.user_id
+                    WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
+                    """,
+                    (queue_id, *chunk),
+                )
+                rows = cast(list[sqlite3.Row], cursor.fetchall())
+
+            for row in rows:
+                summaries_by_id[row["item_id"]] = SessionQueueItemSummary.queue_item_summary_from_dict(dict(row))
+
         return [summaries_by_id[item_id] for item_id in item_ids if item_id in summaries_by_id]
 
     def get_queue_status(

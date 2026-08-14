@@ -180,3 +180,28 @@ def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_o
     assert summaries[0].user_id == "user-b"
     assert summaries[0].created_at is not None
     assert summaries[0].status == "pending"
+
+
+def test_get_queue_item_summaries_by_ids_handles_more_ids_than_sqlite_can_bind(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    """The caller chooses the id count, and one bound parameter per id runs into SQLite's
+    SQLITE_MAX_VARIABLE_NUMBER (32766 on modern builds, 999 on older ones). Unchunked, the whole
+    request fails with an OperationalError and the endpoint answers 500. The ids do not need to
+    exist for this — being bound at all is what costs a parameter."""
+    real_id = _insert_queue_item(session_queue, user_id="user-a")
+    requested = [*range(10_000_000, 10_040_000), real_id]
+
+    summaries = session_queue.get_queue_item_summaries_by_ids(queue_id="default", item_ids=requested)
+
+    assert [item.item_id for item in summaries] == [real_id]
+
+
+def test_get_queue_item_summaries_by_ids_mirrors_repeated_ids(session_queue: SqliteSessionQueue) -> None:
+    """Repeats are collapsed for the lookup (they resolve to the same row) but the response
+    still follows the requested list one-for-one."""
+    item_id = _insert_queue_item(session_queue, user_id="user-a")
+
+    summaries = session_queue.get_queue_item_summaries_by_ids(queue_id="default", item_ids=[item_id, item_id])
+
+    assert [item.item_id for item in summaries] == [item_id, item_id]
