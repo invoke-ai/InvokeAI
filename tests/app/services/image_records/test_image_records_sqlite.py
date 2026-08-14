@@ -144,10 +144,9 @@ class TestGetIntermediatesSubfolder:
     def test_intermediates_are_deleted_via_delete_intermediates_by_names(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "tmp.png", subfolder="x", is_intermediate=True)
         pairs = store.get_intermediates()
-        deleted, retained = store.delete_intermediates_by_names([name for name, _ in pairs])
+        deleted = store.delete_intermediates_by_names([name for name, _ in pairs])
 
         assert deleted == ["tmp.png"]
-        assert retained == []
         with pytest.raises(ImageRecordNotFoundException):
             store.get("tmp.png")
 
@@ -197,10 +196,10 @@ class TestDeleteIntermediatesByNames:
         # Simulate the race: the image stops being an intermediate between the snapshot and delete.
         store.update("promoted.png", ImageRecordChanges(is_intermediate=False))
 
-        deleted, retained = store.delete_intermediates_by_names(snapshot)
+        deleted = store.delete_intermediates_by_names(snapshot)
 
         assert deleted == ["tmp.png"]
-        assert retained == ["promoted.png"]
+        # promoted.png is excluded from the returned names, so the caller never purges its files.
         assert store.get("promoted.png").is_intermediate is False
         with pytest.raises(ImageRecordNotFoundException):
             store.get("tmp.png")
@@ -233,22 +232,21 @@ class TestDeleteIntermediatesByNames:
 
         store._db._conn.set_trace_callback(trace)
         try:
-            deleted, retained = store.delete_intermediates_by_names(snapshot)
+            deleted = store.delete_intermediates_by_names(snapshot)
         finally:
             store._db._conn.set_trace_callback(None)
 
         assert promoted, "the interleaved promotion never ran; the test proves nothing"
         assert deleted == ["tmp.png"]
-        assert retained == ["promoted.png"]
         assert store.get("promoted.png").is_intermediate is False
 
     def test_unknown_and_empty_names_are_no_ops(self, store: SqliteImageRecordStorage) -> None:
         _save(store, "keep.png", is_intermediate=False)
 
-        assert store.delete_intermediates_by_names([]) == ([], [])
-        # "gone.png" has no record at all, so it is neither deleted nor retained; "keep.png" exists
-        # but is not an intermediate, so it is retained.
-        assert store.delete_intermediates_by_names(["gone.png", "keep.png"]) == ([], ["keep.png"])
+        assert store.delete_intermediates_by_names([]) == []
+        # "gone.png" has no record at all and "keep.png" is not an intermediate, so neither is
+        # deleted or returned; keep.png must still be present afterwards.
+        assert store.delete_intermediates_by_names(["gone.png", "keep.png"]) == []
         assert store.get("keep.png").image_name == "keep.png"
 
     def test_more_names_than_sql_variable_limit(self, store: SqliteImageRecordStorage) -> None:
@@ -261,10 +259,10 @@ class TestDeleteIntermediatesByNames:
         survivor = names[chunk + 3]
         store.update(survivor, ImageRecordChanges(is_intermediate=False))
 
-        deleted, retained = store.delete_intermediates_by_names(names)
+        deleted = store.delete_intermediates_by_names(names)
 
         assert set(deleted) == set(names) - {survivor}
-        assert retained == [survivor]
+        assert survivor not in deleted
         assert store.get(survivor).is_intermediate is False
         assert store.get_intermediates() == []
 

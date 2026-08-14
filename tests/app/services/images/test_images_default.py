@@ -5,7 +5,6 @@ silent-failure contract (Points 2 & 3 from PR review), and the transactional
 staged-deletion contracts of delete() and delete_intermediates().
 """
 
-import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -45,8 +44,8 @@ def image_service() -> ImageService:
     invoker.services.board_image_records.get_board_for_image.return_value = None
     invoker.services.urls.get_image_url.return_value = "http://localhost/img.png"
     invoker.services.configuration.image_subfolder_strategy = "flat"
-    # By default every staged intermediate is still an intermediate when the delete runs.
-    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: (list(names), [])
+    # By default every named intermediate is still an intermediate when the delete runs.
+    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
 
     svc.start(invoker)
     return svc
@@ -289,7 +288,7 @@ class TestDeleteForwardsSubfolder:
         count = image_service.delete_intermediates()
 
         assert count == 2
-        calls = invoker.services.image_files.stage_delete.call_args_list
+        calls = invoker.services.image_files.delete.call_args_list
         assert calls[0].args == ("img1.png",)
         assert calls[0].kwargs == {"image_subfolder": "intermediate"}
         assert calls[1].args == ("img2.png",)
@@ -382,8 +381,8 @@ def disk_image_service(tmp_path: Path) -> ImageService:
     svc = ImageService()
     invoker = MagicMock()
     invoker.services.configuration.pil_compress_level = 1
-    # By default every staged intermediate is still an intermediate when the delete runs.
-    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: (list(names), [])
+    # By default every named intermediate is still an intermediate when the delete runs.
+    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
     storage = DiskImageFileStorage(tmp_path / "outputs")
     invoker.services.image_files = storage
     storage.start(invoker)
@@ -480,7 +479,9 @@ class TestDeleteTransactional:
 
 
 class TestDeleteIntermediatesTransactional:
-    """delete_intermediates() must be all-or-nothing: stage everything, delete records once, commit."""
+    """delete_intermediates() deletes records first, then purges the files of exactly the rows it
+    removed. It never stages or restores a promoted image's files, so there is no restore step for a
+    concurrent delete to race (PR #9361, JPPhoto round 2)."""
 
     def test_success_deletes_multiple_intermediates(self, disk_image_service: ImageService):
         invoker = disk_image_service._ImageService__invoker  # type: ignore
@@ -502,8 +503,8 @@ class TestDeleteIntermediatesTransactional:
         assert deleted_callbacks == names
         assert _staging_dirs(storage) == []
 
-    def test_image_promoted_out_of_intermediate_keeps_record_and_files(self, disk_image_service: ImageService):
-        """An image that stops being an intermediate mid-operation keeps its record and its files."""
+    def test_promoted_image_keeps_its_files(self, disk_image_service: ImageService):
+        """An image the DB refused to delete (no longer an intermediate) keeps its files untouched."""
         invoker = disk_image_service._ImageService__invoker  # type: ignore
         storage = invoker.services.image_files
         for name in ("tmp1.png", "promoted.png", "tmp2.png"):
@@ -513,11 +514,10 @@ class TestDeleteIntermediatesTransactional:
             ("promoted.png", ""),
             ("tmp2.png", ""),
         ]
-        # The database reports that promoted.png was no longer an intermediate, so its record stands.
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: (
-            [name for name in names if name != "promoted.png"],
-            ["promoted.png"],
-        )
+        # The store reports it removed everything except promoted.png, so that file is never purged.
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: [
+            name for name in names if name != "promoted.png"
+        ]
         deleted_callbacks: list[str] = []
         disk_image_service.on_deleted(deleted_callbacks.append)
 
@@ -532,191 +532,92 @@ class TestDeleteIntermediatesTransactional:
         assert deleted_callbacks == ["tmp1.png", "tmp2.png"]
         assert _staging_dirs(storage) == []
 
-    def test_promoted_image_is_rolled_back_not_committed(self, image_service: ImageService):
+    def test_only_deleted_rows_are_purged_and_announced(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("promoted.png", "")]
-        tokens = [object(), object()]
-        invoker.services.image_files.stage_delete.side_effect = tokens
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: (
-            ["tmp1.png"],
-            ["promoted.png"],
-        )
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: ["tmp1.png"]
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
         count = image_service.delete_intermediates()
 
         assert count == 1
-        invoker.services.image_files.commit_delete.assert_called_once_with(tokens[0])
-        invoker.services.image_files.rollback_delete.assert_called_once_with(tokens[1])
+        # The promoted row's file is never touched: only the deleted row is purged.
+        invoker.services.image_files.delete.assert_called_once_with("tmp1.png", image_subfolder="")
         assert deleted_callbacks == ["tmp1.png"]
 
-    def test_rollback_failure_for_promoted_image_does_not_abort_the_rest(self, image_service: ImageService):
-        """A failed restore is logged; the surviving deletions still commit and fire callbacks."""
+    def test_subfolder_is_forwarded_to_the_file_purge(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [
-            ("promoted.png", ""),
-            ("tmp1.png", ""),
-        ]
-        tokens = [object(), object()]
-        invoker.services.image_files.stage_delete.side_effect = tokens
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: (
-            ["tmp1.png"],
-            ["promoted.png"],
-        )
-        invoker.services.image_files.rollback_delete.side_effect = ImageFileDeleteException("rollback broken")
-        deleted_callbacks: list[str] = []
-        image_service.on_deleted(deleted_callbacks.append)
+        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", "a/b")]
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
+        image_service.delete_intermediates()
 
-        count = image_service.delete_intermediates()
+        invoker.services.image_files.delete.assert_called_once_with("tmp1.png", image_subfolder="a/b")
 
-        assert count == 1
-        invoker.services.image_files.rollback_delete.assert_called_once_with(tokens[0])
-        invoker.services.image_files.commit_delete.assert_called_once_with(tokens[1])
-        assert deleted_callbacks == ["tmp1.png"]
-        invoker.services.logger.error.assert_called()
-
-    def test_nothing_deleted_returns_zero_and_fires_no_callbacks(self, image_service: ImageService):
-        invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("promoted.png", "")]
-        token = object()
-        invoker.services.image_files.stage_delete.return_value = token
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: ([], ["promoted.png"])
-        deleted_callbacks: list[str] = []
-        image_service.on_deleted(deleted_callbacks.append)
-
-        assert image_service.delete_intermediates() == 0
-
-        invoker.services.image_files.rollback_delete.assert_called_once_with(token)
-        invoker.services.image_files.commit_delete.assert_not_called()
-        assert deleted_callbacks == []
-
-    def test_first_staging_failure_aborts_without_db_delete(self, image_service: ImageService):
+    def test_file_purge_failure_is_logged_and_does_not_abort_or_raise(self, image_service: ImageService):
+        """A filesystem failure orphans one file but must not stop the other purges, undo the
+        committed record deletions, or raise: the records are already gone."""
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
-        invoker.services.image_files.stage_delete.side_effect = ImageFileDeleteException("disk error")
-        deleted_callbacks: list[str] = []
-        image_service.on_deleted(deleted_callbacks.append)
-
-        with pytest.raises(ImageFileDeleteException):
-            image_service.delete_intermediates()
-
-        invoker.services.image_records.delete_intermediates_by_names.assert_not_called()
-        # Nothing was staged, so nothing needs rolling back.
-        invoker.services.image_files.rollback_delete.assert_not_called()
-        invoker.services.image_files.commit_delete.assert_not_called()
-        assert deleted_callbacks == []
-
-    def test_later_staging_failure_rolls_back_earlier_stages(self, image_service: ImageService):
-        invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
-        token1 = object()
-        invoker.services.image_files.stage_delete.side_effect = [token1, ImageFileDeleteException("disk error")]
-        deleted_callbacks: list[str] = []
-        image_service.on_deleted(deleted_callbacks.append)
-
-        with pytest.raises(ImageFileDeleteException):
-            image_service.delete_intermediates()
-
-        invoker.services.image_records.delete_intermediates_by_names.assert_not_called()
-        invoker.services.image_files.rollback_delete.assert_called_once_with(token1)
-        invoker.services.image_files.commit_delete.assert_not_called()
-        assert deleted_callbacks == []
-
-    def test_later_staging_failure_restores_earlier_files_on_disk(self, disk_image_service: ImageService):
-        invoker = disk_image_service._ImageService__invoker  # type: ignore
-        storage = invoker.services.image_files
-        _save_image_file(storage, "tmp1.png")
-        # The second entry's subfolder fails path validation, so staging it raises after
-        # tmp1.png has already been staged.
-        invoker.services.image_records.get_intermediates.return_value = [
-            ("tmp1.png", ""),
-            ("tmp2.png", "bad\\path"),
-        ]
-        deleted_callbacks: list[str] = []
-        disk_image_service.on_deleted(deleted_callbacks.append)
-
-        with pytest.raises(ValueError):
-            disk_image_service.delete_intermediates()
-
-        assert storage.get_path("tmp1.png").exists()
-        assert storage.get_path("tmp1.png", thumbnail=True).exists()
-        invoker.services.image_records.delete_intermediates_by_names.assert_not_called()
-        assert deleted_callbacks == []
-        assert _staging_dirs(storage) == []
-
-    def test_db_failure_restores_all_staged_files(self, disk_image_service: ImageService):
-        invoker = disk_image_service._ImageService__invoker  # type: ignore
-        storage = invoker.services.image_files
-        names = ["tmp1.png", "tmp2.png"]
-        for name in names:
-            _save_image_file(storage, name)
-        invoker.services.image_records.get_intermediates.return_value = [(name, "") for name in names]
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = ImageRecordDeleteException()
-        deleted_callbacks: list[str] = []
-        disk_image_service.on_deleted(deleted_callbacks.append)
-
-        with pytest.raises(ImageRecordDeleteException):
-            disk_image_service.delete_intermediates()
-
-        for name in names:
-            assert storage.get_path(name).exists()
-            assert storage.get_path(name, thumbnail=True).exists()
-        assert deleted_callbacks == []
-        assert _staging_dirs(storage) == []
-
-    def test_one_rollback_failure_does_not_abandon_other_rollbacks(self, image_service: ImageService):
-        invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [
-            ("tmp1.png", ""),
-            ("tmp2.png", ""),
-            ("tmp3.png", ""),
-        ]
-        tokens = [object(), object(), object()]
-        invoker.services.image_files.stage_delete.side_effect = tokens
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = ImageRecordDeleteException()
-        invoker.services.image_files.rollback_delete.side_effect = [
-            ImageFileDeleteException("rollback broken"),
-            None,
-            None,
-        ]
-        deleted_callbacks: list[str] = []
-        image_service.on_deleted(deleted_callbacks.append)
-
-        with pytest.raises(ImageRecordDeleteException):
-            image_service.delete_intermediates()
-
-        # Every staged item must have a rollback attempt, even after one fails.
-        rollback_tokens = [call.args[0] for call in invoker.services.image_files.rollback_delete.call_args_list]
-        assert rollback_tokens == tokens
-        invoker.services.image_files.commit_delete.assert_not_called()
-        assert deleted_callbacks == []
-
-    def test_commit_failure_is_logged_and_remaining_commits_attempted(self, image_service: ImageService):
-        invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
-        tokens = [object(), object()]
-        invoker.services.image_files.stage_delete.side_effect = tokens
-        invoker.services.image_files.commit_delete.side_effect = [ImageFileDeleteException("purge failed"), None]
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
+        invoker.services.image_files.delete.side_effect = [ImageFileDeleteException("purge failed"), None]
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
         count = image_service.delete_intermediates()
 
         assert count == 2
-        commit_tokens = [call.args[0] for call in invoker.services.image_files.commit_delete.call_args_list]
-        assert commit_tokens == tokens
-        # Records were deleted, so the deletions are committed and callbacks must fire.
+        purged = [call.args[0] for call in invoker.services.image_files.delete.call_args_list]
+        assert purged == ["tmp1.png", "tmp2.png"]
+        # Both records were deleted, so both deletions are announced despite the file failure.
         assert deleted_callbacks == ["tmp1.png", "tmp2.png"]
         invoker.services.logger.error.assert_called()
-        invoker.services.image_files.rollback_delete.assert_not_called()
+
+    def test_db_failure_raises_and_purges_nothing(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = ImageRecordDeleteException()
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        with pytest.raises(ImageRecordDeleteException):
+            image_service.delete_intermediates()
+
+        # No record was removed, so no file may be purged.
+        invoker.services.image_files.delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_nothing_deleted_returns_zero_and_fires_no_callbacks(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = [("promoted.png", "")]
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: []
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        assert image_service.delete_intermediates() == 0
+
+        invoker.services.image_files.delete.assert_not_called()
+        assert deleted_callbacks == []
+
+    def test_empty_intermediates_is_a_noop(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get_intermediates.return_value = []
+        deleted_callbacks: list[str] = []
+        image_service.on_deleted(deleted_callbacks.append)
+
+        assert image_service.delete_intermediates() == 0
+
+        invoker.services.image_records.delete_intermediates_by_names.assert_called_once_with([])
+        invoker.services.image_files.delete.assert_not_called()
+        assert deleted_callbacks == []
 
 
 class TestDeleteIntermediatesAgainstRealRecords:
     """delete_intermediates() wired to a real record store, so no stub stands in for the DB decision.
 
     The mocked tests above can only assert that the service honours whatever the store reports. These
-    exercise the real store, which is where the promoted-vs-already-gone distinction is actually made.
+    exercise the real store, which is where the promoted-vs-already-gone distinction is actually made,
+    and where the concurrency hazards JPPhoto reported would surface.
     """
 
     @pytest.fixture
@@ -747,33 +648,48 @@ class TestDeleteIntermediatesAgainstRealRecords:
         )
         _save_image_file(storage, name)
 
-    def _promote_after_staging(
+    def _promote_after_snapshot(
         self,
         records: SqliteImageRecordStorage,
-        storage: DiskImageFileStorage,
         monkeypatch,
         image_name: str,
     ) -> None:
-        """Promote an image out of intermediate status once its files have been staged.
+        """Promote an image out of intermediate status after the snapshot but before the DB delete.
 
-        Promoting it *before* delete_intermediates() runs would keep it out of the snapshot entirely,
-        so it would never reach the retained path these tests are about.
+        Promoting it earlier would drop it from the snapshot entirely; the interesting case is an
+        image that is in the snapshot yet is no longer an intermediate by the time the conditional
+        DELETE runs, so its record (and files) must survive.
         """
-        real_stage_delete = storage.stage_delete
+        real_get_intermediates = records.get_intermediates
 
-        def stage_then_promote(name: str, *args, **kwargs):
-            token = real_stage_delete(name, *args, **kwargs)
-            if name == image_name:
-                records.update(image_name, ImageRecordChanges(is_intermediate=False))
-            return token
+        def snapshot_then_promote():
+            pairs = real_get_intermediates()
+            records.update(image_name, ImageRecordChanges(is_intermediate=False))
+            return pairs
 
-        monkeypatch.setattr(storage, "stage_delete", stage_then_promote)
+        monkeypatch.setattr(records, "get_intermediates", snapshot_then_promote)
+
+    def test_all_intermediates_are_deleted(self, wired) -> None:
+        svc, records, storage = wired
+        self._seed(records, storage, "tmp1.png")
+        self._seed(records, storage, "tmp2.png")
+        deleted_callbacks: list[str] = []
+        svc.on_deleted(deleted_callbacks.append)
+
+        assert svc.delete_intermediates() == 2
+
+        for name in ("tmp1.png", "tmp2.png"):
+            assert not storage.get_path(name).exists()
+            with pytest.raises(ImageRecordNotFoundException):
+                records.get(name)
+        assert sorted(deleted_callbacks) == ["tmp1.png", "tmp2.png"]
+        assert _staging_dirs(storage) == []
 
     def test_promoted_image_keeps_record_and_files(self, wired, monkeypatch) -> None:
         svc, records, storage = wired
         self._seed(records, storage, "tmp1.png")
         self._seed(records, storage, "promoted.png")
-        self._promote_after_staging(records, storage, monkeypatch, "promoted.png")
+        self._promote_after_snapshot(records, monkeypatch, "promoted.png")
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
@@ -785,92 +701,67 @@ class TestDeleteIntermediatesAgainstRealRecords:
         assert deleted_callbacks == ["tmp1.png"]
         assert _staging_dirs(storage) == []
 
-    def test_record_removed_by_another_path_does_not_resurrect_its_files(self, wired, monkeypatch) -> None:
-        """A record deleted elsewhere while we hold its files must not have those files restored.
-
-        "Not deleted by us" is not the same as "still there". Restoring files for a record that is
-        gone orphans them on disk forever: no row references them and no staging dir remains for
-        startup recovery to find.
-        """
+    def test_record_removed_by_another_path_between_snapshot_and_delete(self, wired, monkeypatch) -> None:
+        """An image fully deleted elsewhere after the snapshot is not counted and its (now absent)
+        files are left to the path that owns that deletion — we never touch them."""
         svc, records, storage = wired
         self._seed(records, storage, "tmp1.png")
         self._seed(records, storage, "gone.png")
 
-        real_stage_delete = storage.stage_delete
+        real_get_intermediates = records.get_intermediates
 
-        def stage_then_lose_the_record(image_name: str, *args, **kwargs):
-            token = real_stage_delete(image_name, *args, **kwargs)
-            if image_name == "gone.png":
-                # Another path (single-image delete, board delete, maintenance script) removes the
-                # record after we have already staged its files.
-                records.delete("gone.png")
-            return token
+        def snapshot_then_delete_gone():
+            pairs = real_get_intermediates()
+            # A single-image delete elsewhere removes gone.png (record and files) after our snapshot.
+            records.delete("gone.png")
+            storage.delete("gone.png")
+            return pairs
 
-        monkeypatch.setattr(storage, "stage_delete", stage_then_lose_the_record)
+        monkeypatch.setattr(records, "get_intermediates", snapshot_then_delete_gone)
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
         count = svc.delete_intermediates()
 
-        # gone.png's files must be purged, not restored.
-        assert not storage.get_path("gone.png").exists()
-        assert not storage.get_path("gone.png", thumbnail=True).exists()
-        assert not storage.get_path("tmp1.png").exists()
-        assert _staging_dirs(storage) == []
-        # Only the record this call actually removed is counted and announced.
         assert count == 1
         assert deleted_callbacks == ["tmp1.png"]
+        assert not storage.get_path("tmp1.png").exists()
+        # gone.png was purged by the other path; we neither resurrect nor re-report it.
+        assert not storage.get_path("gone.png").exists()
+        assert _staging_dirs(storage) == []
 
-    def test_retained_record_deleted_before_rollback_does_not_resurrect_its_files(self, wired, monkeypatch) -> None:
-        """A retained record can still be deleted while the commit/rollback loop is running.
-
-        The loop can work through thousands of names before reaching a given token, so "retained at
-        DB-call time" is not enough to justify restoring files. Restoring them against a record that
-        has since been deleted strands them: no row refers to them and the staging dir is gone, so
-        startup recovery can never find them.
+    def test_promoted_record_deleted_after_conditional_delete_is_not_resurrected(self, wired, monkeypatch) -> None:
+        """The B3 regression: a promoted image is concurrently deleted (record and files) right after
+        the conditional DELETE keeps it. Because we never staged its files, there is nothing to
+        restore — its files stay deleted and are not stranded on disk with no record.
         """
         svc, records, storage = wired
         self._seed(records, storage, "tmp1.png")
         self._seed(records, storage, "promoted.png")
-        self._promote_after_staging(records, storage, monkeypatch, "promoted.png")
+        self._promote_after_snapshot(records, monkeypatch, "promoted.png")
 
         real_delete_by_names = records.delete_intermediates_by_names
 
-        def delete_then_lose_the_retained_record(names: list[str]):
-            deleted, retained = real_delete_by_names(names)
-            # Another path deletes the promoted image after we decided to keep its files.
-            for name in retained:
-                records.delete(name)
-            return deleted, retained
+        def delete_then_lose_the_promoted_record(names: list[str]):
+            deleted = real_delete_by_names(names)
+            # A concurrent single-image delete removes the promoted image entirely, right after the
+            # conditional DELETE chose to keep it.
+            records.delete("promoted.png")
+            storage.delete("promoted.png")
+            return deleted
 
-        monkeypatch.setattr(records, "delete_intermediates_by_names", delete_then_lose_the_retained_record)
+        monkeypatch.setattr(records, "delete_intermediates_by_names", delete_then_lose_the_promoted_record)
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
         count = svc.delete_intermediates()
 
-        assert not storage.get_path("promoted.png").exists()
-        assert not storage.get_path("promoted.png", thumbnail=True).exists()
-        assert _staging_dirs(storage) == []
-        # Only this call's own deletion is counted and announced.
         assert count == 1
         assert deleted_callbacks == ["tmp1.png"]
-
-    def test_lookup_failure_during_rollback_check_keeps_the_files(self, wired, monkeypatch) -> None:
-        """If we cannot tell whether the record survived, keep the files — a lost file is final."""
-        svc, records, storage = wired
-        self._seed(records, storage, "promoted.png")
-        self._promote_after_staging(records, storage, monkeypatch, "promoted.png")
-
-        def unavailable(image_name: str):
-            raise sqlite3.OperationalError("database is locked")
-
-        monkeypatch.setattr(records, "get", unavailable)
-        deleted_callbacks: list[str] = []
-        svc.on_deleted(deleted_callbacks.append)
-
-        assert svc.delete_intermediates() == 0
-
-        assert storage.get_path("promoted.png").exists()
+        assert not storage.get_path("tmp1.png").exists()
+        # promoted.png's files stay deleted — never resurrected into an orphan.
+        assert not storage.get_path("promoted.png").exists()
+        assert not storage.get_path("promoted.png", thumbnail=True).exists()
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("promoted.png")
         assert _staging_dirs(storage) == []
-        assert deleted_callbacks == []

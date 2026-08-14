@@ -317,7 +317,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             result = cast(list[sqlite3.Row], cursor.fetchall())
         return [(r[0], r[1]) for r in result]
 
-    def delete_intermediates_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+    def delete_intermediates_by_names(self, image_names: list[str]) -> list[str]:
         """Deletes the named image records, skipping any that are no longer intermediates.
 
         The ``is_intermediate`` predicate rides on the DELETE itself rather than on a preceding
@@ -325,12 +325,11 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         promotion interleaves with this call. (Python's legacy sqlite3 transaction control opens a
         transaction only before a write, so a SELECT here holds no read lock to rely on.)
 
-        Returns ``(deleted, retained)``: the names whose records this call removed, and the names
-        whose records are still present because they are no longer intermediates. Names whose
-        records were already gone appear in neither list — the caller must not restore their files.
+        Returns the names whose records this call actually removed. Names that were already gone, and
+        names whose records survive because they are no longer intermediates, are both excluded — the
+        caller purges the files of exactly the returned names and touches nothing else.
         """
         deleted: list[str] = []
-        retained: list[str] = []
         try:
             with self._db.transaction() as cursor:
                 # Chunked to stay under SQLITE_MAX_VARIABLE_NUMBER; every chunk runs inside the one
@@ -350,11 +349,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     present_after = {cast(str, r[0]) for r in cursor.fetchall()}
 
                     deleted.extend(name for name in chunk if name in present_before and name not in present_after)
-                    retained.extend(name for name in chunk if name in present_after)
         except sqlite3.Error as e:
             # The try wraps the context manager so a failure in its commit is reported too.
             raise ImageRecordDeleteException from e
-        return deleted, retained
+        return deleted
 
     def save(
         self,
