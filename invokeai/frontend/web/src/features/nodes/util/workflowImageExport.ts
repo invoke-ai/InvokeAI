@@ -73,9 +73,12 @@ export const EXPORT_STYLE_PROPERTIES = [
   'line-height',
   'letter-spacing',
   'text-align',
+  'text-overflow',
   'text-decoration',
   'text-transform',
   'text-shadow',
+  '-webkit-line-clamp',
+  '-webkit-box-orient',
   'white-space',
   'word-break',
   'overflow-wrap',
@@ -251,12 +254,18 @@ const inlineSvgStylesForExport = (root: HTMLElement) => {
       Object.entries(styles).forEach(([property, value]) => {
         element.style.setProperty(property, value, 'important');
       });
-  });
+    });
 };
 
 export const setWorkflowExportNodeOpacity = (root: HTMLElement) => {
   root.querySelectorAll<HTMLElement>('.react-flow__node > [data-is-selected]').forEach((element) => {
     setExportElementStyle(element, 'opacity', '1');
+  });
+};
+
+export const hideWorkflowExportStatusIndicators = (root: HTMLElement) => {
+  root.querySelectorAll<HTMLElement>('[data-node-status-indicator="true"]').forEach((element) => {
+    setExportElementStyle(element, 'display', 'none');
   });
 };
 
@@ -303,6 +312,7 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
     setExportElementStyle(element, 'color', 'var(--invoke-colors-base-100)');
   });
   setWorkflowExportNodeOpacity(clone);
+  hideWorkflowExportStatusIndicators(clone);
 
   clone
     .querySelectorAll<HTMLElement>('.react-flow__edges, .react-flow__edges > svg, .react-flow__edge')
