@@ -339,6 +339,17 @@ def test_unrecognized_kohya_flattened_keys_are_left_untouched(flat_module: str) 
         ("lokr_w1", "lokr_w2"),
         ("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b"),
         ("diff", "diff_b"),
+        # LyCORIS saves an `alpha` per module, so this is the realistic on-disk shape rather than an
+        # edge case — see this repo's own captured fixtures. `.alpha` is a suffix the converter knows,
+        # so deciding per key rewrote it while its siblings stayed verbatim, splitting one module into
+        # two groups and aborting the load on the orphaned `{'alpha'}`.
+        ("lokr_w1", "lokr_w2", "alpha"),
+        ("hada_w1_a", "hada_w1_b", "hada_w2_a", "hada_w2_b", "alpha"),
+        # `dora_scale` is deliberately not combined with a LyCORIS algorithm here: it would orphan the
+        # same way, but even grouped correctly `any_lora_layer_from_state_dict` tests `dora_scale`
+        # before `lokr_w1`, so a weight-decomposed LoKr dispatches to DoRALayer and dies on a missing
+        # `lora_up.weight`. That precedence is shared code, predates this branch, and is not what the
+        # per-module gate below is about.
     ],
 )
 def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(lycoris_suffixes: tuple[str, ...]) -> None:
@@ -346,10 +357,13 @@ def test_kohya_lycoris_algorithm_keys_do_not_abort_the_load(lycoris_suffixes: tu
     # LoKr/LoHa/full ones. Un-flattening a key whose suffix `_group_by_layer` cannot split back off used to
     # feed it a dotted path, whose blind `rsplit(".", 2)` fallback then cut inside the module name and fused
     # two modules into one unsupported layer — aborting the *entire* adapter at generation time.
+    # `alpha` is a scalar on disk and `dora_scale` a per-channel vector; giving them weight-shaped
+    # tensors would fail inside the layer for reasons that have nothing to do with the grouping.
+    shapes = {"alpha": torch.tensor(4.0), "dora_scale": torch.ones(4)}
     state_dict = {
         "lora_unet_blocks_0_attn_wv.lora_down.weight": torch.ones(2, 4),
         "lora_unet_blocks_0_attn_wv.lora_up.weight": torch.ones(4, 2),
-        **{f"lora_unet_blocks_6_attn_wq.{suffix}": torch.ones(4, 4) for suffix in lycoris_suffixes},
+        **{f"lora_unet_blocks_6_attn_wq.{suffix}": shapes.get(suffix, torch.ones(4, 4)) for suffix in lycoris_suffixes},
     }
 
     model = lora_model_from_krea2_state_dict(state_dict)

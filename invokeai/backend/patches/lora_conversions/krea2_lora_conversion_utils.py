@@ -193,6 +193,24 @@ def _maybe_convert_kohya_krea2_state_dict(
     state_dict: Dict[str, torch.Tensor],
 ) -> Dict[str, torch.Tensor]:
     """Rewrite kohya/LyCORIS flattened Krea-2 keys to the dotted native layout, leaving all others untouched."""
+    # Whether a module can be converted is a property of the *module*, not of each key on its own. A LyCORIS
+    # module (``lokr_w1``, ``hada_w1_a``, ``diff``) has to stay verbatim — see below — but LyCORIS also saves
+    # a sibling ``.alpha`` (and ``.dora_scale`` for the weight-decomposed variants), whose suffix this
+    # converter *does* recognize. Deciding per key rewrites that sibling alone and splits one module across
+    # two layer groups: the rewritten ``.alpha`` ends up in a group by itself, and ``_get_lora_layer_values``
+    # aborts the whole adapter on ``{'alpha'}`` (the ``.dora_scale`` variant dies in ``DoRALayer`` instead).
+    # So collect each flattened module's suffixes first and convert only modules where *all* of them convert.
+    suffixes_by_flat_path: dict[str, set[str]] = {}
+    for key in state_dict:
+        if isinstance(key, str) and key.startswith(_KREA2_KOHYA_PREFIX):
+            flat_path, _, weight_suffix = key[len(_KREA2_KOHYA_PREFIX) :].lstrip("_").partition(".")
+            suffixes_by_flat_path.setdefault(flat_path, set()).add(f".{weight_suffix}")
+    fully_convertible_flat_paths = {
+        flat_path
+        for flat_path, suffixes in suffixes_by_flat_path.items()
+        if all(suffix in _SUFFIX_TO_VALUE_KEY for suffix in suffixes)
+    }
+
     converted_state_dict: Dict[str, torch.Tensor] = {}
     source_keys: dict[str, str] = {}
     for key, value in state_dict.items():
@@ -208,7 +226,7 @@ def _maybe_convert_kohya_krea2_state_dict(
             # into one bogus layer that aborts the whole load. LyCORIS suffixes such as ``.lokr_w1`` or
             # ``.hada_w1_a`` hit exactly that. Flattened, they have no interior dot and group harmlessly,
             # so leaving them verbatim keeps them at the pre-existing warn-and-skip behaviour.
-            if module_path is not None and f".{weight_suffix}" in _SUFFIX_TO_VALUE_KEY:
+            if module_path is not None and flat_path in fully_convertible_flat_paths:
                 converted_key = f"{module_path}{dot}{weight_suffix}"
         if converted_key in converted_state_dict:
             raise ValueError(
