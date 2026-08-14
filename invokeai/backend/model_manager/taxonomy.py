@@ -312,6 +312,7 @@ class ModelFormat(str, Enum):
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     ExternalApi = "external_api"
+    SDNQQuantized = "sdnq_quantized"
     Unknown = "unknown"
 
 
