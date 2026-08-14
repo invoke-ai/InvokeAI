@@ -28,7 +28,6 @@ from invokeai.app.api.routers import (
     boards,
     client_state,
     custom_nodes,
-    download_queue,
     gallery,
     image_moves,
     images,
@@ -508,7 +507,6 @@ configure_gzip(app, app_config.http_compression_level)
 app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
-app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(videos.videos_router, prefix="/api")

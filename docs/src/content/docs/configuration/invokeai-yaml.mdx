@@ -126,7 +126,7 @@ generation_devices: auto # default value
 
 | Value                      | Behavior                                                                                                                |
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `auto`                          | Use every available CUDA GPU, running one generation session per GPU concurrently. This is the default.             |
+| `auto`                          | Use every available CUDA GPU, running one generation session per GPU concurrently. This is the default. Exception: if the legacy `device` setting is pinned to a specific device, `auto` uses only that device (see Notes below). |
 | `[cuda:0,cuda:1]`         | Use the specific devices listed, one session per device. Useful for reserving a GPU for other work.                 |
 | `[cuda:0]`                | Use a single specific device. Generation runs serially, as it did before multi-GPU support.                                 |
 
