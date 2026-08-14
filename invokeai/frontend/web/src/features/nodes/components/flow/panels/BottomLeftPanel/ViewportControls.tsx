@@ -8,7 +8,7 @@ import {
 } from 'features/nodes/store/workflowSettingsSlice';
 import { exportWorkflowAsPng } from 'features/nodes/util/workflowImageExport';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiCameraBold,
@@ -26,6 +26,7 @@ const ViewportControls = () => {
   const dispatch = useAppDispatch();
   const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
   const workflowName = useAppSelector(selectWorkflowName);
+  const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
 
   const handleClickedZoomIn = useCallback(() => {
     zoomIn({ duration: 300 });
@@ -48,18 +49,30 @@ const ViewportControls = () => {
   }, [t]);
 
   const handleClickedExportWorkflow = useCallback(() => {
+    if (isExportingWorkflow) {
+      return;
+    }
+
     const flowElement = document.querySelector<HTMLElement>('#workflow-editor');
     if (!flowElement) {
       handleWorkflowImageExportError();
       return;
     }
 
-    void exportWorkflowAsPng({
-      flowElement,
-      bounds: getNodesBounds(getNodes()),
-      workflowName,
-    }).catch(handleWorkflowImageExportError);
-  }, [getNodes, getNodesBounds, handleWorkflowImageExportError, workflowName]);
+    setIsExportingWorkflow(true);
+    void new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    })
+      .then(() =>
+        exportWorkflowAsPng({
+          flowElement,
+          bounds: getNodesBounds(getNodes()),
+          workflowName,
+        })
+      )
+      .catch(handleWorkflowImageExportError)
+      .finally(() => setIsExportingWorkflow(false));
+  }, [getNodes, getNodesBounds, handleWorkflowImageExportError, isExportingWorkflow, workflowName]);
 
   return (
     <ButtonGroup orientation="vertical">
@@ -85,6 +98,8 @@ const ViewportControls = () => {
       <IconButton
         tooltip={t('nodes.downloadWorkflowImage')}
         aria-label={t('nodes.downloadWorkflowImage')}
+        isDisabled={isExportingWorkflow}
+        isLoading={isExportingWorkflow}
         onClick={handleClickedExportWorkflow}
         icon={<PiCameraBold />}
       />

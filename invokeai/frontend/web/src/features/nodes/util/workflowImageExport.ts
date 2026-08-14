@@ -1,8 +1,111 @@
 import type { Rect } from '@xyflow/react';
-import { toPng } from 'html-to-image';
+import { toBlob } from 'html-to-image';
 
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
+export const EXPORT_STYLE_PROPERTIES = [
+  'box-sizing',
+  'display',
+  'position',
+  'inset',
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'width',
+  'height',
+  'min-width',
+  'min-height',
+  'max-width',
+  'max-height',
+  'padding',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'margin',
+  'margin-top',
+  'margin-right',
+  'margin-bottom',
+  'margin-left',
+  'flex',
+  'flex-direction',
+  'flex-grow',
+  'flex-shrink',
+  'flex-basis',
+  'align-items',
+  'align-content',
+  'align-self',
+  'justify-content',
+  'gap',
+  'row-gap',
+  'column-gap',
+  'grid-template-columns',
+  'grid-template-rows',
+  'grid-column',
+  'grid-row',
+  'overflow',
+  'overflow-x',
+  'overflow-y',
+  'visibility',
+  'opacity',
+  'transform',
+  'transform-origin',
+  'color',
+  'background',
+  'background-color',
+  'background-image',
+  'background-size',
+  'background-position',
+  'background-repeat',
+  'background-clip',
+  'background-origin',
+  'border',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+  'box-shadow',
+  'font-family',
+  'font-size',
+  'font-weight',
+  'font-style',
+  'line-height',
+  'letter-spacing',
+  'text-align',
+  'text-decoration',
+  'text-transform',
+  'text-shadow',
+  'white-space',
+  'word-break',
+  'overflow-wrap',
+  'filter',
+  'object-fit',
+  'object-position',
+  'fill',
+  'stroke',
+  'stroke-width',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'z-index',
+  'pointer-events',
+  'vertical-align',
+] as const;
+export const SVG_EXPORT_STYLE_PROPERTIES = [
+  ...EXPORT_STYLE_PROPERTIES,
+  'fill-opacity',
+  'stroke-opacity',
+  'marker-start',
+  'marker-mid',
+  'marker-end',
+  'paint-order',
+  'shape-rendering',
+  'vector-effect',
+  'clip-path',
+  'mask',
+] as const;
 const GRID_GAP = 25;
 const DEFAULT_WORKFLOW_IMAGE_FILENAME = 'My Workflow';
 
@@ -60,6 +163,35 @@ export const getWorkflowImageDimensions = (bounds: Rect): WorkflowImageDimension
   return { width, height, canvasWidth: width * EXPORT_SCALE, canvasHeight: height * EXPORT_SCALE };
 };
 
+export const getWorkflowExportCloneStyle = (dimensions: WorkflowImageDimensions) => ({
+  width: `${dimensions.width}px`,
+  height: `${dimensions.height}px`,
+  position: 'relative',
+  left: '0',
+  top: '0',
+  pointerEvents: 'none',
+});
+
+export const getWorkflowExportOptions = (dimensions: WorkflowImageDimensions, backgroundColor: string) => ({
+  width: dimensions.width,
+  height: dimensions.height,
+  canvasWidth: dimensions.canvasWidth,
+  canvasHeight: dimensions.canvasHeight,
+  backgroundColor,
+  pixelRatio: 1,
+  includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
+  skipFonts: true,
+});
+
+export const getWorkflowSvgExportStyles = (computedStyle: Pick<CSSStyleDeclaration, 'getPropertyValue'>) =>
+  SVG_EXPORT_STYLE_PROPERTIES.reduce<Record<string, string>>((styles, property) => {
+    const value = computedStyle.getPropertyValue(property);
+    if (value) {
+      styles[property] = value;
+    }
+    return styles;
+  }, {});
+
 export const sanitizeWorkflowImageFilename = (workflowName: string): string => {
   const sanitizedName = workflowName
     .replace(/[<>:"/\\|?*]/g, '-')
@@ -75,6 +207,15 @@ export const sanitizeWorkflowImageFilename = (workflowName: string): string => {
 const setExportElementStyle = (element: HTMLElement, property: string, value: string) => {
   element.style.setProperty(property, value, 'important');
 };
+
+export const getWorkflowExportStagingStyle = (dimensions: WorkflowImageDimensions) => ({
+  position: 'fixed',
+  left: '-100000px',
+  top: '0',
+  width: `${dimensions.width}px`,
+  height: `${dimensions.height}px`,
+  pointerEvents: 'none',
+});
 
 const setBackgroundGridForExport = (root: HTMLElement, translation: { x: number; y: number }) => {
   const background = root.querySelector<SVGSVGElement>('.react-flow__background');
@@ -100,6 +241,25 @@ const setBackgroundGridForExport = (root: HTMLElement, translation: { x: number;
   dot?.setAttribute('r', '0.5');
 };
 
+const inlineSvgStylesForExport = (root: HTMLElement) => {
+  root
+    .querySelectorAll<SVGElement>(
+      '.react-flow__edges svg, .react-flow__edges svg *, .react-flow__background, .react-flow__background *'
+    )
+    .forEach((element) => {
+      const styles = getWorkflowSvgExportStyles(getComputedStyle(element));
+      Object.entries(styles).forEach(([property, value]) => {
+        element.style.setProperty(property, value, 'important');
+      });
+  });
+};
+
+export const setWorkflowExportNodeOpacity = (root: HTMLElement) => {
+  root.querySelectorAll<HTMLElement>('.react-flow__node > [data-is-selected]').forEach((element) => {
+    setExportElementStyle(element, 'opacity', '1');
+  });
+};
+
 const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: WorkflowImageDimensions) => {
   const root = clone.matches('.react-flow') ? clone : clone.querySelector<HTMLElement>('.react-flow');
   const viewport = clone.querySelector<HTMLElement>('.react-flow__viewport');
@@ -112,15 +272,11 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
     y: EXPORT_PADDING - bounds.y,
   };
 
-  clone.style.width = `${dimensions.width}px`;
-  clone.style.height = `${dimensions.height}px`;
-  clone.style.position = 'absolute';
-  clone.style.left = '-100000px';
-  clone.style.top = '0';
-  clone.style.pointerEvents = 'none';
+  Object.assign(clone.style, getWorkflowExportCloneStyle(dimensions));
 
   root.style.width = `${dimensions.width}px`;
   root.style.height = `${dimensions.height}px`;
+  setExportElementStyle(root, 'background-color', 'var(--invoke-colors-base-900)');
   viewport.style.transform = `translate(${translation.x}px, ${translation.y}px) scale(1)`;
   setBackgroundGridForExport(root, translation);
 
@@ -146,6 +302,7 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
   clone.querySelectorAll<HTMLElement>('[data-connector-node-icon="true"]').forEach((element) => {
     setExportElementStyle(element, 'color', 'var(--invoke-colors-base-100)');
   });
+  setWorkflowExportNodeOpacity(clone);
 
   clone
     .querySelectorAll<HTMLElement>('.react-flow__edges, .react-flow__edges > svg, .react-flow__edge')
@@ -165,13 +322,15 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
   });
 };
 
-const downloadPng = (dataUrl: string, workflowName: string) => {
+const downloadPng = (blob: Blob, workflowName: string) => {
+  const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.download = `${sanitizeWorkflowImageFilename(workflowName)}.png`;
-  anchor.href = dataUrl;
+  anchor.href = objectUrl;
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
 };
 
 export const exportWorkflowAsPng = async ({
@@ -186,20 +345,21 @@ export const exportWorkflowAsPng = async ({
   const contentBounds = getWorkflowContentBounds(flowElement, bounds);
   const dimensions = getWorkflowImageDimensions(contentBounds);
   const clone = flowElement.cloneNode(true) as HTMLElement;
+  const stagingWrapper = document.createElement('div');
 
   prepareExportClone(clone, contentBounds, dimensions);
-  (flowElement.parentElement ?? document.body).appendChild(clone);
+  Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(dimensions));
+  stagingWrapper.appendChild(clone);
+  (flowElement.parentElement ?? document.body).appendChild(stagingWrapper);
 
   try {
-    const dataUrl = await toPng(clone, {
-      width: dimensions.width,
-      height: dimensions.height,
-      canvasWidth: dimensions.canvasWidth,
-      canvasHeight: dimensions.canvasHeight,
-      pixelRatio: 1,
-    });
-    downloadPng(dataUrl, workflowName);
+    inlineSvgStylesForExport(clone);
+    const blob = await toBlob(clone, getWorkflowExportOptions(dimensions, getComputedStyle(clone).backgroundColor));
+    if (!blob) {
+      throw new Error('Workflow image export returned an empty Blob');
+    }
+    downloadPng(blob, workflowName);
   } finally {
-    clone.remove();
+    stagingWrapper.remove();
   }
 };
