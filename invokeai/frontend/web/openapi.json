@@ -13182,14 +13182,7 @@
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
-            "enum": [
-              "euler",
-              "heun",
-              "dpmpp_2m",
-              "dpmpp_2m_sde",
-              "er_sde",
-              "lcm"
-            ],
+            "enum": ["euler", "heun", "dpmpp_2m", "dpmpp_2m_sde", "er_sde", "lcm"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "euler",
@@ -13920,13 +13913,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "type", "type"],
         "title": "AnimaLoRALoaderOutput",
         "type": "object"
       },
@@ -14041,14 +14028,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "AnimaModelLoaderOutput",
         "type": "object"
       },
@@ -15017,16 +14997,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "timestamp",
-          "queue_id",
-          "batch_id",
-          "enqueued",
-          "requested",
-          "priority",
-          "origin",
-          "user_id"
-        ],
+        "required": ["timestamp", "queue_id", "batch_id", "enqueued", "requested", "priority", "origin", "user_id"],
         "title": "BatchEnqueuedEvent",
         "type": "object"
       },
@@ -16476,13 +16447,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "timestamp",
-          "bulk_download_id",
-          "bulk_download_item_id",
-          "bulk_download_item_name",
-          "user_id"
-        ],
+        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "user_id"],
         "title": "BulkDownloadCompleteEvent",
         "type": "object"
       },
@@ -16562,13 +16527,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "timestamp",
-          "bulk_download_id",
-          "bulk_download_item_id",
-          "bulk_download_item_name",
-          "user_id"
-        ],
+        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "user_id"],
         "title": "BulkDownloadStartedEvent",
         "type": "object"
       },
@@ -18371,14 +18330,7 @@
       },
       "Classification": {
         "description": "The classification of an Invocation.\n- `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.\n- `Beta`: The invocation is not yet stable, but is planned to be stable in the future. Workflows built around this invocation may break, but we are committed to supporting this invocation long-term.\n- `Prototype`: The invocation is not yet stable and may be removed from the application at any time. Workflows built around this invocation may break, and we are *not* committed to supporting this invocation.\n- `Deprecated`: The invocation is deprecated and may be removed in a future version.\n- `Internal`: The invocation is not intended for use by end-users. It may be changed or removed at any time, but is exposed for users to play with.\n- `Special`: The invocation is a special case and does not fit into any of the other classifications.",
-        "enum": [
-          "stable",
-          "beta",
-          "prototype",
-          "deprecated",
-          "internal",
-          "special"
-        ],
+        "enum": ["stable", "beta", "prototype", "deprecated", "internal", "special"],
         "title": "Classification",
         "type": "string"
       },
@@ -19015,14 +18967,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "glm_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "glm_encoder", "vae", "type", "type"],
         "title": "CogView4ModelLoaderOutput",
         "type": "object"
       },
@@ -20094,12 +20039,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode to use",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "title": "Resize Mode",
             "type": "string"
           }
@@ -20403,12 +20343,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode used",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "just_resize",
@@ -20497,12 +20432,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode to use",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "title": "Resize Mode",
             "type": "string"
           }
@@ -24226,16 +24156,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "latents",
-          "denoise",
-          "txt2img",
-          "t2i",
-          "t2l",
-          "img2img",
-          "i2i",
-          "l2l"
-        ],
+        "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
         "version": "1.6.0",
@@ -24650,16 +24571,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "latents",
-          "denoise",
-          "txt2img",
-          "t2i",
-          "t2l",
-          "img2img",
-          "i2i",
-          "l2l"
-        ],
+        "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL + Metadata",
         "type": "object",
         "version": "1.2.0",
@@ -25194,14 +25106,7 @@
       },
       "DownloadJobStatus": {
         "type": "string",
-        "enum": [
-          "waiting",
-          "running",
-          "paused",
-          "completed",
-          "cancelled",
-          "error"
-        ],
+        "enum": ["waiting", "running", "paused", "completed", "cancelled", "error"],
         "title": "DownloadJobStatus",
         "description": "State of a download job."
       },
@@ -25252,13 +25157,7 @@
             "type": "integer"
           }
         },
-        "required": [
-          "timestamp",
-          "source",
-          "download_path",
-          "current_bytes",
-          "total_bytes"
-        ],
+        "required": ["timestamp", "source", "download_path", "current_bytes", "total_bytes"],
         "title": "DownloadProgressEvent",
         "type": "object"
       },
@@ -25589,14 +25488,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "queue_id",
-          "enqueued",
-          "requested",
-          "batch",
-          "priority",
-          "item_ids"
-        ],
+        "required": ["queue_id", "enqueued", "requested", "batch", "priority", "item_ids"],
         "title": "EnqueueBatchResult"
       },
       "ErnieImageConditioningField": {
@@ -25969,15 +25861,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "text_encoder",
-          "vae",
-          "prompt_enhancer",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "text_encoder", "vae", "prompt_enhancer", "type", "type"],
         "title": "ErnieImageModelLoaderOutput",
         "type": "object"
       },
@@ -27932,15 +27816,7 @@
             "ui_hidden": false
           }
         },
-        "required": [
-          "output_meta",
-          "image",
-          "width",
-          "height",
-          "type",
-          "mask",
-          "type"
-        ],
+        "required": ["output_meta", "image", "width", "height", "type", "mask", "type"],
         "title": "FaceMaskOutput",
         "type": "object"
       },
@@ -28138,17 +28014,7 @@
             "ui_hidden": false
           }
         },
-        "required": [
-          "output_meta",
-          "image",
-          "width",
-          "height",
-          "type",
-          "mask",
-          "x",
-          "y",
-          "type"
-        ],
+        "required": ["output_meta", "image", "width", "height", "type", "mask", "x", "y", "type"],
         "title": "FaceOffOutput",
         "type": "object"
       },
@@ -28194,14 +28060,7 @@
           "batch_group_id": {
             "default": "None",
             "description": "The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.",
-            "enum": [
-              "None",
-              "Group 1",
-              "Group 2",
-              "Group 3",
-              "Group 4",
-              "Group 5"
-            ],
+            "enum": ["None", "Group 1", "Group 2", "Group 3", "Group 4", "Group 5"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "None",
@@ -28600,17 +28459,7 @@
           "operation": {
             "default": "ADD",
             "description": "The operation to perform",
-            "enum": [
-              "ADD",
-              "SUB",
-              "MUL",
-              "DIV",
-              "EXP",
-              "ABS",
-              "SQRT",
-              "MIN",
-              "MAX"
-            ],
+            "enum": ["ADD", "SUB", "MUL", "DIV", "EXP", "ABS", "SQRT", "MIN", "MAX"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "ADD",
@@ -29348,13 +29197,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "mistral_encoder",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "mistral_encoder", "type", "type"],
         "title": "Flux2DevLoRALoaderOutput",
         "type": "object"
       },
@@ -29527,15 +29370,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "mistral_encoder",
-          "vae",
-          "max_seq_len",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "mistral_encoder", "vae", "max_seq_len", "type", "type"],
         "title": "Flux2DevModelLoaderOutput",
         "type": "object"
       },
@@ -29912,13 +29747,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "type", "type"],
         "title": "Flux2KleinLoRALoaderOutput",
         "type": "object"
       },
@@ -30090,15 +29919,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "vae",
-          "max_seq_len",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "max_seq_len", "type", "type"],
         "title": "Flux2KleinModelLoaderOutput",
         "type": "object"
       },
@@ -30591,13 +30412,7 @@
       },
       "Flux2VariantType": {
         "type": "string",
-        "enum": [
-          "klein_4b",
-          "klein_4b_base",
-          "klein_9b",
-          "klein_9b_base",
-          "dev"
-        ],
+        "enum": ["klein_4b", "klein_4b_base", "klein_9b", "klein_9b_base", "dev"],
         "title": "Flux2VariantType",
         "description": "FLUX.2 model variants."
       },
@@ -30836,12 +30651,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode to use",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "title": "Resize Mode",
             "type": "string"
           },
@@ -30977,12 +30787,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode used",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "just_resize",
@@ -32056,17 +31861,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "flux",
-          "latents",
-          "denoise",
-          "txt2img",
-          "t2i",
-          "t2l",
-          "img2img",
-          "i2i",
-          "l2l"
-        ],
+        "tags": ["flux", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "FLUX Denoise + Metadata",
         "type": "object",
         "version": "1.0.1",
@@ -32730,14 +32525,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "clip",
-          "t5_encoder",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "clip", "t5_encoder", "type", "type"],
         "title": "FluxLoRALoaderOutput",
         "type": "object"
       },
@@ -32911,16 +32699,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "clip",
-          "t5_encoder",
-          "vae",
-          "max_seq_len",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "clip", "t5_encoder", "vae", "max_seq_len", "type", "type"],
         "title": "FluxModelLoaderOutput",
         "type": "object"
       },
@@ -34751,13 +34530,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "denoise_mask",
-          "expanded_mask_area",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "denoise_mask", "expanded_mask_area", "type", "type"],
         "title": "GradientMaskOutput",
         "type": "object"
       },
@@ -36893,13 +36666,7 @@
           "method": {
             "default": "full",
             "description": "The method to apply the IP-Adapter",
-            "enum": [
-              "full",
-              "style",
-              "composition",
-              "style_strong",
-              "style_precise"
-            ],
+            "enum": ["full", "style", "composition", "style_strong", "style_precise"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "full",
@@ -36983,13 +36750,7 @@
           },
           "method": {
             "description": "Method to apply IP Weights with",
-            "enum": [
-              "full",
-              "style",
-              "composition",
-              "style_strong",
-              "style_precise"
-            ],
+            "enum": ["full", "style", "composition", "style_strong", "style_precise"],
             "title": "Method",
             "type": "string"
           },
@@ -38642,14 +38403,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "Ideogram4ModelLoaderOutput",
         "type": "object"
       },
@@ -38926,14 +38680,7 @@
           "batch_group_id": {
             "default": "None",
             "description": "The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.",
-            "enum": [
-              "None",
-              "Group 1",
-              "Group 2",
-              "Group 3",
-              "Group 4",
-              "Group 5"
-            ],
+            "enum": ["None", "Group 1", "Group 2", "Group 3", "Group 4", "Group 5"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "None",
@@ -39741,17 +39488,7 @@
           "mode": {
             "default": "L",
             "description": "The mode to convert to",
-            "enum": [
-              "L",
-              "RGB",
-              "RGBA",
-              "CMYK",
-              "YCbCr",
-              "LAB",
-              "HSV",
-              "I",
-              "F"
-            ],
+            "enum": ["L", "RGB", "RGBA", "CMYK", "YCbCr", "LAB", "HSV", "I", "F"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "L",
@@ -41261,15 +40998,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "x_left",
-          "y_top",
-          "width",
-          "height",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "x_left", "y_top", "width", "height", "type", "type"],
         "title": "ImagePanelCoordinateOutput",
         "type": "object"
       },
@@ -41717,14 +41446,7 @@
           "resample_mode": {
             "default": "bicubic",
             "description": "The resampling mode",
-            "enum": [
-              "nearest",
-              "box",
-              "bilinear",
-              "hamming",
-              "bicubic",
-              "lanczos"
-            ],
+            "enum": ["nearest", "box", "bilinear", "hamming", "bicubic", "lanczos"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "bicubic",
@@ -41843,14 +41565,7 @@
           "resample_mode": {
             "default": "bicubic",
             "description": "The resampling mode",
-            "enum": [
-              "nearest",
-              "box",
-              "bilinear",
-              "hamming",
-              "bicubic",
-              "lanczos"
-            ],
+            "enum": ["nearest", "box", "bilinear", "hamming", "bicubic", "lanczos"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "bicubic",
@@ -42437,14 +42152,7 @@
           "resample_mode": {
             "default": "bicubic",
             "description": "The resampling mode",
-            "enum": [
-              "nearest",
-              "box",
-              "bilinear",
-              "hamming",
-              "bicubic",
-              "lanczos"
-            ],
+            "enum": ["nearest", "box", "bilinear", "hamming", "bicubic", "lanczos"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "bicubic",
@@ -42848,16 +42556,7 @@
       },
       "InstallStatus": {
         "type": "string",
-        "enum": [
-          "waiting",
-          "downloading",
-          "downloads_done",
-          "running",
-          "paused",
-          "completed",
-          "error",
-          "cancelled"
-        ],
+        "enum": ["waiting", "downloading", "downloads_done", "running", "paused", "completed", "error", "cancelled"],
         "title": "InstallStatus",
         "description": "State of an install job running in the background."
       },
@@ -42897,14 +42596,7 @@
           "batch_group_id": {
             "default": "None",
             "description": "The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.",
-            "enum": [
-              "None",
-              "Group 1",
-              "Group 2",
-              "Group 3",
-              "Group 4",
-              "Group 5"
-            ],
+            "enum": ["None", "Group 1", "Group 2", "Group 3", "Group 4", "Group 5"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "None",
@@ -43222,17 +42914,7 @@
           "operation": {
             "default": "ADD",
             "description": "The operation to perform",
-            "enum": [
-              "ADD",
-              "SUB",
-              "MUL",
-              "DIV",
-              "EXP",
-              "MOD",
-              "ABS",
-              "MIN",
-              "MAX"
-            ],
+            "enum": ["ADD", "SUB", "MUL", "DIV", "EXP", "MOD", "ABS", "MIN", "MAX"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "ADD",
@@ -49962,17 +49644,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "image",
-          "hue",
-          "oklab",
-          "cielab",
-          "uplab",
-          "lch",
-          "hsv",
-          "hsl",
-          "lab"
-        ],
+        "tags": ["image", "hue", "oklab", "cielab", "uplab", "lch", "hsv", "hsl", "lab"],
         "title": "Adjust Image Hue Plus",
         "type": "object",
         "version": "1.2.0",
@@ -50264,16 +49936,7 @@
           "color_space": {
             "default": "RGB",
             "description": "Available color spaces for blend computations",
-            "enum": [
-              "RGB",
-              "Linear RGB",
-              "HSL (RGB)",
-              "HSV (RGB)",
-              "Okhsl",
-              "Okhsv",
-              "Oklch (Oklab)",
-              "LCh (CIELab)"
-            ],
+            "enum": ["RGB", "Linear RGB", "HSL (RGB)", "HSV (RGB)", "Okhsl", "Okhsv", "Oklch (Oklab)", "LCh (CIELab)"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "RGB",
@@ -50314,15 +49977,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "image",
-          "blend",
-          "layer",
-          "alpha",
-          "composite",
-          "dodge",
-          "burn"
-        ],
+        "tags": ["image", "blend", "layer", "alpha", "composite", "dodge", "burn"],
         "title": "Image Layer Blend",
         "type": "object",
         "version": "1.2.0",
@@ -50619,15 +50274,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "image",
-          "mask",
-          "dilate",
-          "erode",
-          "expand",
-          "contract",
-          "mask"
-        ],
+        "tags": ["image", "mask", "dilate", "erode", "expand", "contract", "mask"],
         "title": "Image Dilate or Erode",
         "type": "object",
         "version": "1.3.0",
@@ -51738,13 +51385,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_vl_encoder",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_vl_encoder", "type", "type"],
         "title": "Krea2LoRALoaderOutput",
         "type": "object"
       },
@@ -51878,14 +51519,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_vl_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_vl_encoder", "vae", "type", "type"],
         "title": "Krea2ModelLoaderOutput",
         "type": "object"
       },
@@ -52553,15 +52187,7 @@
             "ui_hidden": false
           }
         },
-        "required": [
-          "output_meta",
-          "metadata",
-          "type",
-          "latents",
-          "width",
-          "height",
-          "type"
-        ],
+        "required": ["output_meta", "metadata", "type", "latents", "width", "height", "type"],
         "title": "LatentsMetaOutput",
         "type": "object"
       },
@@ -52597,14 +52223,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "latents",
-          "width",
-          "height",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "latents", "width", "height", "type", "type"],
         "title": "LatentsOutput",
         "type": "object"
       },
@@ -64607,12 +64226,7 @@
           "label": {
             "default": "* CUSTOM LABEL *",
             "description": "Label for this metadata item",
-            "enum": [
-              "* CUSTOM LABEL *",
-              "cfg_scale",
-              "cfg_rescale_multiplier",
-              "guidance"
-            ],
+            "enum": ["* CUSTOM LABEL *", "cfg_scale", "cfg_rescale_multiplier", "guidance"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "* CUSTOM LABEL *",
@@ -64725,12 +64339,7 @@
           "label": {
             "default": "* CUSTOM LABEL *",
             "description": "Label for this metadata item",
-            "enum": [
-              "* CUSTOM LABEL *",
-              "cfg_scale",
-              "cfg_rescale_multiplier",
-              "guidance"
-            ],
+            "enum": ["* CUSTOM LABEL *", "cfg_scale", "cfg_rescale_multiplier", "guidance"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "* CUSTOM LABEL *",
@@ -65500,16 +65109,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "model",
-          "name",
-          "unet",
-          "vae",
-          "clip",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "model", "name", "unet", "vae", "clip", "type", "type"],
         "title": "MetadataToModelOutput",
         "type": "object"
       },
@@ -65795,17 +65395,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "model",
-          "name",
-          "unet",
-          "clip",
-          "clip2",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "model", "name", "unet", "clip", "clip2", "vae", "type", "type"],
         "title": "MetadataToSDXLModelOutput",
         "type": "object"
       },
@@ -67513,14 +67103,7 @@
             "title": "Config"
           }
         },
-        "required": [
-          "timestamp",
-          "id",
-          "source",
-          "key",
-          "total_bytes",
-          "config"
-        ],
+        "required": ["timestamp", "id", "source", "key", "total_bytes", "config"],
         "title": "ModelInstallCompleteEvent",
         "type": "object"
       },
@@ -67598,15 +67181,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "timestamp",
-          "id",
-          "source",
-          "local_path",
-          "bytes",
-          "total_bytes",
-          "parts"
-        ],
+        "required": ["timestamp", "id", "source", "local_path", "bytes", "total_bytes", "parts"],
         "title": "ModelInstallDownloadProgressEvent",
         "type": "object"
       },
@@ -67684,15 +67259,7 @@
             "type": "array"
           }
         },
-        "required": [
-          "timestamp",
-          "id",
-          "source",
-          "local_path",
-          "bytes",
-          "total_bytes",
-          "parts"
-        ],
+        "required": ["timestamp", "id", "source", "local_path", "bytes", "total_bytes", "parts"],
         "title": "ModelInstallDownloadStartedEvent",
         "type": "object"
       },
@@ -69542,17 +69109,7 @@
       },
       "ModelRecordOrderBy": {
         "type": "string",
-        "enum": [
-          "default",
-          "type",
-          "base",
-          "name",
-          "format",
-          "size",
-          "created_at",
-          "updated_at",
-          "path"
-        ],
+        "enum": ["default", "type", "base", "name", "format", "size", "created_at", "updated_at", "path"],
         "title": "ModelRecordOrderBy",
         "description": "The order in which to return model summaries."
       },
@@ -69566,10 +69123,7 @@
             "title": "Model Keys",
             "description": "List of model keys to fetch related models for",
             "examples": [
-              [
-                "aa3b247f-90c9-4416-bfcd-aeaa57a5339e",
-                "ac32b914-10ab-496e-a24a-3068724b9c35"
-              ],
+              ["aa3b247f-90c9-4416-bfcd-aeaa57a5339e", "ac32b914-10ab-496e-a24a-3068724b9c35"],
               [
                 "b1c2d3e4-f5a6-7890-abcd-ef1234567890",
                 "12345678-90ab-cdef-1234-567890abcdef",
@@ -70271,15 +69825,7 @@
           "noise_type": {
             "default": "SD",
             "description": "Architecture-specific noise type.",
-            "enum": [
-              "SD",
-              "FLUX",
-              "FLUX.2",
-              "SD3",
-              "CogView4",
-              "Z-Image",
-              "Anima"
-            ],
+            "enum": ["SD", "FLUX", "FLUX.2", "SD3", "CogView4", "Z-Image", "Anima"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "SD",
@@ -71332,14 +70878,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "normal_map",
-          "roughness_map",
-          "displacement_map",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "normal_map", "roughness_map", "displacement_map", "type", "type"],
         "title": "PBRMapsOutput",
         "type": "object"
       },
@@ -72889,13 +72428,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "positive_prompt",
-          "negative_prompt",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "positive_prompt", "negative_prompt", "type", "type"],
         "title": "PromptTemplateOutput",
         "type": "object"
       },
@@ -73124,14 +72657,7 @@
           },
           "status": {
             "description": "The new status of the queue item",
-            "enum": [
-              "pending",
-              "in_progress",
-              "waiting",
-              "completed",
-              "failed",
-              "canceled"
-            ],
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
             "title": "Status",
             "type": "string"
           },
@@ -73302,13 +72828,7 @@
             "type": "object"
           }
         },
-        "required": [
-          "timestamp",
-          "queue_id",
-          "canceled_item_ids",
-          "user_ids",
-          "canceled_item_ids_by_user"
-        ],
+        "required": ["timestamp", "queue_id", "canceled_item_ids", "user_ids", "canceled_item_ids_by_user"],
         "title": "QueueItemsCanceledEvent",
         "type": "object"
       },
@@ -73353,13 +72873,7 @@
             "type": "object"
           }
         },
-        "required": [
-          "timestamp",
-          "queue_id",
-          "retried_item_ids",
-          "user_ids",
-          "retried_item_ids_by_user"
-        ],
+        "required": ["timestamp", "queue_id", "retried_item_ids", "user_ids", "retried_item_ids_by_user"],
         "title": "QueueItemsRetriedEvent",
         "type": "object"
       },
@@ -75234,14 +74748,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen_vl_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen_vl_encoder", "vae", "type", "type"],
         "title": "QwenImageModelLoaderOutput",
         "type": "object"
       },
@@ -76946,15 +76453,7 @@
           "mode": {
             "default": "bilinear",
             "description": "Interpolation mode",
-            "enum": [
-              "nearest",
-              "linear",
-              "bilinear",
-              "bicubic",
-              "trilinear",
-              "area",
-              "nearest-exact"
-            ],
+            "enum": ["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "bilinear",
@@ -78420,15 +77919,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "unet",
-          "clip",
-          "clip2",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "unet", "clip", "clip2", "vae", "type", "type"],
         "title": "SDXLModelLoaderOutput",
         "type": "object"
       },
@@ -79167,15 +78658,7 @@
           "mode": {
             "default": "bilinear",
             "description": "Interpolation mode",
-            "enum": [
-              "nearest",
-              "linear",
-              "bilinear",
-              "bicubic",
-              "trilinear",
-              "area",
-              "nearest-exact"
-            ],
+            "enum": ["nearest", "linear", "bilinear", "bicubic", "trilinear", "area", "nearest-exact"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "bilinear",
@@ -79547,16 +79030,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "clip_l",
-          "clip_g",
-          "t5_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "clip_l", "clip_g", "t5_encoder", "vae", "type", "type"],
         "title": "Sd3ModelLoaderOutput",
         "type": "object"
       },
@@ -80340,14 +79814,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "pending",
-              "in_progress",
-              "waiting",
-              "completed",
-              "failed",
-              "canceled"
-            ],
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
             "title": "Status",
             "description": "The status of this queue item",
             "default": "pending"
@@ -80861,11 +80328,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "setup_required",
-          "multiuser_enabled",
-          "strict_password_checking"
-        ],
+        "required": ["setup_required", "multiuser_enabled", "strict_password_checking"],
         "title": "SetupStatusResponse",
         "description": "Response for setup status check."
       },
@@ -81885,14 +81348,7 @@
           "batch_group_id": {
             "default": "None",
             "description": "The ID of this batch node's group. If provided, all batch nodes in with the same ID will be 'zipped' before execution, and all nodes' collections must be of the same size.",
-            "enum": [
-              "None",
-              "Group 1",
-              "Group 2",
-              "Group 3",
-              "Group 4",
-              "Group 5"
-            ],
+            "enum": ["None", "Group 1", "Group 2", "Group 3", "Group 4", "Group 5"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "None",
@@ -82380,13 +81836,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "positive_string",
-          "negative_string",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "positive_string", "negative_string", "type", "type"],
         "title": "StringPosNegOutput",
         "type": "object"
       },
@@ -82929,15 +82379,7 @@
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "name",
-          "content",
-          "id",
-          "user_id",
-          "is_public",
-          "created_at",
-          "updated_at"
-        ],
+        "required": ["name", "content", "id", "user_id", "is_public", "created_at", "updated_at"],
         "title": "SystemPromptRecordDTO"
       },
       "SystemPromptWithoutId": {
@@ -83005,12 +82447,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode to use",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "title": "Resize Mode",
             "type": "string"
           }
@@ -83134,12 +82571,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode applied to the T2I-Adapter input image so that it matches the target output size.",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "just_resize",
@@ -83221,12 +82653,7 @@
           "resize_mode": {
             "default": "just_resize",
             "description": "The resize mode to use",
-            "enum": [
-              "just_resize",
-              "crop_resize",
-              "fill_resize",
-              "just_resize_simple"
-            ],
+            "enum": ["just_resize", "crop_resize", "fill_resize", "just_resize_simple"],
             "title": "Resize Mode",
             "type": "string"
           }
@@ -85827,14 +85254,7 @@
             "description": "The node's classification"
           }
         },
-        "required": [
-          "tags",
-          "title",
-          "category",
-          "version",
-          "node_pack",
-          "classification"
-        ],
+        "required": ["tags", "title", "category", "version", "node_pack", "classification"],
         "title": "UIConfigBase",
         "type": "object"
       },
@@ -89010,17 +88430,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "video",
-          "width",
-          "height",
-          "num_frames",
-          "fps",
-          "duration",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "video", "width", "height", "num_frames", "fps", "duration", "type", "type"],
         "title": "VideoOutput",
         "type": "object"
       },
@@ -89161,13 +88571,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "virtual_board_id",
-          "board_name",
-          "date",
-          "image_count",
-          "asset_count"
-        ],
+        "required": ["virtual_board_id", "board_name", "date", "image_count", "asset_count"],
         "title": "VirtualSubBoardDTO",
         "description": "A virtual sub-board computed from image/video metadata, not stored in the database."
       },
@@ -90312,14 +89716,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "wan_t5_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "wan_t5_encoder", "vae", "type", "type"],
         "title": "WanModelLoaderOutput",
         "type": "object"
       },
@@ -91356,12 +90753,7 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "waiting_for_child",
-              "running_child",
-              "completed",
-              "failed"
-            ],
+            "enum": ["waiting_for_child", "running_child", "completed", "failed"],
             "title": "Status",
             "description": "The current workflow-call lifecycle state."
           },
@@ -91464,12 +90856,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "prepared_call_node_id",
-          "source_call_node_id",
-          "workflow_id",
-          "depth"
-        ],
+        "required": ["prepared_call_node_id", "source_call_node_id", "workflow_id", "depth"],
         "title": "WorkflowCallFrame",
         "description": "Represents one workflow-call frame in a nested call chain."
       },
@@ -91666,15 +91053,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "workflow_id",
-          "name",
-          "created_at",
-          "updated_at",
-          "user_id",
-          "is_public",
-          "workflow"
-        ],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
         "title": "WorkflowRecordDTO"
       },
       "WorkflowRecordListItemWithThumbnailDTO": {
@@ -91892,15 +91271,7 @@
           }
         },
         "type": "object",
-        "required": [
-          "workflow_id",
-          "name",
-          "created_at",
-          "updated_at",
-          "user_id",
-          "is_public",
-          "workflow"
-        ],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
         "title": "WorkflowRecordWithThumbnailDTO"
       },
       "WorkflowReturnGetInvocation": {
@@ -92241,13 +91612,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "timestamp",
-          "workflow_id",
-          "user_id",
-          "old_is_public",
-          "new_is_public"
-        ],
+        "required": ["timestamp", "workflow_id", "user_id", "old_is_public", "new_is_public"],
         "title": "WorkflowUpdatedEvent",
         "type": "object"
       },
@@ -93217,17 +92582,7 @@
           }
         },
         "required": ["type", "id"],
-        "tags": [
-          "z-image",
-          "latents",
-          "denoise",
-          "txt2img",
-          "t2i",
-          "t2l",
-          "img2img",
-          "i2i",
-          "l2l"
-        ],
+        "tags": ["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Z-Image + Metadata",
         "type": "object",
         "version": "1.1.0",
@@ -93722,13 +93077,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "type", "type"],
         "title": "ZImageLoRALoaderOutput",
         "type": "object"
       },
@@ -93881,14 +93230,7 @@
             "type": "string"
           }
         },
-        "required": [
-          "output_meta",
-          "transformer",
-          "qwen3_encoder",
-          "vae",
-          "type",
-          "type"
-        ],
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "ZImageModelLoaderOutput",
         "type": "object"
       },
