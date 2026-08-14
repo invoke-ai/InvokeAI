@@ -20,6 +20,29 @@ class NotAMatchError(Exception):
         super().__init__(reason)
 
 
+class InvalidMatchError(Exception):
+    """Exception for when a config class recognises a model and then rejects it as unusable.
+
+    `NotAMatchError` means "this is not my kind of model": classification moves on to the remaining
+    config classes and, if none of them match either, falls back to `Unknown_Config` so the file is
+    still registered. That fallback is right for a file nobody recognises and wrong for one that was
+    recognised and found broken — a truncated checkpoint would be stored as a normal (if unknown)
+    model record and only fail once something tried to load it.
+
+    Raising this instead makes the rejection final: `ModelConfigFactory.from_model_on_disk` returns
+    no config regardless of `allow_unknown`, so nothing is written to the database.
+
+    Deliberately *not* a subclass of `NotAMatchError` — the factory catches that one per candidate
+    class and would swallow this along with it.
+
+    Args:
+        reason: Why the recognised model is unusable.
+    """
+
+    def __init__(self, reason: str):
+        super().__init__(reason)
+
+
 def get_config_dict_or_raise(config_path: Path | set[Path]) -> dict[str, Any]:
     """Load the diffusers/transformers model config file and return it as a dictionary. The config file is expected
     to be in JSON format.
