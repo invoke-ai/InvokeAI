@@ -166,13 +166,30 @@ class WanModelLoaderInvocation(BaseInvocation):
 
                 if getattr(low_config, "variant", None) != main_variant:
                     raise ValueError("The high-noise and low-noise GGUF models must use the same Wan variant.")
-                if {primary_expert, low_expert} != {"high", "low"}:
-                    raise ValueError("A Wan A14B GGUF expert pair must contain one high and one low expert.")
+
+                # The expert tag is a filename heuristic, so 'none' (untagged)
+                # is common on community finetunes. The wiring itself is
+                # explicit user intent — main slot = high, low-noise slot =
+                # low — so an untagged file is taken at its wired position (or
+                # inferred as the complement of its tagged partner). Only a
+                # genuine conflict, both files claiming the *same* expert, is
+                # an error.
+                if primary_expert == low_expert != "none":
+                    raise ValueError(
+                        f"Both selected GGUF models are tagged as the {primary_expert}-noise expert. "
+                        "A Wan A14B expert pair must contain one high and one low expert."
+                    )
+                if primary_expert == "none" and low_expert == "none":
+                    context.logger.warning(
+                        "Neither Wan A14B GGUF filename identifies its expert, so 'Transformer' is assumed to "
+                        "be the high-noise expert and 'Transformer (Low Noise)' the low-noise expert. If the "
+                        "output looks wrong, swap the two models."
+                    )
 
                 # Make sure 'transformer' is the high-noise expert and
                 # 'transformer_low_noise' is the low-noise expert. If the user
                 # accidentally swapped them, swap back.
-                if primary_expert == "low" and low_expert == "high":
+                if primary_expert == "low" or low_expert == "high":
                     transformer = low_id
                     transformer_low_noise = primary_id
                 else:

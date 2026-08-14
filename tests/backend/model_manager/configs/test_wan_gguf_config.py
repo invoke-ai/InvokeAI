@@ -177,6 +177,19 @@ class TestExpertFilenameHeuristic:
             ("Wan2.2-A14B-LowNoise-Q4", "low"),
             ("wan2.2-ti2v-5b-Q4_K_M", "none"),
             ("wan-A14B-flagship", "none"),
+            # Community finetunes often tag the expert with a bare marker
+            # rather than the canonical '<x>_noise' form.
+            ("DasiwaWAN22I2V14BTastysinV8_q5High", "high"),
+            ("DasiwaWAN22I2V14BTastysinV8_q5Low", "low"),
+            ("wan2.2-t2v-a14b-HIGH-Q5_K_M", "high"),
+            ("wan2.2_t2v_a14b_low_q5", "low"),
+            # ...but the bare marker must be a whole word, or names that merely
+            # contain 'high'/'low' as a substring get mistagged.
+            ("wan2.2-a14b-slowmotion-lora-merge-q4", "none"),
+            ("Wan2.2-A14B-Flowstate-Q4", "none"),
+            ("wan2.2-a14b-highres-fix-q4", "none"),
+            # Both markers present -> ambiguous, no guess.
+            ("wan2.2-a14b-high-low-merged-q4", "none"),
         ],
     )
     def test_filename_heuristic(self, name: str, expected: str):

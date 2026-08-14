@@ -108,14 +108,41 @@ def test_gguf_loader_accepts_valid_expert_pair_in_either_order(
             _config("low", WanVariantType.T2V_A14B, "high"),
         ),
         (
-            _config("main", WanVariantType.T2V_A14B, "high"),
-            _config("low", WanVariantType.T2V_A14B, "none"),
+            _config("main", WanVariantType.T2V_A14B, "low"),
+            _config("low", WanVariantType.T2V_A14B, "low"),
         ),
     ],
 )
 def test_gguf_loader_rejects_invalid_expert_pair(main_config: SimpleNamespace, low_config: SimpleNamespace) -> None:
     with pytest.raises(ValueError, match="expert|variant"):
         _invoke(main_config, low_config)
+
+
+@pytest.mark.parametrize(
+    "main_expert,low_expert,expected_high_key",
+    [
+        # The expert tag comes from a filename heuristic, so untagged community
+        # finetunes are common. The wiring is explicit intent: take the untagged
+        # file at its wired position, or as the complement of a tagged partner.
+        ("none", "none", "main"),
+        ("high", "none", "main"),
+        ("none", "low", "main"),
+        ("none", "high", "low"),
+        ("low", "none", "low"),
+    ],
+)
+def test_gguf_loader_falls_back_to_wiring_for_untagged_experts(
+    main_expert: str, low_expert: str, expected_high_key: str
+) -> None:
+    output = _invoke(
+        _config("main", WanVariantType.I2V_A14B, main_expert),
+        _config("low", WanVariantType.I2V_A14B, low_expert),
+    )
+
+    expected_low_key = "low" if expected_high_key == "main" else "main"
+    assert output.transformer.transformer.key == expected_high_key
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == expected_low_key
 
 
 @pytest.mark.parametrize("low_variant", [WanVariantType.TI2V_5B, WanVariantType.T2V_A14B])

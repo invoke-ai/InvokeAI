@@ -1852,18 +1852,36 @@ def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType
     return None
 
 
+# Splits a filename stem into words on both separator and camelCase boundaries:
+# "DasiwaWAN22I2V14B_q5High" -> Dasiwa, WAN, 22, I, 2, V, 14, B, q, 5, High
+_NAME_WORD_RE = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z]*|[a-z]+|\d+")
+
+
 def _detect_wan_gguf_expert(filename: str) -> Literal["high", "low", "none"]:
     """Filename heuristic for the A14B dual-expert MoE.
 
-    Community releases tag each expert in the filename — typically
-    ``high_noise`` / ``low_noise`` (or hyphenated/concatenated variants).
-    Returns 'none' when neither marker is present (single-expert model or
-    ambiguous filename).
+    Community releases tag each expert in the filename. The canonical form is
+    ``high_noise`` / ``low_noise`` (or hyphenated/concatenated variants), but
+    many finetunes only carry a bare ``high`` / ``low`` marker, e.g.
+    ``SomeFinetune_q5High.gguf``. The bare marker is matched as a whole word —
+    separator *or* camelCase delimited — so that names containing ``flow``,
+    ``slowmo`` or ``highres`` don't produce a false positive.
+
+    Returns 'none' when no marker is present (single-expert model) or when
+    markers for both experts are present (ambiguous).
     """
     name = filename.lower()
-    if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
+    is_high = any(s in name for s in ("high_noise", "high-noise", "highnoise"))
+    is_low = any(s in name for s in ("low_noise", "low-noise", "lownoise"))
+
+    if not is_high and not is_low:
+        words = {word.lower() for word in _NAME_WORD_RE.findall(filename)}
+        is_high = "high" in words
+        is_low = "low" in words
+
+    if is_high and not is_low:
         return "high"
-    if any(s in name for s in ("low_noise", "low-noise", "lownoise")):
+    if is_low and not is_high:
         return "low"
     return "none"
 
