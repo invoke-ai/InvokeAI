@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   resolveMany: vi.fn(),
+  selectBoard: vi.fn(),
   selectItem: vi.fn(),
 }));
 
@@ -13,7 +14,9 @@ vi.mock('@features/gallery', () => ({
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
-  useWorkbenchCommands: () => ({ gallery: { selectItem: mocks.selectItem } }),
+  useWorkbenchCommands: () => ({
+    gallery: { selectBoard: mocks.selectBoard, selectItem: mocks.selectItem },
+  }),
 }));
 
 import { useSelectMapImage } from './useSelectMapImage';
@@ -74,6 +77,7 @@ afterEach(async () => {
     await unmount();
   }
   mocks.resolveMany.mockReset();
+  mocks.selectBoard.mockReset();
   mocks.selectItem.mockReset();
 });
 
@@ -86,6 +90,31 @@ describe('useSelectMapImage', () => {
 
     expect(mocks.selectItem).toHaveBeenCalledTimes(1);
     expect(mocks.selectItem.mock.calls[0]?.[0]).toEqual({ image_name: 'a.png' });
+  });
+
+  it("selects the image's board before the image itself", async () => {
+    // The map spans every accessible board, but selectGalleryItem stamps the
+    // navigation query from whatever list the gallery is currently showing. A
+    // cross-board click without this left that query describing a list the
+    // image was never in, and Preview's next/prev found no cursor and went
+    // dead until the user re-selected from the grid.
+    mocks.resolveMany.mockResolvedValue([{ boardId: 'board-portraits', image_name: 'a.png' }]);
+    await mount();
+
+    await flush(() => handle.click?.('a.png'));
+
+    expect(mocks.selectBoard).toHaveBeenCalledWith('board-portraits');
+    expect(mocks.selectBoard.mock.invocationCallOrder[0]).toBeLessThan(mocks.selectItem.mock.invocationCallOrder[0]);
+  });
+
+  it('does not touch the board for a click that never resolves an image', async () => {
+    mocks.resolveMany.mockResolvedValue([]);
+    await mount();
+
+    await flush(() => handle.click?.('gone.png'));
+
+    expect(mocks.selectBoard).not.toHaveBeenCalled();
+    expect(mocks.selectItem).not.toHaveBeenCalled();
   });
 
   it('ignores a slow click that resolves after a newer one', async () => {
