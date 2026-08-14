@@ -36,6 +36,22 @@ export const useSelectMapImage = (): ((imageName: string) => void) => {
             return;
           }
 
+          // Select the image's board first. The map spans every accessible
+          // board, but `selectGalleryItem` stamps `selectedImageQuery` from
+          // whatever list the gallery is CURRENTLY showing — it takes the
+          // selection on faith as "an item from the visible page". Selecting a
+          // point from another board without this left the stored query
+          // describing a list the image was never in, so Preview's next/prev
+          // found no cursor and went dead until the user re-selected from the
+          // grid. Mirrors the command palette's reveal-in-gallery.
+          //
+          // This lands the gallery on page 0 of that board (selectGalleryBoard
+          // resets the page), so next/prev works whenever the image is on the
+          // first page. Placing it exactly would need the board's ordering,
+          // which only the gallery query knows — Preview does it that way, from
+          // pages it has already loaded. The query is at least coherent now:
+          // it describes a real list, and any grid selection re-anchors it.
+          commands.gallery.selectBoard(image.boardId);
           commands.gallery.selectItem(legacyGeneratedImageToGalleryItem(image));
         })
         .catch(() => {

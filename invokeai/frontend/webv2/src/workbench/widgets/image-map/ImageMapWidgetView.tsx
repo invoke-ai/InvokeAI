@@ -2,15 +2,24 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
 import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
-import { lazy, useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
-// Lazy so the plotly bundle (its own vite chunk) loads only when the widget
-// is actually shown; WidgetRenderer supplies the Suspense fallback.
+// Lazy so the plotly bundle (its own vite chunk, ~1.5MB) loads only when the
+// widget is actually shown.
 const ImageMapPlot = lazy(() => import('./ImageMapPlot'));
 
 const handleRefresh = () => {
   void refreshImageMapPoints();
 };
+
+// Module scope: an inline element would be a new value on every render, which
+// is both what react-perf/jsx-no-jsx-as-prop forbids and pointless here — the
+// fallback never varies.
+const plotLoadingFallback = (
+  <Center h="full">
+    <Spinner size="lg" />
+  </Center>
+);
 
 /**
  * Semantic map of the gallery: every image embedded by the backend's image
@@ -41,7 +50,19 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   // A working map beats a full-screen error: when a refresh fails but prior
   // points exist, keep showing them (the next successful refresh recovers).
   if (data && data.points.length > 0) {
-    return <ImageMapPlot />;
+    // Its own boundary, rather than leaning on WidgetRenderer's. That one wraps
+    // the whole widget, so suspending on the plotly chunk replaced the entire
+    // panel — header and actions menu included — with a skeleton frame, and
+    // then held the resolved content for React's fallback throttle on top. It
+    // also sits above `loadWidget`, which preloads only the implementation
+    // chunk and cannot reach this nested import, so a preset switch onto an
+    // already-loaded map suspended anyway. Confining it here keeps the frame
+    // mounted and the spinner where the plot will appear.
+    return (
+      <Suspense fallback={plotLoadingFallback}>
+        <ImageMapPlot />
+      </Suspense>
+    );
   }
 
   if (loadState === 'idle' || loadState === 'loading') {
