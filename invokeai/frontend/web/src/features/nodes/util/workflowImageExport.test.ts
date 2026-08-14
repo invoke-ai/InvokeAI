@@ -9,6 +9,7 @@ import {
   getWorkflowExportStagingStyle,
   getWorkflowImageDimensions,
   getWorkflowSvgExportStyles,
+  hideWorkflowExportStatusIndicators,
   sanitizeWorkflowImageFilename,
   setWorkflowExportNodeOpacity,
   SVG_EXPORT_STYLE_PROPERTIES,
@@ -60,6 +61,12 @@ describe('workflow image export', () => {
     });
   });
 
+  it('preserves single-line field title styles in the export clone', () => {
+    expect(EXPORT_STYLE_PROPERTIES).toEqual(
+      expect.arrayContaining(['text-overflow', '-webkit-line-clamp', '-webkit-box-orient'])
+    );
+  });
+
   it('extracts computed SVG edge styles for inline capture', () => {
     const computedStyle = {
       getPropertyValue: (property: string) =>
@@ -79,12 +86,26 @@ describe('workflow image export', () => {
     const setProperty = vi.fn();
     const nodeWrapper = { style: { setProperty } } as unknown as HTMLElement;
     const root = {
-      querySelectorAll: (selector: string) => (selector === '.react-flow__node > [data-is-selected]' ? [nodeWrapper] : []),
+      querySelectorAll: (selector: string) =>
+        selector === '.react-flow__node > [data-is-selected]' ? [nodeWrapper] : [],
     } as unknown as HTMLElement;
 
     setWorkflowExportNodeOpacity(root);
 
     expect(setProperty).toHaveBeenCalledWith('opacity', '1', 'important');
+  });
+
+  it('hides node status indicators from the export clone', () => {
+    const setProperty = vi.fn();
+    const statusIndicator = { style: { setProperty } } as unknown as HTMLElement;
+    const root = {
+      querySelectorAll: (selector: string) =>
+        selector === '[data-node-status-indicator="true"]' ? [statusIndicator] : [],
+    } as unknown as HTMLElement;
+
+    hideWorkflowExportStatusIndicators(root);
+
+    expect(setProperty).toHaveBeenCalledWith('display', 'none', 'important');
   });
 
   it('keeps ordinary workflow names unchanged', () => {
