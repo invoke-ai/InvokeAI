@@ -76,7 +76,12 @@ import {
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
-import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
+import {
+  isExternalApiModelConfig,
+  isFluxKontextModelConfig,
+  isFluxReduxModelConfig,
+  isWanSingleFileMainModelConfig,
+} from 'services/api/types';
 
 import { getKrea2ComponentUpdates } from './krea2ComponentSync';
 
@@ -621,16 +626,19 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
       // Wan 2.2: auto-default Component Source / standalone VAE / standalone T5 encoder
       // when the new model is Wan. Runs on every Wan selection (including same-base
-      // switches like Diffusers Wan → GGUF Wan) so the user doesn't have to dig into
-      // Advanced when picking a GGUF main. Only sets fields that are currently empty
-      // and only does it for GGUF mains — Diffusers mains carry everything themselves.
+      // switches like Diffusers Wan → single-file Wan) so the user doesn't have to dig
+      // into Advanced when picking a single-file main. Only sets fields that are
+      // currently empty, and only for single-file mains (GGUF or safetensors
+      // checkpoint) — Diffusers mains carry everything themselves.
       if (newBase === 'wan') {
         const modelConfigsResult = selectModelConfigsQuery(state);
         const newModelConfig = modelConfigsResult.data
           ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
           : null;
-        const isNewModelGGUF = newModelConfig?.type === 'main' && newModelConfig.format === 'gguf_quantized';
-        if (isNewModelGGUF) {
+        // Must stay in step with the readiness pre-flight: if that demands a VAE and
+        // encoder for this format but this doesn't offer to fill them, selecting the
+        // model immediately blocks Invoke with nothing populated.
+        if (newModelConfig && isWanSingleFileMainModelConfig(newModelConfig)) {
           const { wanComponentSource, wanVaeModel, wanT5EncoderModel } = state.params;
           // Match component source by variant family — A14B (t2v_a14b/i2v_a14b) and
           // TI2V-5B use different VAEs (16-ch vs 48-ch); a mismatched component source

@@ -689,3 +689,135 @@ describe('FLUX.1 readiness – self-contained SDNQ pipeline', () => {
     expect(flux1ComponentReasons(reasons)).toHaveLength(3);
   });
 });
+
+// --- Wan 2.2 -----------------------------------------------------------------
+//
+// Regression cover for #9463: single-file Wan mains are transformer-only and need a
+// VAE + UMT5-XXL encoder from elsewhere. That was originally gated on the GGUF
+// format alone, so when the safetensors checkpoint format was added the pre-flight
+// silently skipped it and Invoke was enabled for a graph that could only fail in
+// the model loader.
+
+const wanGgufModel = {
+  key: 'wan-gguf',
+  hash: 'h',
+  name: 'Wan 2.2 T2V A14B GGUF',
+  base: 'wan',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 't2v_a14b',
+  expert: 'high',
+} as unknown as MainModelConfig;
+
+const wanCheckpointModel = {
+  key: 'wan-checkpoint',
+  hash: 'h',
+  name: 'Wan 2.2 T2V A14B safetensors',
+  base: 'wan',
+  type: 'main',
+  format: 'checkpoint',
+  variant: 't2v_a14b',
+  expert: 'high',
+} as unknown as MainModelConfig;
+
+const wanDiffusersModel = {
+  key: 'wan-diffusers',
+  hash: 'h',
+  name: 'Wan 2.2 T2V A14B Diffusers',
+  base: 'wan',
+  type: 'main',
+  format: 'diffusers',
+  variant: 't2v_a14b',
+} as unknown as MainModelConfig;
+
+const buildWanTabArg = (overrides: {
+  model?: MainModelConfig | null;
+  wanVaeModel?: unknown;
+  wanT5EncoderModel?: unknown;
+  wanComponentSource?: unknown;
+}) => ({
+  isConnected: true,
+  model: overrides.model ?? wanCheckpointModel,
+  params: {
+    ...baseParams,
+    wanVaeModel: overrides.wanVaeModel ?? null,
+    wanT5EncoderModel: overrides.wanT5EncoderModel ?? null,
+    wanComponentSource: overrides.wanComponentSource ?? null,
+  } as unknown as ParamsState,
+  refImages: baseRefImages,
+  loras: [],
+  dynamicPrompts: baseDynamicPrompts,
+  hasFlux2DiffusersVaeSource: false,
+  hasFlux2DiffusersQwen3Source: false,
+  hasFlux2DevDiffusersSource: false,
+});
+
+const hasWanComponentReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('noWanComponentSourceSelected'));
+
+describe('Wan 2.2 readiness checks – generate tab', () => {
+  it.each([
+    ['GGUF', wanGgufModel],
+    ['single-file checkpoint', wanCheckpointModel],
+  ])('errors when a %s main has no VAE or encoder source', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model }));
+    expect(hasWanComponentReason(reasons)).toBe(true);
+  });
+
+  it.each([
+    ['GGUF', wanGgufModel],
+    ['single-file checkpoint', wanCheckpointModel],
+  ])('no error when a %s main has standalone VAE + encoder', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model, wanVaeModel: { key: 'vae' }, wanT5EncoderModel: { key: 't5' } })
+    );
+    expect(hasWanComponentReason(reasons)).toBe(false);
+  });
+
+  it('errors when only one of VAE / encoder is supplied', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanCheckpointModel, wanVaeModel: { key: 'vae' } })
+    );
+    expect(hasWanComponentReason(reasons)).toBe(true);
+  });
+
+  it('no error when a Component Source supplies both', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanCheckpointModel, wanComponentSource: { key: 'src' } })
+    );
+    expect(hasWanComponentReason(reasons)).toBe(false);
+  });
+
+  it('no error for a Diffusers main, which carries its own components', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model: wanDiffusersModel }));
+    expect(hasWanComponentReason(reasons)).toBe(false);
+  });
+});
+
+describe('Wan 2.2 readiness checks – canvas tab', () => {
+  it.each([
+    ['GGUF', wanGgufModel],
+    ['single-file checkpoint', wanCheckpointModel],
+  ])('errors when a %s main has no VAE or encoder source', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab({
+      ...buildWanTabArg({ model }),
+      canvas: {
+        bbox: {
+          scaleMethod: 'none',
+          rect: { width: 1024, height: 1024 },
+          scaledSize: { width: 1024, height: 1024 },
+        },
+        controlLayers: { entities: [] },
+        regionalGuidance: { entities: [] },
+        rasterLayers: { entities: [] },
+        inpaintMasks: { entities: [] },
+      },
+      canvasIsFiltering: false,
+      canvasIsTransforming: false,
+      canvasIsRasterizing: false,
+      canvasIsCompositing: false,
+      canvasIsSelectingObject: false,
+    } as never);
+    expect(hasWanComponentReason(reasons)).toBe(true);
+  });
+});

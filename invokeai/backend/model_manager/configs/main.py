@@ -1942,13 +1942,32 @@ def _find_unsupported_wan_variant_marker(state_dict: dict[str | int, Any]) -> st
     """
     keys = [key for key in state_dict.keys() if isinstance(key, str)]
 
-    if any("face_adapter." in key or "motion_encoder." in key for key in keys):
+    def has(*markers: str) -> bool:
+        return any(marker in key for key in keys for marker in markers)
+
+    if has("face_adapter.", "motion_encoder."):
         return (
             "state dict has face-adapter / motion-encoder branches, which belong to Wan Animate; "
             "character animation and replacement are not supported yet"
         )
 
-    if any("vace_blocks." in key for key in keys):
+    if has("audio_injector.", "casual_audio_encoder.", "cond_encoder.", "frame_packer."):
+        return (
+            "state dict has audio-conditioning branches, which belong to Wan S2V; "
+            "audio-driven video is not supported yet"
+        )
+
+    if has("control_adapter."):
+        # Fun-Control-Camera is the dangerous one: 36 in-channels and otherwise
+        # key-identical to plain I2V-A14B, and it ships as a properly tagged
+        # high/low pair, so the expert-pairing check passes too. Without this it
+        # would load and render as an ordinary I2V, ignoring every camera input.
+        return (
+            "state dict has a control-adapter branch, which belongs to the Wan Fun-Control family; "
+            "camera and control conditioning are not supported yet"
+        )
+
+    if has("vace_blocks."):
         return "state dict has VACE control blocks, and VACE models are not supported yet"
 
     return None
@@ -1963,6 +1982,7 @@ def _find_unsupported_wan_variant_marker(state_dict: dict[str | int, Any]) -> st
 # a checkpoint whose expert can only be recovered from its name.
 _WAN_EXPERT_DISQUALIFIERS = frozenset(
     {
+        "angle",
         "cfg",
         "guidance",
         "vram",
@@ -1985,69 +2005,116 @@ _WAN_EXPERT_DISQUALIFIERS = frozenset(
 def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
     """Filename heuristic for the A14B dual-expert MoE.
 
-    Two conventions dominate, and both have to work — the expert is not recoverable
-    from the weights, and single-file releases carry no metadata declaring it
-    (sampled across the Kijai catalogue: no ``__metadata__`` at all):
+    Two conventions dominate and both have to work, because the expert cannot be
+    read off the weights:
 
     * ``high_noise`` / ``low_noise`` and its spellings — hyphenated, underscored,
-      spaced, fused (``highnoise``), camel-cased (``HighNoise``), reversed
-      (``noise_high``). This is what Comfy-Org's repackaged repos use.
+      spaced, fused (``highnoise``, ``LOWNOISEFP8``), camel-cased (``HighNoise``),
+      reversed (``noise_high``). This is what Comfy-Org's repackaged repos use.
     * A **bare** ``HIGH`` / ``LOW`` token, e.g.
       ``Wan2_2-T2V-A14B-HIGH_fp8_e4m3fn_scaled_KJ.safetensors``. This is what the
       widely-mirrored Kijai fp8 catalogue and many CivitAI fine-tunes use, so
       refusing to read it would leave most single-file A14B models unpairable.
 
-    An explicit ``noise`` marker always wins over a bare token found earlier in the
-    name, which settles names carrying both (``..._low_high_noise_...``).
+    Some releases also declare the expert in file metadata; ``_resolve_wan_expert``
+    consults that when the name yields nothing.
+
+    Precedence, in order:
+
+    1. An explicit ``noise`` marker anywhere wins outright — it settles names
+       carrying both, such as ``..._low_high_noise_...``.
+    2. Otherwise the **last** surviving bare marker wins. Last, not first, because
+       real names put descriptive words up front and the expert tag at the end
+       (``Extream Low Angle HIGH - Wan2.2 ...`` is the HIGH expert).
+    3. If bare ``high`` *and* bare ``low`` both survive, the name is describing a
+       file that serves both (``... I2V HIGH+LOW ...``) or is simply ambiguous, so
+       return 'none' rather than guess. For a LoRA 'none' means "apply to both",
+       which is the right answer for those.
 
     A bare token is ignored when a neighbour marks it as an adjective about
-    something else (``lowVRAM``, ``low-cfg``, ``highRes``) — see
+    something else (``lowVRAM``, ``low-cfg``, ``Low Angle``) — see
     ``_WAN_EXPERT_DISQUALIFIERS``. TI2V-5B is handled structurally by the callers,
-    which force 'none' because the model is single-transformer, so the common
-    ``...5B-lowVRAM`` style of name can't reach this at all.
+    which force 'none' because the model is single-transformer.
 
-    Matching is per token, so a marker can't fire on a substring: ``slow_noise``,
-    ``flownoise`` and ``highway`` are all left alone.
+    Matching is per token, so a bare marker can't fire on a substring
+    (``highway``), and the fused form is anchored at a token boundary so
+    ``slow_noise`` and ``flownoise`` are left alone.
 
     Returns 'none' for an untagged filename.
     """
     name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", filename).lower()
     tokens = [token for token in re.split(r"[^a-z0-9]+", name) if token]
 
-    bare: Literal["high", "low", "none"] = "none"
+    bare: list[str] = []
     for index, token in enumerate(tokens):
         for marker in ("high", "low"):
-            if token in (f"{marker}noise", f"noise{marker}"):
+            # Fused with 'noise'. Anchored: startswith catches `lownoisefp8`, and
+            # only the reversed form may match at the end — `endswith("lownoise")`
+            # would wrongly claim `slownoise`.
+            if token.startswith(f"{marker}noise") or token.endswith(f"noise{marker}"):
                 return marker  # type: ignore[return-value]
             if token != marker:
                 continue
             neighbours = tokens[max(index - 1, 0) : index] + tokens[index + 1 : index + 2]
             if "noise" in neighbours:
-                return marker  # type: ignore[return-value]
-            # Bare token: remember it, but keep scanning — an explicit "...noise"
-            # marker later in the name is the better answer.
-            if bare == "none" and not _WAN_EXPERT_DISQUALIFIERS.intersection(neighbours):
-                bare = marker  # type: ignore[assignment]
-    return bare
+                return marker
+            # Only the *following* token can disqualify: these are adjective-noun
+            # pairs, so the noun comes second. "low angle" is a camera angle, but
+            # "Angle HIGH" is the high-noise expert of a camera-angle LoRA.
+            following = tokens[index + 1 : index + 2]
+            if not _WAN_EXPERT_DISQUALIFIERS.intersection(following):
+                bare.append(marker)
+
+    if len(set(bare)) == 1:
+        return bare[-1]  # type: ignore[return-value]
+    return "none"
 
 
 def _resolve_wan_expert(
     mod: ModelOnDisk, override_fields: dict[str, Any], variant: WanVariantType
 ) -> Literal["high", "low", "none"]:
-    """Settle the MoE expert field, consuming any explicit override.
+    """Settle the MoE expert field: explicit override, then filename, then metadata.
+
+    The override is consumed here so it can't reach the constructor twice. Note it is
+    not reachable through the install API today — ``ModelRecordChanges`` has no
+    ``expert`` field and ``ModelConfigFactory.build_common_fields`` forwards a fixed
+    whitelist that excludes it — so in practice a mis-detected expert can only be
+    corrected by renaming the file and re-importing.
 
     TI2V-5B is a single-transformer model, so the expert is meaningless there and is
     pinned to 'none'. That is not cosmetic: the frontend's low-noise expert picker
     selects on ``expert == 'low'``, so a TI2V-5B file whose name happens to contain a
     bare ``low`` (``...-5B-lowVRAM``, ``...-Turbo-lowSteps``) would otherwise be
     offered as an A14B partner expert it can never be.
+
+    Metadata is consulted only as a fallback, not as the primary signal, even though
+    it is the more trustworthy of the two. Renaming a file is the one lever a user
+    has to correct a mis-detected expert — there is no UI for the field — and the
+    Wan model loader's error message tells them to use it. Letting an embedded
+    ``model_type`` override the name would take that lever away.
+
+    Coverage is uneven, which is why both signals are needed. Sampled 2026-08-13:
+    every Wan 2.2 safetensors in ``Kijai/WanVideo_comfy_fp8_scaled`` carries
+    ``__metadata__["model_type"]`` naming the expert (``Wan2_2-I2V-A14B-high``),
+    while none of the ``Comfy-Org/Wan_2.2_ComfyUI_Repackaged`` files carry any
+    ``__metadata__`` at all. GGUF releases use ``general.name`` instead.
     """
     explicit_expert = override_fields.pop("expert", None)
     if explicit_expert is not None:
         return explicit_expert  # type: ignore[no-any-return]
+
     if variant == WanVariantType.TI2V_5B:
         return "none"
-    return _detect_wan_expert(mod.path.stem)
+
+    expert = _detect_wan_expert(mod.path.stem)
+    if expert != "none":
+        return expert
+
+    metadata = mod.metadata()
+    declared = metadata.get("model_type") or metadata.get("general.name") or ""
+    if declared:
+        return _detect_wan_expert(declared)
+    return "none"
 
 
 class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):

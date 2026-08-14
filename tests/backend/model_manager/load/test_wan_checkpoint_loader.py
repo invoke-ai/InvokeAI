@@ -185,6 +185,27 @@ class TestEndToEnd:
         # ...without eating scale_shift_table, which is a real Wan parameter.
         assert "scale_shift_table" in handed_over
 
+    def test_extra_modules_are_refused_not_dropped(self, tmp_path: Path) -> None:
+        """`strict=False` silently discards weights the model has nowhere to put.
+
+        Several Wan 2.2 derivatives are supersets of the plain transformer — real
+        wan2.2_fun_camera_high_noise_14B_bf16.safetensors adds 6 `control_adapter.*`
+        keys, S2V adds 165, Animate adds 127. They build a correctly-shaped model and
+        report zero missing keys, so without this check they load clean and then
+        generate with their entire conditioning branch absent.
+
+        The probe turns away the families we know by name; this is the generic
+        backstop for the ones nobody has enumerated yet.
+        """
+        sd = _tiny_model().state_dict()
+        sd["control_adapter.conv.weight"] = torch.zeros(128, 16, 1, 2, 2)
+        sd["control_adapter.residual_blocks.0.conv1.weight"] = torch.zeros(128, 128)
+        path = tmp_path / "wan22-fun-camera-high_noise.safetensors"
+        save_file(sd, path)
+
+        with pytest.raises(RuntimeError, match="control_adapter"):
+            _load(path)
+
     def test_missing_parameter_is_reported(self, tmp_path: Path) -> None:
         sd = _tiny_model().state_dict()
         del sd["blocks.1.attn1.to_q.weight"]

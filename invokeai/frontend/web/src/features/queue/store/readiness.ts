@@ -404,8 +404,10 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   if (model && isWanSingleFileMainModelConfig(model)) {
     // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the
-    // transformer; VAE + UMT5-XXL encoder must
-    // come from either standalone models or the Component Source (Diffusers).
+    // transformer; VAE + UMT5-XXL encoder must come from either standalone models
+    // or the Component Source (Diffusers). Keep this in step with the auto-fill in
+    // modelSelected.ts: if that doesn't offer to populate the slots for a format
+    // this demands them for, selecting the model just blocks Invoke.
     // The low-noise A14B partner expert is optional — if omitted, the loader
     // will use the high-noise expert for the whole schedule (lower quality
     // but still produces an image).
@@ -1160,8 +1162,10 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (model && isWanSingleFileMainModelConfig(model)) {
     // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the
-    // transformer; VAE + UMT5-XXL encoder must
-    // come from either standalone models or the Component Source (Diffusers).
+    // transformer; VAE + UMT5-XXL encoder must come from either standalone models
+    // or the Component Source (Diffusers). Keep this in step with the auto-fill in
+    // modelSelected.ts: if that doesn't offer to populate the slots for a format
+    // this demands them for, selecting the model just blocks Invoke.
     // The low-noise A14B partner expert is optional — if omitted, the loader
     // will use the high-noise expert for the whole schedule (lower quality
     // but still produces an image).

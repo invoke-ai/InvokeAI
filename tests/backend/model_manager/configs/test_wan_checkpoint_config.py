@@ -19,6 +19,7 @@ from invokeai.backend.model_manager.configs.main import (
     _detect_wan_expert,
     _find_wan_2_1_marker,
 )
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
@@ -181,6 +182,29 @@ class TestRejects:
         sd["img_emb.proj.0.bias"] = _t(1280)
         with pytest.raises(NotAMatchError, match="Animate"):
             _probe(tmp_path, "wan2.2_animate_14B_bf16.safetensors", sd)
+
+    def test_s2v(self, tmp_path: Path) -> None:
+        """Wan S2V is 16-channel and otherwise key-identical to plain T2V-A14B, so
+        only its audio branches distinguish it. Prefixes taken from the real
+        wan2.2_s2v_14B_bf16.safetensors header (165 such keys of 1260)."""
+        sd = _native_sd(16)
+        sd["audio_injector.injector.0.k.weight"] = _t(A14B_DIM, A14B_DIM)
+        sd["casual_audio_encoder.encoder.final_proj.weight"] = _t(A14B_DIM, 1024)
+        sd["cond_encoder.weight"] = _t(A14B_DIM, 16, 1, 2, 2)
+        sd["frame_packer.proj.weight"] = _t(A14B_DIM, 16)
+        with pytest.raises(NotAMatchError, match="S2V"):
+            _probe(tmp_path, "wan2.2_s2v_14B_bf16.safetensors", sd)
+
+    def test_fun_control_camera(self, tmp_path: Path) -> None:
+        """The most dangerous of the unsupported variants: 36 channels, key-identical
+        to plain I2V-A14B apart from control_adapter, AND shipped as a properly
+        tagged high/low pair — so the expert-pairing check would pass and it would
+        render as an ordinary I2V, silently ignoring every camera input."""
+        sd = _native_sd(36)
+        sd["control_adapter.conv.weight"] = _t(A14B_DIM, 36, 1, 2, 2)
+        sd["control_adapter.residual_blocks.0.conv1.weight"] = _t(A14B_DIM, A14B_DIM)
+        with pytest.raises(NotAMatchError, match="Fun-Control"):
+            _probe(tmp_path, "wan2.2_fun_camera_high_noise_14B_bf16.safetensors", sd)
 
     def test_vace(self, tmp_path: Path) -> None:
         """VACE exists for both Wan 2.1 and 2.2; either way this loader has no
@@ -350,6 +374,8 @@ class TestExpertFilenameHeuristic:
             ("Wan2.2_NSFW_i2v_14b_high_lighting_fp16_v2.1", "high"),
             ("wan2.2_T2V_fp8_LOW_lightning_edition", "low"),
             ("wan22EnhancedNSFWSVICamera_nsfwFASTMOVEFP8Low", "low"),
+            # A marker fused to an adjacent run of characters, not just to "noise".
+            ("WAN2.2t2vLOWNOISEFP8", "low"),
             # --- bare high/low used as an adjective about something else ---
             ("Wan2.2-A14B-T2V-lowCFG-merge", "none"),
             ("wan2.2-a14b-t2v-4step-low-cfg-merge", "none"),
@@ -357,6 +383,18 @@ class TestExpertFilenameHeuristic:
             ("Wan2.2_A14B_highRes_finetune", "none"),
             ("Wan2.2_A14B_lowVRAM", "none"),
             ("Wan2.2-A14B-HighQuality", "none"),
+            ("wan-14B_vace_phantom_v2_LowSteps[Causvid]_fp8_e4m3fn", "none"),
+            # ...but only the FOLLOWING token disqualifies. "Low Angle" is a camera
+            # angle; "Angle HIGH" is the high-noise expert of a camera-angle LoRA.
+            ("Extream Low Angle HIGH - Wan2.2 - v1 low-angle shot", "high"),
+            ("Wan22_I2V_VBVR_HIGH_rank_64_fp16", "high"),
+            ("Wan2.2_Remix_NSFW_i2v_14b_low_lighting_fp16_v2.1", "low"),
+            # --- a file that serves BOTH experts must not be tagged with one.
+            # For a LoRA, 'none' means "apply to both", which is the right answer. ---
+            ("Wan2.2-I2V-AnalBlasting-HIGH-LOW", "none"),
+            ("Nier yorha HIGH + LOW - Wan2.2 - nier", "none"),
+            ("Anal Insertion I2V LOW + HIGH - Wan2.2 - v2", "none"),
+            ("wan2.2-i2v-low-to-high-lora", "none"),
             # --- no marker at all ---
             ("wan2.2-ti2v-5b-Q4_K_M", "none"),
             ("wan-A14B-flagship", "none"),
@@ -373,6 +411,42 @@ class TestExpertFilenameHeuristic:
     )
     def test_filename_heuristic(self, name: str, expected: str) -> None:
         assert _detect_wan_expert(name) == expected
+
+    @pytest.mark.parametrize(
+        "declared, expected",
+        [
+            ({"model_type": "Wan22-I2V-A14B-low"}, "low"),
+            ({"model_type": "Wan2_2-T2V-A14B-HIGH"}, "high"),
+            ({"general.name": "Wan2.2 T2V A14B high noise"}, "high"),
+            ({"model_type": "Wan2_2-I2V-A14B"}, "none"),
+            ({"format": "pt"}, "none"),
+        ],
+    )
+    def test_expert_falls_back_to_declared_metadata(self, tmp_path: Path, declared: dict, expected: str) -> None:
+        """Sampled 2026-08-13: every Wan 2.2 safetensors in Kijai/WanVideo_comfy_fp8_scaled
+        carries __metadata__["model_type"] naming the expert, while the Comfy-Org
+        repackaged files carry no __metadata__ at all — hence filename first, metadata
+        as the fallback, and neither alone is sufficient."""
+        from safetensors.torch import save_file
+
+        # A name with no marker at all, so only the metadata can settle the expert.
+        path = tmp_path / "my-wan-model.safetensors"
+        save_file(_native_sd(36), path, metadata={k: str(v) for k, v in declared.items()})
+
+        config = Main_Checkpoint_Wan_Config.from_model_on_disk(ModelOnDisk(path), _build_overrides(path, path.stem))
+        assert config.expert == expected
+
+    def test_filename_outranks_metadata(self, tmp_path: Path) -> None:
+        """Renaming the file is the only lever a user has to correct a mis-detected
+        expert — there is no UI for the field, and the Wan model loader's error tells
+        them to use it. An embedded model_type must not override that."""
+        from safetensors.torch import save_file
+
+        path = tmp_path / "Wan2.2-A14B-I2V-high_noise.safetensors"
+        save_file(_native_sd(36), path, metadata={"model_type": "Wan22-I2V-A14B-low"})
+
+        config = Main_Checkpoint_Wan_Config.from_model_on_disk(ModelOnDisk(path), _build_overrides(path, path.stem))
+        assert config.expert == "high"
 
     @pytest.mark.parametrize("name", ["Wan2.2_TI2V_5B_lowVRAM", "Wan2.2-TI2V-5B-Turbo-lowSteps", "wan22-5b-LOW"])
     def test_ti2v_5b_never_gets_an_expert(self, tmp_path: Path, name: str) -> None:

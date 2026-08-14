@@ -186,6 +186,38 @@ def _unwrap_unquantized_to_compute_dtype(state_dict: dict) -> dict:
     return unwrapped
 
 
+def _raise_for_incompatible_keys(incompatible_keys: Any, source: str) -> None:
+    """Fail loudly on anything ``load_state_dict(strict=False)`` quietly discarded.
+
+    Missing keys are the obvious error. Unexpected keys matter just as much here and
+    are far easier to miss: several Wan 2.2 derivatives are supersets of the plain
+    transformer — Fun-Camera adds ``control_adapter.*`` (6 keys), S2V adds
+    ``audio_injector``/``cond_encoder``/``frame_packer`` (165 keys), Animate adds
+    ``face_adapter``/``motion_encoder`` (127 keys). They match the probe, build a
+    correctly-shaped ``WanTransformer3DModel``, report zero missing keys, and then
+    generate with the entire branch they were built around silently absent.
+
+    ``configs.main._find_unsupported_wan_variant_marker`` turns away the families we
+    know by name; this is the generic backstop, so a derivative nobody has enumerated
+    yet produces an error instead of quietly degraded output. Every supported Wan 2.2
+    release checked against this loader yields zero unexpected keys, so there is no
+    benign case to allow through.
+    """
+    if incompatible_keys.missing_keys:
+        raise RuntimeError(f"{source} is missing model parameters: {sorted(incompatible_keys.missing_keys)[:10]}")
+
+    unexpected = [key for key in incompatible_keys.unexpected_keys if isinstance(key, str)]
+    if unexpected:
+        # Report the distinct top-level module names rather than hundreds of keys.
+        modules = sorted({key.split(".")[0] for key in unexpected})
+        raise RuntimeError(
+            f"{source} has {len(unexpected)} weights that WanTransformer3DModel has nowhere to put "
+            f"(modules: {', '.join(modules[:8])}). This is a Wan variant with extra conditioning "
+            "branches — Animate, S2V, Fun-Camera and similar — which InvokeAI cannot run faithfully; "
+            "loading it anyway would silently ignore that conditioning."
+        )
+
+
 def _tensor_shape(tensor: Any) -> tuple[int, ...]:
     """Logical shape of a tensor, unwrapping GGMLTensor's packed storage.
 
@@ -330,8 +362,7 @@ class WanGGUFCheckpointModel(ModelLoader):
             model = WanTransformer3DModel(**model_config)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
-        if incompatible_keys.missing_keys:
-            raise RuntimeError(f"GGUF state dict is missing model parameters: {incompatible_keys.missing_keys}")
+        _raise_for_incompatible_keys(incompatible_keys, source="GGUF state dict")
         return model
 
 
@@ -414,10 +445,7 @@ class WanCheckpointModel(ModelLoader):
         self._ram_cache.make_room(new_sd_size)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
-        if incompatible_keys.missing_keys:
-            raise RuntimeError(
-                f"Wan checkpoint is missing model parameters: {sorted(incompatible_keys.missing_keys)[:10]}"
-            )
+        _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
         return model
 
 
