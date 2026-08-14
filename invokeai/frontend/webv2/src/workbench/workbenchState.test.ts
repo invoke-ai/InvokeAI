@@ -391,6 +391,7 @@ describe('workbench widget region defaults', () => {
 
     expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
       'gallery',
+      'image-map',
       'preview',
       'queue',
       'layers',
@@ -398,6 +399,46 @@ describe('workbench widget region defaults', () => {
       'project',
     ]);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
+  });
+
+  it('adds Image Map to an untouched pre-image-map right rail so it does not read as drifted', () => {
+    // The built-in presets now list image-map. A project persisted before that
+    // keeps the old rail, so without this migration every existing user's
+    // layout compares unequal to the preset it was loaded from: the topbar
+    // shows an unsaved-changes dot and offers to revert a layout they never
+    // edited, and the widget itself is only reachable from the enable menu.
+    const initial = createInitialWorkbenchState();
+    const withRightIds = (instanceIds: Project['widgetRegions']['right']['instanceIds']): WorkbenchState => ({
+      ...initial,
+      projects: initial.projects.map((project) => ({
+        ...project,
+        widgetRegions: {
+          ...project.widgetRegions,
+          right: { ...project.widgetRegions.right, instanceIds },
+        },
+      })),
+    });
+    const preImageMapDefault = withRightIds(['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project']);
+    const customized = withRightIds(['preview', 'gallery', 'queue']);
+
+    const hydratedDefault = workbenchReducer(initial, { state: preImageMapDefault, type: 'hydrateWorkbench' });
+    const hydratedCustomized = workbenchReducer(initial, { state: customized, type: 'hydrateWorkbench' });
+
+    expect(getActiveProject(hydratedDefault).widgetRegions.right.instanceIds).toEqual([
+      'gallery',
+      'image-map',
+      'preview',
+      'queue',
+      'layers',
+      'diagnostics',
+      'project',
+    ]);
+    // A rail the user actually arranged is still theirs.
+    expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual([
+      'preview',
+      'gallery',
+      'queue',
+    ]);
   });
 
   it('adds Upscale to untouched legacy left rails while preserving customized rails', () => {
@@ -850,7 +891,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.right).toMatchObject({
       activeInstanceId: 'gallery',
-      instanceIds: ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+      instanceIds: ['gallery', 'image-map', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
       isCollapsed: false,
       sizePx: 450,
     });

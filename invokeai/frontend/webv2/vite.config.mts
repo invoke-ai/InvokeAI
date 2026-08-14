@@ -159,6 +159,13 @@ export default defineConfig({
               test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
             },
             {
+              // Plotly is large (~1MB min) and only used by the lazy-loaded
+              // Image Map plot; keep it out of the eager vendor chunk.
+              name: 'plotly',
+              priority: 30,
+              test: (id) => id.includes('plotly') && id.includes('node_modules'),
+            },
+            {
               name: getLegacyChunkName,
             },
           ],
