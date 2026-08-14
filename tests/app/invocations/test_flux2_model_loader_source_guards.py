@@ -298,5 +298,8 @@ def test_vae_source_must_still_be_diffusers(source_format: ModelFormat) -> None:
         }
     )
 
-    with pytest.raises(ValueError, match="must be a Diffusers format model"):
+    # The Klein loader also accepts a self-contained SDNQ pipeline as a source, so its message names
+    # the accepted shape ("Diffusers-style FLUX.2 pipeline") rather than the diffusers format alone.
+    # Single-file / GGUF sources are still rejected, which is what this test is about.
+    with pytest.raises(ValueError, match="must be a Diffusers-style FLUX.2 pipeline"):
         invocation.invoke(context)
