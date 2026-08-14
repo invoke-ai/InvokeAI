@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 830939,
+        "brotliBytes": 830940,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 829536,
+        "gzipBytes": 829543,
         "imageRawBytes": 156376,
         "initialRawBytes": 1929616,
         "largestAssetRawBytes": 746314,
@@ -279,10 +279,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 839249,
+        "brotliBytes": 839250,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 837832,
+        "gzipBytes": 837839,
         "imageRawBytes": 157940,
         "initialRawBytes": 1948913,
         "largestAssetRawBytes": 753778,
@@ -297,12 +297,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1022769,
+        "brotliBytes": 1022803,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1018379,
+        "gzipBytes": 1018403,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2505232,
+        "initialRawBytes": 2505565,
         "largestAssetRawBytes": 746314,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 106774,
@@ -814,12 +814,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1032997,
+        "brotliBytes": 1033032,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1028563,
+        "gzipBytes": 1028588,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2530285,
+        "initialRawBytes": 2530621,
         "largestAssetRawBytes": 753778,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 106774,
@@ -831,7 +831,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-13",
+  "capturedAt": "2026-08-14",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
