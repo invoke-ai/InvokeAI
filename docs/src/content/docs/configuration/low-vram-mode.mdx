@@ -32,13 +32,14 @@ enable_partial_loading: false
 
 ## Details and fine-tuning
 
-Low-VRAM mode involves 4 features, each of which can be configured or fine-tuned:
+Low-VRAM mode and related workload-specific optimizations include:
 
 - Partial model loading (`enable_partial_loading`)
 - PyTorch CUDA allocator config (`pytorch_cuda_alloc_conf`)
 - Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
 - Working memory (`device_working_mem_gb`)
 - Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
+- PiD decode activation chunking (`pid_memory_optimization`)
 
 Read on to learn about these features and understand how to fine-tune them for your system and use-cases.
 
@@ -145,6 +146,24 @@ Invoke has the option of keeping a RAM copy of all model weights, even when they
 # Set to false to reduce the average RAM usage at the cost of slower model switching and LoRA patching.
 keep_ram_copy_of_weights: false
 ```
+
+### PiD decode optimization
+
+PiD decodes directly into high-resolution pixels, so its activation and sampler memory can exceed the working memory needed by a normal VAE decode. Partial model loading reduces memory used by PiD's weights, but does not reduce these full-resolution intermediates.
+
+To reduce PiD's peak VRAM use, enable its experimental memory optimization in `invokeai.yaml` and restart InvokeAI:
+
+```yaml
+pid_memory_optimization: true
+```
+
+This setting processes parts of the PiD pixel pathway in chunks and uses float32 instead of float64 sampler intermediates. It applies to every supported PiD decoder. Measured on an RTX 4090, peak activation memory for a 2048px decode drops from ~3.7 GB to ~1.5 GB (1024px: ~0.9 GB to ~0.5 GB).
+
+`device_working_mem_gb` sets a floor for the reservation. To realize the full PiD savings at 1024px-2048px, lower that setting as needed for your GPU.
+
+It is disabled by default because it is **not output-preserving**: neither change is bit-exact, and the few-step sampler amplifies the difference into a slightly different image. The delta is small — around 43 dB PSNR, visually indistinguishable in side-by-side comparisons — but it is real, so the same seed and workflow will not reproduce an unoptimized decode exactly. Decoding speed is roughly unchanged: chunking costs about 4%, which the cheaper sampler math largely offsets.
+
+When the setting is active, each decode logs the resolution, the patch-token count and whether chunking actually engaged — worth checking, since the option is server-wide and never recorded in image metadata. See [PiD Super-Resolution Decode](/features/pid-decode/) for supported models and usage.
 
 ### Disabling Nvidia sysmem fallback (Windows only)
 

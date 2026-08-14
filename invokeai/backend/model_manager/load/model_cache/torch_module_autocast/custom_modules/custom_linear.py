@@ -17,6 +17,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     scaled_mm_linear,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 def linear_lora_forward(input: torch.Tensor, lora_layer: LoRALayer, lora_weight: float) -> torch.Tensor:
@@ -89,7 +90,7 @@ class CustomLinear(torch.nn.Linear, CustomModuleMixin):
             tensor is not None
             and input.is_floating_point()
             and tensor.is_floating_point()
-            and not isinstance(tensor, GGMLTensor)
+            and not isinstance(tensor, (GGMLTensor, SDNQTensor))
             and tensor.dtype != input.dtype
         ):
             tensor = tensor.to(dtype=input.dtype)
@@ -173,7 +174,7 @@ class CustomLinear(torch.nn.Linear, CustomModuleMixin):
             or (
                 self.bias is not None
                 and self.bias.is_floating_point()
-                and not isinstance(self.bias, GGMLTensor)
+                and not isinstance(self.bias, (GGMLTensor, SDNQTensor))
                 and self.bias.dtype != input.dtype
             )
         ):

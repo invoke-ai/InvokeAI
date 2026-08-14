@@ -11,7 +11,7 @@ FP8 Storage cuts a model's VRAM footprint roughly in half by keeping weights on 
 It pairs well with [Low-VRAM mode](/configuration/low-vram-mode/): low-VRAM mode streams layers between RAM and VRAM, while FP8 Storage shrinks the layers themselves.
 
 :::caution[For full precision models only]
-FP8 Storage only applies to **full precision** checkpoints (FP16 / BF16 / FP32). It is **silently a no-op** for already-quantized formats — **GGUF**, **NF4**, and **int8** checkpoints carry their own storage precision and the loader returns a different module type that the FP8 layer cast does not touch. If your model is already quantized, the toggle has no effect; use the full-precision variant of the model if you want to enable FP8 Storage.
+FP8 Storage only applies to **full precision** checkpoints (FP16 / BF16 / FP32). It is **silently a no-op** for already-quantized formats — **GGUF**, **NF4**, **int8**, and [**SDNQ**](/configuration/sdnq-quantization/) checkpoints carry their own storage precision and the loader returns a different module type that the FP8 layer cast does not touch. If your model is already quantized, the toggle has no effect; use the full-precision variant of the model if you want to enable FP8 Storage.
 :::
 
 ## Requirements
