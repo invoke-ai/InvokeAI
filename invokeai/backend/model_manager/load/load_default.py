@@ -28,6 +28,42 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, set_fp8_compute_dtype
+
+
+def put_in_eval_mode(model: AnyModel) -> AnyModel:
+    """Put a freshly constructed model into inference mode.
+
+    Applied once here rather than in each loader, because it is the loaders that keep getting this
+    wrong and there are dozens of them. `from_pretrained` calls `.eval()` on what it returns, but a
+    great many loaders build the module themselves — `accelerate.init_empty_weights()` plus
+    `load_state_dict()` — which leaves `training` True. Anything dropout- or batchnorm-sensitive in
+    such a tree then behaves as if it were training, silently, during inference.
+
+    `_load_model` is the single construction choke point every loader passes through, so covering it
+    here also covers loaders that do not exist yet. `.eval()` is idempotent, so the loaders that
+    already call it are unaffected. Non-module returns (tokenizers, schedulers, IP-Adapter wrappers,
+    pipelines) pass through untouched.
+    """
+    if isinstance(model, torch.nn.Module):
+        model.eval()
+    return model
+
+
+def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, fallback: Path) -> Path:
+    """Where a pipeline component actually lives, preferring what identification recorded.
+
+    `model_index.json` names its components with arbitrary keys, and discovery stores the key it saw
+    in `submodels[...].path_or_prefix`. Reconstructing `model_path / "<slot name>"` at load time
+    instead assumes the key always equals the slot name, so a pipeline that calls its CLIP encoder
+    something else passes discovery and is then loaded from a directory that does not exist.
+
+    `fallback` is used when the config carries no such entry — configs persisted before submodel
+    discovery existed, and the layouts where the component folder *is* the model path.
+    """
+    discovered = (getattr(config, "submodels", None) or {}).get(submodel_type)
+    return Path(discovered.path_or_prefix) if discovered else fallback
+
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
 # `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
@@ -179,7 +215,7 @@ class ModelLoader(ModelLoaderBase):
                 self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
                 ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
                 with skip_torch_weight_init():
-                    loaded_model = self._load_model(config, submodel_type)
+                    loaded_model = put_in_eval_mode(self._load_model(config, submodel_type))
                 if log_mem:
                     ram_peak = MemorySnapshot.capture().process_ram
                     self._logger.info(
@@ -222,9 +258,25 @@ class ModelLoader(ModelLoaderBase):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Get the size of the model on disk."""
+        # Size the folder the model will actually be loaded from. This has to track
+        # `resolve_submodel_path`, or a pipeline whose index calls its CLIP encoder `clip_encoder`
+        # gets sized at the non-existent `text_encoder/` — 0 bytes — and `make_room()` reserves
+        # nothing before a multi-GB component is read. The conventional case is unchanged: only a
+        # component recorded somewhere other than its slot name takes the branch below.
+        subfolder = submodel_type.value if submodel_type else None
+        if submodel_type is not None:
+            conventional = model_path / submodel_type.value
+            resolved = resolve_submodel_path(config, submodel_type, conventional)
+            if resolved != conventional:
+                try:
+                    subfolder = resolved.relative_to(model_path).as_posix()
+                except ValueError:
+                    # Recorded outside this model's directory — size that directory directly.
+                    model_path, subfolder = resolved, None
+
         return calc_model_size_by_fs(
             model_path=model_path,
-            subfolder=submodel_type.value if submodel_type else None,
+            subfolder=subfolder,
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 
@@ -288,6 +340,12 @@ class ModelLoader(ModelLoaderBase):
         if not self._should_use_fp8(config, submodel_type):
             return model
 
+        # The cast is not idempotent: on a second pass the first parameter is already fp8, so the
+        # compute dtype below would be derived as float8. The marker is set by
+        # `_apply_fp8_to_nn_module`, so its presence means this model has already been cast.
+        if isinstance(model, torch.nn.Module) and getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is not None:
+            return model
+
         storage_dtype = torch.float8_e4m3fn
         compute_dtype = self._torch_dtype
 
@@ -331,7 +389,14 @@ class ModelLoader(ModelLoaderBase):
         `_FP8_DEFAULT_SKIP_PATTERNS` (norm, pos_embed, patch_embed, proj_in/out) are skipped.
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
+
+        Records the compute dtype on the model. After the cast, `model.dtype` reports the float8
+        storage dtype, which must never be used to create or cast tensors — torch has no arithmetic
+        kernels for it (see `get_model_compute_dtype`). The marker is set here rather than at the
+        call sites so a new caller cannot forget it.
         """
+        set_fp8_compute_dtype(model, compute_dtype)
+
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue

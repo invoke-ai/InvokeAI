@@ -6,11 +6,11 @@ import re
 import threading
 import time
 import traceback
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from queue import Empty, PriorityQueue
 from shutil import disk_usage
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import requests
 from pydantic.networks import AnyHttpUrl
@@ -31,6 +31,7 @@ from invokeai.app.services.download.download_base import (
     UnknownJobIDException,
 )
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.ssrf import build_guarded_session, validate_download_url, warn_if_proxied
 from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -71,7 +72,27 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
-        self._requests = requests_session or requests.Session()
+        # A caller-supplied session is left exactly as given (the tests inject mock
+        # transports). Sessions we build ourselves refuse to connect to a non-public
+        # address, which is the check that holds against DNS rebinding and against host
+        # spellings that `requests` decodes differently from us.
+        self._request_proxies: Optional[Dict[str, str]] = None
+        if requests_session is not None:
+            self._requests = requests_session
+        elif self._app_config.allow_private_download_urls:
+            # The operator has opted out of the address policy, so ambient proxy variables
+            # keep working here exactly as they always have — but an explicitly configured
+            # download_proxy must still be honored rather than silently ignored when both
+            # settings are present. It is applied per request (see the single call site in
+            # _do_download) because that is the only level that takes precedence over
+            # ambient *_PROXY variables in a plain Session.
+            self._requests = requests.Session()
+            if self._app_config.download_proxy:
+                proxy = self._app_config.download_proxy
+                self._request_proxies = {"http": proxy, "https": proxy}
+        else:
+            self._requests = build_guarded_session(proxy=self._app_config.download_proxy)
+            warn_if_proxied(self._requests, self._logger)
         self._accept_download_requests = False
         self._max_parallel_dl = max_parallel_dl
 
@@ -420,8 +441,18 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.resume_message = "Partial file missing. Restarted download from the beginning."
 
         # Make a streaming request. This will retrieve headers including
-        # content-length and content-disposition, but not fetch any content itself
-        resp = self._requests.get(str(url), headers=header, stream=True)
+        # content-length and content-disposition, but not fetch any content itself.
+        # The URL is checked here rather than at submit time so that it is the address we
+        # are about to connect to that gets vetted, and the response hook re-checks every
+        # redirect hop — otherwise a public URL could bounce us onto a private address.
+        self._validate_url(url)
+        resp = self._requests.get(
+            str(url),
+            headers=header,
+            stream=True,
+            hooks={"response": self._reject_unsafe_redirect},
+            proxies=self._request_proxies,
+        )
         job.final_url = str(resp.url) if resp.url else None
         self._logger.debug(
             "Resume response: "
@@ -433,11 +464,17 @@ class DownloadQueueService(DownloadQueueServiceBase):
         )
         if resp.status_code == 416 and resume_from > 0:
             # Range not satisfiable - local partial is already complete
-            expected = job.expected_total_bytes or job.total_bytes or resume_from
-            if resume_from == expected:
+            match = re.fullmatch(r"bytes \*/(\d+)", resp.headers.get("Content-Range", ""), flags=re.IGNORECASE)
+            # Content-Range is optional on 416 responses. Reuse the size known when
+            # the download started, but never resume_from itself: that would accept
+            # every partial file as complete.
+            expected = int(match.group(1)) if match else (job.expected_total_bytes or job.total_bytes or None)
+            if expected is not None and resume_from == expected:
                 job.total_bytes = expected
+                job.expected_total_bytes = expected
                 job.bytes = resume_from
                 job.download_path = job.download_path or job.dest
+                self._in_progress_path(job.download_path).rename(job.download_path)
                 self._signal_job_started(job)
                 self._signal_job_complete(job)
                 return
@@ -468,6 +505,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 remote_name = match.group(1)
                 if self._validate_filename(job.dest.as_posix(), remote_name):
                     file_name = remote_name
+
+            # The URL path is attacker-influenced too -- a final segment of ".." would
+            # otherwise put download_path one level above dest.
+            if not self._validate_filename(job.dest.as_posix(), file_name):
+                raise ValueError(f"Cannot derive a safe filename for {url} from '{file_name}'")
 
             job.download_path = job.dest / file_name
 
@@ -580,12 +622,39 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._logger.debug(f"{job.source}: saved to {job.download_path} (bytes={job.bytes})")
         in_progress_path.rename(job.download_path)
 
+    def _validate_url(self, url: str) -> None:
+        """Refuse to fetch URLs that point at addresses only the server can reach."""
+        validate_download_url(str(url), allow_private_urls=self._app_config.allow_private_download_urls)
+
+    def _reject_unsafe_redirect(self, response: requests.Response, *args: Any, **kwargs: Any) -> requests.Response:
+        """Response hook: vet each redirect target before `requests` follows it."""
+        if response.is_redirect or response.is_permanent_redirect:
+            location = response.headers.get("location")
+            if location:
+                try:
+                    self._validate_url(urljoin(response.url, location))
+                except Exception:
+                    response.close()
+                    raise
+        return response
+
     def _validate_filename(self, directory: str, filename: str) -> bool:
         pc_name_max = get_pc_name_max(directory)
         pc_path_max = get_pc_path_max(directory)
-        if "/" in filename:
+        # The name must be a single path component. A remote server picks this value, so
+        # separators of either flavour, drive letters and '..' all have to be rejected --
+        # on Windows `Path(dir) / "..\\evil"` escapes `dir` even though it has no '/'.
+        if "/" in filename or "\\" in filename:
+            return False
+        if filename in ("", ".", ".."):
             return False
         if filename.startswith(".."):
+            return False
+        if PurePosixPath(filename).is_absolute() or PureWindowsPath(filename).is_absolute():
+            return False
+        # `WindowsPath("D:/dest") / "C:evil"` yields "C:evil" -- a drive-relative name
+        # replaces the destination entirely without ever looking absolute.
+        if PureWindowsPath(filename).drive:
             return False
         if len(filename) > pc_name_max:
             return False
