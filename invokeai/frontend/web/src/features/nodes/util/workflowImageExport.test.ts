@@ -133,8 +133,8 @@ describe('workflow image export', () => {
 
     expect(setProperty).toHaveBeenCalledWith('display', 'block', 'important');
     expect(setProperty).toHaveBeenCalledWith('white-space', 'nowrap', 'important');
-    expect(setProperty).toHaveBeenCalledWith('overflow', 'hidden', 'important');
-    expect(setProperty).toHaveBeenCalledWith('text-overflow', 'ellipsis', 'important');
+    expect(setProperty).toHaveBeenCalledWith('overflow', 'visible', 'important');
+    expect(setProperty).toHaveBeenCalledWith('text-overflow', 'clip', 'important');
   });
 
   it('keeps ordinary workflow names unchanged', () => {

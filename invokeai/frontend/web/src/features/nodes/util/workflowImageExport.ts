@@ -279,8 +279,8 @@ export const setWorkflowExportInputFieldTitleStyles = (root: HTMLElement) => {
   root.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]').forEach((element) => {
     setExportElementStyle(element, 'display', 'block');
     setExportElementStyle(element, 'white-space', 'nowrap');
-    setExportElementStyle(element, 'overflow', 'hidden');
-    setExportElementStyle(element, 'text-overflow', 'ellipsis');
+    setExportElementStyle(element, 'overflow', 'visible');
+    setExportElementStyle(element, 'text-overflow', 'clip');
   });
 };
 
