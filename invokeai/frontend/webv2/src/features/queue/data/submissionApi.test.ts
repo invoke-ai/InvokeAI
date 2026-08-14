@@ -311,3 +311,55 @@ describe('getResultImages', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('getResultVideoNames', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('test-account');
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('extracts video names from video outputs, ignoring image outputs', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      item_id: 1,
+      session: {
+        results: {
+          decode: { image: { image_name: 'frame.png' }, type: 'image_output' },
+          l2v: {
+            duration: 5.17,
+            type: 'video_output',
+            video: { video_name: 'clip-1.mp4' },
+          },
+          l2v_again: { type: 'video_output', video: { video_name: 'clip-1.mp4' } },
+        },
+      },
+      status: 'completed',
+    });
+
+    const { getResultVideoNames } = await import('./submissionApi');
+
+    await expect(getResultVideoNames(1)).resolves.toEqual(['clip-1.mp4']);
+    // Names only — no per-video DTO hydration requests.
+    expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('can restrict video extraction to explicit result node ids', async () => {
+    mocks.apiFetchJson.mockResolvedValue({
+      item_id: 1,
+      session: {
+        prepared_source_mapping: {
+          exec_final: 'final_l2v',
+          exec_intermediate: 'intermediate_l2v',
+        },
+        results: {
+          exec_final: { type: 'video_output', video: { video_name: 'final.mp4' } },
+          exec_intermediate: { type: 'video_output', video: { video_name: 'intermediate.mp4' } },
+        },
+      },
+      status: 'completed',
+    });
+
+    const { getResultVideoNames } = await import('./submissionApi');
+
+    await expect(getResultVideoNames(1, { resultNodeIds: ['final_l2v'] })).resolves.toEqual(['final.mp4']);
+  });
+});

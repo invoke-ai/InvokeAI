@@ -1032,7 +1032,7 @@ const emptyGalleryItemOrganizationTransportResult = (): GalleryItemOrganizationT
   succeededNames: [],
 });
 
-const isInvalidGalleryBoardDestination = (boardId: string): boolean =>
+export const isInvalidGalleryBoardDestination = (boardId: string): boolean =>
   boardId === 'generated' || boardId === 'assets' || isDateBoardId(boardId);
 
 export const addGalleryImageItemsToBoard = async (

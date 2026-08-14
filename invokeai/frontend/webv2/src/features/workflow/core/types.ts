@@ -40,6 +40,7 @@ export interface FieldInputTemplate {
   exclusiveMaximum: number | null;
   multipleOf: number | null;
   uiModelBase: string[] | null;
+  uiModelFormat: string[] | null;
   uiModelType: string[] | null;
 }
 

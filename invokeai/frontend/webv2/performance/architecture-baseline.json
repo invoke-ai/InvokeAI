@@ -305,7 +305,7 @@
         "initialRawBytes": 2500067,
         "largestAssetRawBytes": 746314,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 105623,
+        "ownedRawBytes": 106186,
         "requestCount": 85,
         "scriptRequestCount": 69,
         "sourceOwners": [
@@ -532,6 +532,7 @@
           "source:src/features/nodes/ui/NodesPage.tsx",
           "source:src/features/queue/contracts.ts",
           "source:src/features/queue/core/generationMeta.ts",
+          "source:src/features/queue/core/graphInputMedia.ts",
           "source:src/features/queue/core/historySnapshot.ts",
           "source:src/features/queue/core/historySummary.ts",
           "source:src/features/queue/core/progressImage.ts",
@@ -820,7 +821,7 @@
         "initialRawBytes": 2525068,
         "largestAssetRawBytes": 753778,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 105623,
+        "ownedRawBytes": 106186,
         "requestCount": 85,
         "scriptRequestCount": 69
       },
