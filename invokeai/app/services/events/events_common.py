@@ -915,3 +915,17 @@ class ImageIndexUpdatedEvent(ImageIndexEventBase):
     @classmethod
     def build(cls, user_id: str) -> "ImageIndexUpdatedEvent":
         return cls(user_id=user_id)
+
+
+@payload_schema.register
+class ImageMapProjectionReadyEvent(ImageIndexEventBase):
+    """Event model for image_map_projection_ready"""
+
+    __event_name__ = "image_map_projection_ready"
+
+    user_id: str = Field(description="The user whose image map projection was recomputed")
+    point_count: int = Field(description="Number of points in the recomputed projection")
+
+    @classmethod
+    def build(cls, user_id: str, point_count: int) -> "ImageMapProjectionReadyEvent":
+        return cls(user_id=user_id, point_count=point_count)
