@@ -7,23 +7,28 @@ staged-deletion contracts of delete() and delete_intermediates().
 
 import sqlite3
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.image_files.image_files_common import ImageFileDeleteException
+from invokeai.app.services.image_files.image_files_common import (
+    ImageFileDeleteException,
+    ImageFileSaveException,
+)
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
     ImageRecordChanges,
     ImageRecordDeleteException,
+    ImageRecordNotFoundException,
     ResourceOrigin,
 )
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
@@ -66,6 +71,79 @@ def _make_record(
         has_workflow=False,
         image_subfolder=image_subfolder,
     )
+
+
+@pytest.fixture
+def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]:
+    logger = InvokeAILogger.get_logger()
+    config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
+    config._root = tmp_path
+    storage = DiskImageFileStorage(tmp_path / "images")
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage.start(invoker)
+    db = init_db(config=config, logger=logger, image_files=storage)
+    records = SqliteImageRecordStorage(db=db)
+
+    invoker.services.configuration.image_subfolder_strategy = "flat"
+    invoker.services.names.create_image_name.return_value = "uploaded.png"
+    invoker.services.image_records = records
+    invoker.services.image_files = storage
+    invoker.services.board_image_records.get_board_for_image.return_value = None
+    invoker.services.urls.get_image_url.return_value = "/api/v1/images/i/uploaded.png"
+    invoker.services.logger = MagicMock()
+
+    service = ImageService()
+    service.start(invoker)
+    return service, records, storage
+
+
+def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(
+    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    image = Image.new("RGB", (32, 32), "red")
+    broken_thumbnail = MagicMock()
+    broken_thumbnail.save.side_effect = OSError("thumbnail filesystem failure")
+
+    try:
+        with patch(
+            "invokeai.app.services.image_files.image_files_disk.make_thumbnail",
+            return_value=broken_thumbnail,
+        ):
+            with pytest.raises(ImageFileSaveException):
+                service.create(
+                    image=image,
+                    image_origin=ResourceOrigin.EXTERNAL,
+                    image_category=ImageCategory.GENERAL,
+                )
+
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("uploaded.png")
+        assert not storage.get_path("uploaded.png").exists()
+        assert not storage.get_path("uploaded.png", thumbnail=True).exists()
+    finally:
+        image.close()
+
+
+def test_create_accepts_large_16_bit_image(
+    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    image = Image.new("I;16", (1024, 1024), 32768)
+
+    try:
+        service.create(
+            image=image,
+            image_origin=ResourceOrigin.EXTERNAL,
+            image_category=ImageCategory.GENERAL,
+        )
+
+        assert records.get("uploaded.png").image_subfolder == ""
+        assert storage.get_path("uploaded.png").exists()
+        assert storage.get_path("uploaded.png", thumbnail=True).exists()
+    finally:
+        image.close()
 
 
 # ── Point 2: subfolder forwarding tests ──

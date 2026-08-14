@@ -297,6 +297,7 @@ def test_runtime_config_redacts_secrets() -> None:
         external_openai_api_key="sk-super-secret",
         external_gemini_base_url="https://example.invalid",
         remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
+        download_proxy="http://proxy-user:proxy-secret@proxy.example:3128",
     )
     redacted = _redact_config_secrets(config)
 
@@ -306,9 +307,11 @@ def test_runtime_config_redacts_secrets() -> None:
     # Non-secret fields are untouched, and the original config is not mutated.
     assert redacted.remote_api_tokens[0].url_regex == "example.com"
     assert redacted.external_gemini_base_url == "https://example.invalid"
+    assert redacted.download_proxy == REDACTED_SECRET
     assert config.external_openai_api_key == "sk-super-secret"
     assert config.remote_api_tokens is not None
     assert config.remote_api_tokens[0].token == "bearer-secret"
+    assert config.download_proxy == "http://proxy-user:proxy-secret@proxy.example:3128"
 
 
 def test_runtime_config_response_has_no_secrets(

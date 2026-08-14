@@ -1,3 +1,4 @@
+import queue
 import threading
 from dataclasses import dataclass, field
 
@@ -50,6 +51,14 @@ class SharedCpuWeightsStore:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        # Releases posted from GC context (a cached-model wrapper's weakref.finalize when its cache
+        # was dropped without shutdown()/clear()). A finalizer must not take self._lock: it can run
+        # at any allocation point on any thread — including inside acquire()'s critical section,
+        # where taking this non-reentrant lock again would self-deadlock the process (see
+        # ModelCache.release_first_use_grace for the same constraint). SimpleQueue.put is
+        # lock-free/reentrant, so finalizers only enqueue; every public method drains the queue
+        # under the lock before doing its own work.
+        self._deferred_releases: queue.SimpleQueue[tuple[str, dict[str, torch.Tensor] | None]] = queue.SimpleQueue()
         self._entries: dict[str, _SharedWeightsEntry] = {}
         # Entries forgotten by `invalidate()` while still referenced by live cached models (e.g. a
         # locked, stale-marked cache entry mid-generation). They can no longer be acquired or peeked,
@@ -76,6 +85,7 @@ class SharedCpuWeightsStore:
             re-pointing its module at these tensors and dropping the `state_dict` it passed in.
         """
         with self._lock:
+            self._drain_deferred_locked()
             entry = self._entries.get(key)
             if entry is None:
                 entry = _SharedWeightsEntry(
@@ -95,6 +105,7 @@ class SharedCpuWeightsStore:
         itself increment the count.
         """
         with self._lock:
+            self._drain_deferred_locked()
             entry = self._entries.get(key)
             return entry.state_dict if entry is not None else None
 
@@ -102,6 +113,7 @@ class SharedCpuWeightsStore:
         """Register the empty (meta-weight) structural clone for `key`, if an entry exists and none
         is set yet. A no-op when the key has no canonical entry (e.g. keep_ram_copy disabled)."""
         with self._lock:
+            self._drain_deferred_locked()
             entry = self._entries.get(key)
             if entry is not None and entry.shell is None:
                 entry.shell = shell
@@ -109,6 +121,7 @@ class SharedCpuWeightsStore:
     def get_shell(self, key: str) -> object | None:
         """Return the registered meta-weight shell for `key`, or None if absent."""
         with self._lock:
+            self._drain_deferred_locked()
             entry = self._entries.get(key)
             return entry.shell if entry is not None else None
 
@@ -127,21 +140,47 @@ class SharedCpuWeightsStore:
         lets go.
         """
         with self._lock:
-            entry = self._entries.get(key)
-            if entry is not None and (state_dict is None or entry.state_dict is state_dict):
-                entry.refcount -= 1
-                if entry.refcount <= 0:
-                    del self._entries[key]
+            self._drain_deferred_locked()
+            self._release_locked(key, state_dict)
+
+    def release_deferred(self, key: str, state_dict: dict[str, torch.Tensor] | None = None) -> None:
+        """Post a release to be applied by the next store operation, WITHOUT taking the store lock.
+
+        This is the only release entry point that is safe from GC context (weakref.finalize
+        callbacks, __del__): it only enqueues. A finalizer can fire at any allocation point on any
+        thread — including while that same thread holds self._lock inside acquire() — so taking the
+        non-reentrant lock here could self-deadlock the process. Every public method drains the
+        queue under the lock, so the released bytes disappear from the accounting no later than the
+        next store operation (in particular, the next `total_bytes_in_use()` / budget query).
+        """
+        self._deferred_releases.put((key, state_dict))
+
+    def _drain_deferred_locked(self) -> None:
+        """Apply all pending deferred releases. Caller must hold self._lock."""
+        while True:
+            try:
+                key, state_dict = self._deferred_releases.get_nowait()
+            except queue.Empty:
                 return
-            # Not the live canonical for `key` — it may be a retired (invalidated) entry whose
-            # tensors are still being counted against the RAM budget.
-            if state_dict is not None:
-                for i, retired in enumerate(self._retired):
-                    if retired.state_dict is state_dict:
-                        retired.refcount -= 1
-                        if retired.refcount <= 0:
-                            del self._retired[i]
-                        return
+            self._release_locked(key, state_dict)
+
+    def _release_locked(self, key: str, state_dict: dict[str, torch.Tensor] | None) -> None:
+        """The body of release(). Caller must hold self._lock."""
+        entry = self._entries.get(key)
+        if entry is not None and (state_dict is None or entry.state_dict is state_dict):
+            entry.refcount -= 1
+            if entry.refcount <= 0:
+                del self._entries[key]
+            return
+        # Not the live canonical for `key` — it may be a retired (invalidated) entry whose
+        # tensors are still being counted against the RAM budget.
+        if state_dict is not None:
+            for i, retired in enumerate(self._retired):
+                if retired.state_dict is state_dict:
+                    retired.refcount -= 1
+                    if retired.refcount <= 0:
+                        del self._retired[i]
+                    return
 
     def invalidate(self, model_key: str) -> int:
         """Forget the canonical entries (and shells) for `model_key` and all of its submodels, so no
@@ -158,6 +197,7 @@ class SharedCpuWeightsStore:
         """
         prefix = f"{model_key}:"
         with self._lock:
+            self._drain_deferred_locked()
             doomed = [key for key in self._entries if key == model_key or key.startswith(prefix)]
             for key in doomed:
                 entry = self._entries.pop(key)
@@ -169,11 +209,13 @@ class SharedCpuWeightsStore:
 
     def __contains__(self, key: str) -> bool:
         with self._lock:
+            self._drain_deferred_locked()
             return key in self._entries
 
     def refcount(self, key: str) -> int:
         """Return the current refcount for `key`, or 0 if not present."""
         with self._lock:
+            self._drain_deferred_locked()
             entry = self._entries.get(key)
             return entry.refcount if entry is not None else 0
 
@@ -185,6 +227,7 @@ class SharedCpuWeightsStore:
         it — i.e. the true RAM footprint of cached weights, not the per-device double-count.
         """
         with self._lock:
+            self._drain_deferred_locked()
             return sum(entry.total_bytes for entry in self._entries.values()) + sum(
                 entry.total_bytes for entry in self._retired
             )
@@ -192,10 +235,12 @@ class SharedCpuWeightsStore:
     def retired_bytes(self) -> int:
         """Return the total size (in bytes) of retired (invalidated but still referenced) entries."""
         with self._lock:
+            self._drain_deferred_locked()
             return sum(entry.total_bytes for entry in self._retired)
 
     def keys(self) -> list[str]:
         with self._lock:
+            self._drain_deferred_locked()
             return list(self._entries.keys())
 
 
