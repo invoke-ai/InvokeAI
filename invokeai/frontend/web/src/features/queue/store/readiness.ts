@@ -44,9 +44,13 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
+import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainOrExternalModelConfig } from 'services/api/types';
-import { isExternalApiModelConfig } from 'services/api/types';
+import {
+  isExternalApiModelConfig,
+  isSelfContainedSDNQFlux1Pipeline,
+  isSelfContainedSDNQPipeline,
+} from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 /**
@@ -121,6 +125,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
       isConnected,
       model,
@@ -130,6 +135,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -140,6 +146,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
       isConnected,
       model,
@@ -155,6 +162,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -251,6 +259,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   dynamicPrompts: DynamicPromptsState;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -261,6 +270,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     dynamicPrompts,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -282,14 +292,20 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   } else if (isExternalApiModelConfig(model)) {
     // external models don't require local sub-models
   } else if (model.base === 'flux') {
-    if (!params.t5EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
-    }
-    if (!params.clipEmbedModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
-    }
-    if (!params.fluxVAE) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    // A complete SDNQ FLUX.1 pipeline install ships its own T5, CLIP and VAE, and the model loader
+    // node falls back to them, so requiring the standalone selections here would keep that path
+    // unreachable from the UI. Anything else (single-file, GGUF, BnB) still needs all three.
+    const mainSuppliesComponents = isSelfContainedSDNQFlux1Pipeline(model);
+    if (!mainSuppliesComponents) {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
     }
     if (params.pidMode !== 'off') {
       if (!params.pidDecoderModel) {
@@ -301,15 +317,34 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'flux2' && model.format !== 'diffusers') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
-    if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-    }
-    if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+  if (model?.base === 'flux2') {
+    // A FLUX.2 model is a self-sufficient source when its config exposes the diffusers-style
+    // submodels (transformer/vae/text_encoder/tokenizer). Plain Diffusers pipelines always do; an
+    // SDNQ pipeline qualifies only when it ships all of them — a truthy submodels dict is not enough,
+    // since a partial pipeline may expose only the transformer and the backend would then request
+    // missing fixed subfolders. Single-file / GGUF models have no submodels and need a standalone
+    // VAE + text encoder, or a Diffusers source of the matching variant family.
+    const mainIsPipeline =
+      model.format === 'diffusers' ||
+      ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
+    if (!mainIsPipeline) {
+      if ('variant' in model && model.variant === 'dev') {
+        // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
+      }
     }
   }
 
@@ -380,15 +415,33 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   if (model?.base === 'z-image') {
-    // Check if VAE source is available (either separate VAE or Qwen3 Source)
-    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+    // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
+    // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+    // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models
+    // don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
+    const mainIsSelfContainedPipeline =
+      (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
+    if (!mainIsSelfContainedPipeline) {
+      // Check if VAE source is available (either separate VAE or Qwen3 Source)
+      const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+      const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
-    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
-    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
     }
     // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
     if (params.pidMode !== 'off') {
@@ -605,6 +658,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsSelectingObject: boolean;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -621,6 +675,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsSelectingObject,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -658,14 +713,20 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   } else if (isExternalApiModelConfig(model)) {
     // external models don't require local sub-models
   } else if (model.base === 'flux') {
-    if (!params.t5EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
-    }
-    if (!params.clipEmbedModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
-    }
-    if (!params.fluxVAE) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    // A complete SDNQ FLUX.1 pipeline install ships its own T5, CLIP and VAE, and the model loader
+    // node falls back to them, so requiring the standalone selections here would keep that path
+    // unreachable from the UI. Anything else (single-file, GGUF, BnB) still needs all three.
+    const mainSuppliesComponents = isSelfContainedSDNQFlux1Pipeline(model);
+    if (!mainSuppliesComponents) {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
     }
 
     const { bbox } = canvas;
@@ -729,15 +790,30 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
-    if (model.format !== 'diffusers') {
-      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-      }
-      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+    // A FLUX.2 model is a self-sufficient source when its config exposes the diffusers-style
+    // submodels. Plain Diffusers pipelines always do; an SDNQ pipeline qualifies only when it ships
+    // all of them — a truthy submodels dict is not enough, since a partial pipeline may expose only
+    // the transformer and the backend would then request missing fixed subfolders. Mirrors the
+    // generate-tab check so both tabs behave identically.
+    const mainIsPipeline =
+      model.format === 'diffusers' ||
+      ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
+    // VAE is shared across variants, but the text encoder requires a variant-matching diffusers model.
+    if (!mainIsPipeline) {
+      if ('variant' in model && model.variant === 'dev') {
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
       }
     }
 
@@ -1094,15 +1170,57 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'z-image') {
-    // Check if VAE source is available (either separate VAE or Qwen3 Source)
-    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+    // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
+    // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+    // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models
+    // don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
+    const mainIsSelfContainedPipeline =
+      (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
+    if (!mainIsSelfContainedPipeline) {
+      // Check if VAE source is available (either separate VAE or Qwen3 Source)
+      const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+      const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
-    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
-    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (canvas.bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+      // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+      // bbox/4 to land on the grid; without this a 1040px bbox silently becomes a 256px generation.
+      const gridSize = getGridSize('z-image', getPidScale(params.pidMode));
+      if (canvas.bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Z-Image',
+            width: canvas.bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (canvas.bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Z-Image',
+            height: canvas.bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
     }
     // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
     if (params.pidMode !== 'off') {

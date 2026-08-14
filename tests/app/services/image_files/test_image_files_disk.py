@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
+from invokeai.app.services.image_files.image_files_common import ImageFileSaveException
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.util.thumbnails import get_thumbnail_name
@@ -155,6 +156,73 @@ def test_level_one_png_round_trip_from_disk(tmp_path: Path, mode: str):
             assert loaded.convert("RGBA").tobytes() == expected_rgba
 
     image.close()
+
+
+def test_large_16_bit_png_save_creates_thumbnail(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image_name = "large-16-bit.png"
+    image = Image.new("I;16", (1024, 1024), 32768)
+
+    try:
+        storage.save(image=image, image_name=image_name)
+
+        image_path = storage.get_path(image_name)
+        thumbnail_path = storage.get_path(image_name, thumbnail=True)
+        assert image_path.exists()
+        assert thumbnail_path.exists()
+        with Image.open(thumbnail_path) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.format == "WEBP"
+            assert thumbnail.mode == "RGB"
+    finally:
+        image.close()
+
+
+def test_palette_transparency_survives_thumbnail_save(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image = Image.new("P", (32, 32), 0)
+    image.putpalette([255, 0, 0] * 256)
+    image.info["transparency"] = 0
+
+    try:
+        storage.save(image=image, image_name="transparent-palette.png")
+
+        with Image.open(storage.get_path("transparent-palette.png", thumbnail=True)) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.mode == "RGBA"
+            assert thumbnail.getpixel((0, 0))[3] == 0
+    finally:
+        image.close()
+
+
+def test_save_removes_partial_files_when_thumbnail_save_fails(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image_name = "thumbnail-failure.png"
+    image = Image.new("RGB", (32, 32), "red")
+    broken_thumbnail = MagicMock()
+    broken_thumbnail.save.side_effect = OSError("thumbnail filesystem failure")
+
+    try:
+        with patch(
+            "invokeai.app.services.image_files.image_files_disk.make_thumbnail",
+            return_value=broken_thumbnail,
+        ):
+            with pytest.raises(ImageFileSaveException):
+                storage.save(image=image, image_name=image_name)
+
+        assert not storage.get_path(image_name).exists()
+        assert not storage.get_path(image_name, thumbnail=True).exists()
+    finally:
+        image.close()
 
 
 # ── Subfolder validation tests (Point 1) ──
