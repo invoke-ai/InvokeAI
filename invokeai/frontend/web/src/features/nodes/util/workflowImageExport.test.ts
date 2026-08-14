@@ -9,8 +9,10 @@ import {
   getWorkflowExportStagingStyle,
   getWorkflowImageDimensions,
   getWorkflowSvgExportStyles,
+  hideWorkflowExportInfoIcons,
   hideWorkflowExportStatusIndicators,
   sanitizeWorkflowImageFilename,
+  setWorkflowExportInputFieldTitleStyles,
   setWorkflowExportNodeOpacity,
   SVG_EXPORT_STYLE_PROPERTIES,
 } from './workflowImageExport';
@@ -106,6 +108,33 @@ describe('workflow image export', () => {
     hideWorkflowExportStatusIndicators(root);
 
     expect(setProperty).toHaveBeenCalledWith('display', 'none', 'important');
+  });
+
+  it('hides node information icons from the export clone', () => {
+    const setProperty = vi.fn();
+    const infoIcon = { style: { setProperty } } as unknown as SVGElement;
+    const root = {
+      querySelectorAll: (selector: string) => (selector === '[data-node-info-icon="true"]' ? [infoIcon] : []),
+    } as unknown as HTMLElement;
+
+    hideWorkflowExportInfoIcons(root);
+
+    expect(setProperty).toHaveBeenCalledWith('display', 'none', 'important');
+  });
+
+  it('keeps input field titles on one line in the export clone', () => {
+    const setProperty = vi.fn();
+    const fieldTitle = { style: { setProperty } } as unknown as HTMLElement;
+    const root = {
+      querySelectorAll: (selector: string) => (selector === '[data-node-input-field-title="true"]' ? [fieldTitle] : []),
+    } as unknown as HTMLElement;
+
+    setWorkflowExportInputFieldTitleStyles(root);
+
+    expect(setProperty).toHaveBeenCalledWith('display', 'block', 'important');
+    expect(setProperty).toHaveBeenCalledWith('white-space', 'nowrap', 'important');
+    expect(setProperty).toHaveBeenCalledWith('overflow', 'hidden', 'important');
+    expect(setProperty).toHaveBeenCalledWith('text-overflow', 'ellipsis', 'important');
   });
 
   it('keeps ordinary workflow names unchanged', () => {

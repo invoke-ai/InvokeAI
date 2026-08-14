@@ -207,7 +207,7 @@ export const sanitizeWorkflowImageFilename = (workflowName: string): string => {
   return sanitizedName || DEFAULT_WORKFLOW_IMAGE_FILENAME;
 };
 
-const setExportElementStyle = (element: HTMLElement, property: string, value: string) => {
+const setExportElementStyle = (element: HTMLElement | SVGElement, property: string, value: string) => {
   element.style.setProperty(property, value, 'important');
 };
 
@@ -269,6 +269,21 @@ export const hideWorkflowExportStatusIndicators = (root: HTMLElement) => {
   });
 };
 
+export const hideWorkflowExportInfoIcons = (root: HTMLElement) => {
+  root.querySelectorAll<SVGElement>('[data-node-info-icon="true"]').forEach((element) => {
+    setExportElementStyle(element, 'display', 'none');
+  });
+};
+
+export const setWorkflowExportInputFieldTitleStyles = (root: HTMLElement) => {
+  root.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]').forEach((element) => {
+    setExportElementStyle(element, 'display', 'block');
+    setExportElementStyle(element, 'white-space', 'nowrap');
+    setExportElementStyle(element, 'overflow', 'hidden');
+    setExportElementStyle(element, 'text-overflow', 'ellipsis');
+  });
+};
+
 const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: WorkflowImageDimensions) => {
   const root = clone.matches('.react-flow') ? clone : clone.querySelector<HTMLElement>('.react-flow');
   const viewport = clone.querySelector<HTMLElement>('.react-flow__viewport');
@@ -313,6 +328,8 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
   });
   setWorkflowExportNodeOpacity(clone);
   hideWorkflowExportStatusIndicators(clone);
+  hideWorkflowExportInfoIcons(clone);
+  setWorkflowExportInputFieldTitleStyles(clone);
 
   clone
     .querySelectorAll<HTMLElement>('.react-flow__edges, .react-flow__edges > svg, .react-flow__edge')
