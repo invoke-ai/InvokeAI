@@ -29,7 +29,14 @@ export const QueueRuntimeAdapter = () => {
         },
         addVideosToGalleryBoard: async (boardId, videoNames) => {
           assertAccountScopeCurrent(owner);
-          const { galleryItemOrganization } = await import('@features/gallery');
+          const { galleryItemOrganization, isGalleryBoardAttachable } = await import('@features/gallery');
+
+          // Virtual destinations (date buckets, `generated`/`assets`) cannot hold
+          // attachments: the transport no-ops for them, which would otherwise read
+          // back as every video failing. The image path ignores this the same way.
+          if (!isGalleryBoardAttachable(boardId)) {
+            return;
+          }
 
           assertAccountScopeCurrent(owner);
           const result = await galleryItemOrganization.moveToBoard(
