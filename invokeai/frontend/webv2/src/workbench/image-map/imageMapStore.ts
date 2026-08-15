@@ -20,6 +20,8 @@ export interface ImageIndexCounts {
   total: number;
   embedded: number;
   pending: number;
+  /** Given up on after repeated failures; excluded from `pending`. */
+  failed: number;
 }
 
 export interface ImageMapSnapshot {

@@ -11,6 +11,13 @@ export interface ImageIndexStatusEvent {
   total: number;
   embedded: number;
   pending: number;
+  /**
+   * Images given up on after repeated embedding failures. Excluded from
+   * `pending`, so it is the only thing that explains a settled index where
+   * `embedded` never reaches `total`. Optional: the backend defaults it to 0,
+   * and an older server omits it entirely.
+   */
+  failed?: number;
 }
 
 /**

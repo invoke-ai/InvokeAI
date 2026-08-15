@@ -40,6 +40,10 @@ const swallow = (promise: Promise<unknown>): void => {
   promise.catch(() => {});
 };
 
+/** Matches the preview's `maxW`/`maxH` (Chakra 40 = 10rem); used to keep it on-screen. */
+const HOVER_PREVIEW_MAX_PX = 160;
+const HOVER_PREVIEW_OFFSET_PX = 14;
+
 interface HoverPreview {
   imageName: string;
   url: string;
@@ -128,7 +132,7 @@ const ImageMapPlot = () => {
     pointsRef.current = points;
     selectedImageNameRef.current = selectedImageName;
   }, [points, selectedImageName]);
-  const [hoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const [pendingHoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic hover session: a resolution from a previous hover (even of the
   // same point) must neither show early nor at stale coordinates.
@@ -245,9 +249,12 @@ const ImageMapPlot = () => {
 
     return () => {
       disposed = true;
-      clearHover();
     };
   }, [points, selectImage]);
+
+  // The timer must not outlive the component; the scene effect used to do
+  // this, but it reruns on every `points` change.
+  useEffect(() => clearHover, []);
 
   // Live gold target on the currently selected gallery image, with a gentle
   // recenter (zoom width preserved) when it drifts near or beyond an edge.
@@ -368,6 +375,34 @@ const ImageMapPlot = () => {
     };
   }, []);
 
+  // A live refresh can drop the hovered image from the map, which makes the
+  // preview stale. Derived rather than cleared from an effect: `points`
+  // changes on every socket-driven refresh, so clearing on that dependency
+  // would silently cancel hovers on a busy server — and they would not come
+  // back, since `Plotly.react` resets hover state and no new `plotly_hover`
+  // fires until the pointer moves.
+  const hoverPreview =
+    pendingHoverPreview && points && !points.some((point) => point.imageName === pendingHoverPreview.imageName)
+      ? null
+      : pendingHoverPreview;
+
+  // The widget is usually docked in a side rail, so a point near the right or
+  // bottom edge would otherwise put a fixed-position preview off-screen, where
+  // nothing can scroll it into view. Flip to the other side of the cursor when
+  // it does not fit.
+  const previewPosition = hoverPreview
+    ? {
+        left:
+          hoverPreview.clientX + HOVER_PREVIEW_OFFSET_PX + HOVER_PREVIEW_MAX_PX > window.innerWidth
+            ? Math.max(0, hoverPreview.clientX - HOVER_PREVIEW_OFFSET_PX - HOVER_PREVIEW_MAX_PX)
+            : hoverPreview.clientX + HOVER_PREVIEW_OFFSET_PX,
+        top:
+          hoverPreview.clientY + HOVER_PREVIEW_OFFSET_PX + HOVER_PREVIEW_MAX_PX > window.innerHeight
+            ? Math.max(0, hoverPreview.clientY - HOVER_PREVIEW_OFFSET_PX - HOVER_PREVIEW_MAX_PX)
+            : hoverPreview.clientY + HOVER_PREVIEW_OFFSET_PX,
+      }
+    : { left: 0, top: 0 };
+
   return (
     <Box h="full" minH="0" position="relative" w="full">
       <Box ref={containerRef} h="full" w="full" />
@@ -375,7 +410,7 @@ const ImageMapPlot = () => {
         <Box
           borderColor="border.emphasized"
           borderWidth="1px"
-          left={`${hoverPreview.clientX + 14}px`}
+          left={`${previewPosition.left}px`}
           maxH="40"
           maxW="40"
           overflow="hidden"
@@ -383,13 +418,13 @@ const ImageMapPlot = () => {
           position="fixed"
           rounded="md"
           shadow="lg"
-          top={`${hoverPreview.clientY + 14}px`}
+          top={`${previewPosition.top}px`}
           zIndex="tooltip"
         >
           <img
             alt={hoverPreview.imageName}
             src={hoverPreview.url}
-            style={{ display: 'block', maxHeight: '10rem', maxWidth: '10rem' }}
+            style={{ display: 'block', maxHeight: `${HOVER_PREVIEW_MAX_PX}px`, maxWidth: `${HOVER_PREVIEW_MAX_PX}px` }}
           />
         </Box>
       ) : null}

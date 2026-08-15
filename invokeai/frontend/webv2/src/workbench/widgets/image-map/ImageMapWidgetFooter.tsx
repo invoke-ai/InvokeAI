@@ -22,6 +22,10 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
   }
 
   const indexing = indexCounts && indexCounts.pending > 0;
+  // Once the queue drains, images given up on are the only reason the index
+  // can settle short of `total` — without saying so the count simply stops
+  // below the total with nothing to explain it.
+  const skipped = indexCounts && indexCounts.pending === 0 && indexCounts.failed > 0;
 
   return (
     <HStack borderTopWidth="1px" color="fg.muted" fontSize="2xs" gap="2" justify="space-between" px="3" py="1" w="full">
@@ -32,6 +36,11 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
           <Text truncate>
             · indexing {indexCounts.embedded}/{indexCounts.total}
           </Text>
+        ) : null}
+        {skipped ? (
+          <Tooltip content="These images repeatedly failed to embed and were given up on.">
+            <Text truncate>· {indexCounts.failed} skipped</Text>
+          </Tooltip>
         ) : null}
       </HStack>
       <Tooltip content="Refresh map">
