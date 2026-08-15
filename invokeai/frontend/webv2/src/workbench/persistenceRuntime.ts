@@ -4,11 +4,15 @@ import type { WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchLoadOptions, WorkbenchSaveResult } from './projects/syncedPersistence';
 
 export interface PersistenceAggregatePort {
+  /** Point a project at the board the server minted for it. */
+  assignProjectBoard(assignment: WorkbenchSaveResult['projectBoardAssignments'][number]): void;
   getPersistedRevision(): number;
   getState(): WorkbenchState;
   hydrate(state: WorkbenchState): void;
   notifyProjectNotFound(): void;
   reconcileConflict(conflict: WorkbenchSaveResult['conflicts'][number]): void;
+  /** Replace a project deleted elsewhere with the fork carrying its unsaved edits. */
+  reconcileDeletedProject(fork: WorkbenchSaveResult['deletedProjectForks'][number]): void;
   reportLoadError(error: string): void;
   saveFailed(error: string): void;
   saveStarted(): void;
@@ -99,6 +103,14 @@ export const createWorkbenchPersistenceRuntime = ({
     for (const conflict of result.conflicts) {
       aggregate.reconcileConflict(conflict);
     }
+
+    for (const fork of result.deletedProjectForks) {
+      aggregate.reconcileDeletedProject(fork);
+    }
+
+    for (const assignment of result.projectBoardAssignments) {
+      aggregate.assignProjectBoard(assignment);
+    }
   };
 
   const isStaleSave = (revision: number, saveGeneration: number, requireCurrentRevision: boolean): boolean =>
@@ -112,14 +124,33 @@ export const createWorkbenchPersistenceRuntime = ({
     saveGeneration: number,
     requireCurrentRevision: boolean
   ): void => {
-    if (isStaleSave(revision, saveGeneration, requireCurrentRevision)) {
+    if (disposed) {
+      return;
+    }
+
+    // Staleness is read before anything is applied, because applying is itself an edit: assigning
+    // a board dispatches through the reducer and bumps the generation this check compares against.
+    const isStale = isStaleSave(revision, saveGeneration, requireCurrentRevision);
+
+    // Applied either way. Every one of these is a fact about the *server* — the board it minted,
+    // the id the fork already occupies — rather than a statement about the snapshot that was sent.
+    // A save is stale whenever a keystroke lands while it is in flight, which for a project's very
+    // first save is the common case; dropping the answer there leaves a new project pointing at no
+    // board, and a deleted one recreated under its old id by the next push.
+    //
+    // What makes that safe for the two that replace a project, and not only for the idempotent
+    // board write, is that they no longer carry a document. A fork hands over an *identity*, and
+    // the reducer re-labels the live project with it; the content the person can see is never
+    // swapped for the snapshot this save started from. See `ProjectRecoveredIdentity`.
+    applySaveResult(result);
+
+    if (isStale) {
       return;
     }
     lastSavedRevision = revision;
     failedRevision = null;
     scheduledRevision = null;
     aggregate.saveSucceeded(result.snapshot.savedAt);
-    applySaveResult(result);
     publish({ error: null, phase: 'idle' });
   };
 

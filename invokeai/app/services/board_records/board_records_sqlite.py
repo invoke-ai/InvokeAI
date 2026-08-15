@@ -1,5 +1,5 @@
 import sqlite3
-from typing import Union, cast
+from typing import Optional, Union, cast
 
 from invokeai.app.services.board_records.board_records_base import BoardRecordStorageBase
 from invokeai.app.services.board_records.board_records_common import (
@@ -8,6 +8,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordDeleteException,
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
+    BoardRecordProjectOwnedException,
     BoardRecordSaveException,
     deserialize_board_record,
 )
@@ -16,24 +17,80 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.util.misc import uuid_string
 
+# Board ids per `IN (...)`. Well under SQLITE_MAX_VARIABLE_NUMBER on every build, including the
+# 999-variable default of older SQLite.
+_BOARD_ID_QUERY_CHUNK = 500
+
 
 class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
         self._db = db
 
-    def delete(self, board_id: str) -> None:
+    def delete_if_unclaimed(self, board_id: str) -> bool:
         with self._db.transaction() as cursor:
             try:
                 cursor.execute(
                     """--sql
                     DELETE FROM boards
-                    WHERE board_id = ?;
+                    WHERE board_id = ?
+                      AND NOT EXISTS (
+                        SELECT 1 FROM projects WHERE projects.board_id = boards.board_id
+                      );
                     """,
                     (board_id,),
                 )
+                return cursor.rowcount > 0
             except Exception as e:
                 raise BoardRecordDeleteException from e
+
+    def get_project_ids_for_boards(self, board_ids: list[str]) -> dict[str, str]:
+        if not board_ids:
+            return {}
+
+        # Chunked because the caller is a board *listing*: an admin's `GET /boards/?all=true`
+        # passes every board on the install at once, and one bind parameter per board runs into
+        # SQLITE_MAX_VARIABLE_NUMBER — which fails the whole listing rather than degrading.
+        claimed: dict[str, str] = {}
+        with self._db.transaction() as cursor:
+            for start in range(0, len(board_ids), _BOARD_ID_QUERY_CHUNK):
+                chunk = board_ids[start : start + _BOARD_ID_QUERY_CHUNK]
+                placeholders = ", ".join("?" for _ in chunk)
+                cursor.execute(
+                    f"""--sql
+                    SELECT board_id, project_id FROM projects WHERE board_id IN ({placeholders});
+                    """,
+                    tuple(chunk),
+                )
+                claimed.update({row[0]: row[1] for row in cursor.fetchall()})
+        return claimed
+
+    def get_with_project_id(self, board_id: str) -> tuple[BoardRecord, Optional[str]]:
+        """The board and the project that claims it, in one query.
+
+        `get_dto` needs both and is called on every authorization check, so asking for them
+        separately doubled the round trips — and the transactions, which take a re-entrant lock —
+        on the hottest read in the API.
+        """
+        with self._db.transaction() as cursor:
+            try:
+                cursor.execute(
+                    """--sql
+                    SELECT boards.*, projects.project_id AS claimed_by_project_id
+                    FROM boards
+                    LEFT JOIN projects ON projects.board_id = boards.board_id
+                    WHERE boards.board_id = ?;
+                    """,
+                    (board_id,),
+                )
+                result = cast(Union[sqlite3.Row, None], cursor.fetchone())
+            except sqlite3.Error as e:
+                raise BoardRecordNotFoundException from e
+        if result is None:
+            raise BoardRecordNotFoundException
+        row = dict(result)
+        project_id = row.pop("claimed_by_project_id", None)
+        return BoardRecord(**row), project_id
 
     def save(
         self,
@@ -96,49 +153,43 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     ) -> BoardRecord:
         with self._db.transaction() as cursor:
             try:
-                # Change the name of a board
-                if changes.board_name is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET board_name = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.board_name, board_id),
-                    )
+                changes_project_owned_state = (
+                    changes.board_name is not None
+                    or changes.archived is not None
+                    or changes.board_visibility is not None
+                )
+                # One conditional write, not a read followed by a write. A project claim racing
+                # this statement either commits first and makes rowcount zero, or waits until this
+                # update has committed; there is no stale DTO window in which project-owned state
+                # can be renamed, archived or published.
+                cursor.execute(
+                    """--sql
+                    UPDATE boards
+                    SET board_name = COALESCE(?, board_name),
+                        cover_image_name = COALESCE(?, cover_image_name),
+                        archived = COALESCE(?, archived),
+                        board_visibility = COALESCE(?, board_visibility)
+                    WHERE board_id = ?
+                      AND (
+                        ? = FALSE
+                        OR NOT EXISTS (SELECT 1 FROM projects WHERE projects.board_id = boards.board_id)
+                      );
+                    """,
+                    (
+                        changes.board_name,
+                        changes.cover_image_name,
+                        changes.archived,
+                        changes.board_visibility.value if changes.board_visibility is not None else None,
+                        board_id,
+                        changes_project_owned_state,
+                    ),
+                )
 
-                # Change the cover image of a board
-                if changes.cover_image_name is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET cover_image_name = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.cover_image_name, board_id),
-                    )
-
-                # Change the archived status of a board
-                if changes.archived is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET archived = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.archived, board_id),
-                    )
-
-                # Change the visibility of a board
-                if changes.board_visibility is not None:
-                    cursor.execute(
-                        """--sql
-                        UPDATE boards
-                        SET board_visibility = ?
-                        WHERE board_id = ?;
-                        """,
-                        (changes.board_visibility.value, board_id),
-                    )
+                if cursor.rowcount == 0:
+                    cursor.execute("SELECT 1 FROM boards WHERE board_id = ?;", (board_id,))
+                    if cursor.fetchone() is None:
+                        raise BoardRecordNotFoundException
+                    raise BoardRecordProjectOwnedException
 
             except sqlite3.Error as e:
                 raise BoardRecordSaveException from e

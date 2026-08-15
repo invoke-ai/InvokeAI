@@ -61,6 +61,9 @@ _PATCHED_API_DEPENDENCIES_MODULES = (
     "invokeai.app.api.routers._access",
     "invokeai.app.api.routers.model_manager",
     "invokeai.app.api.routers.app_info",
+    "invokeai.app.api.routers.projects",
+    "invokeai.app.api.routers.boards",
+    "invokeai.app.api.routers.videos",
 )
 
 
@@ -91,6 +94,12 @@ def _login(client: TestClient, email: str) -> str:
 
 def _auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def _create_board(client: TestClient, token: str, name: str = "Loose+Board") -> str:
+    response = client.post(f"/api/v1/boards/?board_name={name}", headers=_auth(token))
+    assert response.status_code == 201
+    return response.json()["board_id"]
 
 
 @pytest.fixture

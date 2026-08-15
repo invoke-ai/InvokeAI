@@ -126,6 +126,7 @@ const fallbackBoards: GalleryBoard[] = [
     imageCount: 0,
     kind: 'uncategorized',
     name: '',
+    projectId: null,
     videoCount: 0,
   },
 ];

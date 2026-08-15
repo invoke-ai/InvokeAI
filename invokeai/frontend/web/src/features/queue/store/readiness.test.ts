@@ -48,7 +48,7 @@ const flux2GGUF9BModel = {
   variant: 'klein_9b',
 } as unknown as MainModelConfig;
 
-const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
+const flux2VaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
 
 const baseDynamicPrompts: DynamicPromptsState = {
@@ -69,7 +69,7 @@ const baseRefImages: RefImagesState = {
 
 const baseParams = {
   positivePrompt: 'test',
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
 } as unknown as ParamsState;
 
@@ -77,16 +77,17 @@ const baseParams = {
 
 const buildGenerateTabArg = (overrides: {
   model?: MainModelConfig | null;
-  kleinVaeModel?: unknown;
+  flux2VaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
+  hasFlux2DevDiffusersSource?: boolean;
 }) => ({
   isConnected: true,
   model: overrides.model ?? flux2DiffusersModel,
   params: {
     ...baseParams,
-    kleinVaeModel: overrides.kleinVaeModel ?? null,
+    flux2VaeModel: overrides.flux2VaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -94,14 +95,16 @@ const buildGenerateTabArg = (overrides: {
   dynamicPrompts: baseDynamicPrompts,
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
+  hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
 });
 
 const buildCanvasTabArg = (overrides: {
   model?: MainModelConfig | null;
-  kleinVaeModel?: unknown;
+  flux2VaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
+  hasFlux2DevDiffusersSource?: boolean;
 }) => ({
   isConnected: true,
   model: overrides.model ?? flux2DiffusersModel,
@@ -118,7 +121,7 @@ const buildCanvasTabArg = (overrides: {
   },
   params: {
     ...baseParams,
-    kleinVaeModel: overrides.kleinVaeModel ?? null,
+    flux2VaeModel: overrides.flux2VaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -131,6 +134,7 @@ const buildCanvasTabArg = (overrides: {
   canvasIsSelectingObject: false,
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
+  hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
 });
 
 const hasFlux2VaeReason = (reasons: { content: string }[]) =>
@@ -168,7 +172,7 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
 
   it('errors only for Qwen3 when GGUF model with standalone VAE but no Qwen3 and no diffusers source', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildGenerateTabArg({ model: flux2GGUF4BModel, kleinVaeModel: kleinVaeModel })
+      buildGenerateTabArg({ model: flux2GGUF4BModel, flux2VaeModel: flux2VaeModel })
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(true);
@@ -186,7 +190,7 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
       buildGenerateTabArg({
         model: flux2GGUF4BModel,
-        kleinVaeModel: kleinVaeModel,
+        flux2VaeModel: flux2VaeModel,
         kleinQwen3EncoderModel: kleinQwen3Model,
       })
     );
@@ -250,7 +254,7 @@ describe('FLUX.2 Klein readiness checks – canvas tab', () => {
     const reasons = getReasonsWhyCannotEnqueueCanvasTab(
       buildCanvasTabArg({
         model: flux2GGUF4BModel,
-        kleinVaeModel: kleinVaeModel,
+        flux2VaeModel: flux2VaeModel,
         kleinQwen3EncoderModel: kleinQwen3Model,
       }) as never
     );

@@ -194,8 +194,14 @@ class TestTokenPerformance:
         ops_per_second = num_operations / elapsed_time
         print(f"Concurrent token operations: {ops_per_second:.0f} ops/second")
 
-        # Should handle at least 1000 operations per second
-        assert ops_per_second > 1000, f"Only {ops_per_second:.0f} ops/second"
+        # A floor for catching gross regressions (a bcrypt hash, a network round
+        # trip or asymmetric crypto landing in the token path all cost 1-2 orders
+        # of magnitude), NOT a throughput target. Because the GIL serializes the
+        # signing work, this measures the runner's thread scheduling more than
+        # token cost: it reaches ~30k ops/second on a developer machine but only
+        # ~1k on a contended CI runner, so the previous floor of 1000 sat exactly
+        # at the CI measurement floor and failed there roughly one run in five.
+        assert ops_per_second > 200, f"Only {ops_per_second:.0f} ops/second"
 
 
 class TestAuthenticationOverhead:

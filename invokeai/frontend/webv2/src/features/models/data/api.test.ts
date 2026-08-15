@@ -15,6 +15,13 @@ vi.mock('./transport', () => ({
   } satisfies ModelsDataPort,
 }));
 
+// relationshipsApi bypasses the port and uses the platform client directly.
+vi.mock('@platform/transport/http', async (importOriginal) => ({
+  ...((await importOriginal()) as Record<string, unknown>),
+  apiFetch: mocks.request,
+  apiFetchJson: mocks.apiFetchJson,
+}));
+
 describe('installModel', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
@@ -56,13 +63,13 @@ describe('account-owned model requests', () => {
 
   it('forwards one account signal through lookup, credentials, relationships, maintenance, and image requests', async () => {
     const {
-      addModelRelationship,
       deleteOrphanedModels,
       getExternalProviderConfigs,
       getHuggingFaceModels,
       pruneCompletedModelInstalls,
       updateModelImage,
     } = await import('./api');
+    const { addModelRelationship } = await import('./relationshipsApi');
     const controller = new AbortController();
     const image = new Blob(['image'], { type: 'image/png' });
 
@@ -102,5 +109,23 @@ describe('account-owned model requests', () => {
       '/api/v2/models/i/model-a/image',
       expect.objectContaining({ method: 'PATCH', signal: controller.signal })
     );
+  });
+});
+
+describe('bulkReidentifyModels', () => {
+  it('POSTs the key list as JSON and forwards the abort signal', async () => {
+    mocks.apiFetchJson.mockReset().mockResolvedValue({ failed: [], succeeded: ['a', 'b'] });
+    const { bulkReidentifyModels } = await import('./api');
+    const controller = new AbortController();
+
+    const result = await bulkReidentifyModels(['a', 'b'], controller.signal);
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v2/models/i/bulk_reidentify', {
+      body: JSON.stringify({ keys: ['a', 'b'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      signal: controller.signal,
+    });
+    expect(result).toEqual({ failed: [], succeeded: ['a', 'b'] });
   });
 });

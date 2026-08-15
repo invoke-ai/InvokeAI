@@ -17,7 +17,7 @@ export const NodeActivityBar = () => {
   const summary =
     installingCount > 0
       ? `${log.find((entry) => entry.status === 'installing')?.name ?? t('nodes.installing')}${
-          installingCount > 1 ? t('models.plusMore', { count: installingCount - 1 }) : ''
+          installingCount > 1 ? t('common.plusMore', { count: installingCount - 1 }) : ''
         }`
       : log.length > 0
         ? t('nodes.recentActivitySummary', { count: log.length })
@@ -85,4 +85,3 @@ export const NodeActivityBar = () => {
     </Collapsible.Root>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

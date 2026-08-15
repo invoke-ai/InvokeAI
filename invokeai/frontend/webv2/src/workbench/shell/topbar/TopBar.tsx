@@ -35,7 +35,7 @@ export const TopBar = () => (
       flexShrink={0}
       gap="2"
       gridTemplateColumns={TOPBAR_COLUMNS}
-      h="46px"
+      h="44px"
       px="1.5"
       w="full"
     >

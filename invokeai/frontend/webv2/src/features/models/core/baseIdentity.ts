@@ -3,6 +3,10 @@ import type { ModelBase, ModelConfig } from './types';
 // Model-base identity registry: labels, colors, and scalar display facts only.
 // Generation behavior keyed by base lives in @features/generation/settings.
 
+/** Fallback display casing for open-union taxonomy values ("t5_encoder" -> "T5 Encoder"). */
+export const toTitleCase = (value: string): string =>
+  value.replaceAll(/[_-]+/g, ' ').replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+
 export type ModelBaseColorPalette = 'blue' | 'cyan' | 'gray' | 'green' | 'orange' | 'pink' | 'purple' | 'red' | 'teal';
 
 export interface ModelBaseInfo {
@@ -117,9 +121,6 @@ export type KnownModelBase = keyof typeof MODEL_BASES;
 
 export const KNOWN_MODEL_BASES = Object.keys(MODEL_BASES) as KnownModelBase[];
 
-const toTitleCase = (value: string): string =>
-  value.replaceAll(/[_-]+/g, ' ').replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1));
-
 // Unknown bases are display-safe here, but generation support is decided in baseGenerationPolicies.ts.
 export const getModelBaseInfo = (base: ModelBase): ModelBaseInfo =>
   (MODEL_BASES as Record<string, ModelBaseInfo>)[base] ?? {
@@ -138,8 +139,6 @@ export const getModelBaseLongLabel = (base: ModelBase): string => {
 };
 
 export const getModelBaseColorPalette = (base: ModelBase): ModelBaseColorPalette => getModelBaseInfo(base).colorPalette;
-
-export const isKnownModelBase = (base: ModelBase): base is KnownModelBase => base in MODEL_BASES;
 
 export const isConvertibleToDiffusers = (model: Pick<ModelConfig, 'base' | 'format' | 'type'>): boolean =>
   model.format === 'checkpoint' &&

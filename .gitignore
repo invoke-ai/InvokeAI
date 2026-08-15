@@ -201,3 +201,6 @@ installer/InvokeAI-Installer/
 
 # Weblate configuration file
 weblate.ini
+
+# Local dev launcher scripts
+start_frontend.sh

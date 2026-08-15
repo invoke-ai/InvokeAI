@@ -8,7 +8,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
-import { supportsVaeCpuOnlySetting, VaeCpuOnlySetting } from './VaeCpuOnlySetting';
+import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
 
 const api = vi.hoisted(() => ({
   getModelsDir: vi.fn(),
@@ -47,19 +47,13 @@ const deferred = <T,>() => {
   return { promise, reject, resolve };
 };
 
-const VaeCpuOnlySettingHarness = ({
-  onError,
-  onSaved,
-}: {
-  onError: (message: string) => void;
-  onSaved: () => void;
-}) => {
+const CpuOnlySettingHarness = ({ onError, onSaved }: { onError: (message: string) => void; onSaved: () => void }) => {
   const model = useModelsSelector((snapshot) => snapshot.models.find((candidate) => candidate.key === vae.key));
 
-  return model ? <VaeCpuOnlySetting model={model} onError={onError} onSaved={onSaved} /> : null;
+  return model ? <CpuOnlySetting model={model} onError={onError} onSaved={onSaved} /> : null;
 };
 
-describe('VaeCpuOnlySetting', () => {
+describe('CpuOnlySetting', () => {
   let host: HTMLDivElement;
   let root: Root;
   let onError: Mock<(message: string) => void>;
@@ -79,7 +73,7 @@ describe('VaeCpuOnlySetting', () => {
     await act(() => {
       root.render(
         <ChakraProvider value={system}>
-          <VaeCpuOnlySettingHarness onError={onError} onSaved={onSaved} />
+          <CpuOnlySettingHarness onError={onError} onSaved={onSaved} />
         </ChakraProvider>
       );
     });
@@ -91,9 +85,30 @@ describe('VaeCpuOnlySetting', () => {
     accountLifecycle.invalidate();
   });
 
-  it('is available only for VAE model details', () => {
-    expect(supportsVaeCpuOnlySetting({ type: 'vae' })).toBe(true);
-    expect(supportsVaeCpuOnlySetting({ type: 'main' })).toBe(false);
+  it('is available exactly for the types whose config carries cpu_only', () => {
+    const supported = [
+      'vae',
+      'clip_embed',
+      't5_encoder',
+      'qwen3_encoder',
+      'clip_vision',
+      'siglip',
+      'llava_onevision',
+      'text_llm',
+      'wan_t5_encoder',
+      'gemma2_encoder',
+      'mistral_encoder',
+      'qwen3_vl_encoder',
+    ];
+
+    for (const type of supported) {
+      expect(supportsCpuOnlySetting({ type }), type).toBe(true);
+    }
+
+    // These configs have no cpu_only field; the PATCH would silently drop it.
+    for (const type of ['main', 'lora', 'qwen_vl_encoder', 'pid_decoder']) {
+      expect(supportsCpuOnlySetting({ type }), type).toBe(false);
+    }
   });
 
   it('saves immediately, disables while pending, and accepts the canonical response', async () => {

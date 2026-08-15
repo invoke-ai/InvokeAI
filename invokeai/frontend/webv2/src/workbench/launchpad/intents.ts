@@ -5,10 +5,9 @@ import type { BuiltInLayoutPresetId } from '@workbench/layoutContracts';
  * What the user said they wanted to make, translated into how the editor
  * should open.
  *
- * A layout preset deliberately does not imply an invocation source — several
- * graph widgets are placed in every preset, which is why `builtInLayoutPresets`
- * warns against inferring one from the other. An intent therefore names both
- * explicitly rather than deriving one from the other.
+ * A layout preset supplies the account's default route, while an intent names
+ * its source explicitly because it can be more specific. For example, Generate
+ * and Upscale share Compose but need different invocation sources.
  *
  * This is the whole contract behind `/app?new=true&intent=…`: the Launchpad
  * writes the id into the URL, and the editor's session controller applies it
