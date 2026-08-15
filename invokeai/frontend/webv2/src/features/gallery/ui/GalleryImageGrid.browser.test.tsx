@@ -174,6 +174,7 @@ const board = {
   imageCount: 3,
   kind: 'board',
   name: 'Board A',
+  projectId: null,
   videoCount: 1,
 } as const;
 
@@ -308,7 +309,6 @@ const createAdapter = (): GalleryUiAdapter =>
       setItemMultiSelection: noop,
       setPage: noop,
       setPageInfo: noop,
-      setProjectBoard: noop,
       setSearchTerm: noop,
       setView: noop,
       toggleItemSelection: noop,

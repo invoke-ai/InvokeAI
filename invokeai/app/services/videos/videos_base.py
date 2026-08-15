@@ -61,12 +61,26 @@ class VideoServiceABC(ABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         first_frame: Optional[Image.Image] = None,
+        move_source: bool = True,
     ) -> VideoDTO:
-        """Creates a video by moving/copying the file at `source_path` into storage and recording it.
+        """Creates a video by moving the file at `source_path` into storage and recording it.
 
         ``first_frame``, when provided (e.g. the upload path already decoded frame 0 to
         prove decodability), is used as the thumbnail source instead of spawning another
         decode worker.
+
+        ``source_path`` is consumed unless ``move_source=False``. Every caller that hands over a
+        temp file wants the default; a caller copying a video the server already owns must not.
+        """
+        pass
+
+    @abstractmethod
+    def copy(self, source_video_name: str, board_id: Optional[str] = None, user_id: Optional[str] = None) -> VideoDTO:
+        """Copies a stored video under a fresh identity.
+
+        Provenance is preserved, the source file is never consumed, and a requested board
+        attachment is atomic from the caller's perspective: a copy that cannot reach the board is
+        deleted before this method fails.
         """
         pass
 
@@ -131,6 +145,16 @@ class VideoServiceABC(ABC):
     @abstractmethod
     def delete(self, video_name: str) -> None:
         """Deletes a video."""
+        pass
+
+    @abstractmethod
+    def delete_videos_by_names(self, video_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes exactly these videos; returns ``(deleted_names, failed_names)``.
+
+        For callers that must decide whether the deletion may proceed *before* destroying
+        anything, and so enumerate the names themselves. Same per-video failure semantics as
+        ``delete_videos_on_board``.
+        """
         pass
 
     @abstractmethod

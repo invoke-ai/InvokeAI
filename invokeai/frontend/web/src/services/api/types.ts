@@ -118,6 +118,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
+export type MistralEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'mistral_encoder' }>;
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
 export type Qwen3VLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_vl_encoder' }>;
 export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'wan_t5_encoder' }>;
@@ -405,6 +406,10 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
   return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
 };
 
+export const isMistralEncoderModelConfig = (config: AnyModelConfig): config is MistralEncoderModelConfig => {
+  return config.type === 'mistral_encoder';
+};
+
 export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
   return config.type === 'qwen_vl_encoder';
 };
@@ -512,13 +517,24 @@ const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainMo
   return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
 };
 
+const isFlux2DevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.variant === 'dev';
+};
+
+export const isFlux2DevDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return isFlux2DevMainModelConfig(config) && config.format === 'diffusers';
+};
+
 const isIdeogram4MainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'ideogram-4';
 };
 
 export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return (
-    isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config) || isIdeogram4MainModelConfig(config)
+    isFluxDevMainModelConfig(config) ||
+    isFlux2Klein9BMainModelConfig(config) ||
+    isFlux2DevMainModelConfig(config) ||
+    isIdeogram4MainModelConfig(config)
   );
 };
 

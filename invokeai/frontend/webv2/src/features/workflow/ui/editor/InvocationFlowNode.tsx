@@ -34,6 +34,7 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
 
@@ -217,15 +218,19 @@ const InputFieldTooltip = ({
   </Stack>
 );
 
-const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => (
-  <Stack gap="0.5" maxW="18rem">
-    <Text fontWeight="700">{template.title}</Text>
-    <Text color="fg.subtle">Field: {template.name}</Text>
-    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
-    <Text color="fg.subtle">Output</Text>
-    {template.description ? <Text>{template.description}</Text> : null}
-  </Stack>
-);
+const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="0.5" maxW="18rem">
+      <Text fontWeight="700">{template.title}</Text>
+      <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
+      <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
+      <Text color="fg.subtle">{t('nodes.output')}</Text>
+      {template.description ? <Text>{template.description}</Text> : null}
+    </Stack>
+  );
+};
 
 const NodeInfoTooltipContent = ({
   node,
@@ -234,17 +239,18 @@ const NodeInfoTooltipContent = ({
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => {
+  const { t } = useTranslation();
   const title = node.data.label ? `${node.data.label} (${template.title})` : template.title;
   const nodePack = node.data.nodePack || template.nodePack;
 
   return (
     <Stack gap="1" maxW="20rem">
       <Text fontWeight="700">{title}</Text>
-      <Text color="fg.subtle">Type: {template.type}</Text>
-      <Text color="fg.subtle">Node pack: {nodePack}</Text>
-      <Text color="fg.subtle">Version: {node.data.version}</Text>
-      <Text color="fg.subtle">Classification: {template.classification}</Text>
-      <Text color="fg.subtle">Category: {template.category}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeType', { type: template.type })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodePackLabel', { name: nodePack })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeVersion', { version: node.data.version })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
       {node.data.notes ? <Text>{node.data.notes}</Text> : null}
     </Stack>
@@ -463,6 +469,7 @@ const InputFieldRow = ({
             <WorkflowFieldInput
               id={`${node.id}-${template.name}-value`}
               invalid={isInvalid}
+              nodeId={node.id}
               template={template}
               value={instance?.value}
               onChange={(value) =>

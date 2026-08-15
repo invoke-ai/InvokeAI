@@ -51,15 +51,37 @@ describe('custom node data adapter', () => {
     });
   });
 
-  it('forwards account cancellation to node reloads', async () => {
+  it('forwards account cancellation to node reloads and returns the status body', async () => {
+    adapter.requestJson.mockResolvedValue({ status: 'No custom nodes directory found.' });
     const { reloadCustomNodes } = await import('./api');
     const controller = new AbortController();
 
-    await reloadCustomNodes(controller.signal);
-
-    expect(adapter.request).toHaveBeenCalledWith('/api/v2/custom_nodes/reload', {
+    await expect(reloadCustomNodes(controller.signal)).resolves.toEqual({
+      status: 'No custom nodes directory found.',
+    });
+    expect(adapter.requestJson).toHaveBeenCalledWith('/api/v2/custom_nodes/reload', {
       method: 'POST',
       signal: controller.signal,
     });
+  });
+});
+
+describe('getPackWorkflowCount', () => {
+  it('queries the pack tag and extracts its count', async () => {
+    adapter.requestJson.mockResolvedValue({ 'node-pack:my-pack': 3 });
+    const { getPackWorkflowCount } = await import('./api');
+    const controller = new AbortController();
+
+    await expect(getPackWorkflowCount('my-pack', controller.signal)).resolves.toBe(3);
+    expect(adapter.requestJson).toHaveBeenCalledWith('/api/v1/workflows/counts_by_tag?tags=node-pack%3Amy-pack', {
+      signal: controller.signal,
+    });
+  });
+
+  it('returns zero when the tag is absent from the response', async () => {
+    adapter.requestJson.mockResolvedValue({});
+    const { getPackWorkflowCount } = await import('./api');
+
+    await expect(getPackWorkflowCount('my-pack')).resolves.toBe(0);
   });
 });

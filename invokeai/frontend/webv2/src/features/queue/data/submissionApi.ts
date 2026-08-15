@@ -4,6 +4,7 @@ import type {
   QueueEnqueueWorkflowRequest,
   QueueResultImage,
   QueueResultImageOptions,
+  QueueResultVideoOptions,
 } from '@features/queue/core/types';
 
 import { buildGeneratePromptBatchPlan, sanitizeBatchCount } from '@features/queue/core/promptBatch';
@@ -175,4 +176,74 @@ export const getResultImages = async (
 
   assertAccountScopeCurrent(owner);
   return images.filter((image): image is QueueResultImage => image !== null);
+};
+
+const collectResultVideoNames = (queueItem: QueueServerItemDTO, options?: QueueResultImageOptions): string[] => {
+  const videoNames = new Set<string>();
+  const results = queueItem.session?.results ?? {};
+  const preparedSourceMapping = queueItem.session?.prepared_source_mapping ?? {};
+  const resultValues = options?.resultNodeIds
+    ? Object.entries(results)
+        .filter(([nodeId]) => options.resultNodeIds?.includes(preparedSourceMapping[nodeId] ?? nodeId))
+        .map(([, result]) => result)
+    : Object.values(results);
+
+  for (const result of resultValues) {
+    if (!result || typeof result !== 'object') {
+      continue;
+    }
+
+    // VideoOutput shape: { video: { video_name }, width, height, ... }.
+    const videoName = (result as { video?: { video_name?: unknown } }).video?.video_name;
+    if (typeof videoName === 'string') {
+      videoNames.add(videoName);
+    }
+  }
+
+  return [...videoNames];
+};
+
+/**
+ * True when the video's DTO reports it as an intermediate. Fail-open on transport
+ * errors: the caller's board attach is best-effort, and a wrongly-attached
+ * intermediate is invisible in gallery listings (which filter intermediates).
+ */
+const isIntermediateVideo = async (videoName: string, signal: AbortSignal): Promise<boolean> => {
+  try {
+    const video = await apiFetchJson<{ is_intermediate?: unknown }>(
+      `/api/v1/videos/i/${encodeURIComponent(videoName)}`,
+      { signal }
+    );
+
+    return video.is_intermediate === true;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      // The video is already gone; report it intermediate so the caller drops it.
+      return true;
+    }
+    return false;
+  }
+};
+
+/**
+ * The names of the videos a completed backend item produced. The queue runtime only
+ * routes them onto the destination board, so DTOs are hydrated solely when
+ * `excludeIntermediate` needs the `is_intermediate` flag (the video analogue of the
+ * image path's filterIntermediateResults).
+ */
+export const getResultVideoNames = async (itemId: number, options?: QueueResultVideoOptions): Promise<string[]> => {
+  const owner = captureAccountScope();
+  const item = await getQueueItem(itemId, owner.signal);
+
+  assertAccountScopeCurrent(owner);
+  const videoNames = collectResultVideoNames(item, options);
+
+  if (!options?.excludeIntermediate || videoNames.length === 0) {
+    return videoNames;
+  }
+
+  const intermediateFlags = await Promise.all(videoNames.map((name) => isIntermediateVideo(name, owner.signal)));
+
+  assertAccountScopeCurrent(owner);
+  return videoNames.filter((_, index) => !intermediateFlags[index]);
 };

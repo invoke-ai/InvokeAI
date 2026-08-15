@@ -171,9 +171,9 @@ describe('paramsSliceConfig persisted state migration', () => {
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
     // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields,
-    // v3 -> v4 adds Krea-2 and PiD fields, v4 -> v5 adds MiniMax H3 fields, v5 -> v6 adds the
+    // v3 -> v4 adds Krea-2 and PiD fields, v5 -> v6 adds MiniMax H3 fields, v6 -> v7 adds the
     // MiniMax H3 single-file transformer override).
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     expect(result.hiDiffusionEnabled).toBe(false);
@@ -187,6 +187,40 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('merges the separate Klein / dev VAE slots into flux2VaeModel when migrating from v3', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const kleinVae = { key: 'klein-vae', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
+    // Pre-PR v3 state: separate Klein / dev VAE slots, no shared flux2VaeModel and none of the
+    // other v4-only keys. Deleting both is what makes this a field-accurate v3 blob — without it
+    // the fixture carries flux2DevMistralEncoderModel from getInitialParamsState() and masks the
+    // migration's missing seed (which makes zParamsState.parse() throw on real upgrades).
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      positivePrompt: 'a fluffy cat',
+      seed: 42,
+      kleinVaeModel: kleinVae,
+      flux2DevVaeModel: null,
+    };
+    delete v3State.flux2VaeModel;
+    delete v3State.flux2DevMistralEncoderModel;
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
+
+    expect(result._version).toBe(7);
+    expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
+    // The new standalone dev Mistral encoder slot must be seeded, not left undefined.
+    expect(result.flux2DevMistralEncoderModel).toBeNull();
+    // Unrelated params must survive the migration (they'd be wiped if parse() threw).
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.seed).toBe(42);
+    // The old slots must be gone.
+    expect(result.kleinVaeModel).toBeUndefined();
+    expect(result.flux2DevVaeModel).toBeUndefined();
   });
 
   it('backfills Krea-2 fields when migrating from v3 and preserves existing params', () => {
@@ -214,7 +248,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.krea2VaeModel).toBeNull();
     expect(result.krea2Qwen3VlEncoderModel).toBeNull();
     expect(result.krea2SeedVarianceEnabled).toBe(false);
@@ -228,7 +262,126 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.dimensions).toMatchObject({ width: 640, height: 896 });
   });
 
-  it('backfills the MiniMax H3 fields when migrating from v4 and preserves existing params', () => {
+  it('seeds the Wan fields for a released-build v3 blob that predates the Wan merge', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    // Released v6.13.x builds wrote v3 blobs before the Wan fields existed. They're nullable
+    // with no default, so if the v3 -> v4 step didn't seed them, parse() would throw and the
+    // whole slice would be wiped on upgrade.
+    const v3State: Record<string, unknown> = {
+      ...initial,
+      _version: 3,
+      positivePrompt: 'a fluffy cat',
+    };
+    delete v3State.wanTransformerLowNoise;
+    delete v3State.wanComponentSource;
+    delete v3State.wanVaeModel;
+    delete v3State.wanT5EncoderModel;
+    delete v3State.wanGuidanceScaleLowNoise;
+    delete v3State.flux2VaeModel;
+    delete v3State.flux2DevMistralEncoderModel;
+
+    const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(7);
+    expect(result.wanTransformerLowNoise).toBeNull();
+    expect(result.wanComponentSource).toBeNull();
+    expect(result.wanVaeModel).toBeNull();
+    expect(result.wanT5EncoderModel).toBeNull();
+    expect(result.wanGuidanceScaleLowNoise).toBeNull();
+    expect(result.positivePrompt).toBe('a fluffy cat');
+  });
+
+  it('migrates a v4 blob written by main (PiD fields, no flux2 fields) without wiping it', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const kleinVae = { key: 'klein-vae', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
+    // main and the FLUX.2 [dev] branch both shipped _version 4 with different keys. A blob from
+    // main has the PiD fields and the old kleinVaeModel slot, but no flux2VaeModel /
+    // flux2DevMistralEncoderModel.
+    const mainV4State: Record<string, unknown> = {
+      ...initial,
+      _version: 4,
+      positivePrompt: 'a fluffy cat',
+      pidMode: 'fit',
+      kleinVaeModel: kleinVae,
+    };
+    delete mainV4State.flux2VaeModel;
+    delete mainV4State.flux2DevMistralEncoderModel;
+
+    const result = migrate?.(mainV4State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
+
+    expect(result._version).toBe(7);
+    expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
+    expect(result.flux2DevMistralEncoderModel).toBeNull();
+    // main's own v4 values must survive untouched.
+    expect(result.pidMode).toBe('fit');
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.kleinVaeModel).toBeUndefined();
+  });
+
+  it('migrates a v4 blob written by a pre-merge [dev] build (flux2 fields, no PiD fields) without wiping it', () => {
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const flux2Vae = { key: 'flux2-vae', hash: 'h', name: 'FLUX.2 VAE', base: 'flux2', type: 'vae' };
+    const devV4State: Record<string, unknown> = {
+      ...initial,
+      _version: 4,
+      positivePrompt: 'a fluffy cat',
+      flux2VaeModel: flux2Vae,
+      flux2DevMistralEncoderModel: null,
+    };
+    delete devV4State.pidMode;
+    delete devV4State.pidDecoderModel;
+    delete devV4State.gemma2EncoderModel;
+    delete devV4State.pidSteps;
+
+    const result = migrate?.(devV4State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
+
+    expect(result._version).toBe(7);
+    // The branch's own v4 values must survive untouched.
+    expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('flux2-vae');
+    expect(result.pidMode).toBe('off');
+    expect(result.pidDecoderModel).toBeNull();
+    expect(result.gemma2EncoderModel).toBeNull();
+    expect(result.pidSteps).toBe(4);
+    expect(result.positivePrompt).toBe('a fluffy cat');
+  });
+
+  it('backfills the MiniMax H3 fields when migrating from v5 and preserves existing params', () => {
+    // main shipped its own v4 -> v5 (the FLUX.2 [dev] VAE/encoder merge) before this branch
+    // landed, so the H3 step runs as v5 -> v6. A v5 blob written by a released build has no H3
+    // keys, and they are required with no default -- if this step did not run, zParamsState.parse()
+    // would throw and the whole slice would be wiped on upgrade.
+    expect(migrate).toBeDefined();
+
+    const initial = getInitialParamsState();
+    const v5State: Record<string, unknown> = {
+      ...initial,
+      _version: 5,
+      positivePrompt: 'preserve this prompt',
+      seed: 4242,
+      dimensions: { ...initial.dimensions, width: 1344, height: 768 },
+    };
+    delete v5State.minimaxH3DurationSeconds;
+    delete v5State.minimaxH3OutputMode;
+
+    const result = migrate?.(v5State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(7);
+    expect(result.minimaxH3DurationSeconds).toBe(5);
+    expect(result.minimaxH3OutputMode).toBe('video');
+    expect(result.positivePrompt).toBe('preserve this prompt');
+    expect(result.seed).toBe(4242);
+    expect(result.dimensions).toMatchObject({ width: 1344, height: 768 });
+  });
+
+  it('carries a v4 blob through both the flux2 and MiniMax H3 steps in one pass', () => {
+    // The regression this guards: with both steps written as v4 -> v5, the flux2 block sets
+    // _version = 5 and the H3 block never runs, so the parse below throws and the slice is wiped.
     expect(migrate).toBeDefined();
 
     const initial = getInitialParamsState();
@@ -236,22 +389,21 @@ describe('paramsSliceConfig persisted state migration', () => {
       ...initial,
       _version: 4,
       positivePrompt: 'preserve this prompt',
-      seed: 4242,
-      dimensions: { ...initial.dimensions, width: 1344, height: 768 },
     };
     delete v4State.minimaxH3DurationSeconds;
     delete v4State.minimaxH3OutputMode;
+    delete v4State.flux2VaeModel;
+    delete v4State.flux2DevMistralEncoderModel;
     delete v4State.minimaxH3TransformerModel;
 
     const result = migrate?.(v4State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.minimaxH3DurationSeconds).toBe(5);
     expect(result.minimaxH3OutputMode).toBe('video');
+    expect(result.flux2DevMistralEncoderModel).toBeNull();
     expect(result.minimaxH3TransformerModel).toBeNull();
     expect(result.positivePrompt).toBe('preserve this prompt');
-    expect(result.seed).toBe(4242);
-    expect(result.dimensions).toMatchObject({ width: 1344, height: 768 });
   });
 
   it('backfills the MiniMax H3 transformer override when migrating from v5 and preserves existing params', () => {
@@ -269,7 +421,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v5State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(6);
+    expect(result._version).toBe(7);
     expect(result.minimaxH3TransformerModel).toBeNull();
     expect(result.minimaxH3DurationSeconds).toBe(10);
     expect(result.positivePrompt).toBe('preserve this prompt');

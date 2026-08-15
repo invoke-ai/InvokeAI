@@ -2,11 +2,11 @@ import type { GalleryItemKey } from '@features/gallery/core/items';
 import type { GalleryBoardSectionId } from '@features/gallery/core/settings';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { Badge, HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { PinIcon, PlusIcon } from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,7 +20,6 @@ import { GalleryBoardSection } from './GalleryBoardSection';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
-const PROJECT_ROW_COVER = <BoardCoverIcon icon={PinIcon} />;
 const CREATE_ROW_COVER = <BoardCoverIcon icon={PlusIcon} />;
 
 /**
@@ -94,11 +93,6 @@ export const GalleryBoardsPanel = () => {
     [actions]
   );
 
-  const handleSelectProjectBoard = useCallback(() => {
-    setSearchTerm('');
-    void actions.selectProjectBoard();
-  }, [actions]);
-
   const openBoardMenu = useCallback((board: GalleryBoard, x: number, y: number) => {
     setBoardMenuTarget({ board, x, y });
   }, []);
@@ -153,19 +147,11 @@ export const GalleryBoardsPanel = () => {
               sectionId="boards"
               onToggle={handleToggleSection}
             >
-              {groups.hasProjectBoardPlaceholder ? (
-                <GalleryBoardRowShell cover={PROJECT_ROW_COVER} label={projectName} onSelect={handleSelectProjectBoard}>
-                  <Badge colorPalette="accent" flexShrink={0} size="xs" variant="subtle">
-                    {t('common.project')}
-                  </Badge>
-                </GalleryBoardRowShell>
-              ) : null}
               {groups.yourBoards.map((board) => (
                 <GalleryBoardRow
                   key={board.id}
                   board={board}
                   isMenuOpen={boardMenuTarget?.board.id === board.id}
-                  isProjectBoard={board.id === gallery.projectBoardId}
                   isSelected={board.id === gallery.selectedBoardId}
                   loadedItemBoardIds={loadedItemBoardIds}
                   onOpenMenu={openBoardMenu}
@@ -194,7 +180,6 @@ export const GalleryBoardsPanel = () => {
                     key={board.id}
                     board={board}
                     isMenuOpen={boardMenuTarget?.board.id === board.id}
-                    isProjectBoard={false}
                     isSelected={board.id === gallery.selectedBoardId}
                     loadedItemBoardIds={loadedItemBoardIds}
                     onSelectBoard={handleSelectBoard}
@@ -215,7 +200,6 @@ export const GalleryBoardsPanel = () => {
                     key={board.id}
                     board={board}
                     isMenuOpen={boardMenuTarget?.board.id === board.id}
-                    isProjectBoard={false}
                     isSelected={board.id === gallery.selectedBoardId}
                     loadedItemBoardIds={loadedItemBoardIds}
                     onOpenMenu={openBoardMenu}

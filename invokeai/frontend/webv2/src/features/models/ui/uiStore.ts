@@ -36,6 +36,8 @@ export interface ModelsUiSnapshot {
   scan: { path: string; results: FoundModel[] } | null;
   /** Last HuggingFace repo lookup, kept across tab switches. */
   hfLookup: HFLookupState | null;
+  /** Starter bundle selected in Add Models, kept across tab switches. */
+  selectedBundleName: string | null;
   /** Whether the always-visible install queue footer is expanded. */
   queueExpanded: boolean;
   /** Scroll offsets per library-list instance, restored on remount. */
@@ -53,6 +55,7 @@ const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   pickerCompactViews: {},
   queueExpanded: false,
   scan: null,
+  selectedBundleName: null,
   selectedKeys: new Set(),
 });
 
@@ -100,6 +103,16 @@ export const openModelDetail = (modelKey: string): void => {
   updateModelsUi({ activeModelKey: modelKey, activeTab: 'details' });
 };
 
+/**
+ * Jump to Add Models with a starter bundle preselected (e.g. from the
+ * Launchpad notice). Scan and HF lookup results are cleared because Add
+ * Models hides the bundle strip whenever either has results — the user asked
+ * to look at the bundle.
+ */
+export const openAddModelsWithBundle = (bundleName: string): void => {
+  updateModelsUi({ activeTab: 'add', hfLookup: null, scan: null, selectedBundleName: bundleName });
+};
+
 /** Expand the always-visible install queue footer (e.g. from a "View queue" link). */
 export const openInstallQueue = (): void => {
   updateModelsUi({ queueExpanded: true });
@@ -129,8 +142,7 @@ export const setPickerCompactView = (pickerId: string, isCompact: boolean): void
   updateModelsUi({ pickerCompactViews: { ...snapshot.pickerCompactViews, [pickerId]: isCompact } });
 };
 
-export const getPickerCompactView = (pickerId: string): boolean =>
-  store.getSnapshot().pickerCompactViews[pickerId] ?? false;
+export const getModelsUiSnapshotForTests = (): ModelsUiSnapshot => store.getSnapshot();
 
 export const useModelsUiSelector = store.useSelector;
 

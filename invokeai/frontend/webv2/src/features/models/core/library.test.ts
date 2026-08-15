@@ -95,17 +95,15 @@ describe('groupModelsByType', () => {
 });
 
 describe('getModelPickerGroups', () => {
-  it('filters by allowed type, exclusions, custom predicate, and multi-term search', () => {
+  it('filters by allowed type, exclusions, and custom predicate', () => {
     const result = getModelPickerGroups(library, {
       excludeKeys: new Set(['b']),
       filter: (model) => model.base !== 'any',
       modelTypes: ['main', 'lora', 'vae'],
-      searchTerm: 'sd detail',
     });
 
     expect(result.candidates.map((m) => m.key)).toEqual(['a', 'c']);
-    expect(result.groups.map((group) => group.base)).toEqual(['sd-1']);
-    expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['c']);
+    expect(result.groups.map((group) => group.base)).toEqual(['sd-1', 'sdxl']);
   });
 
   // Type is not a grouping axis: a cross-type picker would otherwise repeat a
@@ -113,7 +111,6 @@ describe('getModelPickerGroups', () => {
   it('groups by base alone, in base display order', () => {
     const result = getModelPickerGroups(library, {
       modelTypes: ['main', 'lora', 'vae'],
-      searchTerm: '',
     });
 
     expect(result.groups.map((group) => [group.key, group.models.map((m) => m.key)])).toEqual([
@@ -129,7 +126,7 @@ describe('getModelPickerGroups', () => {
       createModel({ base: 'sdxl', key: 'lora-1', name: 'Alpha LoRA', type: 'lora' }),
       createModel({ base: 'sdxl', key: 'main-1', name: 'Zulu Main', type: 'main' }),
     ];
-    const result = getModelPickerGroups(mixed, { modelTypes: ['main', 'lora'], searchTerm: '' });
+    const result = getModelPickerGroups(mixed, { modelTypes: ['main', 'lora'] });
 
     expect(result.groups).toHaveLength(1);
     expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['main-1', 'lora-1']);
@@ -143,7 +140,6 @@ describe('getModelPickerGroups', () => {
     const result = getModelPickerGroups(related, {
       modelTypes: ['lora'],
       relatedKeys: new Set(['zzz']),
-      searchTerm: '',
     });
 
     expect(result.groups[0]?.models.map((m) => m.key)).toEqual(['zzz', 'aaa']);
@@ -153,7 +149,6 @@ describe('getModelPickerGroups', () => {
     const onlySdxl = getModelPickerGroups(library, {
       baseFilter: new Set(['sdxl']),
       modelTypes: ['main', 'lora', 'vae'],
-      searchTerm: '',
     });
 
     expect(onlySdxl.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['a']);
@@ -161,26 +156,21 @@ describe('getModelPickerGroups', () => {
     const all = getModelPickerGroups(library, {
       baseFilter: new Set(),
       modelTypes: ['main', 'lora', 'vae'],
-      searchTerm: '',
     });
 
     // Base display order, matching `availableBases`: sd-1, sdxl, flux, any.
     expect(all.groups.flatMap((group) => group.models.map((m) => m.key))).toEqual(['c', 'a', 'b', 'd']);
   });
 
-  it('exposes availableBases that stay stable across search and base filtering', () => {
+  it('exposes availableBases that stay stable across base filtering', () => {
     const expected = ['sd-1', 'sdxl', 'flux', 'any'];
 
-    const base = getModelPickerGroups(library, { modelTypes: ['main', 'lora', 'vae'], searchTerm: '' });
+    const base = getModelPickerGroups(library, { modelTypes: ['main', 'lora', 'vae'] });
     expect(base.availableBases).toEqual(expected);
-
-    const searched = getModelPickerGroups(library, { modelTypes: ['main', 'lora', 'vae'], searchTerm: 'flux' });
-    expect(searched.availableBases).toEqual(expected);
 
     const filtered = getModelPickerGroups(library, {
       baseFilter: new Set(['flux']),
       modelTypes: ['main', 'lora', 'vae'],
-      searchTerm: '',
     });
     expect(filtered.availableBases).toEqual(expected);
   });
@@ -190,7 +180,6 @@ describe('getModelPickerGroups', () => {
       excludeKeys: new Set(['b']),
       filter: (model) => model.base !== 'any',
       modelTypes: ['main', 'lora', 'vae'],
-      searchTerm: '',
     });
 
     expect(result.availableBases).toEqual(['sd-1', 'sdxl']);
@@ -208,5 +197,41 @@ describe('collect helpers', () => {
     expect(
       collectBasesForDisplay([{ base: 'unknown' }, { base: 'flux' }, { base: 'external' }, { base: 'sd-1' }])
     ).toEqual(['sd-1', 'flux', 'external', 'unknown']);
+  });
+});
+
+describe('sort fields', () => {
+  it('sorts by path with direction applied', () => {
+    const pathModels = [
+      createModel({ key: 'p1', path: '/models/zeta.safetensors' }),
+      createModel({ key: 'p2', path: '/loras/alpha.safetensors' }),
+      createModel({ key: 'p3', path: '/models/beta.safetensors' }),
+    ];
+
+    const asc = filterModels(
+      pathModels,
+      { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'asc', sortField: 'path' },
+      NO_MISSING
+    ).map((m) => m.key);
+
+    expect(asc).toEqual(['p2', 'p3', 'p1']);
+
+    const desc = filterModels(
+      pathModels,
+      { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'desc', sortField: 'path' },
+      NO_MISSING
+    ).map((m) => m.key);
+
+    expect(desc).toEqual(['p1', 'p3', 'p2']);
+  });
+
+  it('sorts by type in category-rank order, then name', () => {
+    const sorted = filterModels(
+      library,
+      { ...DEFAULT_LIBRARY_FILTERS, sortDirection: 'asc', sortField: 'type' },
+      NO_MISSING
+    ).map((m) => m.type);
+
+    expect(sorted).toEqual(['main', 'main', 'lora', 'vae']);
   });
 });

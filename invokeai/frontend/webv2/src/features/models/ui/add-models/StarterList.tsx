@@ -1,6 +1,6 @@
 import type { StarterModel } from '@features/models/core/types';
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { useStartersSnapshot } from '@features/models/data/startersStore';
+import type { StartersSnapshot } from '@features/models/data/startersStore';
 
 import { Badge, Flex, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
@@ -37,9 +37,9 @@ export const StarterList = ({
   onConfigureExternalProvider: () => void;
   onInstall: (model: StarterModel) => void;
   pendingSources: ReadonlySet<string>;
-  response: ReturnType<typeof useStartersSnapshot>['response'];
+  response: StartersSnapshot['response'];
   selectedBundleSources: ReadonlySet<string> | undefined;
-  status: ReturnType<typeof useStartersSnapshot>['status'];
+  status: StartersSnapshot['status'];
 }) => {
   const { t } = useTranslation();
 
@@ -137,4 +137,3 @@ export const StarterList = ({
     </Stack>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
