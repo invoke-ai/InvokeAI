@@ -2758,6 +2758,7 @@
       "downloadReady": "Download ready",
       "downloadSelection": "Download selection",
       "dropMediaToUploadToBoard": "Drop images or videos to upload to {{name}}",
+      "emptyBoardUploadHint": "Drop media here or click to upload",
       "exportProjectFromBoard": "Export project (.invk)",
       "expandStarredItems": "Expand starred items",
       "generationProgress": "Generation progress",

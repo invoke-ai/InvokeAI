@@ -252,6 +252,25 @@ describe('gallery layout shells', () => {
     expect(contextBase.actions.updateSettings).toHaveBeenLastCalledWith({ boardPanelHeightPx: measuredMaximum });
   });
 
+  it('puts the upload control in the toolbar row for both shells, disabled for date boards', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      setGallery(gallery);
+      await renderLayout(Layout);
+
+      const upload = host?.querySelector<HTMLButtonElement>('button[aria-label^="widgets.gallery.upload"]');
+
+      expect(upload, 'upload control did not render in the toolbar').not.toBeNull();
+      expect(upload?.disabled).toBe(false);
+
+      setGallery(createGallery({ selectedBoardId: 'by_date:2026-07-30' }));
+      await renderLayout(Layout);
+
+      const uploadForDateBoard = host?.querySelector<HTMLButtonElement>('button[aria-label^="widgets.gallery.upload"]');
+
+      expect(uploadForDateBoard?.disabled).toBe(true);
+    }
+  });
+
   it('hides the board column and its handle in both shells when collapsed', async () => {
     setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, boardPanelCollapsed: true } }));
 

@@ -1,6 +1,7 @@
-import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Text } from '@chakra-ui/react';
+import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem } from '@features/gallery/core/items';
+import { isDateBoardId } from '@features/gallery/data/backend';
 import { DropZone } from '@platform/ui';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
@@ -11,7 +12,9 @@ import {
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type DragEvent,
+  type KeyboardEvent,
 } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
@@ -28,6 +31,7 @@ import {
 import { GalleryQueuePlaceholderCell } from './GalleryQueuePlaceholderCell';
 import { GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
+import { ACCEPTED_UPLOAD_EXTENSIONS, UPLOAD_INPUT_STYLE } from './GalleryUploadButton';
 import { useGalleryWidget } from './GalleryWidgetContext';
 import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
 import { useGalleryGridSelection } from './useGalleryGridSelection';
@@ -124,6 +128,7 @@ export const GalleryImageGrid = () => {
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(region) ?? 0);
   const dragDepthRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, thumbnailFit } = gallery.settings;
 
   const {
@@ -149,6 +154,8 @@ export const GalleryImageGrid = () => {
     ? getGalleryBoardLabel(selectedBoard, t)
     : t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.items.length === 0 && gallery.pendingPlaceholders.length === 0;
+  const hasActiveSearch = gallery.searchTerm.trim() !== '';
+  const isVirtualBoard = isDateBoardId(gallery.selectedBoardId);
 
   const rows = useMemo(
     () =>
@@ -295,6 +302,31 @@ export const GalleryImageGrid = () => {
     [actions]
   );
 
+  const handleUploadFileChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(event.currentTarget.files ?? []);
+
+      event.currentTarget.value = '';
+
+      if (files.length > 0) {
+        void actions.uploadFiles(files);
+      }
+    },
+    [actions]
+  );
+
+  const openUploadPicker = useCallback(() => uploadInputRef.current?.click(), []);
+
+  const handleUploadKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openUploadPicker();
+      }
+    },
+    [openUploadPicker]
+  );
+
   const handleShowProgressImages = useCallback(() => {
     account.enableLiveFollow();
   }, [account]);
@@ -324,11 +356,39 @@ export const GalleryImageGrid = () => {
       onDrop={handleDrop}
     >
       {isEmpty ? (
-        <Flex align="center" color="fg.muted" h="full" justify="center" minH="8rem">
-          <Text fontSize="xs">
-            {gallery.isLoading ? t('widgets.gallery.loadingBackendGallery') : t('widgets.gallery.noImagesMatch')}
-          </Text>
-        </Flex>
+        gallery.isLoading || hasActiveSearch || isVirtualBoard ? (
+          <Flex align="center" color="fg.muted" h="full" justify="center" minH="8rem">
+            <Text fontSize="xs">
+              {gallery.isLoading ? t('widgets.gallery.loadingBackendGallery') : t('widgets.gallery.noImagesMatch')}
+            </Text>
+          </Flex>
+        ) : (
+          <Flex align="stretch" h="full" minH="8rem" p="2">
+            <input
+              accept={ACCEPTED_UPLOAD_EXTENSIONS}
+              multiple
+              ref={uploadInputRef}
+              style={UPLOAD_INPUT_STYLE}
+              type="file"
+              onChange={handleUploadFileChange}
+            />
+            <DropZone
+              cursor="pointer"
+              flex="1"
+              fontSize="xs"
+              isOver={isDropActive}
+              role="button"
+              tabIndex={0}
+              onClick={openUploadPicker}
+              onKeyDown={handleUploadKeyDown}
+            >
+              <Stack align="center" gap="1">
+                <Icon as={UploadIcon} boxSize="4" color="fg.subtle" />
+                <Text color="fg.muted">{t('widgets.gallery.emptyBoardUploadHint')}</Text>
+              </Stack>
+            </DropZone>
+          </Flex>
+        )
       ) : (
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
           <ScrollArea.Viewport ref={viewportRef} h="full" outline="none" w="full">

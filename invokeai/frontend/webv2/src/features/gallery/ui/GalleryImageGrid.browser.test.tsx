@@ -118,6 +118,7 @@ void i18n.use(initReactI18next).init({
             noImagesMatch: 'No items',
             collapseStarredItems: 'Collapse starred items',
             dropMediaToUploadToBoard: 'Drop media to {{name}}',
+            emptyBoardUploadHint: 'Drop media here or click to upload',
             expandStarredItems: 'Expand starred items',
             selectImageForPreview: 'Select {{name}} for preview',
             selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
@@ -885,6 +886,53 @@ describe('GalleryImageGrid upload drop zone', () => {
     await interact(() => gridRoot?.dispatchEvent(new DragEvent('dragenter', { bubbles: true, dataTransfer })));
 
     expect(host?.textContent).toContain('Drop media to Uncategorized');
+  });
+
+  it('turns a true-empty, non-searching, non-virtual board into a click/drop upload target', async () => {
+    await renderGallery(createGallery({ items: [], pendingPlaceholders: [] }));
+
+    const target = host?.querySelector<HTMLElement>('[role="button"]');
+    const input = host?.querySelector<HTMLInputElement>('input[type="file"]');
+
+    expect(target).not.toBeNull();
+    expect(target?.getAttribute('tabIndex')).toBe('0');
+    expect(target?.textContent).toContain('Drop media here or click to upload');
+    expect(input).not.toBeNull();
+    expect(host?.textContent).not.toContain('No items');
+
+    const clickSpy = vi.spyOn(input!, 'click');
+
+    await interact(() => target?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+
+    expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the no-match message for a search with no results instead of the upload target', async () => {
+    await renderGallery(createGallery({ items: [], pendingPlaceholders: [], searchTerm: 'nope' }));
+
+    expect(host?.textContent).toContain('No items');
+    expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('keeps the no-match message for an empty virtual (date) board instead of the upload target', async () => {
+    await renderGallery(
+      createGallery({
+        boards: [{ ...board, id: 'by_date:2026-07-30', kind: 'date' }],
+        items: [],
+        pendingPlaceholders: [],
+        selectedBoardId: 'by_date:2026-07-30',
+      })
+    );
+
+    expect(host?.textContent).toContain('No items');
+    expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('keeps the loading message while an empty board is still loading', async () => {
+    await renderGallery(createGallery({ isLoading: true, items: [], pendingPlaceholders: [] }));
+
+    expect(host?.textContent).toContain('Loading gallery');
+    expect(host?.querySelector('[role="button"]')).toBeNull();
   });
 });
 
