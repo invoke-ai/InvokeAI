@@ -9,17 +9,20 @@ import { ReloadNodesButton } from './ReloadNodesButton';
 
 const dependencies = vi.hoisted(() => ({
   error: vi.fn(),
+  getCustomNodesSnapshot: vi.fn(),
   refreshCustomNodePacks: vi.fn(),
   reloadCustomNodes: vi.fn(),
   success: vi.fn(),
+  warning: vi.fn(),
 }));
 
 vi.mock('@features/nodes/data/api', () => ({ reloadCustomNodes: dependencies.reloadCustomNodes }));
 vi.mock('@features/nodes/data/nodesStore', () => ({
+  getCustomNodesSnapshot: dependencies.getCustomNodesSnapshot,
   refreshCustomNodePacks: dependencies.refreshCustomNodePacks,
 }));
 vi.mock('@features/nodes/ui/useNodesNotify', () => ({
-  useNotify: () => ({ error: dependencies.error, success: dependencies.success }),
+  useNotify: () => ({ error: dependencies.error, success: dependencies.success, warning: dependencies.warning }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -43,9 +46,13 @@ describe('ReloadNodesButton account ownership', () => {
 
   beforeEach(async () => {
     dependencies.error.mockReset();
+    dependencies.getCustomNodesSnapshot
+      .mockReset()
+      .mockReturnValue({ customNodesPath: '/custom_nodes', error: null, nodePacks: [], status: 'loaded' });
     dependencies.refreshCustomNodePacks.mockReset().mockResolvedValue(undefined);
-    dependencies.reloadCustomNodes.mockReset().mockResolvedValue(undefined);
+    dependencies.reloadCustomNodes.mockReset().mockResolvedValue({ status: 'Custom nodes reloaded successfully.' });
     dependencies.success.mockReset();
+    dependencies.warning.mockReset();
     owner = accountLifecycle.activate('reload-nodes-a', ':user:reload-nodes-a');
     host = document.createElement('div');
     document.body.append(host);
@@ -77,8 +84,38 @@ describe('ReloadNodesButton account ownership', () => {
     expect(dependencies.error).not.toHaveBeenCalled();
   });
 
+  it('warns instead of celebrating when the backend reports a non-success status', async () => {
+    dependencies.reloadCustomNodes.mockResolvedValueOnce({ status: 'No custom nodes directory found.' });
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button')?.click();
+      await vi.waitFor(() => expect(dependencies.warning).toHaveBeenCalledOnce());
+    });
+
+    expect(dependencies.warning).toHaveBeenCalledWith('nodes.reloadNotice', 'No custom nodes directory found.');
+    expect(dependencies.success).not.toHaveBeenCalled();
+    expect(dependencies.error).not.toHaveBeenCalled();
+  });
+
+  it('reports a swallowed refetch failure instead of celebrating the reload', async () => {
+    dependencies.getCustomNodesSnapshot.mockReturnValue({
+      customNodesPath: '/custom_nodes',
+      error: 'refetch exploded',
+      nodePacks: [{ name: 'pack', nodeCount: 1, nodeTypes: [], path: '/custom_nodes/pack' }],
+      status: 'loaded',
+    });
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('button')?.click();
+      await vi.waitFor(() => expect(dependencies.error).toHaveBeenCalledOnce());
+    });
+
+    expect(dependencies.error).toHaveBeenCalledWith('nodes.refreshFailed', 'refetch exploded');
+    expect(dependencies.success).not.toHaveBeenCalled();
+  });
+
   it('keeps an account A abort quiet after account B activates', async () => {
-    const request = deferred<void>();
+    const request = deferred<{ status: string }>();
     dependencies.reloadCustomNodes.mockReturnValueOnce(request.promise);
 
     await act(async () => {

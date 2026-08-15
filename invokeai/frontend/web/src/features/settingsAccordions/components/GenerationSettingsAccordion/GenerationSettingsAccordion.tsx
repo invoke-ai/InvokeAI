@@ -12,6 +12,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsFlux2Dev,
   selectIsIdeogram4,
   selectIsKrea2,
   selectIsMiniMaxH3,
@@ -64,6 +65,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const base = useAppSelector(selectBase);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
+  const isFlux2Dev = useAppSelector(selectIsFlux2Dev);
   const isZImage = useAppSelector(selectIsZImage);
   const isErnieImage = useAppSelector(selectIsErnieImage);
   const isIdeogram4 = useAppSelector(selectIsIdeogram4);
@@ -128,6 +130,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
                   <ParamGuidance />
                 )}
+                {!isExternal && isFlux2Dev && <ParamGuidance />}
                 {!isExternal && !isFLUX && !isFlux2 && !isIdeogram4 && !isMiniMaxH3 && <ParamCFGScale />}
                 {!isExternal && isWan && <ParamWanGuidanceScaleLowNoise />}
                 {!isExternal && isMiniMaxH3 && <ParamMiniMaxH3OutputMode />}

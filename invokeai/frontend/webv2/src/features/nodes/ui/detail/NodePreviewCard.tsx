@@ -120,6 +120,7 @@ const NodeInfoTooltip = ({ template }: { template: InvocationTemplate }) => {
 };
 
 export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) => {
+  const { t } = useTranslation();
   const inputTemplates = sortByUiOrder(Object.values(template.inputs).filter((input) => !input.uiHidden));
   const outputTemplates = Object.values(template.outputs);
   const hasFields = inputTemplates.length > 0 || outputTemplates.length > 0;
@@ -142,7 +143,12 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
         </Text>
         <Box flex="1" />
         <Tooltip content={<NodeInfoTooltip template={template} />} positioning={{ placement: 'top-end' }} showArrow>
-          <Icon aria-label={`Details for ${template.title}`} as={InfoIcon} boxSize="3.5" color="fg.subtle" />
+          <Icon
+            aria-label={t('nodes.nodeDetailsAria', { title: template.title })}
+            as={InfoIcon}
+            boxSize="3.5"
+            color="fg.subtle"
+          />
         </Tooltip>
       </Flex>
       <Stack bg="bg.muted" borderBottomRadius="lg" gap="0" py="1">
@@ -157,11 +163,10 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
           </>
         ) : (
           <Text color="fg.muted" fontSize="2xs" px="3" py="1">
-            No exposed fields.
+            {t('nodes.noExposedFields')}
           </Text>
         )}
       </Stack>
     </Box>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -7,7 +7,9 @@ import type { InvocationControllerState } from './invocationContracts';
 import type {
   LayoutPreset,
   LayoutPresetId,
+  LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
+  LayoutPresetRouteOverrides,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
@@ -129,6 +131,12 @@ export interface AutosaveState {
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
   customLayoutPresets?: LayoutPreset[];
+  /** One account-wide order shared by every layout-preset surface. */
+  layoutPresetOrder?: LayoutPresetId[];
+  /** Saved name and icon edits for built-in presets. */
+  layoutPresetMetadataOverrides?: LayoutPresetMetadataOverrides;
   /** Saved edits to a built-in preset's arrangement; see {@link LayoutPresetOverrides}. */
   layoutPresetOverrides?: LayoutPresetOverrides;
+  /** Saved edits to built-in preset routes, kept separate from spatial layout drift. */
+  layoutPresetRouteOverrides?: LayoutPresetRouteOverrides;
 }

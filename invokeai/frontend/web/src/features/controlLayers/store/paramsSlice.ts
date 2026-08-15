@@ -365,12 +365,12 @@ const slice = createSlice({
     ) => {
       state.animaScheduler = action.payload;
     },
-    kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
-      const result = zParamsState.shape.kleinVaeModel.safeParse(action.payload);
+    flux2VaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.flux2VaeModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
-      state.kleinVaeModel = result.data;
+      state.flux2VaeModel = result.data;
     },
     kleinQwen3EncoderModelSelected: (
       state,
@@ -381,6 +381,16 @@ const slice = createSlice({
         return;
       }
       state.kleinQwen3EncoderModel = result.data;
+    },
+    flux2DevMistralEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.flux2DevMistralEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.flux2DevMistralEncoderModel = result.data;
     },
     pidModeChanged: (state, action: PayloadAction<PidMode>) => {
       const prevPidScale = getPidScale(state.pidMode);
@@ -831,8 +841,9 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.animaLLLiteModel = oldState.animaLLLiteModel;
-  newState.kleinVaeModel = oldState.kleinVaeModel;
+  newState.flux2VaeModel = oldState.flux2VaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.flux2DevMistralEncoderModel = oldState.flux2DevMistralEncoderModel;
   newState.pidMode = oldState.pidMode;
   newState.pidDecoderModel = oldState.pidDecoderModel;
   newState.gemma2EncoderModel = oldState.gemma2EncoderModel;
@@ -910,10 +921,11 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  flux2VaeModelSelected,
   krea2VaeModelSelected,
   krea2Qwen3VlEncoderModelSelected,
-  kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  flux2DevMistralEncoderModelSelected,
   pidModeChanged,
   pidDecoderModelSelected,
   gemma2EncoderModelSelected,
@@ -1004,8 +1016,12 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
       }
 
       if (state._version === 3) {
-        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields, and the
-        // PiD (Pixel Diffusion Decoder) fields
+        // v3 -> v4, add Krea-2 standalone component and conditioning enhancer fields and the
+        // PiD (Pixel Diffusion Decoder) fields. Also seed the Wan component fields — they were
+        // added to the schema without a version bump while releases were still writing v3 blobs,
+        // and they're nullable with no default, so a genuine released-build v3 blob without them
+        // fails zParamsState.parse() and wipes the whole slice. Seed only when missing: dev-build
+        // v3 blobs written after the Wan merge already carry (possibly non-null) values.
         state._version = 4;
         state.krea2VaeModel = null;
         state.krea2Qwen3VlEncoderModel = null;
@@ -1019,11 +1035,44 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.pidDecoderModel = null;
         state.gemma2EncoderModel = null;
         state.pidSteps = 4;
+        state.wanTransformerLowNoise = state.wanTransformerLowNoise ?? null;
+        state.wanComponentSource = state.wanComponentSource ?? null;
+        state.wanVaeModel = state.wanVaeModel ?? null;
+        state.wanT5EncoderModel = state.wanT5EncoderModel ?? null;
+        state.wanGuidanceScaleLowNoise = state.wanGuidanceScaleLowNoise ?? null;
       }
 
       if (state._version === 4) {
-        // v4 -> v5, add the MiniMax H3 duration and output-mode fields
+        // v4 -> v5, merge the separate Klein / [dev] FLUX.2 VAE slots into one shared
+        // flux2VaeModel (both drew from the same FLUX.2 VAE pool — keep whichever was set) and
+        // seed the new standalone [dev] Mistral encoder slot. Both parents of the FLUX.2 [dev]
+        // merge shipped incompatible schemas under _version 4 (main added the PiD fields; the
+        // [dev] branch added the flux2 fields), so a v4 blob may be missing either side's keys —
+        // every seed here is conditional, and the PiD keys are re-seeded for blobs written by
+        // pre-merge [dev] builds. All are nullable-with-no-default, so any missing key would
+        // fail zParamsState.parse() and wipe the whole slice.
         state._version = 5;
+        state.flux2VaeModel = state.flux2VaeModel ?? state.kleinVaeModel ?? state.flux2DevVaeModel ?? null;
+        state.flux2DevMistralEncoderModel = state.flux2DevMistralEncoderModel ?? null;
+        delete state.kleinVaeModel;
+        delete state.flux2DevVaeModel;
+        state.pidMode = state.pidMode ?? 'off';
+        state.pidDecoderModel = state.pidDecoderModel ?? null;
+        state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
+        state.pidSteps = state.pidSteps ?? 4;
+      }
+
+      if (state._version === 5) {
+        // v5 -> v6, add the MiniMax H3 duration and output-mode fields.
+        //
+        // This step was written as v4 -> v5 on this branch, but main landed its own v4 -> v5
+        // (the FLUX.2 [dev] VAE/encoder merge) first. Keeping both as v4 -> v5 silently breaks
+        // the migration: the block above sets _version = 5, so a v4 blob would skip this one
+        // and reach zParamsState.parse() without the H3 keys — which are required with no
+        // default, so the parse throws and the whole params slice is wiped on upgrade. Running
+        // as v5 -> v6 covers both a v4 blob (via main's step) and any v5 blob already written
+        // by a released build.
+        state._version = 6;
         state.minimaxH3DurationSeconds = 5;
         state.minimaxH3OutputMode = 'video';
       }
@@ -1094,8 +1143,9 @@ export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => par
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectAnimaLLLiteModel = createParamsSelector((params) => params.animaLLLiteModel);
 export const selectAnimaLLLiteWeight = createParamsSelector((params) => params.animaLLLiteWeight);
-export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
+export const selectFlux2VaeModel = createParamsSelector((params) => params.flux2VaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectFlux2DevMistralEncoderModel = createParamsSelector((params) => params.flux2DevMistralEncoderModel);
 export const selectPidMode = createParamsSelector((params) => params.pidMode);
 export const selectPidDecoderModel = createParamsSelector((params) => params.pidDecoderModel);
 export const selectPidSteps = createParamsSelector((params) => params.pidSteps);
@@ -1376,4 +1426,11 @@ export const selectMainModelConfig = createSelector(selectModelConfig, (modelCon
     return null;
   }
   return modelConfig;
+});
+
+export const selectIsFlux2Dev = createSelector(selectMainModelConfig, (modelConfig) => {
+  if (!modelConfig || modelConfig.base !== 'flux2') {
+    return false;
+  }
+  return 'variant' in modelConfig && modelConfig.variant === 'dev';
 });

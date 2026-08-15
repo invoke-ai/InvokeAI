@@ -74,7 +74,8 @@ export const QueueCluster = () => {
             fontVariantNumeric="tabular-nums"
             overflow="hidden"
             position="relative"
-            size="sm"
+            size="xs"
+            px={2}
             variant={tone === 'idle' ? 'outline' : 'subtle'}
             onClick={handleOpenQueue}
           >
@@ -116,7 +117,7 @@ export const QueueCluster = () => {
           <IconButton
             aria-label={t('topbar.queue.actions')}
             color="fg.subtle"
-            size="sm"
+            size="xs"
             minW="0"
             w="6"
             variant="outline"

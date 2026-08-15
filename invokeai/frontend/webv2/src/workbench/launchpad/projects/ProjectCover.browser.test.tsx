@@ -7,10 +7,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectCover } from './ProjectCover';
 
 /**
- * Nothing populates `coverUrl` until the `.invk` project-file work lands, so
- * these assertions are what keep the with-image branch from rotting in the
- * meantime — and what prove the box is reserved either way, which is the whole
- * reason the component exists now rather than later.
+ * The three states a cover has: an image, no image, and an image the browser
+ * could not load. The last is the one worth pinning — a cover names a server
+ * image that may since have been deleted, and a broken `<img>` reads worse than
+ * the glyph. All three reserve the same box, so a grid does not reflow as
+ * covers resolve.
  */
 
 // A 1x1 transparent GIF, so the success path needs no network.
