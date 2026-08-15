@@ -46,6 +46,13 @@ def _dequantize_comfyui_fp8(sd: dict, compute_dtype: torch.dtype) -> int:
       - `<path>.weight` + `<path>.weight_scale`  (FLUX, Z-Image style)
       - `<path>.weight` + `<path>.scale_weight`  (Qwen2.5-VL fp8_scaled style, also
         emits `<path>.scale_input` for activation scaling that we discard).
+
+    The scale is applied whatever dtype the weight is stored in. There is deliberately no
+    "only if the weight is fp8" gate: not every checkpoint using these keys stores fp8
+    weights, and skipping the multiply for those would produce a silently wrong model in
+    the same way applying a stale scale would. The assumption is that a scale key present
+    in the file is a scale that still needs applying — i.e. a checkpoint must not ship
+    already-dequantized weights alongside their scales.
     """
     scale_suffixes = (".weight_scale", ".scale_weight")
     weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(scale_suffixes)]

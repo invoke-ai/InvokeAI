@@ -661,9 +661,22 @@ export const isWanSingleFileMainModelConfig = (config: AnyModelConfigWithExterna
  *  the A14B MoE pair. Suitable for the Transformer (Low Noise) picker, and filtered
  *  out of the primary main dropdown. The two experts don't have to share a format;
  *  both load into the same transformer class. */
-export const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+export const isWanSingleFileLowNoiseMainModelConfig = (
+  config: AnyModelConfigWithExternal
+): config is MainModelConfig => {
   return isWanSingleFileMainModelConfig(config) && 'expert' in config && config.expert === 'low';
 };
+
+/** Main models offerable as the *primary* main. Every list the user can pick a primary
+ *  main from must go through this — there are three (MainModelPicker,
+ *  InitialStateMainModelPicker, and the auto-select in the modelsLoaded listener), and
+ *  filtering in only some of them means the excluded models are still reachable.
+ *
+ *  A Wan low-noise expert wired as the primary main is refused by the loader
+ *  ("An unpaired Wan A14B model must be the high-noise expert"), so offering it can
+ *  only lead somewhere broken. */
+export const isSelectableAsPrimaryMainModel = (config: AnyModelConfigWithExternal): boolean =>
+  !isWanSingleFileLowNoiseMainModelConfig(config);
 
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
   return config.type === 'lora' && config.base === 'wan';

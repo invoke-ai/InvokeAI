@@ -167,7 +167,9 @@ class TestEndToEnd:
     def test_scale_bookkeeping_never_reaches_the_model(self, tmp_path: Path) -> None:
         """``load_state_dict(strict=False)`` silently ignores unexpected keys, so
         assert on what the loader actually hands over rather than on the result."""
+        target = "blocks.0.attn1.to_q.weight"
         sd = _tiny_model().state_dict()
+        sd[target] = torch.full_like(sd[target], 0.5)
         sd["blocks.0.attn1.to_q.scale_weight"] = torch.tensor([4.0])
         sd["blocks.0.attn1.to_q.scale_input"] = torch.tensor([1.0])
         sd["scaled_fp8"] = torch.zeros(1, dtype=torch.float8_e4m3fn)
@@ -184,6 +186,11 @@ class TestEndToEnd:
         assert not [k for k in handed_over if k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8"]
         # ...without eating scale_shift_table, which is a real Wan parameter.
         assert "scale_shift_table" in handed_over
+        # The scale is applied whatever the weight's dtype — `_dequantize_comfyui_fp8`
+        # has no fp8 gate, deliberately, because "scaled" checkpoints are not all fp8.
+        # Asserted rather than left implicit: this fixture's weight is bf16, so without
+        # this line the test would construct a 4x-scaled weight and say nothing about it.
+        assert torch.allclose(handed_over[target].float(), torch.full_like(handed_over[target].float(), 2.0))
 
     def test_extra_modules_are_refused_not_dropped(self, tmp_path: Path) -> None:
         """`strict=False` silently discards weights the model has nowhere to put.
