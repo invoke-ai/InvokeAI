@@ -1,27 +1,23 @@
 import type { GraphWidgetSource } from '@workbench/graphWidgets';
 import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
-import { Box, Icon, Menu, Portal, SegmentGroup, Stack, Text } from '@chakra-ui/react';
+import { Box, Icon, Menu, Portal, Stack, Status, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { describeRoute, getWidgetTypeIdForSourceId } from '@workbench/graphWidgets';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { getDestinationLabel, resultDestinations } from '@workbench/invocation';
 import { getWidgetById } from '@workbench/widgetRegistry';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { ArrowRightIcon, Link2Icon, LockKeyholeIcon, UnlockKeyholeIcon } from 'lucide-react';
+import { LockKeyholeIcon, UnlockKeyholeIcon } from 'lucide-react';
 import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
 
-const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
-const destinationWidgetTypeIds: Record<ResultDestination, 'canvas' | 'gallery'> = {
-  canvas: 'canvas',
-  gallery: 'gallery',
-};
+const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
@@ -30,10 +26,8 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const { invocation, placedTypeIds, sources } = state;
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
-  const relationship = isLocked ? 'link' : 'arrow';
   const hasSource = placedTypeIds.has(getWidgetTypeIdForSourceId(invocation.sourceId));
   const sourceTypeId = getWidgetTypeIdForSourceId(invocation.sourceId);
-  const destinationTypeId = destinationWidgetTypeIds[invocation.destination];
   const accessibleName = describeRoute({
     destination: invocation.destination,
     destinationLocked: invocation.destinationLocked,
@@ -41,8 +35,19 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
     sourceId: invocation.sourceId,
     sourceLocked: invocation.sourceLocked,
   });
-  const glyphColor = isLocked ? 'accent.fg' : 'fg.muted';
   const lockActionLabel = t(isLocked ? 'topbar.routing.unlockRouting' : 'topbar.routing.lockRouting');
+
+  const getWidgetIconProps = (type: 'source' | 'destination') => ({
+    boxSize: '3.5',
+    color: 'fg.muted',
+    [`data-routing-${type}-icon`]: '',
+    icon: getWidgetById(type === 'source' ? sourceTypeId : invocation.destination)?.manifest.icon,
+    position: 'absolute',
+    top: type === 'source' ? '4px' : undefined,
+    left: type === 'source' ? '4px' : undefined,
+    bottom: type === 'destination' ? '4px' : undefined,
+    right: type === 'destination' ? '4px' : undefined,
+  });
 
   return (
     <Menu.Root ids={triggerIds} positioning={MENU_POSITIONING}>
@@ -50,24 +55,48 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
         <Menu.Trigger asChild>
           <Button
             aria-label={accessibleName}
-            colorPalette={isLocked ? 'accent' : undefined}
+            data-routing-control=""
             flexShrink={0}
-            px="2"
-            size="sm"
-            gap="1.5"
-            variant={isLocked ? 'subtle' : 'outline'}
+            maxW="36px"
+            minW="36px"
+            overflow="visible"
+            p="0"
+            position="relative"
+            size="xs"
+            variant="outline"
+            w="34px"
+            display="grid"
           >
             {hasSource ? (
-              <WidgetIcon boxSize="3.5" color={glyphColor} icon={getWidgetById(sourceTypeId)?.manifest.icon} />
+              <WidgetIcon {...getWidgetIconProps('source')} />
             ) : (
-              <Box borderColor="border.emphasized" borderStyle="dashed" borderWidth="1px" boxSize="3.5" rounded="xs" />
+              <Box
+                borderColor="border.emphasized"
+                borderStyle="dashed"
+                borderWidth="1px"
+                boxSize="3.5"
+                data-routing-source-icon=""
+                left="4px"
+                position="absolute"
+                rounded="xs"
+                top="4px"
+              />
             )}
-            <Icon
-              as={relationship === 'link' ? Link2Icon : ArrowRightIcon}
-              boxSize="3"
-              color={isLocked ? 'accent.fg' : 'fg.subtle'}
-            />
-            <WidgetIcon boxSize="3.5" color={glyphColor} icon={getWidgetById(destinationTypeId)?.manifest.icon} />
+            <WidgetIcon {...getWidgetIconProps('destination')} />
+            {isLocked ? (
+              <Status.Root
+                colorPalette="accent"
+                data-routing-lock-indicator=""
+                pointerEvents="none"
+                position="absolute"
+                right="-1px"
+                size="sm"
+                top="-1px"
+                zIndex="1"
+              >
+                <Status.Indicator />
+              </Status.Root>
+            ) : null}
           </Button>
         </Menu.Trigger>
       </Tooltip>
@@ -133,31 +162,15 @@ const DestinationSegments = ({ destination }: { destination: ResultDestination }
   const { generation } = useWorkbenchCommands();
   const { t } = useTranslation();
   const handleChange = useCallback(
-    (event: { value: string | null }) => {
-      if (event.value) {
-        generation.setDestination(event.value as ResultDestination);
-      }
-    },
+    (nextDestination: ResultDestination) => generation.setDestination(nextDestination),
     [generation]
   );
 
   return (
-    <SegmentGroup.Root
-      aria-label={t('topbar.routing.destination')}
-      size="xs"
+    <RoutingDestinationSegments
+      ariaLabel={t('topbar.routing.destination')}
       value={destination}
-      onValueChange={handleChange}
-    >
-      <SegmentGroup.Indicator />
-      {resultDestinations.map((option) => (
-        <SegmentGroup.Item key={option.id} flex="1" justifyContent="center" value={option.id}>
-          <SegmentGroup.ItemHiddenInput />
-          <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
-            <WidgetIcon boxSize="3.5" icon={getWidgetById(destinationWidgetTypeIds[option.id])?.manifest.icon} />
-            {getDestinationLabel(option.id)}
-          </SegmentGroup.ItemText>
-        </SegmentGroup.Item>
-      ))}
-    </SegmentGroup.Root>
+      onChange={handleChange}
+    />
   );
 };

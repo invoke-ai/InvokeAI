@@ -72,6 +72,13 @@ export const tabsSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.tabs.variants,
     size: {
       ...chakraSlotRecipes.tabs.variants?.size,
+      xs: {
+        root: {
+          '--tabs-height': 'sizes.8',
+          '--tabs-content-padding': 'spacing.2.5',
+        },
+        trigger: { px: '2.5', py: '0.5', textStyle: 'xs' },
+      },
       sm: {
         ...chakraSlotRecipes.tabs.variants?.size?.sm,
         trigger: { ...chakraSlotRecipes.tabs.variants?.size?.sm?.trigger, textStyle: 'xs' },

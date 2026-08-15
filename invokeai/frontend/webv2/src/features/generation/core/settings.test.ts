@@ -220,11 +220,13 @@ describe('normalizeGenerateSettings', () => {
     const normalized = normalizeGenerateSettings({
       ...legacyStoredValues,
       loras: [{ isEnabled: true, model: { key: 'lora', name: 'LoRA', type: 'lora' }, weight: 1 }],
+      mistralEncoderModel: { key: 'mistral', name: 'Mistral', type: 'mistral_encoder' },
       qwen3EncoderModel: { key: 'qwen3', name: 'Qwen3', type: 'qwen3_encoder' },
       vae: { key: 'vae', name: 'VAE', type: 'vae' },
     });
 
     expect(normalized?.loras).toEqual([]);
+    expect(normalized?.mistralEncoderModel).toBeNull();
     expect(normalized?.qwen3EncoderModel).toBeNull();
     expect(normalized?.vae).toBeNull();
   });
@@ -252,6 +254,12 @@ describe('normalizeGenerateSettings', () => {
 describe('Generate widget value snapshots', () => {
   const model: MainModelConfig = { base: 'flux2', key: 'model', name: 'Old Model', type: 'main' };
   const component: ComponentModelConfig = { base: 'any', key: 'qwen3', name: 'Old Qwen3', type: 'qwen3_encoder' };
+  const mistral: ComponentModelConfig = {
+    base: 'any',
+    key: 'mistral',
+    name: 'Old Mistral',
+    type: 'mistral_encoder',
+  };
   const vae: VaeModelConfig = { base: 'flux2', key: 'vae', name: 'Old VAE', type: 'vae' };
   const lora: LoraModelConfig = { base: 'flux2', key: 'lora', name: 'Old LoRA', type: 'lora' };
   const values: GenerateWidgetValues = {
@@ -259,6 +267,7 @@ describe('Generate widget value snapshots', () => {
     clipEmbedModel: { base: 'any', key: 'clip', name: 'CLIP', type: 'clip_embed' },
     componentSourceModel: model,
     loras: [{ isEnabled: true, model: lora, weight: 0.5 }],
+    mistralEncoderModel: mistral,
     model,
     modelKey: model.key,
     qwen3EncoderModel: component,
@@ -271,6 +280,7 @@ describe('Generate widget value snapshots', () => {
     expect(clone).toEqual(values);
     expect(clone.model).not.toBe(values.model);
     expect(clone.componentSourceModel).not.toBe(values.componentSourceModel);
+    expect(clone.mistralEncoderModel).not.toBe(values.mistralEncoderModel);
     expect(clone.qwen3EncoderModel).not.toBe(values.qwen3EncoderModel);
     expect(clone.vae).not.toBe(values.vae);
     expect(clone.loras[0]).not.toBe(values.loras[0]);
@@ -280,17 +290,20 @@ describe('Generate widget value snapshots', () => {
   it('uses current backend model records for same-key stored selections', () => {
     const currentModel = { ...model, format: 'diffusers' as const, name: 'Current Model' };
     const currentComponent = { ...component, name: 'Current Qwen3' };
+    const currentMistral = { ...mistral, name: 'Current Mistral' };
     const currentVae = { ...vae, name: 'Current VAE' };
     const currentLora = { ...lora, name: 'Current LoRA' };
     const synced = syncGenerateWidgetValuesWithModels(values, [
       currentModel,
       currentComponent,
+      currentMistral,
       currentVae,
       currentLora,
     ]);
 
     expect(synced.model).toBe(currentModel);
     expect(synced.componentSourceModel).toBe(currentModel);
+    expect(synced.mistralEncoderModel).toBe(currentMistral);
     expect(synced.qwen3EncoderModel).toBe(currentComponent);
     expect(synced.vae).toBe(currentVae);
     expect(synced.loras[0]?.model).toBe(currentLora);
@@ -299,6 +312,7 @@ describe('Generate widget value snapshots', () => {
   it('does not resync cloned current model snapshots by reference alone', () => {
     const currentModel = { ...model, format: 'diffusers' as const, name: 'Current Model' };
     const currentComponent = { ...component, name: 'Current Qwen3' };
+    const currentMistral = { ...mistral, name: 'Current Mistral' };
     const currentVae = { ...vae, name: 'Current VAE' };
     const currentLora = { ...lora, name: 'Current LoRA' };
     const currentValues = {
@@ -306,6 +320,7 @@ describe('Generate widget value snapshots', () => {
       componentSourceModel: currentModel,
       loras: [{ isEnabled: true, model: currentLora, weight: 0.5 }],
       model: currentModel,
+      mistralEncoderModel: currentMistral,
       qwen3EncoderModel: currentComponent,
       vae: currentVae,
     };
@@ -313,6 +328,7 @@ describe('Generate widget value snapshots', () => {
     const synced = syncGenerateWidgetValuesWithModels(clonedValues, [
       currentModel,
       currentComponent,
+      currentMistral,
       currentVae,
       currentLora,
     ]);
@@ -345,10 +361,10 @@ describe('LoRA settings helpers', () => {
     expect(getDefaultLoraWeight(syncedLora!.model)).toBe(1.25);
   });
 
-  it('allows FLUX LoRAs for FLUX.2 while preserving FLUX.2 variant checks', () => {
+  it('restricts FLUX.2 LoRAs by base and variant', () => {
     const flux2Model: MainModelConfig = { base: 'flux2', key: 'flux2', name: 'FLUX.2', type: 'main' };
 
-    expect(isLoraCompatibleWithModel({ base: 'flux' }, flux2Model)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'flux' }, flux2Model)).toBe(false);
     expect(
       isLoraCompatibleWithModel({ base: 'flux2', variant: 'klein_4b' }, { ...flux2Model, variant: 'klein_9b' })
     ).toBe(false);

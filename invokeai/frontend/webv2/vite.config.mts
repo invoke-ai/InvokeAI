@@ -9,6 +9,12 @@ import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
 // backend dev server runs on a non-default port.
 const BACKEND_URL = process.env.INVOKEAI_DEV_BACKEND ?? 'http://127.0.0.1:9090';
 const BACKEND_WS_URL = BACKEND_URL.replace(/^http/, 'ws');
+
+// Set e.g. INVOKEAI_DEV_HOSTS=my-box.local,10.0.0.5 when reaching the dev
+// server by a hostname other than localhost.
+const ALLOWED_HOSTS = process.env.INVOKEAI_DEV_HOSTS?.split(',')
+  .map((host) => host.trim())
+  .filter(Boolean);
 const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 
 const ROUTE_SHARED_MODULES = [
@@ -19,6 +25,7 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  '/platform/core/concurrency.ts',
   '/platform/query/client.ts',
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
@@ -32,9 +39,25 @@ const ROUTE_SHARED_MODULES = [
   // table — a 66 KB, one-extra-request regression on the editor route.
   '/workbench/launchpad/intents.ts',
   '/workbench/palette/settingsEntryDeps.ts',
+  '/workbench/projects/covers.ts',
   '/workbench/projects/ids.ts',
+  // The `.invk` surface both routes touch eagerly: the extension for the file
+  // picker, and the error class every import call site catches to translate.
+  // The schema, the ZIP codec and the archive itself stay behind lazy imports.
+  '/workbench/projects/invk/format.ts',
   '/workbench/projects/library.ts',
+  // Editor-eager through `syncedPersistence` (cover selection on every save)
+  // and Launchpad-eager through the import workflow. Pulling it out of the
+  // shared chunk to spare the Launchpad ~1.5 KB cost the editor a whole extra
+  // request, because nothing else would then group it — a round trip is the
+  // worse end of that trade.
+  '/workbench/projects/projectAssets.ts',
   '/workbench/projects/projectFile.ts',
+  '/workbench/projects/projectFileErrors.ts',
+  // Both routes offer Import and Export, so both need the reporter and the
+  // hooks that drive it.
+  '/workbench/projects/projectFileToasts.ts',
+  '/workbench/projects/useProjectFileActions.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
 ] as const;
 
@@ -90,6 +113,12 @@ const getLegacyChunkName = (id: string): string | null => {
     return 'yaml';
   }
 
+  // Only `projects/invk/archive.ts` reaches for this, and only when a project
+  // file is actually read or written — the same treatment ag-psd gets.
+  if (id.includes('/node_modules/fflate/')) {
+    return 'fflate';
+  }
+
   if (id.includes('/node_modules/react-icons/')) {
     return 'react-icons';
   }
@@ -130,6 +159,13 @@ export default defineConfig({
               test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
             },
             {
+              // Plotly is large (~1MB min) and only used by the lazy-loaded
+              // Image Map plot; keep it out of the eager vendor chunk.
+              name: 'plotly',
+              priority: 30,
+              test: (id) => id.includes('plotly') && id.includes('node_modules'),
+            },
+            {
               name: getLegacyChunkName,
             },
           ],
@@ -157,6 +193,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ALLOWED_HOSTS,
     host: '0.0.0.0',
     port: 5174,
     proxy: {

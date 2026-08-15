@@ -22,6 +22,13 @@ class BoardDTO(BoardRecord):
     """The number of assets in the board."""
     owner_username: Optional[str] = Field(default=None, description="The username of the board owner (for admin view).")
     """The username of the board owner (for admin view)."""
+    project_id: Optional[str] = Field(default=None, description="The id of the project that owns this board, if any.")
+    """Set when a project owns this board. Such a board can only be renamed or deleted through the
+    project APIs; the generic board routes refuse it. Ownership is derived by joining `projects`, so
+    it never appears on `BoardRecord` and is never a column on `boards`.
+
+    Note that `BoardRecord` extends `BaseModelExcludeNull`: this field is *omitted* from serialized
+    output rather than sent as `null`, so clients must treat absent as "not a project board"."""
 
 
 def board_record_to_dto(
@@ -32,6 +39,7 @@ def board_record_to_dto(
     owner_username: Optional[str] = None,
     cover_video_name: Optional[str] = None,
     video_count: int = 0,
+    project_id: Optional[str] = None,
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
@@ -42,4 +50,5 @@ def board_record_to_dto(
         video_count=video_count,
         asset_count=asset_count,
         owner_username=owner_username,
+        project_id=project_id,
     )

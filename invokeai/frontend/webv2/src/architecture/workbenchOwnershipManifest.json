@@ -35,6 +35,10 @@
       "targetOwner": "workbench",
       "targetPath": "workbench/image-actions"
     },
+    "image-map": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/image-map"
+    },
     "launchpad": {
       "targetOwner": "workbench",
       "targetPath": "workbench/launchpad"
@@ -103,6 +107,8 @@
     "invocationSubmit.ts": "workbench",
     "layoutContracts.ts": "workbench",
     "layoutPresetActivation.ts": "workbench",
+    "layoutPresetCollection.ts": "workbench",
+    "layoutPresetRouting.ts": "workbench",
     "layoutPresetSnapshots.ts": "workbench",
     "layoutPresets.ts": "workbench",
     "panZoom.ts": "workbench",
