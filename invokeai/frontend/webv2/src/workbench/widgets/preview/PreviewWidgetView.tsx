@@ -30,6 +30,7 @@ import {
 } from '@features/gallery/contracts';
 import { galleryBoardsOptions } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
+import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useDeviceLabel } from '@features/queue/devices';
 import {
   useActiveProgressTarget,
@@ -878,7 +879,7 @@ const LivePreview = ({
  * Subscribes to its own slot's progress image rather than receiving it from the
  * parent, so a frame from one GPU's session re-renders only that tile.
  */
-const LivePreviewTile = ({
+export const LivePreviewTile = ({
   placeholder,
   shouldAntialiasProgressImage,
 }: {
@@ -906,12 +907,21 @@ const LivePreviewTile = ({
     [placeholder.id, previewImage]
   );
 
+  const percent = getDeterminateProgressPercent(itemProgress?.percentage);
+  // Every tile declares itself live: with several sessions racing, a silent
+  // tile reads as a stuck one. Device label when known, plain "Generating"
+  // otherwise; percent appended once quantified (zero is model-loading).
+  const badgeBase = deviceLabel
+    ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index })
+    : t('common.generating');
+  const liveBadgeLabel = percent === null ? badgeBase : `${badgeBase} · ${percent}%`;
+
   return (
     <PreviewFrame
       frameHeight={previewImage?.height ?? placeholder.height}
       frameWidth={previewImage?.width ?? placeholder.width}
       isLive
-      liveBadgeLabel={deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : undefined}
+      liveBadgeLabel={liveBadgeLabel}
       shouldAntialiasLiveImage={shouldAntialiasProgressImage}
       source={source}
       variant="inset"
@@ -926,7 +936,7 @@ const LivePreviewTile = ({
  * single-frame preview so nothing changes on a single-GPU install. The grid is a
  * plain auto-fit so two GPUs sit side by side and four wrap to a 2×2.
  */
-const LivePreviewTiles = ({
+export const LivePreviewTiles = ({
   placeholders,
   shouldAntialiasProgressImage,
 }: {

@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PreviewActionStrip } from './PreviewActionStrip';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
+import { LivePreviewTile } from './PreviewWidgetView';
 
 const sharedImage: GalleryImageItem = {
   boardId: 'none',
@@ -45,6 +46,34 @@ const sharedVideo: GalleryVideoItem = {
   width: 1920,
 };
 
+const mocks = vi.hoisted(() => ({
+  itemProgress: null as { device: string | null; percentage: number | null } | null,
+  progressImage: null,
+  deviceLabel: null,
+}));
+
+vi.mock('@features/queue/react', () => ({
+  useItemProgress: () => mocks.itemProgress,
+  useQueueItemProgressImage: () => mocks.progressImage,
+  useActiveProgressTargets: () => [],
+  useActiveProgressTarget: () => null,
+  useProgressImage: () => null,
+}));
+
+vi.mock('@features/queue/devices', () => ({
+  useDeviceLabel: () => mocks.deviceLabel,
+}));
+
+vi.mock('@platform/ui/streaming-image/useStreamingImageSource', () => ({
+  useStreamingImageSource: () => ({
+    alt: 'preview',
+    height: 512,
+    kind: 'fallback' as const,
+    src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"/>',
+    width: 512,
+  }),
+}));
+
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -53,7 +82,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { countOfTotal: '{{count}} of {{total}}' },
+        common: { countOfTotal: '{{count}} of {{total}}', generating: 'Generating' },
         widgets: {
           preview: {
             copyCurrentFrame: 'Copy Current Frame',
@@ -64,6 +93,11 @@ void i18n.use(initReactI18next).init({
             previousItemInBoard: 'Previous item in board',
             videoDetails: 'Video Details',
             videoDuration: 'Duration {{duration}}',
+          },
+          queue: {
+            device: {
+              shortLabel: 'GPU {{index}}',
+            },
           },
         },
       },
@@ -391,5 +425,39 @@ describe('Preview mixed media footer and actions', () => {
     expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
     await interact(() => copyImage?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     expect(actions.copyImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'shared' }));
+  });
+});
+
+describe('Multi-session live preview tiles', () => {
+  const placeholder = {
+    backendItemId: 1,
+    boardId: 'none',
+    height: 512,
+    id: 'queue-1:0',
+    itemIndex: 0,
+    queueItemId: 'queue-1',
+    width: 512,
+  };
+
+  it('shows a live badge with percent on session tiles even without a device label', async () => {
+    mocks.itemProgress = { device: null, percentage: 0.4 };
+    mocks.deviceLabel = null;
+
+    await render(
+      <DndContext>
+        <LivePreviewTile placeholder={placeholder} shouldAntialiasProgressImage={false} />
+      </DndContext>
+    );
+
+    const allElements = Array.from(host!.querySelectorAll('*'));
+    const badge = allElements.find((el) => {
+      const text = el.textContent || '';
+      return /Generating · 40%/.test(text);
+    });
+
+    expect(badge).not.toBeNull();
+    if (badge) {
+      expect(badge.textContent || '').toMatch(/Generating · 40%/);
+    }
   });
 });
