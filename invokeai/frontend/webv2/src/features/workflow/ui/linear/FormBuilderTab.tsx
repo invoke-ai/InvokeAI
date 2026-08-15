@@ -1,11 +1,28 @@
 import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import {
+  DndContext,
+  DragOverlay,
+  MeasuringStrategy,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragMoveEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
   isInvocationNode,
   type ContainerFormElement,
   type InvocationTemplates,
   type NodeFieldFormElement,
   type ProjectGraphState,
+  type WorkflowForm,
   type WorkflowFormElement,
 } from '@features/workflow/contracts';
 import { useInvocationTemplatesSelector, type InvocationTemplatesSnapshot } from '@features/workflow/react';
@@ -28,8 +45,16 @@ import {
   TextIcon,
   XIcon,
 } from 'lucide-react';
-import { createContext, use, useMemo, useState, type ChangeEvent, type DragEvent, type ReactNode } from 'react';
+import { createContext, use, useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
 
+import {
+  formEdgeDroppableId,
+  formIntoDroppableId,
+  isFormDescendantOrSelf,
+  parseFormDroppableId,
+  resolveFormDrop,
+  type FormDropTarget,
+} from './formBuilderDnd';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
 
 /**
@@ -37,100 +62,91 @@ import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
  * card with its own title bar — type label on the left, actions on the right,
  * content below — mirroring the legacy builder. Cards reorder and reparent by
  * dragging their title bar (drop indicators above/below, containers accept
- * drops into their body). All edits go through the project graph document
- * reducer.
+ * drops into their body) via dnd-kit: moves happen only at `onDragEnd`, which
+ * fires at the `DndContext` level regardless of whether the drop reparents
+ * (and therefore remounts) the dragged card. All edits go through the
+ * project graph document reducer.
  */
 
 interface BuilderDndContextValue {
-  draggingElementId: string | null;
-  setDraggingElementId: (elementId: string | null) => void;
+  activeElementId: string | null;
+  dropTarget: FormDropTarget | null;
+  form: WorkflowForm;
 }
 
 const BuilderDndContext = createContext<BuilderDndContextValue>({
-  draggingElementId: null,
-  setDraggingElementId: () => undefined,
+  activeElementId: null,
+  dropTarget: null,
+  form: { elements: {}, rootElementId: '' },
 });
 
-type DropEdge = 'above' | 'below';
+/** Title shown in a card's title bar and the drag ghost. Shared so the two never drift. */
+const getFormElementTitle = (element: WorkflowFormElement): string => {
+  switch (element.type) {
+    case 'container':
+      return `Container (${element.data.layout} layout)`;
+    case 'node-field':
+      return 'Node Field';
+    case 'heading':
+      return 'Heading';
+    case 'text':
+      return 'Text';
+    case 'divider':
+      return 'Divider';
+  }
+};
+
+/** The dragged card's `DragOverlay` ghost: a compact title bar following the pointer. */
+const BuilderDragGhost = ({ element }: { element: WorkflowFormElement }) => (
+  <HStack
+    bg="bg.muted"
+    borderColor="border.subtle"
+    borderWidth="1px"
+    cursor="grabbing"
+    gap="1"
+    opacity={0.85}
+    px="1.5"
+    py="0.5"
+    rounded="md"
+    shadow="md"
+  >
+    <Icon as={GripVerticalIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+    <Text color="fg.muted" fontSize="2xs" fontWeight="600" minW="0" truncate>
+      {getFormElementTitle(element)}
+    </Text>
+  </HStack>
+);
 
 /** A builder card: typed title bar (drag handle + actions) over the element's content. */
 const BuilderCard = ({
   children,
   element,
   extraActions,
-  index,
   isHovered,
   isInvalid,
   isSelected,
-  parentId,
   title,
 }: {
   children: ReactNode;
   element: WorkflowFormElement;
   extraActions?: ReactNode;
-  index: number;
   isHovered?: boolean;
   isInvalid?: boolean;
   isSelected?: boolean;
-  parentId: string;
   title: string;
 }) => {
   const { editGraph } = useProjectGraphCommands();
-  const { draggingElementId, setDraggingElementId } = use(BuilderDndContext);
-  const [isDragArmed, setIsDragArmed] = useState(false);
-  const [dropEdge, setDropEdge] = useState<DropEdge | null>(null);
-  const isDropTarget = draggingElementId !== null && draggingElementId !== element.id;
-
-  const onDragOver = (event: DragEvent<HTMLDivElement>) => {
-    if (!isDropTarget) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const bounds = event.currentTarget.getBoundingClientRect();
-
-    setDropEdge(event.clientY < bounds.top + bounds.height / 2 ? 'above' : 'below');
-  };
-
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    if (!isDropTarget || !draggingElementId || !dropEdge) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    editGraph({
-      elementId: draggingElementId,
-      index: dropEdge === 'above' ? index : index + 1,
-      parentId,
-      type: 'moveFormElementTo',
-    });
-    setDropEdge(null);
-  };
+  const { activeElementId, dropTarget, form } = use(BuilderDndContext);
+  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({ id: element.id });
+  const { setNodeRef: setDropRef } = useDroppable({
+    disabled: activeElementId !== null && isFormDescendantOrSelf(form, activeElementId, element.id),
+    id: formEdgeDroppableId(element.id),
+  });
+  const edgeForThisCard = dropTarget?.kind === 'edge' && dropTarget.elementId === element.id ? dropTarget.edge : null;
 
   return (
-    <Box
-      draggable={isDragArmed}
-      flex="1"
-      minW="0"
-      opacity={draggingElementId === element.id ? 0.4 : 1}
-      position="relative"
-      onDragEnd={() => {
-        setDraggingElementId(null);
-        setIsDragArmed(false);
-      }}
-      onDragLeave={() => setDropEdge(null)}
-      onDragOver={onDragOver}
-      onDragStart={(event: DragEvent<HTMLDivElement>) => {
-        event.stopPropagation();
-        event.dataTransfer.effectAllowed = 'move';
-        setDraggingElementId(element.id);
-      }}
-      onDrop={onDrop}
-    >
-      {dropEdge ? (
+    <Box ref={setDropRef} flex="1" minW="0" opacity={activeElementId === element.id ? 0.4 : 1} position="relative">
+      {edgeForThisCard ? (
         <Box
           bg="accent.solid"
           h="2px"
@@ -140,7 +156,7 @@ const BuilderCard = ({
           right="0"
           rounded="full"
           zIndex="1"
-          {...(dropEdge === 'above' ? { top: '-1px' } : { bottom: '-1px' })}
+          {...(edgeForThisCard === 'above' ? { top: '-1px' } : { bottom: '-1px' })}
         />
       ) : null}
       <Box
@@ -150,6 +166,7 @@ const BuilderCard = ({
         {...getWorkflowNodeChromeProps({ invalid: Boolean(isInvalid), selected: Boolean(isHovered || isSelected) })}
       >
         <HStack
+          ref={setDragRef}
           bg="bg.muted"
           borderBottomWidth="1px"
           borderColor="border.subtle"
@@ -160,8 +177,8 @@ const BuilderCard = ({
           position="relative"
           zIndex="2"
           _active={{ cursor: 'grabbing' }}
-          onPointerDown={() => setIsDragArmed(true)}
-          onPointerUp={() => setIsDragArmed(false)}
+          {...attributes}
+          {...listeners}
         >
           <Icon as={GripVerticalIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           <Text color="fg.muted" fontSize="2xs" fontWeight="600" minW="0" truncate>
@@ -190,10 +207,13 @@ const BuilderCard = ({
 
 /** Drop zone covering a container's body, appending at the end. Doubles as the empty-container hint. */
 const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormElement; isEmpty: boolean }) => {
-  const { editGraph } = useProjectGraphCommands();
-  const { draggingElementId } = use(BuilderDndContext);
-  const [isActive, setIsActive] = useState(false);
-  const canDrop = draggingElementId !== null && draggingElementId !== container.id;
+  const { activeElementId, dropTarget, form } = use(BuilderDndContext);
+  const canDrop = activeElementId !== null && !isFormDescendantOrSelf(form, activeElementId, container.id);
+  const { setNodeRef } = useDroppable({
+    disabled: activeElementId === null || isFormDescendantOrSelf(form, activeElementId, container.id),
+    id: formIntoDroppableId(container.id),
+  });
+  const isActive = dropTarget?.kind === 'into' && dropTarget.containerId === container.id;
 
   if (!canDrop && !isEmpty) {
     return null;
@@ -201,6 +221,7 @@ const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormEle
 
   return (
     <DropZone
+      ref={setNodeRef}
       alignSelf="stretch"
       flex={isEmpty ? '1' : undefined}
       fontSize="2xs"
@@ -208,29 +229,6 @@ const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormEle
       px="2"
       py="1.5"
       textAlign="center"
-      onDragLeave={() => setIsActive(false)}
-      onDragOver={(event: DragEvent<HTMLDivElement>) => {
-        if (canDrop) {
-          event.preventDefault();
-          event.stopPropagation();
-          setIsActive(true);
-        }
-      }}
-      onDrop={(event: DragEvent<HTMLDivElement>) => {
-        if (!canDrop || !draggingElementId) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        editGraph({
-          elementId: draggingElementId,
-          index: container.data.children.length,
-          parentId: container.id,
-          type: 'moveFormElementTo',
-        });
-        setIsActive(false);
-      }}
     >
       {canDrop ? 'Drop here' : 'Empty container — drag elements here'}
     </DropZone>
@@ -263,18 +261,14 @@ const FieldDescriptionAction = ({
 
 const BuilderElement = ({
   element,
-  index,
   hoveredNodeId,
-  parentId,
-  projectGraph,
   invalidElementIds,
+  projectGraph,
   selectedNodeIds,
 }: {
   element: WorkflowFormElement;
-  index: number;
   hoveredNodeId: string | null;
   invalidElementIds: Set<string>;
-  parentId: string;
   projectGraph: ProjectGraphState;
   selectedNodeIds: Set<string>;
 }) => {
@@ -301,19 +295,15 @@ const BuilderElement = ({
               <Icon as={isRow ? Rows2Icon : Columns2Icon} boxSize="3" />
             </IconButton>
           }
-          index={index}
-          parentId={parentId}
-          title={`Container (${element.data.layout} layout)`}
+          title={getFormElementTitle(element)}
         >
           <Stack align={isRow ? 'stretch' : undefined} direction={isRow ? 'row' : 'column'} gap="2" w="full">
-            {getFormChildren(projectGraph.form, element.id).map((child, childIndex) => (
+            {getFormChildren(projectGraph.form, element.id).map((child) => (
               <BuilderElement
                 key={child.id}
                 element={child}
                 hoveredNodeId={hoveredNodeId}
                 invalidElementIds={invalidElementIds}
-                index={childIndex}
-                parentId={element.id}
                 projectGraph={projectGraph}
                 selectedNodeIds={selectedNodeIds}
               />
@@ -360,12 +350,10 @@ const BuilderElement = ({
               </IconButton>
             </>
           }
-          index={index}
           isHovered={element.data.fieldIdentifier.nodeId === hoveredNodeId}
           isInvalid={invalidElementIds.has(element.id)}
           isSelected={selectedNodeIds.has(element.data.fieldIdentifier.nodeId)}
-          parentId={parentId}
-          title="Node Field"
+          title={getFormElementTitle(element)}
         >
           <NodeFieldControl element={element} isLabelEditable projectGraph={projectGraph} />
         </BuilderCard>
@@ -373,7 +361,7 @@ const BuilderElement = ({
     }
     case 'heading': {
       return (
-        <BuilderCard element={element} index={index} parentId={parentId} title="Heading">
+        <BuilderCard element={element} title={getFormElementTitle(element)}>
           <Input
             aria-label="Form heading"
             fontSize="sm"
@@ -391,7 +379,7 @@ const BuilderElement = ({
     }
     case 'text': {
       return (
-        <BuilderCard element={element} index={index} parentId={parentId} title="Text">
+        <BuilderCard element={element} title={getFormElementTitle(element)}>
           <Textarea
             aria-label="Form text"
             color="fg.muted"
@@ -411,7 +399,7 @@ const BuilderElement = ({
     }
     case 'divider': {
       return (
-        <BuilderCard element={element} index={index} parentId={parentId} title="Divider">
+        <BuilderCard element={element} title={getFormElementTitle(element)}>
           <Separator borderColor="border.subtle" />
         </BuilderCard>
       );
@@ -514,10 +502,79 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const hoveredNodeId = workflowSelectionStore.useSelector((snapshot) => snapshot.hoveredNodeId);
   const selectedNodeIds = workflowSelectionStore.useSelector((snapshot) => snapshot.selectedNodeIds);
-  const [draggingElementId, setDraggingElementId] = useState<string | null>(null);
+  const { editGraph } = useProjectGraphCommands();
+  const [activeElementId, setActiveElementId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<FormDropTarget | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // Droppable rects freeze at drag start by default; the builder's drop
+  // indicators and container hints appear mid-drag, so re-measure continuously.
+  const measuring = useMemo(() => ({ droppable: { strategy: MeasuringStrategy.Always } }), []);
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const within = pointerWithin(args);
+    return within.length > 0 ? within : rectIntersection(args);
+  }, []);
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setActiveElementId(String(event.active.id));
+  }, []);
+  const handleDragMove = useCallback((event: DragMoveEvent) => {
+    const { active, over } = event;
+
+    if (!over) {
+      setDropTarget(null);
+      return;
+    }
+
+    const parsed = parseFormDroppableId(String(over.id));
+
+    if (!parsed) {
+      setDropTarget(null);
+      return;
+    }
+
+    if (parsed.kind === 'into') {
+      setDropTarget({ containerId: parsed.containerId, kind: 'into' });
+      return;
+    }
+
+    const activeRect = active.rect.current.translated;
+    const pointerY = activeRect ? activeRect.top + activeRect.height / 2 : over.rect.top;
+
+    setDropTarget({
+      edge: pointerY < over.rect.top + over.rect.height / 2 ? 'above' : 'below',
+      elementId: parsed.elementId,
+      kind: 'edge',
+    });
+  }, []);
+  const clearDrag = useCallback(() => {
+    setActiveElementId(null);
+    setDropTarget(null);
+  }, []);
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const activeId = String(event.active.id);
+
+      if (dropTarget) {
+        const resolved = resolveFormDrop(projectGraph.form, activeId, dropTarget);
+
+        if (resolved) {
+          editGraph({
+            elementId: activeId,
+            index: resolved.index,
+            parentId: resolved.parentId,
+            type: 'moveFormElementTo',
+          });
+        }
+      }
+
+      clearDrag();
+    },
+    [clearDrag, dropTarget, editGraph, projectGraph.form]
+  );
+
   const dndContextValue = useMemo<BuilderDndContextValue>(
-    () => ({ draggingElementId, setDraggingElementId }),
-    [draggingElementId]
+    () => ({ activeElementId, dropTarget, form: projectGraph.form }),
+    [activeElementId, dropTarget, projectGraph.form]
   );
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
   const invalidElementIds = useMemo(
@@ -525,30 +582,42 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
     [projectGraph, templatesStatus, templates]
   );
   const rootChildren = getFormChildren(projectGraph.form);
+  const activeElement = activeElementId ? projectGraph.form.elements[activeElementId] : undefined;
 
   return (
-    <BuilderDndContext value={dndContextValue}>
-      <Stack gap="2" p="3" w="full">
-        {rootChildren.length === 0 ? (
-          <Text color="fg.subtle" fontSize="2xs">
-            The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
-            bars to reorder, drop them into containers, and add headings or dividers below.
-          </Text>
-        ) : null}
-        {rootChildren.map((element, index) => (
-          <BuilderElement
-            key={element.id}
-            element={element}
-            hoveredNodeId={hoveredNodeId}
-            invalidElementIds={invalidElementIds}
-            index={index}
-            parentId={projectGraph.form.rootElementId}
-            projectGraph={projectGraph}
-            selectedNodeIds={selectedNodeIdSet}
-          />
-        ))}
-        <AddElementMenu />
-      </Stack>
-    </BuilderDndContext>
+    <DndContext
+      collisionDetection={collisionDetection}
+      measuring={measuring}
+      sensors={sensors}
+      onDragCancel={clearDrag}
+      onDragEnd={handleDragEnd}
+      onDragMove={handleDragMove}
+      onDragStart={handleDragStart}
+    >
+      <BuilderDndContext value={dndContextValue}>
+        <Stack gap="2" p="3" w="full">
+          {rootChildren.length === 0 ? (
+            <Text color="fg.subtle" fontSize="2xs">
+              The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
+              bars to reorder, drop them into containers, and add headings or dividers below.
+            </Text>
+          ) : null}
+          {rootChildren.map((element) => (
+            <BuilderElement
+              key={element.id}
+              element={element}
+              hoveredNodeId={hoveredNodeId}
+              invalidElementIds={invalidElementIds}
+              projectGraph={projectGraph}
+              selectedNodeIds={selectedNodeIdSet}
+            />
+          ))}
+          <AddElementMenu />
+        </Stack>
+      </BuilderDndContext>
+      <DragOverlay dropAnimation={null}>
+        {activeElement ? <BuilderDragGhost element={activeElement} /> : null}
+      </DragOverlay>
+    </DndContext>
   );
 };

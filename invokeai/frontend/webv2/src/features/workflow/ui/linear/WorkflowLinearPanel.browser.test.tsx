@@ -1,10 +1,17 @@
+import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { WorkflowUiAdapter } from '@features/workflow/react';
+import type { ProjectGraphAction } from '@features/workflow/utility';
+
 import { ChakraProvider } from '@chakra-ui/react';
+import { WorkflowUiProvider } from '@features/workflow/react';
+import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
-import { act, useState } from 'react';
+import { act, useCallback, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import { FormBuilderTab } from './FormBuilderTab';
 import { PanelModeToggle } from './WorkflowLinearPanel';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -70,5 +77,184 @@ describe('Workflow Linear panel mode toggle', () => {
 
     await act(() => userEvent.keyboard('{ArrowRight}'));
     expect(selection(tabs)).toEqual(['false', 'true']);
+  });
+});
+
+/**
+ * Regression coverage for the native-DnD bug: dropping a card into a
+ * container reparents it, React remounts the card under its new parent, and
+ * the native `dragend` event (bound to the old node) never fires — leaving
+ * the module's dragging state stuck and killing every drag after it. The
+ * dnd-kit port resolves moves only in `onDragEnd` at the `DndContext` level,
+ * which fires regardless of node unmounts, so a second drag right after a
+ * reparenting drop must still work.
+ */
+describe('Form builder drag and drop (dnd-kit)', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.width = '480px';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  /** root -> [heading "Field A", divider, container(column, empty)] */
+  const buildInitialGraph = (): ProjectGraphState => {
+    let doc = createProjectGraph('form-dnd-test');
+
+    doc = projectGraphReducer(doc, { content: 'Field A', elementType: 'heading', type: 'addFormElement' });
+    doc = projectGraphReducer(doc, { elementType: 'divider', type: 'addFormElement' });
+    doc = projectGraphReducer(doc, { elementType: 'container', layout: 'column', type: 'addFormElement' });
+
+    return doc;
+  };
+
+  const Harness = () => {
+    const [projectGraph, setProjectGraph] = useState(buildInitialGraph);
+    const editGraph = useCallback((action: ProjectGraphAction) => {
+      setProjectGraph((current) => projectGraphReducer(current, action));
+    }, []);
+    const adapter = useMemo(
+      () =>
+        ({
+          commands: {
+            bindLibraryWorkflow: () => undefined,
+            editGraph,
+            redo: () => undefined,
+            replace: () => undefined,
+            restoreSnapshot: () => undefined,
+            saveSnapshot: () => undefined,
+            undo: () => undefined,
+          },
+          widgets: { open: () => undefined, patchValues: () => undefined },
+        }) as unknown as WorkflowUiAdapter,
+      [editGraph]
+    );
+
+    return (
+      <WorkflowUiProvider adapter={adapter}>
+        <FormBuilderTab projectGraph={projectGraph} />
+      </WorkflowUiProvider>
+    );
+  };
+
+  const renderHarness = async () => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <Harness />
+        </ChakraProvider>
+      );
+    });
+  };
+
+  /** The title-bar `HStack` is the drag handle: it's the direct DOM parent of its title `Text`. */
+  const titleBarFor = (title: string): HTMLElement => {
+    const leaf = [...host.querySelectorAll<HTMLElement>('*')].find(
+      (element) => element.children.length === 0 && element.textContent?.trim() === title
+    );
+
+    if (!leaf?.parentElement) {
+      throw new Error(`title bar not found for "${title}"`);
+    }
+
+    return leaf.parentElement;
+  };
+
+  /** The card's content `Box` — the title bar's rounded-chrome parent's second (and last) child. */
+  const cardContentFor = (title: string): HTMLElement => {
+    const chrome = titleBarFor(title).parentElement;
+    const content = chrome?.lastElementChild;
+
+    if (!(content instanceof HTMLElement)) {
+      throw new Error(`card content not found for "${title}"`);
+    }
+
+    return content;
+  };
+
+  const pointer = (type: string, target: EventTarget, clientX: number, clientY: number): void => {
+    target.dispatchEvent(
+      new PointerEvent(type, { bubbles: true, button: 0, clientX, clientY, isPrimary: true, pointerId: 1 })
+    );
+  };
+
+  // dnd-kit's continuous droppable re-measuring (`MeasuringStrategy.Always`)
+  // and sensor activation run on their own rAF-scheduled updates outside
+  // React's synchronous event handling, so each step needs a real tick to
+  // settle before the next one — a bare `act(() => pointer(...))` leaves
+  // `over` stale and the drop resolves against the wrong (or no) target.
+  const interact = (action: () => void): Promise<void> =>
+    act(async () => {
+      action();
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 50);
+      });
+    });
+
+  /** Drags `sourceTitle`'s title bar to `(x, y)` with a >4px jitter move first to arm the PointerSensor. */
+  const dragTo = async (sourceTitle: string, x: number, y: number): Promise<void> => {
+    const handle = titleBarFor(sourceTitle);
+    const startRect = handle.getBoundingClientRect();
+    const startX = startRect.left + startRect.width / 2;
+    const startY = startRect.top + startRect.height / 2;
+
+    await interact(() => pointer('pointerdown', handle, startX, startY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, startX + 8, startY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, x, y));
+    // A `MeasuringStrategy.Always` remeasure lands one tick after the move
+    // that triggered it, so the move's own `onDragMove` can still report a
+    // stale `over`. A no-op settle move re-runs collision detection against
+    // the now-current rects before the drop.
+    await interact(() => pointer('pointermove', handle.ownerDocument, x, y + 1));
+    await interact(() => pointer('pointerup', handle.ownerDocument, x, y + 1));
+  };
+
+  it('keeps dragging alive after a field is dropped into a container', async () => {
+    await renderHarness();
+
+    // Drag 1: "Field A" (a heading) into the empty container's drop zone.
+    const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
+      (element) => element.textContent === 'Empty container — drag elements here'
+    );
+
+    expect(emptyHint).toBeDefined();
+
+    const dropZoneRect = emptyHint!.getBoundingClientRect();
+
+    await dragTo('Heading', dropZoneRect.left + dropZoneRect.width / 2, dropZoneRect.top + dropZoneRect.height / 2);
+
+    // The container's card content now holds the heading card, and the
+    // empty-state hint is gone.
+    const containerContent = cardContentFor('Container (column layout)');
+
+    expect(containerContent.textContent).toContain('Heading');
+    expect(containerContent.textContent).not.toContain('Empty container');
+
+    // Drag 2: THE REGRESSION ASSERTION. "Divider" (still at the root) drops
+    // onto the now-nested "Heading" card's lower edge. Under the old native
+    // DnD implementation, drag 1's reparent remount lost `dragend` and left
+    // `draggingElementId` stuck — this second drag would never start.
+    const headingCardRect = titleBarFor('Heading').parentElement!.getBoundingClientRect();
+
+    await dragTo('Divider', headingCardRect.left + headingCardRect.width / 2, headingCardRect.bottom - 2);
+
+    // The divider moved into the container, next to the heading.
+    const containerContentAfter = cardContentFor('Container (column layout)');
+
+    expect(containerContentAfter.textContent).toContain('Heading');
+    expect(containerContentAfter.textContent).toContain('Divider');
+
+    // No card is left stuck at the mid-drag 40% opacity.
+    const opacities = [...host.querySelectorAll<HTMLElement>('*')].map((element) => getComputedStyle(element).opacity);
+
+    expect(opacities).not.toContain('0.4');
   });
 });
