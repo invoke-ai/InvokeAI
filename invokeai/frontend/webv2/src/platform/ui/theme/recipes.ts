@@ -555,6 +555,15 @@ export const progressCircleSlotRecipe = defineSlotRecipe({
           textStyle: '2xs',
         },
       },
+      '3xs': {
+        circle: {
+          '--size': '14px',
+          '--thickness': '2px',
+        },
+        valueText: {
+          textStyle: '2xs',
+        },
+      },
     },
   },
 });

@@ -1,3 +1,5 @@
+import type { ComponentProps } from 'react';
+
 import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Stack, Text } from '@chakra-ui/react';
 import { getQueueSummary } from '@features/queue/contracts';
 import { useQueueItemProgress } from '@features/queue/react';
@@ -17,8 +19,13 @@ import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
-const PROGRESS_RING_CSS = { '--size': '14px', '--thickness': '2px' } as const;
 const ACK_MS = 420;
+
+type ProgressCircleRootProps = ComponentProps<typeof ProgressCircle.Root>;
+// The `3xs` size (14px/2px, defined in platform/ui/theme/recipes.ts) is a repo
+// extension the generated Chakra types don't know about yet; QueueProgressIndicator
+// casts through the same seam for its `2xs` extension.
+const ICON_RING_SIZE = '3xs' as ProgressCircleRootProps['size'];
 
 const compactBlockingReason = (reason: string, noNodesLabel: string): string => {
   if (reason === 'The project graph has no nodes. Add nodes in the Workflow view.') {
@@ -103,7 +110,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
       >
         <Box alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
           {iconMode.mode === 'progress' ? (
-            <ProgressCircle.Root css={PROGRESS_RING_CSS} value={iconMode.value === null ? null : iconMode.value * 100}>
+            <ProgressCircle.Root size={ICON_RING_SIZE} value={iconMode.value === null ? null : iconMode.value * 100}>
               <ProgressCircle.Circle>
                 <ProgressCircle.Track stroke="bg/40" />
                 <ProgressCircle.Range stroke="bg" strokeLinecap="round" />
