@@ -11,7 +11,7 @@ import {
   nextStackOrder,
 } from './floatingWindows';
 import { doesProjectMatchLayoutPreset, resolveSavedLayoutPreset } from './layoutPresetSnapshots';
-import { normalizeWorkbenchProject } from './workbenchState';
+import { normalizeWorkbenchAccount, normalizeWorkbenchProject } from './workbenchState';
 import { createInitialWorkbenchState, workbenchReducer } from './workbenchState.testing';
 
 const getActiveProject = (state: WorkbenchState): Project => {
@@ -337,6 +337,50 @@ describe('interaction with presets and undo', () => {
 
     expect(project.floatingWidgets?.gallery).toBeDefined();
     expect(getRegionsHolding(project, 'gallery')).toEqual([]);
+  });
+
+  it('carries a saved preset’s floating window through account rehydration', () => {
+    // Account presets are rebuilt by `cloneLayoutPresetSnapshot` on every load;
+    // a field it forgets is a field the preset loses on the next reload.
+    let state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'gallery', type: 'floatWidget' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
+
+    const rehydrated = normalizeWorkbenchAccount(state.account);
+
+    expect(rehydrated.layoutPresetOverrides?.compose?.floatingWidgets?.gallery).toMatchObject({
+      mode: 'windowed',
+      returnRegion: 'right',
+    });
+  });
+
+  it('validates a preset’s floating windows the way a persisted project’s are', () => {
+    // Preset bodies come from account storage, which never passes through
+    // `normalizeWorkbenchProject`.
+    let state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'gallery', type: 'floatWidget' });
+    state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
+
+    const saved = state.account.layoutPresetOverrides!.compose!;
+    const account = normalizeWorkbenchAccount({
+      ...state.account,
+      layoutPresetOverrides: {
+        compose: {
+          ...saved,
+          floatingWidgets: {
+            // Would throw in `dockFloatingWidget` on widgetRegions[returnRegion].
+            gallery: { ...saved.floatingWidgets!.gallery, returnRegion: 'nowhere' },
+            // Docked by the same preset, so honouring this would double-render.
+            queue: { ...saved.floatingWidgets!.gallery },
+          },
+        },
+      },
+    } as unknown);
+    state = { ...state, account };
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+    const project = getActiveProject(state);
+
+    expect(project.floatingWidgets?.gallery).toBeUndefined();
+    expect(getRegionsHolding(project, 'queue')).toEqual([]);
+    expect(project.floatingWidgets?.queue).toBeDefined();
   });
 
   it('reads a floated window as unsaved layout drift until it is saved', () => {

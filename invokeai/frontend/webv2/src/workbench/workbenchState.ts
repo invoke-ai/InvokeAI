@@ -1711,6 +1711,9 @@ const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): P
 });
 
 const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => ({
+  // Every account preset is rebuilt through here on load, so a field missing
+  // from this clone is a field the preset silently loses on the next reload.
+  ...(snapshot.floatingWidgets ? { floatingWidgets: cloneFloatingWidgets(snapshot.floatingWidgets) } : {}),
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
   widgetInstances: Object.fromEntries(
     Object.entries(snapshot.widgetInstances).map(([instanceId, instance]) => [instanceId, { ...instance }])
@@ -2003,21 +2006,28 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
       : createWidgetInstance(instance.typeId, instance.id);
   }
 
+  // A preset is a full placement reset, so the project's own floating windows
+  // go: keeping one would double-render whatever the preset docks. The
+  // preset's are restored in their place — a preset saved while a widget
+  // floated has it in no region, and dropping them both would leave the
+  // instance nowhere at all. Preset bodies reach us from account storage
+  // without passing through `normalizeWorkbenchProject`, so they are validated
+  // and reconciled here on the same terms as a persisted project.
+  const placement = reconcileFloatingWidgets(
+    cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
+    normalizeFloatingWidgets(snapshot.floatingWidgets, widgetInstances)
+  );
+
   return {
     ...project,
-    // A preset is a full placement reset, so the project's own floating
-    // windows go: keeping one would double-render whatever the preset docks.
-    // The preset's are restored in their place — a preset saved while a widget
-    // floated has it in no region, and dropping them both would leave the
-    // instance nowhere at all.
-    floatingWidgets: snapshot.floatingWidgets ? cloneFloatingWidgets(snapshot.floatingWidgets) : undefined,
+    floatingWidgets: placement.floatingWidgets,
     layout: {
       ...snapshot.layout,
       panels: { ...snapshot.layout.panels },
       presetId: preset.id,
     },
     widgetInstances,
-    widgetRegions: cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
+    widgetRegions: placement.widgetRegions,
   };
 };
 

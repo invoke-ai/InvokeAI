@@ -2,6 +2,7 @@ import type { FloatingWidgetState } from '@workbench/layoutContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
 import { Box, Flex, HStack, Icon, Text } from '@chakra-ui/react';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { IconButton, Tooltip } from '@platform/ui';
 import {
   clampWindowToViewport,
@@ -13,7 +14,14 @@ import { WidgetIcon } from '@workbench/iconResolver';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { ChevronsDownUpIcon, ChevronsUpDownIcon, Maximize2Icon, Minimize2Icon, PanelRightIcon } from 'lucide-react';
+import {
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+  PanelRightIcon,
+  TriangleAlertIcon,
+} from 'lucide-react';
 import {
   useCallback,
   useState,
@@ -122,7 +130,13 @@ export const FloatingWidgetWindow = ({
   );
 
   const handleFocus = useCallback(() => widgets.focusFloating(instanceId), [instanceId, widgets]);
-  const handleDock = useCallback(() => widgets.dockFloating(instanceId), [instanceId, widgets]);
+  // Docking remounts the widget in its rail. The draft registry's cleanup only
+  // deregisters the flusher, so an uncommitted edit needs committing first —
+  // the same reason `closeWidgetPlacement` flushes before it unmounts.
+  const handleDock = useCallback(() => {
+    flushWorkbenchDrafts();
+    widgets.dockFloating(instanceId);
+  }, [instanceId, widgets]);
   const handleToggleShade = useCallback(
     () => widgets.setFloatingMode(instanceId, state.mode === 'shaded' ? 'windowed' : 'shaded'),
     [instanceId, state.mode, widgets]
@@ -142,10 +156,15 @@ export const FloatingWidgetWindow = ({
     [handleToggleShade, state.mode]
   );
 
-  if (!instance || !widget || widget.status !== 'enabled') {
+  if (!instance || !widget) {
     return null;
   }
 
+  // A widget that fails registration while floated keeps its chrome. Rendering
+  // nothing would strand the instance: it is in no region, so the dock control
+  // in this title bar is the only way back to the rail — and to the docked
+  // failure card, which owns the retry.
+  const isEnabled = widget.status === 'enabled';
   const label = resolveWidgetInstanceLabel(instance, widget.manifest, t);
   const geometry = dragGeometry ?? state;
   const isMaximized = state.mode === 'maximized';
@@ -185,6 +204,9 @@ export const FloatingWidgetWindow = ({
         justify="space-between"
         pe="2"
         ps="3"
+        // `preventDefault` on pointerdown does not stop touch panning: without
+        // this the browser claims the gesture and cancels the drag.
+        touchAction="none"
         userSelect="none"
         onDoubleClick={handleTitleDoubleClick}
         onPointerDown={handleTitlePointerDown}
@@ -233,7 +255,14 @@ export const FloatingWidgetWindow = ({
       </HStack>
       {isShaded ? null : (
         <Flex direction="column" flex="1" minH="0" overflow="hidden">
-          <WidgetRendererById instanceId={instance.id} region="floating" widget={widget} />
+          {isEnabled ? (
+            <WidgetRendererById instanceId={instance.id} region="floating" widget={widget} />
+          ) : (
+            <HStack color="fg.error" gap="1.5" p="3">
+              <Icon as={TriangleAlertIcon} boxSize="3.5" />
+              <Text fontSize="xs">{t('widgets.failure.title', { label })}</Text>
+            </HStack>
+          )}
         </Flex>
       )}
       {isShaded || isMaximized ? null : (
@@ -244,6 +273,7 @@ export const FloatingWidgetWindow = ({
           h="4"
           position="absolute"
           right="0"
+          touchAction="none"
           w="4"
           onPointerDown={handleResizePointerDown}
         />
