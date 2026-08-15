@@ -346,7 +346,15 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
 
 export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
 
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image', 'wan'];
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sdxl',
+  'flux',
+  'flux2',
+  'qwen-image',
+  'wan',
+  'minimax-h3',
+];
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',

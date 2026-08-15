@@ -16,6 +16,7 @@ import type {
   FLUXReduxConfig,
   ImageWithDims,
   IPAdapterConfig,
+  MiniMaxH3ReferenceImageConfig,
   QwenImageReferenceImageConfig,
   RasterLayerAdjustments,
   RefImageState,
@@ -126,6 +127,10 @@ export const initialQwenImageReferenceImage: QwenImageReferenceImageConfig = {
 };
 export const initialWanReferenceImage: WanReferenceImageConfig = {
   type: 'wan_reference_image',
+  image: null,
+};
+export const initialMiniMaxH3ReferenceImage: MiniMaxH3ReferenceImageConfig = {
+  type: 'minimax_h3_reference_image',
   image: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {
