@@ -1459,6 +1459,8 @@
         "wanVaePlaceholder": "From VAE/Encoder Source",
         "wanComponentSource": "VAE/Encoder Source (Diffusers)",
         "wanComponentSourcePlaceholder": "GGUF Wan models require a Diffusers Wan source for VAE + UMT5-XXL",
+        "minimaxH3TransformerModel": "Transformer (single file)",
+        "minimaxH3TransformerModelPlaceholder": "Folder transformer (default)",
         "wanTransformerLowNoise": "Transformer (Low Noise)",
         "wanTransformerLowNoisePlaceholder": "Add for full detail",
         "upcastAttention": "Upcast Attention",
