@@ -457,10 +457,14 @@ const addNotification = (state: WorkbenchState, notification: WorkbenchNotificat
   return { ...state, notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT) };
 };
 
-/** Adds the "Invocation queued" notice iff the reduction actually grew the active queue. */
-const withEnqueueNotification = (state: WorkbenchState, nextState: WorkbenchState): WorkbenchState => {
-  const before = state.projects.find((project) => project.id === state.activeProjectId);
-  const after = nextState.projects.find((project) => project.id === nextState.activeProjectId);
+/** Adds the "Invocation queued" notice iff the reduction actually grew that project's queue. */
+const withEnqueueNotification = (
+  state: WorkbenchState,
+  nextState: WorkbenchState,
+  projectId: string | null
+): WorkbenchState => {
+  const before = state.projects.find((project) => project.id === projectId);
+  const after = nextState.projects.find((project) => project.id === projectId);
 
   if (!before || !after || before.queue.items.length >= after.queue.items.length) {
     return nextState;
@@ -3497,7 +3501,8 @@ export const __workbenchReducerInternal = (
         state,
         updateActiveProject(state, (project) =>
           submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
-        )
+        ),
+        state.activeProjectId
       );
     }
     case 'submitResolvedInvocationSnapshot': {
@@ -3511,7 +3516,8 @@ export const __workbenchReducerInternal = (
             action.models,
             action.positivePrompts
           )
-        )
+        ),
+        state.activeProjectId
       );
     }
     case 'markQueueItemBackendSubmitted': {
@@ -3912,7 +3918,8 @@ export const __workbenchReducerInternal = (
             action.backendSupportsCancellation,
             action.canvas
           )
-        )
+        ),
+        action.projectId
       );
     }
     case 'cancelQueueItem': {

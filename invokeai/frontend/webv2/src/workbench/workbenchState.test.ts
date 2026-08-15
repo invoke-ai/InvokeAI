@@ -2287,6 +2287,50 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(getActiveProject(next).queue.items).toEqual([]);
       expect(next.notifications).toHaveLength(notificationCount);
     });
+
+    it('notifies for a background-project canvas enqueue', () => {
+      const graph: GraphContract = {
+        edges: [],
+        id: 'canvas-graph',
+        label: 'Canvas',
+        nodes: [],
+        updatedAt: '2026-06-09T00:00:00.000Z',
+        version: 1,
+      };
+
+      let state = createInitialWorkbenchState();
+      const originatingProjectId = state.activeProjectId;
+      state = workbenchReducer(state, { type: 'createProject' });
+      const otherProjectId = state.activeProjectId;
+
+      expect(otherProjectId).not.toBe(originatingProjectId);
+
+      // Project A (originating) stays active; the canvas submission below
+      // targets project B, simulating an async canvas enqueue that lands
+      // after the user has switched away.
+      state = workbenchReducer(state, { projectId: originatingProjectId, type: 'switchProject' });
+
+      expect(state.activeProjectId).toBe(originatingProjectId);
+
+      state = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        canvas: structuredClone(getProject(state, otherProjectId).canvas),
+        destination: 'canvas',
+        generate: {
+          negativePromptNodeId: 'negative_prompt',
+          positivePromptNodeId: 'positive_prompt',
+          seedNodeId: 'seed',
+          values: createGenerateValues({ positivePrompt: 'canvas prompt', seed: 101, shouldRandomizeSeed: false }),
+        },
+        graph,
+        projectId: otherProjectId,
+        type: 'submitCanvasInvocationSnapshot',
+      });
+
+      expect(getProject(state, otherProjectId).queue.items).toHaveLength(1);
+      expect(state.notifications[0]?.title).toBe('Invocation queued');
+      expect(state.notifications[0]?.projectId).toBe(otherProjectId);
+    });
   });
 
   it('accepts the project graph source but does not queue an empty project graph', () => {
