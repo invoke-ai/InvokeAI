@@ -14,7 +14,7 @@ import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfi
 import {
   type AnyModelConfigWithExternal,
   isNonCommercialMainModelConfig,
-  isSelectableAsPrimaryMainModel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 
 export const MainModelPicker = memo(() => {
@@ -26,7 +26,7 @@ export const MainModelPicker = memo(() => {
   // the Transformer (Low Noise) slot of the Wan advanced section, not as a primary
   // main. Shared with the other two places a primary main can be chosen so the
   // three cannot disagree about what is offerable.
-  const modelConfigs = useMemo(() => allModelConfigs.filter(isSelectableAsPrimaryMainModel), [allModelConfigs]);
+  const modelConfigs = useMemo(() => selectPrimaryMainModelOptions(allModelConfigs), [allModelConfigs]);
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

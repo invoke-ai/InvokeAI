@@ -35,20 +35,32 @@ const makeState = () => ({ params: { model: null } }) as unknown as RootState;
 const log = { debug: vi.fn(), info: vi.fn(), error: vi.fn(), warn: vi.fn() } as never;
 
 describe('handleMainModels — Wan low-noise experts', () => {
-  it('does not auto-select a low-noise expert when it is the only Wan model installed', () => {
-    const dispatch = vi.fn();
-    handleMainModels([wanLowExpert], makeState(), dispatch, log);
-
-    // Nothing selectable, so the selection is left null rather than pointed at a model
-    // that cannot load. (`model` is already null, so no clear is dispatched either.)
-    expect(dispatch).not.toHaveBeenCalled();
-  });
-
   it('auto-selects the high-noise expert over the low-noise one regardless of order', () => {
     const dispatch = vi.fn();
     handleMainModels([wanLowExpert, wanHighExpert], makeState(), dispatch, log);
 
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch).toHaveBeenCalledWith(modelSelected(wanHighExpert));
+  });
+
+  it('does offer the low-noise expert when its partner is not installed', () => {
+    // Since #9505 the loader runs an unpaired low expert with a warning instead of
+    // refusing it, so hiding it here with no alternative would be a dead end — the
+    // user's only Wan model would be missing from every picker.
+    const dispatch = vi.fn();
+    handleMainModels([wanLowExpert], makeState(), dispatch, log);
+
+    expect(dispatch).toHaveBeenCalledWith(modelSelected(wanLowExpert));
+  });
+
+  it('treats a different-variant high expert as no partner at all', () => {
+    // An I2V high expert cannot pair with a T2V low one — the loader rejects the
+    // variant mismatch — so it must not be the reason the T2V low expert is hidden.
+    const dispatch = vi.fn();
+    const i2vHigh = { ...wanHighExpert, key: 'wan-i2v-high', variant: 'i2v_a14b' } as unknown as AnyModelConfig;
+    handleMainModels([wanLowExpert, i2vHigh], makeState(), dispatch, log);
+
+    // Both remain offerable; the sort leaves the list order, so the low expert is first.
+    expect(dispatch).toHaveBeenCalledWith(modelSelected(wanLowExpert));
   });
 });

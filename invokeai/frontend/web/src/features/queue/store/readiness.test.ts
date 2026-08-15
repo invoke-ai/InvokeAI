@@ -811,58 +811,35 @@ const buildWanCanvasArg = (overrides: Parameters<typeof buildWanTabArg>[0]) =>
 const hasWanComponentReason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('noWanComponentSourceSelected'));
 
-const hasWanExpertReason = (reasons: { content: string }[]) =>
-  reasons.some((r) => r.content.includes('noWanLowNoiseExpertSelected'));
-
-// The A14B expert pre-flight. `WanModelLoaderInvocation` raises a hard ValueError for
-// an unpaired A14B main that isn't the high-noise expert, so readiness has to block it
-// rather than let the user hit it at generation time. Only expert='high' degrades
-// gracefully (high expert runs the whole schedule, with a warning).
-describe('Wan 2.2 A14B expert pre-flight', () => {
+// Since #9505 the loader takes the A14B expert pairing from the wiring rather than the
+// filename tag: an unpaired or untagged A14B runs with a warning instead of raising. The
+// pre-flight must therefore NOT block on `expert`, or it would stop a generation the
+// backend is happy to run — untagged community checkpoints are the common case this
+// whole branch exists to support.
+describe('Wan 2.2 A14B expert pairing is not a readiness blocker', () => {
   const withComponents = { wanComponentSource: { key: 'src' } };
 
   it.each([
     ['untagged (expert=none)', wanUntaggedA14bModel],
     ['the low-noise expert', wanLowExpertModel],
-  ])('blocks an unpaired A14B main that is %s', (_label, model) => {
+    ['the high-noise expert', wanCheckpointModel],
+    ['TI2V-5B', wanTi2v5bModel],
+  ])('does not block an unpaired A14B main that is %s', (_label, model) => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model, ...withComponents }));
-    expect(hasWanExpertReason(reasons)).toBe(true);
+    expect(reasons).toEqual([]);
   });
 
-  it.each([
-    ['untagged (expert=none)', wanUntaggedA14bModel],
-    ['the low-noise expert', wanLowExpertModel],
-  ])('allows %s once a low-noise partner is wired', (_label, model) => {
-    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildWanTabArg({ model, ...withComponents, wanTransformerLowNoise: { key: 'partner' } })
-    );
-    expect(hasWanExpertReason(reasons)).toBe(false);
-  });
-
-  it('allows an unpaired A14B high-noise expert — it degrades with a warning, not an error', () => {
-    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildWanTabArg({ model: wanCheckpointModel, ...withComponents })
-    );
-    expect(hasWanExpertReason(reasons)).toBe(false);
-  });
-
-  it('does not apply to TI2V-5B, which is single-transformer', () => {
-    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model: wanTi2v5bModel, ...withComponents }));
-    expect(hasWanExpertReason(reasons)).toBe(false);
-  });
-
-  it('does not apply to a Diffusers main, which carries both experts', () => {
-    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildWanTabArg({ model: wanDiffusersModel, ...withComponents })
-    );
-    expect(hasWanExpertReason(reasons)).toBe(false);
-  });
-
-  it('also runs on the canvas tab', () => {
+  it('also does not block on the canvas tab', () => {
     const reasons = getReasonsWhyCannotEnqueueCanvasTab(
       buildWanCanvasArg({ model: wanUntaggedA14bModel, ...withComponents })
     );
-    expect(hasWanExpertReason(reasons)).toBe(true);
+    expect(reasons).toEqual([]);
+  });
+
+  it('still blocks when the VAE/encoder source is missing, whatever the expert', () => {
+    // The component-source rule is independent of the pairing and must survive.
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model: wanUntaggedA14bModel }));
+    expect(hasWanComponentReason(reasons)).toBe(true);
   });
 });
 

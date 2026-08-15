@@ -1793,7 +1793,6 @@
             "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
             "noWanComponentSourceSelected": "Single-file Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
-            "noWanLowNoiseExpertSelected": "Wan 2.2 A14B requires the high-noise expert as the main model. Wire the matching expert to Transformer (Low Noise), or select the high-noise file.",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",

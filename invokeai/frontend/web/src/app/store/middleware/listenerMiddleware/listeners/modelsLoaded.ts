@@ -51,9 +51,9 @@ import {
   isQwen3VLEncoderModelConfig,
   isQwenImageVAEModelConfig,
   isRefinerMainModelModelConfig,
-  isSelectableAsPrimaryMainModel,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -135,13 +135,12 @@ type ModelHandler = (
 
 export const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedMainModel = state.params.model;
-  // isSelectableAsPrimaryMainModel: this auto-selects on the user's behalf whenever the
-  // current selection goes away, so it must not reach for a model the pickers hide and
-  // the loader refuses (a Wan low-noise expert).
-  const allMainModels = models
-    .filter(isNonRefinerMainModelConfig)
-    .filter(isSelectableAsPrimaryMainModel)
-    .sort((a) => (a.base === 'sdxl' ? -1 : 1));
+  // selectPrimaryMainModelOptions: this auto-selects on the user's behalf whenever the
+  // current selection goes away, so it must offer exactly what the pickers offer — never
+  // reaching for a Wan low-noise expert while its partner is installed.
+  const allMainModels = selectPrimaryMainModelOptions(models.filter(isNonRefinerMainModelConfig)).sort((a) =>
+    a.base === 'sdxl' ? -1 : 1
+  );
 
   const firstModel = allMainModels[0];
 

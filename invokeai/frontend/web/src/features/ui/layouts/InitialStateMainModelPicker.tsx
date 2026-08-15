@@ -13,7 +13,7 @@ import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfi
 import {
   type AnyModelConfigWithExternal,
   isNonCommercialMainModelConfig,
-  isSelectableAsPrimaryMainModel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
@@ -23,7 +23,7 @@ export const InitialStateMainModelPicker = memo(() => {
   const [allModelConfigs] = useMainModels();
   // Same filter as MainModelPicker — a Wan low-noise expert offered here is just as
   // unusable as a primary main, and this picker is the launchpad's first impression.
-  const modelConfigs = useMemo(() => allModelConfigs.filter(isSelectableAsPrimaryMainModel), [allModelConfigs]);
+  const modelConfigs = useMemo(() => selectPrimaryMainModelOptions(allModelConfigs), [allModelConfigs]);
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

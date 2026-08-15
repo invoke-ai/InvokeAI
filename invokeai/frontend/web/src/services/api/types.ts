@@ -667,16 +667,41 @@ export const isWanSingleFileLowNoiseMainModelConfig = (
   return isWanSingleFileMainModelConfig(config) && 'expert' in config && config.expert === 'low';
 };
 
-/** Main models offerable as the *primary* main. Every list the user can pick a primary
- *  main from must go through this — there are three (MainModelPicker,
- *  InitialStateMainModelPicker, and the auto-select in the modelsLoaded listener), and
- *  filtering in only some of them means the excluded models are still reachable.
+/** Narrows a main-model list to what may be offered as the *primary* main. Every list
+ *  the user can pick a primary main from must go through this — there are three
+ *  (MainModelPicker, InitialStateMainModelPicker, and the auto-select in the
+ *  modelsLoaded listener), and filtering in only some of them means the excluded models
+ *  are still reachable.
  *
- *  A Wan low-noise expert wired as the primary main is refused by the loader
- *  ("An unpaired Wan A14B model must be the high-noise expert"), so offering it can
- *  only lead somewhere broken. */
-export const isSelectableAsPrimaryMainModel = (config: AnyModelConfigWithExternal): boolean =>
-  !isWanSingleFileLowNoiseMainModelConfig(config);
+ *  It only hides Wan A14B low-noise experts, and only when the user has a partner to
+ *  pick instead. The steer is worth making — a low-noise expert belongs in the
+ *  Transformer (Low Noise) slot, and running it alone gives visibly worse output — but
+ *  since #9505 the loader accepts an unpaired low expert with a warning rather than
+ *  refusing it. Hiding unconditionally would leave someone whose only Wan file is a low
+ *  expert staring at a list that doesn't contain their model, with nothing to do about
+ *  it. Partner-aware, the list degrades instead of dead-ending.
+ *
+ *  A partner is another single-file Wan main of the same variant that isn't itself
+ *  tagged low — i.e. the high-noise or untagged half of the same pair. */
+export const selectPrimaryMainModelOptions = <T extends AnyModelConfigWithExternal>(configs: T[]): T[] => {
+  // Annotated `: boolean` rather than left as an inferred type predicate. Two predicates
+  // narrowing to the same type would make the negated one resolve `candidate` to `never`
+  // below, and the `variant` read would stop compiling.
+  const isLowExpert = (config: T): boolean => isWanSingleFileLowNoiseMainModelConfig(config);
+  const variantOf = (config: T): string | null =>
+    'variant' in config && typeof config.variant === 'string' ? config.variant : null;
+
+  const hasPartner = (low: T): boolean =>
+    configs.some(
+      (candidate) =>
+        candidate.key !== low.key &&
+        isWanSingleFileMainModelConfig(candidate) &&
+        !isLowExpert(candidate) &&
+        variantOf(candidate) === variantOf(low)
+    );
+
+  return configs.filter((config) => !isLowExpert(config) || !hasPartner(config));
+};
 
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
   return config.type === 'lora' && config.base === 'wan';
