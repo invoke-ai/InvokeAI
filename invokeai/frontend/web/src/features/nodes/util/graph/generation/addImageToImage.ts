@@ -26,7 +26,8 @@ type AddImageToImageArg = {
   l2i: Invocation<ImageOutputNodes>;
   i2l: Invocation<ImageToLatentsNodes>;
   noise?: Invocation<'noise'>;
-  denoise: Invocation<DenoiseLatentsNodes>;
+  // MiniMax H3's denoise node has no denoising_start/end, so it cannot do img2img.
+  denoise: Invocation<Exclude<DenoiseLatentsNodes, 'minimax_h3_denoise'>>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
 };
 
