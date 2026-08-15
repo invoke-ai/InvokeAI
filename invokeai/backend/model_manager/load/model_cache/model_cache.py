@@ -33,6 +33,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.prefix_logger_adapter import PrefixedLoggerAdapter
 
@@ -258,6 +259,30 @@ class CacheModelsClearedCallback(Protocol):
     ) -> None: ...
 
 
+def _has_dedicated_vram(device: torch.device) -> bool:
+    """Whether a device has its own VRAM rather than sharing system memory with the CPU.
+
+    Intel integrated GPUs share memory with the CPU exactly as MPS does, so budgeting them as
+    if they had dedicated VRAM double-counts the same DRAM (once as "VRAM", once as RAM). When
+    the Level Zero probe cannot determine the answer, the previous discrete-GPU behaviour is
+    kept rather than guessing.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device) is not True
+    return False
+
+
+def _is_integrated_xpu(device: torch.device) -> bool:
+    """Whether ``device`` is an Intel integrated GPU, i.e. one whose VRAM *is* system RAM.
+
+    Narrower than ``not _has_dedicated_vram()``: CPU and MPS also share memory, but their
+    keep-RAM-copy behaviour is long-standing and out of scope here.
+    """
+    return device.type == "xpu" and xpu_device_is_integrated(device) is True
+
+
 class ModelCache:
     """A cache for managing models in memory.
 
@@ -336,6 +361,9 @@ class ModelCache:
         self._ram_budget = ram_budget
         self._enable_partial_loading = enable_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
+        # Notices already emitted, keyed by (topic, device), so each is logged once rather than
+        # on every model load.
+        self._warned_once: set[tuple[str, str]] = set()
         self._execution_device_working_mem_gb = execution_device_working_mem_gb
         self._execution_device: torch.device = torch.device(execution_device)
         self._storage_device: torch.device = torch.device(storage_device)
@@ -599,18 +627,44 @@ class ModelCache:
         # Use the provided execution device, or fall back to the cache's default
         effective_execution_device = execution_device if execution_device is not None else self._execution_device
 
-        # Partial loading only makes sense on CUDA.
+        # Partial loading needs a device whose residency is worth bounding.
         # - When running on CPU, there is no 'loading' to do.
         # - When running on MPS, memory is shared with the CPU, so the default OS memory management already handles this
         #   well.
-        running_with_cuda = effective_execution_device.type == "cuda"
+        # - An Intel integrated GPU shares memory the same way, but is deliberately included: it is the only bounded
+        #   loading path there. partial_load_to_vram() respects vram_available, whereas the full-load path ignores it
+        #   ("no choice but to try and fit it all"), and on Linux that overshoot is an uncatchable OOM-kill rather than
+        #   a degraded load. Combined with keep_ram_copy=False below, streaming moves weights rather than copying them.
+        running_with_dedicated_vram = _has_dedicated_vram(effective_execution_device)
+        supports_partial_loading = running_with_dedicated_vram or _is_integrated_xpu(effective_execution_device)
+
+        # On an integrated GPU the "VRAM" copy and the RAM copy are the same DRAM, so keeping a RAM
+        # copy makes every resident model cost twice its size: full_load_to_vram() copies each
+        # tensor (`.to(device, copy=True)`) while the CPU state dict stays live. Dropping the copy
+        # turns that into a move -- steady-state 1x, with a transient peak of one tensor -- and the
+        # unload path already restores weights by moving them back when there is no CPU copy.
+        #
+        # Scoped to integrated XPU on purpose: CPU and MPS share memory too, but their behaviour
+        # here predates this and is left alone.
+        keep_ram_copy = self._keep_ram_copy_of_weights and not _is_integrated_xpu(effective_execution_device)
+
+        # Overriding a setting the user turned on is worth saying once, rather than leaving someone
+        # to wonder why it made no difference.
+        if self._keep_ram_copy_of_weights and _is_integrated_xpu(effective_execution_device):
+            self._warn_once(
+                "keep_ram_copy",
+                effective_execution_device,
+                f"`keep_ram_copy_of_weights` is enabled but is being ignored on {effective_execution_device}: "
+                "it is an integrated GPU, whose VRAM is system RAM, so a RAM copy would double each model's "
+                "footprint against the same memory. Weights are moved rather than copied.",
+            )
 
         # Wrap model.
-        if isinstance(model, torch.nn.Module) and running_with_cuda and self._enable_partial_loading:
+        if isinstance(model, torch.nn.Module) and supports_partial_loading and self._enable_partial_loading:
             wrapped_model = CachedModelWithPartialLoad(
                 model,
                 effective_execution_device,
-                keep_ram_copy=self._keep_ram_copy_of_weights,
+                keep_ram_copy=keep_ram_copy,
                 shared_store=self._shared_cpu_weights,
                 cache_key=key,
             )
@@ -619,7 +673,7 @@ class ModelCache:
                 model,
                 effective_execution_device,
                 size,
-                keep_ram_copy=self._keep_ram_copy_of_weights,
+                keep_ram_copy=keep_ram_copy,
                 shared_store=self._shared_cpu_weights,
                 cache_key=key,
             )
@@ -669,6 +723,18 @@ class ModelCache:
             # self here would be worse than useless: _make_room_internal already evicted
             # everything unlocked, so the only entry a self-reconcile could ever claim is the
             # model just admitted — evicting it out from under its own loader.)
+
+    def _warn_once(self, topic: str, device: torch.device, message: str) -> None:
+        """Log `message` the first time `topic` arises for `device`.
+
+        Undecorated on purpose: only ever called from put(), which already holds the cache lock
+        and records activity.
+        """
+        key = (topic, str(device))
+        if key in self._warned_once:
+            return
+        self._warned_once.add(key)
+        self._logger.warning(message)
 
     def cached_model_keys(self) -> set[str]:
         """Return the base model keys of every model currently resident in this cache.
@@ -934,7 +1000,7 @@ class ModelCache:
             self._logger.debug(
                 f"Finished locking model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
             )
-        except torch.cuda.OutOfMemoryError:
+        except torch.OutOfMemoryError:
             self._logger.warning("Insufficient GPU memory to load model. Aborting")
             cache_entry.unlock()
             raise
@@ -1039,8 +1105,8 @@ class ModelCache:
         loaded_percent = model_cur_vram_bytes / model_total_bytes if model_total_bytes > 0 else 0
         # Use the model's actual compute_device for logging, not the cache's default
         model_device = cache_entry.cached_model.compute_device
-        if model_device.type == "cuda":
-            device_label = f"cuda device #{model_device.index}" if model_device.index is not None else "cuda device"
+        if model_device.type in ("cuda", "xpu") and model_device.index is not None:
+            device_label = f"{model_device.type} device #{model_device.index}"
         else:
             device_label = f"{model_device.type} device"
         self._logger.info(
@@ -1062,11 +1128,38 @@ class ModelCache:
                 return cache_entry.cached_model.partial_load_to_vram(vram_available)
             elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
                 # Partial load is not supported, so we have not choice but to try and fit it all into VRAM.
+                #
+                # On an integrated GPU that gamble is not survivable: "VRAM" is system RAM, so
+                # overshooting means the kernel OOM-killer delivers SIGKILL and the process dies with
+                # no exception to catch and nothing useful in the log. vram_available there is read
+                # from actual free system memory, so it is worth trusting -- refuse up front and
+                # leave the caller an error it can act on. Devices with their own VRAM keep the
+                # try-anyway behaviour, where the failure is a catchable allocator error.
+                #
+                # MPS shares memory the same way and would benefit from the same guard, but macOS
+                # degrades differently (compressed memory, a large default swap) and changing Mac
+                # behaviour is out of scope here.
+                #
+                # The comparison must be against the bytes still to be moved, not the model's
+                # total: a resident model's weights already occupy the same DRAM that vram_available
+                # is read from, so its total can exceed "available" precisely because it is loaded.
+                # full_load_to_vram() is a no-op for a resident model; comparing the total would
+                # refuse the re-lock and (via the except handler below) evict a healthy model.
+                model_bytes_needed = cache_entry.cached_model.total_bytes() - cache_entry.cached_model.cur_vram_bytes()
+                device = cache_entry.cached_model.compute_device
+                if _is_integrated_xpu(device) and model_bytes_needed > vram_available:
+                    raise torch.OutOfMemoryError(
+                        f"Cannot load model '{cache_entry.key}' onto {device}: it needs "
+                        f"{model_bytes_needed / MB:.2f}MB but only {vram_available / MB:.2f}MB is available. "
+                        f"{device} shares memory with the CPU, and models are loaded onto it in full, "
+                        "so proceeding would exhaust system memory. Free up RAM, use a smaller or more "
+                        "heavily quantized model, or lower `device_working_mem_gb`."
+                    )
                 return cache_entry.cached_model.full_load_to_vram()
             else:
                 raise ValueError(f"Unsupported cached model type: {type(cache_entry.cached_model)}")
         except Exception as e:
-            if isinstance(e, torch.cuda.OutOfMemoryError):
+            if isinstance(e, torch.OutOfMemoryError):
                 self._logger.warning("Insufficient GPU memory to load model. Aborting")
             # If an exception occurs, the model could be left in a bad state, so we delete it from the cache entirely.
             self._delete_cache_entry(cache_entry)
@@ -1107,9 +1200,19 @@ class ModelCache:
             vram_allocated = torch.cuda.memory_allocated(self._execution_device)
             vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
             vram_available_to_process = vram_free + vram_allocated
-        elif self._execution_device.type == "mps":
-            vram_reserved = torch.mps.driver_allocated_memory()
+        elif self._execution_device.type == "xpu" and _has_dedicated_vram(self._execution_device):
+            vram_allocated = torch.xpu.memory_allocated(self._execution_device)
+            vram_free, _vram_total = TorchDevice.xpu_mem_get_info(self._execution_device)
+            vram_available_to_process = vram_free + vram_allocated
+        elif self._execution_device.type in ("mps", "xpu"):
+            # Shared-memory devices: MPS, and Intel integrated GPUs, whose reported "VRAM" is
+            # system RAM. Budget against actual free system memory instead of device totals.
             # TODO(ryand): Is it accurate that MPS shares memory with the CPU?
+            vram_reserved = (
+                torch.mps.driver_allocated_memory()
+                if self._execution_device.type == "mps"
+                else torch.xpu.memory_reserved(self._execution_device)
+            )
             vram_free = psutil.virtual_memory().available
             vram_available_to_process = vram_free + vram_reserved
         else:
@@ -1129,6 +1232,9 @@ class ModelCache:
             # (which adds vram_allocated(execution_device)), inflating "available" toward total VRAM
             # so the cache never offloads — causing VRAM OOMs that ignore device_working_mem_gb.
             return torch.cuda.memory_allocated(self._execution_device)
+        elif self._execution_device.type == "xpu":
+            # Same per-device requirement as CUDA above.
+            return torch.xpu.memory_allocated(self._execution_device)
         elif self._execution_device.type == "mps":
             return torch.mps.current_allocated_memory()
         else:
@@ -1163,14 +1269,24 @@ class ModelCache:
         #   hard for users to understand. It is better for users to see that their RAM is maxed out, and then override
         #   the default value if desired.
 
-        # Lookup the total VRAM size for the CUDA execution device.
+        # Lookup the total VRAM size for the CUDA or XPU execution device.
         # This runs at startup (one ModelCache is built per generation device before any request is
         # served), and torch.cuda.mem_get_info() would create a CUDA context that permanently holds
         # ~100-300 MiB of VRAM in an otherwise idle process. cudaGetDeviceProperties reports the same
-        # total without creating a context (#9413).
-        total_cuda_vram_bytes: int | None = None
+        # total without creating a context (#9413). torch.xpu.get_device_properties() is the XPU
+        # equivalent, and is also the one total that survives a missing SYCL free-memory aspect --
+        # so this deliberately does not go through TorchDevice.xpu_mem_get_info(), whose first tier
+        # is the context-creating mem_get_info() call.
+        total_vram_bytes: int | None = None
         if self._execution_device.type == "cuda":
-            total_cuda_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
+            total_vram_bytes = torch.cuda.get_device_properties(self._execution_device).total_memory
+        elif self._execution_device.type == "xpu" and _has_dedicated_vram(self._execution_device):
+            # A total of 0 means "unknown" (the device couldn't report total_memory). Treat it like
+            # the CPU case (None) so the RAM heuristic below doesn't compute a negative cache cap.
+            #
+            # Integrated GPUs are excluded above: their total_memory is a share of system RAM, so
+            # capping the RAM cache at "1x VRAM" would cap RAM against itself (heuristic 2).
+            total_vram_bytes = int(torch.xpu.get_device_properties(self._execution_device).total_memory) or None
 
         # Apply heuristic 1.
         # ------------------
@@ -1185,11 +1301,11 @@ class ModelCache:
         # Apply heuristic 2.
         # ------------------
         max_ram_cache_size_bytes = 32 * GB
-        if total_cuda_vram_bytes is not None:
+        if total_vram_bytes is not None:
             if self._max_vram_cache_size_gb is not None:
                 max_ram_cache_size_bytes = int(self._max_vram_cache_size_gb * GB)
             else:
-                max_ram_cache_size_bytes = total_cuda_vram_bytes - int(self._execution_device_working_mem_gb * GB)
+                max_ram_cache_size_bytes = total_vram_bytes - int(self._execution_device_working_mem_gb * GB)
         if ram_available_to_model_cache > max_ram_cache_size_bytes:
             heuristics_applied.append(2)
             ram_available_to_model_cache = max_ram_cache_size_bytes
@@ -1328,13 +1444,16 @@ class ModelCache:
                 vram_available_bytes_percent,
             )
 
-        if torch.cuda.is_available():
-            # Query this cache's execution device (not the process-current one) for correct
-            # per-device numbers in multi-GPU mode. See _get_vram_in_use.
-            allocated = (
-                torch.cuda.memory_allocated(self._execution_device) if self._execution_device.type == "cuda" else 0
-            )
+        # Dispatch on this cache's execution device, not on availability order: a box with both
+        # an NVIDIA card and an Arc would otherwise take the CUDA branch while running on XPU and
+        # report a constant 0.0 MB. Query the execution device for correct per-device numbers in
+        # multi-GPU mode -- see _get_vram_in_use.
+        if self._execution_device.type == "cuda" and torch.cuda.is_available():
+            allocated = torch.cuda.memory_allocated(self._execution_device)
             log += "  {:<30} {:.1f} MB\n".format("CUDA Memory Allocated:", allocated / MB)
+        elif self._execution_device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+            allocated = torch.xpu.memory_allocated(self._execution_device)
+            log += "  {:<30} {:.1f} MB\n".format("XPU Memory Allocated:", allocated / MB)
         log += "  {:<30} {}\n".format("Total models:", len(self._cached_models))
 
         if include_entry_details and len(self._cached_models) > 0:
