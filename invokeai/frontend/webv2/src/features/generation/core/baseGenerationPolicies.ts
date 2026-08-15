@@ -1129,7 +1129,7 @@ const getBaseComponentSectionPolicy = (
         },
         {
           ...vaeSlot(
-            'Z-Image decodes with the FLUX VAE, so FLUX-base VAEs are listed here — they are fully compatible.',
+            'Z-Image decodes with the FLUX VAE, so FLUX-base VAEs are listed here — they are fully compatible. Required unless a Diffusers component source is available.',
             isVaeForBases(['flux'])
           ),
           required: (ctx) => !isBundledOrDiffusersSourceSatisfied(ctx),
@@ -1142,7 +1142,7 @@ const getBaseComponentSectionPolicy = (
       return createPolicy(model.format !== 'diffusers', [
         {
           ...vaeSlot(
-            'Krea-2 decodes with the Qwen-Image 16-channel VAE; the same VAE may be installed under the Qwen-Image or Anima base, so both are listed.',
+            'Krea-2 decodes with the Qwen-Image 16-channel VAE; the same VAE may be installed under the Qwen-Image or Anima base, so both are listed. Required for non-Diffusers Krea-2 models. Qwen-Image VAEs are used.',
             isKrea2Vae
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
@@ -1183,7 +1183,7 @@ const getBaseComponentSectionPolicy = (
         },
         {
           ...vaeSlot(
-            'Anima accepts VAEs installed under the Anima, Qwen-Image, or FLUX base — the same physical VAE ships under any of the three.',
+            'Anima accepts VAEs installed under the Anima, Qwen-Image, or FLUX base — the same physical VAE ships under any of the three. Required for Anima models. Qwen Image and FLUX VAEs are supported.',
             isAnimaVae
           ),
           required: () => true,
