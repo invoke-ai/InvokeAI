@@ -427,12 +427,15 @@ const createNotification = ({
 const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => {
   const [newest, ...rest] = state.notifications;
 
-  // Coalesce an exact repeat of the newest notification into an occurrence
-  // bump on the SAME id, instead of stacking a new one — the toaster dedupes
-  // toasts by id, so a repeat then stops re-toasting for free (e.g. an
-  // ambient retry failing the same way every cycle).
+  // Coalesce an exact repeat of the newest ERROR notification into an
+  // occurrence bump on the SAME id, instead of stacking a new one — the
+  // toaster dedupes toasts by id, so a repeat then stops re-toasting for free
+  // (e.g. an ambient retry failing the same way every cycle). Restricted to
+  // errors: non-error kinds (e.g. "Invocation queued") are routine, repeat
+  // actions that must each surface their own toast.
   if (
     newest &&
+    newest.kind === 'error' &&
     newest.kind === notification.kind &&
     newest.title === notification.title &&
     newest.message === notification.message
@@ -440,7 +443,12 @@ const addNotification = (state: WorkbenchState, notification: WorkbenchNotificat
     return {
       ...state,
       notifications: [
-        { ...newest, createdAt: notification.createdAt, occurrenceCount: (newest.occurrenceCount ?? 1) + 1 },
+        {
+          ...newest,
+          createdAt: notification.createdAt,
+          isRead: false,
+          occurrenceCount: (newest.occurrenceCount ?? 1) + 1,
+        },
         ...rest,
       ],
     };

@@ -2135,6 +2135,41 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(twice.notifications[0]?.id).not.toBe(once.notifications[0]?.id);
   });
 
+  it('does not coalesce repeat non-error notifications (each queued invocation gets its own toast)', () => {
+    const state = primeGenerate();
+
+    const once = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+    const twice = workbenchReducer(once, {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    const enqueueNotifications = twice.notifications.filter((notification) => notification.category === 'enqueue');
+
+    expect(enqueueNotifications).toHaveLength(2);
+    expect(enqueueNotifications[0]?.id).not.toBe(enqueueNotifications[1]?.id);
+    expect(enqueueNotifications.every((notification) => notification.occurrenceCount === undefined)).toBe(true);
+  });
+
+  it('resets isRead to false when a coalesced error repeats after being read', () => {
+    let state = createInitialWorkbenchState();
+
+    state = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+    state = reduceWorkbench(state, { type: 'markAllNotificationsRead' });
+
+    expect(state.notifications[0]?.isRead).toBe(true);
+
+    state = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+
+    expect(state.notifications[0]?.occurrenceCount).toBe(2);
+    expect(state.notifications[0]?.isRead).toBe(false);
+  });
+
   describe('enqueue notifications', () => {
     it('records an enqueue notification when submitResolvedInvocationSnapshot adds a queue item', () => {
       const state = primeGenerate();
