@@ -42,6 +42,25 @@ from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
 
 
+def _set_torch_current_device(device: torch.device) -> None:
+    """Mirror a session-device pin onto torch's per-thread current device.
+
+    CUDA and XPU both track a current device per thread, and index-less allocations
+    (e.g. ``torch.zeros(2, device="xpu")``) resolve through it. Setting only the
+    session device would leave such allocations on whichever GPU the thread was last
+    pinned to -- for a borrowed idle GPU, that is the busy denoise device the offload
+    exists to protect.
+
+    Availability is checked first, mirroring TorchDevice.normalize: generation devices
+    can be configured (or, in tests, faked) for a backend this process cannot actually
+    initialise, and set_device would then fail or block on backend init.
+    """
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.set_device(device)
+    elif device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+        torch.xpu.set_device(device)
+
+
 class DefaultSessionRunner(SessionRunnerBase):
     """Processes a single session's invocations."""
 
@@ -197,7 +216,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         native_device = TorchDevice.get_session_device()
         if (
             native_device is None
-            or native_device.type != "cuda"
+            or native_device.type not in ("cuda", "xpu")
             or not invocation.idle_gpu_offloadable
             or not self._services.configuration.offload_text_encoders_to_idle_gpus
         ):
@@ -217,20 +236,30 @@ class DefaultSessionRunner(SessionRunnerBase):
         # cache's .stats still points at whatever session last ran on that device — possibly an
         # already-summarized one — so without this swap the encoder's cache hits/misses would be
         # lost to (or corrupt) another session's numbers.
-        load = self._services.model_manager.load
-        native_cache = load.ram_cache if load is not None else None
-        TorchDevice.set_session_device(borrowed_device)
-        borrowed_cache = load.ram_cache if load is not None else None
-        saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
-        if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
-            borrowed_cache.stats = native_cache.stats
+        # Everything after the borrow succeeds must be inside the try: if re-pinning or the stats
+        # swap raises, the borrow lock has to be released anyway, or this GPU stays locked for the
+        # life of the process and can never be borrowed again.
+        native_cache = None
+        borrowed_cache = None
+        saved_borrowed_stats = None
         try:
+            load = self._services.model_manager.load
+            native_cache = load.ram_cache if load is not None else None
+            TorchDevice.set_session_device(borrowed_device)
+            _set_torch_current_device(borrowed_device)
+            borrowed_cache = load.ram_cache if load is not None else None
+            saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
+            if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
+                borrowed_cache.stats = native_cache.stats
             yield
         finally:
-            if borrowed_cache is not None and borrowed_cache is not native_cache:
-                borrowed_cache.stats = saved_borrowed_stats
-            TorchDevice.set_session_device(native_device)
-            GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
+            try:
+                if borrowed_cache is not None and borrowed_cache is not native_cache:
+                    borrowed_cache.stats = saved_borrowed_stats
+                TorchDevice.set_session_device(native_device)
+                _set_torch_current_device(native_device)
+            finally:
+                GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called before a session is run.
@@ -626,15 +655,17 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._thread_semaphore.acquire()
 
             # Pin this worker thread to its device so all device-selecting code (TorchDevice.choose_torch_device,
-            # which nodes and the model loader consult) resolves to this GPU. CUDA's current device is per-thread.
+            # which nodes and the model loader consult) resolves to this GPU. CUDA's and XPU's current
+            # device are both per-thread.
             if worker.device is not None:
                 TorchDevice.set_session_device(worker.device)
 
             # torch.cuda.set_device() initializes CUDA on the device, which can permanently reserve
             # VRAM in an otherwise idle process (#9413). Defer the CUDA-side pin until this worker
             # claims its first queue item; the pin is per-thread and this thread persists, so pinning
-            # once before the first item is equivalent to pinning here.
-            cuda_pin_needed = worker.device is not None and worker.device.type == "cuda"
+            # once before the first item is equivalent to pinning here. torch.xpu.set_device() brings
+            # up a SYCL context with the same effect, so XPU is deferred on the same terms.
+            device_pin_needed = worker.device is not None and worker.device.type in ("cuda", "xpu")
 
             worker.cancel_event.clear()
 
@@ -673,9 +704,18 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    if cuda_pin_needed:
-                        torch.cuda.set_device(worker.device)
-                        cuda_pin_needed = False
+                    if device_pin_needed:
+                        assert worker.device is not None
+                        # Called directly rather than via _set_torch_current_device(): that helper
+                        # skips the pin when the backend reports unavailable, which is right for the
+                        # idle-GPU borrow (devices there can be configured or faked for a backend
+                        # this process cannot initialise) but would silently drop the pin this
+                        # deferral exists to perform.
+                        if worker.device.type == "cuda":
+                            torch.cuda.set_device(worker.device)
+                        else:
+                            torch.xpu.set_device(worker.device)
+                        device_pin_needed = False
 
                     # A cancellation can race the claim: it may have marked the row terminal before
                     # this worker recorded `queue_item`, so _on_queue_item_status_changed couldn't set

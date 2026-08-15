@@ -135,20 +135,23 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         use_tiling = False
         if not getattr(vae_info.config, "cpu_only", None):
             exec_device = TorchDevice.choose_torch_device()
+            total_vram: int | None = None
             if exec_device.type == "cuda":
                 total_vram = torch.cuda.get_device_properties(exec_device).total_memory
-                if estimated_working_memory > 0.9 * total_vram:
-                    use_tiling = True
-                    tile_size = int(getattr(vae_info.model, "tile_sample_min_height", 256))
-                    estimated_working_memory = estimate_vae_working_memory_wan(
-                        operation="decode",
-                        vae=vae_info.model,
-                        pixel_height=h_pixel,
-                        pixel_width=w_pixel,
-                        pixel_frames=t_pixel,
-                        tile_size=tile_size,
-                        streaming=False,
-                    )
+            elif exec_device.type == "xpu":
+                total_vram = torch.xpu.get_device_properties(exec_device).total_memory
+            if total_vram is not None and estimated_working_memory > 0.9 * total_vram:
+                use_tiling = True
+                tile_size = int(getattr(vae_info.model, "tile_sample_min_height", 256))
+                estimated_working_memory = estimate_vae_working_memory_wan(
+                    operation="decode",
+                    vae=vae_info.model,
+                    pixel_height=h_pixel,
+                    pixel_width=w_pixel,
+                    pixel_frames=t_pixel,
+                    tile_size=tile_size,
+                    streaming=False,
+                )
 
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_wan_video_", suffix=".mp4", delete=False)
         tmp.close()
