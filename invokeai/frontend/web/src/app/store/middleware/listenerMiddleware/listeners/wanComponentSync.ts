@@ -28,7 +28,9 @@ type WanComponentUpdates = {
 const variantOf = (model: unknown): string | null =>
   model && typeof model === 'object' && 'variant' in model && typeof model.variant === 'string' ? model.variant : null;
 
-const isTi2v5b = (model: unknown): boolean => variantOf(model) === 'ti2v_5b';
+/** Exported so the readiness pre-flight can gate on the same single-expert test the
+ *  loader uses, instead of restating `variant === 'ti2v_5b'` in a second place. */
+export const isWanTi2v5b = (model: unknown): boolean => variantOf(model) === 'ti2v_5b';
 
 /** Mirrors `WanModelLoaderInvocation._validate_standalone_vae`: TI2V-5B needs the
  *  48-channel Wan 2.2 VAE, A14B the 16-channel Wan 2.1 one. Exported so the readiness
@@ -37,7 +39,7 @@ export const isWanVaeCompatible = (mainConfig: unknown, vae: unknown): boolean =
   !!vae &&
   typeof vae === 'object' &&
   'latent_channels' in vae &&
-  vae.latent_channels === (isTi2v5b(mainConfig) ? 48 : 16);
+  vae.latent_channels === (isWanTi2v5b(mainConfig) ? 48 : 16);
 
 /** Mirrors `_validate_component_source_vae` plus `_validate_component_source_format`:
  *  the source must be a Diffusers Wan main on the same side of the TI2V-5B / A14B split,
@@ -47,7 +49,7 @@ export const isWanComponentSourceCompatible = (mainConfig: unknown, source: unkn
   typeof source === 'object' &&
   'format' in source &&
   source.format === 'diffusers' &&
-  isTi2v5b(source) === isTi2v5b(mainConfig);
+  isWanTi2v5b(source) === isWanTi2v5b(mainConfig);
 
 /** The low-noise partner must match the main's variant exactly — a stricter rule than the
  *  TI2V/A14B split above. See `wan_model_loader.py`'s "must use the same Wan variant". */

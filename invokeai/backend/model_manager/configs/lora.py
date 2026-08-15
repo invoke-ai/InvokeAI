@@ -1142,6 +1142,14 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # Run the base-class probe (file-check, lora-suffix, base detection).
         instance = super().from_model_on_disk(mod, override_fields)
 
+        # Auto-detect the model-family variant from inner_dim in the state
+        # dict. The override field skips this if the user has set it.
+        #
+        # Resolved *before* the expert tag because the expert is only meaningful for
+        # A14B — see below.
+        if instance.variant is None:
+            instance.variant = detect_wan_lora_variant(mod.load_state_dict())
+
         # Auto-detect the expert tag from the filename if the user didn't override
         # it, using the same helper as the transformer probes so the two can't drift
         # apart. That also picks up the bare ``HIGH``/``LOW`` convention, which
@@ -1149,17 +1157,20 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # experts by the Wan LoRA loader, which is wrong for the high/low pairs the
         # Lightning-style distills ship in.
         #
+        # TI2V-5B is single-transformer, so it has no experts and the denoise path
+        # reads only the primary LoRA list. Tagging a 5B LoRA would route it through
+        # ``_resolve_target("auto", ...)`` into ``loras_low_noise`` alone, where it is
+        # silently inert. The bare-token convention makes that reachable on ordinary
+        # names — ``Wan2.2_TI2V_5B_low_light_v2`` has ``low`` as a standalone token —
+        # so pin the field the same way ``_resolve_wan_expert`` pins the main-model
+        # probe. Only A14B (or an inconclusive variant) gets a tag.
+        #
         # Note 'none' vs None: this config uses None for "untagged, apply to both",
         # so a 'none' result must leave the field alone.
-        if instance.expert is None:
+        if instance.expert is None and instance.variant != WanLoRAVariantType.Wan5B:
             detected = _detect_wan_expert(mod.path.stem)
             if detected != "none":
                 instance.expert = detected
-
-        # Auto-detect the model-family variant from inner_dim in the state
-        # dict. The override field skips this if the user has set it.
-        if instance.variant is None:
-            instance.variant = detect_wan_lora_variant(mod.load_state_dict())
 
         return instance
 

@@ -907,6 +907,42 @@ describe('Wan 2.2 component compatibility pre-flight', () => {
     expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(true);
   });
 
+  it('ignores a low-noise partner wired against a TI2V-5B main', () => {
+    // The loader logs "'Transformer (Low Noise)' is ignored for the single-expert TI2V-5B
+    // variant" and skips the pairing block entirely, so blocking here disables Invoke over
+    // a wire the backend shrugs off. For TI2V-5B it is unavoidable rather than occasional:
+    // the partner picker cannot offer a 5B (single-transformer models have no partner), so
+    // every possible pick is a variant mismatch — and the combobox is rendered for every
+    // Wan main. Recovery would mean clearing a combobox the error text never names.
+    const a14bLow = { ...wanLowExpertModel, key: 'a14b-low', variant: 't2v_a14b' };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanTi2v5bModel,
+        wanComponentSource: ti2vDiffusers,
+        wiredComponentSource: ti2vDiffusers,
+        wanVaeModel: vae48,
+        wiredVae: vae48,
+        wanTransformerLowNoise: a14bLow,
+        wiredLowNoisePartner: a14bLow,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(false);
+  });
+
+  it('ignores a low-noise partner wired against a Diffusers main', () => {
+    // The Diffusers branch of the loader never reads the slot — a dual-expert Diffusers
+    // A14B carries both experts as its own submodels.
+    const i2vLow = { ...wanLowExpertModel, key: 'i2v-low', variant: 'i2v_a14b' };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanDiffusersModel,
+        wanTransformerLowNoise: i2vLow,
+        wiredLowNoisePartner: i2vLow,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(false);
+  });
+
   it('blocks the same model wired to both transformer slots', () => {
     // Reachable whenever a low expert has no partner: it is offered by the main picker
     // (nothing else to offer) and by the low-noise picker at the same time.

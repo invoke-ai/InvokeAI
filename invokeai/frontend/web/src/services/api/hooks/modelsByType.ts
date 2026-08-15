@@ -44,7 +44,7 @@ import {
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
   isWanDiffusersMainModelConfig,
-  isWanSingleFileLowNoiseMainModelConfig,
+  isWanLowNoisePartnerOption,
   isWanT5EncoderModelConfig,
   isWanVAEModelConfig,
   isZImageDiffusersMainModelConfig,
@@ -126,7 +126,7 @@ export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModel
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useQwen3VLEncoderModels = () => buildModelsHook(isQwen3VLEncoderModelConfig)();
 export const useWanDiffusersModels = () => buildModelsHook(isWanDiffusersMainModelConfig)();
-export const useWanSingleFileLowNoiseModels = () => buildModelsHook(isWanSingleFileLowNoiseMainModelConfig)();
+export const useWanSingleFileLowNoiseModels = () => buildModelsHook(isWanLowNoisePartnerOption)();
 export const useWanVAEModels = () => buildModelsHook(isWanVAEModelConfig)();
 export const useWanT5EncoderModels = () => buildModelsHook(isWanT5EncoderModelConfig)();
 export const usePiDDecoderModels = buildModelsHook(isPiDDecoderModelConfig);

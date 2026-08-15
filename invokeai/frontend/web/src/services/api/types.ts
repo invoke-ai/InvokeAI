@@ -657,14 +657,38 @@ export const isWanSingleFileMainModelConfig = (config: AnyModelConfigWithExterna
   );
 };
 
-/** Wan single-file main models marked as the low-noise expert — the second half of
- *  the A14B MoE pair. Suitable for the Transformer (Low Noise) picker, and filtered
- *  out of the primary main dropdown. The two experts don't have to share a format;
- *  both load into the same transformer class. */
-export const isWanSingleFileLowNoiseMainModelConfig = (
-  config: AnyModelConfigWithExternal
-): config is MainModelConfig => {
+/** Wan single-file main models *tagged* as the low-noise expert. This is the narrow,
+ *  tag-based test, and its only job is deciding what to hide from the primary main
+ *  dropdown — see `selectPrimaryMainModelOptions`, its one caller. Deliberately not
+ *  exported: the Transformer (Low Noise) picker needs the wider test below, and reaching
+ *  for this one there is the mistake that left untagged pairs unwireable. */
+const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
   return isWanSingleFileMainModelConfig(config) && 'expert' in config && config.expert === 'low';
+};
+
+/** What the Transformer (Low Noise) picker may offer.
+ *
+ *  Deliberately wider than the tag test above. Since #9505 the *wiring* decides which
+ *  expert a file is used as and the `expert` tag is only advisory, so requiring
+ *  `expert === 'low'` here strands every pair that probes to `none`/`none`: both halves
+ *  show up in the primary picker (which hides only models tagged `low`) and neither
+ *  shows up here, leaving the pair impossible to assemble outside the workflow editor.
+ *  That is the exact case this branch exists to support, and it is not self-healing —
+ *  `expert` is absent from `ModelRecordChanges` and installed records are never
+ *  re-probed, so anything already stored as `none` stays that way short of a
+ *  delete-and-reinstall, which mints a new model key.
+ *
+ *  Two exclusions. Files tagged `high` belong in the primary slot — the loader would
+ *  only swap them back. TI2V-5B is single-transformer, so it has no partner at all and
+ *  offering one could only produce the variant mismatch the loader rejects. */
+export const isWanLowNoisePartnerOption = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  if (!isWanSingleFileMainModelConfig(config)) {
+    return false;
+  }
+  if ('expert' in config && config.expert === 'high') {
+    return false;
+  }
+  return !('variant' in config && config.variant === 'ti2v_5b');
 };
 
 /** Narrows a main-model list to what may be offered as the *primary* main. Every list

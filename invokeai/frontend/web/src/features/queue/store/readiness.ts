@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import {
   isWanComponentSourceCompatible,
   isWanLowNoisePartnerCompatible,
+  isWanTi2v5b,
   isWanVaeCompatible,
 } from 'app/store/middleware/listenerMiddleware/listeners/wanComponentSync';
 import { $false } from 'app/store/nanostores/util';
@@ -321,7 +322,16 @@ const pushWanReasons = (
       reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanComponentSource') });
     }
   }
-  if (wired.lowNoisePartner) {
+  // Only judge the low-noise slot when the loader actually reads it — a single-file
+  // A14B main. `wan_model_loader.py` logs "'Transformer (Low Noise)' is ignored for the
+  // single-expert TI2V-5B variant" and skips the whole pairing block, and the Diffusers
+  // branch never looks at the slot at all. Validating it regardless disables Invoke over
+  // a wire the backend would shrug off, and for a TI2V-5B main that is unavoidable rather
+  // than occasional: every model the partner picker can offer is an A14B, so every
+  // possible pick fails the variant check. The combobox is rendered for all Wan mains
+  // (see `ParamWanModelSelects`), so this is reachable by picking one, and the error text
+  // does not name the slot the user would have to clear to recover.
+  if (wired.lowNoisePartner && isWanSingleFileMainModelConfig(model) && !isWanTi2v5b(model)) {
     if (params.wanTransformerLowNoise?.key === params.model?.key) {
       reasons.push({ content: i18n.t('parameters.invoke.duplicateWanTransformer') });
     } else if (!isWanLowNoisePartnerCompatible(model, wired.lowNoisePartner)) {

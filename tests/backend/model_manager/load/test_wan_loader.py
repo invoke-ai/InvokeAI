@@ -182,24 +182,42 @@ class TestUnwrapUnquantized:
         assert out["plain"] is plain
 
 
-def _run_gguf_loader(extra_keys: list[str]) -> dict:
+def _run_gguf_loader(extra_keys: list[str], native_layout: bool = False) -> dict:
     """Drive WanGGUFCheckpointModel over a state dict carrying `extra_keys`.
 
     The extras go into the *state dict*, not into a mocked `unexpected_keys`, so the
     loader's own classification runs. Returns the dict actually handed to
     `load_state_dict`, which is what proves a key was dropped rather than merely
     tolerated.
+
+    With `native_layout`, the base keys use the upstream ComfyUI/QuantStack naming so
+    `_convert_wan_native_to_diffusers` runs first — a different path to the same gate,
+    and the one where an unmapped key is possible at all.
     """
-    state_dict = {
-        "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
-        "blocks.0.ffn.net.0.proj.weight": torch.zeros(256, 128),
-        "proj_out.weight": torch.zeros(64, 128),
-    }
+    if native_layout:
+        state_dict = {
+            "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
+            "text_embedding.0.weight": torch.zeros(128, 4096),
+            "blocks.0.ffn.0.weight": torch.zeros(256, 128),
+            "head.head.weight": torch.zeros(64, 128),
+        }
+    else:
+        state_dict = {
+            "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
+            "blocks.0.ffn.net.0.proj.weight": torch.zeros(256, 128),
+            "proj_out.weight": torch.zeros(64, 128),
+        }
     for key in extra_keys:
         state_dict[key] = torch.zeros(4, 4)
     model = MagicMock()
     # Report as unexpected whatever the loader still hands over that isn't a real param.
-    real_params = {"patch_embedding.weight", "blocks.0.ffn.net.0.proj.weight", "proj_out.weight"}
+    # Named post-conversion, since that is what reaches `load_state_dict`.
+    real_params = {
+        "patch_embedding.weight",
+        "condition_embedder.text_embedder.linear_1.weight",
+        "blocks.0.ffn.net.0.proj.weight",
+        "proj_out.weight",
+    }
     model.load_state_dict.side_effect = lambda sd, **_: SimpleNamespace(
         missing_keys=[], unexpected_keys=[k for k in sd if k not in real_params]
     )
@@ -247,6 +265,35 @@ def test_gguf_loader_still_refuses_an_unknown_conditioning_branch() -> None:
     still has to fail loudly rather than generate with its conditioning branch absent."""
     with pytest.raises(RuntimeError, match="audio_injector"):
         _run_gguf_loader(["vae.decoder.conv_in.weight", "audio_injector.0.proj.weight"])
+
+
+def test_gguf_loader_refuses_a_native_layout_key_the_rename_table_does_not_map() -> None:
+    """Pins the intended outcome for the one case the unexpected-key backstop newly
+    changes for GGUF: a native-layout key that survives `_convert_wan_native_to_diffusers`
+    unrenamed.
+
+    Before the backstop the GGUF loader checked `missing_keys` only, so such a key was
+    silently discarded by `load_state_dict(strict=False)`. Refusing is deliberate, and
+    the blast radius is narrower than it looks: an unmapped key that *should* have become
+    a real parameter also leaves that parameter unfilled, which the pre-existing
+    `missing_keys` check already caught. What is genuinely new is the case below —
+    a whole extra branch, here VACE, whose conversion we deliberately do not ship
+    (see `_WAN_NATIVE_TO_DIFFUSERS_RENAMES`: "T2V subset; we don't ship VACE / motion /
+    face-adapter conversion"). Generating with it quietly absent is worse than refusing.
+    """
+    with pytest.raises(RuntimeError, match="vace_blocks"):
+        _run_gguf_loader(["vace_blocks.0.after_proj.weight"], native_layout=True)
+
+
+def test_gguf_loader_accepts_a_native_layout_all_in_one_bundle() -> None:
+    """The benign-extras drop has to survive the native-layout rewrite too. The rename
+    table is blind substring replacement over every key, so it runs across the bundled
+    VAE/encoder names as well — this pins that they are still recognised and dropped."""
+    bundled = ["vae.decoder.conv_in.weight", "text_encoders.umt5xxl.shared.weight"]
+
+    handed_over = _run_gguf_loader(bundled, native_layout=True)
+
+    assert [key for key in bundled if key in handed_over] == []
 
 
 def test_gguf_loader_rejects_missing_model_parameter() -> None:
