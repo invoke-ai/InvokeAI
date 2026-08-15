@@ -3,7 +3,8 @@ import type { GalleryItem } from '@features/gallery';
 import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
-import { getMatchingProgressImage, getVideoFrameCopyNotice, mergePreviewBoardItems } from './PreviewWidgetView';
+import { getMatchingProgressImage, getVideoFrameCopyNotice } from './PreviewWidgetView';
+import { mergePreviewBoardItems } from './usePreviewNavigation';
 
 describe('getMatchingProgressImage', () => {
   const placeholder = {

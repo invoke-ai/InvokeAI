@@ -383,6 +383,57 @@ describe('preview keyboard navigation boundary', () => {
     }
   });
 
+  it('keeps a just-completed batch navigable before the backend refetch lands', async () => {
+    // The batch finished and its queue item is already gone; the backend list
+    // (staleTime + coalesced invalidation) still only has the older image.
+    // recentImages is the bridge: every batch image must stay in the sequence,
+    // or ArrowRight from the newest skips the whole batch onto old images.
+    mocks.project.queue.items = [];
+    mocks.project.widgetInstances.gallery.state.values.recentImages = [
+      {
+        height: 64,
+        imageName: 'batch-2',
+        imageUrl: '/images/batch-2/full',
+        queuedAt: '2026-07-22T00:00:02.000Z',
+        sourceQueueItemId: 'queue-item-done',
+        thumbnailUrl: '/images/batch-2/thumbnail',
+        width: 64,
+      },
+      {
+        height: 64,
+        imageName: 'batch-1',
+        imageUrl: '/images/batch-1/full',
+        queuedAt: '2026-07-22T00:00:01.000Z',
+        sourceQueueItemId: 'queue-item-done',
+        thumbnailUrl: '/images/batch-1/thumbnail',
+        width: 64,
+      },
+    ];
+    mocks.project.widgetInstances.gallery.state.values.selectedImage = {
+      boardId: 'none',
+      height: 64,
+      imageName: 'batch-2',
+      imageUrl: '/images/batch-2/full',
+      queuedAt: '2026-07-22T00:00:02.000Z',
+      sourceQueueItemId: 'queue-item-done',
+      thumbnailUrl: '/images/batch-2/thumbnail',
+      width: 64,
+    };
+    mocks.project.widgetInstances.gallery.state.values.selectedImageName = 'batch-2';
+    mocks.galleryItemPages = [{ items: [createImageItem('pre-batch', '2026-07-20T00:00:00.000Z')], total: 1 }];
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'batch-1' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+  });
+
   it('fetches the next infinite page before stepping past the loaded backend boundary', async () => {
     const newest: GalleryImage = {
       ...mocks.recentImages[0],

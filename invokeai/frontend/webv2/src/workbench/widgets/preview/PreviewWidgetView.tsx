@@ -11,7 +11,6 @@ import {
   type GalleryItem,
   type GalleryItemKey,
   type GalleryItemRef,
-  type GalleryView,
 } from '@features/gallery';
 import {
   getGalleryCompareImage,
@@ -21,23 +20,15 @@ import {
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
-  compareGalleryItems,
   galleryImageItemToGalleryImage,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
   toGalleryItemKey,
   toGalleryItemRef,
-  type GalleryItemsPage,
   type GalleryQueuePlaceholder,
 } from '@features/gallery/contracts';
-import {
-  flattenGalleryItemsData,
-  GALLERY_MAX_ROWS,
-  GALLERY_PAGE_SIZE,
-  galleryBoardsOptions,
-  galleryItemsInfiniteOptions,
-} from '@features/gallery/queries';
+import { galleryBoardsOptions } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useDeviceLabel } from '@features/queue/devices';
 import {
@@ -48,13 +39,12 @@ import {
   useQueueItemProgressImage,
   type LatestProgressImageSnapshot,
 } from '@features/queue/react';
-import { parseDateTokens } from '@platform/search/dateTokens';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
-import { useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   ImageContextMenu,
   useDeletionConfirmation,
@@ -70,17 +60,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import {
-  useCallback,
-  useEffect,
-  useEffectEvent,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-  type Ref,
-} from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -98,18 +78,13 @@ import {
 } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
 import {
-  getPreviewNavigationCursor,
-  getPreviewNavigationSequence,
-  getPreviewNavigationTarget,
-} from './previewNavigation';
-import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
   getPreviewMetadataOpen,
   type PreviewComparisonMode,
 } from './previewSettings';
+import { usePreviewNavigation } from './usePreviewNavigation';
 
-const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 /** For the live footer's Details slot, which renders disabled and never fires. */
 const noop = (): void => {};
 
@@ -161,80 +136,6 @@ const getSelectedItem = (values: Record<string, unknown>, localItems: GalleryIma
 
   return localItems[0] ?? null;
 };
-
-const flattenPreviewItems = (data: InfiniteData<GalleryItemsPage, number> | undefined): GalleryItem[] =>
-  flattenGalleryItemsData(data);
-
-const getOrderedPreviewItems = (
-  items: GalleryItem[],
-  imageOrderDir: 'ASC' | 'DESC',
-  starredFirst: boolean,
-  inputOrder: 'display' | 'newest-first'
-): GalleryItem[] =>
-  items
-    .map((item, index) => ({ index, item }))
-    .sort((a, b) => {
-      const canonicalOrder = compareGalleryItems(a.item, b.item, { orderDir: imageOrderDir, starredFirst });
-
-      if (canonicalOrder !== 0) {
-        return canonicalOrder;
-      }
-
-      return inputOrder === 'newest-first' && imageOrderDir === 'ASC' ? b.index - a.index : a.index - b.index;
-    })
-    .map(({ item }) => item);
-
-const getOrderedLocalItems = ({
-  boardId,
-  galleryView,
-  items,
-  imageOrderDir,
-  starredFirst,
-}: {
-  boardId: string;
-  galleryView: GalleryView;
-  items: GalleryItem[];
-  imageOrderDir: 'ASC' | 'DESC';
-  starredFirst: boolean;
-}): GalleryItem[] =>
-  getOrderedPreviewItems(
-    items.filter((item) => item.boardId === boardId && getItemGalleryView(item) === galleryView),
-    imageOrderDir,
-    starredFirst,
-    'newest-first'
-  );
-
-export const mergePreviewBoardItems = (
-  backendItems: GalleryItem[],
-  localItems: GalleryItem[],
-  imageOrderDir: 'ASC' | 'DESC',
-  starredFirst: boolean
-): GalleryItem[] => {
-  const backendKeys = new Set(backendItems.map(toGalleryItemKey));
-  const missingLocalItems = localItems.filter((item) => !backendKeys.has(toGalleryItemKey(item)));
-
-  if (missingLocalItems.length === 0) {
-    return backendItems.slice(0, GALLERY_MAX_ROWS);
-  }
-
-  return getOrderedPreviewItems([...backendItems, ...missingLocalItems], imageOrderDir, starredFirst, 'display').slice(
-    0,
-    GALLERY_MAX_ROWS
-  );
-};
-
-/**
- * The board used for the "N of M" index comes from the image itself, never
- * from the gallery's currently selected board — switching boards or changing
- * the board list sort must not reshuffle the preview. Freshly generated local
- * images (no boardId yet) fall back to the gallery selection for display only.
- */
-/**
- * Which gallery tab an item belongs to. Mirrors the category split the
- * gallery filters on: `general` is a gallery image, everything else (canvas
- * pixels, control layers, uploads) is an asset.
- */
-const getItemGalleryView = (item: GalleryItem): GalleryView => (item.category === 'general' ? 'images' : 'assets');
 
 const getBoardName = (
   boards: GalleryBoard[],
@@ -295,10 +196,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const hasSelectedItem = selectedItem !== null;
   const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
   const selectedImageQuery = getGallerySelectedImageQuery(galleryValues);
-  const selectedImageSearch = useMemo(
-    () => parseDateTokens(selectedImageQuery.searchTerm),
-    [selectedImageQuery.searchTerm]
-  );
   const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
   const isComparing =
     selectedItem?.kind === 'image' &&
@@ -317,287 +214,54 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
   const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
-  const navigationBoardId = shouldFollowLive ? activeGalleryPlaceholder.boardId : selectedImageQuery.boardId;
-  const navigationGalleryView = shouldFollowLive ? 'images' : selectedImageQuery.galleryView;
-  const navigationOrderDir = shouldFollowLive ? imageOrderDir : selectedImageQuery.imageOrderDir;
-  const navigationStarredFirst = shouldFollowLive ? starredFirst : selectedImageQuery.starredFirst;
-  const hasNavigationContext = shouldFollowLive || hasSelectedItem;
   const { t } = useTranslation();
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
   const videoControllerRef = useRef<PreviewVideoFrameController | null>(null);
   const [copyAvailableItemKey, setCopyAvailableItemKey] = useState<GalleryItemKey | null>(null);
-  const navigationContextKey = `${shouldFollowLive}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
-  const navigationQueryKey = `${shouldFollowLive}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}`;
-
-  // Lets a boundary fetch that resolves after the user has moved on compare the
-  // context it started in against the one now on screen, and drop its stale
-  // result. Written from an effect rather than during render: the compiler
-  // rejects render-phase ref writes, and an effect event cannot be called from
-  // a promise continuation.
-  const navigationContextKeyRef = useRef(navigationContextKey);
-
-  useEffect(() => {
-    navigationContextKeyRef.current = navigationContextKey;
-  }, [navigationContextKey]);
-
-  // A paginated navigation stays anchored to the page the preview opened on,
-  // and re-anchors only when the underlying query identity changes. Derived
-  // state rather than a ref so the compiler can see the dependency.
-  const [navigationAnchor, setNavigationAnchor] = useState({
-    page: selectedImageQuery.page,
-    queryKey: navigationQueryKey,
-  });
-  const hasStaleNavigationAnchor = navigationAnchor.queryKey !== navigationQueryKey;
-
-  if (hasStaleNavigationAnchor) {
-    setNavigationAnchor({ page: selectedImageQuery.page, queryKey: navigationQueryKey });
-  }
-
-  const navigationAnchorPage = hasStaleNavigationAnchor ? selectedImageQuery.page : navigationAnchor.page;
 
   const boardsQuery = useQuery({
     ...galleryBoardsOptions(),
     enabled: hasSelectedItem,
   });
-  const {
-    data: boardItemsData,
-    fetchNextPage: fetchNextBoardItemsPage,
-    fetchPreviousPage: fetchPreviousBoardItemsPage,
-    hasNextPage: hasNextBoardItemsPage,
-    hasPreviousPage: hasPreviousBoardItemsPage,
-    isFetching: isFetchingBoardItems,
-    isFetchingNextPage: isFetchingNextBoardItemsPage,
-    isFetchingPreviousPage: isFetchingPreviousBoardItemsPage,
-  } = useInfiniteQuery({
-    ...galleryItemsInfiniteOptions(
-      {
-        boardId: navigationBoardId,
-        createdFrom: shouldFollowLive ? undefined : selectedImageSearch.range?.from,
-        createdTo: shouldFollowLive ? undefined : selectedImageSearch.range?.to,
-        galleryView: navigationGalleryView,
-        orderDir: navigationOrderDir,
-        searchTerm: shouldFollowLive ? '' : selectedImageSearch.text,
-        starredFirst: navigationStarredFirst,
-      },
-      !shouldFollowLive && selectedImageQuery.paginationMode === 'paginated'
-        ? { kind: 'anchor', offset: navigationAnchorPage * GALLERY_PAGE_SIZE }
-        : { kind: 'infinite' }
-    ),
-    enabled: hasNavigationContext,
-  });
-  const selectPreviewItem = useCallback(
-    (item: GalleryItem) => {
-      const itemKey = toGalleryItemKey(item);
-      const pageIndex = boardItemsData?.pages.findIndex((page) =>
-        page.items.some((candidate) => toGalleryItemKey(candidate) === itemKey)
-      );
-      const pageParam = pageIndex === undefined || pageIndex < 0 ? undefined : boardItemsData?.pageParams[pageIndex];
-      const selectionPage =
-        typeof pageParam === 'number' ? Math.floor(pageParam / GALLERY_PAGE_SIZE) : selectedImageQuery.page;
-
-      gallery.selectItem(item, undefined, selectionPage, true);
-    },
-    [boardItemsData, gallery, selectedImageQuery.page]
-  );
   const boards = boardsQuery.data ?? fallbackBoards;
-  const optimisticQueueItemIds = useMemo(
-    () =>
-      new Set(
-        queueItems.filter((item) => item.status === 'pending' || item.status === 'running').map((item) => item.id)
-      ),
-    [queueItems]
-  );
-  const navigationLocalItems = useMemo(() => {
-    const refreshingSelectedSourceId =
-      !shouldFollowLive && isFetchingBoardItems && selectedItem?.kind === 'image'
-        ? selectedItem.sourceQueueItemId
-        : null;
-
-    return localItems.filter(
-      (item) =>
-        (item.sourceQueueItemId !== undefined && optimisticQueueItemIds.has(item.sourceQueueItemId)) ||
-        item.sourceQueueItemId === refreshingSelectedSourceId
-    );
-  }, [isFetchingBoardItems, localItems, optimisticQueueItemIds, selectedItem, shouldFollowLive]);
-  const localBoardItems = useMemo(
-    () =>
-      getOrderedLocalItems({
-        boardId: navigationBoardId,
-        galleryView: navigationGalleryView,
-        items: navigationLocalItems,
-        imageOrderDir: navigationOrderDir,
-        starredFirst: navigationStarredFirst,
-      }),
-    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir, navigationStarredFirst]
-  );
-  const previewLocalBoardItems = useMemo(() => {
-    if (
-      shouldFollowLive ||
-      !selectedItem ||
-      localBoardItems.some((item) => toGalleryItemKey(item) === selectedItemKey)
-    ) {
-      return localBoardItems;
-    }
-
-    return [selectedItem, ...localBoardItems];
-  }, [localBoardItems, selectedItem, selectedItemKey, shouldFollowLive]);
-  const backendBoardItems = useMemo(() => flattenPreviewItems(boardItemsData), [boardItemsData]);
-  const boardItems = useMemo(
-    () =>
-      !hasNavigationContext
-        ? EMPTY_PREVIEW_ITEMS
-        : mergePreviewBoardItems(backendBoardItems, previewLocalBoardItems, navigationOrderDir, navigationStarredFirst),
-    [backendBoardItems, hasNavigationContext, navigationOrderDir, navigationStarredFirst, previewLocalBoardItems]
-  );
-  const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const boardName = getBoardName(
     boards,
     displayBoardId,
     t('widgets.gallery.uncategorized'),
     t('widgets.gallery.unknownBoard')
   );
-  const navigationSequence = useMemo(
-    () =>
-      getPreviewNavigationSequence({
-        activePlaceholder: activeGalleryPlaceholder,
-        boardId: navigationBoardId,
-        boardImages: boardItems,
-        galleryView: navigationGalleryView,
-        imageOrderDir: navigationOrderDir,
-        starredFirst: navigationStarredFirst,
-      }),
-    [
-      activeGalleryPlaceholder,
-      boardItems,
-      navigationBoardId,
-      navigationGalleryView,
-      navigationOrderDir,
-      navigationStarredFirst,
-    ]
+
+  const enableLiveFollow = useCallback(
+    () => account.updateProjectPreferences({ showProgressImagesInViewer: true }),
+    [account]
   );
-  const navigationCursor = getPreviewNavigationCursor(navigationSequence, {
-    isFollowingLive: shouldFollowLive,
+  const selectGalleryItemAtPage = useCallback(
+    (item: GalleryItem, selectionPage: number) => gallery.selectItem(item, undefined, selectionPage, true),
+    [gallery]
+  );
+  const {
+    boardItems,
+    handleNavigationKeyDown,
+    isLoadingBoard,
+    navigate,
+    navigationCursor,
+    navigationQueryKey,
+    navigationSequence,
+    selectPreviewItem,
+  } = usePreviewNavigation({
+    activePlaceholder: activeGalleryPlaceholder,
+    enableLiveFollow,
+    imageOrderDir,
+    isComparing,
+    localItems,
+    queueItems,
+    selectGalleryItem: selectGalleryItemAtPage,
+    selectedImageQuery,
+    selectedItem,
     selectedItemKey,
+    shouldFollowLive,
+    starredFirst,
   });
-
-  // One navigation action shared by the arrow keys and the footer buttons.
-  // Compare mode stays inert and never exposes the placeholder.
-  const navigate = useCallback(
-    (offset: -1 | 1) => {
-      if (isComparing) {
-        return;
-      }
-
-      const target = getPreviewNavigationTarget(navigationSequence, navigationCursor, offset);
-      const isAtLoadedBackendBoundary =
-        selectedItemKey !== null &&
-        (offset === 1
-          ? backendBoardItems.at(-1) !== undefined &&
-            toGalleryItemKey(backendBoardItems.at(-1)!) === selectedItemKey &&
-            hasNextBoardItemsPage
-          : backendBoardItems[0] !== undefined &&
-            toGalleryItemKey(backendBoardItems[0]) === selectedItemKey &&
-            hasPreviousBoardItemsPage);
-
-      if (!isAtLoadedBackendBoundary) {
-        if (!target) {
-          return;
-        }
-
-        if (target.kind === 'item') {
-          selectPreviewItem(target.item);
-        } else {
-          account.updateProjectPreferences({ showProgressImagesInViewer: true });
-        }
-        return;
-      }
-
-      if (offset === 1 ? isFetchingNextBoardItemsPage : isFetchingPreviousBoardItemsPage) {
-        return;
-      }
-
-      const fetchBoundaryPage = offset === 1 ? fetchNextBoardItemsPage : fetchPreviousBoardItemsPage;
-
-      void fetchBoundaryPage().then((result) => {
-        if (result.isError || navigationContextKeyRef.current !== navigationContextKey) {
-          return;
-        }
-
-        const nextBackendBoardItems = flattenPreviewItems(result.data);
-        const nextBoardItems = mergePreviewBoardItems(
-          nextBackendBoardItems,
-          previewLocalBoardItems,
-          navigationOrderDir,
-          navigationStarredFirst
-        );
-        const nextNavigationSequence = getPreviewNavigationSequence({
-          activePlaceholder: activeGalleryPlaceholder,
-          boardId: navigationBoardId,
-          boardImages: nextBoardItems,
-          galleryView: navigationGalleryView,
-          imageOrderDir: navigationOrderDir,
-          starredFirst: navigationStarredFirst,
-        });
-        const nextNavigationCursor = getPreviewNavigationCursor(nextNavigationSequence, {
-          isFollowingLive: shouldFollowLive,
-          selectedItemKey,
-        });
-        const nextTarget = getPreviewNavigationTarget(nextNavigationSequence, nextNavigationCursor, offset);
-
-        if (nextTarget?.kind === 'item') {
-          selectPreviewItem(nextTarget.item);
-        } else if (nextTarget?.kind === 'placeholder') {
-          account.updateProjectPreferences({ showProgressImagesInViewer: true });
-        }
-      });
-    },
-    [
-      account,
-      activeGalleryPlaceholder,
-      backendBoardItems,
-      fetchNextBoardItemsPage,
-      fetchPreviousBoardItemsPage,
-      hasNextBoardItemsPage,
-      hasPreviousBoardItemsPage,
-      isComparing,
-      isFetchingNextBoardItemsPage,
-      isFetchingPreviousBoardItemsPage,
-      navigationBoardId,
-      navigationContextKey,
-      navigationCursor,
-      navigationGalleryView,
-      navigationOrderDir,
-      navigationSequence,
-      navigationStarredFirst,
-      previewLocalBoardItems,
-      selectedItemKey,
-      selectPreviewItem,
-      shouldFollowLive,
-    ]
-  );
-
-  const handleNavigationKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.target instanceof Element && event.target.closest('video')) {
-        return;
-      }
-
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
-        return;
-      }
-
-      if (isComparing) {
-        return;
-      }
-
-      // stopPropagation keeps the widget hotkey runtime from handling the same
-      // arrow press a second time.
-      event.preventDefault();
-      event.stopPropagation();
-      navigate(event.key === 'ArrowLeft' ? -1 : 1);
-    },
-    [isComparing, navigate]
-  );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
   const getItemActionContext = useCallback(
@@ -793,22 +457,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
-  // Warm the browser cache for the sequence neighbors so arrow-key navigation
-  // swaps without a decode flash.
-  const previousNeighbor = navigationSequence[navigationCursor - 1];
-  const nextNeighbor = navigationSequence[navigationCursor + 1];
-  const previousNeighborUrl =
-    previousNeighbor?.kind === 'item' && previousNeighbor.item.kind === 'image' ? previousNeighbor.item.fullUrl : null;
-  const nextNeighborUrl =
-    nextNeighbor?.kind === 'item' && nextNeighbor.item.kind === 'image' ? nextNeighbor.item.fullUrl : null;
-
-  useEffect(() => {
-    [previousNeighborUrl, nextNeighborUrl].forEach((url) => {
-      if (url) {
-        new Image().src = url;
-      }
-    });
-  }, [nextNeighborUrl, previousNeighborUrl]);
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'viewer.toggleViewer') {
       runtime.workbench.closeWidgetInstance(runtime.instanceId);
