@@ -1,14 +1,12 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop */
+import type { ProjectRecordDTO } from '@workbench/projects/api';
+
 import { Skeleton, Stack, Text } from '@chakra-ui/react';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import { LAUNCHPAD_READY_MARK, markSemanticReady } from '@platform/performance/semanticReady';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
-import { Button, toaster } from '@platform/ui';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { Button } from '@platform/ui';
 import { PageShell } from '@platform/ui/PageShell';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { IntentTiles } from '@workbench/launchpad/home/IntentTiles';
@@ -19,7 +17,7 @@ import { KnownBrowserIssuesAlert } from '@workbench/launchpad/KnownBrowserIssues
 import { prunePinnedProjects, toggleProjectPinPreference } from '@workbench/launchpad/projects/projectPins';
 import { getProjectLibrary, refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { refreshOpenProjects } from '@workbench/projects/openProjects';
-import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { useImportProjectFile } from '@workbench/projects/useProjectFileActions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { FileUpIcon, PlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -65,33 +63,13 @@ export const HomePage = () => {
     ? t('launchpad.projectsGreetingWithName', { name: displayName })
     : t('launchpad.projectsGreeting');
 
-  const handleImport = useCallback(async () => {
-    const owner = captureAccountScope();
-    const file = await pickProjectFile(owner);
-
-    if (!file || !isAccountScopeCurrent(owner)) {
-      return;
-    }
-
-    try {
-      const record = await importProjectFile(file, owner);
-
-      assertAccountScopeCurrent(owner);
+  const openImportedProject = useCallback(
+    async (record: ProjectRecordDTO) => {
       await navigate({ search: { project: record.project_id }, to: '/app' });
-      assertAccountScopeCurrent(owner);
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      toaster.create({
-        description: error instanceof Error ? error.message : undefined,
-        title: t('projects.importFailed'),
-        type: 'error',
-      });
-    }
-  }, [navigate, t]);
-  const handleImportClick = useCallback(() => void handleImport(), [handleImport]);
+    },
+    [navigate]
+  );
+  const handleImportClick = useImportProjectFile(openImportedProject);
 
   const isFirstLoad = summaries.length === 0 && (status === 'idle' || status === 'loading');
   const [mostRecent, ...rest] = summaries;

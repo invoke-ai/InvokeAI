@@ -150,6 +150,48 @@ class TestDeleteAtomicity:
         invoker.services.video_files.commit_delete.assert_not_called()
 
 
+class TestCopy:
+    def test_copy_preserves_provenance_and_removes_an_identity_that_missed_its_board(
+        self, video_service: VideoService
+    ) -> None:
+        """The service owns fidelity and compensation, so no caller can leak or consume an identity."""
+        record = MagicMock(
+            duration=2.5,
+            fps=24.0,
+            height=480,
+            video_category=ImageCategory.GENERAL,
+            video_origin=ResourceOrigin.INTERNAL,
+            width=640,
+        )
+        created = MagicMock(board_id=None, video_name="copy-001.mp4")
+        metadata = MagicMock()
+        metadata.model_dump_json.return_value = '{"seed": 12345}'
+        video_service.get_record = MagicMock(return_value=record)  # type: ignore[method-assign]
+        video_service.get_metadata = MagicMock(return_value=metadata)  # type: ignore[method-assign]
+        video_service.get_path = MagicMock(return_value="/missing/source.mp4")  # type: ignore[method-assign]
+        video_service.get_workflow = MagicMock(return_value="{}")  # type: ignore[method-assign]
+        video_service.get_graph = MagicMock(return_value=None)  # type: ignore[method-assign]
+        video_service.create = MagicMock(return_value=created)  # type: ignore[method-assign]
+        video_service.delete = MagicMock()  # type: ignore[method-assign]
+
+        with pytest.raises(RuntimeError, match="did not reach board"):
+            video_service.copy("src.mp4", board_id="required", user_id="u1")
+
+        video_service.delete.assert_called_once_with("copy-001.mp4")
+        create_args = video_service.create.call_args.kwargs
+        assert (create_args["width"], create_args["height"], create_args["duration"], create_args["fps"]) == (
+            640,
+            480,
+            2.5,
+            24.0,
+        )
+        assert create_args["video_category"] == ImageCategory.GENERAL
+        assert create_args["video_origin"] == ResourceOrigin.INTERNAL
+        assert create_args["metadata"] == '{"seed": 12345}'
+        assert create_args["workflow"] == "{}"
+        assert create_args["move_source"] is False
+
+
 class TestCreateRollback:
     """Per JPPhoto's PR review (May 22 follow-up): if the video file save fails after the DB
     record has been written, the create path must roll back the record (and any board

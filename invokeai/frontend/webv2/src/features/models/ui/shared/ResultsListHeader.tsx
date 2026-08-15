@@ -25,7 +25,7 @@ export const ResultsListHeader = ({
 }: {
   extra?: ReactNode;
   installAllDisabled: boolean;
-  installAllLabel?: string;
+  installAllLabel: string;
   onClear: () => void;
   onInstallAll: () => void;
   onSearchChange: (value: string) => void;
@@ -34,7 +34,6 @@ export const ResultsListHeader = ({
   summary: ReactNode;
 }) => {
   const { t } = useTranslation();
-  const resolvedInstallAllLabel = installAllLabel ?? t('models.installAll');
   const resolvedSearchPlaceholder = searchPlaceholder ?? t('models.filterResults');
   const handleSearchChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => onSearchChange(event.currentTarget.value),
@@ -66,7 +65,7 @@ export const ResultsListHeader = ({
         </InputGroup>
         <Button disabled={installAllDisabled} flexShrink={0} size="xs" variant="outline" onClick={onInstallAll}>
           <Icon as={DownloadIcon} boxSize="3" />
-          {resolvedInstallAllLabel}
+          {installAllLabel}
         </Button>
       </HStack>
     </Stack>

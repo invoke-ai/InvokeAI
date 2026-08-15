@@ -27,6 +27,33 @@ export const QueueRuntimeAdapter = () => {
           await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
           assertAccountScopeCurrent(owner);
         },
+        addVideosToGalleryBoard: async (boardId, videoNames) => {
+          assertAccountScopeCurrent(owner);
+          const { galleryItemOrganization, isGalleryBoardAttachable } = await import('@features/gallery');
+
+          // Virtual destinations (date buckets, `generated`/`assets`) cannot hold
+          // attachments: the transport no-ops for them, which would otherwise read
+          // back as every video failing. The image path ignores this the same way.
+          if (!isGalleryBoardAttachable(boardId)) {
+            return;
+          }
+
+          assertAccountScopeCurrent(owner);
+          const result = await galleryItemOrganization.moveToBoard(
+            videoNames.map((name) => ({ kind: 'video' as const, name })),
+            boardId,
+            owner.signal
+          );
+          assertAccountScopeCurrent(owner);
+          // The video transport confirms per item and never throws on non-fatal errors;
+          // surface unconfirmed refs so the queue runtime can record the failure instead
+          // of leaving the videos silently in Uncategorized (e.g. board deleted mid-run).
+          if (result.failed.length > 0) {
+            throw new Error(
+              `${result.failed.length} of ${videoNames.length} video(s) could not be added to the board.`
+            );
+          }
+        },
       },
       ensureTemplatesLoaded: ensureInvocationTemplatesLoaded,
       history: {

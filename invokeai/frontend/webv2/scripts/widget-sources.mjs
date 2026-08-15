@@ -11,6 +11,7 @@ export const WIDGET_SOURCES = new Map([
   ['src/workbench/widgets/autosave-status/implementation.ts', 'autosave-status'],
   ['src/workbench/widgets/canvas/implementation.ts', 'canvas'],
   ['src/workbench/widgets/diagnostics/implementation.ts', 'diagnostics'],
+  ['src/workbench/widgets/image-map/implementation.ts', 'image-map'],
   ['src/workbench/widgets/layers/implementation.ts', 'layers'],
   ['src/workbench/widgets/notifications/implementation.ts', 'notifications'],
   ['src/workbench/widgets/preview/implementation.ts', 'preview'],

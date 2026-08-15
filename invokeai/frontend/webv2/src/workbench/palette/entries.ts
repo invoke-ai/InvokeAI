@@ -229,6 +229,7 @@ export const buildCatalogCommandEntries = ({
   formatHotkey,
   presentWidgetTypeIds,
   t,
+  titleOverrides,
 }: {
   catalog: readonly HotkeyDefinition[];
   customHotkeys: CustomHotkeys;
@@ -236,6 +237,7 @@ export const buildCatalogCommandEntries = ({
   formatHotkey: (key: string) => string[];
   presentWidgetTypeIds: ReadonlySet<string>;
   t: TFunction;
+  titleOverrides?: Readonly<Record<string, string>>;
 }): PaletteEntry[] =>
   catalog
     .filter((definition) => definition.implemented !== false && !PALETTE_HIDDEN_COMMANDS.has(definition.commandId))
@@ -261,9 +263,11 @@ export const buildCatalogCommandEntries = ({
         keywords: widgetGroup?.group,
         run: () => execute(definition.commandId),
         showInEmptyState: rawGroup === 'Navigation',
-        title: t(`commandPalette.commands.${definition.commandId.replace('.', '_')}`, {
-          defaultValue: TITLE_OVERRIDES[definition.commandId] ?? definition.title,
-        }),
+        title:
+          titleOverrides?.[definition.commandId] ??
+          t(`commandPalette.commands.${definition.commandId.replace('.', '_')}`, {
+            defaultValue: TITLE_OVERRIDES[definition.commandId] ?? definition.title,
+          }),
       };
     });
 
