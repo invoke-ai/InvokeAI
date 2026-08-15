@@ -17,7 +17,7 @@ import {
 } from '@features/gallery/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import type { PreviewNavigationItem } from './previewNavigation';
 
@@ -166,12 +166,15 @@ export const usePreviewNavigation = ({
 
   // Lets a boundary fetch that resolves after the user has moved on compare the
   // context it started in against the one now on screen, and drop its stale
-  // result. Written from an effect rather than during render: the compiler
-  // rejects render-phase ref writes, and an effect event cannot be called from
-  // a promise continuation.
+  // result. Written from a LAYOUT effect: layout effects run synchronously
+  // inside the commit, so no promise continuation can observe the new UI with
+  // the old key — a passive effect leaves a post-paint gap where exactly that
+  // interleaving happens. (Render-phase ref writes are rejected by the
+  // compiler, and an effect event cannot be called from a promise
+  // continuation.)
   const navigationContextKeyRef = useRef(navigationContextKey);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     navigationContextKeyRef.current = navigationContextKey;
   }, [navigationContextKey]);
 
