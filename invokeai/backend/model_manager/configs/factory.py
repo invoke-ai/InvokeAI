@@ -122,6 +122,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
 )
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
+    Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
@@ -380,6 +381,10 @@ AnyModelConfig = Annotated[
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
         # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
+        # MiniMax H3's truncated 32B conditioning encoder goes first: it matches on explicit
+        # safetensors metadata without reading tensors, and the Krea-2 config below is locked to
+        # the 4B shape so neither can claim the other's files.
+        Annotated[Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config, Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Checkpoint_Config, Qwen3VLEncoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
         # Qwen3 Encoder

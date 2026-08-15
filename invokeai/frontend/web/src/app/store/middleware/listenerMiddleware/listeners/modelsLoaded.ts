@@ -45,10 +45,10 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
+  isKrea2Qwen3VLEncoderModelConfig,
   isLoRAModelConfig,
   isNonFluxVAEModelConfig,
   isNonRefinerMainModelConfig,
-  isQwen3VLEncoderModelConfig,
   isQwenImageVAEModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
@@ -115,7 +115,7 @@ export const handleKrea2Components: ModelHandler = (models, state, dispatch) => 
     selectedEncoder: state.params.krea2Qwen3VlEncoderModel,
     availableQwenImageVaes: models.filter((model) => isQwenImageVAEModelConfig(model)),
     availableAnimaVaes: models.filter((model) => isAnimaVAEModelConfig(model)),
-    availableEncoders: models.filter(isQwen3VLEncoderModelConfig),
+    availableEncoders: models.filter(isKrea2Qwen3VLEncoderModelConfig),
   });
   if ('vae' in updates) {
     dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));

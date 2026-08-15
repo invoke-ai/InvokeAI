@@ -1485,7 +1485,9 @@
         "settingsImportedPartial": "Model settings partially imported. Incompatible settings were skipped: {{fields}}",
         "settingsImportFailed": "Failed to import model settings",
         "settingsImportIncompatible": "The settings file contains no compatible settings for this model type",
-        "settingsImportInvalidFile": "Invalid settings file"
+        "settingsImportInvalidFile": "Invalid settings file",
+        "minimaxH3TextEncoderModel": "Text Encoder (single file)",
+        "minimaxH3TextEncoderModelPlaceholder": "Folder text encoder (default)"
     },
     "models": {
         "addLora": "Add LoRA",
