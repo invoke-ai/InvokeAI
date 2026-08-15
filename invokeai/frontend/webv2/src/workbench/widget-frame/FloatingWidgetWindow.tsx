@@ -24,7 +24,10 @@ import {
 } from 'lucide-react';
 import {
   useCallback,
+  useEffect,
+  useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
@@ -35,6 +38,8 @@ import { areWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
 /** Below Chakra dialogs/popovers/toasts; above the docked shell. */
 const FLOATING_BASE_Z_INDEX = 800;
+/** Keyboard step for moving and resizing, matching the panel resize handles. */
+const FLOATING_STEP_PX = 16;
 
 /**
  * One detached widget window: fixed-position chrome with a draggable title
@@ -72,12 +77,22 @@ export const FloatingWidgetWindow = ({
     [instanceId, widgets]
   );
 
+  const pointerSessionRef = useRef<AbortController | null>(null);
+
+  // A drag can outlive the window — docking from a command, an applied preset,
+  // or a project switch all unmount mid-gesture — and window-level listeners
+  // would then stay bound for the rest of the session.
+  useEffect(() => () => pointerSessionRef.current?.abort(), []);
+
   const beginPointerOperation = useCallback(
     (
       event: ReactPointerEvent<HTMLDivElement>,
       apply: (deltaX: number, deltaY: number, start: FloatingGeometry) => FloatingGeometry
     ) => {
       event.preventDefault();
+      // Capture keeps the gesture addressed to this window even when the
+      // pointer crosses an iframe or another window's chrome.
+      event.currentTarget.setPointerCapture(event.pointerId);
 
       const startX = event.clientX;
       const startY = event.clientY;
@@ -85,15 +100,28 @@ export const FloatingWidgetWindow = ({
       let next = start;
       const pointerSession = new AbortController();
 
-      const handlePointerMove = (moveEvent: PointerEvent) => {
-        next = apply(moveEvent.clientX - startX, moveEvent.clientY - startY, start);
-        setDragGeometry(next);
-      };
+      pointerSessionRef.current?.abort();
+      pointerSessionRef.current = pointerSession;
 
       const handlePointerUp = () => {
         pointerSession.abort();
+        pointerSessionRef.current = null;
         setDragGeometry(null);
         commitGeometry(next);
+      };
+
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        // Releasing the button over another application swallows `pointerup`,
+        // and the window would then follow the cursor with nothing held. The
+        // first move that arrives with no button down ends the drag instead.
+        if (moveEvent.buttons === 0) {
+          handlePointerUp();
+
+          return;
+        }
+
+        next = apply(moveEvent.clientX - startX, moveEvent.clientY - startY, start);
+        setDragGeometry(next);
       };
 
       window.addEventListener('pointermove', handlePointerMove, { signal: pointerSession.signal });
@@ -129,6 +157,56 @@ export const FloatingWidgetWindow = ({
     [beginPointerOperation]
   );
 
+  // Pointer gestures are not the only way to place a window: without these the
+  // keyboard can shade, maximize and dock a floated widget but never move or
+  // resize it. Stepping mirrors the panel resize handles in `WidgetFrames`.
+  const handleTitleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? FLOATING_STEP_PX * 2 : FLOATING_STEP_PX;
+      const offsets: Partial<Record<string, [number, number]>> = {
+        ArrowDown: [0, step],
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+      };
+      const offset = offsets[event.key];
+
+      if (!offset || state.mode === 'maximized') {
+        return;
+      }
+
+      event.preventDefault();
+      commitGeometry({ ...state, x: state.x + offset[0], y: state.y + offset[1] });
+    },
+    [commitGeometry, state]
+  );
+
+  const handleResizeKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? FLOATING_STEP_PX * 2 : FLOATING_STEP_PX;
+      const offsets: Partial<Record<string, [number, number]>> = {
+        ArrowDown: [0, step],
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        Home: [FLOATING_MIN_WIDTH_PX - state.widthPx, FLOATING_MIN_HEIGHT_PX - state.heightPx],
+      };
+      const offset = offsets[event.key];
+
+      if (!offset) {
+        return;
+      }
+
+      event.preventDefault();
+      commitGeometry({
+        ...state,
+        heightPx: Math.max(FLOATING_MIN_HEIGHT_PX, state.heightPx + offset[1]),
+        widthPx: Math.max(FLOATING_MIN_WIDTH_PX, state.widthPx + offset[0]),
+      });
+    },
+    [commitGeometry, state]
+  );
+
   const handleFocus = useCallback(() => widgets.focusFloating(instanceId), [instanceId, widgets]);
   // Docking remounts the widget in its rail. The draft registry's cleanup only
   // deregisters the flusher, so an uncommitted edit needs committing first —
@@ -156,16 +234,20 @@ export const FloatingWidgetWindow = ({
     [handleToggleShade, state.mode]
   );
 
-  if (!instance || !widget) {
+  if (!instance) {
     return null;
   }
 
-  // A widget that fails registration while floated keeps its chrome. Rendering
-  // nothing would strand the instance: it is in no region, so the dock control
-  // in this title bar is the only way back to the rail — and to the docked
-  // failure card, which owns the retry.
-  const isEnabled = widget.status === 'enabled';
-  const label = resolveWidgetInstanceLabel(instance, widget.manifest, t);
+  // A floated widget that fails registration — or whose type has gone from the
+  // registry entirely in a later build — keeps its chrome. Rendering nothing
+  // would strand the instance: it is in no region, so the dock control in this
+  // title bar is the only way back to the rail, and to the docked failure card
+  // that owns the retry. This is why a `hidden` widget still shows a window
+  // here while `getWidgetsForRegion` keeps it out of the rails: a rail the
+  // widget is missing from is merely tidy, a window it is missing from is a
+  // widget the person cannot reach.
+  const isEnabled = widget?.status === 'enabled';
+  const label = widget ? resolveWidgetInstanceLabel(instance, widget.manifest, t) : (instance.title ?? instance.id);
   const geometry = dragGeometry ?? state;
   const isMaximized = state.mode === 'maximized';
   const isShaded = state.mode === 'shaded';
@@ -196,6 +278,7 @@ export const FloatingWidgetWindow = ({
       {...positionProps}
     >
       <HStack
+        aria-label={t('widgets.floating.move', { label })}
         borderBottomWidth={isShaded ? 0 : '1px'}
         cursor={isMaximized ? 'default' : 'move'}
         flexShrink={0}
@@ -204,15 +287,17 @@ export const FloatingWidgetWindow = ({
         justify="space-between"
         pe="2"
         ps="3"
+        tabIndex={isMaximized ? undefined : 0}
         // `preventDefault` on pointerdown does not stop touch panning: without
         // this the browser claims the gesture and cancels the drag.
         touchAction="none"
         userSelect="none"
         onDoubleClick={handleTitleDoubleClick}
+        onKeyDown={handleTitleKeyDown}
         onPointerDown={handleTitlePointerDown}
       >
         <HStack flex="1" gap="1.5" minW="0">
-          <WidgetIcon boxSize="4" icon={widget.manifest.icon} />
+          {widget ? <WidgetIcon boxSize="4" icon={widget.manifest.icon} /> : null}
           <Text fontSize="xs" fontWeight="700" truncate>
             {label}
           </Text>
@@ -255,7 +340,7 @@ export const FloatingWidgetWindow = ({
       </HStack>
       {isShaded ? null : (
         <Flex direction="column" flex="1" minH="0" overflow="hidden">
-          {isEnabled ? (
+          {isEnabled && widget ? (
             <WidgetRendererById instanceId={instance.id} region="floating" widget={widget} />
           ) : (
             <HStack color="fg.error" gap="1.5" p="3">
@@ -268,13 +353,18 @@ export const FloatingWidgetWindow = ({
       {isShaded || isMaximized ? null : (
         <Box
           aria-label={t('widgets.floating.resize')}
+          aria-valuemin={FLOATING_MIN_WIDTH_PX}
+          aria-valuenow={geometry.widthPx}
           bottom="0"
           cursor="nwse-resize"
           h="4"
           position="absolute"
           right="0"
+          role="separator"
+          tabIndex={0}
           touchAction="none"
           w="4"
+          onKeyDown={handleResizeKeyDown}
           onPointerDown={handleResizePointerDown}
         />
       )}

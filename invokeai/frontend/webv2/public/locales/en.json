@@ -1373,6 +1373,7 @@
       "dock": "Dock to panel",
       "floatWindow": "Float Window",
       "maximize": "Maximize",
+      "move": "Move {{label}} window",
       "resize": "Resize window",
       "restore": "Restore",
       "shade": "Shade",

@@ -166,6 +166,25 @@ describe('geometry, mode, and stacking actions', () => {
     expect(repeat).toBe(state);
   });
 
+  it('keeps stack orders compact instead of climbing on every raise', () => {
+    let state = floatGallery();
+    state = workbenchReducer(state, { instanceId: 'queue', type: 'floatWidget' });
+
+    for (const instanceId of ['gallery', 'queue', 'gallery', 'queue', 'gallery']) {
+      state = workbenchReducer(state, { instanceId, type: 'focusFloatingWidget' });
+    }
+
+    const floating = getActiveProject(state).floatingWidgets;
+
+    // Two windows, so two orders — no matter how many times they trade places.
+    expect(
+      Object.values(floating ?? {})
+        .map((window) => window.stackOrder)
+        .sort()
+    ).toEqual([1, 2]);
+    expect(floating?.gallery.stackOrder).toBe(2);
+  });
+
   it('focus raises a window to the top and no-ops when already topmost', () => {
     let state = floatGallery();
     state = workbenchReducer(state, { instanceId: 'queue', type: 'floatWidget' });

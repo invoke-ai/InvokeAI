@@ -3419,13 +3419,22 @@ export const __workbenchReducerInternal = (
           return project;
         }
 
-        return {
-          ...project,
-          floatingWidgets: {
-            ...project.floatingWidgets,
-            [action.instanceId]: { ...floating, stackOrder: topOrder + 1 },
-          },
-        };
+        // Renumbered to a compact 1..N rather than appended above the current
+        // top. `stackOrder` is persisted, so a counter that only ever climbs
+        // writes ever-larger numbers into the document for what is really a
+        // reordering of the same few windows.
+        const below = Object.entries(project.floatingWidgets ?? {})
+          .filter(([instanceId]) => instanceId !== action.instanceId)
+          .sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
+        const floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> = {};
+
+        for (const [instanceId, windowState] of below) {
+          floatingWidgets[instanceId] = { ...windowState, stackOrder: Object.keys(floatingWidgets).length + 1 };
+        }
+
+        floatingWidgets[action.instanceId] = { ...floating, stackOrder: below.length + 1 };
+
+        return { ...project, floatingWidgets };
       });
     }
     case 'moveWidgetInstance': {
