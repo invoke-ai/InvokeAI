@@ -1375,7 +1375,6 @@
     "resizePanel": "Resize {{region}} widget panel",
     "settingsLabel": "{{label}} settings",
     "visibilityLabel": "{{region}} widget visibility",
-    "groupLabel": "Widgets",
     "rail": {
       "create": "Create",
       "inspect": "Inspect",

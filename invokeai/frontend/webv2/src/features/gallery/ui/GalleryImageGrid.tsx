@@ -373,10 +373,13 @@ export const GalleryImageGrid = () => {
               onChange={handleUploadFileChange}
             />
             <DropZone
+              alignItems="center"
               cursor="pointer"
+              display="flex"
               flex="1"
               fontSize="xs"
               isOver={isDropActive}
+              justifyContent="center"
               role="button"
               tabIndex={0}
               onClick={openUploadPicker}
