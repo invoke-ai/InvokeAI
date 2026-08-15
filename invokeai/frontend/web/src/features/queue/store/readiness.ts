@@ -251,6 +251,42 @@ export const useReadinessWatcher = () => {
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
+const WAN_A14B_VARIANTS = ['t2v_a14b', 'i2v_a14b'];
+
+/** Pre-flight for single-file Wan mains, shared by the generate and canvas tabs so the
+ *  two can't drift. Mirrors what `WanModelLoaderInvocation` actually enforces.
+ *
+ *  Keep in step with the auto-fill in `modelSelected.ts`: if that doesn't offer to
+ *  populate the slots this demands, selecting the model just blocks Invoke with
+ *  nothing the user can act on. */
+const pushWanSingleFileReasons = (model: MainOrExternalModelConfig, params: ParamsState, reasons: Reason[]): void => {
+  // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the transformer;
+  // VAE + UMT5-XXL encoder must come from standalone models or the Component Source.
+  const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+  const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+  if (!hasVaeSource || !hasEncoderSource) {
+    reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
+  }
+
+  // The A14B MoE pair. An unpaired A14B is only accepted when it is the *high*-noise
+  // expert — that case degrades to "high expert runs the whole schedule" with a warning.
+  // `expert` of 'low' or 'none' with nothing wired to the low-noise slot is a hard
+  // ValueError in the loader, so it has to block here rather than fail at generation
+  // time. ('none' is common: the tag is a filename heuristic, and there is no UI to
+  // correct it.) Revisit if the loader adopts wiring-first pairing — see #9505, which
+  // would make 'none' resolvable from the wiring instead of an error.
+  const variant = 'variant' in model ? model.variant : undefined;
+  const expert = 'expert' in model ? model.expert : undefined;
+  if (
+    typeof variant === 'string' &&
+    WAN_A14B_VARIANTS.includes(variant) &&
+    expert !== 'high' &&
+    !params.wanTransformerLowNoise
+  ) {
+    reasons.push({ content: i18n.t('parameters.invoke.noWanLowNoiseExpertSelected') });
+  }
+};
+
 export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainOrExternalModelConfig | null | undefined;
@@ -403,19 +439,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   if (model && isWanSingleFileMainModelConfig(model)) {
-    // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the
-    // transformer; VAE + UMT5-XXL encoder must come from either standalone models
-    // or the Component Source (Diffusers). Keep this in step with the auto-fill in
-    // modelSelected.ts: if that doesn't offer to populate the slots for a format
-    // this demands them for, selecting the model just blocks Invoke.
-    // The low-noise A14B partner expert is optional — if omitted, the loader
-    // will use the high-noise expert for the whole schedule (lower quality
-    // but still produces an image).
-    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
-    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
-    if (!hasVaeSource || !hasEncoderSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
-    }
+    pushWanSingleFileReasons(model, params, reasons);
   }
 
   if (model?.base === 'z-image') {
@@ -1161,19 +1185,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model && isWanSingleFileMainModelConfig(model)) {
-    // Single-file Wan mains (GGUF or safetensors checkpoint) carry only the
-    // transformer; VAE + UMT5-XXL encoder must come from either standalone models
-    // or the Component Source (Diffusers). Keep this in step with the auto-fill in
-    // modelSelected.ts: if that doesn't offer to populate the slots for a format
-    // this demands them for, selecting the model just blocks Invoke.
-    // The low-noise A14B partner expert is optional — if omitted, the loader
-    // will use the high-noise expert for the whole schedule (lower quality
-    // but still produces an image).
-    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
-    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
-    if (!hasVaeSource || !hasEncoderSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
-    }
+    pushWanSingleFileReasons(model, params, reasons);
   }
 
   if (model?.base === 'z-image') {

@@ -642,13 +642,18 @@ export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is
  *  A14B expert, and the VAE + UMT5-XXL encoder have to come from somewhere else.
  *  Anything gating on that property must use this, not a bare `=== 'gguf_quantized'`
  *  — the two formats are interchangeable here and drifting apart has bitten us. */
-export const WAN_SINGLE_FILE_FORMATS = ['gguf_quantized', 'checkpoint'] as const;
+const WAN_SINGLE_FILE_FORMATS = ['gguf_quantized', 'checkpoint'] as const;
 
-export const isWanSingleFileMainModelConfig = (config: { base?: string; type?: string; format?: string }): boolean => {
+export const isWanSingleFileMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  // Takes AnyModelConfig, not a structural `{base?; type?; format?}`. An all-optional
+  // parameter type is a *weak type*, which TypeScript satisfies with any object sharing
+  // one property name — so `ModelIdentifierField` (base + type, no format) would compile
+  // and silently return false, disabling every gate below it. The bare
+  // `format === 'gguf_quantized'` this replaced was at least a compile error there.
   return (
     config.type === 'main' &&
     config.base === 'wan' &&
-    WAN_SINGLE_FILE_FORMATS.includes(config.format as (typeof WAN_SINGLE_FILE_FORMATS)[number])
+    (WAN_SINGLE_FILE_FORMATS as readonly string[]).includes(config.format)
   );
 };
 

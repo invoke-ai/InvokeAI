@@ -1855,12 +1855,21 @@ def _detect_wan_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Wan
     shape = _wan_patch_embedding_shape(state_dict)
     if shape is None or len(shape) < 2:
         return None
-    in_channels = shape[1]
-    if in_channels == 16:
+    inner_dim, in_channels = shape[0], shape[1]
+
+    # in_channels alone is ambiguous outside the three supported releases: the wider
+    # Wan family reuses these channel counts at other widths (Fun-Control-14B is
+    # 48-channel but 5120-wide, i.e. A14B-sized, not TI2V-5B). Require the width to
+    # agree, so a derivative we don't support falls through to None rather than being
+    # mislabelled — a wrong variant pins `expert`, picks the wrong default settings,
+    # and hides the low-noise partner picker.
+    #
+    # A14B is uniquely 5120-wide and TI2V-5B uniquely 3072-wide across Wan 2.2.
+    if in_channels == 16 and inner_dim == 5120:
         return WanVariantType.T2V_A14B
-    if in_channels == 36:
+    if in_channels == 36 and inner_dim == 5120:
         return WanVariantType.I2V_A14B
-    if in_channels == 48:
+    if in_channels == 48 and inner_dim == 3072:
         return WanVariantType.TI2V_5B
     return None
 

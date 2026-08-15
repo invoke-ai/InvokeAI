@@ -730,11 +730,45 @@ const wanDiffusersModel = {
   variant: 't2v_a14b',
 } as unknown as MainModelConfig;
 
+/** A14B checkpoint whose filename carried no high/low marker, so the probe recorded
+ *  expert='none'. Extremely common on community finetunes — the tag is a filename
+ *  heuristic and there is no UI to correct it. */
+const wanUntaggedA14bModel = {
+  key: 'wan-untagged',
+  hash: 'h',
+  name: 'wan2.2_t2v_A14B_fp8_e4m3fn',
+  base: 'wan',
+  type: 'main',
+  format: 'checkpoint',
+  variant: 't2v_a14b',
+  expert: 'none',
+} as unknown as MainModelConfig;
+
+const wanLowExpertModel = {
+  ...wanUntaggedA14bModel,
+  key: 'wan-low',
+  name: 'Wan2.2-T2V-A14B-LOW',
+  expert: 'low',
+} as unknown as MainModelConfig;
+
+/** TI2V-5B is single-transformer, so the A14B expert pairing does not apply to it. */
+const wanTi2v5bModel = {
+  key: 'wan-5b',
+  hash: 'h',
+  name: 'Wan2.2 TI2V 5B',
+  base: 'wan',
+  type: 'main',
+  format: 'checkpoint',
+  variant: 'ti2v_5b',
+  expert: 'none',
+} as unknown as MainModelConfig;
+
 const buildWanTabArg = (overrides: {
   model?: MainModelConfig | null;
   wanVaeModel?: unknown;
   wanT5EncoderModel?: unknown;
   wanComponentSource?: unknown;
+  wanTransformerLowNoise?: unknown;
 }) => ({
   isConnected: true,
   model: overrides.model ?? wanCheckpointModel,
@@ -743,6 +777,7 @@ const buildWanTabArg = (overrides: {
     wanVaeModel: overrides.wanVaeModel ?? null,
     wanT5EncoderModel: overrides.wanT5EncoderModel ?? null,
     wanComponentSource: overrides.wanComponentSource ?? null,
+    wanTransformerLowNoise: overrides.wanTransformerLowNoise ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
   loras: [],
@@ -752,8 +787,84 @@ const buildWanTabArg = (overrides: {
   hasFlux2DevDiffusersSource: false,
 });
 
+const buildWanCanvasArg = (overrides: Parameters<typeof buildWanTabArg>[0]) =>
+  ({
+    ...buildWanTabArg(overrides),
+    canvas: {
+      bbox: {
+        scaleMethod: 'none',
+        rect: { width: 1024, height: 1024 },
+        scaledSize: { width: 1024, height: 1024 },
+      },
+      controlLayers: { entities: [] },
+      regionalGuidance: { entities: [] },
+      rasterLayers: { entities: [] },
+      inpaintMasks: { entities: [] },
+    },
+    canvasIsFiltering: false,
+    canvasIsTransforming: false,
+    canvasIsRasterizing: false,
+    canvasIsCompositing: false,
+    canvasIsSelectingObject: false,
+  }) as never;
+
 const hasWanComponentReason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('noWanComponentSourceSelected'));
+
+const hasWanExpertReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('noWanLowNoiseExpertSelected'));
+
+// The A14B expert pre-flight. `WanModelLoaderInvocation` raises a hard ValueError for
+// an unpaired A14B main that isn't the high-noise expert, so readiness has to block it
+// rather than let the user hit it at generation time. Only expert='high' degrades
+// gracefully (high expert runs the whole schedule, with a warning).
+describe('Wan 2.2 A14B expert pre-flight', () => {
+  const withComponents = { wanComponentSource: { key: 'src' } };
+
+  it.each([
+    ['untagged (expert=none)', wanUntaggedA14bModel],
+    ['the low-noise expert', wanLowExpertModel],
+  ])('blocks an unpaired A14B main that is %s', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model, ...withComponents }));
+    expect(hasWanExpertReason(reasons)).toBe(true);
+  });
+
+  it.each([
+    ['untagged (expert=none)', wanUntaggedA14bModel],
+    ['the low-noise expert', wanLowExpertModel],
+  ])('allows %s once a low-noise partner is wired', (_label, model) => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model, ...withComponents, wanTransformerLowNoise: { key: 'partner' } })
+    );
+    expect(hasWanExpertReason(reasons)).toBe(false);
+  });
+
+  it('allows an unpaired A14B high-noise expert — it degrades with a warning, not an error', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanCheckpointModel, ...withComponents })
+    );
+    expect(hasWanExpertReason(reasons)).toBe(false);
+  });
+
+  it('does not apply to TI2V-5B, which is single-transformer', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(buildWanTabArg({ model: wanTi2v5bModel, ...withComponents }));
+    expect(hasWanExpertReason(reasons)).toBe(false);
+  });
+
+  it('does not apply to a Diffusers main, which carries both experts', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanDiffusersModel, ...withComponents })
+    );
+    expect(hasWanExpertReason(reasons)).toBe(false);
+  });
+
+  it('also runs on the canvas tab', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildWanCanvasArg({ model: wanUntaggedA14bModel, ...withComponents })
+    );
+    expect(hasWanExpertReason(reasons)).toBe(true);
+  });
+});
 
 describe('Wan 2.2 readiness checks – generate tab', () => {
   it.each([
@@ -799,25 +910,7 @@ describe('Wan 2.2 readiness checks – canvas tab', () => {
     ['GGUF', wanGgufModel],
     ['single-file checkpoint', wanCheckpointModel],
   ])('errors when a %s main has no VAE or encoder source', (_label, model) => {
-    const reasons = getReasonsWhyCannotEnqueueCanvasTab({
-      ...buildWanTabArg({ model }),
-      canvas: {
-        bbox: {
-          scaleMethod: 'none',
-          rect: { width: 1024, height: 1024 },
-          scaledSize: { width: 1024, height: 1024 },
-        },
-        controlLayers: { entities: [] },
-        regionalGuidance: { entities: [] },
-        rasterLayers: { entities: [] },
-        inpaintMasks: { entities: [] },
-      },
-      canvasIsFiltering: false,
-      canvasIsTransforming: false,
-      canvasIsRasterizing: false,
-      canvasIsCompositing: false,
-      canvasIsSelectingObject: false,
-    } as never);
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildWanCanvasArg({ model }));
     expect(hasWanComponentReason(reasons)).toBe(true);
   });
 });

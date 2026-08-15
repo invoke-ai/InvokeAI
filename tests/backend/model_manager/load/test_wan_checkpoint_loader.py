@@ -206,6 +206,57 @@ class TestEndToEnd:
         with pytest.raises(RuntimeError, match="control_adapter"):
             _load(path)
 
+    def test_all_in_one_bundled_components_are_dropped_not_refused(self, tmp_path: Path) -> None:
+        """The "all-in-one" packaging convention bundles transformer + VAE + CLIP in one
+        file so ComfyUI's `Load Checkpoint` node can supply all three.
+        Phr00t/WAN2.2-14B-Rapid-AllInOne and its ~110 GGUF conversions
+        (befox/WAN2.2-14B-Rapid-AllInOne-GGUF) ship this way.
+
+        These loaded fine before the unexpected-key backstop existed — InvokeAI sources
+        the VAE and encoder from separately-wired models and simply ignores the bundled
+        copies — so refusing them is a regression, not a safety check.
+        """
+        sd = _tiny_model().state_dict()
+        sd["vae.decoder.conv_in.weight"] = torch.zeros(96, 16, 3, 3)
+        sd["text_encoders.umt5xxl.shared.weight"] = torch.zeros(256, 32)
+        sd["model_ema.patch_embedding.weight"] = torch.zeros(128, 16, 1, 2, 2)
+        path = tmp_path / "wan2.2-t2v-rapid-aio-v10-high_noise.safetensors"
+        save_file(sd, path)
+
+        model = _load(path)
+        # The transformer itself still loaded, and none of the bundled weights reached it.
+        assert not hasattr(model, "vae")
+        assert not hasattr(model, "text_encoders")
+
+    def test_merged_lora_residue_is_dropped_not_refused(self, tmp_path: Path) -> None:
+        """`configs.main._has_wan_transformer_block_weights` deliberately admits main
+        models that retain merged-in LoRA tensors, using a *positive* structural test
+        rather than a "reject anything with lora keys" exclusion. The loader has to
+        agree, or the probe accepts a file that the loader then refuses with a reason
+        blaming Animate/S2V/Fun-Camera.
+        """
+        sd = _tiny_model().state_dict()
+        sd["blocks.0.attn1.to_q.lora_down.weight"] = torch.zeros(8, 128)
+        sd["blocks.0.attn1.to_q.lora_up.weight"] = torch.zeros(128, 8)
+        sd["blocks.0.attn1.to_q.alpha"] = torch.zeros(())
+        path = tmp_path / "Wan2.2-T2V-A14B-high_noise-merged.safetensors"
+        save_file(sd, path)
+
+        _load(path)  # must not raise
+
+    def test_unknown_extra_module_is_still_refused(self, tmp_path: Path) -> None:
+        """The allowlist above must not turn the backstop off. A conditioning branch
+        nobody has enumerated yet still has to fail loudly rather than load degraded.
+        """
+        sd = _tiny_model().state_dict()
+        sd["vae.decoder.conv_in.weight"] = torch.zeros(96, 16, 3, 3)  # benign, alongside
+        sd["mystery_adapter.proj.weight"] = torch.zeros(128, 128)
+        path = tmp_path / "wan22-unknown-variant-high_noise.safetensors"
+        save_file(sd, path)
+
+        with pytest.raises(RuntimeError, match="mystery_adapter"):
+            _load(path)
+
     def test_missing_parameter_is_reported(self, tmp_path: Path) -> None:
         sd = _tiny_model().state_dict()
         del sd["blocks.1.attn1.to_q.weight"]

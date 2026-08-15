@@ -247,6 +247,29 @@ class TestRejects:
         with pytest.raises(NotAMatchError, match="variant"):
             _probe(tmp_path, "weird-wan22.safetensors", _native_sd(24))
 
+    @pytest.mark.parametrize(
+        "in_channels,dim,label",
+        [
+            # A14B-width but 48-channel: the wider Wan family reuses TI2V-5B's channel
+            # count at A14B's width (Fun-Control-14B). Reading in_channels alone labels
+            # this TI2V-5B, which pins expert='none', picks TI2V-5B default settings and
+            # hides the low-noise partner picker — a mislabel, not a refusal.
+            (48, A14B_DIM, "48-channel at A14B width"),
+            # ...and the converse: TI2V-5B width with an A14B channel count.
+            (16, TI2V_DIM, "16-channel at TI2V-5B width"),
+            (36, TI2V_DIM, "36-channel at TI2V-5B width"),
+        ],
+    )
+    def test_channel_count_must_agree_with_transformer_width(
+        self, tmp_path: Path, in_channels: int, dim: int, label: str
+    ) -> None:
+        """A14B is uniquely 5120-wide and TI2V-5B uniquely 3072-wide. A combination that
+        matches neither is a Wan derivative we don't support, so it must fall through to
+        'unidentified' rather than be labelled as the variant it merely shares a channel
+        count with."""
+        with pytest.raises(NotAMatchError, match="variant"):
+            _probe(tmp_path, f"wan22-{label.replace(' ', '-')}.safetensors", _native_sd(in_channels, dim=dim))
+
 
 class TestWan21Marker:
     def test_clean_wan_2_2_state_dicts_have_no_marker(self) -> None:
