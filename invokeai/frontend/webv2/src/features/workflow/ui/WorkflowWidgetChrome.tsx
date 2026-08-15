@@ -28,7 +28,7 @@ import {
   PlusIcon,
   RefreshCwIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
@@ -303,43 +303,55 @@ export const WorkflowDialogHost = () => {
 
   // Library autosave: bound project graphs save themselves back to the
   // library after edits settle. This host is always mounted alongside the
-  // workflow widget, so one autosaver instance (created once via the lazy
-  // useState initializer) tracks the graph for the widget's whole lifetime.
-  // `read()` pulls straight from the project store's synchronous snapshot
-  // (`projectStore.getSnapshot()`, the same accessor `useWorkflowProjectSelector`
-  // subscribes through) rather than a component-owned ref, so it is always
-  // current whenever the autosaver's debounce timer or `flush()` calls it —
-  // no ref-freshness bookkeeping, and nothing here reads a ref during render.
+  // workflow widget, so one autosaver instance tracks the graph for the
+  // widget's whole lifetime — but that instance is created AND disposed
+  // within a single mount effect (held in a ref, not a `useState`
+  // initializer). A `useState` initializer only runs once per fiber, while
+  // its disposal lived in a separate effect's cleanup; React StrictMode's
+  // dev-only mount→cleanup→mount simulation ran that cleanup once without
+  // ever re-running the initializer, permanently disposing the one instance
+  // still in use (autosave silently no-oped for the rest of the session).
+  // Creating and disposing in the same effect makes the simulation produce a
+  // fresh, live instance instead. `read()` pulls straight from the project
+  // store's synchronous snapshot (`projectStore.getSnapshot()`, the same
+  // accessor `useWorkflowProjectSelector` subscribes through) rather than a
+  // component-owned ref, so it is always current whenever the autosaver's
+  // debounce timer or `flush()` calls it.
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
-  const [autosaver] = useState(() =>
-    createLibraryAutosaver({
+  const autosaverRef = useRef<ReturnType<typeof createLibraryAutosaver> | null>(null);
+
+  useEffect(() => {
+    const autosaver = createLibraryAutosaver({
       onStatus: setWorkflowLibrarySyncStatus,
       read: () => {
         const graph = projectStore.getSnapshot().projectGraph;
         return { libraryWorkflowId: graph.libraryWorkflowId, serialized: serializeWorkflowJson(graph) };
       },
       save: (workflowId, serialized) => updateLibraryWorkflow(workflowId, serialized),
-    })
-  );
+    });
 
-  // External-system sync: notify the autosaver of edits (skipping the mount
-  // run so loading a workflow does not itself count as an edit), register
-  // the markSynced seam other surfaces reach through `librarySyncBridge`,
-  // and dispose on unmount.
+    autosaverRef.current = autosaver;
+
+    const handler = (serialized: Record<string, unknown>) => autosaver.markSynced(serialized);
+
+    registerLibraryGraphSyncedHandler(handler);
+
+    return () => {
+      releaseLibraryGraphSyncedHandler(handler);
+      autosaver.dispose();
+      autosaverRef.current = null;
+    };
+  }, [projectStore]);
+
+  // Notify the autosaver of edits, skipping the mount run so loading a
+  // workflow does not itself count as an edit.
   const lastGraphRef = useRef(projectGraph);
   useEffect(() => {
     if (lastGraphRef.current !== projectGraph) {
       lastGraphRef.current = projectGraph;
-      autosaver.notifyGraphChanged();
+      autosaverRef.current?.notifyGraphChanged();
     }
-  }, [autosaver, projectGraph]);
-  useEffect(() => {
-    const handler = (serialized: Record<string, unknown>) => autosaver.markSynced(serialized);
-
-    registerLibraryGraphSyncedHandler(handler);
-    return () => releaseLibraryGraphSyncedHandler(handler);
-  }, [autosaver]);
-  useEffect(() => () => autosaver.dispose(), [autosaver]);
+  }, [projectGraph]);
 
   useEffect(() => {
     if (importRequestCount > lastImportRequestRef.current) {
