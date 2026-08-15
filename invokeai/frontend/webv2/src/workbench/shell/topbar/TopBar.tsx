@@ -7,6 +7,7 @@ import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
 import { LayoutPresetManagerDialog } from './LayoutPresetManagerDialog';
 import { LayoutPresetStrip } from './LayoutPresetStrip';
 import { ProjectSwitcher } from './ProjectSwitcher';
+import { TopbarProgressRail } from './TopbarProgressRail';
 
 /**
  * The workbench top bar.
@@ -36,6 +37,9 @@ export const TopBar = () => (
       gap="2"
       gridTemplateColumns={TOPBAR_COLUMNS}
       h="44px"
+      // Positioning context for the progress rail, which overlays the bottom
+      // border rather than taking a row of its own.
+      position="relative"
       px="1.5"
       w="full"
     >
@@ -47,6 +51,8 @@ export const TopBar = () => (
       <LayoutPresetStrip />
 
       <InvocationCluster />
+
+      <TopbarProgressRail />
     </Grid>
     {/* Dialog hosts, not controls: every surface that can open one writes to a
         store, so the body cannot belong to whichever trigger happens to be
