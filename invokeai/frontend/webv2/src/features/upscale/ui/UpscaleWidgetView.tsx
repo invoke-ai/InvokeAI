@@ -121,6 +121,7 @@ const DROP_ZONE_DISABLED_PROPS = { cursor: 'wait', opacity: 0.7 };
 const DROP_ZONE_BUSY_PROPS = { disabled: true };
 const DROP_ZONE_HOVER_PROPS = { bg: 'bg.muted', color: 'fg' };
 const UPLOAD_ACCEPT_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const UPLOAD_ACCEPT_ATTR = [...UPLOAD_ACCEPT_TYPES, '.png', '.jpg', '.jpeg', '.webp'].join(',');
 const PRESET_ENTRIES = Object.entries(UPSCALE_PRESETS);
 
 const isSelectableMainModel = (model: ModelConfig): boolean => isSupportedUpscaleMainModel(model);
@@ -134,10 +135,13 @@ const getRangeError = (label: string, value: number, min: number, max: number): 
   Number.isFinite(value) && value >= min && value <= max ? undefined : `${label} must be between ${min} and ${max}.`;
 
 /**
- * `values` is re-derived from the raw widget state on every patch, so its
- * nested members arrive with fresh identities even when nothing about them
- * changed. Sections whose props are those members compare by content instead,
- * which is what keeps a scale edit from re-rendering the prompt editors.
+ * `values` is re-derived from the raw widget state on every patch. Its nested
+ * members are mostly identity-stable — `normalizeUpscaleWidgetValues`
+ * preserves them across a patch that didn't touch them — but that's an
+ * incidental property of the normalizer, not a contract this file should
+ * lean on. The comparators below compare by content instead, so no section
+ * depends on that incidental stability to avoid re-rendering (e.g. the
+ * prompt editors on a scale edit).
  */
 const areLorasEquivalent = (left: readonly GenerateLora[], right: readonly GenerateLora[]): boolean =>
   left.length === right.length &&
@@ -152,6 +156,31 @@ const areLorasEquivalent = (left: readonly GenerateLora[], right: readonly Gener
     );
   });
 
+const areStringArraysEqual = (left: readonly string[], right: readonly string[]): boolean =>
+  left === right || (left.length === right.length && left.every((value, index) => value === right[index]));
+
+const getModelTriggerPhrases = (model: UpscaleWidgetValues['model']): readonly string[] => {
+  const phrases = (model as { trigger_phrases?: unknown } | null)?.trigger_phrases;
+
+  return Array.isArray(phrases) ? phrases.filter((phrase): phrase is string => typeof phrase === 'string') : [];
+};
+
+/**
+ * `key` alone is not enough: a catalog refresh swaps in a fresh config under
+ * the same key, and the prompt editors consume per-config data (trigger
+ * phrases, used both to populate the autocomplete and to label its group;
+ * `base`, used to filter compatible embeddings). Identity short-circuits the
+ * common case.
+ */
+const areModelsEquivalent = (left: UpscaleWidgetValues['model'], right: UpscaleWidgetValues['model']): boolean =>
+  left === right ||
+  (left !== null &&
+    right !== null &&
+    left.key === right.key &&
+    left.base === right.base &&
+    left.name === right.name &&
+    areStringArraysEqual(getModelTriggerPhrases(left), getModelTriggerPhrases(right)));
+
 const areInputImagesEquivalent = (
   left: UpscaleWidgetValues['inputImage'],
   right: UpscaleWidgetValues['inputImage']
@@ -163,102 +192,105 @@ const areInputImagesEquivalent = (
     left.width === right.width &&
     left.height === right.height);
 
-const UpscaleOutputPreflight = memo(function UpscaleOutputPreflight({
-  inputImage,
-  scale,
-}: {
-  inputImage: UpscaleWidgetValues['inputImage'];
-  scale: number;
-}) {
-  const { t } = useTranslation();
+const UpscaleOutputPreflight = memo(
+  function UpscaleOutputPreflight({
+    inputImage,
+    scale,
+  }: {
+    inputImage: UpscaleWidgetValues['inputImage'];
+    scale: number;
+  }) {
+    const { t } = useTranslation();
 
-  if (!inputImage) {
-    return null;
-  }
+    if (!inputImage) {
+      return null;
+    }
 
-  const output = getUpscaleOutputDimensions(inputImage, scale);
-  const outputMegapixels = (output.width * output.height) / 1_000_000;
-  const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
+    const output = getUpscaleOutputDimensions(inputImage, scale);
+    const outputMegapixels = (output.width * output.height) / 1_000_000;
+    const isLargeOutput = outputMegapixels >= LARGE_OUTPUT_MEGAPIXELS;
 
-  return (
-    <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
-      <DataList.Root gap="1.5" orientation="horizontal" size="sm">
-        <DataList.Item>
-          <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
-            {t('widgets.upscale.inputSize')}
-          </DataList.ItemLabel>
-          <DataList.ItemValue
-            fontFamily="mono"
-            fontSize="xs"
-            fontVariantNumeric="tabular-nums"
-            justifyContent="flex-end"
+    return (
+      <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
+        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+          <DataList.Item>
+            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+              {t('widgets.upscale.inputSize')}
+            </DataList.ItemLabel>
+            <DataList.ItemValue
+              fontFamily="mono"
+              fontSize="xs"
+              fontVariantNumeric="tabular-nums"
+              justifyContent="flex-end"
+            >
+              {DIMENSION_FORMATTER.format(inputImage.width)} × {DIMENSION_FORMATTER.format(inputImage.height)}
+            </DataList.ItemValue>
+          </DataList.Item>
+          <DataList.Item>
+            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+              {t('widgets.upscale.scale')}
+            </DataList.ItemLabel>
+            <DataList.ItemValue
+              fontFamily="mono"
+              fontSize="xs"
+              fontVariantNumeric="tabular-nums"
+              justifyContent="flex-end"
+            >
+              {scale}×
+            </DataList.ItemValue>
+          </DataList.Item>
+          <DataList.Item>
+            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+              {t('widgets.upscale.outputSize')}
+            </DataList.ItemLabel>
+            <DataList.ItemValue
+              fontFamily="mono"
+              fontSize="xs"
+              fontVariantNumeric="tabular-nums"
+              fontWeight="semibold"
+              justifyContent="flex-end"
+            >
+              {DIMENSION_FORMATTER.format(output.width)} × {DIMENSION_FORMATTER.format(output.height)}
+            </DataList.ItemValue>
+          </DataList.Item>
+          <DataList.Item>
+            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+              {t('widgets.upscale.outputMegapixels')}
+            </DataList.ItemLabel>
+            <DataList.ItemValue
+              fontFamily="mono"
+              fontSize="xs"
+              fontVariantNumeric="tabular-nums"
+              fontWeight="semibold"
+              gap="1.5"
+              justifyContent="flex-end"
+            >
+              {MEGAPIXEL_FORMATTER.format(outputMegapixels)} MP
+              {isLargeOutput ? (
+                <Badge colorPalette="orange" fontFamily="body" size="xs" variant="surface">
+                  {t('widgets.upscale.largeOutput')}
+                </Badge>
+              ) : null}
+            </DataList.ItemValue>
+          </DataList.Item>
+        </DataList.Root>
+        {isLargeOutput ? (
+          <Text
+            borderTopWidth="1px"
+            borderColor="border.subtle"
+            color="fg.warning"
+            fontSize="2xs"
+            pt="2"
+            textWrap="pretty"
           >
-            {DIMENSION_FORMATTER.format(inputImage.width)} × {DIMENSION_FORMATTER.format(inputImage.height)}
-          </DataList.ItemValue>
-        </DataList.Item>
-        <DataList.Item>
-          <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
-            {t('widgets.upscale.scale')}
-          </DataList.ItemLabel>
-          <DataList.ItemValue
-            fontFamily="mono"
-            fontSize="xs"
-            fontVariantNumeric="tabular-nums"
-            justifyContent="flex-end"
-          >
-            {scale}×
-          </DataList.ItemValue>
-        </DataList.Item>
-        <DataList.Item>
-          <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
-            {t('widgets.upscale.outputSize')}
-          </DataList.ItemLabel>
-          <DataList.ItemValue
-            fontFamily="mono"
-            fontSize="xs"
-            fontVariantNumeric="tabular-nums"
-            fontWeight="semibold"
-            justifyContent="flex-end"
-          >
-            {DIMENSION_FORMATTER.format(output.width)} × {DIMENSION_FORMATTER.format(output.height)}
-          </DataList.ItemValue>
-        </DataList.Item>
-        <DataList.Item>
-          <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
-            {t('widgets.upscale.outputMegapixels')}
-          </DataList.ItemLabel>
-          <DataList.ItemValue
-            fontFamily="mono"
-            fontSize="xs"
-            fontVariantNumeric="tabular-nums"
-            fontWeight="semibold"
-            gap="1.5"
-            justifyContent="flex-end"
-          >
-            {MEGAPIXEL_FORMATTER.format(outputMegapixels)} MP
-            {isLargeOutput ? (
-              <Badge colorPalette="orange" fontFamily="body" size="xs" variant="surface">
-                {t('widgets.upscale.largeOutput')}
-              </Badge>
-            ) : null}
-          </DataList.ItemValue>
-        </DataList.Item>
-      </DataList.Root>
-      {isLargeOutput ? (
-        <Text
-          borderTopWidth="1px"
-          borderColor="border.subtle"
-          color="fg.warning"
-          fontSize="2xs"
-          pt="2"
-          textWrap="pretty"
-        >
-          {t('widgets.upscale.largeOutputDescription')}
-        </Text>
-      ) : null}
-    </Stack>
-  );
-});
+            {t('widgets.upscale.largeOutputDescription')}
+          </Text>
+        ) : null}
+      </Stack>
+    );
+  },
+  (previous, next) => previous.scale === next.scale && areInputImagesEquivalent(previous.inputImage, next.inputImage)
+);
 
 const UpscaleModelReconciler = ({
   rawValues,
@@ -374,7 +406,7 @@ const UpscalePromptFields = memo(
     previous.projectId === next.projectId &&
     areProjectPromptDraftsEqual(previous.promptDraft, next.promptDraft) &&
     previous.showSyntaxHighlighting === next.showSyntaxHighlighting &&
-    previous.model?.key === next.model?.key &&
+    areModelsEquivalent(previous.model, next.model) &&
     areLorasEquivalent(previous.loras, next.loras)
 );
 
@@ -639,7 +671,7 @@ const UpscaleImageField = memo(
         ) : null}
         <Input
           ref={fileInputRef}
-          accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp"
+          accept={UPLOAD_ACCEPT_ATTR}
           aria-hidden="true"
           display="none"
           tabIndex={-1}
