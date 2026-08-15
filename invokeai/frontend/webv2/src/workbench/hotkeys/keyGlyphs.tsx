@@ -55,7 +55,7 @@ export const SHORTCUT_KEY_ARIA_LABELS: Record<string, string> = {
   arrowright: 'Arrow right',
   arrowup: 'Arrow up',
   backspace: 'Backspace',
-  cmd: 'Meta',
+  cmd: 'Command',
   ctrl: 'Control',
   enter: 'Enter',
   meta: 'Meta',

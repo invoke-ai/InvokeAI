@@ -1,7 +1,7 @@
 import { ArrowRightToLineIcon, ChevronUpIcon, CommandIcon, CornerDownLeftIcon, OptionIcon } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 
-import { getShortcutKeyIcon } from './keyGlyphs';
+import { getShortcutKeyIcon, SHORTCUT_KEY_ARIA_LABELS } from './keyGlyphs';
 
 describe('getShortcutKeyIcon', () => {
   it('gives universal keycap symbols an icon on every platform', () => {
@@ -24,5 +24,11 @@ describe('getShortcutKeyIcon', () => {
     expect(getShortcutKeyIcon('k', true)).toBeNull();
     expect(getShortcutKeyIcon('esc', true)).toBeNull();
     expect(getShortcutKeyIcon('space', false)).toBeNull();
+  });
+});
+
+describe('SHORTCUT_KEY_ARIA_LABELS', () => {
+  it('announces the cmd token as Command', () => {
+    expect(SHORTCUT_KEY_ARIA_LABELS.cmd).toBe('Command');
   });
 });
