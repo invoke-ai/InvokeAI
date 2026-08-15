@@ -110,7 +110,7 @@ export const AppMenu = () => {
               </>
             ) : null}
             <Menu.Separator />
-            <HStack gap="0.5" px="1" py="0.5">
+            <HStack gap="0.5" px="0" py="0">
               <SearchMenuAction />
               <SettingsMenuAction onClick={openSettings} />
               <AppMenuLink
@@ -178,11 +178,11 @@ const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
 const FOOTER_ITEM_PROPS = {
   alignItems: 'center',
   flex: '0 0 auto',
-  h: '6',
+  h: '7',
   justifyContent: 'center',
-  minW: '6',
+  minW: '7',
   p: '0',
-  w: '6',
+  w: '7',
 } as const;
 
 const AppMenuAction = ({
