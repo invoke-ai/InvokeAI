@@ -37,7 +37,6 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     SubModelType,
-    WanVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -280,7 +279,7 @@ def _tensor_shape(tensor: Any) -> tuple[int, ...]:
     return tuple(int(dim) for dim in shape)
 
 
-def _build_wan_transformer_config(sd: dict, variant: WanVariantType, source: str) -> dict:
+def _build_wan_transformer_config(sd: dict, source: str) -> dict:
     """Derive ``WanTransformer3DModel`` constructor kwargs from a state dict.
 
     The state dict must already be prefix-stripped and in the diffusers key
@@ -328,16 +327,18 @@ def _build_wan_transformer_config(sd: dict, variant: WanVariantType, source: str
     # patch_size is (1, 2, 2) → prod = 4 for the Wan 2.2 family.
     out_channels = require("proj_out.weight")[0] // 4
 
-    # Layer count fallback (only triggers if the auto-count loop above found
-    # zero blocks, which shouldn't happen for a valid file). T2V/I2V A14B have
-    # 40 layers; TI2V-5B has 30.
-    layer_count_fallback = 30 if variant == WanVariantType.TI2V_5B else 40
+    # No fallback for num_layers. It cannot be zero here: that would mean no key starts
+    # with `blocks.`, and `require("blocks.0.ffn.net.0.proj.weight")` above has already
+    # raised. An earlier revision carried a variant-keyed default (40 for A14B, 30 for
+    # TI2V-5B) that was unreachable, and it was the only thing the `variant` argument
+    # was used for — so the config is now derived entirely from the weights, which is
+    # the point of this helper.
 
     return {
         "patch_size": (1, 2, 2),
         "in_channels": in_channels,
         "out_channels": out_channels,
-        "num_layers": num_layers if num_layers > 0 else layer_count_fallback,
+        "num_layers": num_layers,
         "attention_head_dim": attention_head_dim,
         "num_attention_heads": num_attention_heads,
         "ffn_dim": ffn_dim,
@@ -410,7 +411,7 @@ class WanGGUFCheckpointModel(ModelLoader):
         # so the wrapper's underlying storage dtype reaches PyTorch directly).
         sd = _unwrap_unquantized_to_compute_dtype(sd)
 
-        model_config = _build_wan_transformer_config(sd, config.variant, source="GGUF state dict")
+        model_config = _build_wan_transformer_config(sd, source="GGUF state dict")
 
         with accelerate.init_empty_weights():
             model = WanTransformer3DModel(**model_config)
@@ -487,7 +488,7 @@ class WanCheckpointModel(ModelLoader):
         if _is_native_wan_layout(sd):
             sd = _convert_wan_native_to_diffusers(sd)
 
-        model_config = _build_wan_transformer_config(sd, config.variant, source="checkpoint state dict")
+        model_config = _build_wan_transformer_config(sd, source="checkpoint state dict")
 
         with accelerate.init_empty_weights():
             model = WanTransformer3DModel(**model_config)

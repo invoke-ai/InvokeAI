@@ -89,23 +89,38 @@ def _load(path: Path, variant: WanVariantType = WanVariantType.T2V_A14B):
 class TestArchitectureInference:
     def test_matches_the_model_it_came_from(self) -> None:
         sd = _tiny_model().state_dict()
-        inferred = _build_wan_transformer_config(sd, WanVariantType.T2V_A14B, source="test")
+        inferred = _build_wan_transformer_config(sd, source="test")
         assert inferred == TINY_MODEL_KWARGS
 
     def test_reports_the_missing_key(self) -> None:
         sd = _tiny_model().state_dict()
         del sd["proj_out.weight"]
         with pytest.raises(RuntimeError, match="proj_out.weight"):
-            _build_wan_transformer_config(sd, WanVariantType.T2V_A14B, source="test")
+            _build_wan_transformer_config(sd, source="test")
+
+    def test_out_channels_is_read_from_proj_out_not_assumed_equal_to_in_channels(self) -> None:
+        """I2V-A14B takes 36 channels in (16 noise + 16 ref-image latents + 4 mask) and
+        returns 16 — only the noise prediction comes back. Every other fixture here is
+        16-in/16-out, which cannot tell the two apart."""
+        from diffusers import WanTransformer3DModel
+
+        asymmetric = {**TINY_MODEL_KWARGS, "in_channels": 36, "out_channels": 16}
+        sd = WanTransformer3DModel(**asymmetric).state_dict()
+
+        inferred = _build_wan_transformer_config(sd, source="test")
+
+        assert inferred["in_channels"] == 36
+        assert inferred["out_channels"] == 16
+        assert inferred == asymmetric
 
     def test_counts_layers_from_the_highest_block_index(self) -> None:
         model = _tiny_model()
         sd = model.state_dict()
-        assert _build_wan_transformer_config(sd, WanVariantType.T2V_A14B, source="test")["num_layers"] == 2
+        assert _build_wan_transformer_config(sd, source="test")["num_layers"] == 2
         # Dropping the last block's keys must drop the inferred layer count too —
         # the count comes from the weights, not from a per-variant lookup table.
         trimmed = {k: v for k, v in sd.items() if not k.startswith("blocks.1.")}
-        assert _build_wan_transformer_config(trimmed, WanVariantType.T2V_A14B, source="test")["num_layers"] == 1
+        assert _build_wan_transformer_config(trimmed, source="test")["num_layers"] == 1
 
 
 class TestEndToEnd:

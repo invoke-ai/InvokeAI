@@ -202,6 +202,46 @@ class TestProbe:
                     _build_overrides(path, "unsupported Wan 2.1"),
                 )
 
+    def test_rejects_an_unsupported_wan_variant(self) -> None:
+        """The branch-family refusals were added to this probe alongside the checkpoint
+        one, but only the checkpoint side was covered — deleting the check here left the
+        whole suite green. A Fun-Camera / S2V / Animate GGUF builds a correctly shaped
+        transformer and would generate with its conditioning branch silently absent."""
+        sd = _wan_a14b_state_dict()
+        sd["control_adapter.conv.weight"] = _ggml((5120, 16, 1, 2, 2))
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Wan2.2-Fun-Camera-A14B-high_noise-Q4_K_M.gguf"
+            path.touch()
+
+            with pytest.raises(NotAMatchError, match="Fun"):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, sd),
+                    _build_overrides(path, "Fun-Camera"),
+                )
+
+    def test_rejects_a_lora_carrying_a_full_patch_embedding(self) -> None:
+        """Same asymmetry: the LoRA-vs-transformer guard was added here for parity with
+        the checkpoint probe and had no test. A Wan I2V adapter bundles a replacement
+        patch_embedding, so without the undecorated-block-weight requirement it matches
+        the main probe, outranks the LoRA probe, and lands in the main dropdown."""
+        sd = {
+            "diffusion_model.patch_embedding.weight": _ggml((5120, 36, 1, 2, 2)),
+            "diffusion_model.condition_embedder.text_embedder.linear_1.weight": _ggml((5120, 4096)),
+            "diffusion_model.blocks.0.attn1.to_q.lora_down.weight": _ggml((16, 5120)),
+            "diffusion_model.blocks.0.attn1.to_q.lora_up.weight": _ggml((5120, 16)),
+        }
+
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "Wan2.2-I2V-A14B-high_noise-lora-Q4_K_M.gguf"
+            path.touch()
+
+            with pytest.raises(NotAMatchError):
+                Main_GGUF_Wan_Config.from_model_on_disk(
+                    _make_mod(path, sd),
+                    _build_overrides(path, "Wan LoRA"),
+                )
+
     def test_rejects_ambiguous_a14b_filename(self) -> None:
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "renamed-high_noise-Q4_K_M.gguf"
