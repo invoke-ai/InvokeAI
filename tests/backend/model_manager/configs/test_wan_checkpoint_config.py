@@ -428,8 +428,25 @@ class TestExpertFilenameHeuristic:
             ("wan22-flow-shift-tune", "none"),
             ("wan22-slow-noise-test", "none"),
             ("wan22_flownoise_v1", "none"),
-            # --- an explicit noise marker outranks a bare token found earlier ---
-            ("wan2.2_t2v_low_high_noise_14B_fp16", "high"),
+            # --- an explicit noise marker outranks a bare token found elsewhere ---
+            ("wan2.2_t2v_4step_LOW_lightning_high_noise", "high"),
+            # ...but a `noise` qualifies the whole run of markers next to it, so a name
+            # listing both experts is a file that serves both, not the one that happens
+            # to touch the word. Real: moriqqe/Mabrle_wan2.2_low_high_noise and
+            # Chromatraining/v1_FGO_nitocris_morgan_wan2.2_t2v_low_high_noise_14B_fp16.
+            # This used to return 'high', which disagreed with the bare spelling
+            # ("...HIGH-LOW" -> 'none') for the same meaning.
+            ("wan2.2_t2v_low_high_noise_14B_fp16", "none"),
+            ("Mabrle_wan2.2_low_high_noise", "none"),
+            ("Wan2.2-I2V-A14B-HIGH_NOISE-LOW_NOISE-merged", "none"),
+            # A disqualifier following the run still wins over an adjacent `noise`:
+            # "noise ... LOW VRAM" is describing VRAM.
+            ("Wan2.2-A14B-add-noise-LOW-VRAM", "none"),
+            ("wan22_a14b_noise_low_cfg", "none"),
+            # A conflict in the explicit tier is final — a stray bare marker later in
+            # the name must not rescue it into a confident answer.
+            ("wan2.2_low_high_noise_merged_LOW", "none"),
+            ("wan22_high_noise_low_noise_pack_high", "none"),
         ],
     )
     def test_filename_heuristic(self, name: str, expected: str) -> None:

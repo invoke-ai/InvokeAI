@@ -2030,15 +2030,19 @@ def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
 
     Precedence, in order:
 
-    1. An explicit ``noise`` marker anywhere wins outright — it settles names
-       carrying both, such as ``..._low_high_noise_...``.
-    2. Otherwise the **last** surviving bare marker wins. Last, not first, because
-       real names put descriptive words up front and the expert tag at the end
-       (``Extream Low Angle HIGH - Wan2.2 ...`` is the HIGH expert).
-    3. If bare ``high`` *and* bare ``low`` both survive, the name is describing a
-       file that serves both (``... I2V HIGH+LOW ...``) or is simply ambiguous, so
-       return 'none' rather than guess. For a LoRA 'none' means "apply to both",
-       which is the right answer for those.
+    1. Explicit ``..._noise`` markers outrank bare tokens found elsewhere in the
+       name, so ``..._4step_LOW_lightning_high_noise`` reads as the high-noise file.
+    2. Within a tier, one distinct marker wins. If **both** appear, the file serves
+       both experts (``... I2V HIGH+LOW ...``, ``..._low_high_noise_...`` — both are
+       real release patterns) or the name is simply ambiguous, so return 'none'
+       rather than guess. For a LoRA 'none' means "apply to both", which is the
+       right answer for those; for a main it surfaces as a pairing error the user
+       can act on, which beats silently running one expert for both phases.
+
+    Note the tiers are reconciled the same way. An earlier revision returned on the
+    first ``noise`` marker it saw, which meant the two spellings of the same
+    both-experts name disagreed: ``HIGH-LOW`` gave 'none' but ``low_high_noise``
+    gave 'high'.
 
     A bare token is ignored when a neighbour marks it as an adjective about
     something else (``lowVRAM``, ``low-cfg``, ``Low Angle``) — see
@@ -2054,28 +2058,63 @@ def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
     name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", filename).lower()
     tokens = [token for token in re.split(r"[^a-z0-9]+", name) if token]
 
+    markers = ("high", "low")
+    explicit: list[str] = []
     bare: list[str] = []
-    for index, token in enumerate(tokens):
-        for marker in ("high", "low"):
-            # Fused with 'noise'. Anchored: startswith catches `lownoisefp8`, and
-            # only the reversed form may match at the end — `endswith("lownoise")`
-            # would wrongly claim `slownoise`.
-            if token.startswith(f"{marker}noise") or token.endswith(f"noise{marker}"):
-                return marker  # type: ignore[return-value]
-            if token != marker:
-                continue
-            neighbours = tokens[max(index - 1, 0) : index] + tokens[index + 1 : index + 2]
-            if "noise" in neighbours:
-                return marker
-            # Only the *following* token can disqualify: these are adjective-noun
-            # pairs, so the noun comes second. "low angle" is a camera angle, but
-            # "Angle HIGH" is the high-noise expert of a camera-angle LoRA.
-            following = tokens[index + 1 : index + 2]
-            if not _WAN_EXPERT_DISQUALIFIERS.intersection(following):
-                bare.append(marker)
 
-    if len(set(bare)) == 1:
-        return bare[-1]  # type: ignore[return-value]
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+
+        # Fused with 'noise'. Anchored: startswith catches `lownoisefp8`, and only the
+        # reversed form may match at the end — `endswith("lownoise")` would wrongly
+        # claim `slownoise`.
+        fused = next((m for m in markers if token.startswith(f"{m}noise") or token.endswith(f"noise{m}")), None)
+        if fused is not None:
+            explicit.append(fused)
+            index += 1
+            continue
+
+        if token not in markers:
+            index += 1
+            continue
+
+        # Consume the whole *run* of adjacent marker tokens, so a single 'noise'
+        # qualifies all of them. `low_high_noise` names one file holding both experts
+        # (real: moriqqe/Mabrle_wan2.2_low_high_noise); scoring only the marker
+        # touching 'noise' would read it as the high-noise expert alone.
+        start = index
+        while index < len(tokens) and tokens[index] in markers:
+            index += 1
+        run = tokens[start:index]
+        previous = tokens[start - 1] if start > 0 else None
+        following = tokens[index] if index < len(tokens) else None
+
+        # Only the token *following* the run can disqualify: these are adjective-noun
+        # pairs, so the noun comes second. "low angle" is a camera angle, but
+        # "Angle HIGH" is the high-noise expert of a camera-angle LoRA.
+        #
+        # Checked ahead of the 'noise' test below. A disqualifier sits after the run,
+        # so an adjacent 'noise' would have to precede it — `noise_LOW_VRAM` is
+        # describing VRAM, not the low-noise expert. ('low noise' can't trip this:
+        # 'noise' is not itself a disqualifier.)
+        if following in _WAN_EXPERT_DISQUALIFIERS:
+            continue
+        if previous == "noise" or following == "noise":
+            explicit.extend(run)
+        else:
+            bare.extend(run)
+
+    # An explicit `..._noise` marker outranks a bare token found elsewhere in the
+    # name. Within each tier, both experts named means the file serves both — real
+    # releases do ship that way — so return 'none' rather than pick one. For a LoRA
+    # 'none' means "apply to both", which is the right answer for those.
+    for candidates in (explicit, bare):
+        distinct = set(candidates)
+        if len(distinct) == 1:
+            return candidates[0]  # type: ignore[return-value]
+        if distinct:
+            return "none"
     return "none"
 
 
