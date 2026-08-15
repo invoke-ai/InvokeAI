@@ -12,7 +12,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
 } from 'react';
@@ -31,10 +30,10 @@ import {
 import { GalleryQueuePlaceholderCell } from './GalleryQueuePlaceholderCell';
 import { GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
-import { ACCEPTED_UPLOAD_EXTENSIONS, UPLOAD_INPUT_STYLE } from './GalleryUploadButton';
 import { useGalleryWidget } from './GalleryWidgetContext';
 import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
 import { useGalleryGridSelection } from './useGalleryGridSelection';
+import { useGalleryUploadInput } from './useGalleryUploadInput';
 
 /**
  * Seeds the measured width per region so remounting the gallery in a placement
@@ -128,7 +127,6 @@ export const GalleryImageGrid = () => {
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(region) ?? 0);
   const dragDepthRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const uploadInputRef = useRef<HTMLInputElement | null>(null);
   const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, thumbnailFit } = gallery.settings;
 
   const {
@@ -302,20 +300,7 @@ export const GalleryImageGrid = () => {
     [actions]
   );
 
-  const handleUploadFileChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(event.currentTarget.files ?? []);
-
-      event.currentTarget.value = '';
-
-      if (files.length > 0) {
-        void actions.uploadFiles(files);
-      }
-    },
-    [actions]
-  );
-
-  const openUploadPicker = useCallback(() => uploadInputRef.current?.click(), []);
+  const { inputProps: uploadInputProps, openPicker: openUploadPicker } = useGalleryUploadInput(actions.uploadFiles);
 
   const handleUploadKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -364,14 +349,7 @@ export const GalleryImageGrid = () => {
           </Flex>
         ) : (
           <Flex align="stretch" h="full" minH="8rem" p="2">
-            <input
-              accept={ACCEPTED_UPLOAD_EXTENSIONS}
-              multiple
-              ref={uploadInputRef}
-              style={UPLOAD_INPUT_STYLE}
-              type="file"
-              onChange={handleUploadFileChange}
-            />
+            <input {...uploadInputProps} />
             <DropZone
               alignItems="center"
               cursor="pointer"
