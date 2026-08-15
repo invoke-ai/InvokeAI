@@ -161,16 +161,9 @@ const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
   // Reads the effective binding, so a remapped or unbound shortcut is never
   // advertised as one that still works.
   const shortcut = useTopbarShortcut('app.openSettings');
-  const label = t('common.settings');
+  const label = shortcut ? t('common.settingsWithShortcut', { hotkey: shortcut }) : t('common.settings');
 
-  return (
-    <AppMenuAction
-      icon={SettingsIcon}
-      label={shortcut ? `${label} (${shortcut})` : label}
-      value="settings"
-      onClick={onClick}
-    />
-  );
+  return <AppMenuAction icon={SettingsIcon} label={label} value="settings" onClick={onClick} />;
 };
 
 // Sized like the 2xs icon buttons in widget headers; menu items default to a

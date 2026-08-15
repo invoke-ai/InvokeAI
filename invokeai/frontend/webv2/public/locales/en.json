@@ -231,6 +231,7 @@
     "save": "Save",
     "seed": "Seed",
     "settings": "Settings",
+    "settingsWithShortcut": "Settings ({{hotkey}})",
     "nextPage": "Next page",
     "somethingWentWrong": "Something went wrong.",
     "swap": "Swap",
