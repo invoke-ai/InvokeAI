@@ -3,6 +3,7 @@ import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textare
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   MeasuringStrategy,
   PointerSensor,
   pointerWithin,
@@ -45,13 +46,15 @@ import {
   TextIcon,
   XIcon,
 } from 'lucide-react';
-import { createContext, use, useCallback, useMemo, useState, type ChangeEvent, type ReactNode } from 'react';
+import { createContext, use, useCallback, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 
 import {
   formEdgeDroppableId,
   formIntoDroppableId,
+  getFormDropEdge,
   isFormDescendantOrSelf,
   parseFormDroppableId,
+  pickInnermostFormCollision,
   resolveFormDrop,
   type FormDropTarget,
 } from './formBuilderDnd';
@@ -137,7 +140,21 @@ const BuilderCard = ({
 }) => {
   const { editGraph } = useProjectGraphCommands();
   const { activeElementId, dropTarget, form } = use(BuilderDndContext);
-  const { attributes, listeners, setNodeRef: setDragRef } = useDraggable({ id: element.id });
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef: setDragRef } = useDraggable({ id: element.id });
+  // The title bar is both the draggable node and its own drag handle, so it
+  // needs both refs: `setActivatorNodeRef` is what makes `KeyboardSensor`
+  // enforce `event.target === activator` (dnd-kit's `KeyboardSensor.activators`
+  // check) — without it, `Space`/`Enter` bubbling up from the action buttons
+  // this title bar contains (Remove, Zoom to node, etc.) would also lift the
+  // card, the keyboard equivalent of the `onPointerDown` `stopPropagation`
+  // guard those buttons already carry for pointer drags.
+  const setDragHandleRef = useCallback(
+    (node: HTMLElement | null) => {
+      setDragRef(node);
+      setActivatorNodeRef(node);
+    },
+    [setActivatorNodeRef, setDragRef]
+  );
   const { setNodeRef: setDropRef } = useDroppable({
     disabled: activeElementId !== null && isFormDescendantOrSelf(form, activeElementId, element.id),
     id: formEdgeDroppableId(element.id),
@@ -166,7 +183,7 @@ const BuilderCard = ({
         {...getWorkflowNodeChromeProps({ invalid: Boolean(isInvalid), selected: Boolean(isHovered || isSelected) })}
       >
         <HStack
-          ref={setDragRef}
+          ref={setDragHandleRef}
           bg="bg.muted"
           borderBottomWidth="1px"
           borderColor="border.subtle"
@@ -505,14 +522,36 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
   const { editGraph } = useProjectGraphCommands();
   const [activeElementId, setActiveElementId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<FormDropTarget | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor)
+  );
   // Droppable rects freeze at drag start by default; the builder's drop
   // indicators and container hints appear mid-drag, so re-measure continuously.
   const measuring = useMemo(() => ({ droppable: { strategy: MeasuringStrategy.Always } }), []);
-  const collisionDetection: CollisionDetection = useCallback((args) => {
-    const within = pointerWithin(args);
-    return within.length > 0 ? within : rectIntersection(args);
-  }, []);
+  const form = projectGraph.form;
+  // `DragMoveEvent.delta` is scroll-adjusted (translate + the panel's scroll
+  // offset baked in), so `activatorEvent.clientY + delta.y` overshoots the
+  // real pointer once the panel auto-scrolls while `over.rect` stays in
+  // fresh viewport coordinates. `collisionDetection`'s `args.pointerCoordinates`
+  // is the one place dnd-kit hands back the true (already scroll-correct)
+  // pointer position, so it's captured here and read in `handleDragMove`.
+  const pointerYRef = useRef<number | null>(null);
+  const collisionDetection: CollisionDetection = useCallback(
+    (args) => {
+      pointerYRef.current = args.pointerCoordinates?.y ?? null;
+
+      const within = pointerWithin(args);
+      const candidates = within.length > 0 ? within : rectIntersection(args);
+      const picked = pickInnermostFormCollision(
+        candidates.map((collision) => ({ id: String(collision.id) })),
+        form
+      );
+
+      return picked === null ? candidates : candidates.filter((collision) => String(collision.id) === picked);
+    },
+    [form]
+  );
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveElementId(String(event.active.id));
@@ -537,11 +576,15 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
       return;
     }
 
+    // The true (scroll-correct) pointer position when the drag has one
+    // (`PointerSensor`, captured from `collisionDetection`'s
+    // `pointerCoordinates`); a `KeyboardSensor` drag has no pointer, so fall
+    // back to the dragged card's translated center.
     const activeRect = active.rect.current.translated;
-    const pointerY = activeRect ? activeRect.top + activeRect.height / 2 : over.rect.top;
+    const referenceY = pointerYRef.current ?? (activeRect ? activeRect.top + activeRect.height / 2 : over.rect.top);
 
     setDropTarget({
-      edge: pointerY < over.rect.top + over.rect.height / 2 ? 'above' : 'below',
+      edge: getFormDropEdge(referenceY, over.rect.top, over.rect.height),
       elementId: parsed.elementId,
       kind: 'edge',
     });

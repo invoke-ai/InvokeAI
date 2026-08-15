@@ -186,6 +186,10 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     );
   };
 
+  const key = (target: EventTarget, code: string): void => {
+    target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code }));
+  };
+
   // dnd-kit's continuous droppable re-measuring (`MeasuringStrategy.Always`)
   // and sensor activation run on their own rAF-scheduled updates outside
   // React's synchronous event handling, so each step needs a real tick to
@@ -215,6 +219,41 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     // the now-current rects before the drop.
     await interact(() => pointer('pointermove', handle.ownerDocument, x, y + 1));
     await interact(() => pointer('pointerup', handle.ownerDocument, x, y + 1));
+  };
+
+  /**
+   * Drags `sourceTitle`'s title bar to vertical position `targetCenterY` via
+   * the keyboard: `Space` lifts, `ArrowDown`/`ArrowUp` steps 25px at a time
+   * toward the target (dnd-kit's `defaultKeyboardCoordinateGetter`), `Space`
+   * drops. Ends with a net-zero nudge in the same direction as the last real
+   * step — the keyboard analogue of `dragTo`'s no-op settle move:
+   * `MeasuringStrategy.Always`'s remeasure lands one tick after the arrow
+   * press that triggered it, so the last press's own `onDragMove` can still
+   * report a stale `over`.
+   */
+  const dragToWithKeyboard = async (sourceTitle: string, targetCenterY: number): Promise<void> => {
+    const handle = titleBarFor(sourceTitle);
+    const startRect = handle.getBoundingClientRect();
+    const startCenterY = startRect.top + startRect.height / 2;
+    const direction = targetCenterY >= startCenterY ? 'ArrowDown' : 'ArrowUp';
+    const opposite = direction === 'ArrowDown' ? 'ArrowUp' : 'ArrowDown';
+    const steps = Math.round(Math.abs(targetCenterY - startCenterY) / 25);
+
+    handle.focus();
+    expect(handle.ownerDocument.activeElement).toBe(handle);
+
+    // Space lifts (dnd-kit's `KeyboardSensor` start code).
+    await interact(() => key(handle, 'Space'));
+
+    for (let step = 0; step < steps; step++) {
+      await interact(() => key(handle, direction));
+    }
+    await interact(() => key(handle, direction));
+    await interact(() => key(handle, opposite));
+
+    // Space drops, resolving the move through the same `onDragEnd` ->
+    // `moveFormElementTo` path the pointer drag uses.
+    await interact(() => key(handle, 'Space'));
   };
 
   it('keeps dragging alive after a field is dropped into a container', async () => {
@@ -256,5 +295,63 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     const opacities = [...host.querySelectorAll<HTMLElement>('*')].map((element) => getComputedStyle(element).opacity);
 
     expect(opacities).not.toContain('0.4');
+  });
+
+  /**
+   * Regression coverage for the "keyboard drag" finding: the drag handle
+   * spreads dnd-kit's `attributes` (`role="button"`, `tabIndex=0`), which
+   * promises "press space to lift, arrows to move" — a promise only true
+   * once a `KeyboardSensor` is registered alongside the `PointerSensor`.
+   * There's no pointer during a keyboard drag, so `KeyboardSensor` moves the
+   * dragged card's tracked rect by a fixed 25px step per arrow press
+   * (dnd-kit's `defaultKeyboardCoordinateGetter`) and collision detection
+   * falls through to `rectIntersection` (`pointerWithin` needs real pointer
+   * coordinates, which a keyboard drag never has).
+   */
+  it('moves a form element into a container with the keyboard', async () => {
+    await renderHarness();
+
+    const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
+      (element) => element.textContent === 'Empty container — drag elements here'
+    );
+
+    expect(emptyHint).toBeDefined();
+
+    const dropZoneRect = emptyHint!.getBoundingClientRect();
+
+    await dragToWithKeyboard('Heading', dropZoneRect.top + dropZoneRect.height / 2);
+
+    const containerContent = cardContentFor('Container (column layout)');
+
+    expect(containerContent.textContent).toContain('Heading');
+    expect(containerContent.textContent).not.toContain('Empty container');
+  });
+
+  /**
+   * Coverage for the keyboard *edge* path specifically: the "into a
+   * container" case above never reaches `getFormDropEdge`'s card-center
+   * fallback (`handleDragMove` returns early for `into` targets before
+   * `referenceY` is even computed) — a keyboard drag has no
+   * `pointerCoordinates`, so this is the only path that exercises the
+   * fallback dnd-kit needs for a real "arrows move the card" keyboard drag.
+   * Moves "Divider" (root sibling, after "Heading") up onto the upper
+   * quarter of "Heading"'s card, landing 'above' it and reordering it first.
+   */
+  it('reorders a form element above a sibling with the keyboard', async () => {
+    await renderHarness();
+
+    const headingCardRect = titleBarFor('Heading').parentElement!.getBoundingClientRect();
+
+    await dragToWithKeyboard('Divider', headingCardRect.top + headingCardRect.height * 0.25);
+
+    const leafElements = [...host.querySelectorAll<HTMLElement>('*')].filter(
+      (element) => element.children.length === 0
+    );
+    const dividerIndex = leafElements.findIndex((element) => element.textContent?.trim() === 'Divider');
+    const headingIndex = leafElements.findIndex((element) => element.textContent?.trim() === 'Heading');
+
+    expect(dividerIndex).toBeGreaterThanOrEqual(0);
+    expect(headingIndex).toBeGreaterThanOrEqual(0);
+    expect(dividerIndex).toBeLessThan(headingIndex);
   });
 });
