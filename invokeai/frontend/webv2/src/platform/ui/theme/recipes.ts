@@ -201,6 +201,16 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     // button recipe's `xs` cap.
     size: {
       ...chakraSlotRecipes.segmentGroup.variants?.size,
+      // Repo extension (like the button's own `2xs`): Chakra ships no
+      // segment-group `2xs`, so this borrows the `xs` item styles as its base.
+      '2xs': {
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
+          height: 'calc({sizes.6} - 2px)',
+          px: '2',
+          textStyle: 'xs',
+        },
+      },
       xs: {
         item: {
           ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
