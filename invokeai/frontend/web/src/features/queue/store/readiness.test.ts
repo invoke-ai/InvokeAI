@@ -12,7 +12,7 @@ vi.mock('i18next', () => ({
 
 import type { ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import type { MainModelConfig } from 'services/api/types';
+import type { AnyModelConfig, MainModelConfig } from 'services/api/types';
 
 import { getReasonsWhyCannotEnqueueCanvasTab, getReasonsWhyCannotEnqueueGenerateTab } from './readiness';
 
@@ -113,6 +113,7 @@ const buildGenerateTabArg = (overrides: {
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
   hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const buildCanvasTabArg = (overrides: {
@@ -152,6 +153,7 @@ const buildCanvasTabArg = (overrides: {
   hasFlux2DiffusersVaeSource: overrides.hasFlux2DiffusersVaeSource ?? false,
   hasFlux2DiffusersQwen3Source: overrides.hasFlux2DiffusersQwen3Source ?? false,
   hasFlux2DevDiffusersSource: overrides.hasFlux2DevDiffusersSource ?? false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const hasFlux2VaeReason = (reasons: { content: string }[]) =>
@@ -307,6 +309,7 @@ const buildZImageTabArg = (overrides: {
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
   hasFlux2DevDiffusersSource: false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const hasZImageVaeReason = (reasons: { content: string }[]) =>
@@ -482,6 +485,7 @@ const buildPidCanvasArg = (model: MainModelConfig, bboxSide: number) => ({
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
   hasFlux2DevDiffusersSource: false,
+  wanWiredConfigs: { vae: null, componentSource: null, lowNoisePartner: null },
 });
 
 const hasBboxGridReason = (reasons: { content: string }[]) =>
@@ -769,6 +773,9 @@ const buildWanTabArg = (overrides: {
   wanT5EncoderModel?: unknown;
   wanComponentSource?: unknown;
   wanTransformerLowNoise?: unknown;
+  wiredVae?: unknown;
+  wiredComponentSource?: unknown;
+  wiredLowNoisePartner?: unknown;
 }) => ({
   isConnected: true,
   model: overrides.model ?? wanCheckpointModel,
@@ -778,6 +785,7 @@ const buildWanTabArg = (overrides: {
     wanT5EncoderModel: overrides.wanT5EncoderModel ?? null,
     wanComponentSource: overrides.wanComponentSource ?? null,
     wanTransformerLowNoise: overrides.wanTransformerLowNoise ?? null,
+    model: overrides.model ?? wanCheckpointModel,
   } as unknown as ParamsState,
   refImages: baseRefImages,
   loras: [],
@@ -785,6 +793,11 @@ const buildWanTabArg = (overrides: {
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
   hasFlux2DevDiffusersSource: false,
+  wanWiredConfigs: {
+    vae: (overrides.wiredVae ?? null) as AnyModelConfig | null,
+    componentSource: (overrides.wiredComponentSource ?? null) as AnyModelConfig | null,
+    lowNoisePartner: (overrides.wiredLowNoisePartner ?? null) as AnyModelConfig | null,
+  },
 });
 
 const buildWanCanvasArg = (overrides: Parameters<typeof buildWanTabArg>[0]) =>
@@ -816,6 +829,108 @@ const hasWanComponentReason = (reasons: { content: string }[]) =>
 // pre-flight must therefore NOT block on `expert`, or it would stop a generation the
 // backend is happy to run — untagged community checkpoints are the common case this
 // whole branch exists to support.
+const vae16 = { key: 'vae16', name: 'Wan 2.1 VAE', base: 'wan', type: 'vae', latent_channels: 16 };
+const vae48 = { key: 'vae48', name: 'Wan 2.2 VAE', base: 'wan', type: 'vae', latent_channels: 48 };
+const a14bDiffusers = {
+  key: 'a14b-diff',
+  name: 'A14B Diffusers',
+  base: 'wan',
+  type: 'main',
+  format: 'diffusers',
+  variant: 't2v_a14b',
+};
+const ti2vDiffusers = {
+  key: 'ti2v-diff',
+  name: 'TI2V Diffusers',
+  base: 'wan',
+  type: 'main',
+  format: 'diffusers',
+  variant: 'ti2v_5b',
+};
+
+// The Advanced comboboxes offer every Wan VAE and every Wan Diffusers main with no
+// variant filtering, and nothing re-runs the auto-fill when the user picks by hand — so
+// presence alone is not enough. These are the loader's own checks, mirrored.
+describe('Wan 2.2 component compatibility pre-flight', () => {
+  const src = { wanComponentSource: { key: 'src' } };
+
+  it('blocks a VAE whose channel count does not match the transformer', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, ...src, wanVaeModel: vae16, wiredVae: vae16 })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(true);
+  });
+
+  it('accepts the matching VAE for each variant', () => {
+    for (const [model, vae] of [
+      [wanTi2v5bModel, vae48],
+      [wanCheckpointModel, vae16],
+    ] as const) {
+      const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+        buildWanTabArg({ model, ...src, wanVaeModel: vae, wiredVae: vae })
+      );
+      expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(false);
+    }
+  });
+
+  it('checks the VAE for a Diffusers main too — a wired standalone outranks its own', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanDiffusersModel, wanVaeModel: vae48, wiredVae: vae48 })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(true);
+  });
+
+  it('blocks a Component Source from the other variant family', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, wanComponentSource: a14bDiffusers, wiredComponentSource: a14bDiffusers })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanComponentSource'))).toBe(true);
+  });
+
+  it('accepts a same-family Component Source', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, wanComponentSource: ti2vDiffusers, wiredComponentSource: ti2vDiffusers })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanComponentSource'))).toBe(false);
+  });
+
+  it('blocks a low-noise partner of a different variant', () => {
+    const i2vLow = { ...wanLowExpertModel, key: 'i2v-low', variant: 'i2v_a14b' };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanCheckpointModel,
+        ...src,
+        wanTransformerLowNoise: i2vLow,
+        wiredLowNoisePartner: i2vLow,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanLowNoiseExpert'))).toBe(true);
+  });
+
+  it('blocks the same model wired to both transformer slots', () => {
+    // Reachable whenever a low expert has no partner: it is offered by the main picker
+    // (nothing else to offer) and by the low-noise picker at the same time.
+    const params = { key: wanLowExpertModel.key };
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({
+        model: wanLowExpertModel,
+        ...src,
+        wanTransformerLowNoise: params,
+        wiredLowNoisePartner: wanLowExpertModel,
+      })
+    );
+    expect(reasons.some((r) => r.content.includes('duplicateWanTransformer'))).toBe(true);
+  });
+
+  it('does not judge a slot pointing at a deleted model as incompatible', () => {
+    // wiredVae null means "empty or dangling"; neither can be checked for compatibility.
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildWanTabArg({ model: wanTi2v5bModel, ...src, wanVaeModel: { key: 'gone' }, wiredVae: null })
+    );
+    expect(reasons.some((r) => r.content.includes('incompatibleWanVae'))).toBe(false);
+  });
+});
+
 describe('Wan 2.2 A14B expert pairing is not a readiness blocker', () => {
   const withComponents = { wanComponentSource: { key: 'src' } };
 

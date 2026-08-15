@@ -22,10 +22,37 @@ type WanComponentUpdates = {
   vae?: AnyModelConfig | null;
   componentSource?: AnyModelConfig | null;
   encoder?: AnyModelConfig | null;
+  lowNoisePartner?: AnyModelConfig | null;
 };
 
 const variantOf = (model: unknown): string | null =>
   model && typeof model === 'object' && 'variant' in model && typeof model.variant === 'string' ? model.variant : null;
+
+const isTi2v5b = (model: unknown): boolean => variantOf(model) === 'ti2v_5b';
+
+/** Mirrors `WanModelLoaderInvocation._validate_standalone_vae`: TI2V-5B needs the
+ *  48-channel Wan 2.2 VAE, A14B the 16-channel Wan 2.1 one. Exported so the readiness
+ *  pre-flight tests the same rule rather than a second, drifting copy of it. */
+export const isWanVaeCompatible = (mainConfig: unknown, vae: unknown): boolean =>
+  !!vae &&
+  typeof vae === 'object' &&
+  'latent_channels' in vae &&
+  vae.latent_channels === (isTi2v5b(mainConfig) ? 48 : 16);
+
+/** Mirrors `_validate_component_source_vae` plus `_validate_component_source_format`:
+ *  the source must be a Diffusers Wan main on the same side of the TI2V-5B / A14B split,
+ *  because its VAE is what gets used. */
+export const isWanComponentSourceCompatible = (mainConfig: unknown, source: unknown): boolean =>
+  !!source &&
+  typeof source === 'object' &&
+  'format' in source &&
+  source.format === 'diffusers' &&
+  isTi2v5b(source) === isTi2v5b(mainConfig);
+
+/** The low-noise partner must match the main's variant exactly — a stricter rule than the
+ *  TI2V/A14B split above. See `wan_model_loader.py`'s "must use the same Wan variant". */
+export const isWanLowNoisePartnerCompatible = (mainConfig: unknown, partner: unknown): boolean =>
+  variantOf(partner) === variantOf(mainConfig);
 
 export const getWanComponentUpdates = (arg: {
   /** The newly selected Wan main model's config. */
@@ -40,6 +67,7 @@ export const getWanComponentUpdates = (arg: {
   selectedVae: AnyModelConfig | null;
   selectedComponentSource: AnyModelConfig | null;
   selectedEncoder: Identifier;
+  selectedLowNoisePartner: AnyModelConfig | null;
   availableVaes: AnyModelConfig[];
   availableDiffusers: AnyModelConfig[];
   availableEncoders: AnyModelConfig[];
@@ -50,6 +78,7 @@ export const getWanComponentUpdates = (arg: {
     selectedVae,
     selectedComponentSource,
     selectedEncoder,
+    selectedLowNoisePartner,
     availableVaes,
     availableDiffusers,
     availableEncoders,
@@ -57,27 +86,21 @@ export const getWanComponentUpdates = (arg: {
 
   const updates: WanComponentUpdates = {};
 
-  const isTi2v5b = variantOf(mainConfig) === 'ti2v_5b';
-  const requiredLatentChannels = isTi2v5b ? 48 : 16;
+  const vaeIsCompatible = (model: unknown) => isWanVaeCompatible(mainConfig, model);
+  const sourceIsCompatible = (model: unknown) => isWanComponentSourceCompatible(mainConfig, model);
 
-  const vaeIsCompatible = (model: unknown) =>
-    !!model &&
-    typeof model === 'object' &&
-    'latent_channels' in model &&
-    model.latent_channels === requiredLatentChannels;
-
-  const sourceIsCompatible = (model: unknown) => (variantOf(model) === 'ti2v_5b') === isTi2v5b;
-
-  // The standalone VAE outranks every other source in the loader — including a Diffusers
-  // main's own — so it is checked for any Wan main, not just single-file ones.
-  if (!vaeIsCompatible(selectedVae)) {
+  // A wired standalone VAE outranks every other source in the loader — including a
+  // Diffusers main's own — so an incompatible one has to be corrected for *any* Wan main.
+  // Filling an empty slot is different: only a single-file main needs one. Auto-wiring a
+  // standalone VAE for a self-contained Diffusers main would silently override the VAE it
+  // ships with, and the user could not undo it (clearing the combobox would just refill
+  // on the next selection).
+  if (selectedVae && !vaeIsCompatible(selectedVae)) {
+    updates.vae = availableVaes.find(vaeIsCompatible) ?? null;
+  } else if (!selectedVae && isSingleFileMain) {
     const vae = availableVaes.find(vaeIsCompatible);
-    // Clearing when nothing fits is deliberate: an empty slot reads as "pick one" in the
-    // UI, a stale one reads as already handled.
     if (vae) {
       updates.vae = vae;
-    } else if (selectedVae) {
-      updates.vae = null;
     }
   }
 
@@ -86,7 +109,9 @@ export const getWanComponentUpdates = (arg: {
   if (isSingleFileMain) {
     if (!selectedComponentSource || !sourceIsCompatible(selectedComponentSource)) {
       // No "any Wan Diffusers model" fallback. Picking an arbitrary one here produces
-      // exactly the mismatch the loader validation exists to catch.
+      // exactly the mismatch the loader validation exists to catch. Clearing when nothing
+      // fits is deliberate: an empty slot reads as "pick one" in the UI, a stale one reads
+      // as already handled.
       const source = availableDiffusers.find(sourceIsCompatible);
       if (source) {
         updates.componentSource = source;
@@ -96,13 +121,21 @@ export const getWanComponentUpdates = (arg: {
     }
 
     // The UMT5-XXL encoder is shared across every Wan variant, so first-match is correct
-    // and there is nothing to re-validate.
+    // and there is nothing to re-validate beyond the model still existing.
     if (!selectedEncoder) {
       const encoder = availableEncoders[0];
       if (encoder) {
         updates.encoder = encoder;
       }
     }
+  }
+
+  // The low-noise partner. Its check is exact variant equality, stricter than the VAE's
+  // TI2V/A14B split, so switching t2v -> i2v leaves a partner the loader will refuse.
+  // There is no safe auto-repoint here — which file is the partner is the user's call —
+  // so an incompatible one is cleared and the slot goes back to reading "pick one".
+  if (selectedLowNoisePartner && !isWanLowNoisePartnerCompatible(mainConfig, selectedLowNoisePartner)) {
+    updates.lowNoisePartner = null;
   }
 
   return updates;

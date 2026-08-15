@@ -135,14 +135,17 @@ type ModelHandler = (
 
 export const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedMainModel = state.params.model;
-  // selectPrimaryMainModelOptions: this auto-selects on the user's behalf whenever the
-  // current selection goes away, so it must offer exactly what the pickers offer — never
-  // reaching for a Wan low-noise expert while its partner is installed.
-  const allMainModels = selectPrimaryMainModelOptions(models.filter(isNonRefinerMainModelConfig)).sort((a) =>
-    a.base === 'sdxl' ? -1 : 1
-  );
+  const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
-  const firstModel = allMainModels[0];
+  // Availability and offerability are different questions, and conflating them here
+  // would be destructive. `selectPrimaryMainModelOptions` hides a Wan low-noise expert
+  // once its partner is installed — so if the *selected* model were tested against the
+  // filtered list, installing that partner would read as "your model vanished" and swap
+  // the user onto an unrelated model, firing the whole base-changed cascade (LoRAs
+  // disabled, VAE cleared, bbox resized) for an action that was just a file install.
+  // Keep the selection test on what exists; filter only what we may pick *for* them.
+  const selectableModels = selectPrimaryMainModelOptions(allMainModels);
+  const firstModel = selectableModels[0] ?? allMainModels[0];
 
   // If we have no models, we may need to clear the selected model
   if (!firstModel) {

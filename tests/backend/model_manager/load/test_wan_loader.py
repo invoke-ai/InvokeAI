@@ -182,15 +182,27 @@ class TestUnwrapUnquantized:
         assert out["plain"] is plain
 
 
-def _run_gguf_loader_with_unexpected_keys(unexpected: list[str]) -> None:
-    """Drive WanGGUFCheckpointModel to the incompatible-keys check with `unexpected`."""
+def _run_gguf_loader(extra_keys: list[str]) -> dict:
+    """Drive WanGGUFCheckpointModel over a state dict carrying `extra_keys`.
+
+    The extras go into the *state dict*, not into a mocked `unexpected_keys`, so the
+    loader's own classification runs. Returns the dict actually handed to
+    `load_state_dict`, which is what proves a key was dropped rather than merely
+    tolerated.
+    """
     state_dict = {
         "patch_embedding.weight": torch.zeros(128, 16, 1, 2, 2),
         "blocks.0.ffn.net.0.proj.weight": torch.zeros(256, 128),
         "proj_out.weight": torch.zeros(64, 128),
     }
+    for key in extra_keys:
+        state_dict[key] = torch.zeros(4, 4)
     model = MagicMock()
-    model.load_state_dict.return_value = SimpleNamespace(missing_keys=[], unexpected_keys=unexpected)
+    # Report as unexpected whatever the loader still hands over that isn't a real param.
+    real_params = {"patch_embedding.weight", "blocks.0.ffn.net.0.proj.weight", "proj_out.weight"}
+    model.load_state_dict.side_effect = lambda sd, **_: SimpleNamespace(
+        missing_keys=[], unexpected_keys=[k for k in sd if k not in real_params]
+    )
     config = SimpleNamespace(path="/models/wan.gguf", variant=WanVariantType.T2V_A14B)
     loader = object.__new__(WanGGUFCheckpointModel)
 
@@ -210,30 +222,31 @@ def _run_gguf_loader_with_unexpected_keys(unexpected: list[str]) -> None:
     ):
         loader._load_from_singlefile(config)
 
+    return model.load_state_dict.call_args.args[0]
 
-def test_gguf_loader_accepts_all_in_one_bundled_components() -> None:
+
+def test_gguf_loader_drops_all_in_one_bundled_components_before_loading() -> None:
     """The "all-in-one" GGUF convention bundles the VAE and text encoder alongside the
     transformer — befox/WAN2.2-14B-Rapid-AllInOne-GGUF ships ~110 such files, converted
     from Phr00t/WAN2.2-14B-Rapid-AllInOne.
 
-    Before the unexpected-key backstop these loaded fine: `strict=False` dropped the
-    bundled copies and InvokeAI sourced the VAE and encoder from separately-wired
-    models. Refusing them is a regression on a path that already worked.
+    They must load (refusing them regressed a path that worked before the unexpected-key
+    backstop existed) *and* the bundled weights must be gone before the compute-dtype
+    cast and the RAM-cache reservation, not merely tolerated at load_state_dict — the
+    bundled UMT5-XXL alone is several GB that would otherwise be upcast and reserved.
     """
-    _run_gguf_loader_with_unexpected_keys(
-        [
-            "vae.decoder.conv_in.weight",
-            "text_encoders.umt5xxl.shared.weight",
-            "model_ema.patch_embedding.weight",
-        ]
-    )
+    bundled = ["vae.decoder.conv_in.weight", "text_encoders.umt5xxl.shared.weight", "model_ema.patch_embedding.weight"]
+
+    handed_over = _run_gguf_loader(bundled)
+
+    assert [key for key in bundled if key in handed_over] == []
 
 
 def test_gguf_loader_still_refuses_an_unknown_conditioning_branch() -> None:
     """The allowlist must not switch the backstop off — an unenumerated Wan derivative
     still has to fail loudly rather than generate with its conditioning branch absent."""
     with pytest.raises(RuntimeError, match="audio_injector"):
-        _run_gguf_loader_with_unexpected_keys(["vae.decoder.conv_in.weight", "audio_injector.0.proj.weight"])
+        _run_gguf_loader(["vae.decoder.conv_in.weight", "audio_injector.0.proj.weight"])
 
 
 def test_gguf_loader_rejects_missing_model_parameter() -> None:

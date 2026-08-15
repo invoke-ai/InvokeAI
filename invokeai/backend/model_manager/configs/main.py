@@ -2094,11 +2094,19 @@ def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
         # pairs, so the noun comes second. "low angle" is a camera angle, but
         # "Angle HIGH" is the high-noise expert of a camera-angle LoRA.
         #
-        # Checked ahead of the 'noise' test below. A disqualifier sits after the run,
-        # so an adjacent 'noise' would have to precede it — `noise_LOW_VRAM` is
-        # describing VRAM, not the low-noise expert. ('low noise' can't trip this:
-        # 'noise' is not itself a disqualifier.)
+        # A disqualifier only consumes the marker it is actually attached to — the last
+        # one in the run — not the whole run. `HIGH_lowVRAM` is the high-noise expert of
+        # a low-VRAM build: dropping both markers there loses a correct tag, which for a
+        # main model disables the pair checks and for a LoRA silently applies a
+        # single-expert distill to both experts.
+        #
+        # Checked ahead of the 'noise' test below, and it clears `following` with it: a
+        # disqualifier sits after the run, so an adjacent 'noise' would have to precede
+        # it. ('low noise' can't trip this — 'noise' is not itself a disqualifier.)
         if following in _WAN_EXPERT_DISQUALIFIERS:
+            run = run[:-1]
+            following = None
+        if not run:
             continue
         if previous == "noise" or following == "noise":
             explicit.extend(run)

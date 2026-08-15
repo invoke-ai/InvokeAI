@@ -207,23 +207,72 @@ _BENIGN_EXTRA_MODULES = frozenset(
     }
 )
 
-# Substrings marking a merged-in LoRA's leftover adapter tensors. The main-model
+# Trailing segments marking a merged-in LoRA's leftover adapter tensors. The main-model
 # probe deliberately admits checkpoints that retain these — see
-# ``configs.main._has_wan_transformer_block_weights``, which uses a *positive*
-# structural test precisely so merged-LoRA mains aren't turned away — so the
-# loader has to admit them too, or the two halves disagree about the same file.
-_MERGED_LORA_MARKERS = ("lora_a", "lora_b", "lora_down", "lora_up", "lora_magnitude", "dora_scale", ".alpha")
+# ``configs.main._has_wan_transformer_block_weights``, which uses a *positive* structural
+# test precisely so merged-LoRA mains aren't turned away — so the loader has to admit
+# them too, or the two halves disagree about the same file.
+#
+# Kept in step with the suffix set ``LoRA_LyCORIS_Wan_Config`` matches on
+# (``configs/lora.py``): kohya, PEFT, DoRA and LoKr. Matched against the *last* path
+# segment rather than as a substring anywhere in the key, so a future conditioning branch
+# that merely contains "lora_a" in a module name still trips the backstop instead of
+# being silently discarded by it.
+_MERGED_LORA_SEGMENTS = frozenset(
+    {
+        "alpha",
+        "dora_scale",
+        "lora_magnitude_vector",
+        "lokr_w1",
+        "lokr_w2",
+        "lokr_w1_a",
+        "lokr_w1_b",
+        "lokr_w2_a",
+        "lokr_w2_b",
+        "hada_w1_a",
+        "hada_w1_b",
+        "hada_w2_a",
+        "hada_w2_b",
+        "oft_blocks",
+    }
+)
+_MERGED_LORA_PENULTIMATE = frozenset({"lora_a", "lora_b", "lora_down", "lora_up", "lora_mid", "lora_magnitude"})
 
 
 def _is_benign_extra_key(key: str) -> bool:
     """True if an unexpected key is packaging rather than an unsupported branch."""
-    if key.split(".")[0] in _BENIGN_EXTRA_MODULES:
+    parts = key.lower().split(".")
+    if parts[0] in _BENIGN_EXTRA_MODULES:
         return True
-    lowered = key.lower()
-    return any(marker in lowered for marker in _MERGED_LORA_MARKERS)
+    if parts[-1] in _MERGED_LORA_SEGMENTS:
+        return True
+    # `...to_q.lora_down.weight` — the marker is the segment before the tensor name.
+    return len(parts) >= 2 and parts[-2] in _MERGED_LORA_PENULTIMATE
 
 
-def _raise_for_incompatible_keys(incompatible_keys: Any, source: str, logger: Any) -> None:
+def _drop_benign_extra_keys(sd: dict, source: str, logger: Any) -> None:
+    """Remove packaging weights the transformer has no use for, in place.
+
+    Done up front rather than left to ``load_state_dict(strict=False)`` because
+    everything between here and there costs real memory: the fp8 dequant pass, the
+    blanket cast to the compute dtype, and the RAM-cache reservation all run over the
+    whole dict. An all-in-one checkpoint bundles a full VAE and UMT5-XXL text encoder —
+    several GB, upcast to bf16 and reserved in the cache — only for
+    ``load_state_dict`` to discard them one line later.
+    """
+    dropped = [key for key in sd if isinstance(key, str) and _is_benign_extra_key(key)]
+    if not dropped:
+        return
+    modules = sorted({key.split(".")[0] for key in dropped})
+    for key in dropped:
+        del sd[key]
+    logger.info(
+        f"{source}: ignored {len(dropped)} bundled/merged weights not part of the transformer "
+        f"({', '.join(modules[:8])}). The VAE and text encoder come from the separately-wired models."
+    )
+
+
+def _raise_for_incompatible_keys(incompatible_keys: Any, source: str) -> None:
     """Fail loudly on anything ``load_state_dict(strict=False)`` quietly discarded.
 
     Missing keys are the obvious error. Unexpected keys matter just as much here and
@@ -238,31 +287,19 @@ def _raise_for_incompatible_keys(incompatible_keys: Any, source: str, logger: An
     know by name; this is the generic backstop, so a derivative nobody has enumerated
     yet produces an error instead of quietly degraded output.
 
-    Not every extra key is a conditioning branch, though, so the two categories in
-    ``_is_benign_extra_key`` are dropped with a log line instead of raising: bundled
-    VAE/text-encoder weights (the "all-in-one" packaging convention) and merged-LoRA
-    residue (which the main-model probe explicitly accepts). Refusing those would
-    reject files that load and generate correctly today.
+    Benign extras — bundled VAE/text-encoder weights and merged-LoRA residue — have
+    already been removed by ``_drop_benign_extra_keys``, so anything reaching here is
+    genuinely unplaceable.
     """
     if incompatible_keys.missing_keys:
         raise RuntimeError(f"{source} is missing model parameters: {sorted(incompatible_keys.missing_keys)[:10]}")
 
     unexpected = [key for key in incompatible_keys.unexpected_keys if isinstance(key, str)]
-    benign = [key for key in unexpected if _is_benign_extra_key(key)]
-    unsupported = [key for key in unexpected if not _is_benign_extra_key(key)]
-
-    if benign:
-        modules = sorted({key.split(".")[0] for key in benign})
-        logger.info(
-            f"{source}: ignored {len(benign)} bundled/merged weights not part of the transformer "
-            f"({', '.join(modules[:8])}). The VAE and text encoder come from the separately-wired models."
-        )
-
-    if unsupported:
+    if unexpected:
         # Report the distinct top-level module names rather than hundreds of keys.
-        modules = sorted({key.split(".")[0] for key in unsupported})
+        modules = sorted({key.split(".")[0] for key in unexpected})
         raise RuntimeError(
-            f"{source} has {len(unsupported)} weights that WanTransformer3DModel has nowhere to put "
+            f"{source} has {len(unexpected)} weights that WanTransformer3DModel has nowhere to put "
             f"(modules: {', '.join(modules[:8])}). This is a Wan variant with extra conditioning "
             "branches — Animate, S2V, Fun-Camera and similar — which InvokeAI cannot run faithfully; "
             "loading it anyway would silently ignore that conditioning."
@@ -397,6 +434,8 @@ class WanGGUFCheckpointModel(ModelLoader):
                 }
                 break
 
+        _drop_benign_extra_keys(sd, "GGUF state dict", InvokeAILogger.get_logger(self.__class__.__name__))
+
         # QuantStack and other community releases ship the native upstream Wan key
         # layout (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
         # diffusers' WanTransformer3DModel expects condition_embedder.*, attn1/attn2,
@@ -417,11 +456,7 @@ class WanGGUFCheckpointModel(ModelLoader):
             model = WanTransformer3DModel(**model_config)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
-        _raise_for_incompatible_keys(
-            incompatible_keys,
-            source="GGUF state dict",
-            logger=InvokeAILogger.get_logger(self.__class__.__name__),
-        )
+        _raise_for_incompatible_keys(incompatible_keys, source="GGUF state dict")
         return model
 
 
@@ -471,6 +506,7 @@ class WanCheckpointModel(ModelLoader):
 
         sd = load_file(str(model_path))
         sd = _strip_comfyui_prefix(sd)
+        _drop_benign_extra_keys(sd, "Wan checkpoint", logger)
 
         dequantized = _dequantize_comfyui_fp8(sd, model_dtype)
         if dequantized > 0:
@@ -504,7 +540,7 @@ class WanCheckpointModel(ModelLoader):
         self._ram_cache.make_room(new_sd_size)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
-        _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint", logger=logger)
+        _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
         return model
 
 

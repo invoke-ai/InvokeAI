@@ -245,10 +245,18 @@ class TestEndToEnd:
         path = tmp_path / "wan2.2-t2v-rapid-aio-v10-high_noise.safetensors"
         save_file(sd, path)
 
-        model = _load(path)
-        # The transformer itself still loaded, and none of the bundled weights reached it.
-        assert not hasattr(model, "vae")
-        assert not hasattr(model, "text_encoders")
+        model = MagicMock()
+        model.load_state_dict.return_value = SimpleNamespace(missing_keys=[], unexpected_keys=[])
+        with patch("diffusers.WanTransformer3DModel", return_value=model):
+            _load(path)
+
+        # Assert on the dict actually handed over. `hasattr(model, "vae")` would be a
+        # tautology — a freshly built WanTransformer3DModel has no such attribute either
+        # way — and it would not catch the bundled weights being cast and RAM-reserved
+        # before load_state_dict discarded them, which is the cost this avoids.
+        handed_over = model.load_state_dict.call_args.args[0]
+        assert [k for k in handed_over if k.startswith(("vae.", "text_encoders.", "model_ema."))] == []
+        assert "patch_embedding.weight" in handed_over
 
     def test_merged_lora_residue_is_dropped_not_refused(self, tmp_path: Path) -> None:
         """`configs.main._has_wan_transformer_block_weights` deliberately admits main
@@ -261,6 +269,27 @@ class TestEndToEnd:
         sd["blocks.0.attn1.to_q.lora_down.weight"] = torch.zeros(8, 128)
         sd["blocks.0.attn1.to_q.lora_up.weight"] = torch.zeros(128, 8)
         sd["blocks.0.attn1.to_q.alpha"] = torch.zeros(())
+        path = tmp_path / "Wan2.2-T2V-A14B-high_noise-merged.safetensors"
+        save_file(sd, path)
+
+        _load(path)  # must not raise
+
+    @pytest.mark.parametrize(
+        "residue",
+        [
+            pytest.param(["blocks.0.attn1.to_q.lora_A.weight", "blocks.0.attn1.to_q.lora_B.weight"], id="peft"),
+            pytest.param(["blocks.0.attn1.to_q.lokr_w1", "blocks.0.attn1.to_q.lokr_w2"], id="lokr"),
+            pytest.param(["blocks.0.attn1.to_q.hada_w1_a", "blocks.0.attn1.to_q.hada_w2_a"], id="loha"),
+            pytest.param(["blocks.0.attn1.to_q.dora_scale"], id="dora"),
+        ],
+    )
+    def test_every_lycoris_family_the_probe_accepts_also_loads(self, tmp_path: Path, residue: list[str]) -> None:
+        """The allowlist has to cover the same families as `LoRA_LyCORIS_Wan_Config`'s
+        suffix set, or the probe accepts a merged file the loader then refuses — with a
+        message blaming Animate/S2V/Fun-Camera, which is no help at all."""
+        sd = _tiny_model().state_dict()
+        for key in residue:
+            sd[key] = torch.zeros(8, 8)
         path = tmp_path / "Wan2.2-T2V-A14B-high_noise-merged.safetensors"
         save_file(sd, path)
 

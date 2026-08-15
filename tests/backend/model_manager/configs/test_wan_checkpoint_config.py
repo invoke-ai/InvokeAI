@@ -443,6 +443,14 @@ class TestExpertFilenameHeuristic:
             # "noise ... LOW VRAM" is describing VRAM.
             ("Wan2.2-A14B-add-noise-LOW-VRAM", "none"),
             ("wan22_a14b_noise_low_cfg", "none"),
+            # A disqualifier consumes only the marker it is attached to, not every
+            # marker beside it. `HIGH_lowVRAM` is the high-noise expert of a low-VRAM
+            # build; swallowing the run would drop a correct tag, which disables the
+            # pair checks for a main and applies a single-expert LoRA to both experts.
+            ("Wan2_2-T2V-A14B-HIGH_lowVRAM_fp8_scaled_KJ", "high"),
+            ("Wan2.2-I2V-A14B-HIGH-low-vram", "high"),
+            ("Wan2.2-T2V-A14B-LOW-high-res", "low"),
+            ("wan22_a14b_HIGH_low_mem", "high"),
             # A conflict in the explicit tier is final — a stray bare marker later in
             # the name must not rescue it into a confident answer.
             ("wan2.2_low_high_noise_merged_LOW", "none"),

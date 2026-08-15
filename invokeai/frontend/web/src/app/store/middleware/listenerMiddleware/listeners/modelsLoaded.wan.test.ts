@@ -6,10 +6,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { handleMainModels } from './modelsLoaded';
 
 /**
- * A Wan low-noise expert is refused by the loader as a primary main ("An unpaired Wan
- * A14B model must be the high-noise expert"), so no path that chooses a primary main on
- * the user's behalf may reach for one. This listener is the least visible of the three:
- * it fires on every `getModelConfigs` fulfilment and swaps the selection silently.
+ * A Wan low-noise expert belongs in the Transformer (Low Noise) slot; running it alone as
+ * the primary main is accepted by the loader since #9505 but gives visibly worse output.
+ * So no path that chooses a primary main *on the user's behalf* should reach for one
+ * while its partner is installed. This listener is the least visible of the three: it
+ * fires on every `getModelConfigs` fulfilment and swaps the selection silently.
+ *
+ * Which is exactly why it must not treat "hidden" as "uninstalled" — see the last test.
  */
 
 const wanHighExpert = {
@@ -28,6 +31,15 @@ const wanLowExpert = {
   key: 'wan-low',
   name: 'Wan2.2-T2V-A14B-LOW',
   expert: 'low',
+} as unknown as AnyModelConfig;
+
+const sdxlModel = {
+  key: 'sdxl',
+  hash: 'h',
+  name: 'SDXL',
+  base: 'sdxl',
+  type: 'main',
+  format: 'checkpoint',
 } as unknown as AnyModelConfig;
 
 const makeState = () => ({ params: { model: null } }) as unknown as RootState;
@@ -62,5 +74,24 @@ describe('handleMainModels — Wan low-noise experts', () => {
 
     // Both remain offerable; the sort leaves the list order, so the low expert is first.
     expect(dispatch).toHaveBeenCalledWith(modelSelected(wanLowExpert));
+  });
+
+  it('does not swap the user off a selected low expert when its partner is installed', () => {
+    // The regression this guards: hiding is a *visibility* rule, and the availability
+    // check must not use it. Otherwise installing the high-noise partner reads as "your
+    // model was uninstalled" and silently moves the user to another model — firing the
+    // base-changed cascade for what was just a file install.
+    const dispatch = vi.fn();
+    const state = { params: { model: wanLowExpert } } as unknown as RootState;
+    handleMainModels([wanLowExpert, wanHighExpert, sdxlModel], state, dispatch, log);
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('never auto-selects a hidden low expert when a partner exists', () => {
+    const dispatch = vi.fn();
+    handleMainModels([wanLowExpert, wanHighExpert, sdxlModel], makeState(), dispatch, log);
+
+    expect(dispatch).toHaveBeenCalledWith(modelSelected(sdxlModel));
   });
 });

@@ -23,6 +23,7 @@ import {
   vaeSelected,
   wanComponentSourceSelected,
   wanT5EncoderModelSelected,
+  wanTransformerLowNoiseSelected,
   wanVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
@@ -643,7 +644,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         // encoder for this format but this doesn't offer to fill them, selecting the
         // model immediately blocks Invoke with nothing populated.
         if (newModelConfig) {
-          const { wanComponentSource, wanVaeModel, wanT5EncoderModel } = state.params;
+          const { wanComponentSource, wanVaeModel, wanT5EncoderModel, wanTransformerLowNoise } = state.params;
           const configFor = (identifier: { key: string } | null) =>
             identifier && modelConfigsResult.data
               ? (modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, identifier.key) ?? null)
@@ -654,7 +655,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             isSingleFileMain: isWanSingleFileMainModelConfig(newModelConfig),
             selectedVae: configFor(wanVaeModel),
             selectedComponentSource: configFor(wanComponentSource),
-            selectedEncoder: wanT5EncoderModel,
+            selectedEncoder: configFor(wanT5EncoderModel),
+            selectedLowNoisePartner: configFor(wanTransformerLowNoise),
             availableVaes: selectWanVAEModels(state),
             availableDiffusers: selectWanDiffusersModels(state),
             availableEncoders: selectWanT5EncoderModels(state),
@@ -672,6 +674,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
           if (updates.encoder !== undefined) {
             dispatch(wanT5EncoderModelSelected(updates.encoder && zModelIdentifierField.parse(updates.encoder)));
+          }
+          if (updates.lowNoisePartner !== undefined) {
+            dispatch(
+              wanTransformerLowNoiseSelected(
+                updates.lowNoisePartner && zModelIdentifierField.parse(updates.lowNoisePartner)
+              )
+            );
           }
         }
       }

@@ -181,10 +181,11 @@ class WanModelLoaderInvocation(BaseInvocation):
                 low_expert = getattr(low_config, "expert", "none")
 
                 if getattr(low_config, "variant", None) != main_variant:
+                    low_variant = getattr(low_config, "variant", None)
                     raise ValueError(
                         "The high-noise and low-noise models must use the same Wan variant, but "
                         f"'{main_config.name}' is {main_variant.value} and '{low_config.name}' is "
-                        f"{getattr(low_config, 'variant', None)}."
+                        f"{getattr(low_variant, 'value', low_variant)}."
                     )
 
                 # The expert tag is a filename heuristic, so 'none' (untagged) is common on
@@ -235,12 +236,6 @@ class WanModelLoaderInvocation(BaseInvocation):
                         "An A14B single-file main is wired to 'Transformer' without a paired "
                         "'Transformer (Low Noise)'. Only this one expert will run; quality will be reduced."
                     )
-                    if primary_expert == "low":
-                        message += (
-                            " Its filename tags it as the low-noise expert; when running a single expert, "
-                            "the high-noise one is usually the better choice."
-                        )
-                    context.logger.warning(message)
                     if primary_expert == "low":
                         message += (
                             " Its filename tags it as the low-noise expert; when running a single expert, "

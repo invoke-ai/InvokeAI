@@ -72,6 +72,7 @@ const build = (overrides: Partial<Parameters<typeof getWanComponentUpdates>[0]> 
     selectedVae: null,
     selectedComponentSource: null,
     selectedEncoder: null,
+    selectedLowNoisePartner: null,
     availableVaes: [],
     availableDiffusers: [],
     availableEncoders: [],
@@ -141,9 +142,25 @@ describe('getWanComponentUpdates', () => {
     ).toEqual({});
   });
 
-  it('re-validates the standalone VAE for a Diffusers main too', () => {
-    // The loader prefers a wired standalone VAE over the Diffusers main's own, so a
-    // stale one breaks a model that is otherwise self-contained.
+  it('wires nothing at all for a self-contained Diffusers main', () => {
+    // It carries its own VAE and encoder. Auto-wiring a standalone VAE would silently
+    // override the one the model ships with — the loader ranks a wired standalone VAE
+    // above a Diffusers main's own — and the user could not undo it: clearing the
+    // combobox would just refill on the next selection.
+    expect(
+      build({
+        mainConfig: a14bDiffusers,
+        isSingleFileMain: false,
+        availableVaes: [vae16],
+        availableDiffusers: [a14bDiffusers],
+        availableEncoders: [encoder],
+      })
+    ).toEqual({});
+  });
+
+  it('still corrects an incompatible VAE already wired against a Diffusers main', () => {
+    // Filling and correcting are different: a wired VAE outranks the Diffusers main's
+    // own, so an incompatible one is the user's problem to see fixed either way.
     expect(
       build({
         mainConfig: ti2v5bDiffusers,
@@ -154,16 +171,15 @@ describe('getWanComponentUpdates', () => {
     ).toEqual({ vae: vae48 });
   });
 
-  it('does not wire a Component Source or encoder for a Diffusers main', () => {
-    expect(
-      build({
-        mainConfig: a14bDiffusers,
-        isSingleFileMain: false,
-        availableVaes: [vae16],
-        availableDiffusers: [a14bDiffusers],
-        availableEncoders: [encoder],
-      })
-    ).toEqual({ vae: vae16 });
+  it('clears a low-noise partner whose variant no longer matches the main', () => {
+    // Exact variant equality, stricter than the VAE's TI2V/A14B split — switching
+    // t2v -> i2v leaves a partner the loader refuses. There is no safe auto-repoint
+    // (which file is the partner is the user's call), so it is cleared.
+    const t2vLow = { ...a14bCheckpoint, key: 't2v-low', expert: 'low' } as unknown as AnyModelConfig;
+    const i2vMain = { ...a14bCheckpoint, key: 'i2v-high', variant: 'i2v_a14b' } as unknown as AnyModelConfig;
+
+    expect(build({ mainConfig: i2vMain, selectedLowNoisePartner: t2vLow }).lowNoisePartner).toBeNull();
+    expect(build({ mainConfig: a14bCheckpoint, selectedLowNoisePartner: t2vLow }).lowNoisePartner).toBeUndefined();
   });
 
   it('treats a slot pointing at a deleted model as empty', () => {
