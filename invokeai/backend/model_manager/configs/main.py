@@ -1558,6 +1558,59 @@ class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, C
         return MiniMaxH3VariantType.FL2VA
 
 
+def _has_minimax_h3_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Fingerprint for MiniMax H3 single-file transformer checkpoints (remote-code key layout,
+    as shipped by MiniMax's release and the Comfy-Org repacks, bf16 or int8 alike).
+
+    The joint audio+video patch projections are unique to H3 across every family probed here
+    (Wan keys on `patch_embedding`, FLUX on `double_blocks`, Z-Image on `cap_embedder`, ...);
+    the fused-qkv block key pins the remote-code layout the loader's converter expects.
+    """
+    return all(
+        k in state_dict for k in ("audio_patch_proj.weight", "video_patch_proj.weight", "blocks.0.attn.qkv_proj.weight")
+    )
+
+
+class Main_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MiniMax H3 single-file transformer checkpoints (safetensors).
+
+    Covers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or
+    Comfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned ("adaln curves"). The
+    file holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come
+    from an installed H3 diffusers-layout folder.
+
+    A Ref2VA transformer single file is key-for-key indistinguishable from FL2VA, so Ref2VA is
+    excluded only by filename; a renamed Ref2VA file would load and run but produce degraded
+    output (it expects reference conditioning rows this integration never packs).
+    """
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: MiniMaxH3VariantType = Field()
+    pruned: bool = Field(description="Whether this is an AdaLN-pruned ('adaln curves') checkpoint.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if "ref2va" in mod.path.name.lower():
+            raise NotAMatchError("Ref2VA single-file transformers are not supported yet")
+
+        state_dict = mod.load_state_dict()
+        if not _has_minimax_h3_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MiniMax H3 transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("GGUF-quantized MiniMax H3 checkpoints are not supported yet")
+
+        variant = override_fields.pop("variant", None) or MiniMaxH3VariantType.FL2VA
+        pruned = "adaln_t_table" in state_dict
+
+        return cls(**override_fields, variant=variant, pruned=pruned)
+
+
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Krea-2 single-file checkpoint models (safetensors, etc)."""
 

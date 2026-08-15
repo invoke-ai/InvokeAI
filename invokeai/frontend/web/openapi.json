@@ -916,6 +916,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
                     },
                     {
@@ -1323,6 +1326,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
                     },
                     {
@@ -1728,6 +1734,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2180,6 +2189,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2656,6 +2668,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -3980,6 +3995,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -15258,6 +15276,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
           },
           {
             "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -36216,6 +36237,9 @@
                   "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
                 },
                 {
@@ -45065,6 +45089,9 @@
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
               },
               {
@@ -46443,6 +46470,9 @@
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
               },
               {
@@ -47426,6 +47456,9 @@
           "minimax_h3_frame_conditioning": {
             "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
           },
+          "minimax_h3_ideal_dimensions": {
+            "$ref": "#/components/schemas/IdealSizeOutput"
+          },
           "minimax_h3_latents_to_image": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -47949,6 +47982,7 @@
           "metadata_to_vae",
           "minimax_h3_denoise",
           "minimax_h3_frame_conditioning",
+          "minimax_h3_ideal_dimensions",
           "minimax_h3_latents_to_image",
           "minimax_h3_latents_to_video",
           "minimax_h3_model_loader",
@@ -48744,6 +48778,9 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
@@ -49819,6 +49856,9 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
@@ -58836,6 +58876,181 @@
         "title": "Main_Checkpoint_Krea2_Config",
         "description": "Model config for Krea-2 single-file checkpoint models (safetensors, etc)."
       },
+      "Main_Checkpoint_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MiniMaxH3VariantType"
+          },
+          "pruned": {
+            "type": "boolean",
+            "title": "Pruned",
+            "description": "Whether this is an AdaLN-pruned ('adaln curves') checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant",
+          "pruned"
+        ],
+        "title": "Main_Checkpoint_MiniMaxH3_Config",
+        "description": "Model config for MiniMax H3 single-file transformer checkpoints (safetensors).\n\nCovers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or\nComfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned (\"adaln curves\"). The\nfile holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come\nfrom an installed H3 diffusers-layout folder.\n\nA Ref2VA transformer single file is key-for-key indistinguishable from FL2VA, so Ref2VA is\nexcluded only by filename; a renamed Ref2VA file would load and run but produce degraded\noutput (it expects reference conditioning rows this integration never packs)."
+      },
       "Main_Checkpoint_QwenImage_Config": {
         "properties": {
           "key": {
@@ -67271,6 +67486,76 @@
         "title": "MiniMaxH3FrameConditioningOutput",
         "type": "object"
       },
+      "MiniMaxH3IdealDimensionsInvocation": {
+        "category": "video",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\nApplies the released pipeline's canvas policy: short edge 768, soft area cap of\n768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of\nthe inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image\nPrimitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax\nH3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three\nmust share the same canvas).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Source image width in pixels.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Source image height in pixels.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_ideal_dimensions",
+            "default": "minimax_h3_ideal_dimensions",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["minimax", "video", "dimensions", "math"],
+        "title": "MiniMax H3 Ideal Dimensions",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/IdealSizeOutput"
+        }
+      },
       "MiniMaxH3LatentsToImageInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -67541,7 +67826,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Loads a MiniMax H3 (FL2VA) model, outputting its submodels.\n\nAll six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)\ncome from the one diffusers-layout install; there is no component mix-and-match yet.",
+        "description": "Loads a MiniMax H3 (FL2VA) model, outputting its submodels.\n\nAll six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)\ncome from the one diffusers-layout install. Optionally, a single-file transformer checkpoint\n(e.g. the pruned int8 repack) replaces the folder's transformer while the encoders and VAEs\nkeep coming from the folder install.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -67576,6 +67861,27 @@
             "orig_required": true,
             "title": "Model",
             "ui_model_base": ["minimax-h3"],
+            "ui_model_format": ["diffusers"],
+            "ui_model_type": ["main"]
+          },
+          "transformer_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional single-file MiniMax H3 transformer (e.g. pruned int8) used in place of the main model's transformer. Text encoder and VAEs still come from the main model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer (single file)",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_format": ["checkpoint"],
             "ui_model_type": ["main"]
           },
           "type": {
@@ -67590,7 +67896,7 @@
         "tags": ["model", "minimax", "video"],
         "title": "Main Model - MiniMax H3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
         }
@@ -68647,6 +68953,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
               },
               {
@@ -69300,6 +69609,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
                   },
                   {
@@ -69838,6 +70150,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
               },
               {
@@ -70230,6 +70545,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -71097,6 +71415,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
