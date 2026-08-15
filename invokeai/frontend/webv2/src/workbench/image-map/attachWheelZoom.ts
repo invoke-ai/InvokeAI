@@ -48,11 +48,15 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
   const handleWheel = (event: WheelEvent) => {
     // Also stops ctrl+wheel browser page zoom over the map.
     event.preventDefault();
-    zoomAtClientPoint(event.clientX, event.clientY, zoomFactorFromWheel(event.deltaY, event.ctrlKey));
+    zoomAtClientPoint(event.clientX, event.clientY, zoomFactorFromWheel(event.deltaY, event.deltaMode, event.ctrlKey));
   };
 
   let pinchDistance: number | null = null;
 
+  // Re-baselined on any transition INTO two touches, in either direction. A
+  // third finger landing mid-pinch suspends the gesture without clearing the
+  // baseline, so measuring against it after that finger lifts — with the other
+  // two moved meanwhile — would snap the viewport by an arbitrary factor.
   const handleTouchStart = (event: TouchEvent) => {
     if (event.touches.length === 2) {
       pinchDistance = touchDistance(event.touches);
@@ -88,7 +92,13 @@ export const attachWheelZoom = (element: HTMLElement, host: ZoomHost): (() => vo
   };
 
   const handleTouchEnd = (event: TouchEvent) => {
-    if (event.touches.length < 2 && pinchDistance !== null) {
+    if (event.touches.length === 2) {
+      pinchDistance = touchDistance(event.touches);
+
+      return;
+    }
+
+    if (pinchDistance !== null) {
       pinchDistance = null;
       // Stamp gesture end too: a pinch held still before lifting would
       // otherwise let plotly's synthetic click through.

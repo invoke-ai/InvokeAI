@@ -107,9 +107,48 @@ export const fitRangesToAspect = (ranges: AxisRanges, aspectRatio: number): Axis
   return { x: ranges.x, y: [centerY - nextSpanY / 2, centerY + nextSpanY / 2] };
 };
 
-/** exp() gain per wheel tick; ctrl+wheel is trackpad pinch and moves faster. */
-export const zoomFactorFromWheel = (deltaY: number, isPinch: boolean): number =>
-  Math.exp(deltaY * (isPinch ? 0.01 : 0.001));
+/** Approximate pixels per line and per page, for non-pixel wheel deltas. */
+const WHEEL_LINE_HEIGHT_PX = 16;
+const WHEEL_PAGE_HEIGHT_PX = 400;
+
+/**
+ * Above this many pixels a ctrl+wheel came from a real wheel, not a trackpad
+ * pinch: browsers report a pinch as ctrl+wheel too, but in small synthetic
+ * steps, while one mouse notch is 100px (Chrome) or 3 lines (Firefox).
+ */
+const PINCH_DELTA_LIMIT_PX = 40;
+
+/** The most a single wheel event may scale the view, in either direction. */
+const MAX_WHEEL_ZOOM_STEP = 1.25;
+
+/**
+ * Wheel deltas do not arrive in the same unit everywhere. Firefox reports a
+ * classic mouse wheel in LINES (deltaY ±3), so treating deltaY as pixels made
+ * one notch a 0.3% zoom — and since the handler preventDefaults, the user got
+ * neither zoom nor scroll.
+ */
+export const normalizeWheelDeltaY = (deltaY: number, deltaMode: number): number => {
+  if (deltaMode === 1) {
+    return deltaY * WHEEL_LINE_HEIGHT_PX;
+  }
+
+  if (deltaMode === 2) {
+    return deltaY * WHEEL_PAGE_HEIGHT_PX;
+  }
+
+  return deltaY;
+};
+
+/** exp() gain per wheel tick; a trackpad pinch moves faster per unit. */
+export const zoomFactorFromWheel = (deltaY: number, deltaMode: number, isCtrlHeld: boolean): number => {
+  const pixels = normalizeWheelDeltaY(deltaY, deltaMode);
+  const isPinch = isCtrlHeld && Math.abs(pixels) < PINCH_DELTA_LIMIT_PX;
+  const factor = Math.exp(pixels * (isPinch ? 0.01 : 0.001));
+
+  // The pinch gain applied to a mouse-sized delta would zoom 2.7x in one
+  // notch; clamping keeps every input device to a usable step.
+  return Math.min(Math.max(factor, 1 / MAX_WHEEL_ZOOM_STEP), MAX_WHEEL_ZOOM_STEP);
+};
 
 /**
  * Scale both ranges by `factor` while keeping the point at the given

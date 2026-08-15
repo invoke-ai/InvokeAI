@@ -215,6 +215,20 @@ const ImageMapPlot = () => {
     }
 
     const point = selectedImageName ? points.find((candidate) => candidate.imageName === selectedImageName) : undefined;
+    const suppression = lastMapSelectionRef.current;
+    const isSuppressionFresh = suppression !== null && Date.now() - suppression.at < MAP_CLICK_SUPPRESS_MS;
+    const cameFromMapClick = isSuppressionFresh && suppression.name === selectedImageName;
+
+    // Consume a matching entry; an interleaved external selection keeps a
+    // pending map click's suppression intact for when it lands. Expired
+    // entries go regardless — a click whose selection never arrived (the
+    // image was deleted, or the selection resolved to a non-image) would
+    // otherwise sit here and swallow the recenter for a later, unrelated
+    // gallery pick of the same name. Both run before the `!point` return,
+    // which is the path a never-arriving selection actually takes.
+    if (suppression !== null && (cameFromMapClick || !isSuppressionFresh)) {
+      lastMapSelectionRef.current = null;
+    }
 
     if (!point) {
       swallow(Plotly.restyle(container, { x: [[]], y: [[]] }, [markerIndex]));
@@ -223,18 +237,6 @@ const ImageMapPlot = () => {
     }
 
     swallow(Plotly.restyle(container, { x: [[point.x]], y: [[point.y]] }, [markerIndex]));
-
-    const suppression = lastMapSelectionRef.current;
-    const cameFromMapClick =
-      suppression !== null &&
-      suppression.name === selectedImageName &&
-      Date.now() - suppression.at < MAP_CLICK_SUPPRESS_MS;
-
-    if (suppression !== null && suppression.name === selectedImageName) {
-      // Consume only a matching entry; an interleaved external selection
-      // keeps a pending map click's suppression intact for when it lands.
-      lastMapSelectionRef.current = null;
-    }
 
     if (cameFromMapClick) {
       return;
@@ -269,23 +271,38 @@ const ImageMapPlot = () => {
 
     const observer = new ResizeObserver(() => {
       if (container.offsetWidth > 0 && container.offsetHeight > 0) {
-        void Plotly.Plots.resize(container);
+        // `@types/plotly.js` declares this `void`; plotly resolves a promise
+        // once the resize has actually been applied.
+        const resized = Plotly.Plots.resize(container) as unknown as Promise<unknown>;
 
-        // A plot first built while the container was unmeasured never got
-        // its whole-map fit; apply it on the first real layout.
-        if (!initialFitDoneRef.current) {
-          const fitted = computeInitialFit(
-            pointsRef.current ?? [],
-            selectedImageNameRef.current,
-            container.offsetWidth,
-            container.offsetHeight
-          );
+        // Chained, not fired alongside: the resize defers its own autosize
+        // relayout, so a fit applied immediately would be solved against the
+        // plot's previous dimensions — and with the axes scale-anchored, that
+        // re-solve crops one of them.
+        swallow(
+          resized.then(() => {
+            // A plot first built while the container was unmeasured never got
+            // its whole-map fit; apply it on the first real layout.
+            if (initialFitDoneRef.current) {
+              return undefined;
+            }
 
-          if (fitted) {
-            swallow(Plotly.relayout(container, { 'xaxis.range': fitted.x, 'yaxis.range': fitted.y }));
+            const fitted = computeInitialFit(
+              pointsRef.current ?? [],
+              selectedImageNameRef.current,
+              container.offsetWidth,
+              container.offsetHeight
+            );
+
+            if (!fitted) {
+              return undefined;
+            }
+
             initialFitDoneRef.current = true;
-          }
-        }
+
+            return Plotly.relayout(container, { 'xaxis.range': fitted.x, 'yaxis.range': fitted.y });
+          })
+        );
       }
     });
     observer.observe(container);
@@ -294,6 +311,10 @@ const ImageMapPlot = () => {
       detachZoom();
       observer.disconnect();
       Plotly.purge(container);
+      // Purging drops the layout the flag stands for. Leaving it set costs
+      // the whole-map fit on any remount of this same component instance —
+      // StrictMode's double-mount in development, for one.
+      initialFitDoneRef.current = false;
     };
   }, []);
 

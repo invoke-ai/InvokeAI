@@ -68,10 +68,36 @@ describe('zoomRangesAroundFraction', () => {
 });
 
 describe('zoomFactorFromWheel', () => {
-  it('zooms out on positive deltas, in on negative, faster for pinch', () => {
-    expect(zoomFactorFromWheel(100, false)).toBeCloseTo(Math.exp(0.1), 10);
-    expect(zoomFactorFromWheel(-100, false)).toBeCloseTo(Math.exp(-0.1), 10);
-    expect(zoomFactorFromWheel(100, true)).toBeCloseTo(Math.exp(1), 10);
+  const PIXEL = 0;
+  const LINE = 1;
+  const PAGE = 2;
+
+  it('zooms out on positive deltas and in on negative', () => {
+    expect(zoomFactorFromWheel(100, PIXEL, false)).toBeCloseTo(Math.exp(0.1), 10);
+    expect(zoomFactorFromWheel(-100, PIXEL, false)).toBeCloseTo(Math.exp(-0.1), 10);
+  });
+
+  it('normalizes line and page deltas, so a Firefox wheel is not inert', () => {
+    // Firefox reports a classic mouse wheel as ±3 LINES. Read as pixels that
+    // is a 0.3% zoom — ~230 notches to double the view.
+    const firefoxNotch = zoomFactorFromWheel(3, LINE, false);
+    expect(firefoxNotch).toBeGreaterThan(1.02);
+    expect(firefoxNotch).toBeCloseTo(zoomFactorFromWheel(48, PIXEL, false), 10);
+    expect(zoomFactorFromWheel(1, PAGE, false)).toBeGreaterThan(firefoxNotch);
+  });
+
+  it('gives the trackpad-pinch gain only to trackpad-sized deltas', () => {
+    // A pinch arrives as ctrl+wheel in small synthetic steps...
+    expect(zoomFactorFromWheel(5, PIXEL, true)).toBeCloseTo(Math.exp(0.05), 10);
+    // ...but so does ctrl held over a real wheel, where the pinch gain would
+    // zoom 2.7x in a single notch.
+    expect(zoomFactorFromWheel(100, PIXEL, true)).toBeCloseTo(zoomFactorFromWheel(100, PIXEL, false), 10);
+    expect(zoomFactorFromWheel(3, LINE, true)).toBeCloseTo(zoomFactorFromWheel(3, LINE, false), 10);
+  });
+
+  it('clamps any single event to a usable step in both directions', () => {
+    expect(zoomFactorFromWheel(10000, PIXEL, true)).toBeLessThanOrEqual(1.25);
+    expect(zoomFactorFromWheel(-10000, PIXEL, true)).toBeGreaterThanOrEqual(1 / 1.25);
   });
 });
 
