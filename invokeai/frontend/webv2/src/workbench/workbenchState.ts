@@ -32,6 +32,7 @@ import type {
   ProjectUndoSnapshot,
   PromptHistoryItem,
   WorkbenchNotification,
+  WorkbenchNotificationCategory,
   WorkbenchNotificationKind,
   WorkbenchState,
 } from '@workbench/projectContracts';
@@ -408,7 +409,7 @@ const createNotification = ({
   projectId,
   title,
 }: {
-  category?: string;
+  category?: WorkbenchNotificationCategory;
   kind: WorkbenchNotificationKind;
   message?: string;
   projectId?: string;
