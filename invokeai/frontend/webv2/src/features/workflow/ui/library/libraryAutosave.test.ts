@@ -97,12 +97,90 @@ describe('createLibraryAutosaver', () => {
     expect(h.statuses.at(-1)).toBe('saved');
   });
 
-  it('dispose cancels pending work', () => {
+  it('flushes a pending edit on dispose instead of dropping it', () => {
+    const h = createHarness();
+    h.autosaver.notifyGraphChanged();
+    expect(h.save).not.toHaveBeenCalled();
+
+    h.autosaver.dispose();
+
+    expect(h.save).toHaveBeenCalledTimes(1);
+    expect(h.manual.pendingCount()).toBe(0);
+  });
+
+  it('does not save on dispose when nothing is pending', () => {
+    const h = createHarness();
+    h.autosaver.dispose();
+    expect(h.save).not.toHaveBeenCalled();
+  });
+
+  it('a second dispose() is a no-op', () => {
     const h = createHarness();
     h.autosaver.notifyGraphChanged();
     h.autosaver.dispose();
-    h.manual.fire();
+    expect(h.save).toHaveBeenCalledTimes(1);
+
+    h.autosaver.dispose();
+
+    expect(h.save).toHaveBeenCalledTimes(1);
+    expect(h.manual.pendingCount()).toBe(0);
+  });
+
+  it('flush() after dispose() performs no save and resolves', async () => {
+    const h = createHarness();
+    h.autosaver.dispose();
+
+    const result = h.autosaver.flush();
+
     expect(h.save).not.toHaveBeenCalled();
+    await expect(result).resolves.toBeUndefined();
+  });
+
+  it('dispose does not emit status callbacks for the flush save', async () => {
+    const h = createHarness();
+    h.autosaver.notifyGraphChanged();
+    h.statuses.length = 0; // drop the 'dirty' status from notifyGraphChanged
+    h.autosaver.dispose();
+    await vi.waitFor(() => expect(h.save).toHaveBeenCalledTimes(1));
+    expect(h.statuses).toEqual([]);
+  });
+
+  it('disposing while a save is in flight with a newer edit pending still runs the chained rerun', async () => {
+    const h = createHarness();
+    let resolveSave: () => void;
+    const deferred = new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    });
+    h.save.mockReturnValueOnce(deferred);
+    h.autosaver.notifyGraphChanged();
+    h.manual.fire();
+    // First save is now in flight (unresolved).
+    h.setCurrent({ libraryWorkflowId: 'wf-1', serialized: { nodes: [2] } });
+    h.autosaver.notifyGraphChanged();
+
+    h.autosaver.dispose();
+    // The pending debounce timer was flushed into a chained rerun queued behind
+    // the in-flight save, so no new timer should remain.
+    expect(h.manual.pendingCount()).toBe(0);
+
+    resolveSave!();
+    // The in-flight promise is never cancelled by dispose; it settles, then the
+    // chained runSave() picks up the newer edit and saves it too.
+    await vi.waitFor(() => expect(h.save).toHaveBeenCalledTimes(2));
+    expect(h.save).toHaveBeenLastCalledWith('wf-1', { nodes: [2] });
+  });
+
+  it('dispose with a pending edit whose save rejects does not throw or emit status', async () => {
+    const h = createHarness();
+    h.save.mockRejectedValueOnce(new Error('offline'));
+    h.autosaver.notifyGraphChanged();
+    h.statuses.length = 0;
+
+    h.autosaver.dispose();
+    await vi.waitFor(() => expect(h.save).toHaveBeenCalledTimes(1));
+    // Give the rejection handler's microtask a chance to run before asserting silence.
+    await Promise.resolve();
+    expect(h.statuses).toEqual([]);
   });
 
   it('a change made during an in-flight save is saved afterward', async () => {

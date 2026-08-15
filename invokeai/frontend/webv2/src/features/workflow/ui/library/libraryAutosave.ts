@@ -4,6 +4,12 @@
  * serialized JSON string) prevents echo saves; a failed save parks in 'error'
  * and is retried by the next graph change or an explicit flush(). No automatic
  * retry loop — persistent failures must not spin (cf. bitmapStore anti-spin).
+ *
+ * dispose() flushes rather than drops: a pending debounced edit is an unsaved
+ * change, so unmount collapses it into one final save (status callbacks stay
+ * muted). Known limitation: a hard tab close inside the debounce window can
+ * still lose the final write — there is no pagehide/keepalive path. Fixing
+ * that needs a transport-level keepalive decision and is out of scope here.
  */
 
 export type LibrarySyncStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
@@ -51,18 +57,22 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
 
     const { libraryWorkflowId, serialized } = deps.read();
 
-    if (disposed || !libraryWorkflowId) {
+    if (!libraryWorkflowId) {
       return Promise.resolve();
     }
 
     const json = JSON.stringify(serialized);
 
     if (json === lastSavedJson) {
-      deps.onStatus('saved');
+      if (!disposed) {
+        deps.onStatus('saved');
+      }
       return Promise.resolve();
     }
 
-    deps.onStatus('saving');
+    if (!disposed) {
+      deps.onStatus('saving');
+    }
     inFlight = deps
       .save(libraryWorkflowId, serialized)
       .then(() => {
@@ -85,10 +95,23 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
 
   return {
     dispose: (): void => {
+      if (disposed) {
+        return;
+      }
       disposed = true;
+      // A pending debounce is an unsaved edit; losing it on unmount is data
+      // loss, so the timer collapses into one immediate final save. Status
+      // callbacks stay muted (disposed) — only the write itself survives.
+      const hasPendingEdit = timerHandle !== null;
       clearTimer();
+      if (hasPendingEdit) {
+        void runSave();
+      }
     },
     flush: (): Promise<void> => {
+      if (disposed) {
+        return Promise.resolve();
+      }
       clearTimer();
       return runSave();
     },
