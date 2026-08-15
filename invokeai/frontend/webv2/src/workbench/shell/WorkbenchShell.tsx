@@ -40,6 +40,7 @@ import { useTranslation } from 'react-i18next';
 
 import { BottomPanel } from './BottomPanel';
 import { CenterArea } from './CenterArea';
+import { DocumentTitleProgress } from './DocumentTitleProgress';
 import { WorkbenchNotificationToaster } from './notifications';
 import { LeftPanel, RightPanel } from './Panels';
 import { StatusBar } from './StatusBar';
@@ -235,6 +236,7 @@ export const WorkbenchShell = () => {
       >
         <Flex direction="column" h="100vh" w="100vw">
           <WorkbenchNotificationToaster />
+          <DocumentTitleProgress />
           <TopBar />
 
           <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
