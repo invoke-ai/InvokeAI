@@ -7,6 +7,7 @@ integrated-GPU probe stubbed, so no Intel hardware is required.
 """
 
 import logging
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -29,15 +30,30 @@ def mock_logger():
     return logger
 
 
-def _make_cache(device: str, logger: MagicMock, enable_partial_loading: bool = False) -> ModelCache:
-    return ModelCache(
-        execution_device_working_mem_gb=1.0,
-        enable_partial_loading=enable_partial_loading,
-        keep_ram_copy_of_weights=True,
-        execution_device=device,
-        storage_device="cpu",
-        logger=logger,
-    )
+def _make_cache(
+    device: str,
+    logger: MagicMock,
+    enable_partial_loading: bool = False,
+    keep_ram_copy_of_weights: bool = True,
+) -> ModelCache:
+    # ModelCache.__init__ sizes the RAM cache from the device's total VRAM (heuristic 2), which on
+    # an xpu execution device reads torch.xpu.get_device_properties() -- an AssertionError on the
+    # CPU-only torch builds CI runs. Stub a fixed total so construction works everywhere; the
+    # tests patch the integrated-GPU probe around put() themselves.
+    with patch.object(
+        torch.xpu,
+        "get_device_properties",
+        create=True,
+        return_value=SimpleNamespace(total_memory=8 * 2**30),
+    ):
+        return ModelCache(
+            execution_device_working_mem_gb=1.0,
+            enable_partial_loading=enable_partial_loading,
+            keep_ram_copy_of_weights=keep_ram_copy_of_weights,
+            execution_device=device,
+            storage_device="cpu",
+            logger=logger,
+        )
 
 
 def _patch_integrated(is_integrated: bool | None):
@@ -157,6 +173,29 @@ def test_oversized_model_on_an_integrated_gpu_raises_instead_of_being_oom_killed
         cache.shutdown()
 
 
+def test_relocking_a_resident_model_on_an_integrated_gpu_is_not_refused(mock_logger: MagicMock):
+    """The guard must compare the bytes still to be moved, not the model's total.
+
+    A resident model's weights occupy the same DRAM that vram_available is read from, so once
+    loaded, any model bigger than what is left will always have total > available. lock() runs
+    on every use, and full_load_to_vram() is a no-op for a resident model -- comparing the total
+    would refuse the re-lock and evict a healthy model on every other generation.
+    """
+    cache = _make_cache("xpu:0", mock_logger)
+    try:
+        with _patch_integrated(True):
+            cache.put("m", DummyModule())
+            entry = _entry(cache, "m")
+            # Present the model as already resident without needing Intel hardware.
+            entry.cached_model._is_in_vram = True
+            assert entry.cached_model.cur_vram_bytes() == entry.cached_model.total_bytes()
+            # Free memory is now smaller than the model (it is the model); the re-lock must pass.
+            assert cache._move_model_to_vram(entry, vram_available=0) == 0
+            assert "m" in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
 def test_oversized_model_on_a_discrete_card_still_tries(mock_logger: MagicMock):
     """A device with its own VRAM fails with a catchable allocator error, so the try-anyway
     behaviour is left exactly as it was."""
@@ -218,14 +257,7 @@ def test_overridden_keep_ram_copy_is_reported_once_per_device(mock_logger: Magic
 
 def test_no_keep_ram_copy_notice_when_the_user_already_disabled_it(mock_logger: MagicMock):
     """Nothing was overridden, so there is nothing to report."""
-    cache = ModelCache(
-        execution_device_working_mem_gb=1.0,
-        enable_partial_loading=False,
-        keep_ram_copy_of_weights=False,
-        execution_device="xpu:0",
-        storage_device="cpu",
-        logger=mock_logger,
-    )
+    cache = _make_cache("xpu:0", mock_logger, keep_ram_copy_of_weights=False)
     try:
         with _patch_integrated(True):
             cache.put("m", DummyModule())
