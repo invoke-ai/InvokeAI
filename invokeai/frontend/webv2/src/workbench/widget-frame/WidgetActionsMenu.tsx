@@ -118,6 +118,7 @@ export const WidgetActionsMenu = ({
     (project) => ({ projectGraph: project.projectGraph, widgetGraphs: project.widgetGraphs }),
     shallowEqual
   ) as Project;
+  const centerInstanceCount = useActiveProjectSelector((project) => project.widgetRegions.center.instanceIds.length);
   const { widgets } = useWorkbenchCommands();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [previewGraph, setPreviewGraph] = useState<GraphContract | null>(null);
@@ -128,8 +129,11 @@ export const WidgetActionsMenu = ({
     [label, manifest, region]
   );
   // Floating is offered only from dockable regions; the floating window's own
-  // chrome carries the dock control.
-  const canFloat = Boolean(manifest.allowFloating) && region !== 'floating';
+  // chrome carries the dock control. The last center view is not offered it
+  // either — the reducer refuses to empty the work surface, so the item would
+  // do nothing.
+  const canFloat =
+    Boolean(manifest.allowFloating) && region !== 'floating' && !(region === 'center' && centerInstanceCount === 1);
   const handleFloat = useCallback(() => widgets.float(instance.id), [instance.id, widgets]);
   const surfaceSourceId = surface?.sourceId;
   const handlePreview = useCallback(async () => {

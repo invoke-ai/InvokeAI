@@ -59,6 +59,12 @@ export interface LayoutPresetSnapshot {
   layout: ProjectLayoutState;
   widgetInstances: Record<WidgetInstanceId, LayoutPresetWidgetInstanceSnapshot>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+  /**
+   * Captured with widgetRegions: a floated instance is in no region, so a
+   * preset that recorded only the regions would drop it on the floor. Absent
+   * on presets saved before floating existed, which have no floating windows.
+   */
+  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
 }
 
 /**
