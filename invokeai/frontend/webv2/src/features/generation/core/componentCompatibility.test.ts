@@ -11,6 +11,7 @@ import {
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
   isVaeCompatibleWithGenerateModel,
+  isVaeForBases,
   type GenerateComponentCandidate,
 } from './componentCompatibility';
 
@@ -100,5 +101,22 @@ describe('Generate component compatibility', () => {
     const staleVae: ComponentModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 
     expect(getCompatibleSelectedComponentKey(staleVae, isAnimaVae)).toBeNull();
+  });
+});
+
+const vae = (base: string) => ({ base, type: 'vae' }) as Parameters<ReturnType<typeof isVaeForBases>>[0];
+
+describe('isVaeForBases', () => {
+  it('matches a VAE whose base is listed', () => {
+    expect(isVaeForBases(['flux'])(vae('flux'))).toBe(true);
+    expect(isVaeForBases(['flux'])(vae('sdxl'))).toBe(false);
+  });
+
+  it('an empty base list matches nothing (no all-pass escape hatch)', () => {
+    expect(isVaeForBases([])(vae('flux'))).toBe(false);
+  });
+
+  it('never matches a non-vae model', () => {
+    expect(isVaeForBases(['flux'])({ base: 'flux', type: 'main' } as never)).toBe(false);
   });
 });
