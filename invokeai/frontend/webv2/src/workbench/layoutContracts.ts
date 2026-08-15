@@ -32,6 +32,12 @@ export interface FloatingWidgetState {
   mode: FloatingWidgetMode;
   /** The dockable region this window returns to when docked. */
   returnRegion: WidgetRegion;
+  /**
+   * Where it sat in that region's tab strip when it floated, so docking puts it
+   * back rather than appending. Optional: entries written before this existed,
+   * and any whose index cannot be trusted, dock to the end.
+   */
+  returnIndex?: number;
   /** Z-order within the floating layer; higher renders on top. */
   stackOrder: number;
 }

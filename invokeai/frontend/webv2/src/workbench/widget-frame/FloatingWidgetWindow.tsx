@@ -274,6 +274,18 @@ export const FloatingWidgetWindow = ({
       rounded={isMaximized ? 'none' : 'md'}
       shadow="xl"
       zIndex={FLOATING_BASE_Z_INDEX + stackRank}
+      // The docked frames carry these and the hotkey runtime reads them to tell
+      // which widget a keystroke is for. Floating content renders bare — this
+      // window is its chrome — so without them `getHotkeyTargetWidget` found
+      // nothing and the runtime fell back to the last focused REGION's active
+      // widget: Delete pressed over a floating window ran the docked Gallery's
+      // delete-selection on whatever that had selected. `floating` is a legal
+      // contribution-source region and is what the runtime registers this
+      // widget's own contributions under, so its hotkeys now resolve as well —
+      // previously they could not fire at all.
+      data-hotkey-widget-instance-id={instanceId}
+      data-hotkey-widget-region="floating"
+      data-hotkey-widget-type-id={instance.typeId}
       onPointerDownCapture={handleFocus}
       {...positionProps}
     >

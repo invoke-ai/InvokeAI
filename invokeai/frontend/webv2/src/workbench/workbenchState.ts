@@ -1324,6 +1324,30 @@ const isWidgetRegionId = (value: unknown): value is WidgetRegion => WIDGET_REGIO
  * window's fixed-position CSS, so anything malformed is dropped rather than
  * carried: the widget then reappears docked instead of not at all.
  */
+/**
+ * Put a docking widget back where it was, not on the end.
+ *
+ * The rail is an ordered tab strip, so appending turned float-then-dock — a
+ * gesture that reads as undoing the float — into a permanent reordering, which
+ * then registered as drift from the preset. The rail may have changed while the
+ * window was open, so the remembered index is clamped rather than trusted.
+ */
+const insertAtReturnIndex = (
+  instanceIds: WidgetInstanceId[],
+  instanceId: WidgetInstanceId,
+  returnIndex: number | undefined
+): WidgetInstanceId[] => {
+  const next = [...instanceIds];
+
+  next.splice(
+    isFiniteNumber(returnIndex) && returnIndex >= 0 ? Math.min(Math.floor(returnIndex), next.length) : next.length,
+    0,
+    instanceId
+  );
+
+  return next;
+};
+
 const normalizeFloatingWidgets = (
   value: unknown,
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>
@@ -1356,6 +1380,12 @@ const normalizeFloatingWidgets = (
     floatingWidgets[instanceId] = {
       ...clampSizeToMinimum({ heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y }),
       mode: state.mode,
+      // Carried explicitly, like every other field: this rebuilds the entry
+      // rather than spreading it, so anything not named here is dropped. A
+      // nonsensical index is simply omitted — docking falls back to appending.
+      ...(isFiniteNumber(state.returnIndex) && state.returnIndex >= 0
+        ? { returnIndex: Math.floor(state.returnIndex) }
+        : {}),
       returnRegion: state.returnRegion,
       stackOrder: state.stackOrder,
     };
@@ -3308,6 +3338,7 @@ export const __workbenchReducerInternal = (
         const floating: FloatingWidgetState = {
           ...cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length),
           mode: 'windowed',
+          returnIndex: hostRegion.instanceIds.indexOf(action.instanceId),
           returnRegion: hostRegionId,
           stackOrder: nextStackOrder(project.floatingWidgets),
         };
@@ -3345,7 +3376,7 @@ export const __workbenchReducerInternal = (
         const region = project.widgetRegions[floating.returnRegion];
         const instanceIds = region.instanceIds.includes(action.instanceId)
           ? region.instanceIds
-          : [...region.instanceIds, action.instanceId];
+          : insertAtReturnIndex(region.instanceIds, action.instanceId, floating.returnIndex);
 
         return {
           ...project,

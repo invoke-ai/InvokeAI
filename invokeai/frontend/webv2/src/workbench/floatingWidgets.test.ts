@@ -115,6 +115,40 @@ describe('dockFloatingWidget', () => {
     expect(getActiveProject(state).widgetRegions.right.instanceIds).not.toContain('gallery');
   });
 
+  it('restores the tab to the position it floated from', () => {
+    // Docking appended, so float-then-dock — a gesture that reads as undoing
+    // the float — permanently reordered the rail and left the project drifted
+    // from its preset.
+    const initial = createInitialWorkbenchState();
+    const before = [...getActiveProject(initial).widgetRegions.right.instanceIds];
+
+    let state = workbenchReducer(initial, { instanceId: 'image-map', type: 'floatWidget' });
+    state = workbenchReducer(state, { instanceId: 'image-map', type: 'dockFloatingWidget' });
+
+    expect(getActiveProject(state).widgetRegions.right.instanceIds).toEqual(before);
+  });
+
+  it('docks to the end when the remembered index is gone or nonsensical', () => {
+    const floated = workbenchReducer(createInitialWorkbenchState(), {
+      instanceId: 'image-map',
+      type: 'floatWidget',
+    });
+    const withBadIndex: WorkbenchState = {
+      ...floated,
+      projects: floated.projects.map((project) => ({
+        ...project,
+        floatingWidgets: project.floatingWidgets && {
+          ...project.floatingWidgets,
+          'image-map': { ...project.floatingWidgets['image-map']!, returnIndex: Number.NaN },
+        },
+      })),
+    };
+
+    const state = workbenchReducer(withBadIndex, { instanceId: 'image-map', type: 'dockFloatingWidget' });
+
+    expect(getActiveProject(state).widgetRegions.right.instanceIds.at(-1)).toBe('image-map');
+  });
+
   it('is a no-op when nothing is floating', () => {
     const initial = createInitialWorkbenchState();
 
