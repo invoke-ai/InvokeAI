@@ -270,25 +270,36 @@ def test_gguf_loader_still_refuses_an_unknown_conditioning_branch() -> None:
 def test_gguf_loader_refuses_a_native_layout_key_the_rename_table_does_not_map() -> None:
     """Pins the intended outcome for the one case the unexpected-key backstop newly
     changes for GGUF: a native-layout key that survives `_convert_wan_native_to_diffusers`
-    unrenamed.
+    unrenamed. Before the backstop the GGUF loader checked `missing_keys` only, so such a
+    key was silently discarded by `load_state_dict(strict=False)`.
 
-    Before the backstop the GGUF loader checked `missing_keys` only, so such a key was
-    silently discarded by `load_state_dict(strict=False)`. Refusing is deliberate, and
-    the blast radius is narrower than it looks: an unmapped key that *should* have become
-    a real parameter also leaves that parameter unfilled, which the pre-existing
-    `missing_keys` check already caught. What is genuinely new is the case below —
-    a whole extra branch, here VACE, whose conversion we deliberately do not ship
-    (see `_WAN_NATIVE_TO_DIFFUSERS_RENAMES`: "T2V subset; we don't ship VACE / motion /
-    face-adapter conversion"). Generating with it quietly absent is worse than refusing.
+    The branch here is deliberately one the probe does *not* enumerate. Every family
+    `_find_unsupported_wan_variant_marker` knows about — Animate, S2V, Fun-Control, VACE —
+    is turned away with `NotAMatchError` at identification time and can never reach a
+    loader, so using one of those names would pin a scenario that cannot occur. This
+    backstop exists for the families nobody has enumerated yet, which is exactly what an
+    unmapped native key looks like.
+
+    The blast radius is narrower than the change looks: an unmapped key that *should*
+    have become a real parameter also leaves that parameter unfilled, which the
+    pre-existing `missing_keys` check already caught. What is new is a whole extra
+    conditioning branch riding along, and generating with it quietly absent is worse
+    than refusing.
     """
-    with pytest.raises(RuntimeError, match="vace_blocks"):
-        _run_gguf_loader(["vace_blocks.0.after_proj.weight"], native_layout=True)
+    with pytest.raises(RuntimeError, match="pose_adapter"):
+        _run_gguf_loader(["pose_adapter.0.proj.weight"], native_layout=True)
 
 
 def test_gguf_loader_accepts_a_native_layout_all_in_one_bundle() -> None:
-    """The benign-extras drop has to survive the native-layout rewrite too. The rename
-    table is blind substring replacement over every key, so it runs across the bundled
-    VAE/encoder names as well — this pins that they are still recognised and dropped."""
+    """The benign-extras drop has to keep working on the native-layout path.
+
+    It runs *before* the rename table (`wan.py`: `_drop_benign_extra_keys` at the top of
+    `_load_from_singlefile`, `_convert_wan_native_to_diffusers` several lines later), so
+    the bundled names never reach the rewrite at all — the two passes do not interact.
+    What this pins is the whole native-layout pipeline end to end: it is the test that
+    fails if the rename table stops producing the diffusers names, because then the
+    genuine transformer keys arrive unrenamed and trip the backstop.
+    """
     bundled = ["vae.decoder.conv_in.weight", "text_encoders.umt5xxl.shared.weight"]
 
     handed_over = _run_gguf_loader(bundled, native_layout=True)

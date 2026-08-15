@@ -278,6 +278,10 @@ class TestProbeAcceptance:
         disqualifier list can't help, because ``low`` here is followed by an unrelated
         descriptive word rather than a known false-positive marker. Mirrors the same pin
         in ``_resolve_wan_expert`` on the main-model side.
+
+        Only the ``low`` half is inert — a ``high`` tag routes to the primary list, which
+        the 5B path does read — but neither is meaningful on a single-transformer model,
+        and leaving the field unset keeps the record honest about what it knows.
         """
         for stem in ("Wan2.2_TI2V_5B_low_light_v2", "wan2_2_5B_HIGH_detail_v1"):
             with TemporaryDirectory() as tmp:
@@ -288,7 +292,7 @@ class TestProbeAcceptance:
                     _overrides(f, stem),
                 )
                 assert cfg.variant == "5b"
-                assert cfg.expert is None, f"{stem} was tagged '{cfg.expert}', which routes it nowhere"
+                assert cfg.expert is None, f"{stem} was tagged '{cfg.expert}' on a single-transformer model"
 
     def test_a14b_lora_with_the_same_name_shape_still_gets_tagged(self):
         """The 5B pin must key on the variant, not on the name — the bare-token reading

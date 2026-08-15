@@ -80,6 +80,18 @@ describe('Wan low-noise partner picker', () => {
     expect(selectPrimaryMainModelOptions([a, b])).toHaveLength(2);
   });
 
+  it('keeps an untagged model in the primary picker even next to a tagged high expert', () => {
+    // The case that actually catches `selectPrimaryMainModelOptions` being switched to the
+    // wide predicate. With two untagged models the wide test classes both as low experts,
+    // so neither has a partner and neither is hidden — the mistake hides behind itself.
+    // Add a same-variant `high` and the untagged model suddenly has a partner, so keying
+    // the primary filter on the wide test would drop it from the main picker entirely.
+    const high = wanMain({ key: 'high', expert: 'high', name: 'high' });
+    const untagged = wanMain({ key: 'untagged', expert: 'none', name: 'untagged' });
+
+    expect(selectPrimaryMainModelOptions([high, untagged]).map((c) => c.key)).toEqual(['high', 'untagged']);
+  });
+
   it('still hides a tagged low expert from the primary picker when it has a partner', () => {
     const high = wanMain({ key: 'high', expert: 'high', name: 'high' });
     const low = wanMain({ key: 'low', expert: 'low', name: 'low' });

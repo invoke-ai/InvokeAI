@@ -66,22 +66,34 @@ def _assert_lora_variant_matches_main(lora_config: object, main_config: object, 
         )
 
 
-def _warn_if_low_routing_is_inert(
+def _correct_inert_low_routing(
     context: InvocationContext, main_config: object, lora_key: str, to_primary: bool, to_low_noise: bool
-) -> None:
-    """Warn when a LoRA is routed only to the low-noise list of a TI2V-5B main.
+) -> tuple[bool, bool]:
+    """Re-point a low-only routing at the primary list when the main is TI2V-5B.
 
-    The single-transformer TI2V-5B denoise path consumes only the primary list, so
-    such a LoRA silently has no effect — the node would otherwise report success
-    while doing nothing.
+    TI2V-5B is single-transformer: the denoise path only ever reads the primary LoRA
+    list, so a LoRA routed low-only has no effect at all and the node still reports
+    success. There is no ambiguity about what to do instead — the model has exactly one
+    transformer — so correct the routing rather than merely warning about it.
+
+    This is the backstop for the probe-side pin in ``LoRA_LyCORIS_Wan_Config``, which
+    can only suppress the expert tag when it managed to detect the variant.
+    ``detect_wan_lora_variant`` reads the inner dim off an ``attn1.to_q`` LoRA pair, so
+    it returns None for a LoKr/LoHa adapter or one that patches only ``to_k``/``to_v``,
+    and the tag survives. Records written before that pin existed are in the same
+    position. Here the main model's own variant is known for certain, which is the one
+    signal that cannot be wrong.
     """
     if to_primary or not to_low_noise:
-        return
-    if getattr(main_config, "variant", None) == WanVariantType.TI2V_5B:
-        context.logger.warning(
-            f"LoRA '{lora_key}' is routed only to the low-noise expert, which the single-transformer "
-            "TI2V-5B variant never uses — the LoRA will have no effect."
-        )
+        return to_primary, to_low_noise
+    if getattr(main_config, "variant", None) != WanVariantType.TI2V_5B:
+        return to_primary, to_low_noise
+    context.logger.warning(
+        f"LoRA '{lora_key}' is tagged as the low-noise expert, but the single-transformer "
+        "TI2V-5B variant has no such expert. Applying it to the transformer instead — "
+        "the alternative is to silently do nothing."
+    )
+    return True, False
 
 
 def _resolve_target(target: WanLoRATarget, lora_expert: str | None) -> tuple[bool, bool]:
@@ -168,7 +180,7 @@ class WanLoRALoaderInvocation(BaseInvocation):
 
         lora_expert = getattr(lora_config, "expert", None)
         to_primary, to_low_noise = _resolve_target(self.target, lora_expert)
-        _warn_if_low_routing_is_inert(context, main_config, lora_key, to_primary, to_low_noise)
+        to_primary, to_low_noise = _correct_inert_low_routing(context, main_config, lora_key, to_primary, to_low_noise)
 
         # Reject duplicates on whichever list(s) we're about to append to.
         if to_primary and any(item.lora.key == lora_key for item in self.transformer.loras):
@@ -245,7 +257,9 @@ class WanLoRACollectionLoader(BaseInvocation):
 
             lora_expert = getattr(lora_config, "expert", None)
             to_primary, to_low_noise = _resolve_target("auto", lora_expert)
-            _warn_if_low_routing_is_inert(context, main_config, lora_key, to_primary, to_low_noise)
+            to_primary, to_low_noise = _correct_inert_low_routing(
+                context, main_config, lora_key, to_primary, to_low_noise
+            )
 
             # Reject LoRAs already applied upstream (same invariant the single loader
             # enforces) — re-appending would silently double the effective weight.

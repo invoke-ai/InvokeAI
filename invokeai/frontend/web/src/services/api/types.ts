@@ -673,10 +673,10 @@ const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfigWithExtern
  *  `expert === 'low'` here strands every pair that probes to `none`/`none`: both halves
  *  show up in the primary picker (which hides only models tagged `low`) and neither
  *  shows up here, leaving the pair impossible to assemble outside the workflow editor.
- *  That is the exact case this branch exists to support, and it is not self-healing —
- *  `expert` is absent from `ModelRecordChanges` and installed records are never
- *  re-probed, so anything already stored as `none` stays that way short of a
- *  delete-and-reinstall, which mints a new model key.
+ *  That is the exact case this branch exists to support. It is also not something the
+ *  user can tag their way out of: `expert` is absent from `ModelRecordChanges`, so no
+ *  edit sets it. Re-probing via Reidentify recomputes it, but only from the filename,
+ *  which for an untagged file returns `none` again.
  *
  *  Two exclusions. Files tagged `high` belong in the primary slot — the loader would
  *  only swap them back. TI2V-5B is single-transformer, so it has no partner at all and
