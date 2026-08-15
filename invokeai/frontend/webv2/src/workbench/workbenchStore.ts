@@ -383,6 +383,9 @@ const createCommands = (
       setStatus: command('setQueueItemStatus'),
     },
     widgets: {
+      dockFloating: command('dockFloatingWidget', (instanceId: string) => ({ instanceId })),
+      float: command('floatWidget', (instanceId: string) => ({ instanceId })),
+      focusFloating: command('focusFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
       patchInstanceValues: command(
@@ -409,6 +412,17 @@ const createCommands = (
       ),
       reorder: command('reorderWidgetInstances'),
       select: command('selectRegionWidget'),
+      setFloatingGeometry: command(
+        'setFloatingWidgetGeometry',
+        (instanceId: string, geometry: { x: number; y: number; widthPx: number; heightPx: number }) => ({
+          instanceId,
+          ...geometry,
+        })
+      ),
+      setFloatingMode: command(
+        'setFloatingWidgetMode',
+        (instanceId: string, mode: ActionPayload<'setFloatingWidgetMode'>['mode']) => ({ instanceId, mode })
+      ),
       setInstanceValues: command(
         'setWidgetInstanceValues',
         (instanceId: string, values: Record<string, unknown>, projectId?: string) => ({
