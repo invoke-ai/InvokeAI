@@ -59,7 +59,9 @@ describe('workflow image export', () => {
       backgroundColor: 'rgb(1, 2, 3)',
       pixelRatio: 1,
       includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
-      skipFonts: true,
+      imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
+      onImageErrorHandler: expect.any(Function),
+      skipFonts: false,
     });
   });
 

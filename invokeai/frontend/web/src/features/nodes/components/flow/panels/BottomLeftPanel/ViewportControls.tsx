@@ -1,5 +1,6 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useReactFlow } from '@xyflow/react';
+import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectWorkflowName } from 'features/nodes/store/selectors';
 import {
@@ -19,6 +20,8 @@ import {
 } from 'react-icons/pi';
 
 import { AutoLayoutPopover } from './AutoLayoutPopover';
+
+const log = logger('workflows');
 
 const ViewportControls = () => {
   const { t } = useTranslation();
@@ -44,9 +47,19 @@ const ViewportControls = () => {
     dispatch(shouldShowMinimapPanelChanged(!shouldShowMinimapPanel));
   }, [shouldShowMinimapPanel, dispatch]);
 
-  const handleWorkflowImageExportError = useCallback(() => {
-    toast({ id: 'DOWNLOAD_WORKFLOW_IMAGE_ERROR', status: 'error', description: t('nodes.downloadWorkflowImageError') });
-  }, [t]);
+  const handleWorkflowImageExportError = useCallback(
+    (error?: unknown) => {
+      if (error) {
+        log.error({ error: error instanceof Error ? error.message : String(error) }, 'Workflow image export failed');
+      }
+      toast({
+        id: 'DOWNLOAD_WORKFLOW_IMAGE_ERROR',
+        status: 'error',
+        description: t('nodes.downloadWorkflowImageError'),
+      });
+    },
+    [t]
+  );
 
   const handleClickedExportWorkflow = useCallback(() => {
     if (isExportingWorkflow) {
