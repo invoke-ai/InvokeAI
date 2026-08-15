@@ -29,6 +29,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    MiniMaxH3VariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -74,6 +75,7 @@ class MainModelDefaultSettings(BaseModel):
         | WanVariantType
         | ZImageVariantType
         | Krea2VariantType
+        | MiniMaxH3VariantType
         | None = None,
         name: str | None = None,
         path: str | None = None,
@@ -140,6 +142,11 @@ class MainModelDefaultSettings(BaseModel):
                     return cls(steps=30, cfg_scale=5.0, width=1024, height=1024)
                 # Default to A14B settings (also used when variant is unknown).
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.MiniMaxH3:
+                # H3 is guidance-distilled (no CFG; cfg_scale 1.0 means "no guidance") and was
+                # released for a fixed 768px short edge; 1344x768 is its native 16:9 canvas.
+                # Dimensions must be multiples of 32.
+                return cls(steps=50, cfg_scale=1.0, width=1344, height=768)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -1492,6 +1499,63 @@ class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         if config.get("is_distilled", False) is False:
             return Krea2VariantType.Base
         return Krea2VariantType.Turbo
+
+
+class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."""
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(BaseModelType.MiniMaxH3)
+    variant: MiniMaxH3VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # H3 ships as a Modular Diffusers pipeline: the root config is modular_model_index.json, not
+        # model_index.json, and the class name implies the base type. The HF repo's FL2VA/ and
+        # Ref2VA/ subtrees are the original remote-code checkpoints and declare "MiniMaxH3Pipeline"
+        # instead - deliberately not matched, since their custom Python cannot be run here.
+        raise_for_class_name(
+            mod.path / "modular_model_index.json",
+            {"MiniMaxH3ModularPipeline"},
+        )
+
+        # The jointly-denoised audio track is what distinguishes H3 from every other video family.
+        # Require the audio VAE so a partial download fails identification rather than failing
+        # mid-generation.
+        raise_for_class_name(
+            mod.path / "audio_vae" / "config.json",
+            {"AutoencoderKLMiniMaxH3Audio"},
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> MiniMaxH3VariantType:
+        """Determine the H3 variant from which task transformer is present.
+
+        H3's task checkpoints share every component except the transformer folder: ``transformer``
+        (FL2VA: text / first/last-frame to audio-video) vs ``transformer_ref`` (Ref2VA: multi-
+        reference). Only FL2VA is supported so far. A Ref2VA-only download is a real H3 model this
+        version cannot run, so identification fails rather than mislabeling it as FL2VA.
+        """
+        transformer_config = mod.path / "transformer" / "config.json"
+        if not transformer_config.exists():
+            raise NotAMatchError(
+                "no FL2VA transformer folder (`transformer/`); Ref2VA-only installs are not supported yet"
+            )
+        raise_for_class_name(transformer_config, {"MiniMaxH3Transformer3DModel"})
+        return MiniMaxH3VariantType.FL2VA
 
 
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
