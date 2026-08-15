@@ -1139,12 +1139,18 @@ class ModelCache:
                 # MPS shares memory the same way and would benefit from the same guard, but macOS
                 # degrades differently (compressed memory, a large default swap) and changing Mac
                 # behaviour is out of scope here.
-                model_bytes = cache_entry.cached_model.total_bytes()
+                #
+                # The comparison must be against the bytes still to be moved, not the model's
+                # total: a resident model's weights already occupy the same DRAM that vram_available
+                # is read from, so its total can exceed "available" precisely because it is loaded.
+                # full_load_to_vram() is a no-op for a resident model; comparing the total would
+                # refuse the re-lock and (via the except handler below) evict a healthy model.
+                model_bytes_needed = cache_entry.cached_model.total_bytes() - cache_entry.cached_model.cur_vram_bytes()
                 device = cache_entry.cached_model.compute_device
-                if _is_integrated_xpu(device) and model_bytes > vram_available:
+                if _is_integrated_xpu(device) and model_bytes_needed > vram_available:
                     raise torch.OutOfMemoryError(
                         f"Cannot load model '{cache_entry.key}' onto {device}: it needs "
-                        f"{model_bytes / MB:.2f}MB but only {vram_available / MB:.2f}MB is available. "
+                        f"{model_bytes_needed / MB:.2f}MB but only {vram_available / MB:.2f}MB is available. "
                         f"{device} shares memory with the CPU, and models are loaded onto it in full, "
                         "so proceeding would exhaust system memory. Free up RAM, use a smaller or more "
                         "heavily quantized model, or lower `device_working_mem_gb`."
