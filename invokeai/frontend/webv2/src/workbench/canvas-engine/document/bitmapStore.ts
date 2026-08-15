@@ -355,10 +355,16 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       dirty.add(layerId);
       dirtyReason.set(layerId, 'failure');
       // Report only the first failure of a streak and the one that opens the
-      // circuit — an unreachable server would otherwise toast once per retry,
-      // forever. Intermediate retries stay silent; `runFlush`'s `finally` still
-      // bounds them via the same `failureCounts` and growing backoff below.
-      if (failures === 1 || !willRetry) {
+      // circuit — an unreachable server would otherwise toast once per retry
+      // (including barrier-driven retries against an already-open circuit,
+      // which `flushPendingUploads` still attempts on every Generate/export/
+      // blur), forever. Everything else stays silent; `runFlush`'s `finally`
+      // still bounds ambient retries via the same `failureCounts` and growing
+      // backoff below. `failures` only grows once the circuit is open (a fresh
+      // stroke is the only way to reset it), so comparing to the exact
+      // transition point — not `!willRetry`, which stays true forever after —
+      // keeps this to exactly one report per streak-open transition.
+      if (failures === 1 || failures === maxConsecutiveFailures) {
         try {
           reportError(error, layerId, { consecutiveFailures: failures, willRetry });
         } catch {

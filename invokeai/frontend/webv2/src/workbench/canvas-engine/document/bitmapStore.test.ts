@@ -1270,6 +1270,64 @@ describe('createBitmapStore', () => {
       h.store.dispose();
     });
 
+    it('does not re-report when a barrier retries an already-open circuit', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 3, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // failure 1 of 3.
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      timers.fireNext(); // failure 2 of 3.
+      await drainUntil(() => timers.scheduledDelays.length === 3);
+      timers.fireNext(); // failure 3 of 3 → circuit opens.
+      await drainUntil(() => onError.mock.calls.length === 2);
+      await drainUntil(() => false, 10);
+
+      expect(uploadImage).toHaveBeenCalledTimes(3);
+      expect(onError).toHaveBeenCalledTimes(2);
+
+      // flushPendingUploads() runs before every Generate/export and on
+      // blur/pagehide/visibilitychange; it still attempts a circuit-open layer
+      // (the breaker only gates the AMBIENT reschedule), so a persistently
+      // failing layer must not re-report on every one of those barrier retries.
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(uploadImage).toHaveBeenCalledTimes(5);
+      expect(onError).toHaveBeenCalledTimes(2);
+
+      h.store.dispose();
+    });
+
+    it('reports exactly once when maxConsecutiveFailures is 1 (opens on the very first failure)', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 1, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // the only ambient attempt: the circuit opens immediately.
+      await drainUntil(() => onError.mock.calls.length === 1);
+      await drainUntil(() => false, 10);
+
+      expect(timers.pendingCount()).toBe(0);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenNthCalledWith(1, expect.any(Error), LAYER, {
+        consecutiveFailures: 1,
+        willRetry: false,
+      });
+
+      // Further barrier retries against the already-open circuit stay silent.
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      h.store.dispose();
+    });
+
     it('a new stroke closes the circuit and resets the failure count', async () => {
       const timers = createManualTimers();
       let shouldFail = true;
