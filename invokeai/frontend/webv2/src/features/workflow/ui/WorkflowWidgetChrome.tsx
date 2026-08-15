@@ -1,6 +1,6 @@
 import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
 
-import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { updateLibraryWorkflow } from '@features/workflow/queries';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -17,6 +17,11 @@ import {
   parseWorkflowJson,
   serializeWorkflowJson,
 } from '@features/workflow/utility';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
@@ -35,7 +40,7 @@ import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contra
 
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
-import { createLibraryAutosaver } from './library/libraryAutosave';
+import { createLibraryAutosaver, type LibrarySyncStatus } from './library/libraryAutosave';
 import { registerLibraryGraphSyncedHandler, releaseLibraryGraphSyncedHandler } from './library/librarySyncBridge';
 import { useSaveWorkflowToLibrary } from './library/useSaveWorkflowToLibrary';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
@@ -63,6 +68,15 @@ import {
  * shared widget actions menu via the manifest's `headerMenu`. Dialogs live here
  * (always mounted) and are driven through `workflowUiStore`.
  */
+
+/** Icon + tooltip for each library sync status, shared by the sync control's error and non-error presentations. */
+const SYNC_STATUS_VIEW: Record<LibrarySyncStatus, { icon: typeof CloudCheckIcon; tooltipKey: string }> = {
+  dirty: { icon: RefreshCwIcon, tooltipKey: 'widgets.workflow.librarySyncSaving' },
+  error: { icon: CloudAlertIcon, tooltipKey: 'widgets.workflow.librarySyncError' },
+  idle: { icon: CloudCheckIcon, tooltipKey: 'widgets.workflow.librarySyncSaved' },
+  saved: { icon: CloudCheckIcon, tooltipKey: 'widgets.workflow.librarySyncSaved' },
+  saving: { icon: RefreshCwIcon, tooltipKey: 'widgets.workflow.librarySyncSaving' },
+};
 
 export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const { t } = useTranslation();
@@ -205,33 +219,30 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
         </Tooltip>
       )}
       {libraryWorkflowId ? (
-        <Tooltip
-          content={
-            syncStatus === 'error'
-              ? t('widgets.workflow.librarySyncError')
-              : syncStatus === 'saving' || syncStatus === 'dirty'
-                ? t('widgets.workflow.librarySyncSaving')
-                : t('widgets.workflow.librarySyncSaved')
-          }
-        >
-          <IconButton
-            aria-label={t('widgets.workflow.librarySyncState')}
-            color={syncStatus === 'error' ? 'fg.error' : 'fg.subtle'}
-            size="2xs"
-            variant="ghost"
-            onClick={syncStatus === 'error' ? handleSaveToLibrary : undefined}
-          >
-            <Icon
-              as={
-                syncStatus === 'error'
-                  ? CloudAlertIcon
-                  : syncStatus === 'saving' || syncStatus === 'dirty'
-                    ? RefreshCwIcon
-                    : CloudCheckIcon
-              }
-              boxSize="3.5"
-            />
-          </IconButton>
+        <Tooltip content={t(SYNC_STATUS_VIEW[syncStatus].tooltipKey)}>
+          {syncStatus === 'error' ? (
+            <IconButton
+              aria-label={t('widgets.workflow.librarySyncState')}
+              color="fg.error"
+              size="2xs"
+              variant="ghost"
+              onClick={handleSaveToLibrary}
+            >
+              <Icon as={SYNC_STATUS_VIEW.error.icon} boxSize="3.5" />
+            </IconButton>
+          ) : (
+            <Box
+              alignItems="center"
+              aria-label={t(SYNC_STATUS_VIEW[syncStatus].tooltipKey)}
+              boxSize="6"
+              color="fg.subtle"
+              display="flex"
+              justifyContent="center"
+              role="status"
+            >
+              <Icon as={SYNC_STATUS_VIEW[syncStatus].icon} boxSize="3.5" />
+            </Box>
+          )}
         </Tooltip>
       ) : (
         <Tooltip content={t('widgets.workflow.saveToLibrary')}>
@@ -316,42 +327,63 @@ export const WorkflowDialogHost = () => {
   // store's synchronous snapshot (`projectStore.getSnapshot()`, the same
   // accessor `useWorkflowProjectSelector` subscribes through) rather than a
   // component-owned ref, so it is always current whenever the autosaver's
-  // debounce timer or `flush()` calls it.
-  const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
-  const autosaverRef = useRef<ReturnType<typeof createLibraryAutosaver> | null>(null);
-
+  // debounce timer or `flush()` calls it. The same effect subscribes
+  // directly to the project store to notify the autosaver of edits (skipping
+  // the initial snapshot so loading a workflow does not itself count as an
+  // edit) — a plain subscription rather than a selector, since nothing here
+  // needs to re-render on graph edits, only to poke the autosaver.
+  //
+  // `hostScope` guards `onStatus`: account rotation aborts the in-flight
+  // save's signal and synchronously resets the (account-owned)
+  // `workflowLibrarySyncStore` back to 'idle', but the aborted write's
+  // rejection lands a tick later, after that reset. Without this guard,
+  // `runSave()`'s `.catch` would still write 'error' into the *next*
+  // account's store — `save()`'s own `assertAccountScopeCurrent` throw stops
+  // the write from being trusted, but does not by itself stop that throw's
+  // `onStatus('error')` from landing. `hostScope` is captured once per mount
+  // — safe because this host remounts every account epoch (keyed by
+  // `session.accountEpoch` above it in the tree), so a mount-captured scope
+  // never outlives the account it was captured for.
   useEffect(() => {
+    const hostScope = captureAccountScope();
     const autosaver = createLibraryAutosaver({
-      onStatus: setWorkflowLibrarySyncStatus,
+      onStatus: (status) => {
+        if (isAccountScopeCurrent(hostScope)) {
+          setWorkflowLibrarySyncStatus(status);
+        }
+      },
       read: () => {
         const graph = projectStore.getSnapshot().projectGraph;
         return { libraryWorkflowId: graph.libraryWorkflowId, serialized: serializeWorkflowJson(graph) };
       },
-      save: (workflowId, serialized) => updateLibraryWorkflow(workflowId, serialized),
+      save: async (workflowId, serialized) => {
+        // Same scope discipline as the manual save paths: never let a
+        // debounced write land in the next account's library.
+        const owner = captureAccountScope();
+        await updateLibraryWorkflow(workflowId, serialized, owner.signal);
+        assertAccountScopeCurrent(owner);
+      },
     });
 
-    autosaverRef.current = autosaver;
+    let lastGraph = projectStore.getSnapshot().projectGraph;
+    const unsubscribe = projectStore.subscribe(() => {
+      const graph = projectStore.getSnapshot().projectGraph;
+      if (graph !== lastGraph) {
+        lastGraph = graph;
+        autosaver.notifyGraphChanged();
+      }
+    });
 
     const handler = (serialized: Record<string, unknown>) => autosaver.markSynced(serialized);
 
     registerLibraryGraphSyncedHandler(handler);
 
     return () => {
+      unsubscribe();
       releaseLibraryGraphSyncedHandler(handler);
       autosaver.dispose();
-      autosaverRef.current = null;
     };
   }, [projectStore]);
-
-  // Notify the autosaver of edits, skipping the mount run so loading a
-  // workflow does not itself count as an edit.
-  const lastGraphRef = useRef(projectGraph);
-  useEffect(() => {
-    if (lastGraphRef.current !== projectGraph) {
-      lastGraphRef.current = projectGraph;
-      autosaverRef.current?.notifyGraphChanged();
-    }
-  }, [projectGraph]);
 
   useEffect(() => {
     if (importRequestCount > lastImportRequestRef.current) {
