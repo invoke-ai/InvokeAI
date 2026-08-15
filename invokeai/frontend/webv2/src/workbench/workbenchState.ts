@@ -402,16 +402,19 @@ const createId = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const createNotification = ({
+  category,
   kind,
   message,
   projectId,
   title,
 }: {
+  category?: string;
   kind: WorkbenchNotificationKind;
   message?: string;
   projectId?: string;
   title: string;
 }): WorkbenchNotification => ({
+  category,
   createdAt: now(),
   id: createId('notification'),
   isRead: false,
@@ -425,6 +428,29 @@ const addNotification = (state: WorkbenchState, notification: WorkbenchNotificat
   ...state,
   notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT),
 });
+
+/** Adds the "Invocation queued" notice iff the reduction actually grew the active queue. */
+const withEnqueueNotification = (state: WorkbenchState, nextState: WorkbenchState): WorkbenchState => {
+  const before = state.projects.find((project) => project.id === state.activeProjectId);
+  const after = nextState.projects.find((project) => project.id === nextState.activeProjectId);
+
+  if (!before || !after || before.queue.items.length >= after.queue.items.length) {
+    return nextState;
+  }
+
+  const queueItem = after.queue.items[0];
+
+  return addNotification(
+    nextState,
+    createNotification({
+      category: 'enqueue',
+      kind: 'success',
+      message: `${after.name}: ${queueItem.snapshot.sourceId} to ${queueItem.snapshot.destination}`,
+      projectId: after.id,
+      title: 'Invocation queued',
+    })
+  );
+};
 
 const areRecordsShallowEqual = (left: Record<string, unknown>, right: Record<string, unknown>): boolean => {
   if (left === right) {
@@ -3358,36 +3384,24 @@ export const __workbenchReducerInternal = (
       }));
     }
     case 'submitInvocationSnapshot': {
-      const beforeProject = state.projects.find((project) => project.id === state.activeProjectId);
-      const nextState = updateActiveProject(state, (project) =>
-        submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
-      );
-      const afterProject = nextState.projects.find((project) => project.id === nextState.activeProjectId);
-
-      if (!beforeProject || !afterProject || beforeProject.queue.items.length === afterProject.queue.items.length) {
-        return nextState;
-      }
-
-      const queueItem = afterProject.queue.items[0];
-
-      return addNotification(
-        nextState,
-        createNotification({
-          kind: 'info',
-          message: `${afterProject.name}: ${queueItem.snapshot.sourceId} to ${queueItem.snapshot.destination}`,
-          projectId: afterProject.id,
-          title: 'Invocation queued',
-        })
+      return withEnqueueNotification(
+        state,
+        updateActiveProject(state, (project) =>
+          submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
+        )
       );
     }
     case 'submitResolvedInvocationSnapshot': {
-      return updateActiveProject(state, (project) =>
-        submitInvocationSnapshot(
-          project,
-          action.backendSupportsCancellation,
-          resolveInvocationRoute(project, 'global', action.route, action.models),
-          action.models,
-          action.positivePrompts
+      return withEnqueueNotification(
+        state,
+        updateActiveProject(state, (project) =>
+          submitInvocationSnapshot(
+            project,
+            action.backendSupportsCancellation,
+            resolveInvocationRoute(project, 'global', action.route, action.models),
+            action.models,
+            action.positivePrompts
+          )
         )
       );
     }
@@ -3774,18 +3788,21 @@ export const __workbenchReducerInternal = (
       return updateProjectById(state, action.projectId, (project) => applyAutoRouteForEdit(project, 'canvas', context));
     }
     case 'submitCanvasInvocationSnapshot': {
-      return updateProjectById(state, action.projectId, (project) =>
-        enqueueCompiledSnapshot(
-          project,
-          { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
-          {
-            generate: action.generate,
-            graph: action.graph,
-            positivePrompts: action.positivePrompts,
-            widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
-          },
-          action.backendSupportsCancellation,
-          action.canvas
+      return withEnqueueNotification(
+        state,
+        updateProjectById(state, action.projectId, (project) =>
+          enqueueCompiledSnapshot(
+            project,
+            { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
+            {
+              generate: action.generate,
+              graph: action.graph,
+              positivePrompts: action.positivePrompts,
+              widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
+            },
+            action.backendSupportsCancellation,
+            action.canvas
+          )
         )
       );
     }

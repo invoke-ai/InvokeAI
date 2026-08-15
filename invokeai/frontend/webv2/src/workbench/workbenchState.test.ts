@@ -2101,6 +2101,40 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications).toEqual([]);
   });
 
+  describe('enqueue notifications', () => {
+    it('records an enqueue notification when submitResolvedInvocationSnapshot adds a queue item', () => {
+      const state = primeGenerate();
+
+      const next = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+
+      expect(getActiveProject(next).queue.items.length).toBeGreaterThan(0);
+      expect(next.notifications[0]?.title).toBe('Invocation queued');
+      expect(next.notifications[0]?.category).toBe('enqueue');
+      expect(next.notifications[0]?.kind).toBe('success');
+    });
+
+    it('does not record a notification when the submit adds no queue item', () => {
+      let state = createInitialWorkbenchState();
+
+      state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
+
+      const notificationCount = state.notifications.length;
+
+      const next = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        route: { destination: 'canvas', destinationLocked: false, sourceId: 'upscale', sourceLocked: true },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+
+      expect(getActiveProject(next).queue.items).toEqual([]);
+      expect(next.notifications).toHaveLength(notificationCount);
+    });
+  });
+
   it('accepts the project graph source but does not queue an empty project graph', () => {
     let state = createInitialWorkbenchState();
 

@@ -74,6 +74,10 @@ export interface WorkbenchNotification {
   createdAt: string;
   projectId?: string;
   isRead: boolean;
+  /** Machine category for toast policy (e.g. 'enqueue'); absent = always toast. */
+  category?: string;
+  /** Coalesced repeat count (see addNotification); absent = 1. */
+  occurrenceCount?: number;
 }
 
 /**
