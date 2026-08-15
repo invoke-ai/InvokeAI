@@ -229,7 +229,9 @@ const WidgetShellFrame = ({
     return <WidgetTooltipFrame icon={widget.manifest.icon}>{safeContent}</WidgetTooltipFrame>;
   }
 
-  if (region === 'popover' || region === 'dialog' || presentation === 'compact') {
+  // Floating windows provide their own chrome (FloatingWidgetWindow), so the
+  // view renders bare, like popovers and dialogs.
+  if (region === 'popover' || region === 'dialog' || region === 'floating' || presentation === 'compact') {
     return safeContent;
   }
 

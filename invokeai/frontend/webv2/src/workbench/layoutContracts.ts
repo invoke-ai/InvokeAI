@@ -21,6 +21,27 @@ export interface PanelState {
 
 export type WidgetRegion = 'left' | 'right' | 'bottom' | 'center';
 
+export type FloatingWidgetMode = 'windowed' | 'maximized' | 'shaded';
+
+/** Geometry + stacking for a widget instance detached into a floating window. */
+export interface FloatingWidgetState {
+  x: number;
+  y: number;
+  widthPx: number;
+  heightPx: number;
+  mode: FloatingWidgetMode;
+  /** The dockable region this window returns to when docked. */
+  returnRegion: WidgetRegion;
+  /**
+   * Where it sat in that region's tab strip when it floated, so docking puts it
+   * back rather than appending. Optional: entries written before this existed,
+   * and any whose index cannot be trusted, dock to the end.
+   */
+  returnIndex?: number;
+  /** Z-order within the floating layer; higher renders on top. */
+  stackOrder: number;
+}
+
 export interface WidgetRegionState {
   activeInstanceId: WidgetInstanceId;
   instanceIds: WidgetInstanceId[];
@@ -44,6 +65,12 @@ export interface LayoutPresetSnapshot {
   layout: ProjectLayoutState;
   widgetInstances: Record<WidgetInstanceId, LayoutPresetWidgetInstanceSnapshot>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+  /**
+   * Captured with widgetRegions: a floated instance is in no region, so a
+   * preset that recorded only the regions would drop it on the floor. Absent
+   * on presets saved before floating existed, which have no floating windows.
+   */
+  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
 }
 
 /**
