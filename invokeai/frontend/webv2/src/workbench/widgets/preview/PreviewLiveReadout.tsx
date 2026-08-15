@@ -1,6 +1,5 @@
-import { Badge, Box, Text } from '@chakra-ui/react';
+import { Badge, Text } from '@chakra-ui/react';
 import { useQueueItemProgress, type QueueItemProgress } from '@features/queue/react';
-import { useMemo, type CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -24,33 +23,23 @@ const getStepMessage = (progress: QueueItemProgress | null, generatingLabel: str
   return message;
 };
 
-/** Badge + 2px hairline progress bar drawn over the fitted frame while live. */
+/**
+ * The live badge drawn over the fitted frame.
+ *
+ * No bar under it any more: the denoising image *is* the progress here — you can
+ * watch it resolve — and the top bar's rail already carries the quantified
+ * version at viewport width. A second hairline across the image only competed
+ * with the thing it was describing.
+ */
 export const PreviewLiveOverlay = ({ queueItemId }: { queueItemId: string }) => {
   const { t } = useTranslation();
   const progress = useQueueItemProgress(queueItemId);
   const percentage = progress?.percentage ?? null;
-  const fillStyle = useMemo<CSSProperties>(
-    () => ({ width: percentage === null ? '100%' : `${percentage * 100}%` }),
-    [percentage]
-  );
 
   return (
-    <>
-      <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-        {percentage === null ? t('common.generating') : `${t('common.generating')} · ${formatPercent(percentage)}`}
-      </Badge>
-      <Box bottom="0" h="2px" left="0" pointerEvents="none" position="absolute" right="0">
-        <Box
-          bg="accent.solid"
-          h="full"
-          opacity={percentage === null ? 0.35 : 1}
-          style={fillStyle}
-          transitionDuration="var(--wb-motion-duration-fast)"
-          transitionProperty="width"
-          transitionTimingFunction="ease"
-        />
-      </Box>
-    </>
+    <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
+      {percentage === null ? t('common.generating') : `${t('common.generating')} · ${formatPercent(percentage)}`}
+    </Badge>
   );
 };
 
