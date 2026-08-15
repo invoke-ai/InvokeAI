@@ -105,7 +105,7 @@ export const QueueCluster = () => {
             <IconButton
               aria-label={cancelCurrent.label}
               color="fg.error"
-              size="sm"
+              size="xs"
               variant="outline"
               onClick={cancelCurrent.onClick}
             >

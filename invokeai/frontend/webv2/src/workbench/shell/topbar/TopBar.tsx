@@ -1,4 +1,4 @@
-import { Grid, HStack, Separator } from '@chakra-ui/react';
+import { Grid, HStack } from '@chakra-ui/react';
 import { SettingsDialogHost } from '@workbench/settings/SettingsDialogHost';
 
 import { AppMenu } from './AppMenu';
@@ -39,9 +39,8 @@ export const TopBar = () => (
       px="1.5"
       w="full"
     >
-      <HStack gap="1" minW="0">
+      <HStack gap="0.5" minW="0">
         <AppMenu />
-        <Separator borderColor="border.subtle" h="5" orientation="vertical" />
         <ProjectSwitcher />
       </HStack>
 
