@@ -1,17 +1,24 @@
-import { HStack, Icon, Kbd, Separator, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Stack, Text } from '@chakra-ui/react';
+import { getQueueSummary } from '@features/queue/contracts';
+import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel } from '@workbench/invocation';
+import { useWorkbenchReduceMotion } from '@workbench/settings/store';
+import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { PlayIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
 
+import { getInvokeIconMode } from './invokeButtonModel';
 import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
+const PROGRESS_RING_CSS = { '--size': '14px', '--thickness': '2px' } as const;
+const ACK_MS = 420;
 
 const compactBlockingReason = (reason: string, noNodesLabel: string): string => {
   if (reason === 'The project graph has no nodes. Add nodes in the Workflow view.') {
@@ -26,18 +33,51 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
 /**
  * The single Invoke action for the whole application.
  *
- * Its appearance, width, and enabled state never change while a batch runs.
+ * Its geometry, width, and enabled state never change while a batch runs —
  * Invoke queues further items on top of a running batch, so a button that
- * morphed into a progress bar would read as unavailable at exactly the moment
- * it is most useful. Progress belongs to the queue group. (§5.1, contract §9.4.)
+ * morphed into a progress bar would read as unavailable at exactly the
+ * moment it is most useful. Only the icon slot's content may change: it
+ * shows the queue's progress while a batch runs and the pointer is
+ * elsewhere, and reverts to the play glyph on hover so "queue more on top"
+ * always reads as available. A brief, quiet acknowledgment ring pulses
+ * around the icon on click (skipped under reduced motion). Aggregate
+ * progress otherwise belongs to the queue group. (§5.1, contract §9.4.)
  */
 export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const { blockingReasons, invoke, isValid } = state;
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
   const shortcut = shortcutBinding?.display ?? null;
-  const handleClick = useCallback(() => void invoke(), [invoke]);
   const tooltipContent = useMemo(() => <InvokeTooltipContent shortcut={shortcut} state={state} />, [shortcut, state]);
+
+  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const baseSummary = getQueueSummary(queueItems);
+  const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
+  const hasOpenWork = baseSummary.total > 0;
+  const reduceMotion = useWorkbenchReduceMotion();
+
+  const [isHovered, setIsHovered] = useState(false);
+  const [isAcked, setIsAcked] = useState(false);
+  const ackTimerRef = useRef<number | null>(null);
+  const handlePointerEnter = useCallback(() => setIsHovered(true), []);
+  const handlePointerLeave = useCallback(() => setIsHovered(false), []);
+  const handleClick = useCallback(() => {
+    void invoke();
+    if (reduceMotion) {
+      return;
+    }
+    if (ackTimerRef.current !== null) {
+      window.clearTimeout(ackTimerRef.current);
+    }
+    setIsAcked(true);
+    ackTimerRef.current = window.setTimeout(() => setIsAcked(false), ACK_MS);
+  }, [invoke, reduceMotion]);
+
+  const iconMode = getInvokeIconMode({
+    hasOpenWork,
+    isHovered,
+    progress: runningProgress?.percentage ?? null,
+  });
 
   return (
     <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
@@ -57,9 +97,32 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         opacity={isValid ? undefined : 0.55}
         size="xs"
         onClick={isValid ? handleClick : undefined}
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}
         zIndex="2"
       >
-        <Icon as={PlayIcon} />
+        <Box alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
+          {iconMode.mode === 'progress' ? (
+            <ProgressCircle.Root css={PROGRESS_RING_CSS} value={iconMode.value === null ? null : iconMode.value * 100}>
+              <ProgressCircle.Circle>
+                <ProgressCircle.Track stroke="bg/40" />
+                <ProgressCircle.Range stroke="bg" strokeLinecap="round" />
+              </ProgressCircle.Circle>
+            </ProgressCircle.Root>
+          ) : (
+            <Icon as={PlayIcon} boxSize="3.5" />
+          )}
+          <Box
+            borderRadius="full"
+            boxShadow="0 0 0 3px var(--chakra-colors-bg)"
+            inset="-2px"
+            opacity={isAcked ? 0.55 : 0}
+            pointerEvents="none"
+            position="absolute"
+            transform={isAcked ? 'scale(1.35)' : 'scale(0.9)'}
+            transition={isAcked ? 'none' : `opacity ${ACK_MS}ms ease-out, transform ${ACK_MS}ms ease-out`}
+          />
+        </Box>
         {t('topbar.invoke.invoke')}
         {shortcut ? (
           <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" color="bg" size="sm">
