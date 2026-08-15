@@ -1,8 +1,11 @@
 import type { Rect } from '@xyflow/react';
+import { WORKFLOW_GRID_SIZE } from 'features/nodes/types/constants';
 import { toBlob } from 'html-to-image';
 
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
+export const WORKFLOW_EXPORT_TIMEOUT_MS = 30_000;
+const WORKFLOW_EXPORT_IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 export const EXPORT_STYLE_PROPERTIES = [
   'box-sizing',
   'display',
@@ -30,6 +33,7 @@ export const EXPORT_STYLE_PROPERTIES = [
   'margin-left',
   'flex',
   'flex-direction',
+  'flex-wrap',
   'flex-grow',
   'flex-shrink',
   'flex-basis',
@@ -70,6 +74,7 @@ export const EXPORT_STYLE_PROPERTIES = [
   'font-size',
   'font-weight',
   'font-style',
+  'direction',
   'line-height',
   'letter-spacing',
   'text-align',
@@ -109,7 +114,6 @@ export const SVG_EXPORT_STYLE_PROPERTIES = [
   'clip-path',
   'mask',
 ] as const;
-const GRID_GAP = 25;
 const DEFAULT_WORKFLOW_IMAGE_FILENAME = 'My Workflow';
 
 type WorkflowImageDimensions = {
@@ -126,7 +130,7 @@ const getPaddedWorkflowBounds = (bounds: Rect): Rect => ({
   height: bounds.height + EXPORT_PADDING * 2,
 });
 
-const getWorkflowContentBounds = (flowElement: HTMLElement, nodeBounds: Rect): Rect => {
+export const getWorkflowContentBounds = (flowElement: HTMLElement, nodeBounds: Rect): Rect => {
   let minX = nodeBounds.x;
   let minY = nodeBounds.y;
   let maxX = nodeBounds.x + nodeBounds.width;
@@ -152,6 +156,33 @@ const getWorkflowContentBounds = (flowElement: HTMLElement, nodeBounds: Rect): R
     minY = Math.min(minY, pathBounds.y);
     maxX = Math.max(maxX, pathBounds.x + pathBounds.width);
     maxY = Math.max(maxY, pathBounds.y + pathBounds.height);
+  });
+
+  const flowRect = flowElement.getBoundingClientRect();
+  const viewport = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportRect = viewport?.getBoundingClientRect() ?? flowRect;
+  const transform = viewport ? (getComputedStyle(viewport).transform ?? 'none') : 'none';
+  const matrix = transform
+    .match(/^matrix\(([^)]+)\)$/)?.[1]
+    ?.split(',')
+    .map(Number);
+  const zoom = matrix?.[0] && Number.isFinite(matrix[0]) && matrix[0] > 0 ? matrix[0] : 1;
+
+  flowElement.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]').forEach((label) => {
+    const labelRect = label.getBoundingClientRect();
+    const intrinsicWidth = Math.max(labelRect.width, label.scrollWidth);
+    const intrinsicHeight = Math.max(labelRect.height, label.scrollHeight);
+    const overflowWidth = Math.max(0, intrinsicWidth - labelRect.width) / zoom;
+    const direction = getComputedStyle(label).direction;
+    const labelX = (labelRect.left - viewportRect.left) / zoom - (direction === 'rtl' ? overflowWidth : 0);
+    const labelY = (labelRect.top - viewportRect.top) / zoom;
+    const labelWidth = intrinsicWidth / zoom;
+    const labelHeight = intrinsicHeight / zoom;
+
+    minX = Math.min(minX, labelX);
+    minY = Math.min(minY, labelY);
+    maxX = Math.max(maxX, labelX + labelWidth);
+    maxY = Math.max(maxY, labelY + labelHeight);
   });
 
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
@@ -183,7 +214,9 @@ export const getWorkflowExportOptions = (dimensions: WorkflowImageDimensions, ba
   backgroundColor,
   pixelRatio: 1,
   includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
-  skipFonts: true,
+  imagePlaceholder: WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
+  onImageErrorHandler: () => WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
+  skipFonts: false,
 });
 
 export const getWorkflowSvgExportStyles = (computedStyle: Pick<CSSStyleDeclaration, 'getPropertyValue'>) =>
@@ -229,11 +262,11 @@ const setBackgroundGridForExport = (root: HTMLElement, translation: { x: number;
 
   const patternId = `${pattern.id}-export`;
   pattern.id = patternId;
-  pattern.setAttribute('width', `${GRID_GAP}`);
-  pattern.setAttribute('height', `${GRID_GAP}`);
-  pattern.setAttribute('x', `${((translation.x % GRID_GAP) + GRID_GAP) % GRID_GAP}`);
-  pattern.setAttribute('y', `${((translation.y % GRID_GAP) + GRID_GAP) % GRID_GAP}`);
-  pattern.setAttribute('patternTransform', `translate(-${GRID_GAP},-${GRID_GAP})`);
+  pattern.setAttribute('width', `${WORKFLOW_GRID_SIZE}`);
+  pattern.setAttribute('height', `${WORKFLOW_GRID_SIZE}`);
+  pattern.setAttribute('x', `${((translation.x % WORKFLOW_GRID_SIZE) + WORKFLOW_GRID_SIZE) % WORKFLOW_GRID_SIZE}`);
+  pattern.setAttribute('y', `${((translation.y % WORKFLOW_GRID_SIZE) + WORKFLOW_GRID_SIZE) % WORKFLOW_GRID_SIZE}`);
+  pattern.setAttribute('patternTransform', `translate(-${WORKFLOW_GRID_SIZE},-${WORKFLOW_GRID_SIZE})`);
 
   const patternReference = `url(#${patternId})`;
   background.querySelector('rect')?.setAttribute('fill', patternReference);
@@ -281,6 +314,37 @@ export const setWorkflowExportInputFieldTitleStyles = (root: HTMLElement) => {
     setExportElementStyle(element, 'white-space', 'nowrap');
     setExportElementStyle(element, 'overflow', 'visible');
     setExportElementStyle(element, 'text-overflow', 'clip');
+  });
+};
+
+const namespaceWorkflowExportIds = (clone: HTMLElement) => {
+  const elements = [clone, ...clone.querySelectorAll<HTMLElement | SVGElement>('*')];
+  const ids = new Map<string, string>();
+
+  elements.forEach((element) => {
+    if (element.id) {
+      ids.set(element.id, `${element.id}-workflow-export`);
+    }
+  });
+
+  elements.forEach((element) => {
+    const id = element.id;
+    if (id) {
+      element.id = ids.get(id) ?? id;
+    }
+  });
+
+  const sortedIds = [...ids.entries()].sort(([first], [second]) => second.length - first.length);
+  const rewriteReferences = (value: string) =>
+    sortedIds.reduce((rewritten, [id, namespacedId]) => rewritten.split(`#${id}`).join(`#${namespacedId}`), value);
+
+  elements.forEach((element) => {
+    Array.from(element.attributes).forEach((attribute) => {
+      const rewritten = rewriteReferences(attribute.value);
+      if (rewritten !== attribute.value) {
+        element.setAttribute(attribute.name, rewritten);
+      }
+    });
   });
 };
 
@@ -349,6 +413,25 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
   });
 };
 
+const toBlobWithTimeout = async (clone: HTMLElement, options: ReturnType<typeof getWorkflowExportOptions>) => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      toBlob(clone, options),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Workflow image export timed out after ${WORKFLOW_EXPORT_TIMEOUT_MS} ms`));
+        }, WORKFLOW_EXPORT_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
 const downloadPng = (blob: Blob, workflowName: string) => {
   const objectUrl = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -374,6 +457,7 @@ export const exportWorkflowAsPng = async ({
   const clone = flowElement.cloneNode(true) as HTMLElement;
   const stagingWrapper = document.createElement('div');
 
+  namespaceWorkflowExportIds(clone);
   prepareExportClone(clone, contentBounds, dimensions);
   Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(dimensions));
   stagingWrapper.appendChild(clone);
@@ -381,7 +465,10 @@ export const exportWorkflowAsPng = async ({
 
   try {
     inlineSvgStylesForExport(clone);
-    const blob = await toBlob(clone, getWorkflowExportOptions(dimensions, getComputedStyle(clone).backgroundColor));
+    const blob = await toBlobWithTimeout(
+      clone,
+      getWorkflowExportOptions(dimensions, getComputedStyle(clone).backgroundColor)
+    );
     if (!blob) {
       throw new Error('Workflow image export returned an empty Blob');
     }
