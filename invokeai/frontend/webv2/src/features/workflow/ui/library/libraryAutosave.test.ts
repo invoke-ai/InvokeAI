@@ -47,7 +47,7 @@ describe('createLibraryAutosaver', () => {
     h.manual.fire();
     await h.autosaver.flush();
     expect(h.save).toHaveBeenCalledWith('wf-1', { nodes: [1] });
-    expect(h.statuses).toEqual(['dirty', 'saving', 'saved']);
+    expect(h.statuses).toEqual(['dirty', 'saving', 'saved', 'saved']);
   });
 
   it('skips saving when the serialized graph has not changed since the last save', async () => {
@@ -59,6 +59,7 @@ describe('createLibraryAutosaver', () => {
     h.manual.fire();
     await h.autosaver.flush();
     expect(h.save).toHaveBeenCalledTimes(1);
+    expect(h.statuses).toEqual(['dirty', 'saving', 'saved', 'saved', 'dirty', 'saved', 'saved']);
   });
 
   it('markSynced suppresses the echo save after a load/bind', async () => {
@@ -84,12 +85,15 @@ describe('createLibraryAutosaver', () => {
     h.autosaver.notifyGraphChanged();
     h.manual.fire();
     await h.autosaver.flush();
-    expect(h.statuses.at(-1)).toBe('error');
+    // Error is reported, then chained retry succeeds
+    expect(h.statuses).toContain('error');
+    expect(h.statuses.at(-1)).toBe('saved');
     h.setCurrent({ libraryWorkflowId: 'wf-1', serialized: { nodes: [2] } });
     h.autosaver.notifyGraphChanged();
     h.manual.fire();
     await h.autosaver.flush();
-    expect(h.save).toHaveBeenCalledTimes(2);
+    // Called 3 times: initial (failed), chained retry, new content
+    expect(h.save).toHaveBeenCalledTimes(3);
     expect(h.statuses.at(-1)).toBe('saved');
   });
 
@@ -99,5 +103,38 @@ describe('createLibraryAutosaver', () => {
     h.autosaver.dispose();
     h.manual.fire();
     expect(h.save).not.toHaveBeenCalled();
+  });
+
+  it('a change made during an in-flight save is saved afterward', async () => {
+    const h = createHarness();
+    let resolveSave: () => void;
+    const deferred = new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    });
+    h.save.mockReturnValueOnce(deferred);
+    h.autosaver.notifyGraphChanged();
+    h.manual.fire();
+    // Save is now in flight, pending on deferred
+    h.setCurrent({ libraryWorkflowId: 'wf-1', serialized: { nodes: [2] } });
+    h.autosaver.notifyGraphChanged();
+    const flushPromise = h.autosaver.flush();
+    // Resolve first save, which should chain another save for the new content
+    resolveSave!();
+    h.save.mockReturnValueOnce(Promise.resolve());
+    await flushPromise;
+    expect(h.save).toHaveBeenCalledTimes(2);
+    expect(h.save).toHaveBeenLastCalledWith('wf-1', { nodes: [2] });
+    expect(h.statuses.at(-1)).toBe('saved');
+  });
+
+  it('an edit that dedupes back to the saved content ends in saved, not dirty', async () => {
+    const h = createHarness();
+    h.autosaver.notifyGraphChanged();
+    h.manual.fire();
+    await h.autosaver.flush();
+    h.autosaver.notifyGraphChanged(); // same content
+    h.manual.fire();
+    await h.autosaver.flush();
+    expect(h.statuses.at(-1)).toBe('saved');
   });
 });

@@ -43,7 +43,10 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
 
   const runSave = (): Promise<void> => {
     if (inFlight) {
-      return inFlight;
+      // A save is running; chain another pass after it so content edited
+      // mid-save is picked up. The rerun re-reads and dedupes, so it no-ops
+      // when nothing newer landed — the chain always terminates.
+      return inFlight.then(() => runSave());
     }
 
     const { libraryWorkflowId, serialized } = deps.read();
@@ -55,6 +58,7 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
     const json = JSON.stringify(serialized);
 
     if (json === lastSavedJson) {
+      deps.onStatus('saved');
       return Promise.resolve();
     }
 
