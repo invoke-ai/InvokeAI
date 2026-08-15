@@ -154,6 +154,11 @@ class WanModelLoaderInvocation(BaseInvocation):
                 context.logger.warning("'Transformer (Low Noise)' is ignored for the single-expert TI2V-5B variant.")
 
             if self.transformer_low_noise_model is not None and main_variant != WanVariantType.TI2V_5B:
+                if self.transformer_low_noise_model.key == self.model.key:
+                    raise ValueError(
+                        "The same model is wired to both 'Transformer' and 'Transformer (Low Noise)'. "
+                        "A Wan A14B expert pair needs two different GGUF models."
+                    )
                 low_config = context.models.get_config(self.transformer_low_noise_model)
                 self._validate_main_config(low_config, "Transformer (Low Noise)")
                 if low_config.format != ModelFormat.GGUFQuantized:
@@ -166,30 +171,63 @@ class WanModelLoaderInvocation(BaseInvocation):
 
                 if getattr(low_config, "variant", None) != main_variant:
                     raise ValueError("The high-noise and low-noise GGUF models must use the same Wan variant.")
-                if {primary_expert, low_expert} != {"high", "low"}:
-                    raise ValueError("A Wan A14B GGUF expert pair must contain one high and one low expert.")
+
+                # The expert tag is a filename heuristic, so 'none' (untagged)
+                # is common on community finetunes. The wiring itself is
+                # explicit user intent — main slot = high, low-noise slot =
+                # low — so an untagged file is taken at its wired position (or
+                # inferred as the complement of its tagged partner). Only a
+                # genuine conflict, both files claiming the *same* expert, is
+                # an error.
+                if primary_expert == low_expert != "none":
+                    raise ValueError(
+                        f"Both selected GGUF models are tagged as the {primary_expert}-noise expert. "
+                        "A Wan A14B expert pair must contain one high and one low expert."
+                    )
+                if primary_expert == "none" and low_expert == "none":
+                    context.logger.warning(
+                        "Neither Wan A14B GGUF filename identifies its expert, so 'Transformer' is assumed to "
+                        "be the high-noise expert and 'Transformer (Low Noise)' the low-noise expert. If the "
+                        "output looks wrong, swap the two models."
+                    )
 
                 # Make sure 'transformer' is the high-noise expert and
                 # 'transformer_low_noise' is the low-noise expert. If the user
                 # accidentally swapped them, swap back.
-                if primary_expert == "low" and low_expert == "high":
+                if primary_expert == "low" or low_expert == "high":
                     transformer = low_id
                     transformer_low_noise = primary_id
+                    # The swap overrides the wiring on the strength of a
+                    # filename tag, so say so: a mistagged file is otherwise an
+                    # invisible expert inversion.
+                    context.logger.warning(
+                        f"The wired Wan A14B GGUF experts look reversed, so they were swapped: "
+                        f"'{low_config.name}' (tagged '{low_expert}') runs as the high-noise expert and "
+                        f"'{main_config.name}' (tagged '{primary_expert}') as the low-noise expert. "
+                        "The tags come from the filenames — if the output looks wrong, a filename is lying."
+                    )
                 else:
                     transformer = primary_id
                     transformer_low_noise = low_id
             else:
                 transformer = primary_id
-                if main_variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and primary_expert != "high":
-                    raise ValueError("An unpaired Wan A14B GGUF model must be the high-noise expert.")
                 # A14B without a paired low-noise GGUF will produce degraded
-                # quality (only the high-noise expert runs). Warn but don't
-                # abort — TI2V-5B GGUFs are single-expert and totally fine.
+                # quality (only one expert runs). Warn but don't abort — a
+                # single wired transformer is explicit intent just like a pair
+                # is, and the tag is only a filename guess, so an untagged file
+                # must not be fatal here when the paired path accepts it.
+                # TI2V-5B GGUFs are single-expert and totally fine.
                 if main_variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B):
-                    context.logger.warning(
-                        "A14B GGUF main was provided without a paired 'Transformer (Low Noise)'. "
-                        "Only the high-noise expert will run; image quality will be reduced."
+                    message = (
+                        "An A14B GGUF is wired to 'Transformer' without a paired 'Transformer (Low Noise)'. "
+                        "Only this one expert will run; image quality will be reduced."
                     )
+                    if primary_expert == "low":
+                        message += (
+                            " Its filename tags it as the low-noise expert; when running a single expert, "
+                            "the high-noise one is usually the better choice."
+                        )
+                    context.logger.warning(message)
 
             # Borrow the boundary_ratio recorded on the optional Diffusers
             # component_source, when one is wired.
