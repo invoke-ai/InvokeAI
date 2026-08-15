@@ -16,9 +16,9 @@ import {
   BookOpenTextIcon,
   BlocksIcon,
   BoxIcon,
+  ChevronDownIcon,
   FolderIcon,
   ListOrderedIcon,
-  MenuIcon,
   MessagesSquareIcon,
   SearchIcon,
   SettingsIcon,
@@ -128,39 +128,20 @@ export const AppMenu = () => {
   );
 };
 
-const MARK_SWAP_PROPS = { opacity: 0 } as const;
-const GLYPH_SWAP_PROPS = { opacity: 1 } as const;
+const CHEVRON_HOVER_PROPS = { color: 'fg' } as const;
 
 const AppMenuGlyph = () => (
-  <Box boxSize="4" position="relative" role="presentation">
-    <Box
-      alignItems="center"
-      display="flex"
-      inset="0"
-      justifyContent="center"
-      position="absolute"
-      transition="opacity var(--wb-motion-duration-fast) ease"
-      _groupHover={MARK_SWAP_PROPS}
-      _groupFocusVisible={MARK_SWAP_PROPS}
-      _groupExpanded={MARK_SWAP_PROPS}
-    >
-      <InvokeMark size={14} />
-    </Box>
-    <Box
-      alignItems="center"
-      display="flex"
-      inset="0"
-      justifyContent="center"
-      opacity="0"
-      position="absolute"
-      transition="opacity var(--wb-motion-duration-fast) ease"
-      _groupHover={GLYPH_SWAP_PROPS}
-      _groupFocusVisible={GLYPH_SWAP_PROPS}
-      _groupExpanded={GLYPH_SWAP_PROPS}
-    >
-      <Icon as={MenuIcon} boxSize="4" />
-    </Box>
-  </Box>
+  <HStack gap="0.5" role="presentation">
+    <InvokeMark size={14} />
+    <Icon
+      as={ChevronDownIcon}
+      boxSize="3"
+      color="fg.subtle"
+      transition="color var(--wb-motion-duration-fast) ease"
+      _groupHover={CHEVRON_HOVER_PROPS}
+      _groupExpanded={CHEVRON_HOVER_PROPS}
+    />
+  </HStack>
 );
 
 const SearchMenuAction = () => {

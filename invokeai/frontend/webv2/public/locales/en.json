@@ -1376,6 +1376,12 @@
     "settingsLabel": "{{label}} settings",
     "visibilityLabel": "{{region}} widget visibility",
     "groupLabel": "Widgets",
+    "rail": {
+      "create": "Create",
+      "inspect": "Inspect",
+      "createWidgets": "Create widgets",
+      "inspectWidgets": "Inspect widgets"
+    },
     "labels": {
       "autosaveStatus": "Autosave",
       "canvas": "Canvas",
