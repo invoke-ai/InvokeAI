@@ -8,6 +8,7 @@ import type {
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
+import { collectGraphInputMediaNames } from '@features/queue/core/graphInputMedia';
 import { isQueuePromptSeedBehaviour } from '@features/queue/core/promptBatch';
 import { shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
@@ -23,6 +24,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 
 export interface QueueResultDestinationPort {
   addImagesToGalleryBoard(boardId: string, imageNames: string[]): Promise<void>;
+  addVideosToGalleryBoard(boardId: string, videoNames: string[]): Promise<void>;
 }
 
 export interface QueueRuntime {
@@ -72,6 +74,16 @@ const toErrorMessage = (error: unknown): string =>
 
 export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueResultImageOptions | undefined => {
   return queueItem.snapshot.resultNodeIds ? { resultNodeIds: queueItem.snapshot.resultNodeIds } : undefined;
+};
+
+/**
+ * The compiled backend graph this item submitted, or undefined for legacy/invalid
+ * snapshots. Used to recognize input passthroughs among collected results — see
+ * `collectGraphInputMediaNames`.
+ */
+const getQueueItemCompiledGraph = (queueItem: QueueItem): unknown => {
+  const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+  return submission && typeof submission === 'object' && 'graph' in submission ? submission.graph : undefined;
 };
 
 export const createQueueItemBackendSubmission = (
@@ -203,14 +215,89 @@ export const createQueueRuntime = ({
     }
   };
 
-  /** Drop intermediates when the item asks for it, then land what remains on its destination. */
+  /**
+   * Land result videos on the destination board, like images. Videos are born
+   * unassigned server-side (the compiled graph carries no board unless a node
+   * sets one explicitly), so without this step every generated video sits in
+   * Uncategorized regardless of the active board. Only names are fetched — the
+   * gallery hydrates the video itself on its own refresh. Re-attaching a video
+   * that another settlement path already routed is a no-op server-side.
+   *
+   * Board attachment is cosmetic categorization: the run itself succeeded, so a
+   * failure here (transient fetch error, board deleted mid-run) is recorded as a
+   * queue-results error and NEVER thrown — throwing from the run-settlement path
+   * would mark a completed generation "failed" and skip recording its images.
+   */
+  const addResultVideosToDestination = async (
+    projectId: string,
+    queueItem: QueueItem,
+    backendItemIds: number[]
+  ): Promise<void> => {
+    // Skip ids whose backend items were cancelled — their partial videos are not
+    // deliverable results (mirrors waitForResults filtering images to completed
+    // outcomes). The persisted set can miss a cancellation from the current
+    // session on the resumed path; the residual is a best-effort attach of an
+    // already-rendered video, not a correctness problem.
+    const deliverableItemIds = backendItemIds.filter(
+      (backendItemId) => !queueItem.cancelledBackendItemIds?.includes(backendItemId)
+    );
+
+    if (!isActive() || queueItem.snapshot.destination !== 'gallery' || deliverableItemIds.length === 0) {
+      return;
+    }
+
+    const boardId = queueItem.snapshot.galleryBoardId;
+
+    if (!boardId || boardId === 'none') {
+      return;
+    }
+
+    try {
+      const imageOptions = getQueueItemResultImageOptions(queueItem);
+      const options = queueItem.snapshot.filterIntermediateResults
+        ? { ...imageOptions, excludeIntermediate: true }
+        : imageOptions;
+      const namesPerItem = await Promise.all(
+        deliverableItemIds.map((backendItemId) => backend.getResultVideoNames(backendItemId, options))
+      );
+      // A video primitive echoes the run's INPUT video into session.results (e.g. the
+      // source clip of an extend-video workflow) — exclude it like input images.
+      const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+      const videoNames = [...new Set(namesPerItem.flat())].filter((name) => !inputMedia.videoNames.has(name));
+
+      if (videoNames.length === 0 || !isActive()) {
+        return;
+      }
+
+      await destinations.addVideosToGalleryBoard(boardId, videoNames);
+    } catch (error) {
+      if (isActive()) {
+        commands.recordError({
+          area: 'queue-results',
+          message: toErrorMessage(error),
+          namespace: 'queue',
+          projectId,
+        });
+      }
+    }
+  };
+
+  /**
+   * Drop input passthroughs and (when the item asks) intermediates, then land what
+   * remains on the item's destination. Session results include every node's output,
+   * so a media primitive echoes the run's INPUT image under its original name — e.g.
+   * the first-frame keyframe of an image-to-video workflow — and routing it would
+   * board-attach the user's source image on every run.
+   */
   const deliverVisibleImages = async (
     queueItem: QueueItem,
     allImages: QueueResultImage[]
   ): Promise<QueueResultImage[]> => {
+    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const producedImages = allImages.filter((image) => !inputMedia.imageNames.has(image.imageName));
     const images = queueItem.snapshot.filterIntermediateResults
-      ? allImages.filter((image) => !image.isIntermediate)
-      : allImages;
+      ? producedImages.filter((image) => !image.isIntermediate)
+      : producedImages;
 
     await addImagesToDestination(
       queueItem,
@@ -223,7 +310,12 @@ export const createQueueRuntime = ({
   const routeRunResults = async (
     coordinator: QueueCoordinator,
     projectId: string,
-    queueItem: QueueItem
+    queueItem: QueueItem,
+    // The store is immutable and `queueItem` is a pre-submission closure, so callers must
+    // pass the run's backend item ids explicitly (enqueue result / reconcile outcome /
+    // persisted ids) — reading queueItem.backendItemIds here would always see undefined
+    // on the fresh-submit and adopted paths.
+    backendItemIds: number[]
   ): Promise<void> => {
     try {
       const allImages = await coordinator.waitForResults(
@@ -237,6 +329,10 @@ export const createQueueRuntime = ({
       }
 
       const images = await deliverVisibleImages(queueItem, allImages);
+      // The live path also routes videos per backend item as each completes
+      // (routeBackendItemResults); this run-end pass is the retry/backstop and the only
+      // coverage for items completed in a previous session. Never throws.
+      await addResultVideosToDestination(projectId, queueItem, backendItemIds);
 
       if (!isActive()) {
         return;
@@ -283,6 +379,8 @@ export const createQueueRuntime = ({
       }
 
       const visibleImages = await deliverVisibleImages(queueItem, images);
+      // Never throws — a board-attach hiccup must not block routePartialResults below.
+      await addResultVideosToDestination(projectId, queueItem, [backendItemId]);
 
       if (!isActive()) {
         return;
@@ -382,7 +480,7 @@ export const createQueueRuntime = ({
         });
         void backend.resumeProcessor().catch(() => undefined);
 
-        return routeRunResults(coordinator, project.id, queueItem);
+        return routeRunResults(coordinator, project.id, queueItem, itemIds);
       })
       .catch((error: unknown) => {
         if (isActive()) {
@@ -481,10 +579,10 @@ export const createQueueRuntime = ({
                 projectId: project.id,
                 queueItemId: queueItem.id,
               });
-              void routeRunResults(coordinator, project.id, queueItem);
+              void routeRunResults(coordinator, project.id, queueItem, outcome.backendItemIds);
               break;
             case 'resumed':
-              void routeRunResults(coordinator, project.id, queueItem);
+              void routeRunResults(coordinator, project.id, queueItem, queueItem.backendItemIds ?? []);
               break;
             case 'missing':
               commands.setStatus({

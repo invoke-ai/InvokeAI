@@ -34,6 +34,7 @@ const template: InvocationTemplate = {
       uiComponent: null,
       uiHidden: false,
       uiModelBase: null,
+      uiModelFormat: null,
       uiModelType: null,
       uiOrder: null,
     },
