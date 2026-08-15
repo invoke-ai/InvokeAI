@@ -22,7 +22,6 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
-import { PreviewLiveOverlay } from './PreviewLiveReadout';
 import { FittedFrame, PreviewStage } from './PreviewStage';
 import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
 
@@ -37,8 +36,13 @@ interface PreviewFrameProps {
   frameWidth: number;
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
   isLive: boolean;
-  liveBadgeLabel: string;
-  liveQueueItemId?: string | null;
+  /**
+   * Static caption over a live frame — used only by the multi-session tiles to
+   * name the GPU. The single live preview carries no badge at all: the frame
+   * is styled exactly like a finished item, and progress readouts belong to
+   * the footer and the top bar rail.
+   */
+  liveBadgeLabel?: string;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
   onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
@@ -78,7 +82,6 @@ const PreviewImageFrame = ({
   frameWidth,
   isLive,
   liveBadgeLabel,
-  liveQueueItemId,
   loupeControlsRef,
   onContextMenu,
   padding,
@@ -151,15 +154,12 @@ const PreviewImageFrame = ({
       width={frameWidth}
     />
   ) : null;
-  const liveBadge = isLive ? (
-    typeof liveQueueItemId === 'string' ? (
-      <PreviewLiveOverlay queueItemId={liveQueueItemId} />
-    ) : (
+  const liveBadge =
+    isLive && liveBadgeLabel !== undefined ? (
       <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
         {liveBadgeLabel}
       </Badge>
-    )
-  ) : null;
+    ) : null;
 
   if (variant === 'inset') {
     return (
@@ -168,11 +168,7 @@ const PreviewImageFrame = ({
       // the cell, so only the fitted frame sits a little lower.
       <PreviewStage fill="parent">
         {source ? (
-          <FittedFrame
-            borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
-            frameHeight={frameHeight}
-            frameWidth={frameWidth}
-          >
+          <FittedFrame frameHeight={frameHeight} frameWidth={frameWidth}>
             {media}
             {liveBadge}
           </FittedFrame>
@@ -192,12 +188,14 @@ const PreviewImageFrame = ({
       paddingBottom={paddingBottom}
       {...loupe.stageProps}
     >
-      <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />
+      {/* Never armed over a live render: arming a comparison pauses live-follow
+          and would swap the in-progress image for a compare of the stale hidden
+          selection. The inset live frame never offered this either. */}
+      {isLive ? null : <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />}
       <FittedFrame
         ref={setContentRef}
         {...listeners}
         bg="transparent"
-        borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
         cursor={isDragDisabled ? undefined : isDragging ? 'grabbing' : 'grab'}
         frameHeight={frameHeight}
         frameWidth={frameWidth}

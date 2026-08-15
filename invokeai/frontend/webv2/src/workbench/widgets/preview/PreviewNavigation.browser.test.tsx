@@ -581,6 +581,29 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
+  it('renders the live frame with the standard media chrome: footer up, no badge, item border', async () => {
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: 'queue-item-live' });
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
+      width: 64,
+    });
+
+    await render();
+
+    // The footer island is up during the live render, fed by queue data: the
+    // slot's requested output size, and working prev/next.
+    expect(host?.textContent).toContain('64 × 64');
+    expect(host?.querySelector('button[aria-label="Next item in board"]')).not.toBeNull();
+    // No progress badge over the frame — the image is styled exactly like a
+    // finished item, so completion changes pixels, not chrome.
+    expect(host?.textContent).not.toContain('Generating');
+    expect(host?.querySelector<HTMLImageElement>('img[src^="data:image/png"]')).not.toBeNull();
+  });
+
   it('uses the active placeholder board while following live, even before an image frame arrives', async () => {
     const liveBoardImage = {
       ...mocks.project.widgetInstances.gallery.state.values.recentImages[0],

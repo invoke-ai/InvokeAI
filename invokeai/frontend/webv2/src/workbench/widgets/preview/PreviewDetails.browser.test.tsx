@@ -155,6 +155,14 @@ const interact = (action: () => void, delay = 100): Promise<void> =>
     });
   });
 
+const buildItemMedia = (item: GalleryImageItem | GalleryVideoItem) =>
+  ({
+    actionImage: item.kind === 'image' ? actionImage : null,
+    actions,
+    item,
+    kind: 'item',
+  }) as const;
+
 const renderFooter = async ({
   isOpen,
   item,
@@ -162,18 +170,18 @@ const renderFooter = async ({
   isOpen: boolean;
   item: GalleryImageItem | GalleryVideoItem;
 }): Promise<void> => {
+  const media = buildItemMedia(item);
+
   await interact(() => {
     root?.render(
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
             <PreviewFooter
-              actionImage={item.kind === 'image' ? actionImage : null}
-              actions={actions}
               boardItemCount={2}
               isLoadingBoard={false}
               isMetadataOpen={isOpen}
-              item={item}
+              media={media}
               selectedIndex={0}
               onNext={() => undefined}
               onPrevious={() => undefined}

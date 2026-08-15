@@ -70,7 +70,17 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type Ref,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -79,7 +89,7 @@ import { PreviewCompare } from './PreviewCompare';
 import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
-import { PreviewFooter } from './PreviewFooter';
+import { PreviewFooter, type PreviewFooterMedia } from './PreviewFooter';
 import {
   PreviewFrame,
   type PreviewMediaSource,
@@ -100,6 +110,8 @@ import {
 } from './previewSettings';
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
+/** For the live footer's Details slot, which renders disabled and never fires. */
+const noop = (): void => {};
 
 const VIDEO_FRAME_COPY_FAILURE_KEYS = {
   'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
@@ -878,9 +890,17 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
           />
         ) : shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
+            boardItemCount={navigationSequence.length}
+            density={density}
+            filmstripItems={isFilmstripVisible && density !== 'minimal' ? boardItems : null}
+            isLoadingBoard={isLoadingBoard}
             placeholder={activeGalleryPlaceholder}
             progressImage={matchingProgressImage}
+            selectedIndex={navigationCursor}
             shouldAntialiasProgressImage={antialiasProgressImages}
+            onNext={selectNextItem}
+            onPrevious={selectPreviousItem}
+            onSelectItem={selectPreviewItem}
           />
         ) : selectedItem ? (
           <>
@@ -1021,6 +1041,30 @@ interface SelectedMediaPreviewProps {
   videoControllerRef?: Ref<PreviewVideoFrameController>;
 }
 
+/**
+ * The one media arrangement, shared by selected items and the live preview:
+ * the stage fills, and the filmstrip + footer float above its lower edge in a
+ * single island stack. The stage reserves bottom padding for the footer island
+ * only, so the fitted media is never tucked under it; the filmstrip floats
+ * over the media itself and steals no height. Live and finished renders MUST
+ * pass through the same scaffold — the denoise→done boundary may change only
+ * the pixels inside the frame, never the geometry around it.
+ */
+const PreviewMediaScaffold = ({ children }: { children: ReactNode }) => (
+  <Flex direction="column" h="full" minH="0" position="relative" w="full">
+    {children}
+  </Flex>
+);
+
+/** The floating island column the filmstrip and footer share. */
+const PreviewOverlayStack = ({ children }: { children: ReactNode }) => (
+  <Stack bottom="2" gap="2" insetX="2" position="absolute" zIndex="1">
+    {children}
+  </Stack>
+);
+
+const getMediaStagePadding = (density: PreviewDensity): string => (density === 'full' ? '6' : '3');
+
 const SelectedMediaPreview = ({
   actionImage,
   actions,
@@ -1050,24 +1094,22 @@ const SelectedMediaPreview = ({
   frameWidth: number;
   source: Parameters<typeof PreviewFrame>[0]['source'];
 }) => {
-  const { t } = useTranslation();
+  const media = useMemo<PreviewFooterMedia>(
+    () => ({ actionImage, actions, item, kind: 'item' }),
+    [actionImage, actions, item]
+  );
 
-  // The grid surface fills; the filmstrip and details float above its lower
-  // edge. The surface reserves bottom padding for the details island only, so
-  // the fitted media is never tucked under it; the filmstrip floats over the
-  // media itself and steals no height.
   return (
-    <Flex direction="column" h="full" minH="0" position="relative" w="full">
+    <PreviewMediaScaffold>
       <PreviewFrame
         dragItem={dragItem}
         frameHeight={frameHeight}
         frameWidth={frameWidth}
         isItemCurrent={isItemCurrent}
         isLive={false}
-        liveBadgeLabel={t('common.generating')}
         loupeControlsRef={loupeControlsRef}
         onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
-        padding={density === 'full' ? '6' : '3'}
+        padding={getMediaStagePadding(density)}
         paddingBottom={PREVIEW_OVERLAY_RESERVE}
         shouldAntialiasLiveImage
         source={source}
@@ -1075,7 +1117,7 @@ const SelectedMediaPreview = ({
         videoControllerRef={videoControllerRef}
         onContextMenu={onContextMenu}
       />
-      <Stack bottom="2" gap="2" insetX="2" position="absolute" zIndex="1">
+      <PreviewOverlayStack>
         {filmstripItems ? (
           <PreviewFilmstrip
             density={density}
@@ -1085,32 +1127,52 @@ const SelectedMediaPreview = ({
           />
         ) : null}
         <PreviewFooter
-          actionImage={actionImage}
-          actions={actions}
           boardItemCount={boardItemCount}
-          item={item}
           isLoadingBoard={isLoadingBoard}
           isMetadataOpen={isMetadataOpen}
+          media={media}
           selectedIndex={selectedIndex}
           onNext={onNext}
           onPrevious={onPrevious}
           onToggleMetadata={onToggleMetadata}
         />
-      </Stack>
-    </Flex>
+      </PreviewOverlayStack>
+    </PreviewMediaScaffold>
   );
 };
 
+/**
+ * The single-session live preview: the denoise stream rendered exactly like a
+ * finished item — same scaffold, same frame chrome, no badge — so the moment
+ * generation completes, only the pixels change. The footer stays up
+ * throughout, fed by queue data: the slot's position in the same navigation
+ * sequence the arrow keys walk, and its requested output size.
+ */
 const LivePreview = ({
+  boardItemCount,
+  density,
+  filmstripItems,
+  isLoadingBoard,
   placeholder,
   progressImage,
+  selectedIndex,
   shouldAntialiasProgressImage,
+  onNext,
+  onPrevious,
+  onSelectItem,
 }: {
+  boardItemCount: number;
+  density: PreviewDensity;
+  filmstripItems: GalleryItem[] | null;
+  isLoadingBoard: boolean;
   placeholder: GalleryQueuePlaceholder;
   progressImage: LatestProgressImageSnapshot | null;
+  selectedIndex: number;
   shouldAntialiasProgressImage: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSelectItem: (item: GalleryItem) => void;
 }) => {
-  const { t } = useTranslation();
   const previewImage = useStreamingImageSource({
     liveImage: progressImageToStreamingSource(progressImage),
   });
@@ -1126,17 +1188,39 @@ const LivePreview = ({
     [placeholder.id, previewImage]
   );
 
+  const media = useMemo<PreviewFooterMedia>(
+    () => ({ height: placeholder.height, kind: 'live', width: placeholder.width }),
+    [placeholder.height, placeholder.width]
+  );
+
   return (
-    <PreviewFrame
-      frameHeight={previewImage?.height ?? placeholder.height}
-      frameWidth={previewImage?.width ?? placeholder.width}
-      isLive
-      liveBadgeLabel={t('common.generating')}
-      liveQueueItemId={placeholder.queueItemId}
-      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
-      source={source}
-      variant="inset"
-    />
+    <PreviewMediaScaffold>
+      <PreviewFrame
+        frameHeight={previewImage?.height ?? placeholder.height}
+        frameWidth={previewImage?.width ?? placeholder.width}
+        isLive
+        padding={getMediaStagePadding(density)}
+        paddingBottom={PREVIEW_OVERLAY_RESERVE}
+        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        source={source}
+        variant="framed"
+      />
+      <PreviewOverlayStack>
+        {filmstripItems ? (
+          <PreviewFilmstrip density={density} items={filmstripItems} selectedItemKey={null} onSelect={onSelectItem} />
+        ) : null}
+        <PreviewFooter
+          boardItemCount={boardItemCount}
+          isLoadingBoard={isLoadingBoard}
+          isMetadataOpen={false}
+          media={media}
+          selectedIndex={selectedIndex}
+          onNext={onNext}
+          onPrevious={onPrevious}
+          onToggleMetadata={noop}
+        />
+      </PreviewOverlayStack>
+    </PreviewMediaScaffold>
   );
 };
 
@@ -1179,10 +1263,7 @@ const LivePreviewTile = ({
       frameHeight={previewImage?.height ?? placeholder.height}
       frameWidth={previewImage?.width ?? placeholder.width}
       isLive
-      liveBadgeLabel={
-        deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : t('common.generating')
-      }
-      liveQueueItemId={placeholder.queueItemId}
+      liveBadgeLabel={deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : undefined}
       shouldAntialiasLiveImage={shouldAntialiasProgressImage}
       source={source}
       variant="inset"
@@ -1219,15 +1300,7 @@ const EmptyPreview = () => {
   const { t } = useTranslation();
 
   return (
-    <PreviewFrame
-      frameHeight={1}
-      frameWidth={1}
-      isLive={false}
-      liveBadgeLabel={t('common.generating')}
-      shouldAntialiasLiveImage
-      source={null}
-      variant="inset"
-    >
+    <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
       <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
         <Text fontSize="sm" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}

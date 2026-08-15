@@ -256,12 +256,10 @@ describe('Preview mixed media footer and actions', () => {
             Expected muted
           </Text>
           <PreviewFooter
-            actionImage={null}
-            actions={{} as ImageActions}
             boardItemCount={3}
             isLoadingBoard={false}
             isMetadataOpen={false}
-            item={item}
+            media={{ actionImage: null, actions: {} as ImageActions, item, kind: 'item' }}
             selectedIndex={1}
             onNext={() => undefined}
             onPrevious={() => undefined}
@@ -288,12 +286,10 @@ describe('Preview mixed media footer and actions', () => {
   it('shows mixed position, dimensions, duration, and localized fps with tabular numerals', async () => {
     await render(
       <PreviewFooter
-        actionImage={null}
-        actions={{} as ImageActions}
         boardItemCount={3}
         isLoadingBoard={false}
         isMetadataOpen={false}
-        item={sharedVideo}
+        media={{ actionImage: null, actions: {} as ImageActions, item: sharedVideo, kind: 'item' }}
         selectedIndex={1}
         onNext={() => undefined}
         onPrevious={() => undefined}
