@@ -1,7 +1,7 @@
 import type { GeneratedImageContract } from '@features/gallery';
 import type { WidgetRuntimeApi } from '@workbench/widgetContracts';
 
-import { Badge, Box, Flex, HStack, SegmentGroup, Stack, type SystemStyleObject } from '@chakra-ui/react';
+import { Badge, Box, Flex, HStack, SegmentGroup, Stack } from '@chakra-ui/react';
 import { Button } from '@platform/ui';
 import { ArrowLeftRightIcon, XIcon } from 'lucide-react';
 import {
@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewComparisonMode } from './previewSettings';
 
+import { getFittedFrameCss, previewGridCss } from './PreviewStage';
 import { useCompareLoupe, type CompareLoupePane } from './useCompareLoupe';
 
 const COMPARISON_MODES: { labelKey: string; value: PreviewComparisonMode }[] = [
@@ -31,14 +32,6 @@ export const getNextPreviewComparisonMode = (mode: PreviewComparisonMode): Previ
 
   return COMPARISON_MODES[(index + 1) % COMPARISON_MODES.length]?.value ?? 'slider';
 };
-
-const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
-  aspectRatio: `${width} / ${height}`,
-  height: 'auto',
-  maxHeight: '100%',
-  maxWidth: '100%',
-  width: `min(100cqw, calc(100cqh * ${width / height}))`,
-});
 
 const BASE_IMAGE_STYLE = {
   display: 'block',
@@ -55,13 +48,6 @@ const OVERLAY_IMAGE_STYLE = {
   pointerEvents: 'none',
   userSelect: 'none',
   width: '100%',
-} as const;
-
-const previewGridCss = {
-  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'repeat',
-  backgroundSize: '24px 24px',
 } as const;
 
 const sliderTouchStyle = { touchAction: 'none' } as const;
