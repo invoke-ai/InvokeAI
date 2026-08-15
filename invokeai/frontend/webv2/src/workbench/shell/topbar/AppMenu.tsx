@@ -57,7 +57,16 @@ export const AppMenu = () => {
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={t('topbar.appMenu.open')} className="group" size="xs" variant="ghost">
+        <IconButton
+          aria-label={t('topbar.appMenu.open')}
+          className="group"
+          ms="-1.5"
+          pe="1"
+          ps="0"
+          size="xs"
+          variant="ghost"
+          w="auto"
+        >
           <AppMenuGlyph />
         </IconButton>
       </Menu.Trigger>
@@ -131,8 +140,13 @@ export const AppMenu = () => {
 const CHEVRON_HOVER_PROPS = { color: 'fg' } as const;
 
 const AppMenuGlyph = () => (
-  <HStack gap="0.5" role="presentation">
-    <InvokeMark size={14} />
+  <HStack gap="0" role="presentation">
+    {/* The mark slot is exactly as wide as the widget rail below (w="11"),
+        and the trigger's ms="-1.5" cancels the top bar's padding, so the mark
+        centers on the rail's icon column; the chevron flows out to the right. */}
+    <Box alignItems="center" display="flex" justifyContent="center" w="11">
+      <InvokeMark size={14} />
+    </Box>
     <Icon
       as={ChevronDownIcon}
       boxSize="3"
