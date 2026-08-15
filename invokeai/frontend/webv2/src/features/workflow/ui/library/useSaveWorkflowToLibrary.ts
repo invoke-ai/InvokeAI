@@ -4,7 +4,11 @@ import {
   updateLibraryWorkflow,
 } from '@features/workflow/queries';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
-import { useWorkflowNotifications, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useWorkflowNotifications,
+  useWorkflowProjectSelector,
+  useWorkflowUi,
+} from '@features/workflow/ui/WorkflowUiContext';
 import { serializeWorkflowJson } from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
@@ -29,6 +33,7 @@ export const useSaveWorkflowToLibrary = (): {
   saveToLibrary: () => Promise<string | null>;
 } => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
+  const { project: projectStore } = useWorkflowUi();
   const { bindLibraryWorkflow } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
 
@@ -39,6 +44,7 @@ export const useSaveWorkflowToLibrary = (): {
       try {
         const serialized = serializeWorkflowJson(projectGraph);
         let workflowId: string;
+        let syncedSerialized = serialized;
 
         if (!asNew && projectGraph.libraryWorkflowId) {
           workflowId = projectGraph.libraryWorkflowId;
@@ -52,9 +58,18 @@ export const useSaveWorkflowToLibrary = (): {
           assertAccountScopeCurrent(owner);
           bindLibraryWorkflow(workflowId);
           notify.success('Workflow saved', `Saved "${projectGraph.name || 'Untitled Workflow'}" to the library.`);
+
+          // bindLibraryWorkflow dispatches synchronously, so the store already
+          // reflects the bound `libraryWorkflowId`. Re-serialize from that
+          // post-bind graph (rather than reusing the pre-bind `serialized`,
+          // which has no `id`) so the autosaver's synced baseline matches
+          // exactly what its own read() will produce next — otherwise the id
+          // key `serializeWorkflowJson` adds on bind reads as a dirty edit and
+          // triggers a redundant echo save on the next debounce.
+          syncedSerialized = serializeWorkflowJson(projectStore.getSnapshot().projectGraph);
         }
 
-        markLibraryGraphSynced(serialized);
+        markLibraryGraphSynced(syncedSerialized);
         setWorkflowLibrarySyncStatus('saved');
         invalidateWorkflowLibraryCache();
 
@@ -68,7 +83,7 @@ export const useSaveWorkflowToLibrary = (): {
         return null;
       }
     },
-    [bindLibraryWorkflow, notify, projectGraph]
+    [bindLibraryWorkflow, notify, projectGraph, projectStore]
   );
 
   const saveToLibrary = useCallback(() => save(false), [save]);
