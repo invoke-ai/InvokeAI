@@ -202,6 +202,36 @@ describe('PreviewFilmstrip mixed media', () => {
     expect(selected.querySelector(':scope > div')).toBeNull();
   });
 
+  it('vertically centers the thumb row inside the fixed-height scroll viewport', async () => {
+    await render(
+      <DndContext>
+        <PreviewFilmstrip
+          density="full"
+          items={[sharedImage, sharedVideo]}
+          selectedItemKey="image:shared"
+          onSelect={() => undefined}
+        />
+      </DndContext>
+    );
+
+    const viewport = host!.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]');
+    const thumb = host!.querySelector<HTMLButtonElement>('[aria-current="true"]');
+
+    expect(viewport).not.toBeNull();
+    expect(thumb).not.toBeNull();
+
+    const viewportRect = viewport!.getBoundingClientRect();
+    const thumbRect = thumb!.getBoundingClientRect();
+    const viewportCenterY = viewportRect.top + viewportRect.height / 2;
+    const thumbCenterY = thumbRect.top + thumbRect.height / 2;
+
+    // Without the Scrollable `contentProps={{ h: 'full' }}` fix, the content
+    // wrapper shrinks to the thumb row's own height and the row sticks to
+    // the viewport's top edge instead of centering in it — a multi-pixel
+    // offset for the "full" density's 60px strip / 48px thumb combination.
+    expect(Math.abs(thumbCenterY - viewportCenterY)).toBeLessThan(1);
+  });
+
   it('keeps same-name media independent and selects the clicked video poster', async () => {
     const onSelect = vi.fn();
 

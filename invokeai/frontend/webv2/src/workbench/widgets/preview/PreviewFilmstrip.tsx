@@ -1,9 +1,10 @@
 import type { GalleryItem, GalleryItemKey } from '@features/gallery';
 
-import { Box, HStack, ScrollArea } from '@chakra-ui/react';
+import { Box, HStack } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { useCallback, useMemo } from 'react';
 
 import type { PreviewDensity } from './previewDensity';
@@ -42,44 +43,37 @@ export const PreviewFilmstrip = ({
     // intrinsic width so a long board can never stretch the widget wider than
     // its panel (side panels host widgets in a grid ScrollArea.Content that
     // otherwise grows to max-content).
-    <ScrollArea.Root
+    <Scrollable
       bg="bg.subtle"
       borderColor="border.subtle"
       borderWidth="1px"
+      contentProps={FILMSTRIP_CONTENT_PROPS}
       css={FILMSTRIP_CONTAIN_CSS}
       flexShrink={0}
       h={density === 'full' ? '3.75rem' : '2.75rem'}
       minW="0"
+      orientation="horizontal"
       px="1.5"
       rounded="md"
       shadow="sm"
-      size="xs"
-      variant="hover"
       w="full"
     >
-      <ScrollArea.Viewport h="full" w="full">
-        <ScrollArea.Content asChild>
-          <HStack align="center" gap="1" h="full">
-            {items.map((item) => {
-              const itemKey = toGalleryItemKey(item);
+      <HStack align="center" gap="1" h="full">
+        {items.map((item) => {
+          const itemKey = toGalleryItemKey(item);
 
-              return (
-                <FilmstripThumb
-                  key={itemKey}
-                  item={item}
-                  isSelected={itemKey === selectedItemKey}
-                  size={thumbSize}
-                  onSelect={onSelect}
-                />
-              );
-            })}
-          </HStack>
-        </ScrollArea.Content>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="horizontal">
-        <ScrollArea.Thumb />
-      </ScrollArea.Scrollbar>
-    </ScrollArea.Root>
+          return (
+            <FilmstripThumb
+              key={itemKey}
+              item={item}
+              isSelected={itemKey === selectedItemKey}
+              size={thumbSize}
+              onSelect={onSelect}
+            />
+          );
+        })}
+      </HStack>
+    </Scrollable>
   );
 };
 
@@ -143,6 +137,10 @@ const FilmstripThumb = ({
 };
 
 const FILMSTRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
+
+// The thumb row centers itself with `h="full"`, which needs the content
+// wrapper to actually span the viewport height rather than shrink to it.
+const FILMSTRIP_CONTENT_PROPS = { h: 'full' } as const;
 
 const FILMSTRIP_IMG_STYLE = {
   display: 'block',
