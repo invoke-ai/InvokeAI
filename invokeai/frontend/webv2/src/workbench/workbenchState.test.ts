@@ -430,6 +430,51 @@ describe('workbench widget region defaults', () => {
     expect(getActiveProject(customized).widgetRegions.left.instanceIds).toEqual(['generate', 'gallery']);
   });
 
+  it('adds queue-status to untouched legacy bottom rails while preserving customized rails', () => {
+    const initial = createInitialWorkbenchState();
+    const withoutQueueStatusInstance = Object.fromEntries(
+      Object.entries(getActiveProject(initial).widgetInstances).filter(([id]) => id !== 'queue-status')
+    ) as Project['widgetInstances'];
+    const withBottomIds = (instanceIds: Project['widgetRegions']['bottom']['instanceIds']): WorkbenchState => ({
+      ...initial,
+      projects: initial.projects.map((project) => ({
+        ...project,
+        widgetInstances: withoutQueueStatusInstance,
+        widgetRegions: { ...project.widgetRegions, bottom: { ...project.widgetRegions.bottom, instanceIds } },
+      })),
+    });
+
+    const migrated = workbenchReducer(initial, {
+      state: withBottomIds(['server-status', 'gallery:bottom', 'notifications', 'autosave-status']),
+      type: 'hydrateWorkbench',
+    });
+    const customized = workbenchReducer(initial, {
+      state: withBottomIds(['server-status', 'notifications']),
+      type: 'hydrateWorkbench',
+    });
+    const alreadyPresent = workbenchReducer(initial, {
+      state: withBottomIds(['queue-status', 'server-status', 'gallery:bottom', 'notifications', 'autosave-status']),
+      type: 'hydrateWorkbench',
+    });
+
+    expect(getActiveProject(migrated).widgetRegions.bottom.instanceIds).toEqual([
+      'server-status',
+      'queue-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
+    expect(getActiveProject(migrated).widgetInstances['queue-status']?.typeId).toBe('queue-status');
+    expect(getActiveProject(customized).widgetRegions.bottom.instanceIds).toEqual(['server-status', 'notifications']);
+    expect(getActiveProject(alreadyPresent).widgetRegions.bottom.instanceIds).toEqual([
+      'queue-status',
+      'server-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
+  });
+
   it('migrates a legacy Upscale prompt only when Generate has no prompt content', () => {
     const initial = createInitialWorkbenchState();
     const withPrompts = (generatePrompt: string): WorkbenchState => ({

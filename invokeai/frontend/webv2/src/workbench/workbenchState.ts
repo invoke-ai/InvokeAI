@@ -1284,6 +1284,43 @@ const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRe
   return rightRegion;
 };
 
+// The shipped bottom-region default before 'queue-status' was added — a
+// persisted project whose bottom rail matches this exactly is still running
+// the pre-branch defaults, so it should pick up the new widget the same way
+// a fresh project would.
+const LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS: readonly WidgetInstanceId[] = [
+  'server-status',
+  'gallery:bottom',
+  'notifications',
+  'autosave-status',
+];
+
+const isLegacyDefaultBottomRegion = (region: WidgetRegionState): boolean =>
+  region.instanceIds.length === LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS.length &&
+  region.instanceIds.every((widgetId, index) => widgetId === LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS[index]);
+
+const ensureBottomRegion = (bottomRegion: WidgetRegionState | undefined): WidgetRegionState => {
+  const fallback = createWidgetRegions().bottom;
+
+  if (!bottomRegion) {
+    return fallback;
+  }
+  if (bottomRegion.instanceIds.includes('queue-status')) {
+    return bottomRegion;
+  }
+
+  if (!isLegacyDefaultBottomRegion(bottomRegion)) {
+    return bottomRegion;
+  }
+
+  const serverStatusIndex = bottomRegion.instanceIds.indexOf('server-status');
+  const instanceIds = [...bottomRegion.instanceIds];
+
+  instanceIds.splice(serverStatusIndex === -1 ? instanceIds.length : serverStatusIndex + 1, 0, 'queue-status');
+
+  return { ...bottomRegion, instanceIds };
+};
+
 const getCenterWidgetIdFromViewId = (centerViewId: CenterViewId): WidgetInstanceId => {
   if (centerViewId === 'gallery') {
     return 'gallery:center';
@@ -1338,11 +1375,11 @@ const normalizePromptHistory = (value: unknown): PromptHistoryItem[] => {
 };
 
 export const normalizeWorkbenchProject = (project: Project): Project => {
-  const defaultWidgetRegions = createWidgetRegions();
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
     | undefined;
   const leftRegion = ensureLeftRegion(legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel']);
+  const bottomRegion = ensureBottomRegion(legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar']);
   const widgetInstances = cloneWidgetInstances(project.widgetInstances ?? createWidgetInstances());
 
   const generateInstance = widgetInstances.generate;
@@ -1373,6 +1410,10 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
 
   if (leftRegion.instanceIds.includes('upscale') && !widgetInstances.upscale) {
     widgetInstances.upscale = createWidgetInstance('upscale');
+  }
+
+  if (bottomRegion.instanceIds.includes('queue-status') && !widgetInstances['queue-status']) {
+    widgetInstances['queue-status'] = createWidgetInstance('queue-status');
   }
 
   for (const [instanceId, instance] of Object.entries(widgetInstances)) {
@@ -1411,7 +1452,7 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
     widgetRegions: {
       left: leftRegion,
       right: ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']),
-      bottom: legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar'] ?? defaultWidgetRegions.bottom,
+      bottom: bottomRegion,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
     widgetInstances,
