@@ -507,6 +507,13 @@ const slice = createSlice({
       }
       state.minimaxH3OutputMode = result.data;
     },
+    minimaxH3TransformerModelSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.minimaxH3TransformerModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.minimaxH3TransformerModel = result.data;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -858,6 +865,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.wanVaeModel = oldState.wanVaeModel;
   newState.wanT5EncoderModel = oldState.wanT5EncoderModel;
   newState.wanGuidanceScaleLowNoise = oldState.wanGuidanceScaleLowNoise;
+  newState.minimaxH3TransformerModel = oldState.minimaxH3TransformerModel;
   return newState;
 };
 
@@ -942,6 +950,7 @@ export const {
   wanGuidanceScaleLowNoiseChanged,
   minimaxH3DurationSecondsChanged,
   minimaxH3OutputModeChanged,
+  minimaxH3TransformerModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -1073,8 +1082,22 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         // as v5 -> v6 covers both a v4 blob (via main's step) and any v5 blob already written
         // by a released build.
         state._version = 6;
-        state.minimaxH3DurationSeconds = 5;
-        state.minimaxH3OutputMode = 'video';
+        // Seeded conditionally, like every other step here: a genuine v5 blob predates these keys,
+        // but a blob that already carries them must keep its values rather than be reset.
+        state.minimaxH3DurationSeconds = state.minimaxH3DurationSeconds ?? 5;
+        state.minimaxH3OutputMode = state.minimaxH3OutputMode ?? 'video';
+      }
+
+      if (state._version === 6) {
+        // v6 -> v7, add the MiniMax H3 single-file transformer override.
+        //
+        // Written as v5 -> v6 on this branch, but the H3 duration/output-mode step above already
+        // occupies v5 -> v6 on main. Two steps sharing a version silently breaks the chain: the
+        // first sets _version = 6, the second never runs, and zParamsState.parse() then throws on
+        // the missing key and wipes the whole params slice. See the comment above for the same
+        // collision one version earlier.
+        state._version = 7;
+        state.minimaxH3TransformerModel = null;
       }
 
       if (!('hiDiffusionEnabled' in state)) {
@@ -1162,6 +1185,7 @@ export const selectWanT5EncoderModel = createParamsSelector((params) => params.w
 export const selectWanGuidanceScaleLowNoise = createParamsSelector((params) => params.wanGuidanceScaleLowNoise);
 export const selectMiniMaxH3DurationSeconds = createParamsSelector((params) => params.minimaxH3DurationSeconds);
 export const selectMiniMaxH3OutputMode = createParamsSelector((params) => params.minimaxH3OutputMode);
+export const selectMiniMaxH3TransformerModel = createParamsSelector((params) => params.minimaxH3TransformerModel);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);

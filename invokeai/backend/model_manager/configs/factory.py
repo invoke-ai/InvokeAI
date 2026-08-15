@@ -73,6 +73,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_Krea2_Config,
+    Main_Checkpoint_MiniMaxH3_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -292,6 +293,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
+        Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
