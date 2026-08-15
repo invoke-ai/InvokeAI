@@ -6,10 +6,9 @@ import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel } from '@workbench/invocation';
-import { useWorkbenchReduceMotion } from '@workbench/settings/store';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { PlayIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
@@ -19,7 +18,6 @@ import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
-const ACK_MS = 420;
 
 type ProgressCircleRootProps = ComponentProps<typeof ProgressCircle.Root>;
 // The `3xs` size (14px/2px, defined in platform/ui/theme/recipes.ts) is a repo
@@ -46,9 +44,8 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
  * moment it is most useful. Only the icon slot's content may change: it
  * shows the queue's progress while a batch runs and the pointer is
  * elsewhere, and reverts to the play glyph on hover so "queue more on top"
- * always reads as available. A brief, quiet acknowledgment ring pulses
- * around the icon on click (skipped under reduced motion). Aggregate
- * progress otherwise belongs to the queue group. (§5.1, contract §9.4.)
+ * always reads as available. Aggregate progress otherwise belongs to the
+ * queue group. (§5.1, contract §9.4.)
  */
 export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
@@ -61,24 +58,11 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const baseSummary = getQueueSummary(queueItems);
   const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
   const hasOpenWork = baseSummary.total > 0;
-  const reduceMotion = useWorkbenchReduceMotion();
 
   const [isHovered, setIsHovered] = useState(false);
-  const [isAcked, setIsAcked] = useState(false);
-  const ackTimerRef = useRef<number | null>(null);
   const handlePointerEnter = useCallback(() => setIsHovered(true), []);
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
-  const handleClick = useCallback(() => {
-    void invoke();
-    if (reduceMotion) {
-      return;
-    }
-    if (ackTimerRef.current !== null) {
-      window.clearTimeout(ackTimerRef.current);
-    }
-    setIsAcked(true);
-    ackTimerRef.current = window.setTimeout(() => setIsAcked(false), ACK_MS);
-  }, [invoke, reduceMotion]);
+  const handleClick = useCallback(() => void invoke(), [invoke]);
 
   const iconMode = getInvokeIconMode({
     hasOpenWork,
@@ -119,16 +103,6 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           ) : (
             <Icon as={PlayIcon} boxSize="3.5" />
           )}
-          <Box
-            borderRadius="full"
-            boxShadow="0 0 0 3px var(--chakra-colors-bg)"
-            inset="-2px"
-            opacity={isAcked ? 0.55 : 0}
-            pointerEvents="none"
-            position="absolute"
-            transform={isAcked ? 'scale(1.35)' : 'scale(0.9)'}
-            transition={isAcked ? 'none' : `opacity ${ACK_MS}ms ease-out, transform ${ACK_MS}ms ease-out`}
-          />
         </Box>
         {t('topbar.invoke.invoke')}
         {shortcut ? (
