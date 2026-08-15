@@ -18,6 +18,7 @@ export type {
 } from './data/queries';
 export {
   getGalleryItemBoardIdsFromCaches,
+  getGalleryItemStarredFromCaches,
   invalidateGallery,
   invalidateGalleryItems,
   patchGalleryItemCaches,

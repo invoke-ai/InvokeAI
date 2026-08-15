@@ -230,6 +230,44 @@ export const getGalleryItemBoardIdsFromCaches = (
   return boardIds;
 };
 
+/**
+ * Reads the starred flag each requested item currently has, from whichever
+ * list cache holds it. Optimistic star/unstar captures this before patching
+ * so a totally-failed batch can restore each item's actual prior flag rather
+ * than blanket-inverting the whole request.
+ */
+export const getGalleryItemStarredFromCaches = (
+  client: QueryClient,
+  refs: readonly GalleryItemRef[]
+): Map<GalleryItemKey, boolean> => {
+  const wanted = new Set(refs.map(toGalleryItemKey));
+  const starred = new Map<GalleryItemKey, boolean>();
+
+  for (const query of getGalleryItemListQueries(client)) {
+    if (starred.size === wanted.size) {
+      break;
+    }
+
+    const data = query.state.data;
+
+    if (!isGalleryItemsData(data)) {
+      continue;
+    }
+
+    for (const page of data.pages) {
+      for (const item of page.items) {
+        const key = toGalleryItemKey(item);
+
+        if (wanted.has(key) && !starred.has(key)) {
+          starred.set(key, item.starred);
+        }
+      }
+    }
+  }
+
+  return starred;
+};
+
 interface BoardCacheRollbackEntry {
   after: GalleryBoard[];
   before: GalleryBoard[];

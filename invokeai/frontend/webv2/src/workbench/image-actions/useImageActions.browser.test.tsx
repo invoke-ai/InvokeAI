@@ -17,7 +17,10 @@ const mocks = vi.hoisted(() => ({
   downloadBlob: vi.fn(),
   galleryRemoveItems: vi.fn(),
   galleryPatchItems: vi.fn(),
+  galleryWidgetsPatchValues: vi.fn(),
   getItemBoardIds: vi.fn((..._args: unknown[]) => new Map<string, string>()),
+  getItemStarred: vi.fn((..._args: unknown[]) => new Map<string, boolean>()),
+  getSnapshot: vi.fn(),
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
   imageMetadata: vi.fn(),
@@ -27,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   itemMoveToBoard: vi.fn(),
   itemSetStarred: vi.fn(),
   notificationsAdd: vi.fn(),
+  onImagesDeleted: vi.fn(),
   openWorkbenchWidget: vi.fn(),
   patchGalleryItemCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   removeFromBoard: vi.fn(),
@@ -52,12 +56,19 @@ vi.mock('@features/gallery', () => ({
     setStarred: (...args: unknown[]) => mocks.setStarred(...args),
   },
   galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
+  legacyGeneratedImageToGalleryItem: (image: { boardId?: string; imageName: string; starred?: boolean }) => ({
+    boardId: image.boardId ?? 'none',
+    kind: 'image' as const,
+    name: image.imageName,
+    starred: image.starred ?? false,
+  }),
   toGalleryItemKey: ({ kind, name }: { kind: string; name: string }) => `${kind}:${name}`,
   toGalleryItemRef: ({ kind, name }: { kind: 'image' | 'video'; name: string }) => ({ kind, name }),
 }));
 
 vi.mock('@features/gallery/queries', () => ({
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
+  getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
   invalidateGalleryItems: (...args: unknown[]) => mocks.invalidateGalleryItems(...args),
   patchGalleryItemCaches: (...args: unknown[]) => mocks.patchGalleryItemCaches(...args),
@@ -118,10 +129,13 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       add: (...args: unknown[]) => mocks.notificationsAdd(...args),
       reportError: (...args: unknown[]) => mocks.reportError(...args),
     },
+    widgets: {
+      patchValues: (...args: unknown[]) => mocks.galleryWidgetsPatchValues(...args),
+    },
   }),
   useWorkbenchQueries: () => ({
     getProject: vi.fn(),
-    getSnapshot: () => ({ activeProject: { id: 'project-1' }, projects: [] }),
+    getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
     isActiveProject: vi.fn(() => true),
   }),
 }));
@@ -153,6 +167,30 @@ interface ItemActionContext {
 let currentItemActionContext: ItemActionContext | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/** A `Project`-shaped stub with just enough of `widgetInstances` for the real
+ *  `getProjectWidgetValues` (unmocked) to read `gallery`/`upscale` values. */
+const makeMockProject = (
+  id: string,
+  galleryValues: Record<string, unknown> = {},
+  upscaleValues: Record<string, unknown> = {}
+) => ({
+  id,
+  widgetInstances: {
+    gallery: {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      id: 'gallery',
+      state: { id: 'gallery' as const, label: 'gallery', values: galleryValues, version: 1 as const },
+      typeId: 'gallery' as const,
+    },
+    upscale: {
+      createdAt: '2026-01-01T00:00:00.000Z',
+      id: 'upscale',
+      state: { id: 'upscale' as const, label: 'upscale', values: upscaleValues, version: 1 as const },
+      typeId: 'upscale' as const,
+    },
+  },
+});
+
 const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<ImageActions> }) => {
   const actions = useImageActions({
     boards: [
@@ -169,6 +207,7 @@ const Probe = ({ modelKey = 'sd-1-model', ref }: { modelKey?: string; ref: Ref<I
     ],
     generateValues: { modelKey },
     getItemActionContext: () => currentItemActionContext,
+    onImagesDeleted: mocks.onImagesDeleted,
     projectId: 'project-1',
     requestDeletionConfirmation: mocks.requestDeletionConfirmation,
   });
@@ -185,6 +224,11 @@ beforeEach(async () => {
     (_itemRefs: readonly GalleryItemRef[], executeDeletion: () => Promise<void>) => executeDeletion()
   );
   mocks.invalidateGallery.mockResolvedValue(undefined);
+  mocks.getSnapshot.mockImplementation(() => {
+    const project = makeMockProject('project-1');
+
+    return { activeProject: project, projects: [project] };
+  });
   accountLifecycle.activate('user-a');
   currentItemActionContext = null;
   host = document.createElement('div');
@@ -548,6 +592,273 @@ describe('mixed item mutation outcomes', () => {
 
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd.mock.calls.length + mocks.reportError.mock.calls.length).toBe(1);
+  });
+});
+
+describe('total transport failure rollback', () => {
+  const recentImageFixture = {
+    height: 512,
+    imageName: 'gone.png',
+    imageUrl: '/full/gone.png',
+    queuedAt: '2026-07-30T00:00:00.000Z',
+    sourceQueueItemId: 'queue-gone',
+    thumbnailUrl: '/thumb/gone.png',
+    width: 512,
+  };
+
+  it('restores optimistically removed items when the delete transport fails entirely', async () => {
+    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
+    mocks.itemDelete.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    // The optimistic removal happened up front, before the transport was asked.
+    expect(mocks.galleryRemoveItems).toHaveBeenNthCalledWith(1, ['image:gone.png']);
+
+    // The transport threw outright: the cache rollback captured before the
+    // mutate call must run on the throw path rather than waiting on the
+    // (also-failing) trailing invalidation.
+    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+
+    // `gallery.removeItems` is a no-op stub here, so the pre/post-removal
+    // widget snapshot never actually diverges — nothing to restore, and the
+    // CAS-guarded restore correctly does nothing. Real restore correctness
+    // (recentImages, selection, upscale.inputImage, and the concurrent-change
+    // guard) is covered against the real reducer in galleryOptimisticRollback.test.ts.
+    expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
+
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+  });
+
+  it('restores the gallery widget store when the optimistic removal actually changed it', async () => {
+    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
+    const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
+    const afterRemoval = makeMockProject('project-1', { recentImages: [] });
+
+    // First call is the pre-removal capture; every call after simulates the
+    // store having actually applied the optimistic removal.
+    mocks.getSnapshot.mockReturnValueOnce({ activeProject: before, projects: [before] }).mockReturnValue({
+      activeProject: afterRemoval,
+      projects: [afterRemoval],
+    });
+    mocks.itemDelete.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    expect(mocks.galleryWidgetsPatchValues).toHaveBeenCalledWith(
+      'gallery',
+      { recentImages: [recentImageFixture] },
+      'project-1',
+      'system'
+    );
+  });
+
+  it('does not clobber a gallery widget field something else changed before the rollback runs', async () => {
+    const refs = [{ kind: 'image' as const, name: 'gone.png' }];
+    const before = makeMockProject('project-1', { recentImages: [recentImageFixture] });
+    const afterRemoval = makeMockProject('project-1', { recentImages: [] });
+    const concurrentlyChanged = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, imageName: 'new-generation.png' }],
+    });
+
+    mocks.getSnapshot
+      .mockReturnValueOnce({ activeProject: before, projects: [before] }) // capture, pre-removal
+      .mockReturnValueOnce({ activeProject: afterRemoval, projects: [afterRemoval] }) // diff, post-removal
+      .mockReturnValue({ activeProject: concurrentlyChanged, projects: [concurrentlyChanged] }); // restore-time read
+    mocks.itemDelete.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    // A generation completed mid-flight and rewrote recentImages: the CAS
+    // check must see that and skip the restore rather than clobbering it.
+    expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
+  });
+
+  it('does not roll back caches or the widget store once a partial success has been confirmed', async () => {
+    const refs = [{ kind: 'image' as const, name: 'done.png' }];
+    const result = { affectedBoardIds: ['none'], failed: [], succeeded: refs };
+    mocks.itemDelete.mockResolvedValue(result);
+    mocks.onImagesDeleted.mockImplementation(() => {
+      throw new Error('caller-supplied callback exploded');
+    });
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs);
+    });
+
+    // The confirmed deletion cache patch applied before the callback threw.
+    expect(mocks.patchGalleryItemCaches).toHaveBeenNthCalledWith(2, expect.anything(), {
+      kind: 'delete',
+      result,
+    });
+    // The `rollbackCaches` closure returned for the *optimistic* patch (call
+    // 1) must never fire once confirmation has begun applying.
+    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).not.toHaveBeenCalled();
+    expect(mocks.galleryWidgetsPatchValues).not.toHaveBeenCalled();
+    // The callback's own throw is still surfaced as an error.
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+  });
+
+  it('restores the previous board ids when the move transport fails entirely, including items known only to the store', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'moved.png' },
+      { kind: 'image' as const, name: 'overlay-only.png' },
+    ];
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved.png', 'board-0']]));
+    const beforePaint = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, boardId: 'board-overlay', imageName: 'overlay-only.png' }],
+    });
+    // `gallery.patchItems` is a no-op stub here, so simulate its real effect
+    // by having the snapshot reflect the optimistic paint from the second
+    // call onward (the first call is the pre-paint `previousBoardIds` capture).
+    const afterPaint = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, boardId: 'board-1', imageName: 'overlay-only.png' }],
+    });
+    mocks.getSnapshot
+      .mockReturnValueOnce({ activeProject: beforePaint, projects: [beforePaint] })
+      .mockReturnValue({ activeProject: afterPaint, projects: [afterPaint] });
+    mocks.itemMoveToBoard.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-1');
+    });
+
+    // The optimistic move happened up front, before the transport was asked.
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:moved.png', 'image:overlay-only.png'], {
+      boardId: 'board-1',
+    });
+
+    expect(mocks.patchGalleryItemCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+
+    // The cache-known item and the overlay-only item both return to their
+    // captured prior board.
+    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:moved.png'], { boardId: 'board-0' });
+    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:overlay-only.png'], { boardId: 'board-overlay' });
+
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+  });
+
+  it('does not clobber a store-known board id a concurrent move already carried onto a different board', async () => {
+    const refs = [{ kind: 'image' as const, name: 'overlay-only.png' }];
+    mocks.getItemBoardIds.mockReturnValue(new Map());
+    const beforeFirstMove = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, boardId: 'board-A', imageName: 'overlay-only.png' }],
+    });
+    // A second, concurrent `moveItemsToBoard` call already carried the item
+    // from this move's target ('board-B') onward to 'board-C' by the time
+    // this (first) request's rollback runs.
+    const concurrentlyMovedOn = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, boardId: 'board-C', imageName: 'overlay-only.png' }],
+    });
+    mocks.getSnapshot
+      .mockReturnValueOnce({ activeProject: beforeFirstMove, projects: [beforeFirstMove] })
+      .mockReturnValue({ activeProject: concurrentlyMovedOn, projects: [concurrentlyMovedOn] });
+    mocks.itemMoveToBoard.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-B');
+    });
+
+    // The rollback must not force the item back to 'board-A': it's no
+    // longer on 'board-B' (this move's target), so something else already
+    // moved it on and that later write must win.
+    expect(mocks.galleryPatchItems).not.toHaveBeenCalledWith(['image:overlay-only.png'], { boardId: 'board-A' });
+    // Only the initial optimistic paint touched the store.
+    expect(mocks.galleryPatchItems).toHaveBeenCalledOnce();
+  });
+
+  it('reverts the optimistic star paint per item when the transport fails entirely, not by blanket inversion', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'was-starred.png' },
+      { kind: 'image' as const, name: 'was-unstarred.png' },
+    ];
+    // One of the two requested items was already starred before this batch;
+    // a blanket invert-everything rollback would wrongly unstar it too. The
+    // cache reflects each item's real prior flag pre-paint, then (since
+    // `patchGalleryItemCaches` is a no-op stub here) the painted flag
+    // (`true`, this action's target) from the rollback's read onward,
+    // simulating the optimistic paint having actually landed.
+    mocks.getItemStarred
+      .mockReturnValueOnce(
+        new Map([
+          ['image:was-starred.png', true],
+          ['image:was-unstarred.png', false],
+        ])
+      )
+      .mockReturnValue(
+        new Map([
+          ['image:was-starred.png', true],
+          ['image:was-unstarred.png', true],
+        ])
+      );
+    mocks.itemSetStarred.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+
+    expect(mocks.galleryPatchItems).toHaveBeenNthCalledWith(1, ['image:was-starred.png', 'image:was-unstarred.png'], {
+      starred: true,
+    });
+
+    // Each item reverts to its own prior flag, not a single blanket value.
+    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:was-starred.png'], { starred: true });
+    expect(mocks.galleryPatchItems).toHaveBeenCalledWith(['image:was-unstarred.png'], { starred: false });
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledWith(expect.anything(), {
+      kind: 'star',
+      result: { failed: [], succeeded: [refs[1]] },
+      starred: false,
+    });
+
+    expect(mocks.reportError).toHaveBeenCalledOnce();
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+  });
+
+  it('does not clobber a star toggle a concurrent mutation already applied, in either the cache or the store', async () => {
+    const refs = [{ kind: 'image' as const, name: 'shared.png' }];
+    // Prior: unstarred. This action stars it (painted = true). By the time
+    // the rollback reads current state, a concurrent toggle already left it
+    // somewhere other than what this action painted, in both the cache and
+    // the store overlay.
+    mocks.getItemStarred
+      .mockReturnValueOnce(new Map([['image:shared.png', false]]))
+      .mockReturnValue(new Map([['image:shared.png', false]]));
+    const beforePaint = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, imageName: 'shared.png', starred: false }],
+    });
+    const concurrentToggle = makeMockProject('project-1', {
+      recentImages: [{ ...recentImageFixture, imageName: 'shared.png', starred: false }],
+    });
+    mocks.getSnapshot
+      .mockReturnValueOnce({ activeProject: beforePaint, projects: [beforePaint] })
+      .mockReturnValue({ activeProject: concurrentToggle, projects: [concurrentToggle] });
+    mocks.itemSetStarred.mockRejectedValue(new Error('network down'));
+    mocks.invalidateGallery.mockRejectedValue(new Error('network down'));
+
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+
+    // Neither the cache nor the store restore ran: the rollback's read of
+    // current state never matched what this batch painted (`true`), so it
+    // correctly assumed something else had already written a newer value
+    // and left it alone instead of forcing it back to the prior flag.
+    expect(mocks.galleryPatchItems).toHaveBeenCalledOnce();
+    expect(mocks.patchGalleryItemCaches).toHaveBeenCalledOnce();
   });
 });
 
