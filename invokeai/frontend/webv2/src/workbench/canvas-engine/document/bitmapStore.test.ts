@@ -1328,6 +1328,84 @@ describe('createBitmapStore', () => {
       h.store.dispose();
     });
 
+    it('reports a real failure even when silent declines already advanced the streak', async () => {
+      const surface = createTestStubRasterBackend().createSurface(10, 10);
+      let content = 'pixels-A';
+      let uploadShouldFail = false;
+      const encodeSurface = vi.fn(() => Promise.resolve(new Blob([content], { type: 'image/png' })));
+      const uploadImage = vi.fn(() => {
+        if (uploadShouldFail) {
+          return Promise.reject(new Error('network unreachable'));
+        }
+        return Promise.resolve<CanvasImageUploadResult>({ height: 10, imageName: 'img-decline', width: 10 });
+      });
+      const dispatchBitmap = vi.fn(() => false);
+      const onError = vi.fn();
+      const store = createBitmapStore({
+        debounceMs: 1500,
+        dispatch: vi.fn(() => true),
+        dispatchBitmap,
+        encodeSurface,
+        getLayerSource: () => PAINT_SOURCE,
+        getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+        hashBlob: (blob) => blob.text(),
+        maxUploadAttempts: 2,
+        onError,
+        retryDelaysMs: [1],
+        sleep: () => Promise.resolve(),
+        uploadImage,
+      });
+
+      store.markLayerDirty(LAYER);
+      // Two silent declines advance the streak without reporting anything.
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      expect(onError).not.toHaveBeenCalled();
+
+      // A real upload failure lands mid-streak (position 3 of a 5-max streak):
+      // under the old `failures === 1 || failures === max` check this matched
+      // neither condition and would have gone unreported.
+      content = 'pixels-B';
+      uploadShouldFail = true;
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), LAYER, { consecutiveFailures: 3, willRetry: true });
+
+      store.dispose();
+    });
+
+    it('reports when silent declines alone open the circuit', async () => {
+      const surface = createTestStubRasterBackend().createSurface(10, 10);
+      const dispatchBitmap = vi.fn(() => false);
+      const onError = vi.fn();
+      const store = createBitmapStore({
+        debounceMs: 1500,
+        dispatch: vi.fn(() => true),
+        dispatchBitmap,
+        encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+        getLayerSource: () => PAINT_SOURCE,
+        getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+        hashBlob: (blob) => blob.text(),
+        maxConsecutiveFailures: 3,
+        onError,
+        uploadImage: () => Promise.resolve({ height: 10, imageName: 'img-decline', width: 10 }),
+      });
+
+      store.markLayerDirty(LAYER);
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed'); // decline 1 of 3.
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed'); // decline 2 of 3.
+      expect(onError).not.toHaveBeenCalled();
+
+      // decline 3 of 3 opens the circuit — silently opened, but must still be heard.
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), LAYER, { consecutiveFailures: 3, willRetry: false });
+
+      store.dispose();
+    });
+
     it('a new stroke closes the circuit and resets the failure count', async () => {
       const timers = createManualTimers();
       let shouldFail = true;

@@ -237,6 +237,13 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   const inFlight = new Map<string, Promise<void>>();
   /** Consecutive ambient flush failures per layer; cleared on success or a fresh stroke. */
   const failureCounts = new Map<string, number>();
+  /**
+   * Layer ids whose CURRENT failure streak has already produced one report.
+   * Cleared everywhere `failureCounts` is cleared, so a fresh streak (a new
+   * stroke, or a streak that closed via a successful flush) reports its own
+   * first failure again.
+   */
+  const reportedStreaks = new Set<string>();
   /** Content-hash → uploaded image, an LRU-ish dedupe cache (bounded). */
   const hashToImage = new Map<string, CanvasImageUploadResult>();
   /** Layer id → the image name most recently dispatched by this store (self-echo guard). */
@@ -338,39 +345,64 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     throw lastError ?? new Error('Canvas image upload failed');
   };
 
+  /**
+   * One failure bookkeeping path shared by both ways a flush can fail: an
+   * upload/dispatch throwing (a real network/server error) and a decline
+   * (`accepted !== true` — not an error, but still bounded by the same
+   * breaker). Always advances `failureCounts` and re-dirties the layer with
+   * reason `'failure'`, so `runFlush`'s `finally` schedules the next attempt
+   * with growing backoff — or, once `failures` reaches
+   * `maxConsecutiveFailures`, stops rescheduling entirely (a fresh stroke via
+   * `markLayerDirty` is the only way back in).
+   *
+   * Reporting policy: the FIRST non-silent failure of a streak `reportedStreaks`
+   * hasn't already reported, plus — unconditionally — the failure that opens
+   * the circuit, even when that one is itself a silent decline: once the
+   * circuit is open, strokes stop persisting at all, and that transition must
+   * be heard no matter how the streak got there. Everything else (silent
+   * declines that don't open the circuit, and any retry after the streak's
+   * first report) stays quiet — an unreachable server would otherwise toast
+   * once per retry, including barrier-driven retries `flushPendingUploads`
+   * still attempts against an already-open circuit on every Generate/export/
+   * blur, forever. `reportedStreaks` is cleared everywhere `failureCounts` is
+   * (a fresh stroke, a successful flush, `discardLayer`, `reset`, `dispose`),
+   * so the next streak reports its own first failure again.
+   *
+   * Bookkeeping is committed BEFORE the `reportError` call: an injected
+   * observer may itself call back into this store (e.g. `reset`/
+   * `discardLayer`), and its outcome must be the final word, not overwritten
+   * by a bookkeeping write landing after it returns. Observer exceptions are
+   * caught and ignored — ancillary to the store's own retry state.
+   */
+  const recordFlushFailure = (layerId: string, error: unknown, options: { silent: boolean }): void => {
+    const failures = (failureCounts.get(layerId) ?? 0) + 1;
+    failureCounts.set(layerId, failures);
+    const willRetry = failures < maxConsecutiveFailures;
+    dirty.add(layerId);
+    dirtyReason.set(layerId, 'failure');
+    const opensCircuit = failures === maxConsecutiveFailures;
+    if (!opensCircuit && (options.silent || reportedStreaks.has(layerId))) {
+      return;
+    }
+    reportedStreaks.add(layerId);
+    try {
+      reportError(error, layerId, { consecutiveFailures: failures, willRetry });
+    } catch {
+      // Keep the bounded retry state intact when an observer itself fails.
+    }
+  };
+
   /** Encodes → hashes → dedupes/uploads → swaps the layer's ref, once. */
   const flushLayer = async (layerId: string): Promise<void> => {
     const generationAtEntry = layerGenerations.get(layerId) ?? 0;
     const isCurrentGeneration = (): boolean => !disposed && (layerGenerations.get(layerId) ?? 0) === generationAtEntry;
     const requeueFailure = (error: unknown): void => {
       if (!isCurrentGeneration()) {
+        // A discard/reset already invalidated this flush; its own bookkeeping
+        // stands, and this stale failure has nothing left to report.
         return;
       }
-      // Requeue before notifying. An injected error observer may deliberately
-      // discard/reset this generation; its cancellation must be the final word,
-      // not followed by a stale dirty.add(). Observer exceptions are ancillary.
-      const failures = (failureCounts.get(layerId) ?? 0) + 1;
-      failureCounts.set(layerId, failures);
-      const willRetry = failures < maxConsecutiveFailures;
-      dirty.add(layerId);
-      dirtyReason.set(layerId, 'failure');
-      // Report only the first failure of a streak and the one that opens the
-      // circuit — an unreachable server would otherwise toast once per retry
-      // (including barrier-driven retries against an already-open circuit,
-      // which `flushPendingUploads` still attempts on every Generate/export/
-      // blur), forever. Everything else stays silent; `runFlush`'s `finally`
-      // still bounds ambient retries via the same `failureCounts` and growing
-      // backoff below. `failures` only grows once the circuit is open (a fresh
-      // stroke is the only way to reset it), so comparing to the exact
-      // transition point — not `!willRetry`, which stays true forever after —
-      // keeps this to exactly one report per streak-open transition.
-      if (failures === 1 || failures === maxConsecutiveFailures) {
-        try {
-          reportError(error, layerId, { consecutiveFailures: failures, willRetry });
-        } catch {
-          // Keep the bounded retry state intact when an observer itself fails.
-        }
-      }
+      recordFlushFailure(layerId, error, { silent: false });
     };
     const placed = deps.getLayerSurface(layerId);
     if (!placed) {
@@ -496,10 +528,6 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // Record BEFORE dispatching: `dispatch` may notify the mirror synchronously,
     // so `isSelfEcho` must already see the applied name when the engine reacts.
     lastApplied.set(layerId, result.imageName);
-    // The upload that may have been failing repeatedly just succeeded: close the
-    // ambient breaker so a later failure is reported (and backed off) as a fresh
-    // streak, not a silent continuation of one already surfaced.
-    failureCounts.delete(layerId);
     let accepted: boolean;
     try {
       accepted = deps.dispatchBitmap
@@ -524,6 +552,11 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         authoritativeOffset?.x === offset.x &&
         authoritativeOffset.y === offset.y;
       if (didLand) {
+        // The dispatch's THROW was ancillary (e.g. a subscriber failing after
+        // commit): the bitmap itself landed, so this attempt succeeded — close
+        // the ambient breaker the same as a clean accept.
+        failureCounts.delete(layerId);
+        reportedStreaks.delete(layerId);
         return;
       }
       lastApplied.delete(layerId);
@@ -535,13 +568,18 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (accepted !== true) {
       lastApplied.delete(layerId);
       if (deps.getLayerSource(layerId) !== null) {
-        // Bounded by the same breaker as an upload failure, but silent: a
-        // declined acceptance isn't a network/server error worth surfacing.
-        failureCounts.set(layerId, (failureCounts.get(layerId) ?? 0) + 1);
-        dirty.add(layerId);
-        dirtyReason.set(layerId, 'failure');
+        // A declined acceptance isn't a network error worth a toast of its own,
+        // but it still advances (and can open) the shared breaker.
+        recordFlushFailure(layerId, new Error('Bitmap update was not accepted.'), { silent: true });
       }
+      return;
     }
+    // The upload+dispatch that may have been failing repeatedly just
+    // succeeded: close the ambient breaker so a later failure is reported
+    // (and backed off) as a fresh streak, not a silent continuation of one
+    // already surfaced.
+    failureCounts.delete(layerId);
+    reportedStreaks.delete(layerId);
   };
 
   /** Runs (or joins) a flush for a layer, serializing to one in-flight op per layer. */
@@ -585,6 +623,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // A fresh stroke closes the circuit: whatever was failing about the old
     // pixels no longer applies to the ones about to be persisted.
     failureCounts.delete(layerId);
+    reportedStreaks.delete(layerId);
     dirty.add(layerId);
     dirtyReason.set(layerId, 'stroke');
     if (!isSuspended(layerId)) {
@@ -647,6 +686,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     dirtyReason.delete(layerId);
     lastApplied.delete(layerId);
     failureCounts.delete(layerId);
+    reportedStreaks.delete(layerId);
     clearTimer(layerId);
   };
 
@@ -725,6 +765,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // Same reasoning as `lastApplied`: a reused layer id in the new document
     // must start with a closed circuit, not inherit the old document's streak.
     failureCounts.clear();
+    reportedStreaks.clear();
   };
 
   const dispose = (): void => {
@@ -742,6 +783,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     lastApplied.clear();
     layerGenerations.clear();
     failureCounts.clear();
+    reportedStreaks.clear();
   };
 
   return { discardLayer, dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset, suspendLayer };

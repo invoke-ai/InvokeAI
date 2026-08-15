@@ -204,7 +204,7 @@ const createCleanupAccumulator = (): { run: (step: () => void) => void; throwIfF
 export interface CanvasEngineErrorReport {
   area: 'canvas-engine';
   context: { error: string; layerId: string };
-  message: 'Layer thumbnail rasterization failed' | 'Bitmap persistence failed';
+  message: 'Layer thumbnail rasterization failed' | 'Bitmap persistence failed' | 'Bitmap persistence suspended';
   namespace: 'canvas';
   projectId: string;
 }
@@ -546,7 +546,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         }
         return { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface };
       },
-      onError: (error, layerId, _info) => reportError('Bitmap persistence failed', layerId, error),
+      onError: (error, layerId, info) =>
+        reportError(
+          info.willRetry ? 'Bitmap persistence failed' : 'Bitmap persistence suspended',
+          layerId,
+          // `willRetry === false` means the circuit just opened: strokes stop
+          // persisting from here until a fresh one closes it. That is more
+          // urgent than whatever error tripped it, so the toast leads with it
+          // instead of the (already-surfaced, on the streak's first report)
+          // underlying error text.
+          info.willRetry ? error : new Error('Canvas changes are no longer uploading. A new stroke will retry.')
+        ),
       uploadImage: (blob) => opts.uploadImage(blob),
     });
   const persistenceController = new PersistenceController(bitmapStore);
