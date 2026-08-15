@@ -15,6 +15,7 @@ import type { InvocationState } from './useInvocationState';
 
 import { getInvokeIconMode } from './invokeButtonModel';
 import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
+import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
@@ -51,8 +52,11 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const { blockingReasons, invoke, isValid } = state;
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
-  const shortcut = shortcutBinding?.display ?? null;
-  const tooltipContent = useMemo(() => <InvokeTooltipContent shortcut={shortcut} state={state} />, [shortcut, state]);
+  const shortcutParts = shortcutBinding?.parts ?? null;
+  const tooltipContent = useMemo(
+    () => <InvokeTooltipContent shortcutParts={shortcutParts} state={state} />,
+    [shortcutParts, state]
+  );
 
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const baseSummary = getQueueSummary(queueItems);
@@ -105,9 +109,9 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
           )}
         </Box>
         {t('topbar.invoke.invoke')}
-        {shortcut ? (
+        {shortcutParts ? (
           <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" color="bg" size="sm">
-            {shortcut}
+            <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}
       </Button>
@@ -115,7 +119,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   );
 };
 
-const InvokeTooltipContent = ({ shortcut, state }: { shortcut: string | null; state: InvocationState }) => {
+const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[] | null; state: InvocationState }) => {
   const { t } = useTranslation();
   const { batchCount, blockingReasons, invocation, isValid, promptExpansion } = state;
   const destination = getDestinationLabel(invocation.destination);
@@ -133,9 +137,9 @@ const InvokeTooltipContent = ({ shortcut, state }: { shortcut: string | null; st
         <Text fontSize="xs" fontWeight="800">
           {isValid ? t('topbar.invoke.addToQueue') : t('topbar.invoke.unableToQueue')}
         </Text>
-        {shortcut ? (
+        {shortcutParts ? (
           <Kbd size="sm" variant="subtle">
-            {shortcut}
+            <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}
       </HStack>
