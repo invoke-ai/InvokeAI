@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 831721,
+        "brotliBytes": 831786,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 831265,
+        "gzipBytes": 831287,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1930550,
+        "initialRawBytes": 1930860,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66715,
+        "ownedRawBytes": 66719,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -280,15 +280,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840039,
+        "brotliBytes": 840104,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 839578,
+        "gzipBytes": 839600,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1949856,
+        "initialRawBytes": 1950169,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66715,
+        "ownedRawBytes": 66719,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -298,15 +298,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1021766,
+        "brotliBytes": 1022654,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1018904,
+        "gzipBytes": 1019842,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2503517,
+        "initialRawBytes": 2506464,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 106678,
+        "ownedRawBytes": 107972,
         "requestCount": 85,
         "scriptRequestCount": 69,
         "sourceOwners": [
@@ -741,6 +741,7 @@
           "source:src/workbench/shell/index.ts",
           "source:src/workbench/shell/notifications/WorkbenchNotificationToaster.tsx",
           "source:src/workbench/shell/notifications/index.ts",
+          "source:src/workbench/shell/notifications/toastPolicy.ts",
           "source:src/workbench/shell/topbar/AppMenu.tsx",
           "source:src/workbench/shell/topbar/InvocationCluster.tsx",
           "source:src/workbench/shell/topbar/InvokeButton.tsx",
@@ -755,6 +756,7 @@
           "source:src/workbench/shell/topbar/RoutingDestinationSegments.tsx",
           "source:src/workbench/shell/topbar/TopBar.tsx",
           "source:src/workbench/shell/topbar/index.ts",
+          "source:src/workbench/shell/topbar/invokeButtonModel.ts",
           "source:src/workbench/shell/topbar/layoutPresetDialogModel.ts",
           "source:src/workbench/shell/topbar/layoutPresetIcons.ts",
           "source:src/workbench/shell/topbar/layoutPresetManagerStore.ts",
@@ -803,6 +805,7 @@
           "source:src/workbench/widgets/notifications/manifest.ts",
           "source:src/workbench/widgets/preview/manifest.ts",
           "source:src/workbench/widgets/project/manifest.ts",
+          "source:src/workbench/widgets/queue-status/manifest.ts",
           "source:src/workbench/widgets/queue/manifest.ts",
           "source:src/workbench/widgets/server-status/manifest.ts",
           "source:src/workbench/widgets/upscale/manifest.ts",
@@ -813,15 +816,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1031984,
+        "brotliBytes": 1032881,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1029094,
+        "gzipBytes": 1030041,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2528553,
+        "initialRawBytes": 2531529,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 106678,
+        "ownedRawBytes": 107972,
         "requestCount": 85,
         "scriptRequestCount": 69
       },
@@ -830,7 +833,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-13",
+  "capturedAt": "2026-08-15",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
