@@ -131,7 +131,7 @@ export const buildGalleryGridRows = ({
     kind: 'placeholder',
     placeholder,
   }));
-  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(regularItems, imageOrderDir, false);
+  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(regularItems, imageOrderDir);
   const regularCells = [
     ...regularItemCells.slice(0, placeholderInsertionIndex),
     ...placeholderCells,

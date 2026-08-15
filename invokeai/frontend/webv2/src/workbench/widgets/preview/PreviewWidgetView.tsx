@@ -195,7 +195,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const comparisonMode = getPreviewComparisonMode(previewValues);
   const displayBoardId = selectedItem?.boardId ?? 'none';
   const hasSelectedItem = selectedItem !== null;
-  const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
+  const { imageOrderDir } = getGallerySettings(galleryValues);
   const selectedImageQuery = getGallerySelectedImageQuery(galleryValues);
   const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
   const isComparing =
@@ -261,7 +261,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     selectedItem,
     selectedItemKey,
     shouldFollowLive,
-    starredFirst,
   });
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);

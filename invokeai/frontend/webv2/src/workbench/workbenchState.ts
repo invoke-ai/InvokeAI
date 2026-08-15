@@ -2536,7 +2536,6 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
             page: 0,
             paginationMode: 'infinite',
             searchTerm: '',
-            starredFirst: gallerySettings.starredFirst,
           },
         }
       : {}),
@@ -3663,7 +3662,6 @@ export const __workbenchReducerInternal = (
                   page: selectedImagePage,
                   paginationMode: settings.paginationMode,
                   searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                  starredFirst: settings.starredFirst,
                 };
           const itemKey = toGalleryItemKey(action.item);
 
@@ -3708,7 +3706,6 @@ export const __workbenchReducerInternal = (
                 page: selectedImagePage,
                 paginationMode: settings.paginationMode,
                 searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                starredFirst: settings.starredFirst,
               },
             };
           }
@@ -3774,7 +3771,6 @@ export const __workbenchReducerInternal = (
               page: selectedImagePage,
               paginationMode: settings.paginationMode,
               searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-              starredFirst: settings.starredFirst,
             },
           };
         },
@@ -3824,10 +3820,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'updateGallerySettings': {
-      const resetsQuery =
-        action.settings.imageOrderDir !== undefined ||
-        action.settings.starredFirst !== undefined ||
-        action.settings.paginationMode !== undefined;
+      const resetsQuery = action.settings.imageOrderDir !== undefined || action.settings.paginationMode !== undefined;
 
       return updateGalleryValues(
         state,

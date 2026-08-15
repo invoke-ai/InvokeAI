@@ -93,17 +93,15 @@ interface GalleryOrderImage {
   starred?: boolean;
 }
 
+// Starred-first placement is pinned in gallery/core/settings.ts, so this
+// always inserts after the leading starred block rather than branching on a
+// flag that no longer varies.
 export const getGalleryPlaceholderInsertionIndex = (
   images: GalleryOrderImage[],
-  imageOrderDir: GalleryOrderDir,
-  starredFirst: boolean
+  imageOrderDir: GalleryOrderDir
 ): number => {
   if (imageOrderDir !== 'DESC') {
     return images.length;
-  }
-
-  if (!starredFirst) {
-    return 0;
   }
 
   const firstUnstarredIndex = images.findIndex((image) => !image.starred);
@@ -278,7 +276,6 @@ export interface GallerySelectedImageQuery {
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
-  starredFirst: boolean;
 }
 
 export const getGallerySelectedImageQuery = (values: Record<string, unknown>): GallerySelectedImageQuery => {
@@ -312,7 +309,6 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
         ? query.paginationMode
         : settings.paginationMode,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
-    starredFirst: typeof query?.starredFirst === 'boolean' ? query.starredFirst : settings.starredFirst,
   };
 };
 

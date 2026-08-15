@@ -45,13 +45,13 @@ const flattenPreviewItems = (data: InfiniteData<GalleryItemsPage, number> | unde
 const getOrderedPreviewItems = (
   items: GalleryItem[],
   imageOrderDir: 'ASC' | 'DESC',
-  starredFirst: boolean,
   inputOrder: 'display' | 'newest-first'
 ): GalleryItem[] =>
   items
     .map((item, index) => ({ index, item }))
     .sort((a, b) => {
-      const canonicalOrder = compareGalleryItems(a.item, b.item, { orderDir: imageOrderDir, starredFirst });
+      // Starred-first is pinned in gallery/core/settings.ts.
+      const canonicalOrder = compareGalleryItems(a.item, b.item, { orderDir: imageOrderDir, starredFirst: true });
 
       if (canonicalOrder !== 0) {
         return canonicalOrder;
@@ -73,26 +73,22 @@ const getOrderedLocalItems = ({
   galleryView,
   items,
   imageOrderDir,
-  starredFirst,
 }: {
   boardId: string;
   galleryView: GalleryView;
   items: GalleryItem[];
   imageOrderDir: 'ASC' | 'DESC';
-  starredFirst: boolean;
 }): GalleryItem[] =>
   getOrderedPreviewItems(
     items.filter((item) => item.boardId === boardId && getItemGalleryView(item) === galleryView),
     imageOrderDir,
-    starredFirst,
     'newest-first'
   );
 
 export const mergePreviewBoardItems = (
   backendItems: GalleryItem[],
   localItems: GalleryItem[],
-  imageOrderDir: 'ASC' | 'DESC',
-  starredFirst: boolean
+  imageOrderDir: 'ASC' | 'DESC'
 ): GalleryItem[] => {
   const backendKeys = new Set(backendItems.map(toGalleryItemKey));
   const missingLocalItems = localItems.filter((item) => !backendKeys.has(toGalleryItemKey(item)));
@@ -101,7 +97,7 @@ export const mergePreviewBoardItems = (
     return backendItems.slice(0, GALLERY_MAX_ROWS);
   }
 
-  return getOrderedPreviewItems([...backendItems, ...missingLocalItems], imageOrderDir, starredFirst, 'display').slice(
+  return getOrderedPreviewItems([...backendItems, ...missingLocalItems], imageOrderDir, 'display').slice(
     0,
     GALLERY_MAX_ROWS
   );
@@ -131,7 +127,6 @@ export const usePreviewNavigation = ({
   selectedItem,
   selectedItemKey,
   shouldFollowLive,
-  starredFirst,
 }: {
   /** The live slot from getGalleryGenerationSequence, or null. */
   activePlaceholder: GalleryQueuePlaceholder | null;
@@ -148,7 +143,6 @@ export const usePreviewNavigation = ({
   selectedItem: GalleryItem | null;
   selectedItemKey: GalleryItemKey | null;
   shouldFollowLive: boolean;
-  starredFirst: boolean;
 }): PreviewNavigationState => {
   const hasSelectedItem = selectedItem !== null;
   const selectedImageSearch = useMemo(
@@ -159,10 +153,9 @@ export const usePreviewNavigation = ({
     shouldFollowLive && activePlaceholder ? activePlaceholder.boardId : selectedImageQuery.boardId;
   const navigationGalleryView = shouldFollowLive ? 'images' : selectedImageQuery.galleryView;
   const navigationOrderDir = shouldFollowLive ? imageOrderDir : selectedImageQuery.imageOrderDir;
-  const navigationStarredFirst = shouldFollowLive ? starredFirst : selectedImageQuery.starredFirst;
   const hasNavigationContext = shouldFollowLive || hasSelectedItem;
-  const navigationContextKey = `${shouldFollowLive}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
-  const navigationQueryKey = `${shouldFollowLive}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}`;
+  const navigationContextKey = `${shouldFollowLive}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
+  const navigationQueryKey = `${shouldFollowLive}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}`;
 
   // Lets a boundary fetch that resolves after the user has moved on compare the
   // context it started in against the one now on screen, and drop its stale
@@ -211,7 +204,8 @@ export const usePreviewNavigation = ({
         galleryView: navigationGalleryView,
         orderDir: navigationOrderDir,
         searchTerm: shouldFollowLive ? '' : selectedImageSearch.text,
-        starredFirst: navigationStarredFirst,
+        // Starred-first is pinned in gallery/core/settings.ts.
+        starredFirst: true,
       },
       !shouldFollowLive && selectedImageQuery.paginationMode === 'paginated'
         ? { kind: 'anchor', offset: navigationAnchorPage * GALLERY_PAGE_SIZE }
@@ -288,9 +282,8 @@ export const usePreviewNavigation = ({
         galleryView: navigationGalleryView,
         items: navigationLocalItems,
         imageOrderDir: navigationOrderDir,
-        starredFirst: navigationStarredFirst,
       }),
-    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir, navigationStarredFirst]
+    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir]
   );
   const previewLocalBoardItems = useMemo(() => {
     if (
@@ -308,8 +301,8 @@ export const usePreviewNavigation = ({
     () =>
       !hasNavigationContext
         ? EMPTY_PREVIEW_ITEMS
-        : mergePreviewBoardItems(backendBoardItems, previewLocalBoardItems, navigationOrderDir, navigationStarredFirst),
-    [backendBoardItems, hasNavigationContext, navigationOrderDir, navigationStarredFirst, previewLocalBoardItems]
+        : mergePreviewBoardItems(backendBoardItems, previewLocalBoardItems, navigationOrderDir),
+    [backendBoardItems, hasNavigationContext, navigationOrderDir, previewLocalBoardItems]
   );
   const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const navigationSequence = useMemo(
@@ -320,16 +313,8 @@ export const usePreviewNavigation = ({
         boardImages: boardItems,
         galleryView: navigationGalleryView,
         imageOrderDir: navigationOrderDir,
-        starredFirst: navigationStarredFirst,
       }),
-    [
-      activePlaceholder,
-      boardItems,
-      navigationBoardId,
-      navigationGalleryView,
-      navigationOrderDir,
-      navigationStarredFirst,
-    ]
+    [activePlaceholder, boardItems, navigationBoardId, navigationGalleryView, navigationOrderDir]
   );
   const navigationCursor = getPreviewNavigationCursor(navigationSequence, {
     isFollowingLive: shouldFollowLive,
@@ -383,8 +368,7 @@ export const usePreviewNavigation = ({
         const nextBoardItems = mergePreviewBoardItems(
           nextBackendBoardItems,
           previewLocalBoardItems,
-          navigationOrderDir,
-          navigationStarredFirst
+          navigationOrderDir
         );
         const nextNavigationSequence = getPreviewNavigationSequence({
           activePlaceholder,
@@ -392,7 +376,6 @@ export const usePreviewNavigation = ({
           boardImages: nextBoardItems,
           galleryView: navigationGalleryView,
           imageOrderDir: navigationOrderDir,
-          starredFirst: navigationStarredFirst,
         });
         const nextNavigationCursor = getPreviewNavigationCursor(nextNavigationSequence, {
           isFollowingLive: shouldFollowLive,
@@ -424,7 +407,6 @@ export const usePreviewNavigation = ({
       navigationGalleryView,
       navigationOrderDir,
       navigationSequence,
-      navigationStarredFirst,
       previewLocalBoardItems,
       selectedItemKey,
       selectPreviewItem,
