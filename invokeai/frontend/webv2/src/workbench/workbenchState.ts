@@ -1555,7 +1555,7 @@ const recoverProjectUnderNewIdentity = (
       : snapshotProject
   );
 
-const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
+export const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
   const { max, min } = getPanelSizeBounds(region);
 
   return Math.min(max, Math.max(min, sizePx));

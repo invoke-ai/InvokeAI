@@ -16,7 +16,7 @@ import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { getPanelSizeBounds } from '@workbench/workbenchState';
+import { clampPanelSize, getPanelSizeBounds } from '@workbench/workbenchState';
 import { SettingsIcon } from 'lucide-react';
 import {
   useCallback,
@@ -35,12 +35,6 @@ import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 const PANEL_SIZE_STEP_PX = 16;
 const RESIZE_HANDLE_HOVER_PROPS = { bg: 'accent.solid', opacity: 0.45 };
 const RESIZE_HANDLE_FOCUS_PROPS = { bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' };
-
-const clampSize = (region: WidgetRegion, sizePx: number): number => {
-  const { max, min } = getPanelSizeBounds(region);
-
-  return Math.min(max, Math.max(min, sizePx));
-};
 
 export const WidgetPanelFrame = ({
   children,
@@ -61,13 +55,13 @@ export const WidgetPanelFrame = ({
   const isBottom = region === 'bottom';
   // Clamped at render, not just on commit, so a persisted size from before a
   // bounds change heals on screen immediately instead of on the next resize.
-  const displaySizePx = clampSize(region, dragSizePx ?? regionState.sizePx);
+  const displaySizePx = clampPanelSize(region, dragSizePx ?? regionState.sizePx);
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
   const commitSize = useCallback(
     (sizePx: number) => {
-      const nextSizePx = clampSize(region, sizePx);
+      const nextSizePx = clampPanelSize(region, sizePx);
 
       if (nextSizePx !== regionState.sizePx) {
         layout.setRegionSize(region, nextSizePx);
@@ -90,7 +84,7 @@ export const WidgetPanelFrame = ({
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
 
-        nextSizePx = clampSize(region, startSizePx + deltaPx);
+        nextSizePx = clampPanelSize(region, startSizePx + deltaPx);
         setDragSizePx(nextSizePx);
       };
 
