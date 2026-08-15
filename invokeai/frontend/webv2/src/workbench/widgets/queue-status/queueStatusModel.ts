@@ -1,3 +1,5 @@
+import { getDeterminateProgressFraction } from '@features/queue/contracts';
+
 export interface QueueStatusChip {
   count: number;
   labelKey: 'idle' | 'paused' | 'queued';
@@ -21,12 +23,12 @@ export const getQueueStatusChip = (
  * The chip's hairline, or `undefined` for no bar at all.
  *
  * Only the running tone gets one: an idle queue has nothing to fill, and a
- * paused one would show a bar that never moves, which reads as a hang. Zero and
- * missing percentages become the quiet indeterminate fill for the same reason
- * the top bar rail does — that is the model-loading window, not a stall.
+ * paused one would show a bar that never moves, which reads as a hang. The
+ * fill itself routes through `getDeterminateProgressFraction` — see that
+ * function for why zero reads as indeterminate.
  */
 export const getQueueStatusProgress = (
   chip: QueueStatusChip,
   percentage: number | null | undefined
 ): { value: number | null } | undefined =>
-  chip.tone === 'running' ? { value: typeof percentage === 'number' && percentage > 0 ? percentage : null } : undefined;
+  chip.tone === 'running' ? { value: getDeterminateProgressFraction(percentage) } : undefined;

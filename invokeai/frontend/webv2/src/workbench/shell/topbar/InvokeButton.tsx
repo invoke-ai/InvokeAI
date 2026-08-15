@@ -1,12 +1,11 @@
-import type { ComponentProps } from 'react';
+import type { ComponentProps, FocusEvent } from 'react';
 
 import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Stack, Text } from '@chakra-ui/react';
-import { getQueueSummary } from '@features/queue/contracts';
-import { useQueueItemProgress } from '@features/queue/react';
+import { getDeterminateProgressFraction } from '@features/queue/contracts';
 import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel } from '@workbench/invocation';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { PlayIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,8 +42,10 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
  * Invoke queues further items on top of a running batch, so a button that
  * morphed into a progress bar would read as unavailable at exactly the
  * moment it is most useful. Only the icon slot's content may change: it
- * shows the queue's progress while a batch runs and the pointer is
- * elsewhere, and reverts to the play glyph on hover so "queue more on top"
+ * shows the queue's progress while a batch runs and the pointer is elsewhere
+ * and the button does not hold keyboard focus, and reverts to the play glyph
+ * on hover or on `:focus-visible` (not a plain click-focus, which would leave
+ * a mouse-invoked batch stuck on the play glyph) so "queue more on top"
  * always reads as available. Aggregate progress otherwise belongs to the
  * queue group. (§5.1, contract §9.4.)
  */
@@ -58,20 +59,28 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
     [shortcutParts, state]
   );
 
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const baseSummary = getQueueSummary(queueItems);
-  const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
-  const hasOpenWork = baseSummary.total > 0;
+  const { progress: runningProgress, summary } = useActiveQueueProgress();
+  const hasOpenWork = summary.total > 0;
 
   const [isHovered, setIsHovered] = useState(false);
   const handlePointerEnter = useCallback(() => setIsHovered(true), []);
   const handlePointerLeave = useCallback(() => setIsHovered(false), []);
+  const [isFocused, setIsFocused] = useState(false);
+  // `focus`, unlike `:focus-visible`, fires on every mousedown too — gating on
+  // the pseudo-class keeps this keyboard-only so a mouse click mid-batch does
+  // not strand the icon on the play glyph until something else steals focus.
+  const handleFocus = useCallback((event: FocusEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.matches(':focus-visible')) {
+      setIsFocused(true);
+    }
+  }, []);
+  const handleBlur = useCallback(() => setIsFocused(false), []);
   const handleClick = useCallback(() => void invoke(), [invoke]);
 
   const iconMode = getInvokeIconMode({
     hasOpenWork,
-    isHovered,
-    progress: runningProgress?.percentage ?? null,
+    isHovered: isHovered || isFocused,
+    progress: getDeterminateProgressFraction(runningProgress?.percentage),
   });
 
   return (
@@ -91,7 +100,9 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         flexShrink={0}
         opacity={isValid ? undefined : 0.55}
         size="xs"
+        onBlur={handleBlur}
         onClick={isValid ? handleClick : undefined}
+        onFocus={handleFocus}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
         zIndex="2"

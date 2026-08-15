@@ -2,7 +2,13 @@ import type { QueueItem } from '@features/queue';
 
 import { describe, expect, it } from 'vitest';
 
-import { getProgressRailModel, getProgressRailSegmentValue, selectProjectProgressItemIds } from './progressRail';
+import {
+  getDeterminateProgressFraction,
+  getDeterminateProgressPercent,
+  getProgressRailModel,
+  getProgressRailSegmentValue,
+  selectProjectProgressItemIds,
+} from './progressRail';
 
 const createQueueItem = ({
   backendItemIds,
@@ -53,6 +59,20 @@ describe('getProgressRailModel', () => {
       itemIds: [7, 8],
       kind: 'sessions',
     });
+  });
+});
+
+describe('getDeterminateProgressFraction', () => {
+  it('treats zero and missing as indeterminate', () => {
+    expect(getDeterminateProgressFraction(0)).toBeNull();
+    expect(getDeterminateProgressFraction(null)).toBeNull();
+    expect(getDeterminateProgressFraction(undefined)).toBeNull();
+  });
+
+  it('passes real fractions through and rounds percents', () => {
+    expect(getDeterminateProgressFraction(0.42)).toBe(0.42);
+    expect(getDeterminateProgressPercent(0.428)).toBe(43);
+    expect(getDeterminateProgressPercent(0)).toBeNull();
   });
 });
 

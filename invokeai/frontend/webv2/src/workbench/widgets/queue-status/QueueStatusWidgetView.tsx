@@ -1,10 +1,10 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Stack, Text } from '@chakra-ui/react';
-import { getQueueSummary } from '@features/queue/contracts';
-import { useIsProcessorPaused, useQueueItemProgress } from '@features/queue/react';
+import { getDeterminateProgressPercent, getQueueSummary } from '@features/queue/contracts';
+import { useIsProcessorPaused } from '@features/queue/react';
+import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { StatusWidgetChip } from '@workbench/widget-frame';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { ListOrderedIcon, PauseIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -12,12 +12,14 @@ import { getQueueStatusChip, getQueueStatusProgress } from './queueStatusModel';
 
 export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   const { t } = useTranslation();
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
+  const { progress, queueItems } = useActiveQueueProgress();
   const isPaused = useIsProcessorPaused();
+  // The chip's remaining/total counts must hold steady as progress advances
+  // through a running batch's sub-images, so they come from a summary built
+  // without progress; only the percent label tracks live progress.
   const summary = getQueueSummary(queueItems);
-  const progress = useQueueItemProgress(summary.runningQueueItemId ?? '');
   const chip = getQueueStatusChip(summary, isPaused);
-  const percent = typeof progress?.percentage === 'number' ? Math.round(progress.percentage * 100) : null;
+  const percent = getDeterminateProgressPercent(progress?.percentage);
   const baseLabel =
     chip.labelKey === 'idle'
       ? t('widgets.queueStatus.idle')

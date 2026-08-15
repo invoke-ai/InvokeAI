@@ -1,7 +1,6 @@
-import { getQueueSummary } from '@features/queue/contracts';
-import { useQueueItemProgress } from '@features/queue/react';
+import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,11 +15,9 @@ import { DOCUMENT_TITLE_BASE, formatDocumentTitle } from './documentTitle';
  */
 export const DocumentTitleProgress = () => {
   const { t } = useTranslation();
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const baseSummary = getQueueSummary(queueItems);
-  const progress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
-  const { current, total } = getQueueSummary(queueItems, progress);
-  const percent = typeof progress?.percentage === 'number' ? Math.round(progress.percentage * 100) : null;
+  const { progress, summary } = useActiveQueueProgress();
+  const { current, total } = summary;
+  const percent = getDeterminateProgressPercent(progress?.percentage);
 
   const title = useMemo(
     () =>

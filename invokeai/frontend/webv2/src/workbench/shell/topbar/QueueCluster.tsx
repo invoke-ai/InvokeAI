@@ -6,20 +6,21 @@ import type { ReactNode } from 'react';
 import { Badge, chakra, HStack, Icon, Menu, Portal, Progress, Stack, Text } from '@chakra-ui/react';
 import { useModelLoads } from '@features/models';
 import {
+  getDeterminateProgressFraction,
   getQueueItemExpectedImageCount,
   getQueueItemSnapshotPositivePrompt,
-  getQueueSummary,
 } from '@features/queue/contracts';
 import { QueueMenuItems, useQueueMenuActions } from '@features/queue/menu';
-import { useIsProcessorPaused, useQueueItemProgress } from '@features/queue/react';
+import { useIsProcessorPaused } from '@features/queue/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Group } from '@platform/ui/Group';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
+import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,16 +37,13 @@ const tonePalettes: Record<QueueTone, string | undefined> = {
 
 export const QueueCluster = () => {
   const { t } = useTranslation();
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const actions = useQueueMenuActions({ includeOpenQueue: true });
   const cancelCurrent = actions[0];
 
-  const baseSummary = getQueueSummary(queueItems);
-  const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
-  const summary = getQueueSummary(queueItems, runningProgress);
+  const { progress: runningProgress, queueItems, summary } = useActiveQueueProgress();
   const { current, remaining, total } = summary;
   const runningItem = summary.runningQueueItemId
     ? queueItems.find((item) => item.id === summary.runningQueueItemId)
@@ -55,7 +53,7 @@ export const QueueCluster = () => {
   const isPaused = useIsProcessorPaused();
   const hasOpenWork = total > 0;
   const tone: QueueTone = isPaused && hasOpenWork ? 'paused' : hasOpenWork && isConnected ? 'running' : 'idle';
-  const progressValue = runningProgress?.percentage ?? null;
+  const progressValue = getDeterminateProgressFraction(runningProgress?.percentage);
   const isCancellable = !cancelCurrent?.disabled;
 
   const handleOpenQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
@@ -256,18 +254,16 @@ const QueueTooltip = ({
           {progressLabel}
         </Text>
         {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
-        {progress?.percentage !== null && progress?.percentage !== undefined ? (
-          <Progress.Root
-            aria-label={t('topbar.queue.currentImageProgress')}
-            max={1}
-            size="xs"
-            value={progress.percentage}
-          >
-            <Progress.Track>
-              <Progress.Range />
-            </Progress.Track>
-          </Progress.Root>
-        ) : null}
+        <Progress.Root
+          aria-label={t('topbar.queue.currentImageProgress')}
+          max={1}
+          size="xs"
+          value={getDeterminateProgressFraction(progress?.percentage)}
+        >
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
       </Stack>
       <Stack gap="1" color="fg.subtle" fontSize="2xs">
         <Text fontVariantNumeric="tabular-nums">

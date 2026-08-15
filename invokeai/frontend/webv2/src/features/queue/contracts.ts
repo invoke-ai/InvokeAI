@@ -44,6 +44,8 @@ export {
   type QueueSummary,
 } from './core/historySummary';
 export {
+  getDeterminateProgressFraction,
+  getDeterminateProgressPercent,
   getProgressRailModel,
   getProgressRailSegmentValue,
   selectProjectProgressItemIds,

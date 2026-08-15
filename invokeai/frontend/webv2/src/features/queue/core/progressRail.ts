@@ -43,21 +43,32 @@ export const getProgressRailModel = ({
 };
 
 /**
- * A segment's fill, or null for the indeterminate sweep.
+ * A determinate fill fraction, or null for the indeterminate sweep.
  *
- * Zero is treated as indeterminate rather than as an empty bar: the backend
- * reports `0` for the span between "session started" and "first step done",
- * which is exactly when models are loading and the wait feels longest. An empty
- * determinate bar reads as stalled there; the sweep reads as working.
+ * Zero is indeterminate rather than an empty bar: the backend reports `0` for
+ * the span between "session started" and "first step done", which is exactly
+ * when models are loading and the wait feels longest. An empty determinate
+ * bar (or a "0%" label) reads as stalled there; the sweep reads as working.
+ * Every progress surface routes through this so they cannot disagree.
  */
+export const getDeterminateProgressFraction = (percentage: number | null | undefined): number | null =>
+  typeof percentage === 'number' && percentage > 0 ? percentage : null;
+
+/** Whole percent for text surfaces (tab title, chip label), or null while indeterminate. */
+export const getDeterminateProgressPercent = (percentage: number | null | undefined): number | null => {
+  const fraction = getDeterminateProgressFraction(percentage);
+
+  return fraction === null ? null : Math.round(fraction * 100);
+};
+
+/** A rail segment's fill: also indeterminate while its model is still loading. */
 export const getProgressRailSegmentValue = ({
   isLoadingModels,
   percentage,
 }: {
   isLoadingModels: boolean;
   percentage: number | null | undefined;
-}): number | null =>
-  isLoadingModels || percentage === null || percentage === undefined || percentage === 0 ? null : percentage;
+}): number | null => (isLoadingModels ? null : getDeterminateProgressFraction(percentage));
 
 /**
  * The live sessions belonging to this project, in ascending id order.
