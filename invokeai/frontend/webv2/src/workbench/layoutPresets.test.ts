@@ -74,7 +74,11 @@ describe('built-in layout preset descriptors', () => {
       compose: {
         active: { bottom: 'gallery:bottom', center: 'preview', left: 'generate', right: 'gallery' },
         bottom: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
-        center: ['preview'],
+        // Compose keeps Gallery as a center view: the retired `gallery` preset
+        // migrates here (see legacyLayoutPresetIds) precisely because it was
+        // "Compose with the center view swapped", so the swap has to remain
+        // available.
+        center: ['preview', 'gallery:center'],
         left: ['generate', 'upscale'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
         right: ['gallery', 'queue'],

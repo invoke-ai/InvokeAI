@@ -931,7 +931,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.center).toMatchObject({
       activeInstanceId: 'preview',
-      instanceIds: ['preview'],
+      instanceIds: ['preview', 'gallery:center'],
       isCollapsed: false,
       sizePx: 0,
     });

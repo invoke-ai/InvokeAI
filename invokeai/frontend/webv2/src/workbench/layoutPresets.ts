@@ -158,9 +158,15 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
         isCollapsed: true,
         sizePx: 180,
       }),
+      // Gallery stays a center view here: the retired `gallery` preset resolves
+      // to Compose because it was "Compose with the center view swapped" (see
+      // legacyLayoutPresetIds), so the swap has to stay reachable. Curating it
+      // out also made Gallery an *addable* widget instead of a placed one,
+      // which routed the switch through a menu that warms the Canvas chunk on
+      // intent — a chunk a gallery-only session must never download.
       center: createRegion({
         activeInstanceId: 'preview',
-        instanceIds: ['preview'],
+        instanceIds: ['preview', 'gallery:center'],
         sizePx: 0,
       }),
       left: createRegion({
