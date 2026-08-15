@@ -1164,6 +1164,7 @@ const createWidgetStates = (): WidgetStateMap => ({
   diagnostics: { id: 'diagnostics', label: 'Diagnostics', values: {}, version: 1 },
   gallery: { id: 'gallery', label: 'Gallery', values: {}, version: 1 },
   generate: { graphId: 'generate-graph', id: 'generate', label: 'Generate', values: {}, version: 1 },
+  'image-map': { id: 'image-map', label: 'Image Map', values: {}, version: 1 },
   layers: { id: 'layers', label: 'Layers', values: {}, version: 1 },
   notifications: { id: 'notifications', label: 'Notifications', values: {}, version: 1 },
   preview: { id: 'preview', label: 'Preview', values: {}, version: 1 },
@@ -1206,6 +1207,7 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   'gallery:bottom': 'gallery',
   'gallery:center': 'gallery',
   generate: 'generate',
+  'image-map': 'image-map',
   upscale: 'upscale',
   layers: 'layers',
   notifications: 'notifications',
@@ -1270,6 +1272,18 @@ const isLegacyDefaultRightRegion = (region: WidgetRegionState): boolean =>
   region.instanceIds.length === LEGACY_RIGHT_REGION_WIDGET_IDS.length &&
   region.instanceIds.every((widgetId, index) => widgetId === LEGACY_RIGHT_REGION_WIDGET_IDS[index]);
 
+// The right rail as it shipped before the image map existed. A project
+// persisted with exactly this arrangement is an untouched default, not a
+// customization, so it gains the new widget the way a fresh project would.
+const PRE_IMAGE_MAP_DEFAULT_RIGHT_REGION_WIDGET_IDS: WidgetId[] = [
+  'gallery',
+  'preview',
+  'queue',
+  'layers',
+  'diagnostics',
+  'project',
+];
+
 const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRegionState => {
   const defaultRightRegion = createWidgetRegions().right;
 
@@ -1281,7 +1295,33 @@ const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRe
     return { ...rightRegion, instanceIds: defaultRightRegion.instanceIds };
   }
 
-  return rightRegion;
+  if (rightRegion.instanceIds.includes('image-map')) {
+    return rightRegion;
+  }
+
+  const isPreImageMapDefault =
+    rightRegion.instanceIds.length === PRE_IMAGE_MAP_DEFAULT_RIGHT_REGION_WIDGET_IDS.length &&
+    rightRegion.instanceIds.every(
+      (widgetId, index) => widgetId === PRE_IMAGE_MAP_DEFAULT_RIGHT_REGION_WIDGET_IDS[index]
+    );
+
+  if (!isPreImageMapDefault) {
+    // A customized rail is left alone, matching how `upscale` was introduced.
+    return rightRegion;
+  }
+
+  // Without this, adding the widget to the built-in presets makes every
+  // existing project read as drifted from the preset it was loaded from — the
+  // topbar shows an unsaved-changes dot, and offers to revert a layout the user
+  // never edited. Migrating the persisted rail keeps the two in step, and is
+  // also the only way the widget is discoverable without hunting through the
+  // enable menu.
+  const galleryIndex = rightRegion.instanceIds.indexOf('gallery');
+  const instanceIds = [...rightRegion.instanceIds];
+
+  instanceIds.splice(galleryIndex === -1 ? instanceIds.length : galleryIndex + 1, 0, 'image-map');
+
+  return { ...rightRegion, instanceIds };
 };
 
 // The shipped bottom-region default before 'queue-status' was added — a

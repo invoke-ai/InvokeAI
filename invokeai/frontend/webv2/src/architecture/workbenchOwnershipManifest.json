@@ -35,6 +35,10 @@
       "targetOwner": "workbench",
       "targetPath": "workbench/image-actions"
     },
+    "image-map": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/image-map"
+    },
     "launchpad": {
       "targetOwner": "workbench",
       "targetPath": "workbench/launchpad"

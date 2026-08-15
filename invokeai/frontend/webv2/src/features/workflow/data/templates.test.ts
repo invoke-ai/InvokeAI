@@ -32,6 +32,7 @@ const openApiFixture = {
             type: 'integer',
             ui_component: 'video-frame-index',
             ui_hidden: false,
+            ui_model_format: ['diffusers'],
           },
           id: { field_kind: 'internal', title: 'Id', type: 'string' },
           is_intermediate: { default: false, field_kind: 'internal', type: 'boolean' },
@@ -130,6 +131,9 @@ describe('parseOpenApiToTemplates', () => {
     // Unknown ui_component values collapse to null; known ones pass through.
     expect(add?.inputs.a?.uiComponent).toBeNull();
     expect(add?.inputs.b?.uiComponent).toBe('video-frame-index');
+    // ui_model_format passes through so model pickers can filter by install format.
+    expect(add?.inputs.a?.uiModelFormat).toBeNull();
+    expect(add?.inputs.b?.uiModelFormat).toEqual(['diffusers']);
   });
 
   it('parses ref, nullable-anyOf, single-or-collection, and enum field types', () => {

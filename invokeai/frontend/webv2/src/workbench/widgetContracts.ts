@@ -13,6 +13,7 @@ export type FirstPartyWidgetTypeId =
   | 'gallery'
   | 'generate'
   | 'history-controls'
+  | 'image-map'
   | 'layers'
   | 'notifications'
   | 'preview'

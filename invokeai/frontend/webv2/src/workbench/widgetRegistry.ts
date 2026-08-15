@@ -15,6 +15,7 @@ import { canvasWidgetManifest } from './widgets/canvas/manifest';
 import { diagnosticsWidgetManifest } from './widgets/diagnostics/manifest';
 import { galleryWidgetManifest } from './widgets/gallery/manifest';
 import { generateWidgetManifest } from './widgets/generate/manifest';
+import { imageMapWidgetManifest } from './widgets/image-map/manifest';
 import { layersWidgetManifest } from './widgets/layers/manifest';
 import { notificationsWidgetManifest } from './widgets/notifications/manifest';
 import { previewWidgetManifest } from './widgets/preview/manifest';
@@ -33,6 +34,7 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   canvasWidgetManifest,
   diagnosticsWidgetManifest,
   galleryWidgetManifest,
+  imageMapWidgetManifest,
   previewWidgetManifest,
   projectWidgetManifest,
   layersWidgetManifest,

@@ -50,6 +50,7 @@ import {
   getGalleryVideoMetadata,
   getGalleryVideoWorkflow,
   isDateBoardId,
+  isInvalidGalleryBoardDestination,
   listGalleryBoards,
   makeImageCanvasAsset,
   makeImageDurable,
@@ -251,3 +252,11 @@ export const galleryDestinations = {
 } as const;
 
 export const isGalleryVirtualBoard = isDateBoardId;
+
+/**
+ * Whether a board id can actually receive item attachments. Virtual destinations
+ * (date buckets, `generated`/`assets`) and `none` cannot: the organization
+ * transports no-op for them rather than calling the backend.
+ */
+export const isGalleryBoardAttachable = (boardId: string): boolean =>
+  boardId !== 'none' && !isInvalidGalleryBoardDestination(boardId);
