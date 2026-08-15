@@ -61,7 +61,6 @@
     "react-dom": "^19.2.8",
     "react-hook-tanstack-virtual": "^0.0.4",
     "react-i18next": "^17.0.11",
-    "react-icons": "^5.7.0",
     "socket.io-client": "^4.8.3",
     "tinykeys": "^4.0.0",
     "use-sync-external-store": "^1.6.0",
