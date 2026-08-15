@@ -24,17 +24,21 @@ interface BrandIconSource {
 }
 
 const createBrandIcon = ({ path, title }: BrandIconSource) => {
-  const BrandIcon = (props: SVGProps<SVGSVGElement>) => (
+  const BrandIcon = ({ titleAccess, ...props }: SVGProps<SVGSVGElement> & { titleAccess?: boolean }) => (
     <svg
+      // Decorative by default: every current consumer pairs the mark with
+      // visible text, and a titled icon there is announced twice. Pass
+      // `titleAccess` when the icon stands alone.
+      aria-hidden={titleAccess ? undefined : true}
       fill="currentColor"
       height="1em"
-      role="img"
+      role={titleAccess ? 'img' : undefined}
       viewBox="0 0 24 24"
       width="1em"
       xmlns="http://www.w3.org/2000/svg"
       {...props}
     >
-      <title>{title}</title>
+      {titleAccess ? <title>{title}</title> : null}
       <path d={path} />
     </svg>
   );
