@@ -122,10 +122,6 @@ const getLegacyChunkName = (id: string): string | null => {
     return 'fflate';
   }
 
-  if (id.includes('/node_modules/react-icons/')) {
-    return 'react-icons';
-  }
-
   if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {
     return 'workflow-vendor';
   }

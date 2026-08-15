@@ -374,7 +374,7 @@ export const WorkflowLibraryDialog = ({
                         {items.map((item) => (
                           <Box
                             key={item.workflow_id}
-                            _hover={{ bg: 'bg.emphasized' }}
+                            _hover={{ bg: 'bg.muted/60' }}
                             alignItems="center"
                             display="grid"
                             gap="2"

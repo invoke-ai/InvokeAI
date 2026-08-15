@@ -26,8 +26,8 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
   const triggerIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const { invocation, placedTypeIds, sources } = state;
   const isLocked = invocation.sourceLocked || invocation.destinationLocked;
-  const hasSource = placedTypeIds.has(getWidgetTypeIdForSourceId(invocation.sourceId));
   const sourceTypeId = getWidgetTypeIdForSourceId(invocation.sourceId);
+  const hasSource = placedTypeIds.has(sourceTypeId);
   const isSameRoute = hasSource && sourceTypeId === invocation.destination;
   const accessibleName = describeRoute({
     destination: invocation.destination,
