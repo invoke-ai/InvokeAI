@@ -260,9 +260,10 @@ const VirtualProjectsRow = ({
         </SimpleGrid>
       ) : (
         row.projects.map((project) => (
-          // The wrapper owns the virtualizer's full row pitch and the hairline
-          // divider, so rows sit flush against each other.
-          <Box borderBottomWidth="1px" borderColor="border.subtle" h={`${PROJECT_ROW_HEIGHT_PX}px`} key={project.id}>
+          // The wrapper owns the virtualizer's full row pitch. No divider: the
+          // row's own rounded hover fill separates the items, and a hairline
+          // running under a rounded fill only cuts across its corners.
+          <Box h={`${PROJECT_ROW_HEIGHT_PX}px`} key={project.id}>
             <ProjectRow isPinned={pinnedIds.includes(project.id)} summary={project} onTogglePin={onTogglePin} />
           </Box>
         ))

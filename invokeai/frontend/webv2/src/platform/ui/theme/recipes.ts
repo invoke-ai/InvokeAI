@@ -686,7 +686,9 @@ export const rowRecipe = defineRecipe({
     textAlign: 'start',
     transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
     w: 'full',
-    _hover: { bg: 'bg.emphasized' },
+    // A pointer hint, not a state: it stays under the `muted` (selected)
+    // variant's own `bg.muted` so hovering never reads as selecting.
+    _hover: { bg: 'bg.muted/60' },
     _focusVisible: {
       outline: '2px solid',
       outlineColor: 'accent.solid',
