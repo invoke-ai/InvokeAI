@@ -365,6 +365,7 @@ describe('workbench widget region defaults', () => {
     expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
     expect(project.widgetRegions.bottom.instanceIds).toEqual([
       'server-status',
+      'queue-status',
       'gallery:bottom',
       'notifications',
       'autosave-status',
@@ -857,7 +858,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.bottom).toMatchObject({
       activeInstanceId: 'gallery:bottom',
-      instanceIds: ['server-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
       isCollapsed: true,
       sizePx: 180,
     });

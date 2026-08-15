@@ -19,6 +19,7 @@ import { layersWidgetManifest } from './widgets/layers/manifest';
 import { notificationsWidgetManifest } from './widgets/notifications/manifest';
 import { previewWidgetManifest } from './widgets/preview/manifest';
 import { projectWidgetManifest } from './widgets/project/manifest';
+import { queueStatusWidgetManifest } from './widgets/queue-status/manifest';
 import { queueWidgetManifest } from './widgets/queue/manifest';
 import { serverStatusWidgetManifest } from './widgets/server-status/manifest';
 import { upscaleWidgetManifest } from './widgets/upscale/manifest';
@@ -38,6 +39,7 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   queueWidgetManifest,
   notificationsWidgetManifest,
   serverStatusWidgetManifest,
+  queueStatusWidgetManifest,
   autosaveStatusWidgetManifest,
   versionStatusWidgetManifest,
 ];

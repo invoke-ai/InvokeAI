@@ -13,6 +13,7 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
 
 const defaultBottomInstanceIds: WidgetInstanceId[] = [
   'server-status',
+  'queue-status',
   'gallery:bottom',
   'notifications',
   'autosave-status',
@@ -33,6 +34,7 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   preview: 'preview',
   project: 'project',
   queue: 'queue',
+  'queue-status': 'queue-status',
   'server-status': 'server-status',
   'version-status': 'version-status',
   workflow: 'workflow',

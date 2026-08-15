@@ -1387,6 +1387,7 @@
       "preview": "Preview",
       "project": "Project",
       "queue": "Queue",
+      "queueStatus": "Queue status",
       "serverStatus": "Server Status",
       "upscale": "Upscale",
       "versionStatus": "Version",
@@ -2860,6 +2861,11 @@
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",
       "windowLimit": "Showing the first {{count}} items. Narrow the search or switch to Pages to reach the rest."
+    },
+    "queueStatus": {
+      "idle": "Queue idle",
+      "paused": "{{count}} queued — paused",
+      "queued": "{{count}} queued"
     },
     "serverStatus": {
       "connected": "Connected to Server",
