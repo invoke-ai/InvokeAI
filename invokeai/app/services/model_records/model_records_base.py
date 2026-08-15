@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    MiniMaxH3VariantType,
     MistralVariantType,
     ModelFormat,
     ModelSourceType,
@@ -143,6 +144,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | WanLoRAVariantType
         | Qwen3VariantType
         | Krea2VariantType
+        | MiniMaxH3VariantType
         | MistralVariantType
         | PiDDecoderVariantType
     ] = Field(description="The variant of the model.", default=None)
