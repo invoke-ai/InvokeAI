@@ -29,6 +29,7 @@ import {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen3Encoder,
   isAnimaVae,
+  isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
   isKrea2Vae,
@@ -686,37 +687,63 @@ const buildFlux2Graph = (
   outputIsIntermediate: boolean,
   projectSettings: GenerationProjectSettings
 ): BackendGraphContract => {
+  const isDev = model.variant === 'dev';
   const sourceModel = getFlux2DiffusersComponentSource(model, settings);
   const hasBundledComponents = model.format === 'diffusers' || sourceModel;
+  const mistralEncoderModel =
+    settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
+      ? settings.mistralEncoderModel
+      : null;
   const qwen3EncoderModel =
-    settings.qwen3EncoderModel && isFlux2Qwen3EncoderForModel(model)(settings.qwen3EncoderModel)
+    !isDev && settings.qwen3EncoderModel && isFlux2Qwen3EncoderForModel(model)(settings.qwen3EncoderModel)
       ? settings.qwen3EncoderModel
       : null;
+  const encoderModel = isDev ? mistralEncoderModel : qwen3EncoderModel;
   const vaeModel = getCompatibleVae(settings, ['flux2']);
 
-  if (!hasBundledComponents && (!vaeModel || !qwen3EncoderModel)) {
-    throw new Error('FLUX.2 non-Diffusers models require a VAE and Qwen3 Encoder, or a Diffusers component source.');
+  if (!hasBundledComponents && (!vaeModel || !encoderModel)) {
+    throw new Error(
+      `FLUX.2 non-Diffusers models require a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a compatible Diffusers component source.`
+    );
   }
 
   const graph: BackendGraphContract = { edges: [], id: createId('flux2_graph'), nodes: {} };
   const { positivePrompt } = addPromptAndSeedNodes(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const activeLoras = getActiveCompatibleLoras(settings, model);
-  const modelLoader = addNode(graph, {
-    id: 'model_loader',
-    model,
-    qwen3_encoder_model: qwen3EncoderModel ?? undefined,
-    qwen3_source_model: sourceModel,
-    type: 'flux2_klein_model_loader',
-    vae_model: vaeModel ?? undefined,
-  });
+  const modelLoader = addNode(
+    graph,
+    isDev
+      ? {
+          id: 'model_loader',
+          mistral_encoder_model: mistralEncoderModel ?? undefined,
+          mistral_source_model: sourceModel,
+          model,
+          type: 'flux2_dev_model_loader',
+          vae_model: vaeModel ?? undefined,
+        }
+      : {
+          id: 'model_loader',
+          model,
+          qwen3_encoder_model: qwen3EncoderModel ?? undefined,
+          qwen3_source_model: sourceModel,
+          type: 'flux2_klein_model_loader',
+          vae_model: vaeModel ?? undefined,
+        }
+  );
   const loraSource = activeLoras.length
-    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'flux2_klein_lora_collection_loader', modelLoader, [
-        'transformer',
-        'qwen3_encoder',
-      ])
+    ? addTransformerLoraCollectionLoader(
+        graph,
+        activeLoras,
+        isDev ? 'flux2_dev_lora_collection_loader' : 'flux2_klein_lora_collection_loader',
+        modelLoader,
+        ['transformer', isDev ? 'mistral_encoder' : 'qwen3_encoder']
+      )
     : modelLoader;
-  const posCond = addNode(graph, { id: 'pos_cond', type: 'flux2_klein_text_encoder' });
+  const posCond = addNode(graph, {
+    id: 'pos_cond',
+    type: isDev ? 'flux2_dev_text_encoder' : 'flux2_klein_text_encoder',
+  });
   const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
   const flux2DenoiseSize = getDenoiseSize(settings, model);
   const denoise = addNode(graph, {
@@ -743,7 +770,13 @@ const buildFlux2Graph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
+  addEdge(
+    graph,
+    loraSource,
+    isDev ? 'mistral_encoder' : 'qwen3_encoder',
+    posCond,
+    isDev ? 'mistral_encoder' : 'qwen3_encoder'
+  );
   addEdge(graph, modelLoader, 'max_seq_len', posCond, 'max_seq_len');
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
@@ -753,8 +786,9 @@ const buildFlux2Graph = (
   addEdge(graph, graph.nodes.seed, 'value', denoise, 'seed');
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
   addMetadata(graph, output, settings, model, 'flux2_txt2img', projectSettings, {
-    qwen3_encoder: qwen3EncoderModel ?? undefined,
-    qwen3_source: sourceModel,
+    ...(isDev
+      ? { mistral_encoder: mistralEncoderModel ?? undefined }
+      : { qwen3_encoder: qwen3EncoderModel ?? undefined, qwen3_source: sourceModel }),
     scheduler,
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),

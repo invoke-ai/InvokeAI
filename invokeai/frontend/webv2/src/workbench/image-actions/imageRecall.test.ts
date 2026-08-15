@@ -23,6 +23,12 @@ const animaQwen3: ComponentModelConfig = {
   type: 'qwen3_encoder',
   variant: 'qwen3_06b',
 };
+const mistralEncoder: ComponentModelConfig = {
+  base: 'any',
+  key: 'mistral',
+  name: 'Mistral Encoder',
+  type: 'mistral_encoder',
+};
 const qwenVLEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'qwen-vl',
@@ -67,6 +73,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   positivePromptHeightPx: 96,
   promptTemplate: null,
   promptTemplateViewMode: false,
+  mistralEncoderModel: null,
   qwen3EncoderModel: null,
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
@@ -559,26 +566,44 @@ describe('image recall', () => {
     expect(result?.fields).toContain('components');
   });
 
+  it('recalls FLUX.2 [dev] Mistral encoder metadata', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { mistral_encoder: { key: mistralEncoder.key } },
+      models: [mistralEncoder],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(result?.values.mistralEncoderModel).toBe(mistralEncoder);
+    expect(result?.fields).toContain('components');
+  });
+
   it('clears component models when recalled metadata explicitly stores null', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues({
         componentSourceModel: sd1Model,
+        mistralEncoderModel: mistralEncoder,
         qwen3EncoderModel: animaQwen3,
         qwenVLEncoderModel: qwenVLEncoder,
       }),
       image,
       kind: 'all',
       metadata: {
+        mistral_encoder: null,
         qwen3_encoder: null,
         qwen3_source: null,
         qwen_image_qwen_vl_encoder: null,
       },
-      models: [sd1Model, animaQwen3, qwenVLEncoder],
+      models: [sd1Model, mistralEncoder, animaQwen3, qwenVLEncoder],
       supportedModels: [],
       vaeModels: [],
     });
 
     expect(result?.values.componentSourceModel).toBeNull();
+    expect(result?.values.mistralEncoderModel).toBeNull();
     expect(result?.values.qwen3EncoderModel).toBeNull();
     expect(result?.values.qwenVLEncoderModel).toBeNull();
     expect(result?.fields).toContain('components');

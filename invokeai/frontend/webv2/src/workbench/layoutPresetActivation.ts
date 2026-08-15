@@ -4,19 +4,32 @@ import { loadWidget, preloadWidget } from './widgetRegistry';
 
 interface LayoutPresetActivatorDependencies {
   apply: (presetId: LayoutPresetId) => void;
+  getActiveProjectId: () => string;
+  isCurrent: (preset: LayoutPreset) => boolean;
   load: (preset: LayoutPreset) => Promise<unknown>;
 }
 
-export const createLayoutPresetActivator = ({ apply, load }: LayoutPresetActivatorDependencies) => {
+export const createLayoutPresetActivator = ({
+  apply,
+  getActiveProjectId,
+  isCurrent,
+  load,
+}: LayoutPresetActivatorDependencies) => {
   let latestRequestId = 0;
 
-  return async (preset: LayoutPreset): Promise<void> => {
-    const requestId = ++latestRequestId;
-    await load(preset);
+  return {
+    activate: async (preset: LayoutPreset): Promise<void> => {
+      const projectId = getActiveProjectId();
+      const requestId = ++latestRequestId;
+      await load(preset);
 
-    if (requestId === latestRequestId) {
-      apply(preset.id);
-    }
+      if (requestId === latestRequestId && projectId === getActiveProjectId() && isCurrent(preset)) {
+        apply(preset.id);
+      }
+    },
+    invalidate: (): void => {
+      latestRequestId += 1;
+    },
   };
 };
 

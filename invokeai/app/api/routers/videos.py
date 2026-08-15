@@ -16,7 +16,20 @@ from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.images import WorkflowAndGraphResponse, _assert_board_read_access
+from invokeai.app.api.routers._access import (
+    assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_video_owner as _assert_video_owner,
+)
+from invokeai.app.api.routers._access import (
+    assert_video_read_access as _assert_video_read_access,
+)
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
+from invokeai.app.api.routers.images import WorkflowAndGraphResponse
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
@@ -80,30 +93,6 @@ def _get_video_cache_control() -> str:
     return f"max-age={VIDEO_MAX_AGE}"
 
 
-def _assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user does not own the video and is not an admin."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to modify this video")
-
-
 def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user is not the direct owner of the video.
 
@@ -118,49 +107,6 @@ def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefau
     if owner is not None and owner == current_user.user_id:
         return
     raise HTTPException(status_code=403, detail="Not authorized to move this video")
-
-
-def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not mutate the given board.
-
-    Mirrors _assert_board_write_access in board_images.py: admins and the board owner
-    may write; public boards accept contributions from any user.
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-    if current_user.is_admin:
-        return
-    if board.user_id == current_user.user_id:
-        return
-    if board.board_visibility == BoardVisibility.Public:
-        return
-    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
-
-
-def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not view the video."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to access this video")
 
 
 def _is_accepted_video_upload(file: UploadFile) -> bool:
@@ -254,19 +200,7 @@ async def upload_video(
             raise HTTPException(status_code=422, detail="Metadata must be a JSON object") from e
 
     # Check board access for uploads to a specific board.
-    if board_id is not None:
-        from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Board not found")
-        if (
-            not current_user.is_admin
-            and board.user_id != current_user.user_id
-            and board.board_visibility != BoardVisibility.Public
-        ):
-            raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+    _assert_board_write_access(board_id, current_user)
 
     if not _is_accepted_video_upload(file):
         raise HTTPException(status_code=415, detail="Not a supported video file")
@@ -778,6 +712,59 @@ async def get_video_names(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get video names")
+
+
+class CopiedVideo(BaseModel):
+    source_video_name: str = Field(description="The video that was copied")
+    video_name: str = Field(description="The name assigned to the copy")
+
+
+class CopyVideosResult(BaseModel):
+    copied: list[CopiedVideo] = Field(description="The copies that were made, in request order")
+    failed: list[str] = Field(description="The source video names that could not be copied")
+
+
+@videos_router.post("/copy", operation_id="copy_videos_to_board", response_model=CopyVideosResult)
+def copy_videos_to_board(
+    current_user: CurrentUserOrDefault,
+    video_names: list[str] = Body(description="The names of the videos to copy", max_length=MAX_COPY_BATCH_SIZE),
+    board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
+) -> CopyVideosResult:
+    """Copies videos, optionally onto a board, and returns the new names.
+
+    The image twin of this route explains why copies rather than shared references: `board_videos`
+    keys on `video_name`, so one video sits on exactly one board.
+
+    Blocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of
+    this being a sync `def`, so a large batch cannot stall the event loop.
+
+    `move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,
+    because every other caller hands it a temp file. Here the path is the *source's own* file.
+
+    Read access is enough to copy, which means a video on a board shared with you can be copied
+    into something you own, and the copy outlives the share. That is deliberate — it is what makes
+    a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+    is stated rather than left to be discovered.
+    """
+    _assert_board_write_access(board_id, current_user)
+
+    copied: list[CopiedVideo] = []
+    failed: list[str] = []
+
+    for video_name in video_names:
+        try:
+            _assert_video_read_access(video_name, current_user)
+            video_dto = ApiDependencies.invoker.services.videos.copy(
+                source_video_name=video_name,
+                board_id=board_id,
+                user_id=current_user.user_id,
+            )
+            copied.append(CopiedVideo(source_video_name=video_name, video_name=video_dto.video_name))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy video {video_name}", exc_info=True)
+            failed.append(video_name)
+
+    return CopyVideosResult(copied=copied, failed=failed)
 
 
 @videos_router.post("/star", operation_id="star_videos_in_list", response_model=StarredVideosResult)

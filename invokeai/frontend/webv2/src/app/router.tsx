@@ -8,6 +8,7 @@ import {
   useAuthSession,
   type Capabilities,
 } from '@features/identity';
+import { ModelInstallRuntime } from '@features/models';
 import {
   createHashHistory,
   createRootRoute,
@@ -64,9 +65,11 @@ const RouterError = ({ error }: ErrorComponentProps) => {
 const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
 
 /**
- * Wraps every authenticated route with the shared backend socket transport.
- * Feature runtimes attach their own listeners only where needed, keeping the
- * light Launchpad bundle free of editor/model-manager code.
+ * Wraps every authenticated route with the shared backend socket transport
+ * and the model-install runtime — installs must progress and toast no matter
+ * which surface started them. Heavier feature runtimes still attach their own
+ * listeners only where needed, keeping the light Launchpad bundle free of
+ * editor/model-manager view code.
  */
 const AuthenticatedLayout = () => {
   const session = useAuthSession();
@@ -82,6 +85,7 @@ const AuthenticatedLayout = () => {
   return (
     <Fragment key={session.accountEpoch}>
       <SocketHubRuntime />
+      <ModelInstallRuntime />
       <Outlet />
     </Fragment>
   );

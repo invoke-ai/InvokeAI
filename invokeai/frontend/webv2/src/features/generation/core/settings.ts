@@ -423,6 +423,7 @@ export const cloneGenerateWidgetValues = (
   componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
   loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
   model: { ...values.model },
+  mistralEncoderModel: values.mistralEncoderModel ? { ...values.mistralEncoderModel } : null,
   promptTemplate: values.promptTemplate ? { ...values.promptTemplate } : null,
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
@@ -513,6 +514,7 @@ export const syncGenerateWidgetValuesWithModels = (
     loras: syncGenerateLorasWithModels(values.loras, models),
     model,
     modelKey: model.key,
+    mistralEncoderModel: syncModelIdentifierWithModels(values.mistralEncoderModel, modelsByKey),
     qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
     qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
@@ -527,6 +529,7 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.clipEmbedModel === values.clipEmbedModel &&
     nextValues.clipLEmbedModel === values.clipLEmbedModel &&
     nextValues.clipGEmbedModel === values.clipGEmbedModel &&
+    nextValues.mistralEncoderModel === values.mistralEncoderModel &&
     nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
     nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
     nextValues.referenceImages === values.referenceImages &&
@@ -541,13 +544,11 @@ export const isLoraCompatibleWithModel = (
   mainModel: Pick<GenerateModelConfig, 'base' | 'variant'>
 ): boolean => {
   if (mainModel.base === 'flux2') {
-    if (loraModel.base !== 'flux2' && loraModel.base !== 'flux') {
+    if (loraModel.base !== 'flux2') {
       return false;
     }
 
-    return (
-      loraModel.base === 'flux' || !mainModel.variant || !loraModel.variant || loraModel.variant === mainModel.variant
-    );
+    return !mainModel.variant || !loraModel.variant || loraModel.variant === mainModel.variant;
   }
 
   if (loraModel.base !== mainModel.base) {
@@ -723,6 +724,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     clipEmbedModel: getModelIdentifierOrNull(values.clipEmbedModel),
     clipLEmbedModel: getModelIdentifierOrNull(values.clipLEmbedModel),
     clipGEmbedModel: getModelIdentifierOrNull(values.clipGEmbedModel),
+    mistralEncoderModel: getModelIdentifierOrNull(values.mistralEncoderModel),
     qwen3EncoderModel: getModelIdentifierOrNull(values.qwen3EncoderModel),
     qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
@@ -818,6 +820,7 @@ export const isGenerateSettings = (values: unknown): values is GenerateSettings 
     (values.clipEmbedModel === null || isModelIdentifierConfig(values.clipEmbedModel)) &&
     (values.clipLEmbedModel === null || isModelIdentifierConfig(values.clipLEmbedModel)) &&
     (values.clipGEmbedModel === null || isModelIdentifierConfig(values.clipGEmbedModel)) &&
+    (values.mistralEncoderModel === null || isModelIdentifierConfig(values.mistralEncoderModel)) &&
     (values.qwen3EncoderModel === null || isModelIdentifierConfig(values.qwen3EncoderModel)) &&
     (values.qwenVLEncoderModel === null || isModelIdentifierConfig(values.qwenVLEncoderModel)) &&
     (values.qwen3VLEncoderModel === null || isModelIdentifierConfig(values.qwen3VLEncoderModel)) &&

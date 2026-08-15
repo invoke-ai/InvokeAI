@@ -9,6 +9,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetCount: 0,
   imageCount: 0,
   kind: 'board',
+  projectId: null,
   videoCount: 0,
   ...overrides,
 });
@@ -78,16 +79,12 @@ describe('getGalleryBoardGroups', () => {
     expect(groupsOf({ searchTerm: 'Uncategorized' }).canCreateFromSearch).toBe(false);
   });
 
-  it('treats the yet-to-exist project board as an exact match so it is never duplicated', () => {
-    const groups = groupsOf({ searchTerm: 'Project' });
-
-    expect(groups.hasProjectBoardPlaceholder).toBe(true);
-    expect(groups.canCreateFromSearch).toBe(false);
-    expect(groups.hasAnyMatch).toBe(true);
-  });
-
-  it('drops the project placeholder once the project board exists', () => {
-    expect(groupsOf({ projectBoardId: 'cats' }).hasProjectBoardPlaceholder).toBe(false);
+  /**
+   * The board is not in the list yet — it is still loading — but it exists, and offering to create
+   * one under its own name would be offering to make a second.
+   */
+  it('treats the project board name as an exact match even before the board arrives', () => {
+    expect(groupsOf({ searchTerm: 'Project' }).canCreateFromSearch).toBe(false);
   });
 
   it('reports no match when the search excludes every row', () => {

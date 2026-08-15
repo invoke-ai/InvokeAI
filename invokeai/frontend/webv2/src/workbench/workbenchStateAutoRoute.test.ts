@@ -98,6 +98,6 @@ describe('auto invocation route switching with the preference off', () => {
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
 
     expect(project?.projectGraph.nodes).toHaveLength(1);
-    expect(project?.invocation).toMatchObject({ destination: 'canvas', sourceId: 'generate' });
+    expect(project?.invocation).toMatchObject({ destination: 'gallery', sourceId: 'generate' });
   });
 });

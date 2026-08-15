@@ -10,6 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelSelect } from './ModelSelect';
 
+// Browser tests run without an i18n provider, so translated copy renders as
+// the raw key (e.g. 'models.compactRows'); assertions below match the keys.
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const model = {
@@ -140,16 +144,16 @@ describe('ModelSelect loading states', () => {
     setModelsSnapshotForTests({ error: null, models: [model, secondSdxlModel], status: 'loaded' });
     await renderPicker({ id: 'test-compact' });
 
-    const toggle = document.querySelector<HTMLButtonElement>('button[aria-label="Compact rows"]')!;
+    const toggle = document.querySelector<HTMLButtonElement>('button[aria-label="models.compactRows"]')!;
 
     expect(toggle).not.toBeNull();
     await act(() => toggle.click());
-    await expect.poll(() => document.querySelector('button[aria-label="Full rows"]')).not.toBeNull();
+    await expect.poll(() => document.querySelector('button[aria-label="models.fullRows"]')).not.toBeNull();
 
     // Close and reopen: the preference is stored per picker id, not per mount.
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
     await act(() => host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')?.click());
 
-    await expect.poll(() => document.querySelector('button[aria-label="Full rows"]')).not.toBeNull();
+    await expect.poll(() => document.querySelector('button[aria-label="models.fullRows"]')).not.toBeNull();
   });
 });

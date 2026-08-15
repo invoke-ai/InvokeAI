@@ -78,6 +78,7 @@ from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patc
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -497,7 +498,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 # batch_size=batch_size * num_images_per_prompt,
                 # num_images_per_prompt=num_images_per_prompt,
                 device=device,
-                dtype=control_model.dtype,
+                dtype=get_model_compute_dtype(control_model),
                 control_mode=control_info.control_mode,
                 resize_mode=control_info.resize_mode,
             )
@@ -710,7 +711,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     height=control_height_resize,
                     num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
                     device=device,
-                    dtype=t2i_adapter_model.dtype,
+                    dtype=get_model_compute_dtype(t2i_adapter_model),
                     resize_mode=t2i_adapter_field.resize_mode,
                 )
 
@@ -920,6 +921,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     name_or_path=hidiffusion_name_or_path,
                     apply_raunet=self.hidiffusion_raunet,
                     apply_window_attn=self.hidiffusion_window_attn,
+                    has_controlnet=bool(self.control),
+                    is_controlnet_text_to_image=bool(self.control) and self.latents is None,
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
@@ -1073,18 +1076,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 model=unet,
                 patches=_lora_loader(),
                 prefix="lora_unet_",
-                dtype=unet.dtype,
+                # NOT unet.dtype: with fp8 storage that is float8_e4m3fn, which has no arithmetic
+                # kernels — every tensor in the denoise loop must use the compute dtype.
+                dtype=get_model_compute_dtype(unet),
                 cached_weights=cached_weights,
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=device, dtype=unet.dtype)
+            unet_dtype = get_model_compute_dtype(unet)
+            latents = latents.to(device=device, dtype=unet_dtype)
             if noise is not None:
-                noise = noise.to(device=device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet_dtype)
             if mask is not None:
-                mask = mask.to(device=device, dtype=unet.dtype)
+                mask = mask.to(device=device, dtype=unet_dtype)
             if masked_latents is not None:
-                masked_latents = masked_latents.to(device=device, dtype=unet.dtype)
+                masked_latents = masked_latents.to(device=device, dtype=unet_dtype)
 
             scheduler = get_scheduler(
                 context=context,
@@ -1102,7 +1108,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
                 device=device,
-                dtype=unet.dtype,
+                dtype=unet_dtype,
                 latent_height=latent_height,
                 latent_width=latent_width,
                 cfg_scale=self.cfg_scale,
@@ -1127,7 +1133,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 exit_stack=exit_stack,
                 latent_height=latent_height,
                 latent_width=latent_width,
-                dtype=unet.dtype,
+                dtype=unet_dtype,
             )
 
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
@@ -1146,6 +1152,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     name_or_path=hidiffusion_name_or_path,
                     apply_raunet=self.hidiffusion_raunet,
                     apply_window_attn=self.hidiffusion_window_attn,
+                    has_controlnet=bool(controlnet_data),
+                    is_controlnet_text_to_image=bool(controlnet_data) and self.latents is None,
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),

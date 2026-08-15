@@ -68,7 +68,13 @@ def build_migration() -> Migration:
         # migration_33 is where `projects` should have been created. Depending on it is correct in
         # both cases: on a fork database it genuinely ran, and on an upstream-originated database
         # its id is recorded (by upstream's unrelated migration), so the dependency still resolves.
-        # It also transitively guarantees migration_27's `users` table, which the FK references.
+        #
+        # It does *not* guarantee migration_27's `users` table, for exactly the reason this
+        # migration exists: an upstream-originated database has migration_27's id recorded too,
+        # against upstream's unrelated migration of that number, so the fork's never runs there.
+        # The FK below survives that because SQLite does not resolve a foreign key until DML — but
+        # anything that *reads* `users` has to check first, which is what
+        # `2026_08_06_add_project_boards` does.
         depends_on="migration_33",
         callback=RepairProjectsTableMigrationCallback(),
     )
