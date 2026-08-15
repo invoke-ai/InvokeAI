@@ -59,6 +59,10 @@ export const DEFAULT_MAX_UPLOAD_ATTEMPTS = 3;
 export const DEFAULT_RETRY_DELAYS_MS = [250, 1000] as const;
 /** Default cap on the hash→image dedupe map. */
 export const DEFAULT_DEDUPE_CAP = 64;
+/** Growing re-flush delays after consecutive ambient failures. */
+export const DEFAULT_FAILURE_BACKOFF_MS = [2000, 5000, 15000, 30000] as const;
+/** Consecutive ambient failures before the circuit opens (no more auto-retries). */
+export const DEFAULT_MAX_CONSECUTIVE_FAILURES = 5;
 
 export class BitmapPersistenceError extends Error {
   readonly layerIds: readonly string[];
@@ -127,12 +131,21 @@ export interface BitmapStoreDeps {
   retryDelaysMs?: readonly number[];
   /** Cap on the dedupe map (default {@link DEFAULT_DEDUPE_CAP}). */
   dedupeCap?: number;
+  /** Growing re-flush delays after consecutive ambient failures (default {@link DEFAULT_FAILURE_BACKOFF_MS}). */
+  failureBackoffMs?: readonly number[];
+  /** Consecutive ambient failures before the circuit opens (default {@link DEFAULT_MAX_CONSECUTIVE_FAILURES}). */
+  maxConsecutiveFailures?: number;
   /** Injectable timers (default: global). */
   timers?: BitmapStoreTimers;
   /** Injectable delay used for retry backoff (default: `timers.setTimeout`). */
   sleep?(ms: number): Promise<void>;
-  /** Reports a persistent flush/upload failure. Omitted callbacks leave the failure unreported. */
-  onError?(error: unknown, layerId: string): void;
+  /**
+   * Reports a persistent flush/upload failure. Called on the FIRST failure of a
+   * streak and again when the circuit opens; intermediate retries are silent, so
+   * a persistently failing layer surfaces one report, not one every retry cycle.
+   * Omitted callbacks leave the failure unreported.
+   */
+  onError?(error: unknown, layerId: string, info: { consecutiveFailures: number; willRetry: boolean }): void;
 }
 
 /** The imperative bitmap-store handle. */
@@ -192,6 +205,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   const maxAttempts = Math.max(1, deps.maxUploadAttempts ?? DEFAULT_MAX_UPLOAD_ATTEMPTS);
   const retryDelays = deps.retryDelaysMs ?? DEFAULT_RETRY_DELAYS_MS;
   const dedupeCap = Math.max(1, deps.dedupeCap ?? DEFAULT_DEDUPE_CAP);
+  const failureBackoffMs = deps.failureBackoffMs ?? DEFAULT_FAILURE_BACKOFF_MS;
+  const maxConsecutiveFailures = Math.max(1, deps.maxConsecutiveFailures ?? DEFAULT_MAX_CONSECUTIVE_FAILURES);
   const timers = deps.timers ?? defaultTimers;
   const hashBlob = deps.hashBlob ?? defaultHashBlob;
   const sleep =
@@ -200,7 +215,11 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       new Promise((resolve) => {
         timers.setTimeout(resolve, ms);
       }));
-  const reportError = (error: unknown, layerId: string): void => deps.onError?.(error, layerId);
+  const reportError = (
+    error: unknown,
+    layerId: string,
+    info: { consecutiveFailures: number; willRetry: boolean }
+  ): void => deps.onError?.(error, layerId, info);
 
   /** Layers awaiting a flush (either debounced or re-dirtied during a flush). */
   const dirty = new Set<string>();
@@ -216,6 +235,8 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   const debounceTimers = new Map<string, number>();
   /** The in-flight flush op per layer (at most one), used by the barrier and to serialize. */
   const inFlight = new Map<string, Promise<void>>();
+  /** Consecutive ambient flush failures per layer; cleared on success or a fresh stroke. */
+  const failureCounts = new Map<string, number>();
   /** Content-hash → uploaded image, an LRU-ish dedupe cache (bounded). */
   const hashToImage = new Map<string, CanvasImageUploadResult>();
   /** Layer id → the image name most recently dispatched by this store (self-echo guard). */
@@ -253,12 +274,12 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     }
   };
 
-  const scheduleFlush = (layerId: string): void => {
+  const scheduleFlush = (layerId: string, delayMs: number = debounceMs): void => {
     clearTimer(layerId);
     const handle = timers.setTimeout(() => {
       debounceTimers.delete(layerId);
       void runFlush(layerId);
-    }, debounceMs);
+    }, delayMs);
     debounceTimers.set(layerId, handle);
   };
 
@@ -328,12 +349,21 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       // Requeue before notifying. An injected error observer may deliberately
       // discard/reset this generation; its cancellation must be the final word,
       // not followed by a stale dirty.add(). Observer exceptions are ancillary.
+      const failures = (failureCounts.get(layerId) ?? 0) + 1;
+      failureCounts.set(layerId, failures);
+      const willRetry = failures < maxConsecutiveFailures;
       dirty.add(layerId);
       dirtyReason.set(layerId, 'failure');
-      try {
-        reportError(error, layerId);
-      } catch {
-        // Keep the bounded retry state intact when an observer itself fails.
+      // Report only the first failure of a streak and the one that opens the
+      // circuit — an unreachable server would otherwise toast once per retry,
+      // forever. Intermediate retries stay silent; `runFlush`'s `finally` still
+      // bounds them via the same `failureCounts` and growing backoff below.
+      if (failures === 1 || !willRetry) {
+        try {
+          reportError(error, layerId, { consecutiveFailures: failures, willRetry });
+        } catch {
+          // Keep the bounded retry state intact when an observer itself fails.
+        }
       }
     };
     const placed = deps.getLayerSurface(layerId);
@@ -460,6 +490,10 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // Record BEFORE dispatching: `dispatch` may notify the mirror synchronously,
     // so `isSelfEcho` must already see the applied name when the engine reacts.
     lastApplied.set(layerId, result.imageName);
+    // The upload that may have been failing repeatedly just succeeded: close the
+    // ambient breaker so a later failure is reported (and backed off) as a fresh
+    // streak, not a silent continuation of one already surfaced.
+    failureCounts.delete(layerId);
     let accepted: boolean;
     try {
       accepted = deps.dispatchBitmap
@@ -495,6 +529,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (accepted !== true) {
       lastApplied.delete(layerId);
       if (deps.getLayerSource(layerId) !== null) {
+        // Bounded by the same breaker as an upload failure, but silent: a
+        // declined acceptance isn't a network/server error worth surfacing.
+        failureCounts.set(layerId, (failureCounts.get(layerId) ?? 0) + 1);
         dirty.add(layerId);
         dirtyReason.set(layerId, 'failure');
       }
@@ -514,7 +551,17 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       inFlight.delete(layerId);
       // Re-dirtied during the flush (new stroke) or a failure re-queued it.
       if (dirty.has(layerId) && !disposed && !isSuspended(layerId)) {
-        scheduleFlush(layerId);
+        if (dirtyReason.get(layerId) !== 'failure') {
+          scheduleFlush(layerId);
+        } else {
+          const failures = failureCounts.get(layerId) ?? 0;
+          if (failures < maxConsecutiveFailures) {
+            scheduleFlush(layerId, failureBackoffMs[Math.min(failures - 1, failureBackoffMs.length - 1)] ?? debounceMs);
+          }
+          // failures >= max: the circuit is open — stay dirty, no timer. A new
+          // stroke (markLayerDirty) or a flushPendingUploads barrier call is
+          // the only way back in.
+        }
       } else {
         // Any invalidated operation for this id has now settled and there is no
         // successor waiting to inherit its generation. Retire the tombstone.
@@ -529,6 +576,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (disposed) {
       return;
     }
+    // A fresh stroke closes the circuit: whatever was failing about the old
+    // pixels no longer applies to the ones about to be persisted.
+    failureCounts.delete(layerId);
     dirty.add(layerId);
     dirtyReason.set(layerId, 'stroke');
     if (!isSuspended(layerId)) {
@@ -590,6 +640,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     dirty.delete(layerId);
     dirtyReason.delete(layerId);
     lastApplied.delete(layerId);
+    failureCounts.delete(layerId);
     clearTimer(layerId);
   };
 
@@ -665,6 +716,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // The self-echo map is per-(old)document; a reused layer id in the new
     // document must not inherit it. `hashToImage` is content-addressed and kept.
     lastApplied.clear();
+    // Same reasoning as `lastApplied`: a reused layer id in the new document
+    // must start with a closed circuit, not inherit the old document's streak.
+    failureCounts.clear();
   };
 
   const dispose = (): void => {
@@ -681,6 +735,7 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     hashToImage.clear();
     lastApplied.clear();
     layerGenerations.clear();
+    failureCounts.clear();
   };
 
   return { discardLayer, dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset, suspendLayer };

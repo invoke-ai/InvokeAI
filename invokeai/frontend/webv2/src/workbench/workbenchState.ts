@@ -368,7 +368,7 @@ type WorkbenchReducerAction =
       type: 'recordError';
       message: string;
       area?: string;
-      context?: Record<string, unknown>;
+      context?: { error?: string; layerId?: string };
       namespace?: DeveloperLogNamespace;
       projectId?: string;
     }
@@ -424,10 +424,30 @@ const createNotification = ({
   title,
 });
 
-const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => ({
-  ...state,
-  notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT),
-});
+const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => {
+  const [newest, ...rest] = state.notifications;
+
+  // Coalesce an exact repeat of the newest notification into an occurrence
+  // bump on the SAME id, instead of stacking a new one — the toaster dedupes
+  // toasts by id, so a repeat then stops re-toasting for free (e.g. an
+  // ambient retry failing the same way every cycle).
+  if (
+    newest &&
+    newest.kind === notification.kind &&
+    newest.title === notification.title &&
+    newest.message === notification.message
+  ) {
+    return {
+      ...state,
+      notifications: [
+        { ...newest, createdAt: notification.createdAt, occurrenceCount: (newest.occurrenceCount ?? 1) + 1 },
+        ...rest,
+      ],
+    };
+  }
+
+  return { ...state, notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT) };
+};
 
 /** Adds the "Invocation queued" notice iff the reduction actually grew the active queue. */
 const withEnqueueNotification = (state: WorkbenchState, nextState: WorkbenchState): WorkbenchState => {
@@ -4112,7 +4132,15 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'recordError': {
-      return addNotification(state, createNotification({ kind: 'error', message: action.message, title: 'Error' }));
+      const detail = action.context?.error;
+      return addNotification(
+        state,
+        createNotification({
+          kind: 'error',
+          message: detail ? `${action.message}: ${detail}` : action.message,
+          title: 'Error',
+        })
+      );
     }
     case 'setBackendConnectionStatus': {
       const timestamp = now();

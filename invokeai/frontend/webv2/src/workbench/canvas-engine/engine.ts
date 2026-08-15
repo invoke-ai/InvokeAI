@@ -546,7 +546,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         }
         return { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface };
       },
-      onError: (error, layerId) => reportError('Bitmap persistence failed', layerId, error),
+      onError: (error, layerId, _info) => reportError('Bitmap persistence failed', layerId, error),
       uploadImage: (blob) => opts.uploadImage(blob),
     });
   const persistenceController = new PersistenceController(bitmapStore);

@@ -2102,6 +2102,39 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications).toEqual([]);
   });
 
+  it('coalesces back-to-back identical notifications instead of stacking them', () => {
+    const state = createInitialWorkbenchState();
+
+    const once = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+    const twice = reduceWorkbench(once, { message: 'Bitmap persistence failed', type: 'recordError' });
+
+    expect(twice.notifications).toHaveLength(once.notifications.length);
+    expect(twice.notifications[0]?.occurrenceCount).toBe(2);
+    expect(twice.notifications[0]?.id).toBe(once.notifications[0]?.id);
+  });
+
+  it('includes the error context detail in the recordError notification message', () => {
+    const state = createInitialWorkbenchState();
+
+    const next = reduceWorkbench(state, {
+      context: { error: 'network unreachable', layerId: 'layer-1' },
+      message: 'Bitmap persistence failed',
+      type: 'recordError',
+    });
+
+    expect(next.notifications[0]?.message).toBe('Bitmap persistence failed: network unreachable');
+  });
+
+  it('does not coalesce notifications with a different message', () => {
+    const state = createInitialWorkbenchState();
+
+    const once = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+    const twice = reduceWorkbench(once, { message: 'Something else failed', type: 'recordError' });
+
+    expect(twice.notifications).toHaveLength(once.notifications.length + 1);
+    expect(twice.notifications[0]?.id).not.toBe(once.notifications[0]?.id);
+  });
+
   describe('enqueue notifications', () => {
     it('records an enqueue notification when submitResolvedInvocationSnapshot adds a queue item', () => {
       const state = primeGenerate();
