@@ -24,13 +24,13 @@ from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_KEYFRAME_NOISE_AUG,
     MINIMAX_H3_LATENTS_PER_CHUNK,
     MINIMAX_H3_MAX_DURATION,
-    MINIMAX_H3_MIN_VIDEO_FRAMES,
     MiniMaxH3PackedSequence,
     build_packed_sequence,
     build_row_timesteps,
     keyframe_condition_noise,
     patchify_video_latents,
 )
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_MIN_VIDEO_FRAMES
 from invokeai.backend.minimax_h3.scheduling_minimax_h3 import MiniMaxH3Scheduler
 
 # The released FL2VA checkpoint's two sigma shifts (scheduler/ and audio_scheduler/ configs).

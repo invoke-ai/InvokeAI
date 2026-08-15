@@ -4,13 +4,12 @@ import pytest
 import torch
 
 from invokeai.backend.minimax_h3.packing import (
-    MINIMAX_H3_VIDEO_FRAME_CHOICES,
     align_num_frames,
     audio_latent_num_frames,
     resolve_canvas_size,
-    resolve_lowres_canvas_size,
     video_latent_num_frames,
 )
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES, resolve_lowres_canvas_size
 from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_num_frames
 
 

@@ -37,13 +37,13 @@ from invokeai.backend.minimax_h3.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_CANVAS_MULTIPLE,
     MINIMAX_H3_FPS,
-    MINIMAX_H3_VIDEO_FRAME_CHOICES,
     MiniMaxH3PackedSequence,
     audio_latent_num_frames,
     unpack_audio_tokens,
     unpatchify_video_tokens,
     video_latent_num_frames,
 )
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES
 from invokeai.backend.minimax_h3.pruned_adaln_lora import (
     MINIMAX_H3_SILU_TEMB_GRID_URL,
     MiniMaxH3SiluTembGrid,

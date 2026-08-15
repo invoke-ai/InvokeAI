@@ -410,7 +410,10 @@ class MiniMaxH3AudioAMPBlock(nn.Module):
             [_wn_conv1d(channels, channels, kernel_size, dilation=1, padding=(kernel_size - 1) // 2) for _ in dilation]
         )
         self.activations = nn.ModuleList(
-            [MiniMaxH3AudioActivation1d(activation=MiniMaxH3AudioSnakeBeta(channels)) for _ in range(2 * len(dilation))]
+            [
+                MiniMaxH3AudioActivation1d(activation=MiniMaxH3AudioSnakeBeta(channels))
+                for _ in range(2 * len(dilation))
+            ]
         )
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
