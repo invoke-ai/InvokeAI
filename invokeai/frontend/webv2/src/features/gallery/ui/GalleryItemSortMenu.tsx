@@ -34,7 +34,7 @@ export const GalleryItemSortMenu = () => {
           flexShrink={0}
           fontSize="xs"
           gap="1"
-          size="xs"
+          size="2xs"
           variant="ghost"
         >
           {imageOrderDir === 'DESC' ? t('widgets.gallery.newest') : t('widgets.gallery.oldest')}
