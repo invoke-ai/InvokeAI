@@ -18,6 +18,7 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'ModelIdentifierField',
   'SchedulerField',
   'StringField',
+  'VideoField',
 ]);
 
 export const isStatefulFieldType = (type: FieldType): boolean => STATEFUL_FIELD_TYPE_NAMES.has(type.name);
@@ -139,7 +140,20 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
         hasNonEmptyStringProp(value, 'board_id')
       );
     case 'ImageField':
+      // COLLECTION media values are arrays the direct-input widget never
+      // authors; keep the generic non-null check for them so persisted array
+      // values (imported workflows) stay exactly as valid as before.
+      if (template.type.cardinality === 'COLLECTION') {
+        return value !== undefined && value !== null;
+      }
+
       return hasNonEmptyStringProp(value, 'image_name');
+    case 'VideoField':
+      if (template.type.cardinality === 'COLLECTION') {
+        return value !== undefined && value !== null;
+      }
+
+      return hasNonEmptyStringProp(value, 'video_name');
     case 'ColorField':
       return isColorValueValid(value);
     default:

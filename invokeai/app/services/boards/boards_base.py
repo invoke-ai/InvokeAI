@@ -36,11 +36,17 @@ class BoardServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete(
+    def delete_if_unclaimed(
         self,
         board_id: str,
-    ) -> None:
-        """Deletes a board."""
+    ) -> bool:
+        """Delete a board only if no project owns it. Returns whether it was deleted.
+
+        The only deletion there is. An unconditional `delete` used to sit beside this one with no
+        callers, which made "a project's board cannot be deleted out from under it" true by
+        coincidence rather than by construction — the next caller to reach for the obvious name
+        would have silently given it up.
+        """
         pass
 
     @abstractmethod

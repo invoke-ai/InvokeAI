@@ -28,6 +28,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
   imageCount: 0,
   kind: 'uncategorized',
   name: '',
+  projectId: null,
   videoCount: 0,
 };
 
@@ -225,11 +226,36 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
 
+/**
+ * Where new results land, resolved against the boards this install actually has.
+ *
+ * A saved selection survives whenever it still resolves — it is a deliberate choice, and a project
+ * opened where its destination still exists should keep using it. When it does not resolve the
+ * project's own board is the better answer than Uncategorized: a project arriving from another
+ * install, or one whose pre-migration board was rejected as ambiguous, names a board id that means
+ * nothing here, and dropping it to Uncategorized would quietly scatter that project's output.
+ *
+ * No saved selection at all is the same case, not a choice of Uncategorized. A project saved before
+ * it owned a board — or by a build that never wrote a destination — should still work on its own
+ * board, which is where everything else it has made already lives.
+ *
+ * An empty board list means "still loading", not "no such board", so nothing is resolved yet.
+ */
 export const getGallerySelectedBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string => {
-  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none';
+  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
 
-  if (backendBoards.length === 0 || backendBoards.some((board) => board.id === selectedBoardId)) {
+  if (backendBoards.length === 0) {
+    return selectedBoardId ?? 'none';
+  }
+
+  if (selectedBoardId !== null && backendBoards.some((board) => board.id === selectedBoardId)) {
     return selectedBoardId;
+  }
+
+  const projectBoardId = getGalleryProjectBoardId(values);
+
+  if (projectBoardId !== null && backendBoards.some((board) => board.id === projectBoardId)) {
+    return projectBoardId;
   }
 
   return 'none';
@@ -372,6 +398,7 @@ export const getGalleryStateView = (
         {
           ...UNCATEGORIZED_BOARD,
           imageCount: items.filter((item) => item.kind === 'image' && item.category === 'general').length,
+          projectId: null,
           videoCount: items.filter((item) => item.kind === 'video').length,
         },
       ];

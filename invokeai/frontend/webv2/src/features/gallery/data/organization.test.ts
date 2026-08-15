@@ -1,6 +1,6 @@
 import type { GalleryItemRef } from '@features/gallery/core/items';
 
-import { galleryItemOrganization } from '@features/gallery/index';
+import { galleryItemOrganization, isGalleryBoardAttachable } from '@features/gallery/index';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -534,5 +534,27 @@ describe('galleryItemOrganization transport and confirmed outcomes', () => {
       succeeded: [],
     });
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+
+  it.each(['by_date:2026-08-14', 'generated', 'assets'])(
+    'reports every ref as failed when moving to the virtual board %s',
+    async (boardId) => {
+      await expect(galleryItemOrganization.moveToBoard([videoRef('clip.mp4')], boardId)).resolves.toEqual({
+        affectedBoardIds: [],
+        failed: [videoRef('clip.mp4')],
+        succeeded: [],
+      });
+      expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('isGalleryBoardAttachable', () => {
+  it.each(['by_date:2026-08-14', 'generated', 'assets', 'none'])('rejects the virtual destination %s', (boardId) => {
+    expect(isGalleryBoardAttachable(boardId)).toBe(false);
+  });
+
+  it.each(['board-1', 'some-uuid'])('accepts the real board %s', (boardId) => {
+    expect(isGalleryBoardAttachable(boardId)).toBe(true);
   });
 });

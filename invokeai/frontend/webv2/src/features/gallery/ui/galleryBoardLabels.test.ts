@@ -11,6 +11,7 @@ const createBoard = (overrides: Partial<GalleryBoard> = {}): GalleryBoard => ({
   imageCount: 50,
   kind: 'board',
   name: 'dogs',
+  projectId: null,
   videoCount: 4,
   ...overrides,
 });

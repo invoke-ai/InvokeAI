@@ -50,6 +50,7 @@ import {
   getGalleryVideoMetadata,
   getGalleryVideoWorkflow,
   isDateBoardId,
+  isInvalidGalleryBoardDestination,
   listGalleryBoards,
   makeImageCanvasAsset,
   makeImageDurable,
@@ -63,6 +64,7 @@ import {
   type GalleryItemOrganizationTransportResult,
   unstarGalleryImages,
   uploadGalleryImage,
+  uploadGalleryVideo,
 } from './data/backend';
 
 /** Resolve backend Gallery images without exposing transport DTOs or endpoints. */
@@ -87,6 +89,7 @@ export const galleryVideos = {
 export const galleryTransfers = {
   downloadArchive: downloadGalleryArchive,
   upload: uploadGalleryImage,
+  uploadVideo: uploadGalleryVideo,
 } as const;
 
 /** Durability transitions for intermediate results. */
@@ -249,3 +252,11 @@ export const galleryDestinations = {
 } as const;
 
 export const isGalleryVirtualBoard = isDateBoardId;
+
+/**
+ * Whether a board id can actually receive item attachments. Virtual destinations
+ * (date buckets, `generated`/`assets`) and `none` cannot: the organization
+ * transports no-op for them rather than calling the backend.
+ */
+export const isGalleryBoardAttachable = (boardId: string): boolean =>
+  boardId !== 'none' && !isInvalidGalleryBoardDestination(boardId);

@@ -7,6 +7,8 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import { listModelInstalls } from './api';
 import { refreshModels } from './modelsStore';
@@ -42,8 +44,37 @@ export interface InstallOutcome {
   error: string | null;
 }
 
+/**
+ * Human-readable source for an install job or install socket payload. Accepts
+ * `unknown` so untyped socket payloads and typed job sources produce the SAME
+ * string — active-install matching compares these labels. Lives here rather
+ * than in `core/taxonomy` so the eagerly-loaded data layer does not pull the
+ * taxonomy module out of the lazy UI chunks (the initial-graph byte budget).
+ */
+export const getInstallSourceLabel = (source: unknown): string => {
+  if (typeof source === 'string') {
+    return source;
+  }
+
+  if (source && typeof source === 'object') {
+    const record = source as Record<string, unknown>;
+
+    for (const field of ['repo_id', 'url', 'path'] as const) {
+      const value = record[field];
+
+      if (typeof value === 'string') {
+        return value;
+      }
+    }
+  }
+
+  return 'model';
+};
+
 const REFRESH_COALESCE_MS = 250;
-const OUTCOME_LIMIT = 16;
+// Display cap and eviction margin in one: comfortably above any completion
+// burst that could land between two toast-effect flushes.
+const OUTCOME_LIMIT = 64;
 
 const EMPTY_INSTALLS_SNAPSHOT: InstallsSnapshot = { error: null, jobs: [], status: 'idle' };
 const EMPTY_INSTALL_OUTCOMES: { outcomes: InstallOutcome[] } = { outcomes: [] };
@@ -54,8 +85,9 @@ let nextOutcomeId = 1;
 
 const progressByJobId = createKeyedTransientStore<number, InstallDownloadProgress>();
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let catalogRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 registerAccountOwnedResource({
   clear: () => {
@@ -64,7 +96,12 @@ registerAccountOwnedResource({
       refreshTimer = null;
     }
 
-    inflightRefresh = null;
+    if (catalogRefreshTimer !== null) {
+      clearTimeout(catalogRefreshTimer);
+      catalogRefreshTimer = null;
+    }
+
+    refreshFlight.reset();
     nextOutcomeId = 1;
     progressByJobId.clear();
     outcomesStore.setSnapshot(EMPTY_INSTALL_OUTCOMES);
@@ -73,51 +110,43 @@ registerAccountOwnedResource({
   name: 'model-installs',
 });
 
-export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+export const refreshInstalls = (owner: AccountScope = captureAccountScope()): Promise<void> =>
+  refreshFlight.run(() => {
+    store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
 
-  store.patchSnapshot({ status: store.getSnapshot().status === 'loaded' ? 'loaded' : 'loading' });
-
-  const refresh = listModelInstalls(owner.signal)
-    .then((jobs) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      const activeJobIds = new Set(jobs.map((job) => job.id));
-
-      for (const [jobId] of progressByJobId.entries()) {
-        if (!activeJobIds.has(jobId)) {
-          progressByJobId.delete(jobId);
+    return listModelInstalls(owner.signal)
+      .then((jobs) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
         }
-      }
 
-      store.patchSnapshot({ error: null, jobs, status: 'loaded' });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+        const activeJobIds = new Set(jobs.map((job) => job.id));
 
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load install queue.',
-        status: store.getSnapshot().jobs.length > 0 ? 'loaded' : 'error',
+        for (const [jobId] of progressByJobId.entries()) {
+          if (!activeJobIds.has(jobId)) {
+            progressByJobId.delete(jobId);
+          }
+        }
+
+        store.patchSnapshot({ error: null, jobs, status: 'loaded' });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        store.patchSnapshot({
+          error: getApiErrorMessage(error, 'Failed to load install queue.'),
+          status: store.getSnapshot().jobs.length > 0 ? 'loaded' : 'error',
+        });
       });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
+  });
 
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
-
+/** Fetch on first use or retry after an error, so one failed load never sticks. */
 export const ensureInstallsLoaded = (): void => {
-  if (store.getSnapshot().status === 'idle') {
+  const { status } = store.getSnapshot();
+
+  if (status === 'idle' || status === 'error') {
     void refreshInstalls();
   }
 };
@@ -130,6 +159,23 @@ const scheduleRefresh = (): void => {
   refreshTimer = setTimeout(() => {
     refreshTimer = null;
     void refreshInstalls();
+  }, REFRESH_COALESCE_MS);
+};
+
+/**
+ * Revalidate the library + starter flags after installs land. Coalesced like
+ * `scheduleRefresh`: a bundle whose jobs complete in a burst triggers one
+ * full-library refetch, not one per completion event.
+ */
+const scheduleCatalogRefresh = (): void => {
+  if (catalogRefreshTimer !== null) {
+    return;
+  }
+
+  catalogRefreshTimer = setTimeout(() => {
+    catalogRefreshTimer = null;
+    void refreshModels();
+    refreshStartersIfLoaded();
   }, REFRESH_COALESCE_MS);
 };
 
@@ -166,24 +212,6 @@ interface ModelInstallSocketPayload {
   error_type?: string | null;
   config?: { name?: string } | null;
 }
-
-const describeSource = (source: unknown): string => {
-  if (typeof source === 'string') {
-    return source;
-  }
-
-  if (source && typeof source === 'object') {
-    const record = source as Record<string, unknown>;
-
-    for (const field of ['repo_id', 'url', 'path']) {
-      if (typeof record[field] === 'string') {
-        return record[field];
-      }
-    }
-  }
-
-  return 'model';
-};
 
 export const MODEL_INSTALL_SOCKET_EVENTS = [
   'model_install_started',
@@ -231,23 +259,28 @@ export const handleModelInstallSocketEvent = (
     return;
   }
 
+  if (event === 'model_install_complete' || event === 'model_install_error' || event === 'model_install_cancelled') {
+    // The settled job stays listed until "Clear finished", but its byte
+    // progress is dead weight the moment it stops downloading.
+    progressByJobId.delete(data.id);
+  }
+
   if (event === 'model_install_complete') {
     recordOutcome({
       error: null,
       jobId: data.id,
       kind: 'completed',
       modelName: data.config?.name ?? null,
-      source: describeSource(data.source),
+      source: getInstallSourceLabel(data.source),
     });
-    void refreshModels();
-    refreshStartersIfLoaded();
+    scheduleCatalogRefresh();
   } else if (event === 'model_install_error') {
     recordOutcome({
       error: data.error ?? data.error_type ?? 'Unknown install error.',
       jobId: data.id,
       kind: 'error',
       modelName: null,
-      source: describeSource(data.source),
+      source: getInstallSourceLabel(data.source),
     });
   } else if (event === 'model_install_cancelled') {
     recordOutcome({
@@ -255,7 +288,7 @@ export const handleModelInstallSocketEvent = (
       jobId: data.id,
       kind: 'cancelled',
       modelName: null,
-      source: describeSource(data.source),
+      source: getInstallSourceLabel(data.source),
     });
   }
 
@@ -267,8 +300,6 @@ const ACTIVE_STATUSES: ModelInstallStatus[] = ['waiting', 'downloading', 'downlo
 export const isActiveInstallStatus = (status: ModelInstallStatus): boolean => ACTIVE_STATUSES.includes(status);
 
 export const useInstallsSelector = store.useSelector;
-
-export const useInstallsSnapshot = (): InstallsSnapshot => store.useSnapshot();
 
 export const getInstallsSnapshot = (): InstallsSnapshot => store.getSnapshot();
 
@@ -283,7 +314,7 @@ const getActiveInstallSources = (jobs: ModelInstallJob[]): ReadonlySet<string> =
   new Set(
     jobs
       .filter((job) => isActiveInstallStatus(job.status) || job.status === 'paused')
-      .map((job) => describeSource(job.source))
+      .map((job) => getInstallSourceLabel(job.source))
   );
 
 export const useActiveInstallSources = (): ReadonlySet<string> =>

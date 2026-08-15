@@ -8,9 +8,12 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 
+import type { ProjectPushOutcome } from './projects/projectFlush';
+
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
 import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
+import { createOpenProjectBroker } from './projects/openProjectBroker';
 import {
   createSyncedWorkbenchPersistence,
   type SyncedWorkbenchPersistence,
@@ -76,8 +79,47 @@ export const WorkbenchProvider = ({
       persistence,
       signal: owner.signal,
     });
+    // Published for the whole life of the mount, so a library surface rendered beside the editor
+    // mutates an open project through the sync engine rather than beside it.
+    const openProjectBroker = createOpenProjectBroker({
+      closeProject: (projectId) => {
+        // The last tab is not this handle's business. `close` refuses it *and* raises "at least one
+        // project must remain open" — correct for someone closing a tab, wrong for a deletion,
+        // which is not asking to keep working here. Leaving the editor is the caller's job
+        // (`leaveEditorIfLast`), and it is already doing it.
+        if (store.getSnapshot().projects.length > 1) {
+          store.commands.projects.close(projectId);
+        }
+      },
+      deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
+      flushProject: (projectId) => {
+        const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
+
+        // A project the editor no longer holds has nothing to push, and the id is by definition
+        // whatever the server last acknowledged for it.
+        return project
+          ? persistence.flushProjectToServer(project)
+          : Promise.resolve<ProjectPushOutcome>({ documentJson: '', kind: 'acknowledged' });
+      },
+      getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
+      markProjectDeleted: (projectId) => {
+        persistence.markProjectDeleted(projectId);
+      },
+      renameProject: (projectId, name) => {
+        store.commands.projects.rename(projectId, name);
+      },
+      subscribe: store.subscribe,
+      unmarkProjectDeleted: (projectId) => {
+        persistence.unmarkProjectDeleted(projectId);
+      },
+    });
+
     persistenceRuntime.start();
-    return () => persistenceRuntime.dispose();
+
+    return () => {
+      openProjectBroker.dispose();
+      persistenceRuntime.dispose();
+    };
   });
 
   return (
