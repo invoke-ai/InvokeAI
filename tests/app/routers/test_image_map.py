@@ -1,6 +1,7 @@
 """Tests for the /v1/image_map endpoints: serving, staleness, and user scoping."""
 
 import logging
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -760,10 +761,68 @@ def test_image_search_embeds_unindexed_reference_on_demand(
     assert [r["image_name"] for r in body["results"]] == ["a.png"]
 
 
-def test_image_search_unembeddable_reference_is_404(mock_invoker: Invoker, client: TestClient) -> None:
-    # No stored embedding AND the file cannot be loaded (mock file store).
+def test_image_search_unembeddable_reference_is_404(monkeypatch, mock_invoker: Invoker, client: TestClient) -> None:
+    # No stored embedding AND the file is gone. Raised explicitly rather than
+    # relying on the mock store's own AttributeError: this asserts the mapping
+    # for the exception a real missing file produces, which is a plain
+    # Exception subclass and not an OSError.
+    from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+
     _save_unembedded_image(mock_invoker, "not-indexed.png")
+
+    def _missing(name):
+        raise ImageFileNotFoundException()
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_pil_image", _missing)
+
     assert client.get("/api/v1/image_map/search", params={"image_name": "not-indexed.png"}).status_code == 404
+
+
+def test_image_search_rejects_an_oversized_stored_reference(
+    monkeypatch, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # Assets and intermediates are never indexed, so this on-demand branch is the
+    # normal path for exactly the images that can be huge. Without a cap the
+    # convert("RGB") inside embed_image materializes hundreds of MB on a request
+    # thread; the uploaded/downloaded path has always capped, this one had not.
+    from PIL import Image
+
+    from invokeai.app.api.routers.image_map import MAX_SEARCH_IMAGE_PIXELS
+
+    _save_unembedded_image(mock_invoker, "huge.png")
+
+    side = int(MAX_SEARCH_IMAGE_PIXELS**0.5) + 64
+    oversized = SimpleNamespace(width=side, height=side)
+    monkeypatch.setattr(mock_invoker.services.images, "get_pil_image", lambda name: oversized)
+
+    response = client.get("/api/v1/image_map/search", params={"image_name": "huge.png"})
+
+    assert response.status_code == 415
+    # Refused before anything tried to decode it.
+    assert image_index_service.embedded_images == []
+
+    # A reference inside the cap still embeds.
+    monkeypatch.setattr(mock_invoker.services.images, "get_pil_image", lambda name: Image.new("RGB", (4, 4)))
+    assert client.get("/api/v1/image_map/search", params={"image_name": "huge.png"}).status_code == 200
+
+
+def test_image_search_reports_an_encoder_fault_as_a_server_error(
+    monkeypatch, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # A missing file is a 404, but an encoder fault, a stopped index or an OOM is
+    # ours — reporting those as "its file may be missing" sends whoever is
+    # debugging to the wrong place entirely.
+    from PIL import Image
+
+    _save_unembedded_image(mock_invoker, "not-indexed.png")
+    monkeypatch.setattr(mock_invoker.services.images, "get_pil_image", lambda name: Image.new("RGB", (4, 4)))
+
+    def _boom(pil):
+        raise RuntimeError("The image index is not running")
+
+    monkeypatch.setattr(image_index_service, "embed_image", _boom)
+
+    assert client.get("/api/v1/image_map/search", params={"image_name": "not-indexed.png"}).status_code == 500
 
 
 def test_search_by_image_upload_returns_ranked_results(

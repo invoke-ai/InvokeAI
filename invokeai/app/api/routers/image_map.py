@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_image_read_access
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
 from invokeai.app.services.image_index.image_index_common import ImageIndexStatus
 from invokeai.app.services.image_index.projection import (
@@ -22,6 +23,7 @@ from invokeai.app.services.image_index.projection import (
     resolve_cluster_eps,
     scope_hash,
 )
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 
 image_map_router = APIRouter(prefix="/v1/image_map", tags=["image_map"])
 
@@ -387,15 +389,39 @@ async def search_image_map(
             # embed the stored file on demand for this one query.
             def embed_from_file() -> np.ndarray:
                 pil = services.images.get_pil_image(image_name)
+                # Capped exactly as the uploaded/downloaded path is: the encoder
+                # downscales to ~224px either way, and convert("RGB") on a large
+                # stored image materializes hundreds of MB on a request thread.
+                # This branch is the *normal* one for such images, since assets
+                # and intermediates are never indexed.
+                if pil.width * pil.height > MAX_SEARCH_IMAGE_PIXELS:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail="The reference image has too many pixels",
+                    )
                 return services.image_index.embed_image(pil)
 
             try:
                 query_embedding = await asyncio.to_thread(embed_from_file)
-            except Exception:
-                services.logger.warning(f"Image search: failed to embed '{image_name}' on demand", exc_info=True)
+            except HTTPException:
+                raise
+            except (ImageFileNotFoundException, ImageRecordNotFoundException, OSError):
+                # The stored file is missing or undecodable — the only failure
+                # here that is really about this image. Both record and file
+                # exceptions are plain Exceptions rather than OSError, so they
+                # have to be named; PIL's decode failures are OSError subclasses.
+                services.logger.warning(f"Image search: cannot read '{image_name}' for on-demand embed", exc_info=True)
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="This image could not be embedded for search (its file may be missing)",
+                )
+            except Exception:
+                # An encoder fault, a stopped index, an OOM. Reporting these as
+                # "file may be missing" sent anyone debugging to the wrong place.
+                services.logger.error(f"Image search: failed to embed '{image_name}' on demand", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="This image could not be embedded for search",
                 )
 
     results = await asyncio.to_thread(services.image_index.search_similar, scope_user, query_embedding, limit)
@@ -466,10 +492,31 @@ def _download_search_image(url: str) -> bytes:
     import requests
 
     deadline = time.monotonic() + _URL_TOTAL_DEADLINE_SECONDS
+
+    def _remaining() -> float:
+        """Budget left, as a positive number; raises once it is gone.
+
+        Checked before each hop and used as the per-request timeout, so the deadline bounds the
+        whole exchange rather than only the body. Without it the connect and read timeouts apply
+        afresh to every redirect, and a server that stalls each of the allowed hops before sending
+        a byte holds a thread for minutes — uninterruptibly, since this runs under
+        `asyncio.to_thread` on the executor that also serves embedding and search.
+        """
+        left = deadline - time.monotonic()
+
+        if left <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The image download took too long",
+            )
+
+        return left
+
     try:
         for _ in range(_URL_MAX_REDIRECTS + 1):
             _assert_url_host_allowed(url)
-            with requests.get(url, stream=True, timeout=_URL_TIMEOUT_SECONDS, allow_redirects=False) as response:
+            hop_timeout = min(_URL_TIMEOUT_SECONDS, _remaining())
+            with requests.get(url, stream=True, timeout=hop_timeout, allow_redirects=False) as response:
                 if response.is_redirect:
                     location = response.headers.get("location")
                     if not location:
@@ -486,11 +533,7 @@ def _download_search_image(url: str) -> bytes:
                             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                             detail="The reference image is too large",
                         )
-                    if time.monotonic() > deadline:
-                        raise HTTPException(
-                            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="The image download took too long",
-                        )
+                    _remaining()
                     chunks.append(chunk)
                 return b"".join(chunks)
     except HTTPException:

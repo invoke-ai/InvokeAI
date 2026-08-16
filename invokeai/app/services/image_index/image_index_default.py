@@ -13,6 +13,7 @@ from invokeai.app.services.image_index.projection import compute_umap, projectio
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.util.devices import TorchDevice
@@ -50,6 +51,26 @@ _MAX_ATTEMPTS = 3
 # Consecutive systemic failures back off exponentially from _POLL_SECONDS up to this ceiling,
 # so an outage that lasts hours does not retry at 1 Hz while still recovering promptly.
 _MAX_BACKOFF_SECONDS = 60.0
+
+
+def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
+    """L2-normalize one query embedding, refusing anything that would poison a search.
+
+    The norm is taken in float64 for the same reason `_process_batch` does it: a float32 sum of
+    squares under/overflows well inside the range these encoders produce.
+
+    A zero or non-finite norm is raised rather than passed through. The indexer can afford to
+    drop such a row; a query cannot. Dividing by a non-finite norm gives a NaN vector, every
+    similarity it takes part in is NaN, `argpartition` then returns arbitrary rows, and FastAPI
+    serializes the NaN scores as bare `NaN` — which is not valid JSON, so the browser fails to
+    parse the response instead of showing an empty result.
+    """
+    norm = float(np.linalg.norm(vector.astype(np.float64)))
+
+    if not np.isfinite(norm) or norm == 0.0:
+        raise RuntimeError("The embedding model returned a degenerate vector for this query")
+
+    return (vector / norm).astype(EMBEDDING_DTYPE)
 
 
 def warm_up_attention(config: "InvokeAIAppConfig", logger: "Logger") -> None:
@@ -179,8 +200,7 @@ class ImageIndexService(ImageIndexServiceBase):
             matrix = np.asarray(self._encode_fn([rgb]), dtype=EMBEDDING_DTYPE)
         if matrix.ndim != 2 or matrix.shape[0] != 1:
             raise RuntimeError(f"Encoder returned shape {matrix.shape}; expected (1, D)")
-        norm = float(np.linalg.norm(matrix[0]))
-        return matrix[0] / norm if norm > 0 else matrix[0]
+        return _normalize_query_vector(matrix[0])
 
     def embed_text(self, text: str) -> np.ndarray:
         if self._model_id is None:
@@ -196,8 +216,7 @@ class ImageIndexService(ImageIndexServiceBase):
             outputs = model(**inputs)
             embedding = outputs.pooler_output[0] if is_siglip else outputs.text_embeds[0]
             vector = embedding.float().cpu().numpy()
-        norm = np.linalg.norm(vector)
-        return vector / norm if norm > 0 else vector
+        return _normalize_query_vector(vector)
 
     def _get_text_encoder(self) -> tuple[Any, Any, bool]:
         with self._text_encoder_lock:
@@ -212,10 +231,16 @@ class ImageIndexService(ImageIndexServiceBase):
                 try:
                     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
                     text_cls = SiglipTextModel if is_siglip else CLIPTextModelWithProjection
-                    # skip_torch_weight_init serializes torch module construction
-                    # process-wide; an unserialized from_pretrained racing another
-                    # thread's model load leaks meta-device parameters.
-                    with skip_torch_weight_init():
+                    # skip_torch_weight_init serializes nothing: it monkey-patches
+                    # torch.nn.Linear/_ConvNd/Embedding.reset_parameters process-wide
+                    # and restores whatever it saw on entry. Two threads inside it at
+                    # once means the second saves the _no_op, and whoever leaves last
+                    # restores _no_op for the life of the process — every layer built
+                    # afterwards silently skips weight init. MODEL_LOAD_LOCK is what
+                    # makes it safe, and also excludes the concurrent VRAM move whose
+                    # load_state_dict(assign=True) would hijack these parameters onto
+                    # the meta device. Same reasoning as ModelLoader._load_and_cache.
+                    with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
                         model = text_cls.from_pretrained(model_path, local_files_only=True)
                 except Exception as e:
                     # Vision-only or partial installs (e.g. the IP-Adapter image
@@ -1073,9 +1098,9 @@ class ImageIndexService(ImageIndexServiceBase):
                         if self._model_config.type is ModelType.SigLIP
                         else CLIPVisionModelWithProjection
                     )
-                    # skip_torch_weight_init serializes torch module construction
-                    # process-wide (see _get_text_encoder).
-                    with skip_torch_weight_init():
+                    # Process-global patch, so it needs the process-global lock —
+                    # see _get_text_encoder for what goes wrong without it.
+                    with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
                         model = model_cls.from_pretrained(model_path, local_files_only=True)
                     model.eval()
                     self._cpu_model = model

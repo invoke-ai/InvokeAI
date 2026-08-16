@@ -1618,3 +1618,59 @@ def test_search_similar_scopes_to_the_requesting_user(
     # Admin scope (None) sees both.
     admin_names = {name for name, _ in service.search_similar(None, unit(0), limit=10)}
     assert admin_names == {"mine.png", "theirs.png"}
+
+
+def test_query_vectors_reject_a_non_finite_embedding(service: ImageIndexService) -> None:
+    # The indexer drops rows whose norm is non-finite because they poison every
+    # similarity they take part in. A query has nothing to drop: dividing anyway
+    # gives an all-NaN vector, then all-NaN scores, arbitrary argpartition
+    # results, and a response body containing bare `NaN` — which is not valid
+    # JSON, so the browser fails to parse it rather than showing no matches.
+    from invokeai.app.services.image_index.image_index_default import _normalize_query_vector
+
+    for bad in (np.inf, np.nan):
+        vector = np.ones(DIM, dtype=np.float32)
+        vector[0] = bad
+
+        with pytest.raises(RuntimeError, match="degenerate"):
+            _normalize_query_vector(vector)
+
+    with pytest.raises(RuntimeError, match="degenerate"):
+        _normalize_query_vector(np.zeros(DIM, dtype=np.float32))
+
+
+def test_query_vectors_normalize_in_float64(service: ImageIndexService) -> None:
+    from invokeai.app.services.image_index.image_index_default import _normalize_query_vector
+
+    # A float32 sum of squares overflows to inf well inside the range these
+    # encoders produce; float64 carries it, so this must normalize rather than
+    # trip the guard above.
+    vector = np.full(DIM, 3.0e19, dtype=np.float32)
+    normalized = _normalize_query_vector(vector)
+
+    assert np.isfinite(normalized).all()
+    assert float(np.linalg.norm(normalized.astype(np.float64))) == pytest.approx(1.0, rel=1e-3)
+
+
+def test_lazy_model_construction_takes_the_process_global_load_lock() -> None:
+    # skip_torch_weight_init monkey-patches torch.nn.*.reset_parameters process-wide
+    # and restores whatever it saw on entry. Two threads inside it at once means the
+    # second saves the no-op, and whoever leaves last restores the no-op forever —
+    # every layer built afterwards silently skips weight init. MODEL_LOAD_LOCK is
+    # what makes it safe, so both lazy loaders must hold it.
+    import inspect
+
+    from invokeai.app.services.image_index import image_index_default
+
+    loaders = (
+        image_index_default.ImageIndexService._get_text_encoder,
+        image_index_default.ImageIndexService._encode_with_model,
+    )
+
+    for fn in loaders:
+        source = inspect.getsource(fn)
+
+        if "skip_torch_weight_init" in source:
+            assert "MODEL_LOAD_LOCK.write_lock()" in source, (
+                f"{fn.__qualname__} patches torch globally without the process-global load lock"
+            )

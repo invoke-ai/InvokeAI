@@ -101,16 +101,40 @@ const canonicalizeBoardsQuery = (query: GalleryBoardsQuery): CanonicalGalleryBoa
   orderDir: query.orderDir ?? 'DESC',
 });
 
-export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): CanonicalGalleryItemsFilter => ({
-  boardId: filter.boardId,
-  ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
-  ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
-  galleryView: filter.galleryView,
-  orderDir: filter.orderDir ?? 'DESC',
-  searchTerm: filter.searchTerm.trim(),
-  ...(filter.semanticQuery ? { semantic: toGallerySemanticQuery(filter.semanticQuery) } : {}),
-  starredFirst: filter.starredFirst ?? false,
-});
+export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): CanonicalGalleryItemsFilter => {
+  const semantic = filter.semanticQuery ? toGallerySemanticQuery(filter.semanticQuery) : undefined;
+
+  if (semantic) {
+    // A ranked result set answers to the reference alone: the semantic branch
+    // of `galleryItemNamesOptionsForOwner` sends only the query, so board,
+    // view, order, starred-first and the date range change nothing about the
+    // response. Keeping them in the key made clicking a board — or toggling
+    // starred-first, or switching the images/assets tab — mint a fresh key and
+    // re-run the search for byte-identical results, which for a dropped file
+    // means re-uploading the blob and for a URL reference means the server
+    // re-downloads the remote image. Pinned rather than omitted so the shape
+    // stays a `CanonicalGalleryItemsFilter`; the values are never read on this
+    // path, only compared.
+    return {
+      boardId: '',
+      galleryView: 'images',
+      orderDir: 'DESC',
+      searchTerm: '',
+      semantic,
+      starredFirst: false,
+    };
+  }
+
+  return {
+    boardId: filter.boardId,
+    ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
+    ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
+    galleryView: filter.galleryView,
+    orderDir: filter.orderDir ?? 'DESC',
+    searchTerm: filter.searchTerm.trim(),
+    starredFirst: filter.starredFirst ?? false,
+  };
+};
 
 const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
   accountId: owner.accountId,

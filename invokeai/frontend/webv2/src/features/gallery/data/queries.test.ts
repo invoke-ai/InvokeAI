@@ -26,6 +26,7 @@ import {
   galleryItemNamesOptions,
   galleryItemsInfiniteOptions,
   getGalleryItemListQueries,
+  canonicalizeGalleryItemsFilter,
   type GalleryItemsFilter,
 } from './queries';
 import { invalidateGalleryItems } from './queryCache';
@@ -355,5 +356,66 @@ describe('Gallery item query read model', () => {
       pages: [{ items: [{ name: 'shared-date-0' }], total: 1 }],
     });
     await pageRequest.catch(() => undefined);
+  });
+});
+
+describe('canonicalizeGalleryItemsFilter under a semantic query', () => {
+  const reference = { fileId: 'external-1-abc', kind: 'file', label: 'shot.png' } as const;
+
+  it('ignores the controls a ranked result set does not answer to', () => {
+    // The semantic branch sends only the reference, so board, view, order,
+    // starred-first and the date range change nothing about the response.
+    // While they stayed in the key, clicking a board minted a fresh key and
+    // re-ran the search — re-uploading the dropped blob, or making the server
+    // re-download a remote URL, to render byte-identical results.
+    const base = canonicalizeGalleryItemsFilter({
+      boardId: 'board-a',
+      galleryView: 'images',
+      searchTerm: '',
+      semanticQuery: reference,
+    });
+
+    for (const variant of [
+      { boardId: 'board-b' },
+      { galleryView: 'assets' as const },
+      { orderDir: 'ASC' as const },
+      { starredFirst: true },
+      { createdFrom: '2026-01-01' },
+    ]) {
+      expect(
+        canonicalizeGalleryItemsFilter({
+          boardId: 'board-a',
+          galleryView: 'images',
+          searchTerm: '',
+          semanticQuery: reference,
+          ...variant,
+        })
+      ).toEqual(base);
+    }
+  });
+
+  it('still distinguishes one reference from another', () => {
+    const other = canonicalizeGalleryItemsFilter({
+      boardId: 'board-a',
+      galleryView: 'images',
+      searchTerm: '',
+      semanticQuery: { fileId: 'external-2-def', kind: 'file', label: 'shot.png' },
+    });
+
+    expect(other).not.toEqual(
+      canonicalizeGalleryItemsFilter({
+        boardId: 'board-a',
+        galleryView: 'images',
+        searchTerm: '',
+        semanticQuery: reference,
+      })
+    );
+  });
+
+  it('leaves a non-semantic filter keyed on all of its controls', () => {
+    const onBoardA = canonicalizeGalleryItemsFilter({ boardId: 'board-a', galleryView: 'images', searchTerm: '' });
+    const onBoardB = canonicalizeGalleryItemsFilter({ boardId: 'board-b', galleryView: 'images', searchTerm: '' });
+
+    expect(onBoardA).not.toEqual(onBoardB);
   });
 });
