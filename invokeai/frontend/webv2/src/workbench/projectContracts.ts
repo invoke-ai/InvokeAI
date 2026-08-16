@@ -5,6 +5,7 @@ import type { CanvasStateContractV2 } from './canvas-engine/api';
 import type { GraphContract } from './graphContracts';
 import type { InvocationControllerState } from './invocationContracts';
 import type {
+  FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetMetadataOverrides,
@@ -38,6 +39,13 @@ export interface Project {
   projectGraph: ProjectGraphState;
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+  /**
+   * Widget instances detached into floating windows. Optional and additive:
+   * projects persisted before this field existed hydrate with no floating
+   * windows. A floated instance is removed from its region's instanceIds
+   * while it floats.
+   */
+  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV2;
   graphHistory: GraphHistorySnapshot[];
@@ -121,6 +129,8 @@ export interface ProjectUndoSnapshot {
   projectGraph: ProjectGraphState;
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+  /** Captured with widgetRegions: regions and floating windows are one placement fact. */
+  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
 }
 

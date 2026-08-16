@@ -16,6 +16,7 @@ import { FocusRegionProvider } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { WidgetBar } from '@workbench/widget-frame';
+import { FloatingWidgetLayer } from '@workbench/widget-frame/FloatingWidgetLayer';
 import {
   getRegionDropState,
   isWidgetDndData,
@@ -287,6 +288,7 @@ export const WorkbenchShell = () => {
           <BottomPanel />
           <StatusBar dropState={bottomDropState} />
         </Flex>
+        <FloatingWidgetLayer />
         <DragOverlay>{activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}</DragOverlay>
       </DndContext>
     </FocusRegionProvider>

@@ -15,6 +15,7 @@ import {
   selectIsFlux2Dev,
   selectIsIdeogram4,
   selectIsKrea2,
+  selectIsMiniMaxH3,
   selectIsQwenImage,
   selectIsWan,
   selectIsZImage,
@@ -33,6 +34,8 @@ import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDyp
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamIdeogram4SamplerPreset from 'features/parameters/components/Core/ParamIdeogram4SamplerPreset';
+import ParamMiniMaxH3Duration from 'features/parameters/components/Core/ParamMiniMaxH3Duration';
+import ParamMiniMaxH3OutputMode from 'features/parameters/components/Core/ParamMiniMaxH3OutputMode';
 import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
@@ -71,6 +74,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isKrea2 = useAppSelector(selectIsKrea2);
   const isAnima = useAppSelector(selectIsAnima);
   const isWan = useAppSelector(selectIsWan);
+  const isMiniMaxH3 = useAppSelector(selectIsMiniMaxH3);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
   const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
@@ -127,8 +131,10 @@ export const GenerationSettingsAccordion = memo(() => {
                   <ParamGuidance />
                 )}
                 {!isExternal && isFlux2Dev && <ParamGuidance />}
-                {!isExternal && !isFLUX && !isFlux2 && !isIdeogram4 && <ParamCFGScale />}
+                {!isExternal && !isFLUX && !isFlux2 && !isIdeogram4 && !isMiniMaxH3 && <ParamCFGScale />}
                 {!isExternal && isWan && <ParamWanGuidanceScaleLowNoise />}
+                {!isExternal && isMiniMaxH3 && <ParamMiniMaxH3OutputMode />}
+                {!isExternal && isMiniMaxH3 && <ParamMiniMaxH3Duration />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}
                 {!isExternal && isFLUX && <ParamFluxDypePreset />}

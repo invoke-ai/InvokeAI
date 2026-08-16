@@ -362,7 +362,7 @@ describe('workbench widget region defaults', () => {
     const project = getActiveProject(state);
 
     expect(project.widgetRegions.left.instanceIds).toEqual(['generate', 'upscale']);
-    expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+    expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
     expect(project.widgetRegions.bottom.instanceIds).toEqual([
       'server-status',
       'queue-status',
@@ -398,16 +398,19 @@ describe('workbench widget region defaults', () => {
     const hydratedLegacyDefault = workbenchReducer(initial, { state: legacyDefault, type: 'hydrateWorkbench' });
     const hydratedCustomized = workbenchReducer(initial, { state: customized, type: 'hydrateWorkbench' });
 
-    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+    expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
+      'gallery',
+      'image-map',
+      'queue',
+    ]);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
   });
 
-  it('adds Image Map to an untouched pre-image-map right rail so it does not read as drifted', () => {
-    // The built-in presets now list image-map. A project persisted before that
-    // keeps the old rail, so without this migration every existing user's
-    // layout compares unequal to the preset it was loaded from: the topbar
-    // shows an unsaved-changes dot and offers to revert a layout they never
-    // edited, and the widget itself is only reachable from the enable menu.
+  it('hydrates a pre-image-map right rail to the curated rail rather than splicing Image Map in', () => {
+    // Splicing would leave a rail no preset holds, so an untouched project
+    // would compare unequal to the preset it was loaded from — the drift dot
+    // the rail migrations exist to avoid. Adopting the curated rail is the
+    // only result that both surfaces the widget and keeps the two in step.
     const initial = createInitialWorkbenchState();
     const withRightIds = (instanceIds: Project['widgetRegions']['right']['instanceIds']): WorkbenchState => ({
       ...initial,
@@ -428,11 +431,7 @@ describe('workbench widget region defaults', () => {
     expect(getActiveProject(hydratedDefault).widgetRegions.right.instanceIds).toEqual([
       'gallery',
       'image-map',
-      'preview',
       'queue',
-      'layers',
-      'diagnostics',
-      'project',
     ]);
     // A rail the user actually arranged is still theirs.
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual([
@@ -440,6 +439,9 @@ describe('workbench widget region defaults', () => {
       'gallery',
       'queue',
     ]);
+    for (const preset of layoutPresets) {
+      expect(preset.snapshot.widgetRegions.right.instanceIds).toContain('image-map');
+    }
   });
 
   it('adds Upscale to untouched legacy left rails while preserving customized rails', () => {
@@ -513,6 +515,50 @@ describe('workbench widget region defaults', () => {
       'notifications',
       'autosave-status',
     ]);
+  });
+
+  it('leaves a floated queue-status floating instead of re-docking it every load', () => {
+    // A rail whose queue-status was floated back out is byte-identical to the
+    // pre-branch default, so the migration re-adds it. Reconciliation runs on
+    // the migration's output and must win, or the widget re-docks on every
+    // reload and the layout reads as permanently drifted.
+    const initial = createInitialWorkbenchState();
+    const migrated = workbenchReducer(initial, {
+      state: {
+        ...initial,
+        projects: initial.projects.map((project) => ({
+          ...project,
+          floatingWidgets: {
+            'queue-status': {
+              heightPx: 180,
+              mode: 'windowed',
+              returnIndex: 1,
+              returnRegion: 'bottom',
+              stackOrder: 1,
+              widthPx: 320,
+              x: 64,
+              y: 64,
+            },
+          },
+          widgetRegions: {
+            ...project.widgetRegions,
+            bottom: {
+              ...project.widgetRegions.bottom,
+              instanceIds: ['server-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+            },
+          },
+        })),
+      },
+      type: 'hydrateWorkbench',
+    });
+
+    expect(getActiveProject(migrated).widgetRegions.bottom.instanceIds).toEqual([
+      'server-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
+    expect(getActiveProject(migrated).floatingWidgets?.['queue-status']?.returnRegion).toBe('bottom');
   });
 
   it('migrates a legacy Upscale prompt only when Generate has no prompt content', () => {
@@ -937,7 +983,7 @@ describe('workbench layout presets', () => {
     });
     expect(project.widgetRegions.right).toMatchObject({
       activeInstanceId: 'gallery',
-      instanceIds: ['gallery', 'queue'],
+      instanceIds: ['gallery', 'image-map', 'queue'],
       isCollapsed: false,
       sizePx: 450,
     });

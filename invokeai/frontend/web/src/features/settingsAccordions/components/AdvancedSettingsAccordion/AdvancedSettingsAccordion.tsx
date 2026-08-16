@@ -12,6 +12,7 @@ import {
   selectIsFlux2Dev,
   selectIsIdeogram4,
   selectIsKrea2,
+  selectIsMiniMaxH3,
   selectIsQwenImage,
   selectIsSD3,
   selectIsWan,
@@ -35,6 +36,7 @@ import {
   ParamHiDiffusionWindowAttnToggle,
 } from 'features/parameters/components/Advanced/ParamHiDiffusionToggle';
 import ParamKrea2ModelSelects from 'features/parameters/components/Advanced/ParamKrea2ModelSelects';
+import ParamMiniMaxH3ModelSelects from 'features/parameters/components/Advanced/ParamMiniMaxH3ModelSelects';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
@@ -79,6 +81,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isErnieImage = useAppSelector(selectIsErnieImage);
   const isKrea2 = useAppSelector(selectIsKrea2);
   const isWan = useAppSelector(selectIsWan);
+  const isMiniMaxH3 = useAppSelector(selectIsMiniMaxH3);
 
   const selectBadges = useMemo(
     () =>
@@ -229,6 +232,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isWan && (
           <FormControlGroup>
             <ParamWanModelSelects />
+          </FormControlGroup>
+        )}
+        {isMiniMaxH3 && (
+          <FormControlGroup>
+            <ParamMiniMaxH3ModelSelects />
           </FormControlGroup>
         )}
         {isIdeogram4 && (

@@ -69,7 +69,7 @@ describe('built-in layout preset descriptors', () => {
         center: ['workflow:center', 'preview'],
         left: ['workflow'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-        right: ['queue', 'preview', 'gallery'],
+        right: ['queue', 'preview', 'gallery', 'image-map'],
       },
       compose: {
         active: { bottom: 'gallery:bottom', center: 'preview', left: 'generate', right: 'gallery' },
@@ -81,7 +81,7 @@ describe('built-in layout preset descriptors', () => {
         center: ['preview', 'gallery:center'],
         left: ['generate', 'upscale'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-        right: ['gallery', 'queue'],
+        right: ['gallery', 'image-map', 'queue'],
       },
       edit: {
         active: { bottom: 'gallery:bottom', center: 'canvas', left: 'generate', right: 'layers' },
@@ -89,7 +89,7 @@ describe('built-in layout preset descriptors', () => {
         center: ['canvas', 'preview'],
         left: ['generate', 'upscale'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
-        right: ['layers', 'preview', 'gallery', 'queue'],
+        right: ['layers', 'preview', 'gallery', 'image-map', 'queue'],
       },
     });
   });

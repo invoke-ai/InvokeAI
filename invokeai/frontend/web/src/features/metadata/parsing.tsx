@@ -20,6 +20,10 @@ import {
   kleinQwen3EncoderModelSelected,
   krea2Qwen3VlEncoderModelSelected,
   krea2VaeModelSelected,
+  minimaxH3DurationSecondsChanged,
+  minimaxH3OutputModeChanged,
+  minimaxH3TextEncoderModelSelected,
+  minimaxH3TransformerModelSelected,
   negativePromptChanged,
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
@@ -1122,6 +1126,111 @@ const WanGuidanceScaleLowNoise: SingleMetadataHandler<number | null> = {
   ),
 };
 //#endregion WanGuidanceScaleLowNoise
+
+//#region MiniMaxH3DurationSeconds
+const MiniMaxH3DurationSeconds: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3DurationSeconds',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'minimax_h3_duration_seconds');
+    if (raw === undefined) {
+      // Reject when the key is absent so the handler is not rendered for non-H3 media.
+      return Promise.reject();
+    }
+    const parsed = z.number().int().min(5).max(14).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3DurationSecondsChanged(value));
+  },
+  i18nKey: 'parameters.minimaxH3DurationSeconds',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion MiniMaxH3DurationSeconds
+
+//#region MiniMaxH3OutputMode
+const MiniMaxH3OutputMode: SingleMetadataHandler<'video' | 'image'> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3OutputMode',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'minimax_h3_output_mode');
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    const parsed = z.enum(['video', 'image']).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3OutputModeChanged(value));
+  },
+  i18nKey: 'parameters.minimaxH3OutputMode',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'video' | 'image'>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion MiniMaxH3OutputMode
+
+//#region MiniMaxH3TransformerModel
+const MiniMaxH3TransformerModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3TransformerModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'minimax_h3_transformer_model');
+    if (raw === undefined) {
+      // The graph builder only writes this key when a single-file transformer override was
+      // used; reject when absent so the handler is not rendered (and recall-all skips it).
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    // Validate the single-file transformer is still installed - recall-all must skip silently
+    // (not clobber or error) when it has since been deleted.
+    const parsed = await parseModelIdentifier(raw, store, 'main');
+    assert(parsed.type === 'main' && parsed.base === 'minimax-h3');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3TransformerModelSelected(value));
+  },
+  i18nKey: 'modelManager.minimaxH3TransformerModel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion MiniMaxH3TransformerModel
+
+//#region MiniMaxH3TextEncoderModel
+const MiniMaxH3TextEncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'MiniMaxH3TextEncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'minimax_h3_text_encoder_model');
+    if (raw === undefined) {
+      // The graph builder only writes this key when a single-file text-encoder override was
+      // used; reject when absent so the handler is not rendered (and recall-all skips it).
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    // Validate the single-file encoder is still installed - recall-all must skip silently
+    // (not clobber or error) when it has since been deleted.
+    const parsed = await parseModelIdentifier(raw, store, 'qwen3_vl_encoder');
+    assert(parsed.type === 'qwen3_vl_encoder' && parsed.base === 'minimax-h3');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(minimaxH3TextEncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.minimaxH3TextEncoderModel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion MiniMaxH3TextEncoderModel
 
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number | null> = {
@@ -2339,6 +2448,10 @@ export const ImageMetadataHandlers = {
   WanVaeModel,
   WanT5EncoderModel,
   WanGuidanceScaleLowNoise,
+  MiniMaxH3DurationSeconds,
+  MiniMaxH3OutputMode,
+  MiniMaxH3TransformerModel,
+  MiniMaxH3TextEncoderModel,
   ZImageShift,
   Ideogram4SamplerPreset,
   Ideogram4Steps,

@@ -257,6 +257,12 @@ WAN22_LATENT_RGB_FACTORS = [
 
 WAN22_LATENT_RGB_BIAS = [0.0317, -0.0878, -0.1388]
 
+# MiniMax H3's video VAE has 24 latent channels and 16x spatial downscale. No community RGB
+# projection exists yet, so previews use a uniform channel-mean (grayscale) fallback.
+# TODO(minimax-h3): generate real factors with scripts/generate_vae_linear_approximation.py
+# against the H3 video VAE once weights are available locally.
+MINIMAX_H3_LATENT_RGB_FACTORS = [[1.0 / 24.0, 1.0 / 24.0, 1.0 / 24.0] for _ in range(24)]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor,
@@ -366,6 +372,9 @@ def diffusion_step_callback(
         else:
             latent_rgb_factors = WAN_LATENT_RGB_FACTORS
             latent_rgb_bias = WAN_LATENT_RGB_BIAS
+    elif base_model == BaseModelType.MiniMaxH3:
+        # 24-ch H3 video VAE; grayscale channel-mean fallback until real factors exist.
+        latent_rgb_factors = MINIMAX_H3_LATENT_RGB_FACTORS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 
@@ -387,6 +396,8 @@ def diffusion_step_callback(
     # Wan TI2V-5B's Wan2.2-VAE uses 16x.
     spatial_scale = 8
     if base_model == BaseModelType.Wan and sample.shape[-3] == 48:
+        spatial_scale = 16
+    elif base_model == BaseModelType.MiniMaxH3:
         spatial_scale = 16
     width = image.width * spatial_scale
     height = image.height * spatial_scale

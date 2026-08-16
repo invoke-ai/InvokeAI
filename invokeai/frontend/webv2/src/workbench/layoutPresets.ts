@@ -176,7 +176,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       right: createRegion({
         activeInstanceId: 'gallery',
-        instanceIds: ['gallery', 'queue'],
+        instanceIds: ['gallery', 'image-map', 'queue'],
         sizePx: 450,
       }),
     },
@@ -209,7 +209,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       right: createRegion({
         activeInstanceId: 'layers',
-        instanceIds: ['layers', 'preview', 'gallery', 'queue'],
+        instanceIds: ['layers', 'preview', 'gallery', 'image-map', 'queue'],
         sizePx: 450,
       }),
     },
@@ -242,7 +242,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       right: createRegion({
         activeInstanceId: 'queue',
-        instanceIds: ['queue', 'preview', 'gallery'],
+        instanceIds: ['queue', 'preview', 'gallery', 'image-map'],
         sizePx: 450,
       }),
     },

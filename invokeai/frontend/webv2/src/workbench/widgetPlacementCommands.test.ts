@@ -59,6 +59,9 @@ const applyCommand = (state: WorkbenchState, command: (widgets: WorkbenchWidgetC
 };
 
 const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): WorkbenchWidgetCommands => ({
+  dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
+  float: (instanceId) => dispatch({ instanceId, type: 'floatWidget' }),
+  focusFloating: (instanceId) => dispatch({ instanceId, type: 'focusFloatingWidget' }),
   move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
   open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
   patchInstanceValues: (instanceId, values, projectId) =>
@@ -66,6 +69,9 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
   patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
   reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
   select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
+  setFloatingGeometry: (instanceId, geometry) =>
+    dispatch({ instanceId, type: 'setFloatingWidgetGeometry', ...geometry }),
+  setFloatingMode: (instanceId, mode) => dispatch({ instanceId, mode, type: 'setFloatingWidgetMode' }),
   setInstanceValues: (instanceId, values, projectId) =>
     dispatch({ instanceId, projectId, type: 'setWidgetInstanceValues', values }),
   toggle: (options) => dispatch({ ...options, type: 'toggleRegionWidget' }),

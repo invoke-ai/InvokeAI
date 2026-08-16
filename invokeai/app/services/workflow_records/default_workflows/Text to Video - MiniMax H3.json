@@ -1,0 +1,501 @@
+{
+  "name": "Text to Video - MiniMax H3",
+  "author": "InvokeAI",
+  "description": "Text-to-video generation with MiniMax H3 (FL2VA). Produces an MP4 with a jointly generated AAC stereo soundtrack: `num_frames` frames at the model's fixed 24 fps (default 124 frames = ~5.2 s at 1344x768).",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "minimax h3, text to video, video, audio",
+  "notes": "This workflow needs the MiniMax H3 FL2VA model (diffusers layout). Each InvokeAI install assigns its own internal model IDs, so the model field is left blank -- select your installed MiniMax H3 model in the form after loading.\n\nMiniMax H3 generates video and a synchronized stereo soundtrack together; the soundtrack is muxed into the MP4 automatically (AAC, 32 kHz). The frame rate is fixed at 24 fps and frame counts snap to a 17n+5 grid: 124 frames = ~5.2 s, up to 345 frames = 14.4 s. Width/height must be multiples of 32; the native canvas is a 768 px short edge (max 768x1344).\n\nThe model is guidance-distilled: no negative prompt, no CFG. Steps counts sigma grid points; 50 is the reference default.",
+  "exposedFields": [
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "fieldName": "prompt"
+    },
+    {
+      "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "fieldName": "width"
+    },
+    {
+      "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "fieldName": "height"
+    },
+    {
+      "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "fieldName": "steps"
+    }
+  ],
+  "meta": {
+    "version": "4.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "type": "invocation",
+      "data": {
+        "id": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 200,
+        "y": 0
+      }
+    },
+    {
+      "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "type": "invocation",
+      "data": {
+        "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Prompt",
+        "notes": "H3 is guidance-distilled: there is no negative prompt.",
+        "type": "minimax_h3_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Prompt",
+            "description": "",
+            "value": ""
+          },
+          "text_encoder": {
+            "name": "text_encoder",
+            "label": "",
+            "description": ""
+          },
+          "first_image": {
+            "name": "first_image",
+            "label": "",
+            "description": ""
+          },
+          "last_image": {
+            "name": "last_image",
+            "label": "",
+            "description": ""
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 700,
+        "y": -150
+      }
+    },
+    {
+      "id": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "type": "invocation",
+      "data": {
+        "id": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "rand_int",
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "description": "",
+            "value": 2147483647
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 400,
+        "y": 500
+      }
+    },
+    {
+      "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "type": "invocation",
+      "data": {
+        "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_denoise",
+        "inputs": {
+          "transformer": {
+            "name": "transformer",
+            "label": "",
+            "description": ""
+          },
+          "positive_conditioning": {
+            "name": "positive_conditioning",
+            "label": "",
+            "description": ""
+          },
+          "frame_conditioning": {
+            "name": "frame_conditioning",
+            "label": "",
+            "description": ""
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Frames",
+            "description": "Frame count must be 5 more than a multiple of 17 (124, 141, ..., 345). 124 frames = ~5.2 s at the fixed 24 fps; the maximum is 345 (14.4 s).",
+            "value": 124
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 50
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": 0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1150,
+        "y": -50
+      }
+    },
+    {
+      "id": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "type": "invocation",
+      "data": {
+        "id": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_latents_to_video",
+        "inputs": {
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": "",
+            "description": ""
+          },
+          "video_latents": {
+            "name": "video_latents",
+            "label": "",
+            "description": ""
+          },
+          "audio_latents": {
+            "name": "audio_latents",
+            "label": "",
+            "description": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": ""
+          },
+          "audio_vae": {
+            "name": "audio_vae",
+            "label": "",
+            "description": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": 1550,
+        "y": -50
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-9a1e6c7b-transformer-9d3b9faf-transformer",
+      "type": "default",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "transformer",
+      "targetHandle": "transformer"
+    },
+    {
+      "id": "edge-9a1e6c7b-text_encoder-9b2f7d8c-text_encoder",
+      "type": "default",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "sourceHandle": "text_encoder",
+      "targetHandle": "text_encoder"
+    },
+    {
+      "id": "edge-9b2f7d8c-conditioning-9d3b9faf-positive_conditioning",
+      "type": "default",
+      "source": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "conditioning",
+      "targetHandle": "positive_conditioning"
+    },
+    {
+      "id": "edge-9c4cab0b-value-9d3b9faf-seed",
+      "type": "default",
+      "source": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "value",
+      "targetHandle": "seed"
+    },
+    {
+      "id": "edge-9d3b9faf-video_latents-9e5dcb1c-video_latents",
+      "type": "default",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "sourceHandle": "video_latents",
+      "targetHandle": "video_latents"
+    },
+    {
+      "id": "edge-9d3b9faf-audio_latents-9e5dcb1c-audio_latents",
+      "type": "default",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "sourceHandle": "audio_latents",
+      "targetHandle": "audio_latents"
+    },
+    {
+      "id": "edge-9a1e6c7b-vae-9e5dcb1c-vae",
+      "type": "default",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "sourceHandle": "vae",
+      "targetHandle": "vae"
+    },
+    {
+      "id": "edge-9a1e6c7b-audio_vae-9e5dcb1c-audio_vae",
+      "type": "default",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "sourceHandle": "audio_vae",
+      "targetHandle": "audio_vae"
+    }
+  ],
+  "form": {
+    "elements": {
+      "heading-h3-gen": {
+        "id": "heading-h3-gen",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Generation"
+        }
+      },
+      "node-field-h3-prompt": {
+        "id": "node-field-h3-prompt",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+            "fieldName": "prompt"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "string-field-config",
+            "component": "textarea"
+          }
+        }
+      },
+      "container-h3-size": {
+        "id": "container-h3-size",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "layout": "row",
+          "children": [
+            "node-field-h3-width",
+            "node-field-h3-height"
+          ]
+        }
+      },
+      "node-field-h3-width": {
+        "id": "node-field-h3-width",
+        "parentId": "container-h3-size",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+            "fieldName": "width"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "node-field-h3-height": {
+        "id": "node-field-h3-height",
+        "parentId": "container-h3-size",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+            "fieldName": "height"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "container-h3-len": {
+        "id": "container-h3-len",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "layout": "row",
+          "children": [
+            "node-field-h3-frames",
+            "node-field-h3-steps"
+          ]
+        }
+      },
+      "node-field-h3-frames": {
+        "id": "node-field-h3-frames",
+        "parentId": "container-h3-len",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+            "fieldName": "num_frames"
+          },
+          "showDescription": true,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "node-field-h3-steps": {
+        "id": "node-field-h3-steps",
+        "parentId": "container-h3-len",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+            "fieldName": "steps"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "divider-h3": {
+        "id": "divider-h3",
+        "parentId": "root",
+        "type": "divider"
+      },
+      "heading-h3-model": {
+        "id": "heading-h3-model",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Model"
+        }
+      },
+      "node-field-h3-model": {
+        "id": "node-field-h3-model",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "model"
+          },
+          "showDescription": false
+        }
+      },
+      "root": {
+        "id": "root",
+        "data": {
+          "layout": "column",
+          "children": [
+            "heading-h3-gen",
+            "node-field-h3-prompt",
+            "container-h3-size",
+            "container-h3-len",
+            "divider-h3",
+            "heading-h3-model",
+            "node-field-h3-model"
+          ]
+        },
+        "type": "container"
+      }
+    },
+    "rootElementId": "root"
+  },
+  "id": "default_minimax_h3_t2v"
+}

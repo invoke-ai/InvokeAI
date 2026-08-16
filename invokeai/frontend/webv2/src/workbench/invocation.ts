@@ -112,6 +112,15 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
     }
   }
 
+  // A floated instance is mounted in its window, not in a region.
+  for (const instanceId of Object.keys(project.floatingWidgets ?? {})) {
+    const widgetId = project.widgetInstances[instanceId]?.typeId;
+
+    if (widgetId) {
+      mountedWidgetIds.add(widgetId);
+    }
+  }
+
   return Array.from(mountedWidgetIds).sort();
 };
 

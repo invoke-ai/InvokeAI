@@ -185,6 +185,9 @@ GENERATION_MODES = Literal[
     "wan_inpaint",
     "wan_outpaint",
     "wan_i2v",
+    "minimax_h3_t2v",
+    "minimax_h3_i2v",
+    "minimax_h3_txt2img",
 ]
 
 

@@ -27,13 +27,15 @@ import {
   isFluxVAEModelConfig,
   isGemma2EncoderModelConfig,
   isIPAdapterModelConfig,
+  isKrea2Qwen3VLEncoderModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
+  isMiniMaxH3CheckpointMainModelConfig,
+  isMiniMaxH3TextEncoderModelConfig,
   isMistralEncoderModelConfig,
   isPiDDecoderModelConfig,
   isQwen3EncoderModelConfig,
-  isQwen3VLEncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
   isQwenImageVAEModelConfig,
   isQwenVLEncoderModelConfig,
@@ -124,11 +126,13 @@ export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiff
 export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
 export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
-export const useQwen3VLEncoderModels = () => buildModelsHook(isQwen3VLEncoderModelConfig)();
+export const useQwen3VLEncoderModels = () => buildModelsHook(isKrea2Qwen3VLEncoderModelConfig)();
 export const useWanDiffusersModels = () => buildModelsHook(isWanDiffusersMainModelConfig)();
 export const useWanGGUFLowNoiseModels = () => buildModelsHook(isWanGGUFLowNoiseMainModelConfig)();
 export const useWanVAEModels = () => buildModelsHook(isWanVAEModelConfig)();
 export const useWanT5EncoderModels = () => buildModelsHook(isWanT5EncoderModelConfig)();
+export const useMiniMaxH3CheckpointModels = () => buildModelsHook(isMiniMaxH3CheckpointMainModelConfig)();
+export const useMiniMaxH3TextEncoderModels = () => buildModelsHook(isMiniMaxH3TextEncoderModelConfig)();
 export const usePiDDecoderModels = buildModelsHook(isPiDDecoderModelConfig);
 export const useGemma2EncoderModels = () => buildModelsHook(isGemma2EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
@@ -174,7 +178,9 @@ export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMa
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
-export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);
+// Krea-2-scoped: its consumers (modelSelected Krea-2 component updates) must never auto-select
+// the MiniMax H3 truncated encoders, which share the model type.
+export const selectQwen3VLEncoderModels = buildModelsSelector(isKrea2Qwen3VLEncoderModelConfig);
 export const selectWanDiffusersModels = buildModelsSelector(isWanDiffusersMainModelConfig);
 export const selectWanVAEModels = buildModelsSelector(isWanVAEModelConfig);
 export const selectWanT5EncoderModels = buildModelsSelector(isWanT5EncoderModelConfig);
