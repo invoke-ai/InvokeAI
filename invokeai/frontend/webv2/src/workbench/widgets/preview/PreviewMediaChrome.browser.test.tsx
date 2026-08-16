@@ -60,9 +60,14 @@ vi.mock('@features/queue/react', () => ({
   useProgressImage: () => null,
 }));
 
-vi.mock('@features/queue/devices', () => ({
-  useDeviceLabel: () => mocks.deviceLabel,
-}));
+vi.mock('@features/queue/devices', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@features/queue/devices')>();
+
+  return {
+    ...actual,
+    useDeviceLabel: () => mocks.deviceLabel,
+  };
+});
 
 vi.mock('@platform/ui/streaming-image/useStreamingImageSource', () => ({
   useStreamingImageSource: () => ({
