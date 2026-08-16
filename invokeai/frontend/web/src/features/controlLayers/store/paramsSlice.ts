@@ -514,6 +514,13 @@ const slice = createSlice({
       }
       state.minimaxH3TransformerModel = result.data;
     },
+    minimaxH3TextEncoderModelSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.minimaxH3TextEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.minimaxH3TextEncoderModel = result.data;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -866,6 +873,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.wanT5EncoderModel = oldState.wanT5EncoderModel;
   newState.wanGuidanceScaleLowNoise = oldState.wanGuidanceScaleLowNoise;
   newState.minimaxH3TransformerModel = oldState.minimaxH3TransformerModel;
+  newState.minimaxH3TextEncoderModel = oldState.minimaxH3TextEncoderModel;
   return newState;
 };
 
@@ -951,6 +959,7 @@ export const {
   minimaxH3DurationSecondsChanged,
   minimaxH3OutputModeChanged,
   minimaxH3TransformerModelSelected,
+  minimaxH3TextEncoderModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -1100,6 +1109,17 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.minimaxH3TransformerModel = null;
       }
 
+      if (state._version === 7) {
+        // v7 -> v8, add the MiniMax H3 single-file text encoder override.
+        //
+        // Written as v6 -> v7 on this branch, but the transformer-override step above already
+        // occupies v6 -> v7 on main. Two steps sharing a version silently breaks the chain: the
+        // first sets _version = 7, the second never runs, and zParamsState.parse() then throws on
+        // the missing key and wipes the whole params slice.
+        state._version = 8;
+        state.minimaxH3TextEncoderModel = null;
+      }
+
       if (!('hiDiffusionEnabled' in state)) {
         state.hiDiffusionEnabled = false;
       }
@@ -1186,6 +1206,7 @@ export const selectWanGuidanceScaleLowNoise = createParamsSelector((params) => p
 export const selectMiniMaxH3DurationSeconds = createParamsSelector((params) => params.minimaxH3DurationSeconds);
 export const selectMiniMaxH3OutputMode = createParamsSelector((params) => params.minimaxH3OutputMode);
 export const selectMiniMaxH3TransformerModel = createParamsSelector((params) => params.minimaxH3TransformerModel);
+export const selectMiniMaxH3TextEncoderModel = createParamsSelector((params) => params.minimaxH3TextEncoderModel);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);

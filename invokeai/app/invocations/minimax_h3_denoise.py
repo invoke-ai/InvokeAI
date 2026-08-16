@@ -6,7 +6,10 @@ and audio step down two different flow schedules (shift 12.0 / 3.0). The checkpo
 guidance-distilled: no negative prompt, no CFG, one forward per step.
 """
 
+from contextlib import ExitStack
+
 import torch
+from PIL import Image
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import (
@@ -26,6 +29,7 @@ from invokeai.app.invocations.fields import (
     OutputField,
 )
 from invokeai.app.invocations.model import MiniMaxH3TransformerField
+from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.minimax_h3.denoise import denoise
 from invokeai.backend.minimax_h3.packing import (
@@ -44,7 +48,9 @@ from invokeai.backend.minimax_h3.sampling import (
     validate_canvas,
     validate_num_frames,
 )
+from invokeai.backend.minimax_h3.taehv_decoder import TAEH3_PREVIEW_MODEL_URL, TAEH3Decoder
 from invokeai.backend.minimax_h3.transformer_minimax_h3 import MiniMaxH3Transformer3DModel
+from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import MiniMaxH3ConditioningInfo
@@ -69,7 +75,7 @@ class MiniMaxH3DenoiseOutput(BaseInvocationOutput):
     title="Denoise - MiniMax H3",
     tags=["latents", "video", "audio", "minimax"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3DenoiseInvocation(BaseInvocation):
@@ -142,6 +148,21 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
         estimated += 2 * GB
         return estimated
 
+    @staticmethod
+    def _load_preview_decoder(context: InvocationContext) -> LoadedModelWithoutConfig | None:
+        """Fetch (a one-time ~23 MB download) and load the taeh3 preview decoder.
+
+        Previews degrade gracefully to the linear latent->RGB projection when the download is
+        unavailable (offline installs), so any failure here is a warning, never an error.
+        """
+        try:
+            return context.models.load_remote_model(TAEH3_PREVIEW_MODEL_URL, TAEH3Decoder.load_model)
+        except Exception as e:
+            context.logger.warning(
+                f"MiniMax H3 preview decoder unavailable ({e}); previews fall back to latent projection."
+            )
+            return None
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MiniMaxH3DenoiseOutput:
         validate_num_frames(self.num_frames)
@@ -202,38 +223,88 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
 
         num_condition_video_rows = state.layout.num_condition_video_rows
 
-        def step_callback(step: int, total_steps: int, video_rows: torch.Tensor) -> None:
-            # Unpack the generated rows to a 5D grid and preview the middle temporal slice.
-            latents_5d = unpatchify_video_tokens(
-                video_rows[num_condition_video_rows:],
-                num_latent_frames,
-                latent_height,
-                latent_width,
-                MINIMAX_H3_VAE_LATENT_CHANNELS,
-                MINIMAX_H3_PATCH_SIZE,
-            )
-            context.util.sd_step_callback(
-                PipelineIntermediateState(
-                    step=step,
-                    order=1,
-                    total_steps=total_steps,
-                    timestep=0,
-                    latents=latents_5d[:, :, num_latent_frames // 2],
-                ),
-                BaseModelType.MiniMaxH3,
-            )
+        preview_failed = False
+
+        def make_step_callback(preview_decoder: TAEH3Decoder | None):
+            def step_callback(step: int, total_steps: int, pred_x0_video_rows: torch.Tensor) -> None:
+                if context.util.is_canceled():
+                    raise CanceledException
+                # Unpack the generated rows' x-hat-0 estimate to a 5D grid.
+                latents_5d = unpatchify_video_tokens(
+                    pred_x0_video_rows,
+                    num_latent_frames,
+                    latent_height,
+                    latent_width,
+                    MINIMAX_H3_VAE_LATENT_CHANNELS,
+                    MINIMAX_H3_PATCH_SIZE,
+                )
+                nonlocal preview_failed
+                if preview_decoder is not None and not preview_failed:
+                    try:
+                        # A two-latent-frame window ending at the middle frame: the extra frame is
+                        # causal warmup so the decoder's temporal memory is warm for the shown frame.
+                        mid = num_latent_frames // 2
+                        window = latents_5d[:, :, max(0, mid - 1) : mid + 1]
+                        frame = preview_decoder.decode_preview_frame(window)
+                        image = Image.fromarray(frame.mul(255).round().byte().permute(1, 2, 0).cpu().numpy())
+                        context.util.signal_progress(
+                            "Denoising MiniMax H3 audio-video", step / total_steps, image, (self.width, self.height)
+                        )
+                        return
+                    except CanceledException:
+                        raise
+                    except Exception:
+                        preview_failed = True
+                        context.logger.warning(
+                            "MiniMax H3 preview decode failed; falling back to latent-projection previews.",
+                            exc_info=True,
+                        )
+                # Fallback: linear latent->RGB projection of the middle temporal slice.
+                context.util.sd_step_callback(
+                    PipelineIntermediateState(
+                        step=step,
+                        order=1,
+                        total_steps=total_steps,
+                        timestep=0,
+                        latents=latents_5d[:, :, num_latent_frames // 2],
+                    ),
+                    BaseModelType.MiniMaxH3,
+                )
+
+            return step_callback
 
         estimated_working_memory = self._estimate_working_memory(state.layout)
         transformer_info = context.models.load(self.transformer.transformer)
-        with transformer_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, transformer):
+        # The preview decoder's cache record is created after the transformer's RAM load (whose
+        # make_room could otherwise drop the unlocked 23 MB record) and locked before the
+        # transformer's VRAM lock, so the partial load accounts for it. Previews are strictly
+        # best-effort: no failure here may abort the generation.
+        preview_decoder_info = self._load_preview_decoder(context)
+        with ExitStack() as stack:
+            preview_decoder: TAEH3Decoder | None = None
+            if preview_decoder_info is not None:
+                try:
+                    preview_model = stack.enter_context(preview_decoder_info)
+                    assert isinstance(preview_model, TAEH3Decoder)
+                    preview_decoder = preview_model
+                except Exception:
+                    context.logger.warning(
+                        "Could not lock the MiniMax H3 preview decoder; previews fall back to latent projection.",
+                        exc_info=True,
+                    )
+            step_callback = make_step_callback(preview_decoder)
+
+            _, transformer = stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
+            )
             assert isinstance(transformer, MiniMaxH3Transformer3DModel)
             context.util.signal_progress("Denoising MiniMax H3 audio-video")
             # steps counts sigma grid points (terminal included) -> steps-1 model evaluations.
             progress = tqdm(total=len(state.timesteps), desc=f"Denoising MiniMax H3 ({self.num_frames} frames)")
 
-            def callback_with_progress(step: int, total_steps: int, video_rows: torch.Tensor) -> None:
+            def callback_with_progress(step: int, total_steps: int, pred_x0_video_rows: torch.Tensor) -> None:
                 progress.update(1)
-                step_callback(step, total_steps, video_rows)
+                step_callback(step, total_steps, pred_x0_video_rows)
 
             try:
                 video_rows, audio_rows = denoise(

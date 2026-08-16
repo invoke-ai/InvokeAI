@@ -89,14 +89,17 @@ export const buildMiniMaxH3Graph = async (arg: GraphBuilderArg): Promise<GraphBu
 
   const g = new Graph(getPrefixedId('minimax_h3_graph'));
 
-  // Optional single-file transformer override (e.g. pruned int8): replaces the folder's
-  // transformer; the text encoder and both VAEs still come from the folder install.
+  // Optional single-file overrides (e.g. pruned int8 transformer, truncated int8 text
+  // encoder): each replaces its folder counterpart; everything else still comes from the
+  // folder install.
   const transformerModel = params.minimaxH3TransformerModel;
+  const textEncoderModel = params.minimaxH3TextEncoderModel;
   const modelLoader = g.addNode({
     type: 'minimax_h3_model_loader',
     id: getPrefixedId('minimax_h3_model_loader'),
     model,
     transformer_model: transformerModel ?? undefined,
+    text_encoder_model: textEncoderModel ?? undefined,
   });
 
   const positivePrompt = g.addNode({
@@ -133,6 +136,9 @@ export const buildMiniMaxH3Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   });
   if (transformerModel) {
     g.upsertMetadata({ minimax_h3_transformer_model: transformerModel });
+  }
+  if (textEncoderModel) {
+    g.upsertMetadata({ minimax_h3_text_encoder_model: textEncoderModel });
   }
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');

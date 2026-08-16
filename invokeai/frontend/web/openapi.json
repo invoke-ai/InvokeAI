@@ -1087,6 +1087,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
                     },
                     {
@@ -1497,6 +1500,9 @@
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
                     },
                     {
@@ -1905,6 +1911,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -2360,6 +2369,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -2839,6 +2851,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -4166,6 +4181,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -15447,6 +15465,9 @@
           },
           {
             "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -67259,7 +67280,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
@@ -67826,7 +67847,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Loads a MiniMax H3 (FL2VA) model, outputting its submodels.\n\nAll six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)\ncome from the one diffusers-layout install. Optionally, a single-file transformer checkpoint\n(e.g. the pruned int8 repack) replaces the folder's transformer while the encoders and VAEs\nkeep coming from the folder install.",
+        "description": "Loads a MiniMax H3 (FL2VA) model, outputting its submodels.\n\nAll six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)\ncome from the one diffusers-layout install. Optionally, a single-file transformer checkpoint\n(e.g. the pruned int8 repack) replaces the folder's transformer, and/or a single-file\ntruncated Qwen3-VL encoder (e.g. the int8 repack) replaces the folder's text encoder, while\neverything else keeps coming from the folder install.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -67884,6 +67905,26 @@
             "ui_model_format": ["checkpoint"],
             "ui_model_type": ["main"]
           },
+          "text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional single-file MiniMax H3 Qwen3-VL text encoder (e.g. the truncated int8 repack) used in place of the main model's text encoder. The tokenizer and processor still come from the main model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Text Encoder (single file)",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_format": ["checkpoint"],
+            "ui_model_type": ["qwen3_vl_encoder"]
+          },
           "type": {
             "const": "minimax_h3_model_loader",
             "default": "minimax_h3_model_loader",
@@ -67896,7 +67937,7 @@
         "tags": ["model", "minimax", "video"],
         "title": "Main Model - MiniMax H3",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
         }
@@ -69124,6 +69165,9 @@
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
               },
               {
@@ -69780,6 +69824,9 @@
                     "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
                   },
                   {
@@ -70321,6 +70368,9 @@
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
               },
               {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
               },
               {
@@ -70716,6 +70766,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -71586,6 +71639,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -75794,6 +75850,142 @@
         ],
         "title": "Qwen3VLEncoder_Checkpoint_Config",
         "description": "Configuration for a single-file Qwen3-VL text encoder checkpoint (e.g. ComfyUI ``qwen3vl_4b_*``).\n\nDistinguished from the text-only ``Qwen3Encoder`` checkpoint (Z-Image) by the presence of the\nQwen3-VL visual tower. The tokenizer is not bundled in single-file checkpoints and is pulled from\nHuggingFace (``Qwen/Qwen3-VL-4B-Instruct``) by the loader."
+      },
+      "Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_vl_encoder",
+            "title": "Type",
+            "default": "qwen3_vl_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format"
+        ],
+        "title": "Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config",
+        "description": "Configuration for MiniMax H3's truncated Qwen3-VL-32B conditioning encoder single files\n(Comfy-Org ``qwen3vl_32b_minimax_h3_*.safetensors`` and mirrors).\n\nThese are NOT complete Qwen3-VL-32B checkpoints: the language stack is truncated to the 50\nlayers H3 conditions on (the file's ``minimax_h3_te`` metadata records the contract:\n\"unnormalized_hidden_after_layer_50\"), the final norm and LM head are omitted, and the\nbf16/int8-convrot repacks quantize only the 50 language layers (vision tower stays bf16).\n\nIdentified primarily by the explicit ``minimax_h3_te`` safetensors metadata; a structural\nfallback covers metadata-stripped re-uploads. Krea-2's ``Qwen3VLEncoder_Checkpoint_Config``\nis locked to the 4B shape (hidden 2560), so neither config can claim the other's files.\n\nThe nvfp4 repacks share this layout and are accepted here, but the loader rejects their\nquantization format early (header-only check) with a clear error - mirroring how the H3\ntransformer checkpoint config treats fp8_scaled files."
       },
       "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
         "properties": {
