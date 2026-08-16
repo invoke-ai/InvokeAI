@@ -46,7 +46,17 @@ import {
   TextIcon,
   XIcon,
 } from 'lucide-react';
-import { createContext, use, useCallback, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import {
+  createContext,
+  memo,
+  use,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ReactNode,
+} from 'react';
 
 import {
   formEdgeDroppableId,
@@ -73,15 +83,24 @@ import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
 
 interface BuilderDndContextValue {
   activeElementId: string | null;
-  dropTarget: FormDropTarget | null;
   form: WorkflowForm;
 }
 
 const BuilderDndContext = createContext<BuilderDndContextValue>({
   activeElementId: null,
-  dropTarget: null,
   form: { elements: {}, rootElementId: '' },
 });
+
+/**
+ * Split out from `BuilderDndContext`: `dropTarget` changes on every
+ * `onDragMove` frame while a drag is in flight, while `activeElementId`/
+ * `form` only change at drag start/end. Bundling them would force every
+ * card to re-render per pointer move (cards read `BuilderDndContext` for
+ * opacity/disabled state); only the drop-indicator components below read
+ * this one, so a move re-renders just the indicator for the affected card
+ * or container.
+ */
+const BuilderDropTargetContext = createContext<FormDropTarget | null>(null);
 
 /** Title shown in a card's title bar and the drag ghost. Shared so the two never drift. */
 const getFormElementTitle = (element: WorkflowFormElement): string => {
@@ -120,8 +139,36 @@ const BuilderDragGhost = ({ element }: { element: WorkflowFormElement }) => (
   </HStack>
 );
 
+/**
+ * The edge drop-indicator line above/below a card. The only piece of a card
+ * that needs to know `dropTarget` — isolated into its own component so it's
+ * also the only piece that re-renders on every drag-move frame.
+ */
+const CardDropEdgeIndicator = ({ elementId }: { elementId: string }) => {
+  const dropTarget = use(BuilderDropTargetContext);
+  const edge = dropTarget?.kind === 'edge' && dropTarget.elementId === elementId ? dropTarget.edge : null;
+
+  if (!edge) {
+    return null;
+  }
+
+  return (
+    <Box
+      bg="accent.solid"
+      h="2px"
+      left="0"
+      pointerEvents="none"
+      position="absolute"
+      right="0"
+      rounded="full"
+      zIndex="1"
+      {...(edge === 'above' ? { top: '-1px' } : { bottom: '-1px' })}
+    />
+  );
+};
+
 /** A builder card: typed title bar (drag handle + actions) over the element's content. */
-const BuilderCard = ({
+const BuilderCardBase = ({
   children,
   element,
   extraActions,
@@ -139,7 +186,7 @@ const BuilderCard = ({
   title: string;
 }) => {
   const { editGraph } = useProjectGraphCommands();
-  const { activeElementId, dropTarget, form } = use(BuilderDndContext);
+  const { activeElementId, form } = use(BuilderDndContext);
   const { attributes, listeners, setActivatorNodeRef, setNodeRef: setDragRef } = useDraggable({ id: element.id });
   // The title bar is both the draggable node and its own drag handle, so it
   // needs both refs: `setActivatorNodeRef` is what makes `KeyboardSensor`
@@ -159,23 +206,10 @@ const BuilderCard = ({
     disabled: activeElementId !== null && isFormDescendantOrSelf(form, activeElementId, element.id),
     id: formEdgeDroppableId(element.id),
   });
-  const edgeForThisCard = dropTarget?.kind === 'edge' && dropTarget.elementId === element.id ? dropTarget.edge : null;
 
   return (
     <Box ref={setDropRef} flex="1" minW="0" opacity={activeElementId === element.id ? 0.4 : 1} position="relative">
-      {edgeForThisCard ? (
-        <Box
-          bg="accent.solid"
-          h="2px"
-          left="0"
-          pointerEvents="none"
-          position="absolute"
-          right="0"
-          rounded="full"
-          zIndex="1"
-          {...(edgeForThisCard === 'above' ? { top: '-1px' } : { bottom: '-1px' })}
-        />
-      ) : null}
+      <CardDropEdgeIndicator elementId={element.id} />
       <Box
         overflow="hidden"
         position="relative"
@@ -222,19 +256,33 @@ const BuilderCard = ({
   );
 };
 
-/** Drop zone covering a container's body, appending at the end. Doubles as the empty-container hint. */
-const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormElement; isEmpty: boolean }) => {
-  const { activeElementId, dropTarget, form } = use(BuilderDndContext);
-  const canDrop = activeElementId !== null && !isFormDescendantOrSelf(form, activeElementId, container.id);
-  const { setNodeRef } = useDroppable({
-    disabled: activeElementId === null || isFormDescendantOrSelf(form, activeElementId, container.id),
-    id: formIntoDroppableId(container.id),
-  });
-  const isActive = dropTarget?.kind === 'into' && dropTarget.containerId === container.id;
+/**
+ * Memoized so a `dropTarget` change elsewhere in the form (a context update
+ * that only its parent `BuilderElement` would otherwise re-render for)
+ * doesn't cascade into every card — `BuilderCard` itself only reads
+ * `BuilderDndContext`, which changes solely at drag start/end.
+ */
+const BuilderCard = memo(BuilderCardBase);
 
-  if (!canDrop && !isEmpty) {
-    return null;
-  }
+/**
+ * The container drop-zone's hover styling and "drop here" vs. "empty" copy.
+ * The only piece of `ContainerDropZone` that needs `dropTarget` — isolated
+ * into its own component so it's also the only piece that re-renders on
+ * every drag-move frame.
+ */
+const ContainerDropZoneBody = ({
+  canDrop,
+  containerId,
+  isEmpty,
+  setNodeRef,
+}: {
+  canDrop: boolean;
+  containerId: string;
+  isEmpty: boolean;
+  setNodeRef: (node: HTMLElement | null) => void;
+}) => {
+  const dropTarget = use(BuilderDropTargetContext);
+  const isActive = dropTarget?.kind === 'into' && dropTarget.containerId === containerId;
 
   return (
     <DropZone
@@ -251,6 +299,26 @@ const ContainerDropZone = ({ container, isEmpty }: { container: ContainerFormEle
     </DropZone>
   );
 };
+
+/** Drop zone covering a container's body, appending at the end. Doubles as the empty-container hint. */
+const ContainerDropZoneBase = ({ container, isEmpty }: { container: ContainerFormElement; isEmpty: boolean }) => {
+  const { activeElementId, form } = use(BuilderDndContext);
+  const canDrop = activeElementId !== null && !isFormDescendantOrSelf(form, activeElementId, container.id);
+  const { setNodeRef } = useDroppable({
+    disabled: activeElementId === null || isFormDescendantOrSelf(form, activeElementId, container.id),
+    id: formIntoDroppableId(container.id),
+  });
+
+  if (!canDrop && !isEmpty) {
+    return null;
+  }
+
+  return (
+    <ContainerDropZoneBody canDrop={canDrop} containerId={container.id} isEmpty={isEmpty} setNodeRef={setNodeRef} />
+  );
+};
+
+const ContainerDropZone = memo(ContainerDropZoneBase);
 
 /** The shared description popover, bound through the form element. */
 const FieldDescriptionAction = ({
@@ -276,7 +344,7 @@ const FieldDescriptionAction = ({
   );
 };
 
-const BuilderElement = ({
+const BuilderElementBase = ({
   element,
   hoveredNodeId,
   invalidElementIds,
@@ -423,6 +491,18 @@ const BuilderElement = ({
     }
   }
 };
+
+/**
+ * Memoized so `FormBuilderTab`'s per-drag-move `dropTarget` state update
+ * (a plain `useState` re-render, unrelated to any of this component's own
+ * props) doesn't re-invoke every card's render function on every pointer
+ * move — none of `element`/`hoveredNodeId`/`invalidElementIds`/
+ * `projectGraph`/`selectedNodeIds` change mid-drag, so this bails and the
+ * `dropTarget` update only reaches the drop-indicator components that
+ * subscribe to `BuilderDropTargetContext` directly (context updates reach
+ * their consumers regardless of memoized ancestors in between).
+ */
+const BuilderElement = memo(BuilderElementBase);
 
 const AddElementMenu = () => {
   const { editGraph } = useProjectGraphCommands();
@@ -616,8 +696,8 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
   );
 
   const dndContextValue = useMemo<BuilderDndContextValue>(
-    () => ({ activeElementId, dropTarget, form: projectGraph.form }),
-    [activeElementId, dropTarget, projectGraph.form]
+    () => ({ activeElementId, form: projectGraph.form }),
+    [activeElementId, projectGraph.form]
   );
   const selectedNodeIdSet = useMemo(() => new Set(selectedNodeIds), [selectedNodeIds]);
   const invalidElementIds = useMemo(
@@ -638,25 +718,27 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
       onDragStart={handleDragStart}
     >
       <BuilderDndContext value={dndContextValue}>
-        <Stack gap="2" p="3" w="full">
-          {rootChildren.length === 0 ? (
-            <Text color="fg.subtle" fontSize="2xs">
-              The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
-              bars to reorder, drop them into containers, and add headings or dividers below.
-            </Text>
-          ) : null}
-          {rootChildren.map((element) => (
-            <BuilderElement
-              key={element.id}
-              element={element}
-              hoveredNodeId={hoveredNodeId}
-              invalidElementIds={invalidElementIds}
-              projectGraph={projectGraph}
-              selectedNodeIds={selectedNodeIdSet}
-            />
-          ))}
-          <AddElementMenu />
-        </Stack>
+        <BuilderDropTargetContext value={dropTarget}>
+          <Stack gap="2" p="3" w="full">
+            {rootChildren.length === 0 ? (
+              <Text color="fg.subtle" fontSize="2xs">
+                The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
+                bars to reorder, drop them into containers, and add headings or dividers below.
+              </Text>
+            ) : null}
+            {rootChildren.map((element) => (
+              <BuilderElement
+                key={element.id}
+                element={element}
+                hoveredNodeId={hoveredNodeId}
+                invalidElementIds={invalidElementIds}
+                projectGraph={projectGraph}
+                selectedNodeIds={selectedNodeIdSet}
+              />
+            ))}
+            <AddElementMenu />
+          </Stack>
+        </BuilderDropTargetContext>
       </BuilderDndContext>
       <DragOverlay dropAnimation={null}>
         {activeElement ? <BuilderDragGhost element={activeElement} /> : null}

@@ -1,20 +1,38 @@
+import type * as DndKitCoreModule from '@dnd-kit/core';
 import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { WorkflowUiAdapter } from '@features/workflow/react';
 import type { ProjectGraphAction } from '@features/workflow/utility';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { useDroppable } from '@dnd-kit/core';
 import { WorkflowUiProvider } from '@features/workflow/react';
 import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { act, useCallback, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import { formEdgeDroppableId } from './formBuilderDnd';
 import { FormBuilderTab } from './FormBuilderTab';
 import { PanelModeToggle } from './WorkflowLinearPanel';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+// This app is built with the React Compiler (`vite.config.mts`), which
+// auto-memoizes plain value computations inside components based on their
+// detected dependencies — so a spy on a pure helper a card's render calls
+// (e.g. `isFormDescendantOrSelf`) can't be trusted as a "did this card's
+// render function run" probe: the compiler can (and does) skip re-running
+// such a call even when the surrounding component *was* invoked. `dnd-kit`'s
+// `useDroppable` is a hook, and hook calls can never be skipped by the
+// compiler (they must run unconditionally, in order, every render), so a
+// real passthrough spy on it is a reliable per-card render probe instead.
+vi.mock('@dnd-kit/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof DndKitCoreModule>();
+
+  return { ...actual, useDroppable: vi.fn(actual.useDroppable) };
+});
 
 describe('Workflow Linear panel mode toggle', () => {
   let host: HTMLDivElement;
@@ -116,8 +134,8 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     return doc;
   };
 
-  const Harness = () => {
-    const [projectGraph, setProjectGraph] = useState(buildInitialGraph);
+  const Harness = ({ initialGraph }: { initialGraph: ProjectGraphState }) => {
+    const [projectGraph, setProjectGraph] = useState(initialGraph);
     const editGraph = useCallback((action: ProjectGraphAction) => {
       setProjectGraph((current) => projectGraphReducer(current, action));
     }, []);
@@ -145,11 +163,11 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     );
   };
 
-  const renderHarness = async () => {
+  const renderHarness = async (initialGraph: ProjectGraphState = buildInitialGraph()): Promise<void> => {
     await act(() => {
       root.render(
         <ChakraProvider value={system}>
-          <Harness />
+          <Harness initialGraph={initialGraph} />
         </ChakraProvider>
       );
     });
@@ -353,5 +371,74 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     expect(dividerIndex).toBeGreaterThanOrEqual(0);
     expect(headingIndex).toBeGreaterThanOrEqual(0);
     expect(dividerIndex).toBeLessThan(headingIndex);
+  });
+
+  /**
+   * Perf isolation for `BuilderDropTargetContext`: `dropTarget` (per-move
+   * churn) lives apart from `BuilderDndContext`'s `activeElementId`/`form`
+   * (drag start/end only), and `BuilderElement` is memoized on props that
+   * don't change mid-drag — so a move that never targets "Divider" should
+   * never re-invoke its `BuilderCard`. Probed via the `useDroppable`
+   * passthrough spy (mocked at module scope above): `BuilderCard` calls it
+   * exactly once per render with `formEdgeDroppableId(element.id)`, and hook
+   * calls (unlike plain helper calls) can't be optimized away by the React
+   * Compiler, so a call carrying "Divider"'s edge-droppable id is direct,
+   * compiler-proof evidence its `BuilderCard` re-rendered.
+   */
+  it('does not re-render an unrelated card on a drag-move that only changes the drop target', async () => {
+    const initialGraph = buildInitialGraph();
+    const dividerId = Object.values(initialGraph.form.elements).find((element) => element.type === 'divider')!.id;
+    const dividerDroppableId = formEdgeDroppableId(dividerId);
+
+    await renderHarness(initialGraph);
+
+    // The empty-container hint's rect, captured *before* the drag starts —
+    // once a drag is active this card's `canDrop` flips true and its own
+    // text changes from "Empty container..." to "Drop here", so the text
+    // selector below would no longer match if read mid-drag.
+    const emptyHint = [...host.querySelectorAll<HTMLElement>('*')].find(
+      (element) => element.textContent === 'Empty container — drag elements here'
+    );
+
+    expect(emptyHint).toBeDefined();
+
+    const dropZoneRect = emptyHint!.getBoundingClientRect();
+    const midX = dropZoneRect.left + dropZoneRect.width / 2;
+    const midY = dropZoneRect.top + dropZoneRect.height / 2;
+
+    const handle = titleBarFor('Heading');
+    const startRect = handle.getBoundingClientRect();
+    const startX = startRect.left + startRect.width / 2;
+    const startY = startRect.top + startRect.height / 2;
+
+    // Arm the `PointerSensor` (>4px activation constraint), then settle onto
+    // the container's drop zone the same way `dragTo` does (a same-target
+    // no-op nudge — `MeasuringStrategy.Always`'s remeasure lands one tick
+    // after the move that triggered it, so a single move can still report a
+    // stale `over`). This establishes a real `into` `dropTarget`; only the
+    // moves *after* this point, which don't change the logical target, are
+    // under test.
+    await interact(() => pointer('pointerdown', handle, startX, startY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, startX + 8, startY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY + 1));
+    vi.mocked(useDroppable).mockClear();
+
+    // Two more moves inside the same drop zone: `over` (and therefore the
+    // *logical* `dropTarget`) doesn't change, but `handleDragMove` still
+    // calls `setDropTarget` with a fresh object every time `onDragMove`
+    // fires — that per-frame churn, not touching "Divider" at all, is
+    // exactly what's under test.
+    await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY + 2));
+    await interact(() => pointer('pointermove', handle.ownerDocument, midX, midY + 3));
+
+    const dividerCardRerendered = vi
+      .mocked(useDroppable)
+      .mock.calls.some(([options]) => options.id === dividerDroppableId);
+
+    expect(dividerCardRerendered).toBe(false);
+
+    // End the drag cleanly so it doesn't leak into other tests.
+    await interact(() => pointer('pointerup', handle.ownerDocument, midX, midY + 3));
   });
 });
