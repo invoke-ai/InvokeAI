@@ -11,9 +11,12 @@ class RegionalIPData:
         masks: list[torch.Tensor],
         dtype: torch.dtype,
         device: torch.device,
-        max_downscale_factor: int = 8,
+        max_downscale_factor: int = 16,
     ):
-        """Initialize a `IPAdapterConditioningData` object."""
+        """Initialize an `IPAdapterConditioningData` object.
+
+        HiDiffusion's RAU-Net requires one mask level beyond the standard UNet's 8x downscale.
+        """
         assert len(image_prompt_embeds) == len(scales) == len(masks)
 
         # The image prompt embeddings.
