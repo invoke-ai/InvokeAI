@@ -35,14 +35,13 @@ interface PreviewFrameProps {
   frameHeight: number;
   frameWidth: number;
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
-  isLive: boolean;
   /**
-   * Static caption over a live frame — used only by the multi-session tiles to
-   * name the GPU. The single live preview carries no badge at all: the frame
-   * is styled exactly like a finished item, and progress readouts belong to
-   * the footer and the top bar rail.
+   * No live frame carries a caption of any kind. The frame is styled exactly
+   * like a finished item so nothing about it moves when denoising ends, and
+   * every progress readout — including which device is rendering — belongs to
+   * the footer island or the top bar rail.
    */
-  liveBadgeLabel?: string;
+  isLive: boolean;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
   onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
@@ -81,7 +80,6 @@ const PreviewImageFrame = ({
   frameHeight,
   frameWidth,
   isLive,
-  liveBadgeLabel,
   loupeControlsRef,
   onContextMenu,
   padding,
@@ -154,13 +152,6 @@ const PreviewImageFrame = ({
       width={frameWidth}
     />
   ) : null;
-  const liveBadge =
-    isLive && liveBadgeLabel !== undefined ? (
-      <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-        {liveBadgeLabel}
-      </Badge>
-    ) : null;
-
   if (variant === 'inset') {
     return (
       // Live tiles all reserve the chrome inset, so in a multi-session grid the
@@ -170,7 +161,6 @@ const PreviewImageFrame = ({
         {source ? (
           <FittedFrame frameHeight={frameHeight} frameWidth={frameWidth}>
             {media}
-            {liveBadge}
           </FittedFrame>
         ) : (
           children
@@ -204,7 +194,6 @@ const PreviewImageFrame = ({
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
       >
         {media}
-        {liveBadge}
       </FittedFrame>
       {loupe.zoomPercent !== null ? (
         <Badge

@@ -49,7 +49,7 @@ const sharedVideo: GalleryVideoItem = {
 const mocks = vi.hoisted(() => ({
   itemProgress: null as { device: string | null; percentage: number | null } | null,
   progressImage: null,
-  deviceLabel: null,
+  deviceLabel: null as { index: number } | null,
 }));
 
 vi.mock('@features/queue/react', () => ({
@@ -469,9 +469,51 @@ describe('Multi-session live preview tiles', () => {
     width: 512,
   };
 
-  it('shows a live badge with percent on session tiles even without a device label', async () => {
+  const renderTile = async () => {
+    await render(
+      <DndContext>
+        <LivePreviewTile placeholder={placeholder} shouldAntialiasProgressImage={false} />
+      </DndContext>
+    );
+
+    return Array.from(host!.querySelectorAll<HTMLElement>('p')).map((element) => element.textContent ?? '');
+  };
+
+  it('reports percent from the footer when no device label is available', async () => {
     mocks.itemProgress = { device: null, percentage: 0.4 };
     mocks.deviceLabel = null;
+
+    const footerText = await renderTile();
+
+    expect(footerText).toContain('40%');
+  });
+
+  it('names the device alongside percent once the label resolves', async () => {
+    mocks.itemProgress = { device: 'cuda:1', percentage: 0.4 };
+    mocks.deviceLabel = { index: 1 };
+
+    const footerText = await renderTile();
+
+    expect(footerText).toContain('GPU 1');
+    expect(footerText).toContain('40%');
+  });
+
+  it('still declares itself live before progress is quantified', async () => {
+    // A silent tile reads as a stuck one when several sessions race, so the
+    // footer says "Generating" rather than going blank.
+    mocks.itemProgress = { device: null, percentage: null };
+    mocks.deviceLabel = null;
+
+    const footerText = await renderTile();
+
+    expect(footerText).toContain('Generating');
+  });
+
+  it('carries no caption over the image itself', async () => {
+    // The frame must be indistinguishable from a finished item's, so that
+    // nothing moves at the moment denoising ends.
+    mocks.itemProgress = { device: 'cuda:1', percentage: 0.4 };
+    mocks.deviceLabel = { index: 1 };
 
     await render(
       <DndContext>
@@ -479,15 +521,10 @@ describe('Multi-session live preview tiles', () => {
       </DndContext>
     );
 
-    const allElements = Array.from(host!.querySelectorAll('*'));
-    const badge = allElements.find((el) => {
-      const text = el.textContent || '';
-      return /Generating · 40%/.test(text);
-    });
+    const image = host!.querySelector('img');
+    const captionInsideFrame = image?.closest('div')?.querySelector('p, span');
 
-    expect(badge).not.toBeNull();
-    if (badge) {
-      expect(badge.textContent || '').toMatch(/Generating · 40%/);
-    }
+    expect(image).not.toBeNull();
+    expect(captionInsideFrame).toBeNull();
   });
 });

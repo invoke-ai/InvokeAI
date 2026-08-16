@@ -70,7 +70,7 @@ import { PreviewCompare } from './PreviewCompare';
 import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
-import { PreviewFooter, type PreviewFooterMedia } from './PreviewFooter';
+import { PreviewFooter, type PreviewFooterMedia, PreviewTileFooter } from './PreviewFooter';
 import {
   PreviewFrame,
   type PreviewMediaSource,
@@ -173,6 +173,14 @@ const selectGenerateRecallValues = createGenerateFormValuesSelector();
  * and closes back down.
  */
 const PREVIEW_OVERLAY_RESERVE = '5.5rem';
+
+/**
+ * A tile carries a footer but never a filmstrip, so it reserves the one island
+ * instead of the pair. Its stage padding stays compact for the same reason the
+ * grid exists at all: at four sessions each cell is a quarter of the widget.
+ */
+const PREVIEW_TILE_OVERLAY_RESERVE = '3.25rem';
+const PREVIEW_TILE_STAGE_PADDING = '3';
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
@@ -907,24 +915,27 @@ export const LivePreviewTile = ({
   );
 
   const percent = getDeterminateProgressPercent(itemProgress?.percentage);
-  // Every tile declares itself live: with several sessions racing, a silent
-  // tile reads as a stuck one. Device label when known, plain "Generating"
-  // otherwise; percent appended once quantified (zero is model-loading).
-  const badgeBase = deviceLabel
-    ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index })
-    : t('common.generating');
-  const liveBadgeLabel = percent === null ? badgeBase : `${badgeBase} · ${percent}%`;
+  // Device identity and progress read from the footer, not from a badge over
+  // the image: a tile is the same media card as any other preview surface, and
+  // the one thing that must never differ between them is the frame itself.
+  const tileDeviceLabel = deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null;
 
   return (
-    <PreviewFrame
-      frameHeight={previewImage?.height ?? placeholder.height}
-      frameWidth={previewImage?.width ?? placeholder.width}
-      isLive
-      liveBadgeLabel={liveBadgeLabel}
-      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
-      source={source}
-      variant="inset"
-    />
+    <PreviewMediaScaffold>
+      <PreviewFrame
+        frameHeight={previewImage?.height ?? placeholder.height}
+        frameWidth={previewImage?.width ?? placeholder.width}
+        isLive
+        padding={PREVIEW_TILE_STAGE_PADDING}
+        paddingBottom={PREVIEW_TILE_OVERLAY_RESERVE}
+        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        source={source}
+        variant="framed"
+      />
+      <PreviewOverlayStack>
+        <PreviewTileFooter deviceLabel={tileDeviceLabel} percent={percent} />
+      </PreviewOverlayStack>
+    </PreviewMediaScaffold>
   );
 };
 

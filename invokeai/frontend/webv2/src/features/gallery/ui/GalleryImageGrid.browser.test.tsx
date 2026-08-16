@@ -383,7 +383,6 @@ const Harness = ({
                       frameHeight={96}
                       frameWidth={128}
                       isLive={false}
-                      liveBadgeLabel="Generating"
                       shouldAntialiasLiveImage
                       source={{ itemKey: 'image:shared', kind: 'image', source: previewSource }}
                       variant="framed"
