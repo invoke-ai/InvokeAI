@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 832319,
+        "brotliBytes": 832456,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 832068,
+        "gzipBytes": 832132,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1932743,
+        "initialRawBytes": 1932874,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66704,
+        "ownedRawBytes": 66746,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -280,15 +280,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840643,
+        "brotliBytes": 840781,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 840389,
+        "gzipBytes": 840454,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1952071,
+        "initialRawBytes": 1952203,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66704,
+        "ownedRawBytes": 66746,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -298,17 +298,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1025567,
+        "brotliBytes": 1026239,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1022773,
+        "gzipBytes": 1023297,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2514981,
+        "initialRawBytes": 2516151,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 109821,
-        "requestCount": 86,
-        "scriptRequestCount": 70,
+        "ownedRawBytes": 110197,
+        "requestCount": 87,
+        "scriptRequestCount": 71,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -732,6 +732,7 @@
           "source:src/workbench/projects/syncedPersistence.ts",
           "source:src/workbench/projects/useProjectActions.ts",
           "source:src/workbench/projects/useProjectFileActions.ts",
+          "source:src/workbench/queue-integration/useActiveQueueProgress.ts",
           "source:src/workbench/queueHistoryNormalization.ts",
           "source:src/workbench/settings/SettingsDialogHost.tsx",
           "source:src/workbench/settings/settingsDialogStore.ts",
@@ -824,24 +825,24 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1035823,
+        "brotliBytes": 1036502,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1033001,
+        "gzipBytes": 1033530,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2540131,
+        "initialRawBytes": 2541313,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 109821,
-        "requestCount": 86,
-        "scriptRequestCount": 70
+        "ownedRawBytes": 110197,
+        "requestCount": 87,
+        "scriptRequestCount": 71
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-15",
+  "capturedAt": "2026-08-16",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
@@ -886,7 +887,9 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "editorForbiddenInitialChunkNames": [
+      "ag-psd"
+    ],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }
