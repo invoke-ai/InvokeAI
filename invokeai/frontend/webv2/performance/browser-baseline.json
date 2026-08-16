@@ -25,11 +25,11 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 112.59999999997672,
+      "domContentLoadedMedianMs": 110.79999999981374,
       "id": "launchpad",
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 112.59999999997672,
-      "longestTaskMaxMs": 70,
+      "loadMedianMs": 110.90000000037253,
+      "longestTaskMaxMs": 66,
       "owner": "app",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:launchpad",
@@ -56,7 +56,7 @@
         "scriptRequestCount": 32,
         "totalRawBytes": 1784521
       },
-      "routeReadyMedianMs": 249.5,
+      "routeReadyMedianMs": 244.5,
       "scriptSourceOwnerSet": "launchpad-static",
       "stateProfile": "empty"
     },
@@ -83,11 +83,11 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 112,
+      "domContentLoadedMedianMs": 117.70000000018626,
       "id": "launchpad",
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 112,
-      "longestTaskMaxMs": 67,
+      "loadMedianMs": 117.70000000018626,
+      "longestTaskMaxMs": 76,
       "owner": "app",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:launchpad",
@@ -114,7 +114,7 @@
         "scriptRequestCount": 32,
         "totalRawBytes": 1784521
       },
-      "routeReadyMedianMs": 262.9000000000233,
+      "routeReadyMedianMs": 269.70000000018626,
       "scriptSourceOwnerSet": "launchpad-static",
       "stateProfile": "representative"
     },
@@ -141,13 +141,13 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 115.79999999993015,
+      "domContentLoadedMedianMs": 115.5,
       "id": "editor-minimal",
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 115.89999999990687,
+      "loadMedianMs": 115.5,
       "longestTaskMaxMs": 94,
       "owner": "workbench",
-      "projectSwitchMedianMs": 32.40000000002328,
+      "projectSwitchMedianMs": 32.89999999944121,
       "readyMark": "invokeai:ready:widget:center:preview",
       "remediationTicket": "deepen-widget-registry-loading",
       "resourceBaseline": {
@@ -156,10 +156,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 113,
-        "scriptRawBytes": 3366154,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3699704
+        "requestCount": 115,
+        "scriptRawBytes": 3374529,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3708079
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -167,12 +167,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 113,
-        "scriptRawBytes": 3399816,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3736702
+        "requestCount": 115,
+        "scriptRawBytes": 3408275,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3745160
       },
-      "routeReadyMedianMs": 635.5999999999767,
+      "routeReadyMedianMs": 637.7999999998137,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "empty"
     },
@@ -199,13 +199,13 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 113.59999999997672,
+      "domContentLoadedMedianMs": 115.70000000018626,
       "id": "editor-minimal",
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 113.59999999997672,
-      "longestTaskMaxMs": 114,
+      "loadMedianMs": 115.70000000018626,
+      "longestTaskMaxMs": 107,
       "owner": "workbench",
-      "projectSwitchMedianMs": 52.5,
+      "projectSwitchMedianMs": 50.5,
       "readyMark": "invokeai:ready:widget:center:preview",
       "remediationTicket": "deepen-widget-registry-loading",
       "resourceBaseline": {
@@ -214,10 +214,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 113,
-        "scriptRawBytes": 3366154,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3699704
+        "requestCount": 115,
+        "scriptRawBytes": 3374529,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3708079
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -225,12 +225,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 113,
-        "scriptRawBytes": 3399816,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3736702
+        "requestCount": 115,
+        "scriptRawBytes": 3408275,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3745160
       },
-      "routeReadyMedianMs": 696.6999999999534,
+      "routeReadyMedianMs": 701.2000000001863,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "representative"
     },
@@ -257,11 +257,11 @@
         "scriptRequestCount": 5,
         "totalRawBytes": 286746
       },
-      "domContentLoadedMedianMs": 112.90000000002328,
+      "domContentLoadedMedianMs": 108.20000000018626,
       "id": "editor-canvas",
-      "layoutSwitchMedianMs": 63.40000000002328,
-      "loadMedianMs": 112.90000000002328,
-      "longestTaskMaxMs": 90,
+      "layoutSwitchMedianMs": 62.89999999944121,
+      "loadMedianMs": 108.20000000018626,
+      "longestTaskMaxMs": 84,
       "owner": "canvas",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:canvas",
@@ -272,10 +272,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 118,
-        "scriptRawBytes": 3650060,
-        "scriptRequestCount": 112,
-        "totalRawBytes": 3983610
+        "requestCount": 120,
+        "scriptRawBytes": 3658435,
+        "scriptRequestCount": 114,
+        "totalRawBytes": 3991985
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -283,12 +283,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 118,
-        "scriptRawBytes": 3686561,
-        "scriptRequestCount": 112,
-        "totalRawBytes": 4023447
+        "requestCount": 120,
+        "scriptRawBytes": 3695020,
+        "scriptRequestCount": 114,
+        "totalRawBytes": 4031905
       },
-      "routeReadyMedianMs": 1085.1000000000931,
+      "routeReadyMedianMs": 1056.7000000001863,
       "scriptSourceOwnerSet": "editor-canvas-static",
       "stateProfile": "empty"
     },
@@ -315,11 +315,11 @@
         "scriptRequestCount": 5,
         "totalRawBytes": 286746
       },
-      "domContentLoadedMedianMs": 115.30000000004657,
+      "domContentLoadedMedianMs": 111.40000000037253,
       "id": "editor-canvas",
-      "layoutSwitchMedianMs": 191.29999999993015,
-      "loadMedianMs": 115.40000000002328,
-      "longestTaskMaxMs": 383,
+      "layoutSwitchMedianMs": 179.20000000018626,
+      "loadMedianMs": 111.5,
+      "longestTaskMaxMs": 352,
       "owner": "canvas",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:canvas",
@@ -330,10 +330,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 118,
-        "scriptRawBytes": 3650060,
-        "scriptRequestCount": 112,
-        "totalRawBytes": 3983610
+        "requestCount": 120,
+        "scriptRawBytes": 3658435,
+        "scriptRequestCount": 114,
+        "totalRawBytes": 3991985
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -341,12 +341,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 118,
-        "scriptRawBytes": 3686561,
-        "scriptRequestCount": 112,
-        "totalRawBytes": 4023447
+        "requestCount": 120,
+        "scriptRawBytes": 3695020,
+        "scriptRequestCount": 114,
+        "totalRawBytes": 4031905
       },
-      "routeReadyMedianMs": 1269.7000000000698,
+      "routeReadyMedianMs": 1229.2000000001863,
       "scriptSourceOwnerSet": "editor-canvas-static",
       "stateProfile": "representative"
     },
@@ -373,11 +373,11 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 120.30000000004657,
+      "domContentLoadedMedianMs": 108.90000000037253,
       "id": "editor-workflow",
-      "layoutSwitchMedianMs": 61.60000000009313,
-      "loadMedianMs": 120.30000000004657,
-      "longestTaskMaxMs": 111,
+      "layoutSwitchMedianMs": 60.700000000186265,
+      "loadMedianMs": 109,
+      "longestTaskMaxMs": 92,
       "owner": "workflow",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:workflow",
@@ -388,10 +388,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 113,
-        "scriptRawBytes": 3366154,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3699704
+        "requestCount": 115,
+        "scriptRawBytes": 3374529,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3708079
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -399,12 +399,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 113,
-        "scriptRawBytes": 3399816,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3736702
+        "requestCount": 115,
+        "scriptRawBytes": 3408275,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3745160
       },
-      "routeReadyMedianMs": 1096.5999999999767,
+      "routeReadyMedianMs": 1069,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "empty"
     },
@@ -431,11 +431,11 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 112.5,
+      "domContentLoadedMedianMs": 111.3999999994412,
       "id": "editor-workflow",
-      "layoutSwitchMedianMs": 115.19999999995343,
-      "loadMedianMs": 112.5,
-      "longestTaskMaxMs": 377,
+      "layoutSwitchMedianMs": 113.40000000037253,
+      "loadMedianMs": 111.3999999994412,
+      "longestTaskMaxMs": 376,
       "owner": "workflow",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:workflow",
@@ -446,10 +446,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 113,
-        "scriptRawBytes": 3366154,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3699704
+        "requestCount": 115,
+        "scriptRawBytes": 3374529,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3708079
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -457,12 +457,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 113,
-        "scriptRawBytes": 3399816,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3736702
+        "requestCount": 115,
+        "scriptRawBytes": 3408275,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3745160
       },
-      "routeReadyMedianMs": 1190.5,
+      "routeReadyMedianMs": 1176.0999999996275,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "representative"
     },
@@ -489,11 +489,11 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 113.80000000004657,
+      "domContentLoadedMedianMs": 110.09999999962747,
       "id": "editor-gallery",
-      "layoutSwitchMedianMs": 25,
-      "loadMedianMs": 113.80000000004657,
-      "longestTaskMaxMs": 97,
+      "layoutSwitchMedianMs": 23.09999999962747,
+      "loadMedianMs": 110.09999999962747,
+      "longestTaskMaxMs": 88,
       "owner": "gallery",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:gallery",
@@ -504,10 +504,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 113,
-        "scriptRawBytes": 3366154,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3699704
+        "requestCount": 115,
+        "scriptRawBytes": 3374529,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3708079
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -515,12 +515,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 113,
-        "scriptRawBytes": 3399816,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3736702
+        "requestCount": 115,
+        "scriptRawBytes": 3408275,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3745160
       },
-      "routeReadyMedianMs": 1332,
+      "routeReadyMedianMs": 1289.0999999996275,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "empty"
     },
@@ -547,11 +547,11 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 116.09999999997672,
+      "domContentLoadedMedianMs": 108.70000000018626,
       "id": "editor-gallery",
-      "layoutSwitchMedianMs": 96.79999999993015,
-      "loadMedianMs": 116.09999999997672,
-      "longestTaskMaxMs": 142,
+      "layoutSwitchMedianMs": 94.79999999981374,
+      "loadMedianMs": 108.70000000018626,
+      "longestTaskMaxMs": 134,
       "owner": "gallery",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:gallery",
@@ -562,10 +562,10 @@
         "imageRawBytes": 156376,
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 135938,
-        "requestCount": 113,
-        "scriptRawBytes": 3366154,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3699704
+        "requestCount": 115,
+        "scriptRawBytes": 3374529,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3708079
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -573,12 +573,12 @@
         "imageRawBytes": 157940,
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137298,
-        "requestCount": 113,
-        "scriptRawBytes": 3399816,
-        "scriptRequestCount": 107,
-        "totalRawBytes": 3736702
+        "requestCount": 115,
+        "scriptRawBytes": 3408275,
+        "scriptRequestCount": 109,
+        "totalRawBytes": 3745160
       },
-      "routeReadyMedianMs": 1467.0999999999767,
+      "routeReadyMedianMs": 1428.4000000003725,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "representative"
     }
@@ -1649,6 +1649,8 @@
       "source:src/workbench/image-actions/selectedImage.ts",
       "source:src/workbench/image-actions/useDeletionConfirmation.tsx",
       "source:src/workbench/image-actions/useImageActions.ts",
+      "source:src/workbench/image-map/api.ts",
+      "source:src/workbench/image-map/imageMapStore.ts",
       "source:src/workbench/invocation.ts",
       "source:src/workbench/invocationSubmit.ts",
       "source:src/workbench/launchpad/HelpMenu.tsx",
@@ -1791,6 +1793,10 @@
       "source:src/workbench/widgets/diagnostics/manifest.ts",
       "source:src/workbench/widgets/gallery/manifest.ts",
       "source:src/workbench/widgets/generate/manifest.ts",
+      "source:src/workbench/widgets/image-map/ImageMapDataRuntime.tsx",
+      "source:src/workbench/widgets/image-map/ImageMapWidgetFooter.tsx",
+      "source:src/workbench/widgets/image-map/ImageMapWidgetView.tsx",
+      "source:src/workbench/widgets/image-map/implementation.ts",
       "source:src/workbench/widgets/image-map/manifest.ts",
       "source:src/workbench/widgets/layers/controlModelOptions.ts",
       "source:src/workbench/widgets/layers/layerOps.ts",
@@ -2604,6 +2610,8 @@
       "source:src/workbench/image-actions/selectedImage.ts",
       "source:src/workbench/image-actions/useDeletionConfirmation.tsx",
       "source:src/workbench/image-actions/useImageActions.ts",
+      "source:src/workbench/image-map/api.ts",
+      "source:src/workbench/image-map/imageMapStore.ts",
       "source:src/workbench/invocation.ts",
       "source:src/workbench/invocationSubmit.ts",
       "source:src/workbench/launchpad/HelpMenu.tsx",
@@ -2802,6 +2810,10 @@
       "source:src/workbench/widgets/diagnostics/manifest.ts",
       "source:src/workbench/widgets/gallery/manifest.ts",
       "source:src/workbench/widgets/generate/manifest.ts",
+      "source:src/workbench/widgets/image-map/ImageMapDataRuntime.tsx",
+      "source:src/workbench/widgets/image-map/ImageMapWidgetFooter.tsx",
+      "source:src/workbench/widgets/image-map/ImageMapWidgetView.tsx",
+      "source:src/workbench/widgets/image-map/implementation.ts",
       "source:src/workbench/widgets/image-map/manifest.ts",
       "source:src/workbench/widgets/layers/AdjustmentsPopover.tsx",
       "source:src/workbench/widgets/layers/ControlLayerSettings.tsx",

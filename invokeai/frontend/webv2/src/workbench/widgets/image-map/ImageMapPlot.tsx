@@ -18,9 +18,10 @@ import {
   fitRangesToAspect,
   rangesToKeepMarkerInView,
 } from '@workbench/image-map/imageMapViewport';
+import { getThumbnailUrl } from '@workbench/image-map/thumbnailCache';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import Plotly from 'plotly.js-gl2d-dist-min';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useSelectMapImage } from './useSelectMapImage';
 
@@ -30,11 +31,25 @@ const PINCH_CLICK_SUPPRESS_MS = 500;
 /** How long a map click may suppress the recenter its own selection causes. */
 const MAP_CLICK_SUPPRESS_MS = 5000;
 
+/** Dwell before a hover thumbnail appears (PhotoMapAI's delay). */
+const HOVER_DELAY_MS = 150;
+
 /** These plotly calls can reject on a plot whose WebGL init failed; the map
  * already shows the store's error state, so the rejection itself is noise. */
 const swallow = (promise: Promise<unknown>): void => {
   promise.catch(() => {});
 };
+
+/** Matches the preview's `maxW`/`maxH` (Chakra 40 = 10rem); used to keep it on-screen. */
+const HOVER_PREVIEW_MAX_PX = 160;
+const HOVER_PREVIEW_OFFSET_PX = 14;
+
+interface HoverPreview {
+  imageName: string;
+  url: string;
+  clientX: number;
+  clientY: number;
+}
 
 interface PlotElement extends PlotlyHTMLElement {
   _fullLayout?: {
@@ -117,6 +132,20 @@ const ImageMapPlot = () => {
     pointsRef.current = points;
     selectedImageNameRef.current = selectedImageName;
   }, [points, selectedImageName]);
+  const [pendingHoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Monotonic hover session: a resolution from a previous hover (even of the
+  // same point) must neither show early nor at stale coordinates.
+  const hoverSessionRef = useRef(0);
+
+  const clearHover = () => {
+    hoverSessionRef.current += 1;
+    if (hoverTimerRef.current !== null) {
+      clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = null;
+    }
+    setHoverPreview(null);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -177,6 +206,35 @@ const ImageMapPlot = () => {
             selectImage(imageName);
           }
         });
+        plot.removeAllListeners?.('plotly_hover');
+        plot.on('plotly_hover', (event) => {
+          const imageName = event.points?.[0]?.customdata;
+          const mouse = (event as { event?: MouseEvent }).event;
+
+          if (typeof imageName !== 'string' || !mouse) {
+            return;
+          }
+
+          clearHover();
+          const session = hoverSessionRef.current;
+          const { clientX, clientY } = mouse;
+          hoverTimerRef.current = setTimeout(() => {
+            void getThumbnailUrl(imageName).then((url) => {
+              // Deliberately not gated on `disposed`: that belongs to this
+              // effect, which re-runs on every socket-driven refresh, so a
+              // refresh landing mid-dwell would drop the thumbnail — and no
+              // new `plotly_hover` fires while the pointer sits still.
+              // Unmount is covered by the session bump in the cleanup below.
+              if (url && hoverSessionRef.current === session) {
+                setHoverPreview({ clientX, clientY, imageName, url });
+              }
+            });
+          }, HOVER_DELAY_MS);
+        });
+        plot.removeAllListeners?.('plotly_unhover');
+        plot.on('plotly_unhover', () => {
+          clearHover();
+        });
       })
       .catch(() => {
         if (disposed) {
@@ -199,6 +257,14 @@ const ImageMapPlot = () => {
     };
   }, [points, selectImage]);
 
+  // The timer must not outlive the component; the scene effect used to do
+  // this, but it reruns on every `points` change.
+  useEffect(() => clearHover, []);
+
+  // Ending the session retires the hover for good. Hiding it alone is not
+  // enough: an image that leaves the map never fires `plotly_unhover`, so a
+  // later refresh restoring it would pop the thumbnail back up at coordinates
+  // captured long before, wherever the pointer has since moved.
   // Live gold target on the currently selected gallery image, with a gentle
   // recenter (zoom width preserved) when it drifts near or beyond an edge.
   useEffect(() => {
@@ -318,7 +384,61 @@ const ImageMapPlot = () => {
     };
   }, []);
 
-  return <Box ref={containerRef} h="full" minH="0" w="full" />;
+  // A live refresh can drop the hovered image from the map, which makes the
+  // preview stale. Derived from whether the image is still on the map, not
+  // from `points` changing: that changes on every socket-driven refresh, and
+  // clearing on it would silently cancel live hovers — they would not come
+  // back either, since `Plotly.react` resets hover state and no new
+  // `plotly_hover` fires until the pointer moves.
+  const hoverPreview =
+    pendingHoverPreview && points && !points.some((point) => point.imageName === pendingHoverPreview.imageName)
+      ? null
+      : pendingHoverPreview;
+
+  // The widget is usually docked in a side rail, so a point near the right or
+  // bottom edge would otherwise put a fixed-position preview off-screen, where
+  // nothing can scroll it into view. Flip to the other side of the cursor when
+  // it does not fit.
+  const previewPosition = hoverPreview
+    ? {
+        left:
+          hoverPreview.clientX + HOVER_PREVIEW_OFFSET_PX + HOVER_PREVIEW_MAX_PX > window.innerWidth
+            ? Math.max(0, hoverPreview.clientX - HOVER_PREVIEW_OFFSET_PX - HOVER_PREVIEW_MAX_PX)
+            : hoverPreview.clientX + HOVER_PREVIEW_OFFSET_PX,
+        top:
+          hoverPreview.clientY + HOVER_PREVIEW_OFFSET_PX + HOVER_PREVIEW_MAX_PX > window.innerHeight
+            ? Math.max(0, hoverPreview.clientY - HOVER_PREVIEW_OFFSET_PX - HOVER_PREVIEW_MAX_PX)
+            : hoverPreview.clientY + HOVER_PREVIEW_OFFSET_PX,
+      }
+    : { left: 0, top: 0 };
+
+  return (
+    <Box h="full" minH="0" position="relative" w="full">
+      <Box ref={containerRef} h="full" w="full" />
+      {hoverPreview ? (
+        <Box
+          borderColor="border.emphasized"
+          borderWidth="1px"
+          left={`${previewPosition.left}px`}
+          maxH="40"
+          maxW="40"
+          overflow="hidden"
+          pointerEvents="none"
+          position="fixed"
+          rounded="md"
+          shadow="lg"
+          top={`${previewPosition.top}px`}
+          zIndex="tooltip"
+        >
+          <img
+            alt={hoverPreview.imageName}
+            src={hoverPreview.url}
+            style={{ display: 'block', maxHeight: `${HOVER_PREVIEW_MAX_PX}px`, maxWidth: `${HOVER_PREVIEW_MAX_PX}px` }}
+          />
+        </Box>
+      ) : null}
+    </Box>
+  );
 };
 
 export default ImageMapPlot;
