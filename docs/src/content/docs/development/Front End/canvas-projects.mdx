@@ -4,6 +4,10 @@ title: Canvas Projects
 
 Canvas projects serialize the current canvas into a portable `.invk` archive. The feature lives in `invokeai/frontend/web/src/features/controlLayers/` and is exposed in the canvas toolbar archive menu and the canvas context menu under **Project**.
 
+:::note
+This page describes **version 1** of the `.invk` container, which is canvas-only and written by this frontend. Workbench projects write version 2 of the same container — see [Project Files (.invk)](/development/front-end/project-files/). The two readers each pin their own version and refuse the other's archives.
+:::
+
 ## File format
 
 `.invk` files are ZIP archives. The current manifest version is `1`.
@@ -51,4 +55,4 @@ Image existence checks and uploads are also concurrency-limited.
 
 The archive stores references to models, LoRAs, and other generation resources, not the model files themselves. Loading a project on another install can restore the canvas images and state, but missing model resources still need to be installed or replaced by the user.
 
-Future format changes should increment `CANVAS_PROJECT_VERSION` and keep validation in `parseManifest()` explicit so unsupported project files fail early.
+Future format changes should increment `CANVAS_PROJECT_VERSION` and keep validation in `parseManifest()` explicit so unsupported project files fail early. Version `2` is taken by the Workbench project archive.

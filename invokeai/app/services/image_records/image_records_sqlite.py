@@ -51,8 +51,15 @@ _ALL_ACTIVE_BOARDS_CONDITION = """(
                 )"""
 
 
-def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, list[Union[int, str, bool]]]:
-    """Build the shared filters for image-list and image-name queries."""
+def _build_image_query_conditions(
+    filters: _ImageQueryFilters, *, use_board_join: bool = True
+) -> tuple[str, list[Union[int, str, bool]]]:
+    """Build shared image filters.
+
+    Paginated DTO queries keep the outer board join because they return board
+    data. Names-only queries use correlated membership checks so SQLite can
+    scan images directly without multiplying rows or probing a redundant join.
+    """
     conditions: list[str] = []
     params: list[Union[int, str, bool]] = []
 
@@ -71,21 +78,81 @@ def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, lis
         params.append(filters.is_intermediate)
 
     if filters.board_id == "none":
-        conditions.append("board_images.board_id IS NULL")
+        conditions.append(
+            "board_images.board_id IS NULL"
+            if use_board_join
+            else """NOT EXISTS (
+                SELECT 1
+                FROM board_images
+                WHERE board_images.image_name = images.image_name
+            )"""
+        )
         if filters.user_id is not None and not filters.is_admin:
             conditions.append("images.user_id = ?")
             params.append(filters.user_id)
     elif filters.board_id == "all":
-        if filters.is_admin:
-            conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
-        elif filters.user_id is not None:
+        if use_board_join:
+            if filters.is_admin:
+                conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
+            elif filters.user_id is not None:
+                conditions.append(
+                    """(
+                        (board_images.board_id IS NULL AND images.user_id = ?)
+                        OR EXISTS (
+                            SELECT 1
+                            FROM boards
+                            WHERE boards.board_id = board_images.board_id
+                            AND boards.archived = 0
+                            AND (
+                                boards.user_id = ?
+                                OR boards.board_visibility IN ('shared', 'public')
+                                OR EXISTS (
+                                    SELECT 1
+                                    FROM shared_boards
+                                    WHERE shared_boards.board_id = boards.board_id
+                                    AND shared_boards.user_id = ?
+                                )
+                            )
+                        )
+                    )"""
+                )
+                params.extend([filters.user_id, filters.user_id, filters.user_id])
+            else:
+                # Single-user mode has no current user; it reads the administrative scope.
+                conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
+        elif filters.is_admin or filters.user_id is None:
             conditions.append(
                 """(
-                    (board_images.board_id IS NULL AND images.user_id = ?)
+                    NOT EXISTS (
+                        SELECT 1
+                        FROM board_images
+                        WHERE board_images.image_name = images.image_name
+                    )
                     OR EXISTS (
                         SELECT 1
-                        FROM boards
-                        WHERE boards.board_id = board_images.board_id
+                        FROM board_images
+                        INNER JOIN boards ON boards.board_id = board_images.board_id
+                        WHERE board_images.image_name = images.image_name
+                        AND boards.archived = 0
+                    )
+                )"""
+            )
+        else:
+            conditions.append(
+                """(
+                    (
+                        NOT EXISTS (
+                            SELECT 1
+                            FROM board_images
+                            WHERE board_images.image_name = images.image_name
+                        )
+                        AND images.user_id = ?
+                    )
+                    OR EXISTS (
+                        SELECT 1
+                        FROM board_images
+                        INNER JOIN boards ON boards.board_id = board_images.board_id
+                        WHERE board_images.image_name = images.image_name
                         AND boards.archived = 0
                         AND (
                             boards.user_id = ?
@@ -101,11 +168,17 @@ def _build_image_query_conditions(filters: _ImageQueryFilters) -> tuple[str, lis
                 )"""
             )
             params.extend([filters.user_id, filters.user_id, filters.user_id])
-        else:
-            # Single-user mode has no current user; it reads the administrative scope.
-            conditions.append(_ALL_ACTIVE_BOARDS_CONDITION)
     elif filters.board_id is not None:
-        conditions.append("board_images.board_id = ?")
+        conditions.append(
+            "board_images.board_id = ?"
+            if use_board_join
+            else """EXISTS (
+                SELECT 1
+                FROM board_images
+                WHERE board_images.image_name = images.image_name
+                AND board_images.board_id = ?
+            )"""
+        )
         params.append(filters.board_id)
     elif filters.user_id is not None and not filters.is_admin:
         conditions.append("images.user_id = ?")
@@ -511,7 +584,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     created_to=created_to,
                     user_id=user_id,
                     is_admin=is_admin,
-                )
+                ),
+                use_board_join=False,
             )
 
             # Get starred count if starred_first is enabled
@@ -520,7 +594,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 starred_count_query = f"""--sql
                 SELECT COUNT(*)
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE images.starred = TRUE AND (1=1{query_conditions})
                 """
                 cursor.execute(starred_count_query, query_params)
@@ -531,7 +604,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 names_query = f"""--sql
                 SELECT images.image_name
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1{query_conditions}
                 ORDER BY images.starred DESC, images.created_at {order_dir.value}
                 """
@@ -539,7 +611,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 names_query = f"""--sql
                 SELECT images.image_name
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1{query_conditions}
                 ORDER BY images.created_at {order_dir.value}
                 """

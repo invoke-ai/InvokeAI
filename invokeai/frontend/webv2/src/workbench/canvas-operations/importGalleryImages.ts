@@ -11,6 +11,7 @@ import {
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
 import { getModelsSnapshot } from '@features/models';
+import { mapWithConcurrency } from '@platform/core/concurrency';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -164,24 +165,6 @@ const buildLayers = (
     );
   }
   return layers;
-};
-
-const mapWithConcurrency = async <T, R>(
-  items: readonly T[],
-  concurrency: number,
-  mapper: (item: T, index: number) => Promise<R>
-): Promise<R[]> => {
-  const results: R[] = [];
-  let nextIndex = 0;
-  const worker = async (): Promise<void> => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await mapper(items[index]!, index);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
-  return results;
 };
 
 type ResizeResult =

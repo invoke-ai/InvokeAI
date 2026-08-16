@@ -30,18 +30,14 @@ export const useGalleryActions = ({
   boards,
   getCurrentGalleryLocation,
   loadMore,
-  projectBoardId,
-  projectName,
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
   getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
-  projectBoardId: string | null;
-  projectName: string;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { gallery, notifications } = useGalleryUi();
+  const { exportProject, gallery, notifications } = useGalleryUi();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -171,6 +167,7 @@ export const useGalleryActions = ({
           recordError(error);
         }
       },
+      exportProject,
       loadMore,
       refresh,
       renameBoard: async (boardId, boardName) => {
@@ -193,34 +190,6 @@ export const useGalleryActions = ({
       selectBoard: gallery.selectBoard,
       selectItem: gallery.selectItem,
       selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
-      selectProjectBoard: async () => {
-        const owner = captureAccountScope();
-
-        if (projectBoardId && boards.some((board) => board.id === projectBoardId)) {
-          gallery.selectBoard(projectBoardId);
-          return;
-        }
-
-        if (boards.length === 0) {
-          return;
-        }
-
-        try {
-          const board = await createGalleryBoard(projectName, owner.signal);
-
-          assertAccountScopeCurrent(owner);
-          gallery.setProjectBoard(board.id);
-          gallery.selectBoard(board.id);
-          recordSuccess(t('widgets.gallery.projectBoardCreated', { name: board.name }));
-          refresh();
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          recordError(error);
-        }
-      },
       setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
       setView: gallery.setView,
@@ -228,16 +197,5 @@ export const useGalleryActions = ({
       updateSettings: gallery.updateSettings,
       uploadFiles,
     };
-  }, [
-    boards,
-    gallery,
-    loadMore,
-    notifications,
-    projectBoardId,
-    projectName,
-    queryClient,
-    selectedBoardId,
-    t,
-    uploadFiles,
-  ]);
+  }, [boards, exportProject, gallery, loadMore, notifications, queryClient, selectedBoardId, t, uploadFiles]);
 };

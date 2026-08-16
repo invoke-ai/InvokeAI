@@ -71,6 +71,7 @@ export interface RegionalGuidanceInput {
 /** Options for {@link addRegionalGuidance}. */
 export interface AddRegionalGuidanceOptions {
   base: RegionalGuidanceBase;
+  modelVariant?: string | null;
   regions: readonly RegionalGuidanceInput[];
   /** Applies model-specific transforms before a regional positive conditioning is collected. */
   transformRegionalPositiveConditioning?: (
@@ -80,14 +81,14 @@ export interface AddRegionalGuidanceOptions {
 }
 
 /** Per-base conditioning encoder node type + the fields carrying the prompt. */
-const conditioningNodeType = (base: RegionalGuidanceBase): string => {
+const conditioningNodeType = (base: RegionalGuidanceBase, modelVariant?: string | null): string => {
   switch (base) {
     case 'sdxl':
       return 'sdxl_compel_prompt';
     case 'flux':
       return 'flux_text_encoder';
     case 'flux2':
-      return 'flux2_klein_text_encoder';
+      return modelVariant === 'dev' ? 'flux2_dev_text_encoder' : 'flux2_klein_text_encoder';
     case 'krea-2':
       return 'krea2_text_encoder';
     case 'sd-1':
@@ -104,14 +105,14 @@ const promptFields = (base: RegionalGuidanceBase): readonly string[] =>
  * regional one, so the region shares the same CLIP / T5 encoders (legacy copies
  * the CLIP/T5 edges verbatim). `mask` is wired separately, so it's excluded here.
  */
-const copyEncoderFields = (base: RegionalGuidanceBase): readonly string[] => {
+const copyEncoderFields = (base: RegionalGuidanceBase, modelVariant?: string | null): readonly string[] => {
   switch (base) {
     case 'sdxl':
       return ['clip', 'clip2'];
     case 'flux':
       return ['clip', 't5_encoder', 't5_max_seq_len'];
     case 'flux2':
-      return ['qwen3_encoder', 'max_seq_len'];
+      return modelVariant === 'dev' ? ['mistral_encoder', 'max_seq_len'] : ['qwen3_encoder', 'max_seq_len'];
     case 'krea-2':
       return ['qwen3_vl_encoder'];
     case 'sd-1':
@@ -167,15 +168,16 @@ const resolveDenoiseCollector = (
 const addRegionalConditioning = (
   graph: BackendGraphContract,
   base: RegionalGuidanceBase,
+  modelVariant: string | null | undefined,
   nodeId: string,
   prompt: string,
   copyFrom: string
 ): BackendInvocationContract => {
-  const node = addNode(graph, { id: nodeId, type: conditioningNodeType(base) });
+  const node = addNode(graph, { id: nodeId, type: conditioningNodeType(base, modelVariant) });
   for (const field of promptFields(base)) {
     (node as Record<string, unknown>)[field] = prompt;
   }
-  copyEncoderEdges(graph, copyFrom, node, copyEncoderFields(base));
+  copyEncoderEdges(graph, copyFrom, node, copyEncoderFields(base, modelVariant));
   return node;
 };
 
@@ -192,7 +194,7 @@ const addRegionalConditioning = (
  * - reference images → mask-scoped `ip_adapter` (SD) / `flux_redux` (FLUX).
  */
 export const addRegionalGuidance = (graph: BackendGraphContract, options: AddRegionalGuidanceOptions): void => {
-  const { base, regions, transformRegionalPositiveConditioning } = options;
+  const { base, modelVariant, regions, transformRegionalPositiveConditioning } = options;
   const denoise = graph.nodes[DENOISE_NODE_ID];
   if (!denoise) {
     throw new Error('addRegionalGuidance: base graph is missing the denoise node.');
@@ -219,6 +221,7 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
       const posCond = addRegionalConditioning(
         graph,
         base,
+        modelVariant,
         `rg_pos_cond_${region.id}`,
         region.positivePrompt,
         POS_COND_ID
@@ -233,6 +236,7 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
       const negCond = addRegionalConditioning(
         graph,
         base,
+        modelVariant,
         `rg_neg_cond_${region.id}`,
         region.negativePrompt,
         NEG_COND_ID
@@ -249,6 +253,7 @@ export const addRegionalGuidance = (graph: BackendGraphContract, options: AddReg
       const inverted = addRegionalConditioning(
         graph,
         base,
+        modelVariant,
         `rg_pos_cond_inverted_${region.id}`,
         region.positivePrompt,
         POS_COND_ID

@@ -2,6 +2,7 @@ import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { ProjectSettings } from './contracts';
 import type * as storeModule from './store';
 
 /**
@@ -331,14 +332,44 @@ describe('clearWorkbenchSettings', () => {
 });
 
 describe('normalizeProjectSettings', () => {
-  it('defaults prompt syntax highlighting off for older project payloads', () => {
-    expect(store.normalizeProjectSettings({}).showPromptSyntaxHighlighting).toBe(false);
-    expect(store.normalizeProjectSettings({ showPromptSyntaxHighlighting: true }).showPromptSyntaxHighlighting).toBe(
-      true
-    );
-    expect(store.normalizeProjectSettings({ showPromptSyntaxHighlighting: false }).showPromptSyntaxHighlighting).toBe(
+  it('defaults progress-image behavior for older project payloads', () => {
+    expect(store.normalizeProjectSettings({}).showProgressImagesInViewer).toBe(true);
+    expect(store.normalizeProjectSettings({ showProgressImagesInViewer: false }).showProgressImagesInViewer).toBe(
       false
     );
+  });
+
+  /**
+   * Prompt highlighting and attention style used to be project settings. They
+   * are per-user preferences now, and a document written by an older build
+   * still carries them — normalizing must not let them back in, or importing
+   * someone else's project would rewrite the reader's editor.
+   */
+  it('drops prompt preferences that older documents still carry in project settings', () => {
+    const normalized = store.normalizeProjectSettings({
+      preferNumericAttentionStyle: true,
+      showPromptSyntaxHighlighting: true,
+    } as Partial<ProjectSettings>);
+
+    expect(normalized).not.toHaveProperty('showPromptSyntaxHighlighting');
+    expect(normalized).not.toHaveProperty('preferNumericAttentionStyle');
+  });
+});
+
+describe('normalizeWorkbenchPreferences prompt editing', () => {
+  it('defaults prompt syntax highlighting and numeric attention style off', () => {
+    expect(store.normalizeWorkbenchPreferences({}).showPromptSyntaxHighlighting).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({}).preferNumericAttentionStyle).toBe(false);
+  });
+
+  it('round-trips both prompt preferences', () => {
+    const normalized = store.normalizeWorkbenchPreferences({
+      preferNumericAttentionStyle: true,
+      showPromptSyntaxHighlighting: true,
+    });
+
+    expect(normalized.showPromptSyntaxHighlighting).toBe(true);
+    expect(normalized.preferNumericAttentionStyle).toBe(true);
   });
 });
 

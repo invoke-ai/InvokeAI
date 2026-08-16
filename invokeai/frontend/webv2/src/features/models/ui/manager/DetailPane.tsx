@@ -21,7 +21,7 @@ export const DetailPane = () => {
     (left, right) => left.activeModelKey === right.activeModelKey && left.activeTab === right.activeTab
   );
   const detailLabel = useModelsSelector(
-    (snapshot) => snapshot.models.find((model) => model.key === activeModelKey)?.name ?? t('models.details')
+    (snapshot) => (activeModelKey ? snapshot.modelsByKey.get(activeModelKey)?.name : undefined) ?? t('models.details')
   );
 
   return (
@@ -97,8 +97,7 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
 
   return (
     <Scrollable h="full" label={t('models.details')} minH="0" p="3">
-      <ModelDetail key={modelKey} density="full" modelKey={modelKey} onDeleted={handleDeleted} />
+      <ModelDetail key={modelKey} modelKey={modelKey} onDeleted={handleDeleted} />
     </Scrollable>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

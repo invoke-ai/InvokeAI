@@ -1,21 +1,15 @@
 import type { StarterModelBundle } from '@features/models/core/types';
 
 import { Flex, Icon, Spinner, Stack, Text, Wrap } from '@chakra-ui/react';
-import {
-  ensureInstallsLoaded,
-  isActiveInstallStatus,
-  refreshInstalls,
-  useInstallsSelector,
-} from '@features/models/data/installsStore';
-import { ensureModelsLoaded, refreshModels, useModelsSelector } from '@features/models/data/modelsStore';
+import { ensureInstallsLoaded, isActiveInstallStatus, useInstallsSelector } from '@features/models/data/installsStore';
+import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
-import { getStarterBundleInstallSources } from '@features/models/ui/add-models/starterModelInstallSources';
-import { useInstallActions } from '@features/models/ui/add-models/useInstallActions';
+import { openAddModelsWithBundle } from '@features/models/ui/uiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
-import { BoxIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
+import { ArrowRightIcon, BoxIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -27,8 +21,6 @@ import { useTranslation } from 'react-i18next';
  * starter bundle still downloading — and disappears for good once the library
  * has something in it.
  */
-
-const INSTALL_POLL_INTERVAL_MS = 2_500;
 
 const EMPTY_BUNDLES: Record<string, StarterModelBundle> = {};
 
@@ -55,37 +47,6 @@ export const ModelsNotice = () => {
     ensureStartersLoaded();
     ensureInstallsLoaded();
   });
-
-  /**
-   * Installs started here would otherwise sit on "Installing…" forever: the
-   * socket handling, reconnect refresh, and completion toasts all live in
-   * `ModelInstallRuntime`, which only the model manager mounts. Mounting a
-   * second copy of that runtime is not an option — its outcome toasts keep
-   * per-instance state, so Home and an already-visited Models section would
-   * each announce every install.
-   *
-   * Polling only while something is actually installing keeps this to the
-   * window where it matters, and both refreshes de-duplicate in flight.
-   */
-  useEffect(() => {
-    if (activeInstallCount === 0) {
-      return;
-    }
-
-    const owner = captureAccountScope();
-    const interval = setInterval(() => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      void refreshInstalls(owner);
-      void refreshModels(owner);
-    }, INSTALL_POLL_INTERVAL_MS);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [activeInstallCount]);
 
   // Nothing to say until the library has actually been read; guessing "you
   // have no models" during the first fetch would be a lie half the time.
@@ -145,17 +106,19 @@ const StarterBundles = ({ bundles }: { bundles: Record<string, StarterModelBundl
 };
 
 const StarterBundleButton = ({ bundle, bundleKey }: { bundle: StarterModelBundle; bundleKey: string }) => {
-  const { install } = useInstallActions();
+  const navigate = useNavigate();
 
-  const handleInstall = useCallback(() => {
-    for (const source of getStarterBundleInstallSources(bundle)) {
-      void install({ config: source.config, source: source.source }, { silent: true });
-    }
-  }, [bundle, install]);
+  // Opens the bundle in the model manager rather than installing blind — the
+  // user sees what the pack contains and installs from there.
+  const handleOpen = useCallback(() => {
+    openAddModelsWithBundle(bundle.name || bundleKey);
+    void navigate({ to: '/models' });
+  }, [bundle.name, bundleKey, navigate]);
 
   return (
-    <Button size="xs" variant="outline" onClick={handleInstall}>
+    <Button size="xs" variant="outline" onClick={handleOpen}>
       {bundle.name || bundleKey}
+      <Icon as={ArrowRightIcon} boxSize="3" color="fg.muted" />
     </Button>
   );
 };

@@ -45,6 +45,7 @@ from invokeai.backend.minimax_h3.sampling import (
     MINIMAX_H3_SPATIAL_COMPRESSION,
     MINIMAX_H3_VAE_LATENT_CHANNELS,
     build_denoise_state,
+    validate_canvas,
     validate_num_frames,
 )
 from invokeai.backend.minimax_h3.taehv_decoder import TAEH3_PREVIEW_MODEL_URL, TAEH3Decoder
@@ -165,6 +166,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MiniMaxH3DenoiseOutput:
         validate_num_frames(self.num_frames)
+        validate_canvas(self.height, self.width)
 
         device = TorchDevice.choose_torch_device()
 

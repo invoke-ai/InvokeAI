@@ -19,17 +19,15 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
-import { createLayoutPresetActivator, loadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
-import { builtInLayoutPresetDescriptors, getLayoutPreset } from '@workbench/layoutPresets';
+import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
+import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchExtensions, useWorkbenchQueries } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent, useMemo } from 'react';
 
-/** ⌥1 / ⌥2 / ⌥3 — the three shipped layout presets, in strip order. */
 const layoutPresetCommands = builtInLayoutPresetDescriptors.map(({ hotkeyId, preset }) => ({
   id: `app.${hotkeyId}`,
   presetId: preset.id,
@@ -86,10 +84,6 @@ export const useRegisterFirstPartyCommands = () => {
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { layout, notifications, queue, widgets } = commands;
-  const activateLayoutPreset = useMemo(
-    () => createLayoutPresetActivator({ apply: layout.applyPreset, load: loadLayoutPresetWidgets }),
-    [layout.applyPreset]
-  );
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
@@ -101,11 +95,11 @@ export const useRegisterFirstPartyCommands = () => {
    * is never written back to the project — "just this once, send it to the
    * gallery" must not silently retarget every subsequent invoke.
    */
-  const submitInvocation = useEffectEvent(async (destinationOverride?: ResultDestination) => {
+  const submitInvocation = async (destinationOverride?: ResultDestination) => {
     await submitActiveInvocation({ commands, destinationOverride, getModels: getAvailableModels, queries });
-  });
+  };
 
-  const recallSelectedImage = useEffectEvent(async (kind: ImageRecallKind) => {
+  const recallSelectedImage = async (kind: ImageRecallKind) => {
     const owner = captureAccountScope();
 
     try {
@@ -153,7 +147,7 @@ export const useRegisterFirstPartyCommands = () => {
 
       throw error;
     }
-  });
+  };
 
   useMountEffect(() =>
     commandApi.register({
@@ -163,7 +157,7 @@ export const useRegisterFirstPartyCommands = () => {
     })
   );
 
-  useEffect(() => {
+  useMountEffect(() => {
     const disposers = [
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invoke', title: 'Invoke' }),
       commandApi.register({ handler: () => submitInvocation(), id: 'app.invokeFront', title: 'Invoke front' }),
@@ -187,7 +181,7 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Save changes to the active layout preset',
       }),
       ...layoutPresetCommands.map(({ id, presetId, title }) =>
-        commandApi.register({ handler: () => void activateLayoutPreset(getLayoutPreset(presetId)), id, title })
+        commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
       ),
       commandApi.register({
         handler: () => {
@@ -307,20 +301,12 @@ export const useRegisterFirstPartyCommands = () => {
         title: 'Next prompt history item',
       }),
       commandApi.register({
-        handler: () =>
-          adjustFocusedPromptAttention(
-            'increment',
-            queries.getSnapshot().activeProject.settings.preferNumericAttentionStyle
-          ),
+        handler: () => adjustFocusedPromptAttention('increment', getWorkbenchPreferences().preferNumericAttentionStyle),
         id: 'app.promptWeightUp',
         title: 'Increase prompt weight',
       }),
       commandApi.register({
-        handler: () =>
-          adjustFocusedPromptAttention(
-            'decrement',
-            queries.getSnapshot().activeProject.settings.preferNumericAttentionStyle
-          ),
+        handler: () => adjustFocusedPromptAttention('decrement', getWorkbenchPreferences().preferNumericAttentionStyle),
         id: 'app.promptWeightDown',
         title: 'Decrease prompt weight',
       }),
@@ -367,5 +353,5 @@ export const useRegisterFirstPartyCommands = () => {
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [activateLayoutPreset, commandApi, commands, layout, notifications, queries, queryClient, queue, widgets]);
+  });
 };

@@ -8,7 +8,7 @@ import { getModelCategoryRank, getModelTypePluralLabel } from './taxonomy';
  * the list views stay thin and this logic is unit-testable.
  */
 
-export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'format';
+export type ModelSortField = 'default' | 'name' | 'base' | 'size' | 'format' | 'type' | 'path';
 
 export interface ModelLibraryFilters {
   searchTerm: string;
@@ -44,10 +44,9 @@ export interface ModelPickerOptions {
   excludeKeys?: ReadonlySet<string>;
   /** Extra predicate supplied by the owning form, e.g. base compatibility. */
   filter?: (model: ModelConfig) => boolean;
-  modelTypes: ModelTaxonomyType[];
+  modelTypes: readonly ModelTaxonomyType[];
   /** Models linked to the current selection, floated to the top of their group. */
   relatedKeys?: ReadonlySet<string>;
-  searchTerm: string;
 }
 
 /**
@@ -64,23 +63,20 @@ export interface ModelPickerGroup {
 export interface ModelPickerResult {
   /** Distinct bases among candidates (pre-search, pre-base-filter), for chips. */
   availableBases: string[];
-  /** Models available before text search, used for empty-state copy. */
+  /** Models available before the base filter (text search is the Picker's own concern), used for empty-state copy. */
   candidates: ModelConfig[];
   groups: ModelPickerGroup[];
 }
 
-const matchesSearch = (model: ModelConfig, searchTerm: string): boolean => {
-  if (!searchTerm) {
+const matchesSearchTerms = (model: ModelConfig, terms: readonly string[]): boolean => {
+  if (terms.length === 0) {
     return true;
   }
 
   const haystack =
     `${model.name} ${model.description ?? ''} ${model.base} ${model.type} ${model.format} ${(model.trigger_phrases ?? []).join(' ')}`.toLowerCase();
 
-  return searchTerm
-    .toLowerCase()
-    .split(/\s+/)
-    .every((term) => haystack.includes(term));
+  return terms.every((term) => haystack.includes(term));
 };
 
 const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortField): number => {
@@ -94,6 +90,13 @@ const compareBySortField = (a: ModelConfig, b: ModelConfig, field: ModelSortFiel
       return a.file_size - b.file_size;
     case 'format':
       return String(a.format).localeCompare(String(b.format));
+    case 'type':
+      return (
+        getModelCategoryRank(a.type) - getModelCategoryRank(b.type) ||
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      );
+    case 'path':
+      return a.path.localeCompare(b.path);
   }
 };
 
@@ -102,7 +105,8 @@ export const filterModels = (
   filters: ModelLibraryFilters,
   missingModelKeys: ReadonlySet<string>
 ): ModelConfig[] => {
-  const searchTerm = filters.searchTerm.trim();
+  // Split once per pass, not once per model.
+  const terms = filters.searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const directionFactor = filters.sortDirection === 'desc' ? -1 : 1;
 
   return models
@@ -111,7 +115,7 @@ export const filterModels = (
         (!filters.missingOnly || missingModelKeys.has(model.key)) &&
         (filters.typeFilter === null || model.type === filters.typeFilter) &&
         (filters.baseFilter === null || model.base === filters.baseFilter) &&
-        matchesSearch(model, searchTerm)
+        matchesSearchTerms(model, terms)
     )
     .sort((a, b) => compareBySortField(a, b, filters.sortField) * directionFactor);
 };
@@ -135,19 +139,7 @@ export const groupModelsByType = (models: ModelConfig[]): ModelGroup[] => {
     .map(([type, groupModels]) => ({ label: getModelTypePluralLabel(type), models: groupModels, type }));
 };
 
-const matchesPickerSearch = (model: ModelConfig, searchTerm: string): boolean => {
-  const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-  if (terms.length === 0) {
-    return true;
-  }
-
-  const haystack = `${model.name} ${model.base} ${model.type}`.toLowerCase();
-
-  return terms.every((term) => haystack.includes(term));
-};
-
-/** Candidate, search, sort, and grouping rules shared by every model picker instance. */
+/** Candidate, sort, and grouping rules shared by every model picker instance. */
 export const getModelPickerGroups = (models: ModelConfig[], options: ModelPickerOptions): ModelPickerResult => {
   const allowedTypes = new Set(options.modelTypes);
   const candidates = models.filter(
@@ -156,19 +148,15 @@ export const getModelPickerGroups = (models: ModelConfig[], options: ModelPicker
       !options.excludeKeys?.has(model.key) &&
       (options.filter ? options.filter(model) : true)
   );
-  // Chips are derived from candidates — before text search and the base filter —
-  // so the chip row stays stable while the user types or toggles chips.
+  // Chips are derived from candidates — before the base filter — so the chip
+  // row stays stable while the user toggles chips.
   const availableBases = collectBasesForDisplay(candidates);
   const { baseFilter } = options;
   const { relatedKeys } = options;
   // Bases order the groups; within a group, related models lead, then category
   // rank keeps main models above LoRAs in a cross-type picker, then name.
   const visibleModels = candidates
-    .filter(
-      (model) =>
-        matchesPickerSearch(model, options.searchTerm) &&
-        (!baseFilter || baseFilter.size === 0 || baseFilter.has(String(model.base)))
-    )
+    .filter((model) => !baseFilter || baseFilter.size === 0 || baseFilter.has(String(model.base)))
     .sort(
       (a, b) =>
         getBaseDisplayRank(String(a.base)) - getBaseDisplayRank(String(b.base)) ||
@@ -211,15 +199,15 @@ const DEPRIORITIZED_BASES: ReadonlySet<string> = new Set(['any', 'external', 'un
  * registry order from `baseIdentity`, unknown bases come next, and the
  * meaningless `any`/`external`/`unknown` bases are pushed to the very end.
  */
+const KNOWN_BASE_RANKS = new Map<string, number>(KNOWN_MODEL_BASES.map((base, index) => [base, index]));
+
 /** Display rank for a base: registry order, unknown bases next, meaningless bases last. */
 const getBaseDisplayRank = (base: string): number => {
   if (DEPRIORITIZED_BASES.has(base)) {
     return KNOWN_MODEL_BASES.length + 1;
   }
 
-  const index = KNOWN_MODEL_BASES.indexOf(base as (typeof KNOWN_MODEL_BASES)[number]);
-
-  return index === -1 ? KNOWN_MODEL_BASES.length : index;
+  return KNOWN_BASE_RANKS.get(base) ?? KNOWN_MODEL_BASES.length;
 };
 
 export const collectBasesForDisplay = (models: Pick<ModelConfig, 'base'>[]): string[] => {

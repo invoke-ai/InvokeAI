@@ -234,7 +234,7 @@
       "type": "invocation",
       "data": {
         "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

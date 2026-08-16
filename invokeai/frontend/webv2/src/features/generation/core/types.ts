@@ -211,6 +211,8 @@ export interface GenerateSettings {
   clipLEmbedModel: ComponentModelConfig | null;
   clipGEmbedModel: ComponentModelConfig | null;
   qwen3EncoderModel: ComponentModelConfig | null;
+  /** FLUX.2 [dev]'s Mistral text encoder. */
+  mistralEncoderModel: ComponentModelConfig | null;
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
   qwen3VLEncoderModel: ComponentModelConfig | null;
