@@ -878,6 +878,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1297,6 +1300,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1714,6 +1720,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -2178,6 +2187,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -2666,6 +2678,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -3984,6 +3999,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -14173,6 +14191,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -58015,6 +58036,183 @@
         ],
         "title": "Main_Checkpoint_SDXL_Config"
       },
+      "Main_Checkpoint_Wan_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "wan",
+            "title": "Base",
+            "default": "wan"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/WanVariantType"
+          },
+          "expert": {
+            "type": "string",
+            "enum": ["high", "low", "none"],
+            "title": "Expert",
+            "description": "For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, 'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).",
+            "default": "none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant",
+          "expert"
+        ],
+        "title": "Main_Checkpoint_Wan_Config",
+        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized. The loader normalises all of those.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
+      },
       "Main_Checkpoint_ZImage_Config": {
         "properties": {
           "key": {
@@ -66378,6 +66576,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -67043,6 +67244,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                   },
                   {
@@ -67593,6 +67797,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -67997,6 +68204,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -68873,6 +69083,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -88743,7 +88956,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a collection of LoRAs to the Wan 2.2 transformer(s).\n\nEach LoRA is routed to the primary and/or low-noise list based on its\nrecorded ``expert`` tag (set by the probe from the filename). Untagged\nLoRAs go to both lists.",
+        "description": "Apply a collection of LoRAs to the Wan 2.2 transformer(s).\n\nEach LoRA is routed to the primary and/or low-noise list based on its\nrecorded ``expert`` tag (set by the probe from the filename). Untagged\nLoRAs go to both lists.\n\nAgainst a TI2V-5B main, which is a single transformer with no low-noise\nexpert, a LoRA that would land only in the low-noise list is applied to\nthe transformer instead, with a warning.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -88833,7 +89046,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime; a LoRA routed only to the low-noise list would be inert, so that\nrouting logs a warning.",
+        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime, so a LoRA that would land only in the low-noise list is applied to\nthe transformer instead, with a warning. The alternative is to accept the\nLoRA and silently have no effect.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -88890,7 +89103,7 @@
           },
           "target": {
             "default": "auto",
-            "description": "Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it.",
+            "description": "Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it. On the single-transformer TI2V-5B, which has no low-noise expert, 'low' is applied to the transformer instead of being discarded.",
             "enum": ["auto", "both", "high", "low"],
             "field_kind": "input",
             "input": "any",
@@ -88974,7 +89187,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Loads a Wan 2.2 model, outputting its submodels.\n\nComponents can be mixed and matched, mirroring the Qwen Image loader pattern:\n\n- Transformer(s):\n    * Diffusers main: emits ``transformer/`` and (for A14B) ``transformer_2/``\n      from the same model record.\n    * GGUF main: emits the single GGUF as the primary transformer; for A14B\n      the second-expert GGUF must be wired to ``Transformer (Low Noise)``.\n- VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).\n- UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >\n  Component Source (Diffusers).\n\nThe Component Source slot lets users supply a Diffusers Wan main model purely\nfor VAE / encoder extraction when the actual transformer is in a single-file\nformat. Together, the standalone VAE + standalone encoder let a GGUF\ntransformer run without a full ~30 GB Diffusers install.",
+        "description": "Loads a Wan 2.2 model, outputting its submodels.\n\nComponents can be mixed and matched, mirroring the Qwen Image loader pattern:\n\n- Transformer(s):\n    * Diffusers main: emits ``transformer/`` and (for A14B) ``transformer_2/``\n      from the same model record.\n    * Single-file main (GGUF or safetensors checkpoint): emits the file as the\n      primary transformer; for A14B the second-expert file must be wired to\n      ``Transformer (Low Noise)``.\n- VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).\n- UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >\n  Component Source (Diffusers).\n\nThe Component Source slot lets users supply a Diffusers Wan main model purely\nfor VAE / encoder extraction when the actual transformer is in a single-file\nformat. Together, the standalone VAE + standalone encoder let a single-file\ntransformer run without a full ~30 GB Diffusers install.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -89021,14 +89234,14 @@
               }
             ],
             "default": null,
-            "description": "Optional second GGUF transformer for the A14B low-noise expert. Only relevant when the main model is a single-file GGUF and the variant is A14B; ignored when the main is a Diffusers A14B (both experts are pulled from transformer/ and transformer_2/ already) or when the variant is TI2V-5B.",
+            "description": "Optional second single-file transformer for the A14B low-noise expert. Only relevant when the main model is a single-file GGUF or safetensors checkpoint and the variant is A14B; ignored when the main is a Diffusers A14B (both experts are pulled from transformer/ and transformer_2/ already) or when the variant is TI2V-5B.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
             "orig_required": false,
             "title": "Transformer (Low Noise)",
             "ui_model_base": ["wan"],
-            "ui_model_format": ["gguf_quantized"],
+            "ui_model_format": ["gguf_quantized", "checkpoint"],
             "ui_model_type": ["main"]
           },
           "vae_model": {
