@@ -82,7 +82,7 @@ describe('image map api', () => {
 describe('image map store', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
-    imageMapStore.setSnapshot({ data: null, error: null, loadState: 'idle', renderError: null });
+    imageMapStore.setSnapshot({ data: null, error: null, indexCounts: null, loadState: 'idle', renderError: null });
   });
 
   it('loads points into the snapshot', async () => {
@@ -185,6 +185,7 @@ describe('snapshot transitions', () => {
     imageMapStore.setSnapshot({
       data: null,
       error: 'boom',
+      indexCounts: null,
       loadState: 'error',
       renderError: null,
     });
@@ -210,6 +211,7 @@ describe('snapshot transitions', () => {
     imageMapStore.setSnapshot({
       data: null,
       error: null,
+      indexCounts: null,
       loadState: 'loaded',
       renderError: 'The map failed to render (WebGL unavailable).',
     });
