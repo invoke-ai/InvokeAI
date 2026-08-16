@@ -39449,6 +39449,10 @@ export type components = {
          *     Each LoRA is routed to the primary and/or low-noise list based on its
          *     recorded ``expert`` tag (set by the probe from the filename). Untagged
          *     LoRAs go to both lists.
+         *
+         *     Against a TI2V-5B main, which is a single transformer with no low-noise
+         *     expert, a LoRA that would land only in the low-noise list is applied to
+         *     the transformer instead, with a warning.
          */
         WanLoRACollectionLoader: {
             /**
@@ -39497,8 +39501,9 @@ export type components = {
          *     field to override.
          *
          *     For TI2V-5B (single transformer) only the primary list is used at denoise
-         *     time; a LoRA routed only to the low-noise list would be inert, so that
-         *     routing logs a warning.
+         *     time, so a LoRA that would land only in the low-noise list is applied to
+         *     the transformer instead, with a warning. The alternative is to accept the
+         *     LoRA and silently have no effect.
          */
         WanLoRALoaderInvocation: {
             /**

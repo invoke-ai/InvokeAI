@@ -26,10 +26,12 @@ from invokeai.backend.model_manager.taxonomy import (
 # - ``high``: append only to the primary list (high-noise expert).
 # - ``low``: append only to the low-noise list (low-noise expert).
 #
-# One exception overrides all four: against a single-transformer TI2V-5B main, a
-# routing that would touch only the low-noise list is re-pointed at the primary
-# list by ``_correct_inert_low_routing``. That model has no low-noise expert, so
-# the alternative is to accept the LoRA and silently do nothing with it.
+# One exception applies afterwards, to whichever of the four produced a low-only
+# routing — ``auto`` on a low-tagged LoRA, or an explicit ``low``. Against a
+# single-transformer TI2V-5B main, ``_correct_inert_low_routing`` re-points it at
+# the primary list, because that model has no low-noise expert and the alternative
+# is to accept the LoRA and silently do nothing with it. ``both`` and ``high``
+# always reach the primary list, so they are never affected.
 WanLoRATarget = Literal["auto", "both", "high", "low"]
 
 
@@ -144,8 +146,9 @@ class WanLoRALoaderInvocation(BaseInvocation):
     field to override.
 
     For TI2V-5B (single transformer) only the primary list is used at denoise
-    time; a LoRA routed only to the low-noise list would be inert, so that
-    routing logs a warning.
+    time, so a LoRA that would land only in the low-noise list is applied to
+    the transformer instead, with a warning. The alternative is to accept the
+    LoRA and silently have no effect.
     """
 
     lora: ModelIdentifierField = InputField(
@@ -219,6 +222,10 @@ class WanLoRACollectionLoader(BaseInvocation):
     Each LoRA is routed to the primary and/or low-noise list based on its
     recorded ``expert`` tag (set by the probe from the filename). Untagged
     LoRAs go to both lists.
+
+    Against a TI2V-5B main, which is a single transformer with no low-noise
+    expert, a LoRA that would land only in the low-noise list is applied to
+    the transformer instead, with a warning.
     """
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(

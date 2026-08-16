@@ -88956,7 +88956,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a collection of LoRAs to the Wan 2.2 transformer(s).\n\nEach LoRA is routed to the primary and/or low-noise list based on its\nrecorded ``expert`` tag (set by the probe from the filename). Untagged\nLoRAs go to both lists.",
+        "description": "Apply a collection of LoRAs to the Wan 2.2 transformer(s).\n\nEach LoRA is routed to the primary and/or low-noise list based on its\nrecorded ``expert`` tag (set by the probe from the filename). Untagged\nLoRAs go to both lists.\n\nAgainst a TI2V-5B main, which is a single transformer with no low-noise\nexpert, a LoRA that would land only in the low-noise list is applied to\nthe transformer instead, with a warning.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -89046,7 +89046,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime; a LoRA routed only to the low-noise list would be inert, so that\nrouting logs a warning.",
+        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime, so a LoRA that would land only in the low-noise list is applied to\nthe transformer instead, with a warning. The alternative is to accept the\nLoRA and silently have no effect.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
