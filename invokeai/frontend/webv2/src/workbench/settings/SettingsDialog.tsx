@@ -436,7 +436,7 @@ const BehaviorSection = () => {
       />
       <SettingToggle
         checked={notifyOnEnqueue}
-        description="Show a toast each time an invocation is added to the queue."
+        description="Show a toast for every successful enqueue. Off, enqueues are still recorded in the notification center."
         label="Notify when queued"
         onChange={updateNotifyOnEnqueue}
       />
