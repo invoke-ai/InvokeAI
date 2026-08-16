@@ -129,9 +129,9 @@ class WanModelLoaderInvocation(BaseInvocation):
         # low-noise expert (A14B only). boundary_ratio comes from the probed
         # model_index.json.
         #
-        # GGUF main: the file itself is one expert (high or low). For A14B,
-        # the user wires the other expert to transformer_low_noise_model.
-        # We swap so the *high*-noise expert is always the primary if needed.
+        # GGUF main: the file itself is one expert. For A14B, the user wires
+        # the other expert to transformer_low_noise_model. The explicit slots
+        # define the roles; filename-derived expert tags are advisory only.
         # boundary_ratio falls back to 0.875 unless a Diffusers component_source
         # provides a recorded value.
         boundary_ratio = 0.9 if main_variant == WanVariantType.I2V_A14B else 0.875
@@ -172,18 +172,10 @@ class WanModelLoaderInvocation(BaseInvocation):
                 if getattr(low_config, "variant", None) != main_variant:
                     raise ValueError("The high-noise and low-noise GGUF models must use the same Wan variant.")
 
-                # The expert tag is a filename heuristic, so 'none' (untagged)
-                # is common on community finetunes. The wiring itself is
-                # explicit user intent — main slot = high, low-noise slot =
-                # low — so an untagged file is taken at its wired position (or
-                # inferred as the complement of its tagged partner). Only a
-                # genuine conflict, both files claiming the *same* expert, is
-                # an error.
-                if primary_expert == low_expert != "none":
-                    raise ValueError(
-                        f"Both selected GGUF models are tagged as the {primary_expert}-noise expert. "
-                        "A Wan A14B expert pair must contain one high and one low expert."
-                    )
+                # Expert tags come from filenames and may be absent or wrong on
+                # community models. Explicit graph wiring is authoritative:
+                # Transformer is high-noise and Transformer (Low Noise) is
+                # low-noise. Tags can only trigger an advisory warning.
                 if primary_expert == "none" and low_expert == "none":
                     context.logger.warning(
                         "Neither Wan A14B GGUF filename identifies its expert, so 'Transformer' is assumed to "
@@ -191,24 +183,14 @@ class WanModelLoaderInvocation(BaseInvocation):
                         "output looks wrong, swap the two models."
                     )
 
-                # Make sure 'transformer' is the high-noise expert and
-                # 'transformer_low_noise' is the low-noise expert. If the user
-                # accidentally swapped them, swap back.
-                if primary_expert == "low" or low_expert == "high":
-                    transformer = low_id
-                    transformer_low_noise = primary_id
-                    # The swap overrides the wiring on the strength of a
-                    # filename tag, so say so: a mistagged file is otherwise an
-                    # invisible expert inversion.
+                elif primary_expert == "low" or low_expert == "high" or primary_expert == low_expert:
                     context.logger.warning(
-                        f"The wired Wan A14B GGUF experts look reversed, so they were swapped: "
-                        f"'{low_config.name}' (tagged '{low_expert}') runs as the high-noise expert and "
-                        f"'{main_config.name}' (tagged '{primary_expert}') as the low-noise expert. "
-                        "The tags come from the filenames — if the output looks wrong, a filename is lying."
+                        "The Wan A14B GGUF filename tags disagree with the explicit transformer wiring. "
+                        "The wiring is authoritative: 'Transformer' runs as the high-noise expert and "
+                        "'Transformer (Low Noise)' runs as the low-noise expert."
                     )
-                else:
-                    transformer = primary_id
-                    transformer_low_noise = low_id
+                transformer = primary_id
+                transformer_low_noise = low_id
             else:
                 transformer = primary_id
                 # A14B without a paired low-noise GGUF will produce degraded
