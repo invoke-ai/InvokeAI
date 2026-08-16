@@ -3,7 +3,6 @@ import type { GenerateLora, MainModelConfig, PromptHistoryItem } from '@features
 import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
-import type { FeatureHintId } from '@platform/ui/hints';
 import type { ChangeEvent } from 'react';
 
 import {
@@ -64,8 +63,9 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { Button, Combobox, DropZone, Field, IconButton, Select, Slider, Tooltip } from '@platform/ui';
+import { Button, Combobox, DropZone, Field, IconButton, Select, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { toaster } from '@platform/ui/toaster';
 import { DicesIcon, ImagePlusIcon, Trash2Icon, UploadIcon, XIcon } from 'lucide-react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
@@ -409,92 +409,6 @@ const UpscalePromptFields = memo(
     areModelsEquivalent(previous.model, next.model) &&
     areLorasEquivalent(previous.loras, next.loras)
 );
-
-const NumericSliderField = memo(function NumericSliderField({
-  error,
-  formatValue,
-  helpText,
-  hint,
-  label,
-  marks,
-  numberMax,
-  numberMin,
-  onChange,
-  sliderMax = numberMax,
-  sliderMin = numberMin,
-  step,
-  value,
-}: {
-  error?: string;
-  formatValue?: (value: number) => string;
-  helpText?: string;
-  hint?: FeatureHintId;
-  label: string;
-  marks?: number[];
-  numberMax: number;
-  numberMin: number;
-  onChange: (value: number) => void;
-  sliderMax?: number;
-  sliderMin?: number;
-  step: number;
-  value: number;
-}) {
-  const ariaLabel = useMemo(() => [label], [label]);
-  const sliderValue = useMemo(() => [Math.min(sliderMax, Math.max(sliderMin, value))], [sliderMax, sliderMin, value]);
-  const handleFormatValue = useCallback(
-    (nextValue: number) => (formatValue ? formatValue(nextValue) : String(nextValue)),
-    [formatValue]
-  );
-  const handleSliderChange = useCallback(
-    (details: { value: number[] }) => {
-      const nextValue = details.value[0];
-
-      if (nextValue !== undefined) {
-        onChange(nextValue);
-      }
-    },
-    [onChange]
-  );
-  const handleNumberChange = useCallback(
-    ({ valueAsNumber }: NumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        onChange(valueAsNumber);
-      }
-    },
-    [onChange]
-  );
-
-  return (
-    <Field error={error} helpText={helpText} hint={hint} label={label}>
-      <HStack align="center" gap="3">
-        <Slider
-          aria-label={ariaLabel}
-          flex="1"
-          formatValue={handleFormatValue}
-          marks={marks}
-          max={sliderMax}
-          min={sliderMin}
-          size="sm"
-          step={step}
-          value={sliderValue}
-          onValueChange={handleSliderChange}
-        />
-        <NumberInput.Root
-          max={numberMax}
-          min={numberMin}
-          size="xs"
-          step={step}
-          value={String(value)}
-          w="20"
-          onValueChange={handleNumberChange}
-        >
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={`${label} value`} fontVariantNumeric="tabular-nums" />
-        </NumberInput.Root>
-      </HStack>
-    </Field>
-  );
-});
 
 const UpscaleImageField = memo(
   function UpscaleImageField({
@@ -983,19 +897,24 @@ export const UpscaleWidgetView = () => {
               onChange={set.spandrelModel}
             />
           </Field>
-          <NumericSliderField
+          <Field
             error={errors.scale}
-            formatValue={formatScale}
             helpText={t('widgets.upscale.scaleHelp')}
             hint="upscaleScale"
             label={t('widgets.upscale.scale')}
-            marks={SCALE_MARKS}
-            numberMax={UPSCALE_SCALE_MAX}
-            numberMin={UPSCALE_SCALE_MIN}
-            step={0.5}
-            value={values.scale}
-            onChange={set.scale}
-          />
+          >
+            <SliderNumberField
+              ariaLabel={t('widgets.upscale.scale')}
+              formatValue={formatScale}
+              marks={SCALE_MARKS}
+              max={UPSCALE_SCALE_MAX}
+              min={UPSCALE_SCALE_MIN}
+              showStepper
+              step={0.5}
+              value={values.scale}
+              onChange={set.scale}
+            />
+          </Field>
           <SegmentGroup.Root
             aria-label={t('widgets.upscale.presetsLabel')}
             size="xs"
@@ -1023,30 +942,40 @@ export const UpscaleWidgetView = () => {
               );
             })}
           </SegmentGroup.Root>
-          <NumericSliderField
+          <Field
             error={errors.creativity}
             helpText={t('widgets.upscale.creativityHelp')}
             hint="creativity"
             label={t('widgets.upscale.creativity')}
-            marks={CREATIVITY_MARKS}
-            numberMax={UPSCALE_CREATIVITY_MAX}
-            numberMin={UPSCALE_CREATIVITY_MIN}
-            step={1}
-            value={values.creativity}
-            onChange={set.creativity}
-          />
-          <NumericSliderField
+          >
+            <SliderNumberField
+              ariaLabel={t('widgets.upscale.creativity')}
+              marks={CREATIVITY_MARKS}
+              max={UPSCALE_CREATIVITY_MAX}
+              min={UPSCALE_CREATIVITY_MIN}
+              showStepper
+              step={1}
+              value={values.creativity}
+              onChange={set.creativity}
+            />
+          </Field>
+          <Field
             error={errors.structure}
             helpText={t('widgets.upscale.structureHelp')}
             hint="structure"
             label={t('widgets.upscale.structure')}
-            marks={STRUCTURE_MARKS}
-            numberMax={UPSCALE_STRUCTURE_MAX}
-            numberMin={UPSCALE_STRUCTURE_MIN}
-            step={1}
-            value={values.structure}
-            onChange={set.structure}
-          />
+          >
+            <SliderNumberField
+              ariaLabel={t('widgets.upscale.structure')}
+              marks={STRUCTURE_MARKS}
+              max={UPSCALE_STRUCTURE_MAX}
+              min={UPSCALE_STRUCTURE_MIN}
+              showStepper
+              step={1}
+              value={values.structure}
+              onChange={set.structure}
+            />
+          </Field>
         </Stack>
       </GenerationSettingsSection>
 
@@ -1189,30 +1118,40 @@ export const UpscaleWidgetView = () => {
               onChange={setTileControlNet}
             />
           </Field>
-          <NumericSliderField
+          <Field
             error={errors.tileSize}
             helpText={t('widgets.upscale.tileSizeHelp')}
             hint="tileSize"
             label={t('widgets.upscale.tileSize')}
-            marks={TILE_SIZE_MARKS}
-            numberMax={UPSCALE_TILE_SIZE_MAX}
-            numberMin={UPSCALE_TILE_SIZE_MIN}
-            step={64}
-            value={values.tileSize}
-            onChange={set.tileSize}
-          />
-          <NumericSliderField
+          >
+            <SliderNumberField
+              ariaLabel={t('widgets.upscale.tileSize')}
+              marks={TILE_SIZE_MARKS}
+              max={UPSCALE_TILE_SIZE_MAX}
+              min={UPSCALE_TILE_SIZE_MIN}
+              showStepper
+              step={64}
+              value={values.tileSize}
+              onChange={set.tileSize}
+            />
+          </Field>
+          <Field
             error={errors.tileOverlap}
             helpText={t('widgets.upscale.tileOverlapHelp')}
             hint="tileOverlap"
             label={t('widgets.upscale.tileOverlap')}
-            marks={TILE_OVERLAP_MARKS}
-            numberMax={UPSCALE_TILE_OVERLAP_MAX}
-            numberMin={UPSCALE_TILE_OVERLAP_MIN}
-            step={8}
-            value={values.tileOverlap}
-            onChange={set.tileOverlap}
-          />
+          >
+            <SliderNumberField
+              ariaLabel={t('widgets.upscale.tileOverlap')}
+              marks={TILE_OVERLAP_MARKS}
+              max={UPSCALE_TILE_OVERLAP_MAX}
+              min={UPSCALE_TILE_OVERLAP_MIN}
+              showStepper
+              step={8}
+              value={values.tileOverlap}
+              onChange={set.tileOverlap}
+            />
+          </Field>
           <SimpleGrid columns={ADVANCED_GRID_COLUMNS} gap="2">
             <Field
               hint="vae"

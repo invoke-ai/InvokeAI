@@ -11,6 +11,7 @@ import {
   MIN_DIMENSION,
 } from '@features/generation/core/settings';
 import { Field, IconButton, Tooltip } from '@platform/ui';
+import { MODEL_DEFAULT_END_ELEMENT_PROPS, ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { ArrowLeftRightIcon, LockIcon, RulerDimensionLineIcon, ScalingIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,7 +19,6 @@ import { useTranslation } from 'react-i18next';
 import { AspectRatioPreview } from './shared/AspectRatioPreview';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { MODEL_DEFAULT_END_ELEMENT_PROPS, ModelDefaultButton } from './shared/ModelDefaultButton';
 
 interface GenerateDimensionFieldsProps {
   settings: GenerateSettings;

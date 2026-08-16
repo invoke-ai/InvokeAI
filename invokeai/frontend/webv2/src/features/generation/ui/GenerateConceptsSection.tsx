@@ -17,6 +17,7 @@ import {
 } from '@features/generation/core/settings';
 import { Field, IconButton, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { Trash2Icon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,7 +27,6 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { SliderNumberField } from './shared/SliderNumberField';
 import { useDebouncedDraftValue } from './useDebouncedDraftValue';
 
 interface GenerateConceptsSectionProps {

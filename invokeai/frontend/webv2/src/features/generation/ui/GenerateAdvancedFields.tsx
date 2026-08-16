@@ -13,13 +13,13 @@ import {
 } from '@features/generation/core/settings';
 import { Field, Select } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { ModelDefaultButton } from './shared/ModelDefaultButton';
-import { SliderNumberField } from './shared/SliderNumberField';
 
 interface GenerateAdvancedFieldsProps {
   settings: GenerateSettings;
