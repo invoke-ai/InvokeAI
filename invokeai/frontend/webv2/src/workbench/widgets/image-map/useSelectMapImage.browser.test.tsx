@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   resolveMany: vi.fn(),
   selectBoard: vi.fn(),
+  setItemMultiSelection: vi.fn(),
   selectItem: vi.fn(),
 }));
 
@@ -16,7 +17,11 @@ vi.mock('@features/gallery', () => ({
 
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({
-    gallery: { selectBoard: mocks.selectBoard, selectItem: mocks.selectItem },
+    gallery: {
+      selectBoard: mocks.selectBoard,
+      selectItem: mocks.selectItem,
+      setItemMultiSelection: mocks.setItemMultiSelection,
+    },
   }),
 }));
 
@@ -28,14 +33,18 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 /** Published from an effect, not during render, so the probe stays render-pure. */
-const handle: { click: ((imageName: string) => void) | null } = { click: null };
+const handle: {
+  click: ((imageName: string) => void) | null;
+  clickCluster: ((primaryImageName: string, imageNames: string[]) => void) | null;
+} = { click: null, clickCluster: null };
 
 const Probe = () => {
-  const { selectImage } = useMapSelection();
+  const { selectCluster, selectImage } = useMapSelection();
 
   useEffect(() => {
     handle.click = selectImage;
-  }, [selectImage]);
+    handle.clickCluster = selectCluster;
+  }, [selectCluster, selectImage]);
 
   return null;
 };
@@ -61,6 +70,7 @@ const unmount = async () => {
   root = null;
   host = null;
   handle.click = null;
+  handle.clickCluster = null;
 };
 
 /** A promise plus the trigger that settles it, so click ordering can be forced. */
@@ -80,6 +90,7 @@ afterEach(async () => {
   mocks.resolveMany.mockReset();
   mocks.selectBoard.mockReset();
   mocks.selectItem.mockReset();
+  mocks.setItemMultiSelection.mockReset();
 });
 
 describe('useMapSelection', () => {
@@ -116,6 +127,71 @@ describe('useMapSelection', () => {
 
     expect(mocks.selectBoard).not.toHaveBeenCalled();
     expect(mocks.selectItem).not.toHaveBeenCalled();
+  });
+
+  it('selects the primary image\u2019s board before the cluster', async () => {
+    // Same reason as the single-image case: setItemMultiSelection stamps the
+    // navigation query from the list the gallery is currently showing, so a
+    // cluster picked from another board would leave that query describing a
+    // list none of these images are in.
+    mocks.resolveMany.mockResolvedValue([{ boardId: 'board-landscapes', image_name: 'a.png' }]);
+    await mount();
+
+    await flush(() => handle.clickCluster?.('a.png', ['a.png', 'b.png', 'c.png']));
+
+    expect(mocks.selectBoard).toHaveBeenCalledWith('board-landscapes');
+    expect(mocks.selectBoard.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.setItemMultiSelection.mock.invocationCallOrder[0]
+    );
+  });
+
+  it('passes every cluster member as an image-kinded key, anchored on the clicked one', async () => {
+    mocks.resolveMany.mockResolvedValue([{ boardId: 'board-a', image_name: 'a.png' }]);
+    await mount();
+
+    await flush(() => handle.clickCluster?.('a.png', ['a.png', 'b.png']));
+
+    expect(mocks.setItemMultiSelection).toHaveBeenCalledTimes(1);
+    const [keys, primary] = mocks.setItemMultiSelection.mock.calls[0] ?? [];
+    expect(keys).toEqual([
+      { kind: 'image', name: 'a.png' },
+      { kind: 'image', name: 'b.png' },
+    ]);
+    expect(primary).toEqual({ boardId: 'board-a', image_name: 'a.png' });
+  });
+
+  it('leaves the selection alone when the primary image cannot be resolved', async () => {
+    mocks.resolveMany.mockResolvedValue([]);
+    await mount();
+
+    await flush(() => handle.clickCluster?.('gone.png', ['gone.png', 'b.png']));
+
+    expect(mocks.selectBoard).not.toHaveBeenCalled();
+    expect(mocks.setItemMultiSelection).not.toHaveBeenCalled();
+  });
+
+  it('shares one sequence guard across both modes, so the newer click wins', async () => {
+    // The two entry points must not race each other: switching cluster mode
+    // mid-flight would otherwise let a stale resolution overwrite a newer
+    // selection.
+    const slow = deferred<{ image_name: string }[]>();
+    const fast = deferred<{ image_name: string }[]>();
+
+    mocks.resolveMany.mockReturnValueOnce(slow.promise).mockReturnValueOnce(fast.promise);
+    await mount();
+
+    await flush(() => {
+      handle.clickCluster?.('slow.png', ['slow.png']);
+      handle.click?.('fast.png');
+    });
+    await flush(() => {
+      fast.resolve([{ image_name: 'fast.png' }]);
+      slow.resolve([{ image_name: 'slow.png' }]);
+    });
+
+    expect(mocks.setItemMultiSelection).not.toHaveBeenCalled();
+    expect(mocks.selectItem).toHaveBeenCalledTimes(1);
+    expect(mocks.selectItem.mock.calls[0]?.[0]).toEqual({ image_name: 'fast.png' });
   });
 
   it('ignores a slow click that resolves after a newer one', async () => {

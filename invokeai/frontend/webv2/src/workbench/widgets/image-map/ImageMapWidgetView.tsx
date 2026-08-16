@@ -1,6 +1,7 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
+import { getImageMapClickSelectsCluster } from '@workbench/image-map/imageMapSettings';
 import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
@@ -29,7 +30,7 @@ const plotLoadingFallback = (
  */
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
-  const clickSelectsCluster = useWidgetValuesSelector('image-map', (values) => Boolean(values.clickSelectsCluster));
+  const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
 
   useEffect(() => {
     ensureImageMapLoaded();

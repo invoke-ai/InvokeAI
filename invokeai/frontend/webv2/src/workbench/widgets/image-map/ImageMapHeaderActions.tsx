@@ -1,7 +1,7 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Icon } from '@chakra-ui/react';
-import { IconButton, Tooltip } from '@platform/ui';
+import { ToggleIconButton } from '@platform/ui';
+import { getImageMapClickSelectsCluster } from '@workbench/image-map/imageMapSettings';
 import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { GroupIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -13,24 +13,19 @@ import { useCallback } from 'react';
  */
 export const ImageMapHeaderActions = (_props: WidgetViewProps) => {
   const { widgets } = useWorkbenchCommands();
-  const clickSelectsCluster = useWidgetValuesSelector('image-map', (values) => Boolean(values.clickSelectsCluster));
+  const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
   const handleToggle = useCallback(
-    () => widgets.patchValues('image-map', { clickSelectsCluster: !clickSelectsCluster }),
-    [clickSelectsCluster, widgets]
+    (checked: boolean) => widgets.patchValues('image-map', { clickSelectsCluster: checked }),
+    [widgets]
   );
 
   return (
-    <Tooltip content={clickSelectsCluster ? 'Click selects the whole cluster' : 'Click selects one image'}>
-      <IconButton
-        aria-label="Toggle cluster selection mode"
-        aria-pressed={clickSelectsCluster}
-        color={clickSelectsCluster ? 'accent.fg' : 'fg.muted'}
-        size="2xs"
-        variant={clickSelectsCluster ? 'subtle' : 'ghost'}
-        onClick={handleToggle}
-      >
-        <Icon as={GroupIcon} boxSize="3.5" />
-      </IconButton>
-    </Tooltip>
+    <ToggleIconButton
+      checked={clickSelectsCluster}
+      icon={GroupIcon}
+      label="Toggle cluster selection mode"
+      tooltip={clickSelectsCluster ? 'Click selects the whole cluster' : 'Click selects one image'}
+      onCheckedChange={handleToggle}
+    />
   );
 };

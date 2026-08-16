@@ -82,6 +82,11 @@ export const useMapSelection = (): MapSelectionActions => {
             return;
           }
 
+          // Same reason as `selectImage` above: the multi-selection command
+          // stamps `selectedImageQuery` from the board the gallery is showing,
+          // so without landing on the primary image's board first the query
+          // describes a list none of these images are in.
+          commands.gallery.selectBoard(image.boardId);
           // Map points are always images, so every key is kind-tagged 'image'.
           const itemKeys = imageNames.map((name) => toGalleryItemKey({ kind: 'image', name }));
           commands.gallery.setItemMultiSelection(itemKeys, legacyGeneratedImageToGalleryItem(image));
