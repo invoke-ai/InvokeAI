@@ -133,7 +133,7 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.6.0",
+    version="1.7.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -209,15 +209,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         description=FieldDescriptions.hidiffusion_window_attn,
         title="HiDiffusion: Window Attention",
     )
-    hidiffusion_t1_ratio: float = InputField(
-        default=0.4,
+    hidiffusion_t1_ratio: Optional[float] = InputField(
+        default=None,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t1_ratio,
         title="HiDiffusion: T1 Ratio",
     )
-    hidiffusion_t2_ratio: float = InputField(
-        default=0.0,
+    hidiffusion_t2_ratio: Optional[float] = InputField(
+        default=None,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t2_ratio,

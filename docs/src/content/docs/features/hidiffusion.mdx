@@ -17,6 +17,7 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 3. In the **Advanced** grid, enable **HiDiffusion** and optionally adjust the two sub‑toggles and ratios:
    - **HiDiffusion: RAU‑Net**
    - **HiDiffusion: Window Attention**
+   - **HiDiffusion: Automatic Ratios**
    - **HiDiffusion: T1 Ratio**
    - **HiDiffusion: T2 Ratio**
 
@@ -28,9 +29,11 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 
 - **HiDiffusion: Window Attention**: Enables windowed attention blocks. This can boost local texture/detail, but may slightly affect global coherence in some prompts.
 
-- **HiDiffusion: T1 Ratio**: Controls when HiDiffusion switches into its mid‑stage behavior. Lower values switch earlier; higher values preserve global structure longer.
+- **HiDiffusion: Automatic Ratios**: Uses HiDiffusion's model- and resolution-specific T1/T2 presets. Disable it to enter manual overrides.
 
-- **HiDiffusion: T2 Ratio**: Controls when HiDiffusion switches into its late‑stage behavior. Higher values keep window attention active longer and can sharpen local detail.
+- **HiDiffusion: T1 Ratio**: Controls the first RAU-Net switching threshold. Lower values switch earlier; higher values keep the first resolution-aware stage active longer.
+
+- **HiDiffusion: T2 Ratio**: Controls the second RAU-Net switching threshold used for extreme-resolution generation. It does not control window attention. Higher values keep the second resolution-aware stage active longer.
 
 ## Tips
 
