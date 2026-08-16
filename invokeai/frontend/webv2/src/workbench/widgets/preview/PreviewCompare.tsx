@@ -18,7 +18,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewComparisonMode } from './previewSettings';
 
-import { getFittedFrameCss, previewGridCss } from './PreviewStage';
+import { getFittedFrameCss, PreviewStage } from './PreviewStage';
 import { useCompareLoupe, type CompareLoupePane } from './useCompareLoupe';
 
 const COMPARISON_MODES: { labelKey: string; value: PreviewComparisonMode }[] = [
@@ -153,20 +153,11 @@ export const PreviewCompare = ({
 
   return (
     <Stack gap="3" h="full" minH="0" w="full">
-      <Flex
-        align="center"
-        backgroundColor="bg.inset"
-        color="fg.grid"
-        containerType="size"
-        css={previewGridCss}
-        flex="1"
-        justify="center"
-        minH="0"
-        overflow="hidden"
-        p="6"
-        w="full"
-      >
+      <PreviewStage fill="flex" padding="6">
         {mode === 'slider' ? (
+          // Not FittedFrame: this frame needs the drag cursor and pointer-capture
+          // handlers below, and FittedFrame's drop shadow would be a visual change
+          // this Box never had.
           <Box
             ref={containerRef}
             borderColor="border.emphasized"
@@ -231,7 +222,7 @@ export const PreviewCompare = ({
             />
           </HStack>
         )}
-      </Flex>
+      </PreviewStage>
       <HStack flexShrink={0} gap="1" justify="center">
         <SegmentGroup.Root size="xs" value={mode} onValueChange={handleModeChange}>
           <SegmentGroup.Indicator />
