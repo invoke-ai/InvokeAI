@@ -80,6 +80,23 @@ describe('Wan low-noise partner picker', () => {
     expect(selectPrimaryMainModelOptions([a, b])).toHaveLength(2);
   });
 
+  it('never leaves a TI2V-5B invisible in both pickers', () => {
+    // The partner picker excludes every TI2V-5B, so the primary picker must not hide one
+    // either — a single-transformer model has no partner slot to be steered toward. The
+    // two exclusions have to agree or the model is reachable from nowhere in the linear UI.
+    //
+    // Reachable with a real record: the pre-branch GGUF probe applied the expert tag
+    // without consulting the variant, so a 5B whose stem contained `low_noise` was stored
+    // as `expert='low'` and still is. `hasPartner` then matches it against any second
+    // TI2V-5B, which is all it takes to hide it.
+    const taggedLow5b = wanMain({ key: 'ti2v-low', variant: 'ti2v_5b', expert: 'low' });
+    const plain5b = wanMain({ key: 'ti2v-plain', variant: 'ti2v_5b', expert: 'none' });
+    const library = [taggedLow5b, plain5b];
+
+    expect(selectPrimaryMainModelOptions(library).map((c) => c.key)).toEqual(['ti2v-low', 'ti2v-plain']);
+    expect(library.filter(isWanLowNoisePartnerOption)).toHaveLength(0);
+  });
+
   it('keeps an untagged model in the primary picker even next to a tagged high expert', () => {
     // The case that actually catches `selectPrimaryMainModelOptions` being switched to the
     // wide predicate. With two untagged models the wide test classes both as low experts,

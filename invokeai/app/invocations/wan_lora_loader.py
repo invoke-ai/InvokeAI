@@ -25,6 +25,11 @@ from invokeai.backend.model_manager.taxonomy import (
 # - ``both``: append to both lists regardless of the config.
 # - ``high``: append only to the primary list (high-noise expert).
 # - ``low``: append only to the low-noise list (low-noise expert).
+#
+# One exception overrides all four: against a single-transformer TI2V-5B main, a
+# routing that would touch only the low-noise list is re-pointed at the primary
+# list by ``_correct_inert_low_routing``. That model has no low-noise expert, so
+# the alternative is to accept the LoRA and silently do nothing with it.
 WanLoRATarget = Literal["auto", "both", "high", "low"]
 
 
@@ -153,7 +158,9 @@ class WanLoRALoaderInvocation(BaseInvocation):
     target: WanLoRATarget = InputField(
         default="auto",
         description="Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's "
-        "recorded expert tag (or both if untagged); 'both'/'high'/'low' override it.",
+        "recorded expert tag (or both if untagged); 'both'/'high'/'low' override it. "
+        "On the single-transformer TI2V-5B, which has no low-noise expert, 'low' is "
+        "applied to the transformer instead of being discarded.",
     )
     transformer: WanTransformerField | None = InputField(
         default=None,

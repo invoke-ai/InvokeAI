@@ -39532,7 +39532,7 @@ export type components = {
             weight?: number;
             /**
              * Target
-             * @description Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it.
+             * @description Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it. On the single-transformer TI2V-5B, which has no low-noise expert, 'low' is applied to the transformer instead of being discarded.
              * @default auto
              * @enum {string}
              */

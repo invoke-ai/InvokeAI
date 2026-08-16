@@ -657,13 +657,31 @@ export const isWanSingleFileMainModelConfig = (config: AnyModelConfigWithExterna
   );
 };
 
+/** TI2V-5B is the single-transformer Wan variant: it has no expert pair, so no expert
+ *  tag on it means anything. Both predicates below have to agree about that, or a file
+ *  can fall through the gap between them. */
+const isWanTi2v5bConfig = (config: AnyModelConfigWithExternal): boolean =>
+  'variant' in config && config.variant === 'ti2v_5b';
+
 /** Wan single-file main models *tagged* as the low-noise expert. This is the narrow,
  *  tag-based test, and its only job is deciding what to hide from the primary main
  *  dropdown — see `selectPrimaryMainModelOptions`, its one caller. Deliberately not
  *  exported: the Transformer (Low Noise) picker needs the wider test below, and reaching
- *  for this one there is the mistake that left untagged pairs unwireable. */
+ *  for this one there is the mistake that left untagged pairs unwireable.
+ *
+ *  TI2V-5B is excluded for the same reason it is excluded from the partner picker. The
+ *  two exclusions have to match: hiding a 5B from the primary list steers it toward a
+ *  partner slot that will not offer it either, which is how a model ends up reachable
+ *  from nowhere. Such a record is not hypothetical — the pre-branch GGUF probe applied
+ *  the tag without consulting the variant, so a 5B named `...-low_noise.gguf` installed
+ *  before this branch still carries `expert='low'` today. */
 const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
-  return isWanSingleFileMainModelConfig(config) && 'expert' in config && config.expert === 'low';
+  return (
+    isWanSingleFileMainModelConfig(config) &&
+    !isWanTi2v5bConfig(config) &&
+    'expert' in config &&
+    config.expert === 'low'
+  );
 };
 
 /** What the Transformer (Low Noise) picker may offer.
@@ -688,7 +706,7 @@ export const isWanLowNoisePartnerOption = (config: AnyModelConfigWithExternal): 
   if ('expert' in config && config.expert === 'high') {
     return false;
   }
-  return !('variant' in config && config.variant === 'ti2v_5b');
+  return !isWanTi2v5bConfig(config);
 };
 
 /** Narrows a main-model list to what may be offered as the *primary* main. Every list
