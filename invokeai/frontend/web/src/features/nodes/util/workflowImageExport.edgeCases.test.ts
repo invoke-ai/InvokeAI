@@ -27,6 +27,8 @@ type FakeElement = {
   querySelectorAll: (selector: string) => FakeElement[];
   remove: () => void;
   setAttribute: (name: string, value: string) => void;
+  scrollHeight?: number;
+  scrollWidth?: number;
   style: { setProperty: ReturnType<typeof vi.fn> } & Record<string, unknown>;
 };
 
@@ -99,6 +101,7 @@ describe('workflow image export edge cases', () => {
       flowElement: flowElement as unknown as HTMLElement,
       bounds: { x: 0, y: 0, width: 100, height: 100 },
       workflowName: 'Workflow',
+      fallbackWorkflowName: 'Unnamed Workflow',
     });
     const rejection = expect(exportPromise).rejects.toThrow('timed out');
     try {
@@ -132,7 +135,7 @@ describe('workflow image export edge cases', () => {
   it('includes overflowing input labels in content bounds', () => {
     const label = {
       getBoundingClientRect: () => ({ left: 590, top: 220, width: 100, height: 20 }),
-      scrollWidth: 100,
+      scrollWidth: 200,
       scrollHeight: 20,
     };
     const viewport = { getBoundingClientRect: () => ({ left: 100, top: 200, width: 1000, height: 1000 }) };
@@ -144,7 +147,34 @@ describe('workflow image export edge cases', () => {
 
     expect(
       getWorkflowContentBounds(flowElement as unknown as HTMLElement, { x: 0, y: 0, width: 500, height: 100 })
-    ).toMatchObject({ x: 0, y: 0, width: 590, height: 100 });
+    ).toMatchObject({ x: 0, y: 0, width: 690, height: 100 });
+  });
+
+  it('measures overflowing labels after export styles are applied', async () => {
+    vi.mocked(toBlob).mockResolvedValue(null);
+    const label = createFakeElement({
+      getBoundingClientRect: () => ({ left: 500, top: 100, width: 100, height: 20 }),
+      scrollWidth: 100,
+      scrollHeight: 20,
+    });
+    label.style.setProperty = vi.fn((property: string) => {
+      if (property === 'white-space') {
+        label.scrollWidth = 200;
+      }
+    });
+    const { clone, flowElement } = createExportDom();
+    clone.querySelectorAll = (selector) => (selector === '[data-node-input-field-title="true"]' ? [label] : []);
+
+    await expect(
+      exportWorkflowAsPng({
+        flowElement: flowElement as unknown as HTMLElement,
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
+      })
+    ).rejects.toThrow('empty Blob');
+
+    expect(vi.mocked(toBlob).mock.calls[0]?.[1]).toMatchObject({ width: 900, height: 320 });
   });
 
   it('preserves flex wrapping and document direction in the export clone', () => {
@@ -160,6 +190,7 @@ describe('workflow image export edge cases', () => {
         flowElement: flowElement as unknown as HTMLElement,
         bounds: { x: 0, y: 0, width: 100, height: 100 },
         workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
       })
     ).rejects.toThrow('empty Blob');
 
@@ -180,6 +211,7 @@ describe('workflow image export edge cases', () => {
         flowElement: flowElement as unknown as HTMLElement,
         bounds: { x: 0, y: 0, width: 100, height: 100 },
         workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
       })
     ).rejects.toThrow('empty Blob');
 

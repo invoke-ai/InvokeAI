@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  EXPORT_MAX_CANVAS_DIMENSION,
   EXPORT_PADDING,
   EXPORT_SCALE,
   EXPORT_STYLE_PROPERTIES,
@@ -25,6 +26,13 @@ describe('workflow image export', () => {
       canvasWidth: (1600 + EXPORT_PADDING * 2) * EXPORT_SCALE,
       canvasHeight: (900 + EXPORT_PADDING * 2) * EXPORT_SCALE,
     });
+  });
+
+  it('preserves the aspect ratio when large exports reach the canvas limit', () => {
+    const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width: 9000, height: 9000 });
+
+    expect(dimensions.canvasWidth).toBe(EXPORT_MAX_CANVAS_DIMENSION);
+    expect(dimensions.canvasHeight).toBe(EXPORT_MAX_CANVAS_DIMENSION);
   });
 
   it('keeps capture clone local to an offscreen staging wrapper', () => {
@@ -67,7 +75,7 @@ describe('workflow image export', () => {
 
   it('preserves single-line field title styles in the export clone', () => {
     expect(EXPORT_STYLE_PROPERTIES).toEqual(
-      expect.arrayContaining(['text-overflow', '-webkit-line-clamp', '-webkit-box-orient'])
+      expect.arrayContaining(['aspect-ratio', 'text-overflow', '-webkit-line-clamp', '-webkit-box-orient'])
     );
   });
 
@@ -140,11 +148,11 @@ describe('workflow image export', () => {
   });
 
   it('keeps ordinary workflow names unchanged', () => {
-    expect(sanitizeWorkflowImageFilename('Hi-Res Two Stage')).toBe('Hi-Res Two Stage');
+    expect(sanitizeWorkflowImageFilename('Hi-Res Two Stage', 'Unnamed Workflow')).toBe('Hi-Res Two Stage');
   });
 
   it('replaces filesystem-invalid characters and falls back for blank names', () => {
-    expect(sanitizeWorkflowImageFilename('Workflow: 01 / test?')).toBe('Workflow- 01 - test-');
-    expect(sanitizeWorkflowImageFilename('   ...   ')).toBe('My Workflow');
+    expect(sanitizeWorkflowImageFilename('Workflow: 01 / test?', 'Unnamed Workflow')).toBe('Workflow- 01 - test-');
+    expect(sanitizeWorkflowImageFilename('   ...   ', 'Unnamed Workflow')).toBe('Unnamed Workflow');
   });
 });
