@@ -1266,6 +1266,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     // values would be needed to close that, which is a bigger change than this suite.
     for (const release of Object.keys(RELEASE_PARAMS_KEYS) as (keyof typeof RELEASE_PARAMS_KEYS)[]) {
       const { version } = RELEASE_PARAMS_KEYS[release];
+      const currentVersion: number = getInitialParamsState()._version;
       const blob = buildReleaseBlob(release);
 
       applyParamsVersionMigrations(blob);
@@ -1281,7 +1282,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
       expect(
         backfilled,
-        version === getInitialParamsState()._version
+        version === currentVersion
           ? `Keys missing from a blob written at ${release}, the commit that bumped _version to ${version}. ` +
               `A blob already at the current version matches no branch in the migration chain, so no step can ` +
               `seed these — each needs a zod default, or upgrading throws in zParamsState.parse() and wipes ` +
