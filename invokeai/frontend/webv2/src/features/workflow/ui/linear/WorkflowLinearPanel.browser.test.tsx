@@ -290,7 +290,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     // The container's card content now holds the heading card, and the
     // empty-state hint is gone.
-    const containerContent = cardContentFor('Container (column layout)');
+    const containerContent = cardContentFor('Container (column)');
 
     expect(containerContent.textContent).toContain('Heading');
     expect(containerContent.textContent).not.toContain('Empty container');
@@ -304,7 +304,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     await dragTo('Divider', headingCardRect.left + headingCardRect.width / 2, headingCardRect.bottom - 2);
 
     // The divider moved into the container, next to the heading.
-    const containerContentAfter = cardContentFor('Container (column layout)');
+    const containerContentAfter = cardContentFor('Container (column)');
 
     expect(containerContentAfter.textContent).toContain('Heading');
     expect(containerContentAfter.textContent).toContain('Divider');
@@ -339,7 +339,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     await dragToWithKeyboard('Heading', dropZoneRect.top + dropZoneRect.height / 2);
 
-    const containerContent = cardContentFor('Container (column layout)');
+    const containerContent = cardContentFor('Container (column)');
 
     expect(containerContent.textContent).toContain('Heading');
     expect(containerContent.textContent).not.toContain('Empty container');

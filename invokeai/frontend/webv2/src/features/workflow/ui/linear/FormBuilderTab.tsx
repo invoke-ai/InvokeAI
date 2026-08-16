@@ -34,18 +34,7 @@ import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCo
 import { useWorkflowHostCommands } from '@features/workflow/ui/WorkflowUiContext';
 import { getFormChildren, getResolvedWorkflowEdges, getWorkflowFieldInvalidReason } from '@features/workflow/utility';
 import { Button, DropZone, IconButton } from '@platform/ui';
-import {
-  Columns2Icon,
-  CrosshairIcon,
-  GripVerticalIcon,
-  HeadingIcon,
-  InfoIcon,
-  MinusIcon,
-  PlusIcon,
-  Rows2Icon,
-  TextIcon,
-  XIcon,
-} from 'lucide-react';
+import { Columns2Icon, CrosshairIcon, GripVerticalIcon, InfoIcon, PlusIcon, Rows2Icon, XIcon } from 'lucide-react';
 import {
   createContext,
   memo,
@@ -68,6 +57,12 @@ import {
   resolveFormDrop,
   type FormDropTarget,
 } from './formBuilderDnd';
+import {
+  ADDABLE_FORM_ELEMENT_KEYS,
+  FORM_ELEMENT_META,
+  getFormElementTitle,
+  type AddableFormElementKey,
+} from './formElementMeta';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
 
 /**
@@ -101,22 +96,6 @@ const BuilderDndContext = createContext<BuilderDndContextValue>({
  * or container.
  */
 const BuilderDropTargetContext = createContext<FormDropTarget | null>(null);
-
-/** Title shown in a card's title bar and the drag ghost. Shared so the two never drift. */
-const getFormElementTitle = (element: WorkflowFormElement): string => {
-  switch (element.type) {
-    case 'container':
-      return `Container (${element.data.layout} layout)`;
-    case 'node-field':
-      return 'Node Field';
-    case 'heading':
-      return 'Heading';
-    case 'text':
-      return 'Text';
-    case 'divider':
-      return 'Divider';
-  }
-};
 
 /** The dragged card's `DragOverlay` ghost: a compact title bar following the pointer. */
 const BuilderDragGhost = ({ element }: { element: WorkflowFormElement }) => (
@@ -506,8 +485,12 @@ const BuilderElement = memo(BuilderElementBase);
 
 const AddElementMenu = () => {
   const { editGraph } = useProjectGraphCommands();
-  const add = (elementType: 'divider' | 'heading' | 'text' | 'container', layout?: 'row' | 'column') =>
-    editGraph({ elementType, layout, type: 'addFormElement' });
+  const add = (key: AddableFormElementKey) =>
+    editGraph(
+      key === 'container-column' || key === 'container-row'
+        ? { elementType: 'container', layout: key === 'container-row' ? 'row' : 'column', type: 'addFormElement' }
+        : { elementType: key, type: 'addFormElement' }
+    );
 
   return (
     <Menu.Root positioning={{ placement: 'bottom-start' }}>
@@ -520,26 +503,12 @@ const AddElementMenu = () => {
       <Portal>
         <Menu.Positioner>
           <Menu.Content minW="11rem">
-            <Menu.Item value="heading" onClick={() => add('heading')}>
-              <Icon as={HeadingIcon} boxSize="3" />
-              Heading
-            </Menu.Item>
-            <Menu.Item value="text" onClick={() => add('text')}>
-              <Icon as={TextIcon} boxSize="3" />
-              Text
-            </Menu.Item>
-            <Menu.Item value="divider" onClick={() => add('divider')}>
-              <Icon as={MinusIcon} boxSize="3" />
-              Divider
-            </Menu.Item>
-            <Menu.Item value="container-column" onClick={() => add('container', 'column')}>
-              <Icon as={Columns2Icon} boxSize="3" />
-              Container (column)
-            </Menu.Item>
-            <Menu.Item value="container-row" onClick={() => add('container', 'row')}>
-              <Icon as={Rows2Icon} boxSize="3" />
-              Container (row)
-            </Menu.Item>
+            {ADDABLE_FORM_ELEMENT_KEYS.map((key) => (
+              <Menu.Item key={key} value={key} onClick={() => add(key)}>
+                <Icon as={FORM_ELEMENT_META[key].icon} boxSize="3" />
+                {FORM_ELEMENT_META[key].label}
+              </Menu.Item>
+            ))}
           </Menu.Content>
         </Menu.Positioner>
       </Portal>
