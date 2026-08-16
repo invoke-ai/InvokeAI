@@ -99,7 +99,7 @@ export const openWidgetPlacement = ({
   return { ok: true, region: target.region };
 };
 
-const getEnabledCenterViewCount = (
+export const getEnabledCenterViewCount = (
   project: WidgetPlacementProject,
   getWidgetById: (typeId: WidgetTypeId) => RegisteredWidget | undefined
 ): number =>

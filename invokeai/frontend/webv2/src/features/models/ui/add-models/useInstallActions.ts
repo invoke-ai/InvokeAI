@@ -7,7 +7,9 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Shared install entry point: queues an install job, optimistically adds it to
@@ -17,6 +19,7 @@ import { useCallback, useState } from 'react';
  * of a toast per model; failures always notify.
  */
 export const useInstallActions = () => {
+  const { t } = useTranslation();
   const notify = useNotify();
   const [pendingSources, setPendingSources] = useState<ReadonlySet<string>>(new Set());
 
@@ -39,7 +42,7 @@ export const useInstallActions = () => {
         addInstallJob(job);
 
         if (!options?.silent) {
-          notify.success('Model install queued', request.source);
+          notify.success(t('models.modelInstallQueued'), request.source);
         }
 
         return true;
@@ -48,7 +51,7 @@ export const useInstallActions = () => {
           return false;
         }
 
-        notify.error('Model install failed to start', error instanceof Error ? error.message : String(error));
+        notify.error(t('models.modelInstallFailedToStart'), getApiErrorMessage(error, t('common.unknownError')));
 
         return false;
       } finally {
@@ -63,8 +66,33 @@ export const useInstallActions = () => {
         }
       }
     },
-    [notify]
+    [notify, t]
   );
 
-  return { install, pendingSources };
+  /**
+   * Queue many installs sequentially and silently; returns how many were
+   * accepted so the caller can emit one summary. Failures still toast
+   * individually via `install`'s error path.
+   */
+  const installMany = useCallback(
+    async (requests: InstallModelRequest[]): Promise<number> => {
+      const owner = captureAccountScope();
+      let queued = 0;
+
+      for (const request of requests) {
+        if (!isAccountScopeCurrent(owner)) {
+          break;
+        }
+
+        if (await install(request, { silent: true })) {
+          queued += 1;
+        }
+      }
+
+      return queued;
+    },
+    [install]
+  );
+
+  return { install, installMany, pendingSources };
 };

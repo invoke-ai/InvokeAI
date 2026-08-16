@@ -9,6 +9,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsFlux2Dev,
   selectIsIdeogram4,
   selectIsKrea2,
   selectIsMiniMaxH3,
@@ -25,6 +26,7 @@ import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/P
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
+import ParamFlux2DevModelSelect from 'features/parameters/components/Advanced/ParamFlux2DevModelSelect';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
 import {
   ParamHiDiffusionRauNetToggle,
@@ -69,6 +71,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isFlux2 = useAppSelector(selectIsFlux2);
+  const isFlux2Dev = useAppSelector(selectIsFlux2Dev);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
   const isIdeogram4 = useAppSelector(selectIsIdeogram4);
@@ -183,9 +186,14 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamCLIPEmbedModelSelect />
           </FormControlGroup>
         )}
-        {isFlux2 && (
+        {isFlux2 && !isFlux2Dev && (
           <FormControlGroup>
             <ParamFlux2KleinModelSelect />
+          </FormControlGroup>
+        )}
+        {isFlux2Dev && (
+          <FormControlGroup>
+            <ParamFlux2DevModelSelect />
           </FormControlGroup>
         )}
         {isSD3 && (

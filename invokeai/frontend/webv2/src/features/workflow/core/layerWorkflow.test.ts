@@ -42,6 +42,7 @@ const input = (name: string, overrides: Partial<FieldInputTemplate> = {}): Field
   uiComponent: null,
   uiHidden: false,
   uiModelBase: null,
+  uiModelFormat: null,
   uiModelType: null,
   uiOrder: null,
   ...overrides,

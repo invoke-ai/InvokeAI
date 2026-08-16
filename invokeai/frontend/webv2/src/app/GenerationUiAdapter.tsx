@@ -32,12 +32,20 @@ const GenerateCanvasCompositingSection = lazy(() =>
  * Workbench, Models, and Gallery state. No second adapter is expected.
  */
 export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode }) => {
-  const project = useActiveProjectSelector((activeProject) => ({
+  const projectState = useActiveProjectSelector((activeProject) => ({
     activeProjectId: activeProject.id,
     generateValues: getProjectWidgetValues(activeProject, 'generate'),
     invocationSourceId: activeProject.invocation.sourceId,
-    showPromptSyntaxHighlighting: activeProject.settings.showPromptSyntaxHighlighting,
   }));
+  // Syntax highlighting is a per-user preference, not a property of the
+  // project, so it is joined here rather than read off the document.
+  const showPromptSyntaxHighlighting = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.showPromptSyntaxHighlighting
+  );
+  const project = useMemo<GenerationUiAdapter['project']>(
+    () => ({ ...projectState, showPromptSyntaxHighlighting }),
+    [projectState, showPromptSyntaxHighlighting]
+  );
   const promptHistoryItems = useActiveProjectSelector((activeProject) => activeProject.promptHistory);
   const selectedGalleryImage = useActiveProjectSelector((activeProject) =>
     getGenerationSelectedGalleryImage(getProjectWidgetValues(activeProject, 'gallery'))

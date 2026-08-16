@@ -1,30 +1,33 @@
+import { DEFAULT_NODE_PACK_FILTERS, type NodePackFilters } from '@features/nodes/core/library';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
 /**
  * Session-lived UI state for the Launchpad nodes manager. Keeping the active
- * detail tab, selected pack, search term, and add-node form tab in an external
- * store (the same pattern as the models UI store) means nothing resets while
- * the user navigates within the manager.
+ * detail tab, selected pack, search term, and in-progress install source in an
+ * external store (the same pattern as the models UI store) means nothing
+ * resets while the user navigates within the manager.
  */
 
 export type NodesManagerTab = 'details' | 'add';
-export type AddNodesTab = 'git' | 'scan';
 
 export interface NodesUiSnapshot {
   activeTab: NodesManagerTab;
-  addTab: AddNodesTab;
   activePackName: string | null;
   activityExpanded: boolean;
-  searchTerm: string;
+  filters: NodePackFilters;
+  /** Typed install source; survives the detail tabs unmounting their content. */
+  installSource: string;
 }
 
 const INITIAL_NODES_UI_SNAPSHOT: NodesUiSnapshot = {
-  activeTab: 'details',
+  // 'add' so a fresh install lands on the way to get node packs rather than
+  // the "select a pack" dead end (the models manager sets the same default).
+  activeTab: 'add',
   activePackName: null,
   activityExpanded: false,
-  addTab: 'git',
-  searchTerm: '',
+  filters: { ...DEFAULT_NODE_PACK_FILTERS },
+  installSource: '',
 };
 
 const store = createExternalStore<NodesUiSnapshot>(INITIAL_NODES_UI_SNAPSHOT);

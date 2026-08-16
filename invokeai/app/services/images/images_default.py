@@ -24,6 +24,7 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_base import ImageServiceABC
 from invokeai.app.services.images.images_common import ImageDTO, image_record_to_dto
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.bulk_media_delete import StagedMediaDeleteAdapter, delete_media_by_names
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -110,6 +111,93 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
+
+    def copy(
+        self,
+        source_image_name: str,
+        board_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ImageDTO:
+        """Duplicate an existing image under a new identity, optionally onto a board.
+
+        New identity, same picture: the record is cloned and the file copied byte for byte, so
+        embedded metadata, workflow and graph travel as file chunks rather than being re-derived.
+        The copy is never intermediate, and starring is not copied.
+
+        Board attachment is checked *before* the file is written, where the video twin writes first
+        and withdraws on failure. The orders differ because `create` — which the video path reuses —
+        swallows a failed attachment, so there it can only be detected after the fact.
+
+        Nothing partial survives a failure: the unwind covers everything after the record exists,
+        including reading the DTO back, and removes the file as well as the row.
+        """
+        try:
+            record = self.__invoker.services.image_records.get(source_image_name)
+            metadata = self.__invoker.services.image_records.get_metadata(source_image_name)
+
+            image_name = self.__invoker.services.names.create_image_name()
+            strategy_name = self.__invoker.services.configuration.image_subfolder_strategy
+            strategy = create_subfolder_strategy(strategy_name)
+            image_subfolder = strategy.get_subfolder(image_name, record.image_category, False)
+
+            record_saved = False
+            file_copied = False
+            try:
+                self.__invoker.services.image_records.save(
+                    image_name=image_name,
+                    image_origin=record.image_origin,
+                    image_category=record.image_category,
+                    width=record.width,
+                    height=record.height,
+                    has_workflow=record.has_workflow,
+                    is_intermediate=False,
+                    metadata=metadata.model_dump_json() if metadata is not None else None,
+                    user_id=user_id,
+                    image_subfolder=image_subfolder,
+                )
+                record_saved = True
+
+                if board_id is not None:
+                    # Deliberately fatal, unlike `create`. There the alternative to a board is
+                    # losing a freshly generated image; here the caller asked for a copy *on a
+                    # board*, and a copy that silently landed uncategorized would be reported as a
+                    # success that the caller then remaps its document onto.
+                    self.__invoker.services.board_image_records.add_image_to_board(
+                        board_id=board_id, image_name=image_name
+                    )
+
+                self.__invoker.services.image_files.copy(
+                    source_image_name=source_image_name,
+                    image_name=image_name,
+                    source_subfolder=record.image_subfolder or "",
+                    image_subfolder=image_subfolder,
+                )
+                file_copied = True
+
+                image_dto = self.get_dto(image_name)
+                self._on_changed(image_dto)
+                return image_dto
+            except Exception:
+                # Unwind whatever exists, newest first. The board membership goes with the record
+                # via the FK.
+                if file_copied:
+                    try:
+                        self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
+                    except Exception as cleanup_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to roll back the file for copy {image_name}: {cleanup_error}"
+                        )
+                if record_saved:
+                    try:
+                        self.__invoker.services.image_records.delete(image_name)
+                    except Exception as cleanup_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to roll back the record for copy {image_name}: {cleanup_error}"
+                        )
+                raise
+        except Exception:
+            self.__invoker.services.logger.error(f"Failed to copy image {source_image_name}", exc_info=True)
+            raise
 
     def update(
         self,
@@ -308,50 +396,38 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        # When ``user_id`` is set the lookup filters to images owned by that user so the
+        # cascade doesn't destroy other users' contributions to a public/shared board.
+        image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
+            board_id,
+            categories=None,
+            is_intermediate=None,
+            user_id=user_id,
+        )
+        return self.delete_images_by_names(image_names)
+
+    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Delete exactly these images, returning ``(deleted, failed)``.
+
+        Split from ``delete_images_on_board`` so a caller that must decide whether the board may go
+        *before* destroying anything can enumerate first and delete second. Records whose file
+        delete fails keep their record on purpose and come back as failures.
+        """
         try:
-            # When ``user_id`` is set the lookup filters to images owned by that user so the
-            # cascade doesn't destroy other users' contributions to a public/shared board.
-            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
-                board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=user_id,
+            records = self.__invoker.services.image_records
+            files = self.__invoker.services.image_files
+            return delete_media_by_names(
+                image_names,
+                StagedMediaDeleteAdapter(
+                    kind="image",
+                    stage=lambda name: files.stage_delete(name, image_subfolder=records.get(name).image_subfolder),
+                    delete_records=records.delete_many,
+                    rollback=files.rollback_delete,
+                    commit=files.commit_delete,
+                    notify_deleted=self._on_deleted,
+                    log_error=self.__invoker.services.logger.error,
+                ),
             )
-            deleted_image_names: list[str] = []
-            failed_image_names: list[str] = []
-            staged_deletes: list[tuple[str, object]] = []
-            for image_name in image_names:
-                try:
-                    record = self.__invoker.services.image_records.get(image_name)
-                    token = self.__invoker.services.image_files.stage_delete(
-                        image_name, image_subfolder=record.image_subfolder
-                    )
-                    staged_deletes.append((image_name, token))
-                    deleted_image_names.append(image_name)
-                except Exception as e:
-                    failed_image_names.append(image_name)
-                    self.__invoker.services.logger.error(
-                        f"Failed to delete image file {image_name}; keeping record: {str(e)}"
-                    )
-            try:
-                self.__invoker.services.image_records.delete_many(deleted_image_names)
-            except Exception:
-                for image_name, token in staged_deletes:
-                    try:
-                        self.__invoker.services.image_files.rollback_delete(token)
-                    except Exception as rollback_error:
-                        self.__invoker.services.logger.error(
-                            f"Failed to restore staged image files for {image_name}: {rollback_error}"
-                        )
-                raise
-            for _, token in staged_deletes:
-                try:
-                    self.__invoker.services.image_files.commit_delete(token)
-                except Exception as cleanup_error:
-                    self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
-            for image_name in deleted_image_names:
-                self._on_deleted(image_name)
-            return deleted_image_names, failed_image_names
         except ImageRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete image records")
             raise

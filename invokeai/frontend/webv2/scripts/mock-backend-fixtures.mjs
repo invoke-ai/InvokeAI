@@ -36,6 +36,9 @@ export const MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME = 'fixture-video-001.mp4';
 const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
 const range = (length, build) => Array.from({ length }, (_, index) => build(index));
 const ordinal = (index, width = 3) => String(index + 1).padStart(width, '0');
+
+/** The single user every fixture belongs to; matches `MOCK_USER_ID` in the mock backend. */
+const FIXTURE_USER_ID = 'fixture-user';
 const timestampAt = (index) => new Date(FIXED_EPOCH_MS - index * 60_000).toISOString();
 
 export const isMockBackendProfileName = (value) => MOCK_BACKEND_PROFILE_NAMES.includes(value);
@@ -50,12 +53,58 @@ export const assertMockBackendProfileName = (value) => {
   return value;
 };
 
+/**
+ * What Fixture Project 002's own board holds, and what sits just outside it.
+ *
+ * The project-file journey is the only place the whole board path runs end to end, and it can only
+ * prove the interesting rules if the fixture actually contains them: a result the canvas draws with
+ * *and* the board owns (so a restore must copy it and rewrite the layer), a result the document
+ * never mentions (which is the entire reason `.invk` carries a board at all), assets under each
+ * visible category, media that must be excluded, and references that live outside the board and so
+ * must be deduplicated rather than copied.
+ *
+ * Every name here is an existing fixture image reassigned to the project's board — the image count
+ * is a pinned dimension of the representative profile, so this composition must not change it.
+ */
+export const PROJECT_FILE_BOARD = Object.freeze({
+  /** Generated, on the board, and drawn by the canvas: the overlap case. */
+  referencedImage: 'fixture-image-0002.png',
+  /** Generated, on the board, referenced by nothing. Travels only because the archive enumerates the board. */
+  unreferencedImage: 'fixture-image-0005.png',
+  /** An upload, filed under the `user` asset category. */
+  userAsset: 'fixture-image-0006.png',
+  /** A control-layer asset, so the restore has more than one category to preserve. */
+  maskAsset: 'fixture-image-0007.png',
+  /** Already starred in the base composition, so starring survives without perturbing any ordering. */
+  starredImage: 'fixture-image-0012.png',
+  /** The canvas's private category. On the board, and it must never travel as board membership. */
+  canvasOwnedImage: 'fixture-image-0008.png',
+  /** Hidden from every gallery view, and from the snapshot with it. */
+  intermediateImage: 'fixture-image-0009.png',
+  /** A visible video on the board, which is a separate namespace and a separate copy path. */
+  video: 'fixture-video-project.mp4',
+  /** Drawn by the canvas but owned by no project: reused on import, never copied. */
+  externalImages: Object.freeze(['fixture-image-0001.png', 'fixture-image-0003.png', 'fixture-image-0004.png']),
+});
+
+/** Category and visibility overrides that put the board composition above onto the project's board. */
+const PROJECT_BOARD_IMAGES = new Map([
+  [PROJECT_FILE_BOARD.referencedImage, { image_category: 'general' }],
+  [PROJECT_FILE_BOARD.unreferencedImage, { image_category: 'general' }],
+  [PROJECT_FILE_BOARD.starredImage, { image_category: 'general', starred: true }],
+  [PROJECT_FILE_BOARD.userAsset, { image_category: 'user' }],
+  [PROJECT_FILE_BOARD.maskAsset, { image_category: 'mask' }],
+  [PROJECT_FILE_BOARD.canvasOwnedImage, { image_category: 'other' }],
+  [PROJECT_FILE_BOARD.intermediateImage, { image_category: 'general', is_intermediate: true }],
+]);
+
 const createImages = (count) =>
   range(count, (index) => {
     const id = ordinal(index, 4);
     const imageName = `fixture-image-${id}.png`;
     const boardIndex = index % 10;
     const imageCategory = index % 10 === 0 ? 'control' : 'general';
+    const projectBoardMembership = PROJECT_BOARD_IMAGES.get(imageName);
 
     return {
       board_id: index % 8 === 0 ? null : `fixture-board-${ordinal(boardIndex, 2)}`,
@@ -68,6 +117,9 @@ const createImages = (count) =>
       starred: index % 11 === 0,
       thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
       width: 512 + (index % 4) * 64,
+      ...(projectBoardMembership === undefined
+        ? {}
+        : { board_id: PROJECT_FILE_BOARD_ID, starred: false, ...projectBoardMembership }),
     };
   });
 
@@ -168,6 +220,27 @@ const createVideos = () => [
     workflow: null,
   },
   {
+    // On Fixture Project 002's own board: videos are a separate namespace with their own copy and
+    // upload routes, so a project file that only ever carried images would prove half the path.
+    board_id: 'fixture-project-board-02',
+    created_at: timestampAt(5),
+    duration: 1,
+    fps: 10,
+    graph: null,
+    height: 64,
+    is_intermediate: false,
+    metadata: { prompt: 'project board fixture' },
+    owner_user_id: 'fixture-user',
+    starred: false,
+    thumbnail_url: '/api/v1/videos/i/fixture-video-project.mp4/thumbnail',
+    video_category: 'general',
+    video_name: 'fixture-video-project.mp4',
+    video_origin: 'internal',
+    video_url: '/api/v1/videos/i/fixture-video-project.mp4/full',
+    width: 64,
+    workflow: null,
+  },
+  {
     board_id: null,
     created_at: timestampAt(4),
     duration: 1,
@@ -207,45 +280,73 @@ const createVideos = () => [
   },
 ];
 
-const createBoards = (images, videos) =>
-  range(10, (index) => {
-    const boardId = `fixture-board-${ordinal(index, 2)}`;
-    const boardImages = images.filter((image) => image.board_id === boardId);
-    const boardVideos = videos.filter((video) => video.board_id === boardId);
-    const cover = [
-      ...boardImages.map((image) => ({
-        createdAt: image.created_at,
-        kind: 'image',
-        name: image.image_name,
-        starred: image.starred,
-      })),
-      ...boardVideos.map((video) => ({
-        createdAt: video.created_at,
-        kind: 'video',
-        name: video.video_name,
-        starred: video.starred,
-      })),
-    ].sort(
-      (left, right) =>
-        Number(right.starred) - Number(left.starred) ||
-        right.createdAt.localeCompare(left.createdAt) ||
-        right.kind.localeCompare(left.kind) ||
-        right.name.localeCompare(left.name)
-    )[0];
+/**
+ * The board a project owns. Every project has exactly one, and only project APIs may rename or
+ * delete it — the generic board routes refuse a claimed board.
+ */
+export const projectBoardId = (index) => `fixture-project-board-${ordinal(index, 2)}`;
 
-    return {
-      archived: false,
-      asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
-      board_id: boardId,
-      board_name: `Fixture Board ${ordinal(index, 2)}`,
-      cover_image_name: cover?.kind === 'image' ? cover.name : null,
-      cover_video_name: cover?.kind === 'video' ? cover.name : null,
-      created_at: timestampAt(index * 10),
-      image_count: boardImages.filter((image) => image.image_category === 'general').length,
-      owner_username: null,
-      video_count: boardVideos.length,
-    };
-  });
+/**
+ * The board owned by Fixture Project 002 — the project the project-file journey exports, imports
+ * and duplicates. Declared here rather than inlined so the composition above and the journey's
+ * assertions cannot drift from the project they describe.
+ */
+export const PROJECT_FILE_BOARD_ID = projectBoardId(1);
+
+const buildBoard = (boardId, boardName, images, videos, createdAt) => {
+  const boardImages = images.filter((image) => image.board_id === boardId);
+  const boardVideos = videos.filter((video) => video.board_id === boardId);
+  const cover = [
+    ...boardImages.map((image) => ({
+      createdAt: image.created_at,
+      kind: 'image',
+      name: image.image_name,
+      starred: image.starred,
+    })),
+    ...boardVideos.map((video) => ({
+      createdAt: video.created_at,
+      kind: 'video',
+      name: video.video_name,
+      starred: video.starred,
+    })),
+  ].sort(
+    (left, right) =>
+      Number(right.starred) - Number(left.starred) ||
+      right.createdAt.localeCompare(left.createdAt) ||
+      right.kind.localeCompare(left.kind) ||
+      right.name.localeCompare(left.name)
+  )[0];
+
+  return {
+    archived: false,
+    asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
+    board_id: boardId,
+    board_name: boardName,
+    board_visibility: 'private',
+    cover_image_name: cover?.kind === 'image' ? cover.name : null,
+    cover_video_name: cover?.kind === 'video' ? cover.name : null,
+    created_at: createdAt,
+    image_count: boardImages.filter((image) => image.image_category === 'general').length,
+    owner_username: null,
+    user_id: FIXTURE_USER_ID,
+    video_count: boardVideos.length,
+  };
+};
+
+const createBoards = (images, videos, projectCount) => [
+  ...range(10, (index) =>
+    buildBoard(
+      `fixture-board-${ordinal(index, 2)}`,
+      `Fixture Board ${ordinal(index, 2)}`,
+      images,
+      videos,
+      timestampAt(index * 10)
+    )
+  ),
+  ...range(projectCount, (index) =>
+    buildBoard(projectBoardId(index), `Fixture Project ${ordinal(index, 3)}`, images, videos, timestampAt(index))
+  ),
+];
 
 const QUEUE_STATUSES = ['pending', 'waiting', 'in_progress', 'completed', 'failed', 'canceled'];
 
@@ -431,6 +532,27 @@ const createCanvasLayers = (count) =>
     };
   });
 
+const createProjectFileWorkflowNodes = () => {
+  const [node] = createWorkflowNodes(1);
+
+  return [
+    {
+      ...node,
+      data: {
+        ...node.data,
+        inputs: {
+          ...node.data.inputs,
+          video: {
+            label: '',
+            name: 'video',
+            value: { video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME },
+          },
+        },
+      },
+    },
+  ];
+};
+
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
   const id = `fixture-project-${ordinal(index, 3)}`;
   const graphId = `${id}-graph`;
@@ -509,12 +631,15 @@ const createProjects = (count, workflowNodeCount, layerCount) =>
   range(count, (index) => {
     const data = createProjectDocument({
       index,
-      layers: index === 0 ? createCanvasLayers(layerCount) : [],
-      workflowNodes: index === 0 ? createWorkflowNodes(workflowNodeCount) : [],
+      layers: index === 0 ? createCanvasLayers(layerCount) : index === 1 ? createCanvasLayers(4) : [],
+      workflowNodes:
+        index === 0 ? createWorkflowNodes(workflowNodeCount) : index === 1 ? createProjectFileWorkflowNodes() : [],
     });
     const timestamp = timestampAt(index);
 
     return {
+      // Every project owns exactly one private board; the server is authoritative for which.
+      board_id: projectBoardId(index),
       created_at: timestamp,
       data,
       name: data.name,
@@ -575,7 +700,7 @@ const createRepresentativeFixture = () => {
   const videos = createVideos();
 
   return {
-    boards: createBoards(images, videos),
+    boards: createBoards(images, videos, counts.projects),
     images,
     models: createModels(counts.models),
     nodeCatalog: {

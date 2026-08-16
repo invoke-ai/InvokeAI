@@ -13,6 +13,7 @@ export type FirstPartyWidgetTypeId =
   | 'gallery'
   | 'generate'
   | 'history-controls'
+  | 'image-map'
   | 'layers'
   | 'notifications'
   | 'preview'
@@ -30,7 +31,7 @@ export type WidgetInstanceId = string;
 
 export type WidgetId = WidgetTypeId;
 
-export type WorkbenchRegion = 'left' | 'right' | 'center' | 'bottom' | 'dialog' | 'popover';
+export type WorkbenchRegion = 'left' | 'right' | 'center' | 'bottom' | 'dialog' | 'popover' | 'floating';
 
 export interface WidgetStateContract {
   id: WidgetTypeId;
@@ -299,6 +300,8 @@ export interface WidgetManifest {
   icon: WidgetIconComponent;
   bottomPanel?: 'expandable' | 'tooltip';
   centerPlacement?: 'toolbar' | 'view';
+  /** Opt-in: the widget can be detached into a movable floating window. */
+  allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
   chrome?: {

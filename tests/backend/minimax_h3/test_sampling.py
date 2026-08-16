@@ -6,9 +6,46 @@ import torch
 from invokeai.backend.minimax_h3.packing import (
     align_num_frames,
     audio_latent_num_frames,
+    resolve_canvas_size,
     video_latent_num_frames,
 )
-from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_num_frames
+from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_canvas, validate_num_frames
+
+
+class TestCanvas:
+    def test_every_resolvable_canvas_is_accepted(self):
+        # The guard must never reject a canvas resolve_canvas_size can emit. Rounding both axes to
+        # the 32 grid happens *after* the area cap, so its own outputs reach ~1.04x the cap.
+        canvases = set()
+        for index in range(1501):
+            ratio = min(0.25 + index * (3.75 / 1500), 4.0)
+            canvases.add(resolve_canvas_size(ratio, 1.0))
+        assert len(canvases) > 50
+        for height, width in canvases:
+            validate_canvas(height, width)
+
+    def test_native_canvas_accepted(self):
+        validate_canvas(768, 1344)
+        validate_canvas(1344, 768)
+
+    def test_oversized_canvas_rejected(self):
+        # 4096x4096 builds a ~607k-row packed sequence against the native canvas's ~38k.
+        with pytest.raises(ValueError, match="soft area cap"):
+            validate_canvas(4096, 4096)
+        with pytest.raises(ValueError, match="soft area cap"):
+            validate_canvas(2048, 2048)
+
+    def test_off_grid_canvas_rejected(self):
+        with pytest.raises(ValueError, match="multiples of 32"):
+            validate_canvas(768, 1000)
+
+    def test_extreme_aspect_ratio_rejected(self):
+        with pytest.raises(ValueError, match="aspect ratios"):
+            validate_canvas(128, 1344)
+
+    def test_nonpositive_rejected(self):
+        with pytest.raises(ValueError, match="must be positive"):
+            validate_canvas(0, 1344)
 
 
 class TestFrameGrid:
