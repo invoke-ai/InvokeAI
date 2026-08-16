@@ -21,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
+import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
@@ -49,6 +50,7 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.invokeToOtherDestination',
   'app.openCommandPalette',
   'app.openProjectSwitcher',
+  'app.openSettings',
   'app.saveLayoutPreset',
   ...layoutPresetCommands.map(({ id }) => id),
   'app.cancelQueueItem',
@@ -174,6 +176,11 @@ export const useRegisterFirstPartyCommands = () => {
         handler: openProjectSwitcher,
         id: 'app.openProjectSwitcher',
         title: 'Open project switcher',
+      }),
+      commandApi.register({
+        handler: () => openWorkbenchSettings(),
+        id: 'app.openSettings',
+        title: 'Open settings',
       }),
       commandApi.register({
         handler: () => layout.savePreset(queries.getSnapshot().activeProject.layout.presetId),

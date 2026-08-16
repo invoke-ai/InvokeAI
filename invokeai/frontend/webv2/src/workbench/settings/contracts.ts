@@ -53,6 +53,8 @@ export interface WorkbenchPreferences {
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;
+  /** Toast when an invocation is added to the queue. The notification center records it regardless. */
+  notifyOnEnqueue: boolean;
   /** Write numeric attention weights (`(word)1.1`) when the attention hotkeys insert them. */
   preferNumericAttentionStyle: boolean;
   /** Experimental. Color prompt syntax in prompt fields; changes rendering only. */

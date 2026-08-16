@@ -101,9 +101,7 @@ export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
           <Dialog.Positioner>
             <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
               <Dialog.Header>
-                <Dialog.Title fontSize="sm" fontWeight="700">
-                  {t('widgets.queue.itemTitle', { id: item.id })}
-                </Dialog.Title>
+                <Dialog.Title>{t('widgets.queue.itemTitle', { id: item.id })}</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 <JsonPreview label={t('widgets.queue.itemJsonLabel', { id: item.id })} maxH="60vh" value={item} />

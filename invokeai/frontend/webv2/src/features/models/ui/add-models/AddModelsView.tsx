@@ -26,10 +26,10 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Scrollable, Tooltip } from '@platform/ui';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
 
 import { AccessTokenPopover } from './AccessTokenPopover';
 import { BundleChips } from './BundleChips';
@@ -46,7 +46,7 @@ import { useInstallActions } from './useInstallActions';
 const SOURCE_KIND_ICONS: Record<string, ElementType> = {
   'models.sourceKind.filePath': FileIcon,
   'models.sourceKind.folderPath': FolderIcon,
-  'models.sourceKind.hfRepo': SiHuggingface,
+  'models.sourceKind.hfRepo': HuggingFaceIcon,
   'models.sourceKind.url': LinkIcon,
 };
 

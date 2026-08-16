@@ -21,6 +21,7 @@ import { Field } from '@platform/ui/Field';
 import { MenuContent } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { Select } from '@platform/ui/Select';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { MoreHorizontalIcon, RotateCcwIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useState } from 'react';
@@ -29,7 +30,6 @@ import { useTranslation } from 'react-i18next';
 import { useGenerationUi } from './GenerationUiContext';
 import { ConditioningRebalanceBars } from './shared/ConditioningRebalanceBars';
 import { ConditioningRebalanceSparkline } from './shared/ConditioningRebalanceSparkline';
-import { SliderNumberField } from './shared/SliderNumberField';
 
 /** The gain slider's practical range. Typed values may go to the legacy schema's bound. */
 const GAIN_SLIDER_MAX = 10;

@@ -30,9 +30,10 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiCopyBold, PiDownloadSimpleBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 import type { VideoDTO } from 'services/api/types';
 
-import { useImageViewerContext } from './context';
+import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
+import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
@@ -57,6 +58,8 @@ type Props = {
  * appear on top of the previously-loaded video. Without this, a freshly generated render's
  * progress images had nowhere to display whenever a video was the last-selected gallery
  * item (and the user only saw the static first-frame still until the new video finished).
+ * Also mirrors its temporary reveal: clicking a gallery thumbnail mid-render lifts the
+ * overlay briefly so the click visibly lands, then the live preview returns.
  */
 export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoUrl = useMediaUrl(videoDTO?.video_url);
@@ -71,16 +74,81 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const deleteVideoModal = useDeleteVideoModalApi();
   const { downloadItem } = useDownloadItem();
   const clipboard = useClipboard();
-  const { $progressEvent, $progressImage, onLoadImage } = useImageViewerContext();
+  const {
+    $progressEvent,
+    $progressImage,
+    $activeProgressData,
+    $isProgressImageResolving,
+    $isTemporarilyShowingSelectedImage,
+    lastRenderedItemNameRef,
+    onLoadImage,
+  } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
-  const withProgress = shouldShowProgressInViewer && progressImage !== null;
+  const activeProgressData = useStore($activeProgressData);
+  const isProgressImageResolving = useStore($isProgressImageResolving);
+  const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
+  const hasProgressImage = progressImage !== null;
+  // `!isPlaying`: a reveal exposes the play button, and an explicit play is a stronger signal than
+  // the click that triggered the reveal — never re-cover an actively-playing video with the opaque
+  // overlay (its audio would keep running underneath, with the controls unreachable). The overlay
+  // returns when the user closes the player.
+  const withProgress =
+    shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying;
+  // When more than one session is generating concurrently (multi-GPU), tile their previews instead
+  // of letting the sessions overwrite each other's full-size preview. Mirrors CurrentImagePreview.
+  const withTiledProgress = withProgress && activeProgressData.length > 1;
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
+  const selectedVideoRevealTimeoutId = useRef(0);
 
   // Whenever the selected video changes, drop back to the idle still + play overlay.
   useEffect(() => {
     setIsPlaying(false);
   }, [videoName]);
+
+  // Mid-generation gallery clicks: mirror CurrentImagePreview's temporary reveal. Without this,
+  // the opaque progress overlay swallows every video-thumbnail click for the whole render — the
+  // selection changes underneath, but nothing visibly happens. Unlike the image path there is no
+  // preload step: the <video> renders immediately (first frame paints when metadata arrives), so
+  // the reveal is keyed directly off the selected video name. The previous-item ref is shared with
+  // CurrentImagePreview so an image -> video click still reads as a selection change.
+  useEffect(() => {
+    const previousRenderedItemName = lastRenderedItemNameRef.current;
+    lastRenderedItemNameRef.current = videoName;
+
+    window.clearTimeout(selectedVideoRevealTimeoutId.current);
+
+    if (!shouldShowProgressInViewer || !hasProgressImage || isProgressImageResolving || !videoName) {
+      $isTemporarilyShowingSelectedImage.set(false);
+      return;
+    }
+
+    if (previousRenderedItemName === null || previousRenderedItemName === videoName) {
+      return;
+    }
+
+    $isTemporarilyShowingSelectedImage.set(true);
+    selectedVideoRevealTimeoutId.current = window.setTimeout(() => {
+      $isTemporarilyShowingSelectedImage.set(false);
+    }, SELECTED_ITEM_REVEAL_DURATION_MS);
+
+    return () => {
+      window.clearTimeout(selectedVideoRevealTimeoutId.current);
+    };
+  }, [
+    $isTemporarilyShowingSelectedImage,
+    hasProgressImage,
+    isProgressImageResolving,
+    lastRenderedItemNameRef,
+    shouldShowProgressInViewer,
+    videoName,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      $isTemporarilyShowingSelectedImage.set(false);
+    };
+  }, [$isTemporarilyShowingSelectedImage]);
 
   // Register the viewer's <video> as a drag source so users can drag the currently-displayed
   // video onto node fields (e.g. a Video Primitive's "Starting Video" input) directly from
@@ -125,13 +193,17 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     if (isMediaCookieSelfHealPending()) {
       return;
     }
+    // A genuinely errored element will never fire onLoadedMetadata, which is what normally clears
+    // a pending post-render progress overlay — clear it here or it strands over the viewer.
+    // (onLoadImage is a no-op unless a resolve is actually pending.)
+    onLoadImage();
     toast({
       id: 'VIDEO_PLAYBACK_FAILED',
       status: 'error',
       title: t('toast.videoPlaybackFailed'),
       description: t('toast.videoPlaybackFailedDesc'),
     });
-  }, [t]);
+  }, [onLoadImage, t]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -355,9 +427,15 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       )}
       {withProgress && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
-          <ProgressImage progressImage={progressImage} />
-          {progressEvent && (
-            <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+          {withTiledProgress ? (
+            <ProgressImageTiles data={activeProgressData} />
+          ) : (
+            <>
+              <ProgressImage progressImage={progressImage} />
+              {progressEvent && (
+                <ProgressIndicator progressEvent={progressEvent} position="absolute" top={6} right={6} size={8} />
+              )}
+            </>
           )}
         </Flex>
       )}

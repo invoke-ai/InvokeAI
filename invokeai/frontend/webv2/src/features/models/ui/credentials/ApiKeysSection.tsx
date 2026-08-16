@@ -18,10 +18,10 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
 import { HexagonIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
 
 /**
  * Credentials for every model source, as one uniform grid of key cards:
@@ -175,7 +175,7 @@ const HuggingFaceKeyCard = ({ onError }: { onError: (title: string, message: str
   return (
     <ApiKeyCard
       description={t('models.huggingFaceKeyDescription')}
-      icon={SiHuggingface}
+      icon={HuggingFaceIcon}
       isLoading={status === null}
       placeholder="hf_…"
       status={statusBadge}

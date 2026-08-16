@@ -69,9 +69,7 @@ export const UpdatePathDialog = ({
           <Dialog.Content>
             <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
               <Stack gap="0.5">
-                <Dialog.Title fontSize="sm" fontWeight="700">
-                  {t('models.updatePath')}
-                </Dialog.Title>
+                <Dialog.Title>{t('models.updatePath')}</Dialog.Title>
                 <Text color="fg.subtle" fontSize="2xs">
                   {t('models.updatePathDescription')}
                 </Text>

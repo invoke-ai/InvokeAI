@@ -257,7 +257,7 @@ describe('loadWorkbench session hydration', () => {
     const serverAccount = {
       ...local.account,
       layoutPresetMetadataOverrides: { compose: { label: 'Writing' } },
-      layoutPresetRouteOverrides: { compose: { destination: 'canvas' as const, sourceId: 'canvas' as const } },
+      layoutPresetRouteOverrides: { compose: { destination: 'canvas' as const, sourceId: 'upscale' as const } },
     };
     storage.set(
       'invokeai:v7:webv2:workbench',
@@ -272,7 +272,7 @@ describe('loadWorkbench session hydration', () => {
       snapshot?.state.projects.find((project) => project.id === snapshot.state.activeProjectId)?.invocation
     ).toMatchObject({
       destination: 'canvas',
-      sourceId: 'canvas',
+      sourceId: 'upscale',
     });
   });
 
@@ -368,7 +368,7 @@ describe('loadWorkbench session hydration', () => {
     const account = {
       ...createInitialWorkbenchState().account,
       layoutPresetRouteOverrides: {
-        compose: { destination: 'canvas' as const, sourceId: 'canvas' as const },
+        compose: { destination: 'canvas' as const, sourceId: 'upscale' as const },
       },
     };
 
@@ -380,7 +380,7 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.activeProjectId).not.toBe(first.id);
     expect(
       snapshot?.state.projects.find((project) => project.id === snapshot.state.activeProjectId)?.invocation
-    ).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+    ).toMatchObject({ destination: 'canvas', sourceId: 'upscale' });
     expect(service.hasPendingChanges()).toBe(true);
   });
 
@@ -391,7 +391,7 @@ describe('loadWorkbench session hydration', () => {
       account: {
         ...initial.account,
         layoutPresetRouteOverrides: {
-          compose: { destination: 'canvas', sourceId: 'canvas' },
+          compose: { destination: 'canvas', sourceId: 'upscale' },
         },
       },
     };
@@ -412,7 +412,7 @@ describe('loadWorkbench session hydration', () => {
     expect(snapshot?.state.activeProjectId).not.toBe(cachedProjectId);
     expect(
       snapshot?.state.projects.find((project) => project.id === snapshot.state.activeProjectId)?.invocation
-    ).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+    ).toMatchObject({ destination: 'canvas', sourceId: 'upscale' });
   });
 
   it('starts an account-resolved draft from an empty offline session', async () => {
@@ -422,7 +422,7 @@ describe('loadWorkbench session hydration', () => {
       account: {
         ...initial.account,
         layoutPresetRouteOverrides: {
-          compose: { destination: 'canvas', sourceId: 'canvas' },
+          compose: { destination: 'canvas', sourceId: 'upscale' },
         },
       },
       activeProjectId: '',
@@ -438,7 +438,7 @@ describe('loadWorkbench session hydration', () => {
     const snapshot = await service.loadWorkbench();
 
     expect(snapshot?.state.projects).toHaveLength(1);
-    expect(snapshot?.state.projects[0]?.invocation).toMatchObject({ destination: 'canvas', sourceId: 'canvas' });
+    expect(snapshot?.state.projects[0]?.invocation).toMatchObject({ destination: 'canvas', sourceId: 'upscale' });
   });
 
   it('reopens the cached session when the backend is unreachable and no draft was requested', async () => {

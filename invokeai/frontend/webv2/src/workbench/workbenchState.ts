@@ -34,6 +34,7 @@ import type {
   ProjectUndoSnapshot,
   PromptHistoryItem,
   WorkbenchNotification,
+  WorkbenchNotificationCategory,
   WorkbenchNotificationKind,
   WorkbenchState,
 } from '@workbench/projectContracts';
@@ -384,7 +385,7 @@ type WorkbenchReducerAction =
       type: 'recordError';
       message: string;
       area?: string;
-      context?: Record<string, unknown>;
+      context?: { error?: string; layerId?: string };
       namespace?: DeveloperLogNamespace;
       projectId?: string;
     }
@@ -394,10 +395,23 @@ type WorkbenchReducerAction =
 const HISTORY_LIMIT = 40;
 export const GRAPH_HISTORY_BYTE_BUDGET = 64 * 1024 * 1024;
 const NOTIFICATION_LIMIT = 100;
-const MIN_PANEL_SIZE_PX = 180;
+// Side panels host real widget UIs (gallery grid, generate form); below
+// ~350px their toolbars and grids collapse into unusable slivers, so that is
+// the floor rather than a merely-rendered 180px. The bottom strip is a
+// status row, not a widget host, and keeps its own bounds.
+const MIN_PANEL_SIZE_PX = 350;
 const MAX_PANEL_SIZE_PX = 520;
 const MIN_STATUS_PANEL_SIZE_PX = 96;
 const MAX_STATUS_PANEL_SIZE_PX = 420;
+
+/** The resize bounds for a widget region — shared with the resize handles. */
+export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
+  if (region === 'bottom') {
+    return { max: MAX_STATUS_PANEL_SIZE_PX, min: MIN_STATUS_PANEL_SIZE_PX };
+  }
+
+  return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
+};
 
 const now = (): string => new Date().toISOString();
 
@@ -405,16 +419,19 @@ const createId = (prefix: string): string =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
 const createNotification = ({
+  category,
   kind,
   message,
   projectId,
   title,
 }: {
+  category?: WorkbenchNotificationCategory;
   kind: WorkbenchNotificationKind;
   message?: string;
   projectId?: string;
   title: string;
 }): WorkbenchNotification => ({
+  category,
   createdAt: now(),
   id: createId('notification'),
   isRead: false,
@@ -424,10 +441,65 @@ const createNotification = ({
   title,
 });
 
-const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => ({
-  ...state,
-  notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT),
-});
+const addNotification = (state: WorkbenchState, notification: WorkbenchNotification): WorkbenchState => {
+  const [newest, ...rest] = state.notifications;
+
+  // Coalesce an exact repeat of the newest ERROR notification into an
+  // occurrence bump on the SAME id, instead of stacking a new one — the
+  // toaster dedupes toasts by id, so a repeat then stops re-toasting for free
+  // (e.g. an ambient retry failing the same way every cycle). Restricted to
+  // errors: non-error kinds (e.g. "Invocation queued") are routine, repeat
+  // actions that must each surface their own toast.
+  if (
+    newest &&
+    newest.kind === 'error' &&
+    newest.kind === notification.kind &&
+    newest.title === notification.title &&
+    newest.message === notification.message
+  ) {
+    return {
+      ...state,
+      notifications: [
+        {
+          ...newest,
+          createdAt: notification.createdAt,
+          isRead: false,
+          occurrenceCount: (newest.occurrenceCount ?? 1) + 1,
+        },
+        ...rest,
+      ],
+    };
+  }
+
+  return { ...state, notifications: [notification, ...state.notifications].slice(0, NOTIFICATION_LIMIT) };
+};
+
+/** Adds the "Invocation queued" notice iff the reduction actually grew that project's queue. */
+const withEnqueueNotification = (
+  state: WorkbenchState,
+  nextState: WorkbenchState,
+  projectId: string | null
+): WorkbenchState => {
+  const before = state.projects.find((project) => project.id === projectId);
+  const after = nextState.projects.find((project) => project.id === projectId);
+
+  if (!before || !after || before.queue.items.length >= after.queue.items.length) {
+    return nextState;
+  }
+
+  const queueItem = after.queue.items[0];
+
+  return addNotification(
+    nextState,
+    createNotification({
+      category: 'enqueue',
+      kind: 'success',
+      message: `${after.name}: ${queueItem.snapshot.sourceId} to ${queueItem.snapshot.destination}`,
+      projectId: after.id,
+      title: 'Invocation queued',
+    })
+  );
+};
 
 const areRecordsShallowEqual = (left: Record<string, unknown>, right: Record<string, unknown>): boolean => {
   if (left === right) {
@@ -1219,23 +1291,25 @@ const ensureLeftRegion = (leftRegion: WidgetRegionState | undefined): WidgetRegi
   return { ...leftRegion, instanceIds };
 };
 
-const LEGACY_RIGHT_REGION_WIDGET_IDS: WidgetId[] = ['queue', 'gallery', 'layers'];
+// Every right rail this app has shipped as a default. A project persisted with
+// one of these exactly is an untouched default rather than a customization, so
+// it adopts the current curated rail wholesale.
+//
+// Adopting beats splicing the new widget in: the curated presets are the only
+// arrangements a rail can hold without reading as drifted, and a spliced rail
+// is by construction not one of them — it would show the unsaved-changes dot
+// and offer to revert a layout nobody edited.
+const LEGACY_RIGHT_REGION_WIDGET_IDS: WidgetId[][] = [
+  ['queue', 'gallery', 'layers'],
+  // The rail as it shipped before the image map existed.
+  ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+];
 
 const isLegacyDefaultRightRegion = (region: WidgetRegionState): boolean =>
-  region.instanceIds.length === LEGACY_RIGHT_REGION_WIDGET_IDS.length &&
-  region.instanceIds.every((widgetId, index) => widgetId === LEGACY_RIGHT_REGION_WIDGET_IDS[index]);
-
-// The right rail as it shipped before the image map existed. A project
-// persisted with exactly this arrangement is an untouched default, not a
-// customization, so it gains the new widget the way a fresh project would.
-const PRE_IMAGE_MAP_DEFAULT_RIGHT_REGION_WIDGET_IDS: WidgetId[] = [
-  'gallery',
-  'preview',
-  'queue',
-  'layers',
-  'diagnostics',
-  'project',
-];
+  LEGACY_RIGHT_REGION_WIDGET_IDS.some(
+    (ids) =>
+      ids.length === region.instanceIds.length && ids.every((widgetId, index) => region.instanceIds[index] === widgetId)
+  );
 
 const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRegionState => {
   const defaultRightRegion = createWidgetRegions().right;
@@ -1248,33 +1322,50 @@ const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRe
     return { ...rightRegion, instanceIds: defaultRightRegion.instanceIds };
   }
 
-  if (rightRegion.instanceIds.includes('image-map')) {
-    return rightRegion;
+  return rightRegion;
+};
+
+// The shipped bottom-region default before 'queue-status' was added — a
+// persisted project whose bottom rail matches this exactly is still running
+// the pre-branch defaults, so it should pick up the new widget the same way
+// a fresh project would.
+//
+// A rail whose 'queue-status' was floated back out matches this shape too, so
+// the migration re-docks it on every load. That is left to
+// `reconcileFloatingWidgets`, which runs on this region's output and drops any
+// instance holding a floating window — the same contract the other rail
+// migrations here rely on.
+const LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS: readonly WidgetInstanceId[] = [
+  'server-status',
+  'gallery:bottom',
+  'notifications',
+  'autosave-status',
+];
+
+const isLegacyDefaultBottomRegion = (region: WidgetRegionState): boolean =>
+  region.instanceIds.length === LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS.length &&
+  region.instanceIds.every((widgetId, index) => widgetId === LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS[index]);
+
+const ensureBottomRegion = (bottomRegion: WidgetRegionState | undefined): WidgetRegionState => {
+  const fallback = createWidgetRegions().bottom;
+
+  if (!bottomRegion) {
+    return fallback;
+  }
+  if (bottomRegion.instanceIds.includes('queue-status')) {
+    return bottomRegion;
   }
 
-  const isPreImageMapDefault =
-    rightRegion.instanceIds.length === PRE_IMAGE_MAP_DEFAULT_RIGHT_REGION_WIDGET_IDS.length &&
-    rightRegion.instanceIds.every(
-      (widgetId, index) => widgetId === PRE_IMAGE_MAP_DEFAULT_RIGHT_REGION_WIDGET_IDS[index]
-    );
-
-  if (!isPreImageMapDefault) {
-    // A customized rail is left alone, matching how `upscale` was introduced.
-    return rightRegion;
+  if (!isLegacyDefaultBottomRegion(bottomRegion)) {
+    return bottomRegion;
   }
 
-  // Without this, adding the widget to the built-in presets makes every
-  // existing project read as drifted from the preset it was loaded from — the
-  // topbar shows an unsaved-changes dot, and offers to revert a layout the user
-  // never edited. Migrating the persisted rail keeps the two in step, and is
-  // also the only way the widget is discoverable without hunting through the
-  // enable menu.
-  const galleryIndex = rightRegion.instanceIds.indexOf('gallery');
-  const instanceIds = [...rightRegion.instanceIds];
+  const serverStatusIndex = bottomRegion.instanceIds.indexOf('server-status');
+  const instanceIds = [...bottomRegion.instanceIds];
 
-  instanceIds.splice(galleryIndex === -1 ? instanceIds.length : galleryIndex + 1, 0, 'image-map');
+  instanceIds.splice(serverStatusIndex === -1 ? instanceIds.length : serverStatusIndex + 1, 0, 'queue-status');
 
-  return { ...rightRegion, instanceIds };
+  return { ...bottomRegion, instanceIds };
 };
 
 const getCenterWidgetIdFromViewId = (centerViewId: CenterViewId): WidgetInstanceId => {
@@ -1318,13 +1409,6 @@ const isFloatingWidgetMode = (value: unknown): value is FloatingWidgetMode =>
 const isWidgetRegionId = (value: unknown): value is WidgetRegion => WIDGET_REGION_IDS.includes(value as WidgetRegion);
 
 /**
- * Persisted floating windows are an unsafe-cast boundary like every other
- * sub-shape here. An entry naming a region that does not exist crashes the
- * reducer the moment it is docked, and a non-numeric geometry reaches the
- * window's fixed-position CSS, so anything malformed is dropped rather than
- * carried: the widget then reappears docked instead of not at all.
- */
-/**
  * Put a docking widget back where it was, not on the end.
  *
  * The rail is an ordered tab strip, so appending turned float-then-dock — a
@@ -1348,6 +1432,13 @@ const insertAtReturnIndex = (
   return next;
 };
 
+/**
+ * Persisted floating windows are an unsafe-cast boundary like every other
+ * sub-shape here: an entry naming a region that does not exist crashes the
+ * reducer the moment it is docked, and non-numeric geometry reaches the
+ * window's fixed-position CSS. Anything malformed is dropped, so the widget
+ * reappears docked rather than not at all.
+ */
 const normalizeFloatingWidgets = (
   value: unknown,
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>
@@ -1475,11 +1566,11 @@ const normalizePromptHistory = (value: unknown): PromptHistoryItem[] => {
 };
 
 export const normalizeWorkbenchProject = (project: Project): Project => {
-  const defaultWidgetRegions = createWidgetRegions();
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
     | undefined;
   const leftRegion = ensureLeftRegion(legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel']);
+  const bottomRegion = ensureBottomRegion(legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar']);
   const widgetInstances = cloneWidgetInstances(project.widgetInstances ?? createWidgetInstances());
 
   const generateInstance = widgetInstances.generate;
@@ -1512,6 +1603,10 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
     widgetInstances.upscale = createWidgetInstance('upscale');
   }
 
+  if (bottomRegion.instanceIds.includes('queue-status') && !widgetInstances['queue-status']) {
+    widgetInstances['queue-status'] = createWidgetInstance('queue-status');
+  }
+
   for (const [instanceId, instance] of Object.entries(widgetInstances)) {
     if (instance.typeId !== 'gallery' || !('recentImages' in instance.state.values)) {
       continue;
@@ -1534,7 +1629,7 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
     {
       left: leftRegion,
       right: ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']),
-      bottom: legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar'] ?? defaultWidgetRegions.bottom,
+      bottom: bottomRegion,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
     normalizeFloatingWidgets((project as Partial<Project>).floatingWidgets, widgetInstances)
@@ -1581,19 +1676,16 @@ export const withAuthoritativeProjectBoard = (project: Project, boardId: string)
 /**
  * The project a recovery fork should become, preferring live content over the snapshot.
  *
- * A fork is created by the sync engine from the document it was *pushing* — serialized when the
- * save began. By the time the answer comes back, anything typed since is newer than that snapshot
- * and is what the person is looking at. Adopting the snapshot would therefore delete precisely the
- * edits the fork exists to rescue, and do it in the case the mechanism is most likely to fire: a
- * save is stale exactly when a keystroke landed while it was in flight.
+ * The fork is serialized when the save begins, so anything typed since is newer than it. Adopting
+ * the snapshot would delete precisely the edits the fork exists to rescue, in the case the
+ * mechanism most often fires: a save is stale exactly when a keystroke landed mid-flight.
  *
  * So the live project is re-labelled instead. The server-side fork already holds the older document
- * under this identity, and the sync entry recorded for it says as much, so the next push sees a
- * difference and sends the current content up its revision chain. Nothing is lost and nothing has
- * to be merged.
+ * under this identity, so the next push sees a difference and sends the current content up its
+ * revision chain — nothing lost, nothing to merge.
  *
- * The snapshot is still the answer when there is no live project — a tab closed while the save was
- * in flight — because then it is the only copy of that work left anywhere local.
+ * The snapshot still wins when there is no live project (a tab closed mid-save), because then it is
+ * the only local copy of that work.
  */
 const recoverProjectUnderNewIdentity = (
   localProject: Project | undefined,
@@ -1612,12 +1704,10 @@ const recoverProjectUnderNewIdentity = (
       : snapshotProject
   );
 
-const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
-  if (region === 'bottom') {
-    return Math.min(MAX_STATUS_PANEL_SIZE_PX, Math.max(MIN_STATUS_PANEL_SIZE_PX, sizePx));
-  }
+export const clampPanelSize = (region: WidgetRegion, sizePx: number): number => {
+  const { max, min } = getPanelSizeBounds(region);
 
-  return Math.min(MAX_PANEL_SIZE_PX, Math.max(MIN_PANEL_SIZE_PX, sizePx));
+  return Math.min(max, Math.max(min, sizePx));
 };
 
 const createCanvasState = (): CanvasStateContractV2 => createNewCanvasStateV2();
@@ -2610,7 +2700,6 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
             page: 0,
             paginationMode: 'infinite',
             searchTerm: '',
-            starredFirst: gallerySettings.starredFirst,
           },
         }
       : {}),
@@ -3734,37 +3823,27 @@ export const __workbenchReducerInternal = (
       }));
     }
     case 'submitInvocationSnapshot': {
-      const beforeProject = state.projects.find((project) => project.id === state.activeProjectId);
-      const nextState = updateActiveProject(state, (project) =>
-        submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
-      );
-      const afterProject = nextState.projects.find((project) => project.id === nextState.activeProjectId);
-
-      if (!beforeProject || !afterProject || beforeProject.queue.items.length === afterProject.queue.items.length) {
-        return nextState;
-      }
-
-      const queueItem = afterProject.queue.items[0];
-
-      return addNotification(
-        nextState,
-        createNotification({
-          kind: 'info',
-          message: `${afterProject.name}: ${queueItem.snapshot.sourceId} to ${queueItem.snapshot.destination}`,
-          projectId: afterProject.id,
-          title: 'Invocation queued',
-        })
+      return withEnqueueNotification(
+        state,
+        updateActiveProject(state, (project) =>
+          submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
+        ),
+        state.activeProjectId
       );
     }
     case 'submitResolvedInvocationSnapshot': {
-      return updateActiveProject(state, (project) =>
-        submitInvocationSnapshot(
-          project,
-          action.backendSupportsCancellation,
-          resolveInvocationRoute(project, 'global', action.route, action.models),
-          action.models,
-          action.positivePrompts
-        )
+      return withEnqueueNotification(
+        state,
+        updateActiveProject(state, (project) =>
+          submitInvocationSnapshot(
+            project,
+            action.backendSupportsCancellation,
+            resolveInvocationRoute(project, 'global', action.route, action.models),
+            action.models,
+            action.positivePrompts
+          )
+        ),
+        state.activeProjectId
       );
     }
     case 'markQueueItemBackendSubmitted': {
@@ -3909,7 +3988,6 @@ export const __workbenchReducerInternal = (
                   page: selectedImagePage,
                   paginationMode: settings.paginationMode,
                   searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                  starredFirst: settings.starredFirst,
                 };
           const itemKey = toGalleryItemKey(action.item);
 
@@ -3954,7 +4032,6 @@ export const __workbenchReducerInternal = (
                 page: selectedImagePage,
                 paginationMode: settings.paginationMode,
                 searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-                starredFirst: settings.starredFirst,
               },
             };
           }
@@ -4020,7 +4097,6 @@ export const __workbenchReducerInternal = (
               page: selectedImagePage,
               paginationMode: settings.paginationMode,
               searchTerm: typeof values.searchTerm === 'string' ? values.searchTerm : '',
-              starredFirst: settings.starredFirst,
             },
           };
         },
@@ -4070,10 +4146,7 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'updateGallerySettings': {
-      const resetsQuery =
-        action.settings.imageOrderDir !== undefined ||
-        action.settings.starredFirst !== undefined ||
-        action.settings.paginationMode !== undefined;
+      const resetsQuery = action.settings.imageOrderDir !== undefined || action.settings.paginationMode !== undefined;
 
       return updateGalleryValues(
         state,
@@ -4150,19 +4223,23 @@ export const __workbenchReducerInternal = (
       return updateProjectById(state, action.projectId, (project) => applyAutoRouteForEdit(project, 'canvas', context));
     }
     case 'submitCanvasInvocationSnapshot': {
-      return updateProjectById(state, action.projectId, (project) =>
-        enqueueCompiledSnapshot(
-          project,
-          { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
-          {
-            generate: action.generate,
-            graph: action.graph,
-            positivePrompts: action.positivePrompts,
-            widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
-          },
-          action.backendSupportsCancellation,
-          action.canvas
-        )
+      return withEnqueueNotification(
+        state,
+        updateProjectById(state, action.projectId, (project) =>
+          enqueueCompiledSnapshot(
+            project,
+            { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
+            {
+              generate: action.generate,
+              graph: action.graph,
+              positivePrompts: action.positivePrompts,
+              widgetStates: getWidgetStatesSnapshot(project.widgetInstances),
+            },
+            action.backendSupportsCancellation,
+            action.canvas
+          )
+        ),
+        action.projectId
       );
     }
     case 'cancelQueueItem': {
@@ -4471,7 +4548,15 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'recordError': {
-      return addNotification(state, createNotification({ kind: 'error', message: action.message, title: 'Error' }));
+      const detail = action.context?.error;
+      return addNotification(
+        state,
+        createNotification({
+          kind: 'error',
+          message: detail ? `${action.message}: ${detail}` : action.message,
+          title: 'Error',
+        })
+      );
     }
     case 'setBackendConnectionStatus': {
       const timestamp = now();

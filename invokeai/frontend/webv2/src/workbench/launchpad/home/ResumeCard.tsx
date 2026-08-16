@@ -2,6 +2,7 @@ import type { ProjectSummary } from '@workbench/projects/library';
 
 import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Link } from '@tanstack/react-router';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { ProjectCover } from '@workbench/launchpad/projects/ProjectCover';
@@ -53,9 +54,7 @@ export const ResumeCard = ({ summary }: { summary: ProjectSummary }) => {
           <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
             {t('launchpad.home.resume')}
           </Text>
-          <Text fontSize="sm" fontWeight="700" truncate>
-            {summary.name}
-          </Text>
+          <MiddleTruncate fontSize="sm" fontWeight="700" text={summary.name} />
           <Text color="fg.muted" fontSize="2xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>

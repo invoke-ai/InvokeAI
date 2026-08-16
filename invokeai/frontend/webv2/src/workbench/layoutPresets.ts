@@ -13,12 +13,10 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
 
 const defaultBottomInstanceIds: WidgetInstanceId[] = [
   'server-status',
-  'diagnostics:bottom',
+  'queue-status',
   'gallery:bottom',
   'notifications',
   'autosave-status',
-  'version-status',
-  'workflow:bottom',
 ];
 
 const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
@@ -37,6 +35,7 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   preview: 'preview',
   project: 'project',
   queue: 'queue',
+  'queue-status': 'queue-status',
   'server-status': 'server-status',
   'version-status': 'version-status',
   workflow: 'workflow',
@@ -159,19 +158,25 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
         isCollapsed: true,
         sizePx: 180,
       }),
+      // Gallery stays a center view here: the retired `gallery` preset resolves
+      // to Compose because it was "Compose with the center view swapped" (see
+      // legacyLayoutPresetIds), so the swap has to stay reachable. Curating it
+      // out also made Gallery an *addable* widget instead of a placed one,
+      // which routed the switch through a menu that warms the Canvas chunk on
+      // intent — a chunk a gallery-only session must never download.
       center: createRegion({
         activeInstanceId: 'preview',
-        instanceIds: ['preview', 'canvas', 'gallery:center', 'workflow:center'],
+        instanceIds: ['preview', 'gallery:center'],
         sizePx: 0,
       }),
       left: createRegion({
         activeInstanceId: 'generate',
-        instanceIds: ['generate', 'workflow', 'upscale'],
+        instanceIds: ['generate', 'upscale'],
         sizePx: 450,
       }),
       right: createRegion({
         activeInstanceId: 'gallery',
-        instanceIds: ['gallery', 'image-map', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+        instanceIds: ['gallery', 'image-map', 'queue'],
         sizePx: 450,
       }),
     },
@@ -194,17 +199,17 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       center: createRegion({
         activeInstanceId: 'canvas',
-        instanceIds: ['canvas', 'preview', 'gallery:center', 'workflow:center'],
+        instanceIds: ['canvas', 'preview'],
         sizePx: 0,
       }),
       left: createRegion({
         activeInstanceId: 'generate',
-        instanceIds: ['generate', 'workflow', 'upscale'],
+        instanceIds: ['generate', 'upscale'],
         sizePx: 450,
       }),
       right: createRegion({
         activeInstanceId: 'layers',
-        instanceIds: ['layers', 'gallery', 'image-map', 'queue', 'preview', 'diagnostics', 'project'],
+        instanceIds: ['layers', 'preview', 'gallery', 'image-map', 'queue'],
         sizePx: 450,
       }),
     },
@@ -220,24 +225,24 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {
       bottom: createRegion({
-        activeInstanceId: 'workflow:bottom',
+        activeInstanceId: 'gallery:bottom',
         instanceIds: defaultBottomInstanceIds,
         isCollapsed: true,
         sizePx: 180,
       }),
       center: createRegion({
         activeInstanceId: 'workflow:center',
-        instanceIds: ['workflow:center', 'canvas', 'preview', 'gallery:center'],
+        instanceIds: ['workflow:center', 'preview'],
         sizePx: 0,
       }),
       left: createRegion({
         activeInstanceId: 'workflow',
-        instanceIds: ['workflow', 'generate', 'upscale'],
+        instanceIds: ['workflow'],
         sizePx: 450,
       }),
       right: createRegion({
         activeInstanceId: 'queue',
-        instanceIds: ['queue', 'gallery', 'image-map', 'layers', 'preview', 'diagnostics', 'project'],
+        instanceIds: ['queue', 'preview', 'gallery', 'image-map'],
         sizePx: 450,
       }),
     },

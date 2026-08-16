@@ -19,6 +19,7 @@ export type FirstPartyWidgetTypeId =
   | 'preview'
   | 'project'
   | 'queue'
+  | 'queue-status'
   | 'server-status'
   | 'upscale'
   | 'users'

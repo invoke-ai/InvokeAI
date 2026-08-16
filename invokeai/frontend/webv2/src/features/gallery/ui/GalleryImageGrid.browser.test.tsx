@@ -42,7 +42,7 @@ const mocks = vi.hoisted(() => ({
   scrollToIndex: vi.fn(),
   virtualizerOptions: [] as Array<{
     count: number;
-    estimateSize: () => number;
+    estimateSize: (index: number) => number;
     getScrollElement: () => Element | null;
     overscan: number;
   }>,
@@ -62,23 +62,24 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
 vi.mock('react-hook-tanstack-virtual', () => ({
   useVirtualizer: (options: {
     count: number;
-    estimateSize: () => number;
+    estimateSize: (index: number) => number;
     getScrollElement: () => Element | null;
     overscan: number;
   }) => {
     mocks.virtualizerOptions.push(options);
-    const size = options.estimateSize();
+    const sizes = Array.from({ length: options.count }, (_, index) => options.estimateSize(index));
+    const starts = sizes.map((_, index) => sizes.slice(0, index).reduce((total, size) => total + size, 0));
 
     return {
       measure: mocks.measure,
       scrollToIndex: mocks.scrollToIndex,
-      totalSize: options.count * size,
+      totalSize: sizes.reduce((total, size) => total + size, 0),
       virtualItems: Array.from({ length: options.count }, (_, index) => ({
-        end: (index + 1) * size,
+        end: (starts[index] ?? 0) + (sizes[index] ?? 0),
         index,
         key: index,
-        size,
-        start: index * size,
+        size: sizes[index] ?? 0,
+        start: starts[index] ?? 0,
       })),
     };
   },
@@ -115,11 +116,15 @@ void i18n.use(initReactI18next).init({
             itemsAriaLabel: 'Gallery items',
             loadingBackendGallery: 'Loading gallery',
             noImagesMatch: 'No items',
+            collapseStarredItems: 'Collapse starred items',
             dropMediaToUploadToBoard: 'Drop media to {{name}}',
+            emptyBoardUploadHint: 'Drop media here or click to upload',
+            expandStarredItems: 'Expand starred items',
             selectImageForPreview: 'Select {{name}} for preview',
             selectVideoForPreview: 'Select video {{name}}, duration {{duration}}, for preview',
             selectedBoardFallback: 'selected board',
             starImage: 'Star {{name}}',
+            starredItems: 'Starred',
             unstarImage: 'Unstar {{name}}',
             uncategorized: 'Uncategorized',
             windowLimit: 'Limited to {{count}}',
@@ -378,7 +383,6 @@ const Harness = ({
                       frameHeight={96}
                       frameWidth={128}
                       isLive={false}
-                      liveBadgeLabel="Generating"
                       shouldAntialiasLiveImage
                       source={{ itemKey: 'image:shared', kind: 'image', source: previewSource }}
                       variant="framed"
@@ -455,6 +459,93 @@ afterEach(async () => {
 });
 
 describe('GalleryImageGrid mixed item cells', () => {
+  it('separates starred items into an expanded disclosure above regular items', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    const trigger = getButton('Collapse starred items');
+    const starredSection = host?.querySelector('[data-gallery-section="starred"]');
+    const regularSection = host?.querySelector('[data-gallery-section="regular"]');
+
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.textContent).toContain('Starred');
+    expect(starredSection?.querySelector('button[aria-label="Select starred.png for preview"]')).not.toBeNull();
+    expect(regularSection?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
+    expect(
+      Array.from(host?.querySelectorAll('[data-gallery-section]') ?? []).map((row) =>
+        row.getAttribute('data-gallery-section')
+      )
+    ).toEqual(['starred', 'regular']);
+  });
+
+  it('matches board disclosure chrome while retaining the star marker', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    const trigger = getButton('Collapse starred items');
+    const header = trigger.parentElement;
+
+    expect(header?.getBoundingClientRect().height).toBe(24);
+    expect(trigger.querySelector('svg.lucide-star')).not.toBeNull();
+    expect(getComputedStyle(trigger).transitionProperty).toBe('color');
+
+    await act(() => userEvent.hover(trigger));
+
+    expect(getComputedStyle(trigger).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+  });
+
+  it('keeps the starred label and grid together before a dedicated trailing gap', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    const listRect = host?.querySelector('[role="list"]')?.getBoundingClientRect();
+    const headerRect = getButton('Collapse starred items').parentElement?.getBoundingClientRect();
+    const starredRect = getButton('Select starred.png for preview').getBoundingClientRect();
+    const regularRect = getButton('Select regular.png for preview').getBoundingClientRect();
+
+    expect((headerRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(0, 0);
+    expect(starredRect.top - (headerRect?.bottom ?? 0)).toBeLessThan(4);
+    expect(regularRect.top - starredRect.bottom).toBeCloseTo(12, 0);
+
+    await click(getButton('Collapse starred items'));
+
+    const collapsedHeaderRect = getButton('Expand starred items').parentElement?.getBoundingClientRect();
+    const collapsedRegularRect = getButton('Select regular.png for preview').getBoundingClientRect();
+    const collapsedSectionGap = collapsedRegularRect.top - (collapsedHeaderRect?.bottom ?? 0);
+
+    expect((collapsedHeaderRect?.top ?? 0) - (listRect?.top ?? 0)).toBeCloseTo(0, 0);
+    expect(collapsedSectionGap).toBeGreaterThanOrEqual(4);
+    expect(collapsedSectionGap).toBeLessThan(8);
+  });
+
+  it('collapses only the starred items and omits the disclosure when no stars are loaded', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      })
+    );
+
+    await click(getButton('Collapse starred items'));
+
+    expect(getButton('Expand starred items').getAttribute('aria-expanded')).toBe('false');
+    expect(host?.querySelector('button[aria-label="Select starred.png for preview"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
+
+    await renderGallery(createGallery({ items: [createItem('image', 'regular.png')] }));
+
+    expect(host?.querySelector('button[aria-label="Expand starred items"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Collapse starred items"]')).toBeNull();
+  });
+
   it('renders same-name media independently and gives a video a static accessible poster', async () => {
     const gallery = createGallery({
       items: [createItem('image', 'shared'), createItem('video', 'shared')],
@@ -795,6 +886,53 @@ describe('GalleryImageGrid upload drop zone', () => {
 
     expect(host?.textContent).toContain('Drop media to Uncategorized');
   });
+
+  it('turns a true-empty, non-searching, non-virtual board into a click/drop upload target', async () => {
+    await renderGallery(createGallery({ items: [], pendingPlaceholders: [] }));
+
+    const target = host?.querySelector<HTMLElement>('[role="button"]');
+    const input = host?.querySelector<HTMLInputElement>('input[type="file"]');
+
+    expect(target).not.toBeNull();
+    expect(target?.getAttribute('tabIndex')).toBe('0');
+    expect(target?.textContent).toContain('Drop media here or click to upload');
+    expect(input).not.toBeNull();
+    expect(host?.textContent).not.toContain('No items');
+
+    const clickSpy = vi.spyOn(input!, 'click');
+
+    await interact(() => target?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+
+    expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the no-match message for a search with no results instead of the upload target', async () => {
+    await renderGallery(createGallery({ items: [], pendingPlaceholders: [], searchTerm: 'nope' }));
+
+    expect(host?.textContent).toContain('No items');
+    expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('keeps the no-match message for an empty virtual (date) board instead of the upload target', async () => {
+    await renderGallery(
+      createGallery({
+        boards: [{ ...board, id: 'by_date:2026-07-30', kind: 'date' }],
+        items: [],
+        pendingPlaceholders: [],
+        selectedBoardId: 'by_date:2026-07-30',
+      })
+    );
+
+    expect(host?.textContent).toContain('No items');
+    expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+
+  it('keeps the loading message while an empty board is still loading', async () => {
+    await renderGallery(createGallery({ isLoading: true, items: [], pendingPlaceholders: [] }));
+
+    expect(host?.textContent).toContain('Loading gallery');
+    expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
 });
 
 describe('GalleryImageGrid virtualization', () => {
@@ -808,6 +946,32 @@ describe('GalleryImageGrid virtualization', () => {
 
     expect(secondOptions?.estimateSize).toBe(firstOptions?.estimateSize);
     expect(secondOptions?.getScrollElement).toBe(firstOptions?.getScrollElement);
+  });
+
+  it('re-measures when the row model changes without a resize, and only then', async () => {
+    const gallery = createGallery({
+      items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+    });
+
+    await renderGallery(gallery);
+
+    // Collapsing starred keeps the visible range identical, so without an
+    // explicit measure() the virtualizer would keep serving the expanded
+    // offsets — the new rows would paint below a stale starred-sized hole.
+    mocks.measure.mockClear();
+    await click(getButton('Collapse starred items'));
+    expect(mocks.measure).toHaveBeenCalled();
+
+    // Swapping the item list (e.g. the media/assets view switch) is the same
+    // structural change arriving through props.
+    mocks.measure.mockClear();
+    await renderGallery(createGallery({ items: [createItem('image', 'other.png')] }));
+    expect(mocks.measure).toHaveBeenCalled();
+
+    // An equivalent render leaves the row model alone and must not thrash.
+    mocks.measure.mockClear();
+    await renderGallery({ ...currentGallery });
+    expect(mocks.measure).not.toHaveBeenCalled();
   });
 
   it('retains constant row estimates, overscan, and the near-end infinite-load trigger', async () => {
@@ -831,7 +995,7 @@ describe('GalleryImageGrid virtualization', () => {
     expect(options?.count).toBe(renderedRows);
     expect(renderedCells).toBe(items.length);
     expect(options?.overscan).toBe(4);
-    expect(options?.estimateSize()).toBe(options?.estimateSize());
+    expect(options?.estimateSize(0)).toBe(options?.estimateSize(0));
     expect(host?.querySelector('[role="listitem"]')).toHaveStyle({ aspectRatio: '1 / 1' });
   });
 });

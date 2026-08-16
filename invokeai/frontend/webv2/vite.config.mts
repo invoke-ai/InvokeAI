@@ -30,6 +30,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
+  // Name/identifier truncation used eagerly by Launchpad project cards and
+  // editor widget chrome alike.
+  '/platform/ui/MiddleTruncate.tsx',
   '/platform/ui/theme/applyTheme.ts',
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',
@@ -117,10 +120,6 @@ const getLegacyChunkName = (id: string): string | null => {
   // file is actually read or written — the same treatment ag-psd gets.
   if (id.includes('/node_modules/fflate/')) {
     return 'fflate';
-  }
-
-  if (id.includes('/node_modules/react-icons/')) {
-    return 'react-icons';
   }
 
   if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {

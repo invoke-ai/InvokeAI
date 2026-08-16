@@ -7,6 +7,7 @@ import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { getCompatibleInputTemplate, getCompatibleOutputTemplate } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HammerIcon } from 'lucide-react';
 import {
   startTransition,
@@ -127,9 +128,7 @@ const NodeResultRow = ({
               <Icon as={HammerIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
             </Tooltip>
           ) : null}
-          <Text fontSize="xs" fontWeight="600" truncate>
-            {row.title}
-          </Text>
+          <MiddleTruncate fontSize="xs" fontWeight="600" text={row.title} />
         </HStack>
         {row.description ? (
           <Text color="fg.subtle" fontSize="2xs" lineClamp={2} lineHeight="1.4">

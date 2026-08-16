@@ -1,7 +1,7 @@
 import type { DragEndEvent, KeyboardSensorOptions } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 
-import { Box, Dialog, HStack, Icon, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, Dialog, HStack, Icon, Portal, Stack } from '@chakra-ui/react';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
@@ -98,7 +99,7 @@ export const LayoutPresetManagerDialogBody = () => {
               </DndContext>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button size="sm" variant="outline" onClick={closeLayoutPresetManager}>
+              <Button size="xs" variant="outline" onClick={closeLayoutPresetManager}>
                 {t('common.done')}
               </Button>
             </Dialog.Footer>
@@ -156,9 +157,7 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
         <Icon as={GripVerticalIcon} boxSize="3.5" />
       </IconButton>
       <Icon as={icon} boxSize="4" color="fg.muted" flexShrink={0} />
-      <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
-        {preset.label}
-      </Text>
+      <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={preset.label} />
       {isOverridden ? (
         <Box
           aria-label={t('topbar.presets.edited')}

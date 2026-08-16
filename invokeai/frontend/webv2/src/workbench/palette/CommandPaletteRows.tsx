@@ -3,6 +3,7 @@ import type { ReactNode, Ref } from 'react';
 import { Box, HStack, Icon, Kbd, ScrollArea, Spacer, Text, chakra } from '@chakra-ui/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
+import { ShortcutKeyGlyph } from '@workbench/hotkeys/keyGlyphs';
 import { CheckIcon } from 'lucide-react';
 import { useCallback, useImperativeHandle, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -102,7 +103,7 @@ const EntryRow = ({
         <HStack flexShrink={0} gap="0.5">
           {entry.keys.map((part) => (
             <Kbd key={part} size="sm" textTransform="lowercase">
-              {part}
+              <ShortcutKeyGlyph fallback={part} part={part} />
             </Kbd>
           ))}
         </HStack>
@@ -169,7 +170,7 @@ const ScopeRow = ({
     </Text>
     <Spacer />
     <Kbd size="sm" textTransform="lowercase">
-      tab
+      <ShortcutKeyGlyph fallback="tab" part="tab" />
     </Kbd>
   </HStack>
 );

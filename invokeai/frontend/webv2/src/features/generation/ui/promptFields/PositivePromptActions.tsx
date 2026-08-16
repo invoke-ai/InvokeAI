@@ -28,6 +28,7 @@ import { useSystemPrompts } from '@features/generation/ui/promptFields/useSystem
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton, Scrollable, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   EyeIcon,
   EyeOffIcon,
@@ -42,6 +43,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
+const PROMPT_TRIGGER_EMPTY_SCROLL_CONTENT_PROPS = { h: 'full' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 /**
@@ -297,12 +299,14 @@ export const PromptTriggerPopover = ({
                   onChange={handleSearchChange}
                 />
                 <Separator />
-                <Scrollable flex="1" label={t('widgets.generate.promptTriggerOptions')} minH="0">
+                <Scrollable
+                  contentProps={options.length === 0 ? PROMPT_TRIGGER_EMPTY_SCROLL_CONTENT_PROPS : undefined}
+                  flex="1"
+                  label={t('widgets.generate.promptTriggerOptions')}
+                  minH="0"
+                >
                   {options.length === 0 ? (
-                    <Stack align="start" gap="1" px="2">
-                      <PromptHistoryEmptyText>{t('widgets.generate.noPromptTriggersAvailable')}</PromptHistoryEmptyText>
-                      <OpenModelManagerButton />
-                    </Stack>
+                    <PromptTriggerEmptyState />
                   ) : filteredOptions.length === 0 ? (
                     <PromptHistoryEmptyText>{t('widgets.generate.noMatchingTriggers')}</PromptHistoryEmptyText>
                   ) : (
@@ -330,6 +334,19 @@ export const PromptTriggerPopover = ({
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
+  );
+};
+
+const PromptTriggerEmptyState = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack align="start" gap="1" h="full" justify="center" px="2">
+      <Text color="fg.subtle" fontSize="xs">
+        {t('widgets.generate.noPromptTriggersAvailable')}
+      </Text>
+      <OpenModelManagerButton />
+    </Stack>
   );
 };
 
@@ -677,9 +694,7 @@ const ImageToPromptButton = ({
                           rounded="md"
                           src={image.thumbnailUrl || image.imageUrl}
                         />
-                        <Text color="fg.subtle" fontSize="xs" truncate>
-                          {image.imageName}
-                        </Text>
+                        <MiddleTruncate color="fg.subtle" fontSize="xs" text={image.imageName} />
                       </HStack>
                     ) : (
                       <Text color="fg.subtle" fontSize="xs">

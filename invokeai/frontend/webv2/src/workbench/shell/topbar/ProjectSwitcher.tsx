@@ -9,6 +9,7 @@ import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { QueueCircularProgress } from '@workbench/components/QueueProgressIndicator';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
@@ -154,9 +155,7 @@ export const ProjectSwitcher = () => {
             size="xs"
             variant="ghost"
           >
-            <Text css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" truncate>
-              {activeProjectName}
-            </Text>
+            <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
             <Icon as={ChevronsUpDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>
@@ -167,9 +166,7 @@ export const ProjectSwitcher = () => {
                 <Text color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                   {t('projects.projectDetails')}
                 </Text>
-                <Text fontSize="xs" fontWeight="700" truncate>
-                  {activeProjectName}
-                </Text>
+                <MiddleTruncate fontSize="xs" fontWeight="700" text={activeProjectName} />
               </Stack>
               <Menu.Separator />
               <Menu.Item value="rename-project" onClick={renameActiveProject}>
@@ -295,8 +292,8 @@ const OpenProjectRow = ({
       <Menu.ItemIndicator color="accent.fg">
         <Icon as={CheckIcon} boxSize="3.5" />
       </Menu.ItemIndicator>
-      <Menu.ItemText flex="1" minW="0" truncate>
-        {project.name}
+      <Menu.ItemText flex="1" minW="0">
+        <MiddleTruncate as="span" text={project.name} />
       </Menu.ItemText>
       <QueueCircularProgress state={progressState} />
     </Menu.RadioItem>
@@ -315,8 +312,8 @@ const RecentProjectRow = ({
 
   return (
     <Menu.Item value={summary.id} onClick={handleSelect}>
-      <Menu.ItemText flex="1" minW="0" truncate>
-        {summary.name}
+      <Menu.ItemText flex="1" minW="0">
+        <MiddleTruncate as="span" text={summary.name} />
       </Menu.ItemText>
       <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
         {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}

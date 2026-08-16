@@ -5,10 +5,10 @@ import type { ReactNode } from 'react';
 import { Icon, Menu } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
 import { useModelActions } from '@features/models/ui/detail/useModelActions';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { RefreshCcwIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
 
 /**
  * The reidentify/convert/delete action set for one model, shared by the
@@ -60,7 +60,7 @@ export const ModelActionMenuItems = ({
       </Menu.Item>
       {showConvertItem && isConvertibleToDiffusers(model) ? (
         <Menu.Item value="convert" onClick={() => onRequestConfirm({ kind: 'convert', model })}>
-          <Icon as={SiHuggingface} boxSize="3.5" />
+          <Icon as={HuggingFaceIcon} boxSize="3.5" />
           <Menu.ItemText fontSize="xs">{t('models.convertToDiffusers')}</Menu.ItemText>
         </Menu.Item>
       ) : null}

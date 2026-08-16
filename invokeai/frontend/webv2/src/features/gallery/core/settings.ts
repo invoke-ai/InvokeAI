@@ -115,6 +115,8 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
       : DEFAULT_GALLERY_SETTINGS.showImageDimensions,
   showPendingItems:
     typeof values.showPendingItems === 'boolean' ? values.showPendingItems : DEFAULT_GALLERY_SETTINGS.showPendingItems,
-  starredFirst: typeof values.starredFirst === 'boolean' ? values.starredFirst : DEFAULT_GALLERY_SETTINGS.starredFirst,
+  // Starred items have a dedicated section, so the backing window must always
+  // fetch them first to keep that section complete under infinite pagination.
+  starredFirst: true,
   thumbnailFit: values.thumbnailFit === 'aspect' ? 'aspect' : DEFAULT_GALLERY_SETTINGS.thumbnailFit,
 });
