@@ -32,6 +32,23 @@ const flux2Klein9bModel: MainModelConfig = {
   type: 'main',
   variant: 'klein_9b',
 };
+const flux2DevModel: MainModelConfig = {
+  base: 'flux2',
+  format: 'diffusers',
+  key: 'flux2-dev',
+  name: 'FLUX.2 [dev]',
+  type: 'main',
+  variant: 'dev',
+};
+const flux2DevGgufModel: MainModelConfig = {
+  ...flux2DevModel,
+  format: 'gguf_quantized',
+  key: 'flux2-dev-gguf',
+};
+const flux2DevSource: MainModelConfig = {
+  ...flux2DevModel,
+  key: 'flux2-dev-source',
+};
 const fluxKontextModel: MainModelConfig = {
   base: 'flux',
   format: 'diffusers',
@@ -76,6 +93,13 @@ const sd1Lora: LoraModelConfig = { base: 'sd-1', key: 'sd1-lora', name: 'SD 1.5 
 const sd2Lora: LoraModelConfig = { base: 'sd-2', key: 'sd2-lora', name: 'SD 2 LoRA', type: 'lora' };
 const sdxlLora: LoraModelConfig = { base: 'sdxl', key: 'sdxl-lora', name: 'SDXL LoRA', type: 'lora' };
 const fluxLora: LoraModelConfig = { base: 'flux', key: 'flux-lora', name: 'FLUX LoRA', type: 'lora' };
+const flux2DevLora: LoraModelConfig = {
+  base: 'flux2',
+  key: 'flux2-dev-lora',
+  name: 'FLUX.2 [dev] LoRA',
+  type: 'lora',
+  variant: 'dev',
+};
 const sd1IpAdapter: ComponentModelConfig = {
   base: 'sd-1',
   key: 'sd1-ip-adapter',
@@ -94,6 +118,12 @@ const flux2Vae: VaeModelConfig = { base: 'flux2', key: 'flux2-vae', name: 'FLUX.
 const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
 const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const mistralEncoder: ComponentModelConfig = {
+  base: 'any',
+  key: 'mistral',
+  name: 'Mistral Encoder',
+  type: 'mistral_encoder',
+};
 const qwen3Encoder: ComponentModelConfig = {
   base: 'any',
   key: 'qwen3',
@@ -343,9 +373,42 @@ describe('compileGenerateGraph', () => {
   it('builds modern Diffusers-family graphs without separate component overrides', () => {
     expect(compile(sd3Model).nodes.model_loader?.type).toBe('sd3_model_loader');
     expect(compile(flux2Model).nodes.model_loader?.type).toBe('flux2_klein_model_loader');
+    expect(compile(flux2DevModel).nodes.model_loader?.type).toBe('flux2_dev_model_loader');
     expect(compile(cogView4Model).nodes.model_loader?.type).toBe('cogview4_model_loader');
     expect(compile(qwenImageModel).nodes.model_loader?.type).toBe('qwen_image_model_loader');
     expect(compile(zImageModel).nodes.model_loader?.type).toBe('z_image_model_loader');
+  });
+
+  it('builds FLUX.2 [dev] graphs with standalone components and dev LoRAs', () => {
+    const graph = compile(flux2DevGgufModel, {
+      loras: [{ isEnabled: true, model: flux2DevLora, weight: 0.75 }],
+      mistralEncoderModel: mistralEncoder,
+      vae: flux2Vae,
+    });
+    const loraLoader = getNodeByType(graph, 'flux2_dev_lora_collection_loader');
+    const metadata = getNodeByType(graph, 'core_metadata');
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      mistral_encoder_model: mistralEncoder,
+      type: 'flux2_dev_model_loader',
+      vae_model: flux2Vae,
+    });
+    expect(graph.nodes.pos_cond?.type).toBe('flux2_dev_text_encoder');
+    expect(loraLoader).toBeDefined();
+    expect(getEdge(graph, 'pos_cond', 'mistral_encoder')?.source.node_id).toBe(loraLoader?.id);
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loraLoader?.id);
+    expect(metadata?.mistral_encoder).toEqual(mistralEncoder);
+  });
+
+  it('uses a compatible Diffusers model as the FLUX.2 [dev] component source', () => {
+    const graph = compile(flux2DevGgufModel, { componentSourceModel: flux2DevSource });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      mistral_source_model: flux2DevSource,
+      type: 'flux2_dev_model_loader',
+    });
+    expect(graph.nodes.model_loader?.mistral_encoder_model).toBeUndefined();
+    expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
   });
 
   it('does not enable FLUX.2 CFG without negative conditioning', () => {

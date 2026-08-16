@@ -19,12 +19,17 @@ from diffusers.utils.torch_utils import randn_tensor
 
 from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_AUDIO_CHANNELS,
+    MINIMAX_H3_CANVAS_MULTIPLE,
     MINIMAX_H3_FPS,
     MINIMAX_H3_FRAMES_PER_CHUNK,
     MINIMAX_H3_KEYFRAME_NOISE_AUG,
     MINIMAX_H3_LATENTS_PER_CHUNK,
+    MINIMAX_H3_MAX_ASPECT_RATIO,
     MINIMAX_H3_MAX_DURATION,
+    MINIMAX_H3_MAX_PIXELS,
+    MINIMAX_H3_MIN_ASPECT_RATIO,
     MINIMAX_H3_MIN_DURATION,
+    MINIMAX_H3_SHORT_EDGE,
     MiniMaxH3PackedSequence,
     build_packed_sequence,
     build_row_timesteps,
@@ -72,6 +77,44 @@ def validate_num_frames(num_frames: int) -> None:
             f"seconds at {MINIMAX_H3_FPS} fps ({int(MINIMAX_H3_MIN_DURATION * MINIMAX_H3_FPS)}-"
             f"{int(MINIMAX_H3_MAX_DURATION * MINIMAX_H3_FPS)} frames on the 17n+5 grid), or exactly "
             f"{MINIMAX_H3_STILL_NUM_FRAMES} frames for a still image; got {num_frames}."
+        )
+
+
+def validate_canvas(height: int, width: int) -> None:
+    """Reject canvases the FL2VA checkpoint was not released for.
+
+    H3 was released for a 768 px short edge under a soft ``768 * 1344`` area cap, with aspect
+    ratios from 1:4 to 4:1 and both axes on the 32 px grid. Without this the packed sequence
+    simply grows with the canvas — a 4096x4096 request builds a ~607k-row sequence against the
+    native canvas's ~38k — and the run surfaces as an out-of-memory failure rather than a named
+    error, while ``num_frames`` one off the grid is rejected precisely.
+
+    The area test carries the rounding slack rather than comparing to the cap directly:
+    :func:`~invokeai.backend.minimax_h3.packing.resolve_canvas_size` rounds both axes to the 32
+    grid *after* applying the area cap, so its own outputs reach ~1.04x the cap (e.g. 576x1856).
+    Shrinking each axis by the maximum rounding-up slack asks the real question — could this
+    canvas have come from rounding a within-budget canvas up? — and accepts every canvas
+    ``resolve_canvas_size`` can emit.
+    """
+    if height <= 0 or width <= 0:
+        raise ValueError(f"Canvas dimensions must be positive, got {width}x{height}.")
+    if height % MINIMAX_H3_CANVAS_MULTIPLE or width % MINIMAX_H3_CANVAS_MULTIPLE:
+        raise ValueError(
+            f"MiniMax H3 requires both canvas axes to be multiples of "
+            f"{MINIMAX_H3_CANVAS_MULTIPLE}, got {width}x{height}."
+        )
+
+    ratio = width / height
+    if not MINIMAX_H3_MIN_ASPECT_RATIO <= ratio <= MINIMAX_H3_MAX_ASPECT_RATIO:
+        raise ValueError(f"MiniMax H3 supports aspect ratios from 1:4 to 4:1, got {width}x{height} ({ratio:g}).")
+
+    slack = MINIMAX_H3_CANVAS_MULTIPLE // 2
+    if (height - slack) * (width - slack) > MINIMAX_H3_MAX_PIXELS:
+        raise ValueError(
+            f"MiniMax H3 was released for a {MINIMAX_H3_SHORT_EDGE}px short edge with a soft area cap of "
+            f"{MINIMAX_H3_MAX_PIXELS} pixels ({MINIMAX_H3_SHORT_EDGE}x{MINIMAX_H3_MAX_PIXELS // MINIMAX_H3_SHORT_EDGE}); "
+            f"{width}x{height} is {width * height / MINIMAX_H3_MAX_PIXELS:.1f}x that budget. Larger canvases grow the "
+            "packed sequence past what the model can attend over and will exhaust device memory."
         )
 
 

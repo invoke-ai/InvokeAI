@@ -4,11 +4,9 @@ import type { ModelConfig } from '@features/models/core/types';
 import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/models/data/api';
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { useScopedAction } from '@platform/react/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { DropZone, IconButton, Tooltip } from '@platform/ui';
 import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
 import { useRef, useState, type DragEvent } from 'react';
@@ -39,8 +37,9 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
   const dragDepthRef = useRef(0);
   const imageVersion = useModelsSelector((snapshot) => snapshot.coverImageVersions[model.key]);
   const [hasImage, setHasImage] = useState(Boolean(model.cover_image));
-  const [isBusy, setIsBusy] = useState(false);
   const [isDropActive, setIsDropActive] = useState(false);
+  // Upload and delete share one busy flag: the tile hosts one action at a time.
+  const { isBusy, run } = useScopedAction();
 
   const handleFile = async (file: File | undefined) => {
     if (!file) {
@@ -52,56 +51,36 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
       return;
     }
 
-    const owner = captureAccountScope();
     const modelKey = model.key;
 
-    setIsBusy(true);
+    await run(
+      async (owner) => {
+        await updateModelImage(modelKey, file, owner.signal);
 
-    try {
-      await updateModelImage(modelKey, file, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      setHasImage(true);
-      // Bumps the cache-bust version so this tile and list thumbnails reload.
-      markCoverImageChanged(modelKey, true);
-      onUpdated();
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      onError(error instanceof Error ? error.message : t('models.failedToUploadModelImage'));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsBusy(false);
-      }
-    }
+        assertAccountScopeCurrent(owner);
+        setHasImage(true);
+        // Bumps the cache-bust version so this tile and list thumbnails reload.
+        markCoverImageChanged(modelKey, true);
+        onUpdated();
+      },
+      (_message, error) => onError(getApiErrorMessage(error, t('models.failedToUploadModelImage')))
+    );
   };
 
   const handleDelete = async () => {
-    const owner = captureAccountScope();
     const modelKey = model.key;
 
-    setIsBusy(true);
+    await run(
+      async (owner) => {
+        await deleteModelImage(modelKey, owner.signal);
 
-    try {
-      await deleteModelImage(modelKey, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      setHasImage(false);
-      markCoverImageChanged(modelKey, false);
-      onUpdated();
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      onError(error instanceof Error ? error.message : t('models.failedToRemoveModelImage'));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsBusy(false);
-      }
-    }
+        assertAccountScopeCurrent(owner);
+        setHasImage(false);
+        markCoverImageChanged(modelKey, false);
+        onUpdated();
+      },
+      (_message, error) => onError(getApiErrorMessage(error, t('models.failedToRemoveModelImage')))
+    );
   };
 
   return (
@@ -235,4 +214,3 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
     </DropZone>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
