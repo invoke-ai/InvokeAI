@@ -5,7 +5,7 @@ import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
 import { type Atom, atom, computed, map, type MapStore, type WritableAtom } from 'nanostores';
-import type { PropsWithChildren } from 'react';
+import type { MutableRefObject, PropsWithChildren } from 'react';
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { S } from 'services/api/types';
 import { getEventScope } from 'services/events/eventScope';
@@ -33,8 +33,22 @@ type ImageViewerContextValue = {
   $activeProgressData: Atom<ViewerProgressDatum[]>;
   $isProgressImageResolving: Atom<boolean>;
   $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
+  /** Name of the item most recently rendered by either preview component (image or video). Shared
+   * across the two components so a click that switches media type (image -> video or back) still
+   * reads as a selection change to the temporary-reveal logic — a per-component ref resets on the
+   * swap and would silently swallow the first reveal after every type switch. */
+  lastRenderedItemNameRef: MutableRefObject<string | null>;
   onLoadImage: () => void;
 };
+
+/** How long a mid-generation gallery click shows the clicked item before the live preview returns. */
+export const SELECTED_ITEM_REVEAL_DURATION_MS = 2000;
+
+/** Upper bound on the post-completion "progress preview resolves into the final media" illusion.
+ * The clear normally fires from the final image's onLoad / the final video's onLoadedMetadata, but
+ * on a slow connection that load can lag far behind completion — and if the media element errors,
+ * it never fires at all. Past this deadline we drop the illusion rather than strand the overlay. */
+const RESOLVE_FAILSAFE_MS = 10_000;
 
 const ImageViewerContext = createContext<ImageViewerContextValue | null>(null);
 
@@ -59,6 +73,8 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   const $isProgressImageResolving = useState(() => atom(false))[0];
   const $isTemporarilyShowingSelectedImage = useState(() => atom(false))[0];
   const shouldClearProgressImageOnLoadRef = useRef(false);
+  const lastRenderedItemNameRef = useRef<string | null>(null);
+  const resolveFailsafeTimeoutRef = useRef(0);
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
@@ -81,6 +97,8 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         );
         return;
       }
+      // A new render owns the display now; a pending resolve (and its failsafe) is moot.
+      window.clearTimeout(resolveFailsafeTimeoutRef.current);
       shouldClearProgressImageOnLoadRef.current = false;
       $isProgressImageResolving.set(false);
       $progressEvent.set(data);
@@ -153,6 +171,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
           // will be stuck on the viewer.
           (data.origin === 'canvas' && data.destination !== 'canvas')
         ) {
+          window.clearTimeout(resolveFailsafeTimeoutRef.current);
           shouldClearProgressImageOnLoadRef.current = false;
           $isProgressImageResolving.set(false);
           $progressEvent.set(null);
@@ -160,6 +179,20 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
         } else {
           shouldClearProgressImageOnLoadRef.current = true;
           $isProgressImageResolving.set(true);
+          // Failsafe: onLoadImage normally performs this clear when the final media loads, but on
+          // a slow connection that can lag far behind completion, and an errored media element
+          // never fires it — stranding the opaque overlay until a tab switch remounts this
+          // provider. Past the deadline, drop the resolve illusion and clear directly.
+          window.clearTimeout(resolveFailsafeTimeoutRef.current);
+          resolveFailsafeTimeoutRef.current = window.setTimeout(() => {
+            if (!shouldClearProgressImageOnLoadRef.current) {
+              return;
+            }
+            shouldClearProgressImageOnLoadRef.current = false;
+            $isProgressImageResolving.set(false);
+            $progressEvent.set(null);
+            $progressImage.set(null);
+          }, RESOLVE_FAILSAFE_MS);
         }
       }
     };
@@ -185,11 +218,19 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       return;
     }
 
+    window.clearTimeout(resolveFailsafeTimeoutRef.current);
     shouldClearProgressImageOnLoadRef.current = false;
     $isProgressImageResolving.set(false);
     $progressEvent.set(null);
     $progressImage.set(null);
   }, [$isProgressImageResolving, $progressEvent, $progressImage]);
+
+  useEffect(() => {
+    const timeoutRef = resolveFailsafeTimeoutRef;
+    return () => {
+      window.clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -200,6 +241,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       $activeProgressData,
       $isProgressImageResolving,
       $isTemporarilyShowingSelectedImage,
+      lastRenderedItemNameRef,
       onLoadImage,
     }),
     [
