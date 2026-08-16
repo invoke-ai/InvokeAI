@@ -5,6 +5,11 @@
  * and is retried by the next graph change or an explicit flush(). No automatic
  * retry loop — persistent failures must not spin (cf. bitmapStore anti-spin).
  *
+ * A save's acknowledgement only reports 'saved' if no edit arrived while it was
+ * in flight; otherwise the status stays 'dirty' and the queued write reports
+ * for itself. The status is a promise about the person's current work, not a
+ * receipt for whichever bytes happened to be in the last request.
+ *
  * dispose() flushes rather than drops: a pending debounced edit is an unsaved
  * change, so unmount collapses it into one final save (status callbacks stay
  * muted). Known limitation: a hard tab close inside the debounce window can
@@ -39,6 +44,17 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
   let inFlight: Promise<void> | null = null;
   let lastSavedJson: string | null = null;
   let disposed = false;
+  /**
+   * Bumped by every graph change. A save captures it after serializing, so a
+   * captured value that no longer matches means the person edited again while
+   * the write was in flight and the answer we just got is about older content.
+   *
+   * Only the success path consults it, because the two ways of being wrong are
+   * not symmetric: claiming 'saved' over unwritten work invites someone to
+   * close the tab, while claiming 'error' or 'dirty' over work that did land
+   * costs one redundant save. Failures still report as failures.
+   */
+  let editGeneration = 0;
 
   const clearTimer = (): void => {
     if (timerHandle !== null) {
@@ -73,12 +89,18 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
     if (!disposed) {
       deps.onStatus('saving');
     }
+
+    const generationAtCapture = editGeneration;
+
     inFlight = deps
       .save(libraryWorkflowId, serialized)
       .then(() => {
+        // `json` did reach the server, so it is still the dedupe baseline even
+        // when newer edits exist — the next pass compares against it and saves
+        // only the difference.
         lastSavedJson = json;
         if (!disposed) {
-          deps.onStatus('saved');
+          deps.onStatus(editGeneration === generationAtCapture ? 'saved' : 'dirty');
         }
       })
       .catch(() => {
@@ -123,6 +145,7 @@ export const createLibraryAutosaver = (deps: LibraryAutosaverDeps) => {
       if (disposed || !deps.read().libraryWorkflowId) {
         return;
       }
+      editGeneration += 1;
       deps.onStatus('dirty');
       clearTimer();
       timerHandle = timers.setTimeout(() => {

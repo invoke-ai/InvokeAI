@@ -205,6 +205,32 @@ describe('createLibraryAutosaver', () => {
     expect(h.statuses.at(-1)).toBe('saved');
   });
 
+  it('does not report saved while an edit made during the save is still unwritten', async () => {
+    // The dangerous direction: an older save's acknowledgement lands after a
+    // newer edit has already marked the graph dirty. Reporting 'saved' there
+    // tells someone their work is safe during the window in which it is not,
+    // and that is exactly when they close the tab.
+    const h = createHarness();
+    let resolveSave: () => void;
+    const deferred = new Promise<void>((resolve) => {
+      resolveSave = resolve;
+    });
+
+    h.save.mockReturnValueOnce(deferred);
+    h.autosaver.notifyGraphChanged();
+    h.manual.fire();
+
+    h.setCurrent({ libraryWorkflowId: 'wf-1', serialized: { nodes: [2] } });
+    h.autosaver.notifyGraphChanged();
+
+    resolveSave!();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(h.statuses.at(-1)).toBe('dirty');
+    expect(h.manual.pendingCount()).toBe(1);
+  });
+
   it('an edit that dedupes back to the saved content ends in saved, not dirty', async () => {
     const h = createHarness();
     h.autosaver.notifyGraphChanged();
