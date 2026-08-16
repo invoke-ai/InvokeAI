@@ -29,6 +29,7 @@ const ViewportControls = () => {
   const dispatch = useAppDispatch();
   const shouldShowMinimapPanel = useAppSelector(selectShouldShowMinimapPanel);
   const workflowName = useAppSelector(selectWorkflowName);
+  const fallbackWorkflowName = t('workflows.unnamedWorkflow');
   const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
 
   const handleClickedZoomIn = useCallback(() => {
@@ -81,11 +82,19 @@ const ViewportControls = () => {
           flowElement,
           bounds: getNodesBounds(getNodes()),
           workflowName,
+          fallbackWorkflowName,
         })
       )
       .catch(handleWorkflowImageExportError)
       .finally(() => setIsExportingWorkflow(false));
-  }, [getNodes, getNodesBounds, handleWorkflowImageExportError, isExportingWorkflow, workflowName]);
+  }, [
+    fallbackWorkflowName,
+    getNodes,
+    getNodesBounds,
+    handleWorkflowImageExportError,
+    isExportingWorkflow,
+    workflowName,
+  ]);
 
   return (
     <ButtonGroup orientation="vertical">
