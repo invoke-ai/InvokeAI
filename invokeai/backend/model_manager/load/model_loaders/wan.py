@@ -2,22 +2,34 @@
 
 Currently covers:
 - Main: Diffusers format (T2V-A14B with dual experts via Transformer +
-  Transformer2 submodels, plus TI2V-5B). Phase 4 will add a GGUFQuantized loader.
+  Transformer2 submodels, plus TI2V-5B).
+- Main: GGUFQuantized and single-file Checkpoint (safetensors) transformers.
+  Both are transformer-only — one file per A14B expert — and rely on a
+  standalone VAE + T5 encoder for the rest of the pipeline.
 - WanT5Encoder: standalone UMT5-XXL encoder folder (``text_encoder/`` +
   ``tokenizer/`` subdirs, or a flat ``text_encoder/`` folder).
 - VAE: handled in ``vae.py`` (registered for type=VAE generically).
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import torch
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.main import Main_GGUF_Wan_Config, _is_native_wan_layout
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_Wan_Config,
+    Main_GGUF_Wan_Config,
+    _is_native_wan_layout,
+)
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils import (
+    _dequantize_comfyui_fp8,
+    _strip_comfyui_prefix,
+    _strip_quantization_metadata,
+)
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -25,7 +37,6 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     SubModelType,
-    WanVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -48,7 +59,9 @@ class WanDiffusersModel(GenericDiffusersLoader):
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if isinstance(config, Checkpoint_Config_Base):
-            raise NotImplementedError("Single-file checkpoint format is not yet supported for Wan models.")
+            # Defensive: the registry keys on format, so single-file configs are
+            # routed to WanGGUFCheckpointModel / WanCheckpointModel, not here.
+            raise TypeError(f"{type(config).__name__} is a single-file config; it does not belong to this loader.")
 
         if submodel_type is None:
             raise Exception("A submodel type must be provided when loading Wan main pipelines.")
@@ -172,6 +185,204 @@ def _unwrap_unquantized_to_compute_dtype(state_dict: dict) -> dict:
     return unwrapped
 
 
+# Top-level modules that legitimately ride along in a single-file Wan checkpoint
+# without being part of the transformer. Dropping these is correct: the pipeline
+# sources its VAE and text encoder from separately-wired models, and the EMA copy
+# is not the weight set we generate with.
+#
+# ``vae`` / ``text_encoders`` / ``clip`` / ``cond_stage_model`` / ``first_stage_model``
+# are the "all-in-one" packaging convention — one file holding transformer + VAE +
+# CLIP so ComfyUI's ``Load Checkpoint`` node can supply all three. The
+# Phr00t/WAN2.2-14B-Rapid-AllInOne family and its ~110 GGUF conversions
+# (befox/WAN2.2-14B-Rapid-AllInOne-GGUF) ship this way and loaded fine before the
+# unexpected-key check existed, so refusing them would be a regression.
+_BENIGN_EXTRA_MODULES = frozenset(
+    {
+        "vae",
+        "first_stage_model",
+        "text_encoders",
+        "cond_stage_model",
+        "clip",
+        "model_ema",
+    }
+)
+
+# Trailing segments marking a merged-in LoRA's leftover adapter tensors. The main-model
+# probe deliberately admits checkpoints that retain these — see
+# ``configs.main._has_wan_transformer_block_weights``, which uses a *positive* structural
+# test precisely so merged-LoRA mains aren't turned away — so the loader has to admit
+# them too, or the two halves disagree about the same file.
+#
+# Kept in step with the suffix set ``LoRA_LyCORIS_Wan_Config`` matches on
+# (``configs/lora.py``): kohya, PEFT, DoRA and LoKr. Matched against the *last* path
+# segment rather than as a substring anywhere in the key, so a future conditioning branch
+# that merely contains "lora_a" in a module name still trips the backstop instead of
+# being silently discarded by it.
+_MERGED_LORA_SEGMENTS = frozenset(
+    {
+        "alpha",
+        "dora_scale",
+        "lora_magnitude_vector",
+        "lokr_w1",
+        "lokr_w2",
+        "lokr_w1_a",
+        "lokr_w1_b",
+        "lokr_w2_a",
+        "lokr_w2_b",
+        "hada_w1_a",
+        "hada_w1_b",
+        "hada_w2_a",
+        "hada_w2_b",
+        "oft_blocks",
+    }
+)
+_MERGED_LORA_PENULTIMATE = frozenset({"lora_a", "lora_b", "lora_down", "lora_up", "lora_mid", "lora_magnitude"})
+
+
+def _is_benign_extra_key(key: str) -> bool:
+    """True if an unexpected key is packaging rather than an unsupported branch."""
+    parts = key.lower().split(".")
+    if parts[0] in _BENIGN_EXTRA_MODULES:
+        return True
+    if parts[-1] in _MERGED_LORA_SEGMENTS:
+        return True
+    # `...to_q.lora_down.weight` — the marker is the segment before the tensor name.
+    return len(parts) >= 2 and parts[-2] in _MERGED_LORA_PENULTIMATE
+
+
+def _drop_benign_extra_keys(sd: dict, source: str, logger: Any) -> None:
+    """Remove packaging weights the transformer has no use for, in place.
+
+    Done up front rather than left to ``load_state_dict(strict=False)`` because
+    everything between here and there costs real memory: the fp8 dequant pass, the
+    blanket cast to the compute dtype, and the RAM-cache reservation all run over the
+    whole dict. An all-in-one checkpoint bundles a full VAE and UMT5-XXL text encoder —
+    several GB, upcast to bf16 and reserved in the cache — only for
+    ``load_state_dict`` to discard them one line later.
+    """
+    dropped = [key for key in sd if isinstance(key, str) and _is_benign_extra_key(key)]
+    if not dropped:
+        return
+    modules = sorted({key.split(".")[0] for key in dropped})
+    for key in dropped:
+        del sd[key]
+    logger.info(
+        f"{source}: ignored {len(dropped)} bundled/merged weights not part of the transformer "
+        f"({', '.join(modules[:8])}). The VAE and text encoder come from the separately-wired models."
+    )
+
+
+def _raise_for_incompatible_keys(incompatible_keys: Any, source: str) -> None:
+    """Fail loudly on anything ``load_state_dict(strict=False)`` quietly discarded.
+
+    Missing keys are the obvious error. Unexpected keys matter just as much here and
+    are far easier to miss: several Wan 2.2 derivatives are supersets of the plain
+    transformer — Fun-Camera adds ``control_adapter.*`` (6 keys), S2V adds
+    ``audio_injector``/``cond_encoder``/``frame_packer`` (165 keys), Animate adds
+    ``face_adapter``/``motion_encoder`` (127 keys). They match the probe, build a
+    correctly-shaped ``WanTransformer3DModel``, report zero missing keys, and then
+    generate with the entire branch they were built around silently absent.
+
+    ``configs.main._find_unsupported_wan_variant_marker`` turns away the families we
+    know by name; this is the generic backstop, so a derivative nobody has enumerated
+    yet produces an error instead of quietly degraded output.
+
+    Benign extras — bundled VAE/text-encoder weights and merged-LoRA residue — have
+    already been removed by ``_drop_benign_extra_keys``, so anything reaching here is
+    genuinely unplaceable.
+    """
+    if incompatible_keys.missing_keys:
+        raise RuntimeError(f"{source} is missing model parameters: {sorted(incompatible_keys.missing_keys)[:10]}")
+
+    unexpected = [key for key in incompatible_keys.unexpected_keys if isinstance(key, str)]
+    if unexpected:
+        # Report the distinct top-level module names rather than hundreds of keys.
+        modules = sorted({key.split(".")[0] for key in unexpected})
+        raise RuntimeError(
+            f"{source} has {len(unexpected)} weights that WanTransformer3DModel has nowhere to put "
+            f"(modules: {', '.join(modules[:8])}). This is a Wan variant with extra conditioning "
+            "branches — Animate, S2V, Fun-Camera and similar — which InvokeAI cannot run faithfully; "
+            "loading it anyway would silently ignore that conditioning."
+        )
+
+
+def _tensor_shape(tensor: Any) -> tuple[int, ...]:
+    """Logical shape of a tensor, unwrapping GGMLTensor's packed storage.
+
+    A GGMLTensor's ``.shape`` describes the packed quantized blob, not the weight,
+    so the logical dimensions live on ``.tensor_shape``.
+    """
+    shape = tensor.tensor_shape if isinstance(tensor, GGMLTensor) else tensor.shape
+    return tuple(int(dim) for dim in shape)
+
+
+def _build_wan_transformer_config(sd: dict, source: str) -> dict:
+    """Derive ``WanTransformer3DModel`` constructor kwargs from a state dict.
+
+    The state dict must already be prefix-stripped and in the diffusers key
+    layout. Shared by the GGUF and single-file checkpoint loaders so a community
+    release is described by its own weights rather than by a hard-coded table of
+    known repos.
+
+    ``source`` only flavours the error messages.
+    """
+    num_layers = 0
+    for key in sd.keys():
+        if isinstance(key, str) and key.startswith("blocks."):
+            parts = key.split(".")
+            if len(parts) >= 2:
+                try:
+                    num_layers = max(num_layers, int(parts[1]) + 1)
+                except ValueError:
+                    pass
+
+    def require(key: str) -> tuple[int, ...]:
+        tensor = sd.get(key)
+        if tensor is None:
+            raise RuntimeError(f"{source} is missing {key} after prefix strip and key conversion")
+        return _tensor_shape(tensor)
+
+    # Patch embedding gives us in_channels (16/36=A14B, 48=TI2V-5B) and inner dim.
+    patch_shape = require("patch_embedding.weight")
+    inner_dim = patch_shape[0]
+    in_channels = patch_shape[1]
+
+    # Wan uses head_dim=128 throughout the family; num_heads = inner_dim / 128.
+    attention_head_dim = 128
+    num_attention_heads = inner_dim // attention_head_dim
+
+    ffn_dim = require("blocks.0.ffn.net.0.proj.weight")[0]
+
+    text_w = sd.get("condition_embedder.text_embedder.linear_1.weight")
+    text_dim = _tensor_shape(text_w)[1] if text_w is not None else 4096
+
+    # out_channels is read from proj_out.weight directly rather than assumed
+    # equal to in_channels: I2V-A14B has in_channels=36 (16 noise + 16
+    # ref-image latents + 4 mask, concatenated by the denoise loop) but
+    # out_channels=16 (only the noise prediction comes back). proj_out is
+    # ``nn.Linear(inner_dim, out_channels * prod(patch_size))`` and
+    # patch_size is (1, 2, 2) → prod = 4 for the Wan 2.2 family.
+    out_channels = require("proj_out.weight")[0] // 4
+
+    # No fallback for num_layers. It cannot be zero here: that would mean no key starts
+    # with `blocks.`, and `require("blocks.0.ffn.net.0.proj.weight")` above has already
+    # raised. An earlier revision carried a variant-keyed default (40 for A14B, 30 for
+    # TI2V-5B) that was unreachable, and it was the only thing the `variant` argument
+    # was used for — so the config is now derived entirely from the weights, which is
+    # the point of this helper.
+
+    return {
+        "patch_size": (1, 2, 2),
+        "in_channels": in_channels,
+        "out_channels": out_channels,
+        "num_layers": num_layers,
+        "attention_head_dim": attention_head_dim,
+        "num_attention_heads": num_attention_heads,
+        "ffn_dim": ffn_dim,
+        "text_dim": text_dim,
+    }
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
 class WanGGUFCheckpointModel(ModelLoader):
     """Loader for GGUF-quantized Wan 2.2 transformer models.
@@ -207,6 +418,8 @@ class WanGGUFCheckpointModel(ModelLoader):
         import accelerate
         from diffusers import WanTransformer3DModel
 
+        from invokeai.backend.util.logging import InvokeAILogger
+
         model_path = Path(config.path)
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
@@ -220,6 +433,8 @@ class WanGGUFCheckpointModel(ModelLoader):
                     (k[len(prefix) :] if isinstance(k, str) and k.startswith(prefix) else k): v for k, v in sd.items()
                 }
                 break
+
+        _drop_benign_extra_keys(sd, "GGUF state dict", InvokeAILogger.get_logger(self.__class__.__name__))
 
         # QuantStack and other community releases ship the native upstream Wan key
         # layout (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
@@ -235,75 +450,97 @@ class WanGGUFCheckpointModel(ModelLoader):
         # so the wrapper's underlying storage dtype reaches PyTorch directly).
         sd = _unwrap_unquantized_to_compute_dtype(sd)
 
-        # Auto-detect architecture from the state dict.
-        num_layers = 0
-        for key in sd.keys():
-            if isinstance(key, str) and key.startswith("blocks."):
-                parts = key.split(".")
-                if len(parts) >= 2:
-                    try:
-                        num_layers = max(num_layers, int(parts[1]) + 1)
-                    except ValueError:
-                        pass
-
-        # Patch embedding gives us in_channels (16=A14B, 48=TI2V-5B) and inner dim.
-        patch_w = sd.get("patch_embedding.weight")
-        if patch_w is None:
-            raise RuntimeError("GGUF state dict missing patch_embedding.weight after prefix strip")
-        patch_shape = patch_w.tensor_shape if isinstance(patch_w, GGMLTensor) else patch_w.shape
-        inner_dim = int(patch_shape[0])
-        in_channels = int(patch_shape[1])
-
-        # Wan uses head_dim=128 throughout the family; num_heads = inner_dim / 128.
-        attention_head_dim = 128
-        num_attention_heads = inner_dim // attention_head_dim
-
-        ffn_w = sd.get("blocks.0.ffn.net.0.proj.weight")
-        if ffn_w is None:
-            raise RuntimeError("GGUF state dict missing blocks.0.ffn.net.0.proj.weight after prefix strip")
-        ffn_shape = ffn_w.tensor_shape if isinstance(ffn_w, GGMLTensor) else ffn_w.shape
-        ffn_dim = int(ffn_shape[0])
-
-        text_w = sd.get("condition_embedder.text_embedder.linear_1.weight")
-        text_dim = 4096
-        if text_w is not None:
-            text_shape = text_w.tensor_shape if isinstance(text_w, GGMLTensor) else text_w.shape
-            text_dim = int(text_shape[1])
-
-        # out_channels is read from proj_out.weight directly rather than assumed
-        # equal to in_channels: I2V-A14B has in_channels=36 (16 noise + 16
-        # ref-image latents + 4 mask, concatenated by the denoise loop) but
-        # out_channels=16 (only the noise prediction comes back). proj_out is
-        # ``nn.Linear(inner_dim, out_channels * prod(patch_size))`` and
-        # patch_size is (1, 2, 2) → prod = 4 for the Wan 2.2 family.
-        proj_out_w = sd.get("proj_out.weight")
-        if proj_out_w is None:
-            raise RuntimeError("GGUF state dict missing proj_out.weight after prefix strip")
-        proj_out_shape = proj_out_w.tensor_shape if isinstance(proj_out_w, GGMLTensor) else proj_out_w.shape
-        out_channels = int(proj_out_shape[0]) // 4
-
-        # Layer count fallback (only triggers if the auto-count loop above
-        # found zero blocks, which shouldn't happen for a valid GGUF). T2V/I2V
-        # A14B have 40 layers; TI2V-5B has 30.
-        layer_count_fallback = 30 if config.variant == WanVariantType.TI2V_5B else 40
-
-        model_config: dict = {
-            "patch_size": (1, 2, 2),
-            "in_channels": in_channels,
-            "out_channels": out_channels,
-            "num_layers": num_layers if num_layers > 0 else layer_count_fallback,
-            "attention_head_dim": attention_head_dim,
-            "num_attention_heads": num_attention_heads,
-            "ffn_dim": ffn_dim,
-            "text_dim": text_dim,
-        }
+        model_config = _build_wan_transformer_config(sd, source="GGUF state dict")
 
         with accelerate.init_empty_weights():
             model = WanTransformer3DModel(**model_config)
 
         incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
-        if incompatible_keys.missing_keys:
-            raise RuntimeError(f"GGUF state dict is missing model parameters: {incompatible_keys.missing_keys}")
+        _raise_for_incompatible_keys(incompatible_keys, source="GGUF state dict")
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.Main, format=ModelFormat.Checkpoint)
+class WanCheckpointModel(ModelLoader):
+    """Loader for single-file Wan 2.2 transformer checkpoints (safetensors).
+
+    This is what CivitAI fine-tunes and ComfyUI-oriented Hugging Face repos ship.
+    Handles the full matrix of community conventions: the optional
+    ``model.diffusion_model.`` key prefix, the native upstream key layout as well
+    as the diffusers one, ComfyUI ``fp8_scaled`` weights (dequantized to the
+    compute dtype at load time), and plain ``float8_e4m3fn`` weights with no
+    scales (cast the same way as any other non-bf16 dtype).
+
+    Like the GGUF loader, one file is one expert; A14B pairing happens at the
+    WanModelLoaderInvocation layer.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_Checkpoint_Wan_Config):
+            raise TypeError(f"Expected Main_Checkpoint_Wan_Config, got {type(config).__name__}.")
+
+        if submodel_type != SubModelType.Transformer:
+            raise ValueError(
+                "Only the Transformer submodel is available from a single-file Wan checkpoint. "
+                "Pair with a standalone Wan VAE and Wan T5 encoder for the other components."
+            )
+
+        return self._load_from_singlefile(config)
+
+    def _load_from_singlefile(self, config: Main_Checkpoint_Wan_Config) -> AnyModel:
+        import accelerate
+        from diffusers import WanTransformer3DModel
+        from safetensors.torch import load_file
+
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+
+        model_path = Path(config.path)
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        sd = load_file(str(model_path))
+        sd = _strip_comfyui_prefix(sd)
+        _drop_benign_extra_keys(sd, "Wan checkpoint", logger)
+
+        dequantized = _dequantize_comfyui_fp8(sd, model_dtype)
+        if dequantized > 0:
+            logger.info(f"Dequantized {dequantized} ComfyUI-quantized weights")
+        # Drop the scale tensors themselves — they've been folded into the weights
+        # above and are not parameters of WanTransformer3DModel. load_state_dict
+        # runs with strict=False and would ignore them anyway, but dropping them
+        # here keeps the dtype cast and the RAM-cache reservation below honest.
+        _strip_quantization_metadata(sd)
+
+        # Community releases ship the native upstream Wan key layout
+        # (text_embedding.0, self_attn/cross_attn, ffn.0/2, head.head, ...);
+        # diffusers' WanTransformer3DModel expects condition_embedder.*,
+        # attn1/attn2, ffn.net.*, proj_out. Convert if needed.
+        if _is_native_wan_layout(sd):
+            sd = _convert_wan_native_to_diffusers(sd)
+
+        model_config = _build_wan_transformer_config(sd, source="checkpoint state dict")
+
+        with accelerate.init_empty_weights():
+            model = WanTransformer3DModel(**model_config)
+
+        # Cast every float tensor to the compute dtype. Dequantized fp8_scaled
+        # weights are already there; this catches plain fp16/fp32/fp8 checkpoints
+        # and makes the cache reservation below reflect the post-cast sizes.
+        for key in list(sd.keys()):
+            if sd[key].is_floating_point():
+                sd[key] = sd[key].to(model_dtype)
+
+        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+        self._ram_cache.make_room(new_sd_size)
+
+        incompatible_keys = model.load_state_dict(sd, strict=False, assign=True)
+        _raise_for_incompatible_keys(incompatible_keys, source="Wan checkpoint")
         return model
 
 
