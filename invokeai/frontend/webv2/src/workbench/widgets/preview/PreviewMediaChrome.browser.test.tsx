@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { GalleryImageItem, GalleryVideoItem } from '@features/gallery';
+import type * as queueDevicesModule from '@features/queue/devices';
 import type { ImageActions } from '@workbench/image-actions';
 
 import { Box, ChakraProvider, Text } from '@chakra-ui/react';
@@ -61,7 +62,7 @@ vi.mock('@features/queue/react', () => ({
 }));
 
 vi.mock('@features/queue/devices', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@features/queue/devices')>();
+  const actual = await importOriginal<typeof queueDevicesModule>();
 
   return {
     ...actual,
