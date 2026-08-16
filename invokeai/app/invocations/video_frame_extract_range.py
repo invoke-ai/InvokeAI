@@ -5,6 +5,13 @@ Companion to ``video_frame_extract`` (single frame → image) and
 video and emits a new MP4, so the output can be fed straight into
 Concatenate Videos to splice clips together — e.g. trim a generated clip
 to a usable middle section before chaining it to another shot.
+
+If the source carries an audio track, the matching slice of it is carried
+through (and retimed alongside the video when the output fps differs from
+the source's). Like ``video_concat``, the audio path buffers the source
+soundtrack in full — float32 stereo PCM, ~3 orders of magnitude smaller
+per second than decoded frames — and audio failures fail the node loudly
+rather than emit a silently-stripped clip.
 """
 
 import tempfile
@@ -32,7 +39,8 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.primitives import VideoOutput
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.video_encoding import make_mp4_writer
+from invokeai.app.util.video_audio import extract_audio_pcm, mux_audio_into_video, resample_linear
+from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
 from invokeai.app.util.video_thumbnails import decoder_frame_count, iter_video_frames, probe_video
 
 
@@ -104,7 +112,7 @@ class ExtractVideoRangeOutput(BaseInvocationOutput):
     title="Frame Range from Video",
     tags=["video", "trim", "range", "frames"],
     category="video",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -114,7 +122,10 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
     emits 41 frames. Negative indices count from the end (``end_frame=-1``
     is the final frame), matching ``video_frame_extract``. The output frame
     rate defaults to the source video's frame rate; set ``fps=0`` to inherit
-    it (or 16 fps if the source rate can't be probed).
+    it (or 16 fps if the source rate can't be probed). If the source has an
+    audio track, the same range of it is carried into the output (retimed
+    with the video when the output fps changes playback speed); silent
+    sources stay silent.
 
     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
@@ -183,6 +194,8 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
+        wav_path: Optional[Path] = None
+        muxed_path: Optional[Path] = None
         try:
             # imageio's iter_index isn't exposed by iio.imiter, so we enumerate and skip.
             # Frames stream straight from the decoder into the encoder; see _write_frame_range.
@@ -206,13 +219,40 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                     f"(probed {n_frames} frames). The container's metadata may be inaccurate."
                 )
 
+            # Carry the source's audio (if any) through: slice the matching span of
+            # its soundtrack and map it onto the output timeline. Silent sources
+            # keep the old behavior (no audio stream).
+            source_path = tmp_path
+            audio = self._build_audio_track(
+                context=context,
+                video_path=video_path,
+                start=start,
+                end=end,
+                n_frames=n_frames,
+                source_fps=source_fps,
+                source_duration=duration,
+                output_fps=output_fps,
+            )
+            if audio is not None:
+                pcm, rate = audio
+                context.util.signal_progress("Muxing audio")
+                wav_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".wav", delete=False)
+                wav_tmp.close()
+                wav_path = Path(wav_tmp.name)
+                write_stereo_wav(wav_path, pcm, rate)
+                mux_tmp = tempfile.NamedTemporaryFile(prefix="invokeai_video_range_", suffix=".mp4", delete=False)
+                mux_tmp.close()
+                muxed_path = Path(mux_tmp.name)
+                mux_audio_into_video(tmp_path, wav_path, muxed_path)
+                source_path = muxed_path
+
             out_duration = num_frames / output_fps
             context.logger.info(
                 f"Encoded trimmed MP4: {num_frames} frames @ {output_fps:.2f} fps "
-                f"({out_duration:.2f}s) at {width}x{height}"
+                f"({out_duration:.2f}s) at {width}x{height}" + (", with AAC audio" if audio is not None else ", silent")
             )
             video_dto = context.videos.save(
-                source_path=tmp_path,
+                source_path=source_path,
                 width=width,
                 height=height,
                 duration=out_duration,
@@ -231,10 +271,61 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 end_frame=end,
             )
         finally:
-            try:
-                tmp_path.unlink(missing_ok=True)
-            except Exception:
-                pass
+            for cleanup in (tmp_path, wav_path, muxed_path):
+                if cleanup is None:
+                    continue
+                try:
+                    cleanup.unlink(missing_ok=True)
+                except Exception:
+                    pass
+
+    def _build_audio_track(
+        self,
+        context: InvocationContext,
+        video_path: Path,
+        start: int,
+        end: int,
+        n_frames: int,
+        source_fps: Optional[float],
+        source_duration: Optional[float],
+        output_fps: float,
+    ) -> Optional[tuple[np.ndarray, int]]:
+        """Slice the source soundtrack to frames [start, end] and map it onto the output timeline.
+
+        Returns ``(pcm, sample_rate)`` — ``pcm`` shaped ``(2, n)``, float32 in [-1, 1] —
+        or ``None`` when the source has no audio track.
+
+        Frame-to-sample mapping needs the source's effective frame rate. Preference
+        order (mirroring ``video_concat``): the probed fps; the probed duration (fps can
+        be None for VFR-flagged containers); the extracted length itself, which
+        approximates the native span to within the codec padding. The final resample
+        maps the sliced window onto the span the trimmed video occupies in the output —
+        a no-op at matching fps, a deliberate speed/pitch retime under an fps override
+        (matching what the retime does to the video).
+        """
+        context.util.signal_progress("Extracting audio")
+        extracted = extract_audio_pcm(video_path)
+        if extracted is None:
+            return None
+        if context.util.is_canceled():
+            raise CanceledException
+        pcm, rate = extracted
+        if source_fps is not None and source_fps > 0:
+            eff_fps = float(source_fps)
+        elif source_duration is not None and source_duration > 0:
+            eff_fps = n_frames / float(source_duration)
+        else:
+            # extract_audio_pcm returns None for zero-sample tracks, so pcm is non-empty.
+            eff_fps = n_frames * rate / pcm.shape[1]
+        window_start = round(start * rate / eff_fps)
+        window_end = round((end + 1) * rate / eff_fps)
+        window = pcm[:, window_start:window_end]
+        if window.shape[1] < window_end - window_start:
+            # Audio track shorter than the video (or the range lies past its end):
+            # keep temporal alignment by padding the shortfall with silence.
+            window = np.pad(window, ((0, 0), (0, (window_end - window_start) - window.shape[1])))
+        target = round((end - start + 1) / output_fps * rate)
+        return resample_linear(window, target), rate
 
     @staticmethod
     def _resolve_index(value: int, n_frames: int, field_name: str) -> int:
