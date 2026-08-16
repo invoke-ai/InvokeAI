@@ -14,6 +14,7 @@ import {
   getGalleryCompareImage,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/contracts';
+import { isSlotUnclaimed, selectUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 /**
@@ -112,13 +113,16 @@ export interface GalleryWidgetRestorePatch {
 }
 
 /**
- * Selects which snapshot entries are still safe to restore: a key restores
- * only if its current value is still reference-equal to what our own
- * mutation left it at — mirroring `patchGalleryItemCaches`'s rollback rule
- * (`if (client.getQueryData(queryKey) === after)`). A key something else
- * wrote to since (a generation completing, a user re-selecting) is left
- * alone rather than clobbered. Entries for the same project+widget are
- * merged into a single patch.
+ * Selects which snapshot entries are still safe to restore, under the shared
+ * compare-and-swap rule (`@platform/state/compareAndSwapRollback`): a key
+ * restores only if its current value is still what our own mutation left it
+ * at. A key something else wrote to since (a generation completing, a user
+ * re-selecting) is left alone rather than clobbered. Entries for the same
+ * project+widget are merged into a single patch.
+ *
+ * A project that has since disappeared has no slot to restore, so its entries
+ * drop out before the compare rather than resolving to a bare `undefined` that
+ * the check could mistake for a match.
  */
 export const selectRestorableGalleryWidgetPatches = (
   entries: readonly GalleryWidgetKeySnapshotEntry[],
@@ -126,20 +130,12 @@ export const selectRestorableGalleryWidgetPatches = (
 ): GalleryWidgetRestorePatch[] => {
   const projectsById = new Map(projects.map((project) => [project.id, project]));
   const patchesByGroup = new Map<string, GalleryWidgetRestorePatch>();
+  const liveEntries = entries.filter((entry) => projectsById.has(entry.projectId));
 
-  for (const entry of entries) {
-    const project = projectsById.get(entry.projectId);
-
-    if (!project) {
-      continue;
-    }
-
-    const currentValue = getProjectWidgetValues(project, entry.widgetId)[entry.key];
-
-    if (currentValue !== entry.after) {
-      continue;
-    }
-
+  for (const entry of selectUnclaimedEntries(
+    liveEntries,
+    (candidate) => getProjectWidgetValues(projectsById.get(candidate.projectId)!, candidate.widgetId)[candidate.key]
+  )) {
     const groupKey = widgetGroupKey(entry.projectId, entry.widgetId);
     const patch = patchesByGroup.get(groupKey) ?? { projectId: entry.projectId, values: {}, widgetId: entry.widgetId };
 
@@ -204,22 +200,18 @@ export const collectGalleryStoreKnownItemFields = (
 };
 
 /**
- * Filters `keys` down to those still safe to roll back: a key restores only
- * if its current value (as read by `readCurrent`) is either unknown (nothing
- * locally to protect) or still equal to `paintedValue` — the value *this*
- * optimistic mutation painted it to. A key a second, later mutation already
- * moved on from (e.g. a subsequent drag to a different board, or another
- * star toggle) is excluded, the per-item analogue of
- * `selectRestorableGalleryWidgetPatches`'s reference-equality CAS check and
- * `patchGalleryItemCaches`'s own `if (current === after)` rollback rule.
+ * The per-item form of the shared compare-and-swap rule: a key rolls back only
+ * if its current value is still what *this* mutation painted it to. A key a
+ * second, later mutation already moved on from (a subsequent drag to a
+ * different board, another star toggle) is excluded.
+ *
+ * Unknown counts as unclaimed here, unlike the widget-value case: `readCurrent`
+ * looks the item up in local state that may simply not hold it, so `undefined`
+ * means "nothing here to protect" rather than "someone cleared it".
  */
 export const selectItemKeysUnchangedSince = <Value>(
   keys: readonly GalleryItemKey[],
   paintedValue: Value,
   readCurrent: (key: GalleryItemKey) => Value | undefined
 ): GalleryItemKey[] =>
-  keys.filter((key) => {
-    const current = readCurrent(key);
-
-    return current === undefined || current === paintedValue;
-  });
+  keys.filter((key) => isSlotUnclaimed(readCurrent(key), paintedValue, { treatUnknownAsUnclaimed: true }));

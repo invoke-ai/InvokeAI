@@ -11,6 +11,7 @@ import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query'
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { rollBackUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { hashKey } from '@tanstack/react-query';
 
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from './backend';
@@ -184,13 +185,12 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
     }
   }
 
-  return () => {
-    for (const { after, before, queryKey } of rollbackEntries) {
-      if (client.getQueryData(queryKey) === after) {
-        client.setQueryData(queryKey, before);
-      }
-    }
-  };
+  return () =>
+    rollBackUnclaimedEntries(
+      rollbackEntries,
+      (entry) => client.getQueryData<InfiniteData<GalleryItemsPage, number>>(entry.queryKey),
+      (entry) => client.setQueryData(entry.queryKey, entry.before)
+    );
 };
 
 /**
@@ -318,13 +318,12 @@ export const patchGalleryBoardCaches = (
     }
   }
 
-  return () => {
-    for (const { after, before, queryKey } of rollbackEntries) {
-      if (client.getQueryData(queryKey) === after) {
-        client.setQueryData(queryKey, before);
-      }
-    }
-  };
+  return () =>
+    rollBackUnclaimedEntries(
+      rollbackEntries,
+      (entry) => client.getQueryData<InfiniteData<GalleryItemsPage, number>>(entry.queryKey),
+      (entry) => client.setQueryData(entry.queryKey, entry.before)
+    );
 };
 
 const runGalleryInvalidation = async (
