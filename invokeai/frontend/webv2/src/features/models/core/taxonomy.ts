@@ -76,6 +76,7 @@ const FORMAT_LABELS: Record<string, string> = {
   onnx: 'ONNX',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen VL Encoder',
+  sdnq_quantized: 'SDNQ',
   t5_encoder: 'T5 Encoder',
   unknown: 'Unknown',
 };

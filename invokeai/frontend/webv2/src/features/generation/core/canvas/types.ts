@@ -57,6 +57,8 @@ export interface CompileCanvasGraphInput {
   settings: GenerateSettings;
   model: GenerateModelConfig;
   projectSettings: GenerationProjectSettings;
+  /** Runtime-derived random-device metadata; defaults to the legacy CPU/CUDA value for direct callers. */
+  randDevice?: string;
   /** The resolved canvas mode (from `canvasMode.ts`). */
   mode: CanvasCompileMode;
   /**
