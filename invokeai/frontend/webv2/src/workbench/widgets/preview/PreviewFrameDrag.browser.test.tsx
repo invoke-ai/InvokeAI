@@ -91,7 +91,6 @@ const renderHarness = async () => {
             frameHeight={128}
             frameWidth={128}
             isLive={false}
-            liveBadgeLabel="Generating"
             shouldAntialiasLiveImage
             source={{ itemKey: 'image:preview.png', kind: 'image', source }}
             variant="framed"

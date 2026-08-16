@@ -4,6 +4,7 @@ import {
   buttonRecipe,
   colorPickerSlotRecipe,
   comboboxSlotRecipe,
+  dataListSlotRecipe,
   dialogSlotRecipe,
   hoverCardSlotRecipe,
   inputRecipe,
@@ -22,28 +23,20 @@ import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDe
 /**
  * Workbench design system.
  *
- * Each theme (`themes.ts`) is authored as one neutral ramp (`neutral.50…neutral.950`,
- * lightest → darkest) plus a few seeds (brand, accent, status) and four off-ramp
- * neutrals (`inset`, `fill`, `grid`, `control`). This module turns that into two
- * token layers:
+ * Each theme is one neutral ramp (`neutral.50…950`) plus seeds and four
+ * off-ramp neutrals, turned into two token layers:
  *
- *   1. The **ramp** is emitted verbatim as conditional semantic tokens
- *      (`neutral.*`), one value per theme keyed on a custom `[data-theme=<id>]`
- *      condition. Chakra base `tokens.colors` only hold plain strings, so anything
- *      that varies per theme must live in `semanticTokens`.
- *   2. The **semantic contract** (`bg`, `fg.muted`, `border.emphasized`, the
- *      `gray`/`brand`/`accent` palettes, …) is theme-agnostic: it references ramp
- *      steps and flips by light/dark mode only. `bg` is `neutral.950` in dark mode and
- *      `neutral.200` in light — the light ramp is not a mirror of the dark one, because
- *      light panels go *whiter* than the app background.
+ *   1. The **ramp** emits as conditional semantic tokens keyed on
+ *      `[data-theme=<id>]`. Chakra's base `tokens.colors` hold plain strings, so
+ *      anything varying per theme must live in `semanticTokens`.
+ *   2. The **semantic contract** (`bg`, `fg.muted`, …) is theme-agnostic and
+ *      flips by light/dark only. Light is not a mirror of dark — light panels go
+ *      *whiter* than the app background.
  *
- * `ThemeController` sets `data-theme` (and the `.dark`/`.light` class) on `<html>`,
- * so switching themes is a single attribute change with zero React re-render.
- * Components reference only the semantic tokens — never the ramp or a theme.
- *
- * Re-pointing Chakra's neutral `gray` palette at the ramp makes every built-in
- * component (Dialog, Menu, Input, Button, Tooltip, Badge) follow the active theme
- * with no per-component overrides.
+ * `ThemeController` sets `data-theme` on `<html>`, so switching is one attribute
+ * change with zero re-render. Components reference only semantic tokens.
+ * Re-pointing Chakra's `gray` at the ramp makes every built-in component follow
+ * the theme without per-component overrides.
  */
 
 const NON_DEFAULT_THEMES = THEMES.filter((theme) => theme.id !== DEFAULT_THEME_ID);
@@ -288,6 +281,7 @@ const config = defineConfig({
     slotRecipes: {
       colorPicker: colorPickerSlotRecipe,
       combobox: comboboxSlotRecipe,
+      dataList: dataListSlotRecipe,
       dialog: dialogSlotRecipe,
       hoverCard: hoverCardSlotRecipe,
       menu: menuSlotRecipe,

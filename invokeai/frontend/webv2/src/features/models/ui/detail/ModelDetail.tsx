@@ -16,10 +16,10 @@ import {
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, IconButton, MenuContent } from '@platform/ui';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
 import { ExternalLinkIcon, MoreHorizontalIcon, PencilIcon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
 
 import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
 import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
@@ -286,7 +286,7 @@ const ModelDetailActions = ({
     <HStack flexShrink={0} gap="1" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
         <Button size="xs" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
-          <Icon as={SiHuggingface} boxSize="3" />
+          <Icon as={HuggingFaceIcon} boxSize="3" />
           {t('models.convertToDiffusers')}
         </Button>
       ) : null}

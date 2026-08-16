@@ -155,6 +155,14 @@ const interact = (action: () => void, delay = 100): Promise<void> =>
     });
   });
 
+const buildItemMedia = (item: GalleryImageItem | GalleryVideoItem) =>
+  ({
+    actionImage: item.kind === 'image' ? actionImage : null,
+    actions,
+    item,
+    kind: 'item',
+  }) as const;
+
 const renderFooter = async ({
   isOpen,
   item,
@@ -162,18 +170,18 @@ const renderFooter = async ({
   isOpen: boolean;
   item: GalleryImageItem | GalleryVideoItem;
 }): Promise<void> => {
+  const media = buildItemMedia(item);
+
   await interact(() => {
     root?.render(
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
             <PreviewFooter
-              actionImage={item.kind === 'image' ? actionImage : null}
-              actions={actions}
               boardItemCount={2}
               isLoadingBoard={false}
               isMetadataOpen={isOpen}
-              item={item}
+              media={media}
               selectedIndex={0}
               onNext={() => undefined}
               onPrevious={() => undefined}
@@ -397,6 +405,50 @@ describe('Preview query-driven Details', () => {
 
     await interact(() => getButton('Recall All').click());
     expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'all');
+  });
+
+  it('recalls a single field from its metadata row', async () => {
+    galleryMocks.imageMetadata.mockResolvedValueOnce({
+      model: { name: 'Test Model' },
+      positive_prompt: 'row prompt',
+      seed: 42,
+    });
+
+    await renderFooter({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(host?.textContent).toContain('row prompt'));
+    });
+
+    // Only the row buttons carry aria-labels; the verb-row buttons are named
+    // by their visible text, so the attribute selector is unambiguous.
+    const seedRecall = host?.querySelector<HTMLButtonElement>('[aria-label="Use Seed"]');
+    expect(seedRecall).not.toBeNull();
+    expect(host?.querySelector('[aria-label="Use Prompt"]')).not.toBeNull();
+    // No size row was parsed, so no row carries the size verb even though the
+    // capability itself is available.
+    expect(host?.querySelector('[aria-label="Use Size"]')).toBeNull();
+
+    // The model row has no single-field verb — copy stays its only action.
+    const modelRow = [...(host?.querySelectorAll('.chakra-data-list__item') ?? [])].find((row) =>
+      row.textContent?.includes('Test Model')
+    );
+    expect(modelRow?.querySelectorAll('button')).toHaveLength(1);
+    expect(modelRow?.querySelector('[aria-label="Copy"]')).not.toBeNull();
+
+    await interact(() => seedRecall?.click());
+    expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'seed');
+  });
+
+  it('omits row recall buttons when the capability is unavailable', async () => {
+    actions.deriveImageRecallCapabilities = vi.fn(() => NO_RECALL_CAPABILITIES);
+    galleryMocks.imageMetadata.mockResolvedValueOnce({ seed: 42 });
+
+    await renderFooter({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(host?.textContent).toContain('42'));
+    });
+
+    expect(host?.querySelector('[aria-label="Use Seed"]')).toBeNull();
   });
 
   it('updates recall buttons when capability inputs change without refetching cached metadata', async () => {

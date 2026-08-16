@@ -35,6 +35,17 @@ const RECALL_ACTION_ITEMS: {
   { capability: 'clipSkip', icon: ScissorsIcon, kind: 'clipSkip', label: 'Use CLIP Skip' },
 ];
 
+/**
+ * The verb's icon and label for hosts that surface a recall affordance
+ * outside this row (per-row buttons in the metadata panel), so every recall
+ * control keeps the same vocabulary.
+ */
+export const getImageRecallVerb = (kind: ImageRecallKind): { icon: LucideIcon; label: string } => {
+  const item = RECALL_ACTION_ITEMS.find((candidate) => candidate.kind === kind) ?? RECALL_ACTION_ITEMS[0]!;
+
+  return { icon: item.icon, label: item.label };
+};
+
 // The verb row is wide at max-content; `contain: inline-size` zeroes its
 // intrinsic width contribution so it can never stretch a host (queue row,
 // preview footer) past its panel — it fills the given width and wraps.

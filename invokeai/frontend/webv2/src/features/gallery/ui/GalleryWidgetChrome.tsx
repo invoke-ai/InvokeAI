@@ -1,28 +1,22 @@
-import type { GalleryBoard } from '@features/gallery/core/types';
-
 import { HStack, Icon, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGallerySettings } from '@features/gallery/core/settings';
-import { isDateBoardId } from '@features/gallery/data/backend';
 import { galleryBoardsOptions } from '@features/gallery/data/queries';
-import { Button, IconButton } from '@platform/ui/Button';
-import { Tooltip } from '@platform/ui/Tooltip';
+import { Button } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronsDownUpIcon, ChevronsUpDownIcon, UploadIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef } from 'react';
+import { ChevronsDownUpIcon, ChevronsUpDownIcon } from 'lucide-react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryWidgetProps } from './GalleryUiContext';
 
 import { GallerySettingsMenu } from './GallerySettingsMenu';
-import { getGallerySelectedBoardId, getGalleryView } from './galleryStateView';
+import { getGallerySelectedBoardId } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
-import { useGalleryUploadAction } from './useGalleryUploadAction';
 
 type GalleryChromeProps = { region: GalleryWidgetProps['region'] };
 
-const ACCEPTED_UPLOAD_EXTENSIONS = 'image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4';
-const UPLOAD_INPUT_STYLE = { display: 'none' } as const;
 const LABEL_EXPANDED_PROPS = { bg: 'transparent' } as const;
 
 const useGalleryChromeBoards = () => {
@@ -45,19 +39,6 @@ const useGalleryChromeBoards = () => {
     selectedBoardId: getGallerySelectedBoardId(galleryValues, resolvedBoards),
     settings,
   };
-};
-
-const useGalleryChromeActions = () => {
-  const { boards, galleryValues, selectedBoardId, ...rest } = useGalleryChromeBoards();
-  const galleryView = getGalleryView(galleryValues);
-  const currentGalleryLocationRef = useRef({ galleryView, selectedBoardId });
-
-  // eslint-disable-next-line react/react-compiler
-  currentGalleryLocationRef.current = { galleryView, selectedBoardId };
-  const getCurrentGalleryLocation = useCallback(() => currentGalleryLocationRef.current, []);
-  const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
-
-  return { ...rest, boards, galleryValues, selectedBoardId, uploadFiles };
 };
 
 export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
@@ -93,9 +74,7 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
         variant="ghost"
         onClick={toggleBoards}
       >
-        <Text fontWeight="600" minW="0" truncate>
-          {boardName}
-        </Text>
+        <MiddleTruncate fontWeight="600" minW="0" text={boardName} />
         <Icon as={isCollapsed ? ChevronsUpDownIcon : ChevronsDownUpIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
       </Button>
     </HStack>
@@ -103,72 +82,11 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
 };
 
 export const GalleryWidgetHeaderActions = (_props: GalleryChromeProps) => {
-  const { boards, gallery, selectedBoardId, settings, uploadFiles } = useGalleryChromeActions();
+  const { gallery, settings } = useGalleryChromeBoards();
 
   return (
     <HStack gap="0.5">
-      <GalleryUploadButton boards={boards} selectedBoardId={selectedBoardId} onUploadFiles={uploadFiles} />
       <GallerySettingsMenu settings={settings} onUpdateSettings={gallery.updateSettings} />
     </HStack>
-  );
-};
-
-const GalleryUploadButton = ({
-  boards,
-  selectedBoardId,
-  onUploadFiles,
-}: {
-  boards: GalleryBoard[];
-  selectedBoardId: string;
-  onUploadFiles: (files: File[]) => Promise<void>;
-}) => {
-  const { t } = useTranslation();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const selectedBoard = boards.find((board) => board.id === selectedBoardId);
-  const isVirtualTarget = isDateBoardId(selectedBoardId);
-  const label = isVirtualTarget
-    ? t('widgets.gallery.uploadsUnavailableForDateBoards')
-    : t('widgets.gallery.uploadMediaToBoard', {
-        name: selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.selectedBoardFallback'),
-      });
-
-  const handleFileChange = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(event.currentTarget.files ?? []);
-
-      event.currentTarget.value = '';
-
-      if (files.length > 0) {
-        void onUploadFiles(files);
-      }
-    },
-    [onUploadFiles]
-  );
-
-  const handleUploadClick = useCallback(() => fileInputRef.current?.click(), []);
-
-  return (
-    <>
-      <input
-        accept={ACCEPTED_UPLOAD_EXTENSIONS}
-        multiple
-        ref={fileInputRef}
-        style={UPLOAD_INPUT_STYLE}
-        type="file"
-        onChange={handleFileChange}
-      />
-      <Tooltip content={label}>
-        <IconButton
-          aria-label={label}
-          color="fg.muted"
-          disabled={isVirtualTarget}
-          size="2xs"
-          variant="ghost"
-          onClick={handleUploadClick}
-        >
-          <Icon as={UploadIcon} boxSize="3.5" />
-        </IconButton>
-      </Tooltip>
-    </>
   );
 };

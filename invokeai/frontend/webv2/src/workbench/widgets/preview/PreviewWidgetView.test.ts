@@ -3,7 +3,8 @@ import type { GalleryItem } from '@features/gallery';
 import { GALLERY_MAX_ROWS } from '@features/gallery/queries';
 import { describe, expect, it } from 'vitest';
 
-import { getMatchingProgressImage, getVideoFrameCopyNotice, mergePreviewBoardItems } from './PreviewWidgetView';
+import { getMatchingProgressImage, getVideoFrameCopyNotice } from './PreviewWidgetView';
+import { mergePreviewBoardItems } from './usePreviewNavigation';
 
 describe('getMatchingProgressImage', () => {
   const placeholder = {
@@ -56,8 +57,8 @@ describe('mergePreviewBoardItems', () => {
     const middle = item('image', 'middle', '2026-07-21T00:00:02.000Z');
     const newest = item('image', 'newest', '2026-07-21T00:00:03.000Z');
 
-    expect(mergePreviewBoardItems([newest, oldest], [middle, newest], 'DESC', false)).toEqual([newest, middle, oldest]);
-    expect(mergePreviewBoardItems([oldest, newest], [middle, oldest], 'ASC', false)).toEqual([oldest, middle, newest]);
+    expect(mergePreviewBoardItems([newest, oldest], [middle, newest], 'DESC')).toEqual([newest, middle, oldest]);
+    expect(mergePreviewBoardItems([oldest, newest], [middle, oldest], 'ASC')).toEqual([oldest, middle, newest]);
   });
 
   it('keeps starred backend items ahead of optimistic unstarred items', () => {
@@ -65,11 +66,7 @@ describe('mergePreviewBoardItems', () => {
     const optimistic = item('image', 'optimistic', '2026-07-21T00:00:03.000Z');
     const existing = item('video', 'existing', '2026-07-21T00:00:02.000Z');
 
-    expect(mergePreviewBoardItems([starred, existing], [optimistic], 'DESC', true)).toEqual([
-      starred,
-      optimistic,
-      existing,
-    ]);
+    expect(mergePreviewBoardItems([starred, existing], [optimistic], 'DESC')).toEqual([starred, optimistic, existing]);
   });
 
   it('uses the server kind/name tie-breakers for equal timestamps in both directions', () => {
@@ -79,13 +76,8 @@ describe('mergePreviewBoardItems', () => {
     const videoA = item('video', 'a', createdAt);
     const videoZ = item('video', 'z', createdAt);
 
-    expect(mergePreviewBoardItems([videoA, imageZ], [videoZ, imageA], 'ASC', false)).toEqual([
-      imageA,
-      imageZ,
-      videoA,
-      videoZ,
-    ]);
-    expect(mergePreviewBoardItems([imageA, videoZ], [imageZ, videoA], 'DESC', false)).toEqual([
+    expect(mergePreviewBoardItems([videoA, imageZ], [videoZ, imageA], 'ASC')).toEqual([imageA, imageZ, videoA, videoZ]);
+    expect(mergePreviewBoardItems([imageA, videoZ], [imageZ, videoA], 'DESC')).toEqual([
       videoZ,
       videoA,
       imageZ,
@@ -103,7 +95,7 @@ describe('mergePreviewBoardItems', () => {
     backend[GALLERY_MAX_ROWS - 1] = item('image', 'shared', new Date((GALLERY_MAX_ROWS - 1) * 1_000).toISOString());
     optimistic[0] = item('video', 'shared', new Date((GALLERY_MAX_ROWS + 1) * 1_000).toISOString());
 
-    const merged = mergePreviewBoardItems(backend, optimistic, 'DESC', false);
+    const merged = mergePreviewBoardItems(backend, optimistic, 'DESC');
 
     expect(merged).toHaveLength(GALLERY_MAX_ROWS);
     expect(merged[0]?.name).toBe('optimistic-59');

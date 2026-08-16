@@ -74,6 +74,9 @@ export interface BackendConnectionState {
 
 export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 
+/** Machine categories for toast policy. Absent category = always toast. */
+export type WorkbenchNotificationCategory = 'enqueue';
+
 export interface WorkbenchNotification {
   id: string;
   kind: WorkbenchNotificationKind;
@@ -82,6 +85,10 @@ export interface WorkbenchNotification {
   createdAt: string;
   projectId?: string;
   isRead: boolean;
+  /** Machine category for toast policy; absent = always toast. */
+  category?: WorkbenchNotificationCategory;
+  /** Coalesced repeat count (see addNotification); absent = 1. */
+  occurrenceCount?: number;
 }
 
 /**

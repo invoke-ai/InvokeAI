@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { getLayerContextActions } from './layerContextActions';
 import {
   getLayerContextMenuLayerLabelKey,
+  getLayerContextMenuGroupLayout,
   getLayerContextMenuLayout,
   getLayerContextMenuRenderEntries,
   type LayerContextMenuSection,
@@ -177,6 +178,31 @@ describe('getLayerContextMenuLayout', () => {
       'danger',
     ]);
     expect(summarizeEntries(false)).toEqual(['quick', 'primary', 'operations', 'output', 'state', 'danger']);
+  });
+
+  it('builds legacy layer and Canvas groups while keeping row menus in one labeled layer group', () => {
+    const upper = paintLayer('upper-with-groups');
+    const below = paintLayer('below-with-groups');
+    const layout = layoutFor(upper, [upper, below]);
+    const summarizeEntries = (entries: ReturnType<typeof getLayerContextMenuGroupLayout>['layerEntries']) =>
+      entries.map((entry) => (entry.kind === 'slot' ? entry.id : entry.section.id));
+
+    const canvasMenu = getLayerContextMenuGroupLayout(layout, true);
+    expect(summarizeEntries(canvasMenu.layerEntries)).toEqual(['quick', 'primary', 'operations', 'output', 'state']);
+    expect(canvasMenu.hasCanvasGroup).toBe(true);
+    expect(summarizeEntries(canvasMenu.trailingEntries)).toEqual(['danger']);
+
+    const rowMenu = getLayerContextMenuGroupLayout(layout, false);
+    expect(summarizeEntries(rowMenu.layerEntries)).toEqual([
+      'quick',
+      'primary',
+      'operations',
+      'output',
+      'state',
+      'danger',
+    ]);
+    expect(rowMenu.hasCanvasGroup).toBe(false);
+    expect(rowMenu.trailingEntries).toEqual([]);
   });
 
   it.each([

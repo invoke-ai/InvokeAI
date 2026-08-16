@@ -26,7 +26,7 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
-import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries } from './entries';
+import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries, getEntryKeys } from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
 import {
   createBoardsProvider,
@@ -37,8 +37,8 @@ import {
   createWorkflowsProvider,
 } from './paletteProviders';
 
-const buildStaticAppEntries = (t: TFunction): PaletteEntry[] => [
-  buildOpenSettingsEntry(t, () => openWorkbenchSettings()),
+const buildStaticAppEntries = (t: TFunction, settingsKeys: string[] | undefined): PaletteEntry[] => [
+  buildOpenSettingsEntry(t, () => openWorkbenchSettings(), settingsKeys),
   {
     group: 'App',
     groupLabel: t('commandPalette.groups.app'),
@@ -114,7 +114,14 @@ const WorkbenchCommandPaletteDialog = ({
       ...paletteContributions.map((contribution) =>
         buildExtensionPaletteEntry(contribution, extensions.commands.executeForSource)
       ),
-      ...buildStaticAppEntries(t),
+      ...buildStaticAppEntries(
+        t,
+        getEntryKeys(
+          catalog.find((definition) => definition.id === 'app.openSettings'),
+          preferences.customHotkeys,
+          formatHotkey
+        )
+      ),
       ...buildSettingsEntries(preferences, settingsEntryDeps, t),
     ],
     [

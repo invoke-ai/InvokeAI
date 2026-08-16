@@ -357,13 +357,22 @@ const submitGenerate = (state: WorkbenchState) =>
   workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
 
 describe('workbench widget region defaults', () => {
-  it('enables Diagnostics in the right side panel rail', () => {
+  it('starts new projects from the curated Compose widget defaults', () => {
     const state = createInitialWorkbenchState();
+    const project = getActiveProject(state);
 
-    expect(getActiveProject(state).widgetRegions.right.instanceIds).toContain('diagnostics');
+    expect(project.widgetRegions.left.instanceIds).toEqual(['generate', 'upscale']);
+    expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
+    expect(project.widgetRegions.bottom.instanceIds).toEqual([
+      'server-status',
+      'queue-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
   });
 
-  it('hydrates the old default right rail with Diagnostics while preserving customized rails', () => {
+  it('hydrates the old default right rail to the curated Compose defaults while preserving customized rails', () => {
     const initial = createInitialWorkbenchState();
     const legacyDefault = {
       ...initial,
@@ -392,21 +401,16 @@ describe('workbench widget region defaults', () => {
     expect(getActiveProject(hydratedLegacyDefault).widgetRegions.right.instanceIds).toEqual([
       'gallery',
       'image-map',
-      'preview',
       'queue',
-      'layers',
-      'diagnostics',
-      'project',
     ]);
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual(['gallery', 'layers']);
   });
 
-  it('adds Image Map to an untouched pre-image-map right rail so it does not read as drifted', () => {
-    // The built-in presets now list image-map. A project persisted before that
-    // keeps the old rail, so without this migration every existing user's
-    // layout compares unequal to the preset it was loaded from: the topbar
-    // shows an unsaved-changes dot and offers to revert a layout they never
-    // edited, and the widget itself is only reachable from the enable menu.
+  it('hydrates a pre-image-map right rail to the curated rail rather than splicing Image Map in', () => {
+    // Splicing would leave a rail no preset holds, so an untouched project
+    // would compare unequal to the preset it was loaded from — the drift dot
+    // the rail migrations exist to avoid. Adopting the curated rail is the
+    // only result that both surfaces the widget and keeps the two in step.
     const initial = createInitialWorkbenchState();
     const withRightIds = (instanceIds: Project['widgetRegions']['right']['instanceIds']): WorkbenchState => ({
       ...initial,
@@ -427,11 +431,7 @@ describe('workbench widget region defaults', () => {
     expect(getActiveProject(hydratedDefault).widgetRegions.right.instanceIds).toEqual([
       'gallery',
       'image-map',
-      'preview',
       'queue',
-      'layers',
-      'diagnostics',
-      'project',
     ]);
     // A rail the user actually arranged is still theirs.
     expect(getActiveProject(hydratedCustomized).widgetRegions.right.instanceIds).toEqual([
@@ -439,6 +439,9 @@ describe('workbench widget region defaults', () => {
       'gallery',
       'queue',
     ]);
+    for (const preset of layoutPresets) {
+      expect(preset.snapshot.widgetRegions.right.instanceIds).toContain('image-map');
+    }
   });
 
   it('adds Upscale to untouched legacy left rails while preserving customized rails', () => {
@@ -467,6 +470,51 @@ describe('workbench widget region defaults', () => {
     expect(getActiveProject(migrated).widgetRegions.left.instanceIds).toEqual(['generate', 'workflow', 'upscale']);
     expect(getActiveProject(migrated).widgetInstances.upscale?.typeId).toBe('upscale');
     expect(getActiveProject(customized).widgetRegions.left.instanceIds).toEqual(['generate', 'gallery']);
+  });
+
+  it('adds queue-status to untouched legacy bottom rails while preserving customized rails', () => {
+    const initial = createInitialWorkbenchState();
+    const withoutQueueStatusInstance = Object.fromEntries(
+      Object.entries(getActiveProject(initial).widgetInstances).filter(([id]) => id !== 'queue-status')
+    ) as Project['widgetInstances'];
+    const withBottomIds = (instanceIds: Project['widgetRegions']['bottom']['instanceIds']): WorkbenchState => ({
+      ...initial,
+      projects: initial.projects.map((project) => ({
+        ...project,
+        widgetInstances: withoutQueueStatusInstance,
+        widgetRegions: { ...project.widgetRegions, bottom: { ...project.widgetRegions.bottom, instanceIds } },
+      })),
+    });
+
+    const migrated = workbenchReducer(initial, {
+      state: withBottomIds(['server-status', 'gallery:bottom', 'notifications', 'autosave-status']),
+      type: 'hydrateWorkbench',
+    });
+    const customized = workbenchReducer(initial, {
+      state: withBottomIds(['server-status', 'notifications']),
+      type: 'hydrateWorkbench',
+    });
+    const alreadyPresent = workbenchReducer(initial, {
+      state: withBottomIds(['queue-status', 'server-status', 'gallery:bottom', 'notifications', 'autosave-status']),
+      type: 'hydrateWorkbench',
+    });
+
+    expect(getActiveProject(migrated).widgetRegions.bottom.instanceIds).toEqual([
+      'server-status',
+      'queue-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
+    expect(getActiveProject(migrated).widgetInstances['queue-status']?.typeId).toBe('queue-status');
+    expect(getActiveProject(customized).widgetRegions.bottom.instanceIds).toEqual(['server-status', 'notifications']);
+    expect(getActiveProject(alreadyPresent).widgetRegions.bottom.instanceIds).toEqual([
+      'queue-status',
+      'server-status',
+      'gallery:bottom',
+      'notifications',
+      'autosave-status',
+    ]);
   });
 
   it('migrates a legacy Upscale prompt only when Generate has no prompt content', () => {
@@ -684,7 +732,7 @@ describe('workbench layout presets', () => {
           },
         },
         layoutPresetRouteOverrides: {
-          compose: { destination: 'canvas', sourceId: 'canvas' },
+          compose: { destination: 'canvas', sourceId: 'upscale' },
         },
       },
     };
@@ -695,7 +743,7 @@ describe('workbench layout presets', () => {
     expect(project.invocation).toEqual({
       destination: 'canvas',
       destinationLocked: false,
-      sourceId: 'canvas',
+      sourceId: 'upscale',
       sourceLocked: false,
     });
     expect(project.layout).toMatchObject({ centerViewId: 'gallery', presetId: 'compose' });
@@ -753,13 +801,13 @@ describe('workbench layout presets', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, {
-      defaultRoute: { destination: 'canvas', sourceId: 'workflow' },
+      defaultRoute: { destination: 'canvas', sourceId: 'upscale' },
       presetId: 'compose',
       type: 'setLayoutPresetRoute',
     });
     state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
 
-    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'canvas', sourceId: 'workflow' });
+    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'canvas', sourceId: 'upscale' });
   });
 
   it('applies preset routing with the edit preference off in the same undo entry as the layout', () => {
@@ -879,33 +927,25 @@ describe('workbench layout presets', () => {
     expect(project.layout.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
     expect(project.widgetRegions.left).toMatchObject({
       activeInstanceId: 'generate',
-      instanceIds: ['generate', 'workflow', 'upscale'],
+      instanceIds: ['generate', 'upscale'],
       isCollapsed: false,
       sizePx: 450,
     });
     expect(project.widgetRegions.center).toMatchObject({
       activeInstanceId: 'preview',
-      instanceIds: ['preview', 'canvas', 'gallery:center', 'workflow:center'],
+      instanceIds: ['preview', 'gallery:center'],
       isCollapsed: false,
       sizePx: 0,
     });
     expect(project.widgetRegions.right).toMatchObject({
       activeInstanceId: 'gallery',
-      instanceIds: ['gallery', 'image-map', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+      instanceIds: ['gallery', 'image-map', 'queue'],
       isCollapsed: false,
       sizePx: 450,
     });
     expect(project.widgetRegions.bottom).toMatchObject({
       activeInstanceId: 'gallery:bottom',
-      instanceIds: [
-        'server-status',
-        'diagnostics:bottom',
-        'gallery:bottom',
-        'notifications',
-        'autosave-status',
-        'version-status',
-        'workflow:bottom',
-      ],
+      instanceIds: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
       isCollapsed: true,
       sizePx: 180,
     });
@@ -915,7 +955,7 @@ describe('workbench layout presets', () => {
     let state = createInitialWorkbenchState();
     const projectId = state.activeProjectId;
 
-    state = workbenchReducer(state, { region: 'right', sizePx: 336, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { region: 'right', sizePx: 384, type: 'setRegionWidgetSize' });
     state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'queue' });
     state = workbenchReducer(state, { region: 'center', type: 'selectRegionWidget', widgetId: 'preview' });
     state = workbenchReducer(state, {
@@ -931,7 +971,7 @@ describe('workbench layout presets', () => {
 
     expect(state.account.customLayoutPresets).toHaveLength(1);
     expect(state.account.customLayoutPresets?.[0]).toMatchObject({ id: 'custom-layout-1', label: 'Queue review' });
-    expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 336 });
+    expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'queue', sizePx: 384 });
     expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
   });
 
@@ -1294,7 +1334,7 @@ describe('workbench layout presets', () => {
   it('saves the live arrangement onto a built-in preset and restores its shipped default', () => {
     let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'compose', type: 'applyPreset' });
 
-    state = workbenchReducer(state, { region: 'right', sizePx: 320, type: 'setRegionWidgetSize' });
+    state = workbenchReducer(state, { region: 'right', sizePx: 360, type: 'setRegionWidgetSize' });
     state = workbenchReducer(state, { presetId: 'compose', type: 'saveLayoutPreset' });
     state = workbenchReducer(state, {
       defaultRoute: { destination: 'canvas', sourceId: 'upscale' },
@@ -1302,7 +1342,7 @@ describe('workbench layout presets', () => {
       type: 'setLayoutPresetRoute',
     });
 
-    expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(320);
+    expect(state.account.layoutPresetOverrides?.compose?.widgetRegions.right.sizePx).toBe(360);
     expect(state.account.layoutPresetRouteOverrides?.compose).toEqual({ destination: 'canvas', sourceId: 'upscale' });
 
     state = workbenchReducer(state, { sourceId: 'workflow', type: 'setInvocationSource' });
@@ -1312,7 +1352,7 @@ describe('workbench layout presets', () => {
     state = workbenchReducer(state, { region: 'right', sizePx: 500, type: 'setRegionWidgetSize' });
     state = workbenchReducer(state, { type: 'resetActiveLayout' });
 
-    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(320);
+    expect(getActiveProject(state).widgetRegions.right.sizePx).toBe(360);
     expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
 
     state = workbenchReducer(state, { presetId: 'compose', type: 'restoreLayoutPresetDefault' });
@@ -2147,6 +2187,152 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications).toEqual([]);
 
     expect(state.notifications).toEqual([]);
+  });
+
+  it('coalesces back-to-back identical notifications instead of stacking them', () => {
+    const state = createInitialWorkbenchState();
+
+    const once = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+    const twice = reduceWorkbench(once, { message: 'Bitmap persistence failed', type: 'recordError' });
+
+    expect(twice.notifications).toHaveLength(once.notifications.length);
+    expect(twice.notifications[0]?.occurrenceCount).toBe(2);
+    expect(twice.notifications[0]?.id).toBe(once.notifications[0]?.id);
+  });
+
+  it('includes the error context detail in the recordError notification message', () => {
+    const state = createInitialWorkbenchState();
+
+    const next = reduceWorkbench(state, {
+      context: { error: 'network unreachable', layerId: 'layer-1' },
+      message: 'Bitmap persistence failed',
+      type: 'recordError',
+    });
+
+    expect(next.notifications[0]?.message).toBe('Bitmap persistence failed: network unreachable');
+  });
+
+  it('does not coalesce notifications with a different message', () => {
+    const state = createInitialWorkbenchState();
+
+    const once = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+    const twice = reduceWorkbench(once, { message: 'Something else failed', type: 'recordError' });
+
+    expect(twice.notifications).toHaveLength(once.notifications.length + 1);
+    expect(twice.notifications[0]?.id).not.toBe(once.notifications[0]?.id);
+  });
+
+  it('does not coalesce repeat non-error notifications (each queued invocation gets its own toast)', () => {
+    const state = primeGenerate();
+
+    const once = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+    const twice = workbenchReducer(once, {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    const enqueueNotifications = twice.notifications.filter((notification) => notification.category === 'enqueue');
+
+    expect(enqueueNotifications).toHaveLength(2);
+    expect(enqueueNotifications[0]?.id).not.toBe(enqueueNotifications[1]?.id);
+    expect(enqueueNotifications.every((notification) => notification.occurrenceCount === undefined)).toBe(true);
+  });
+
+  it('resets isRead to false when a coalesced error repeats after being read', () => {
+    let state = createInitialWorkbenchState();
+
+    state = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+    state = reduceWorkbench(state, { type: 'markAllNotificationsRead' });
+
+    expect(state.notifications[0]?.isRead).toBe(true);
+
+    state = reduceWorkbench(state, { message: 'Bitmap persistence failed', type: 'recordError' });
+
+    expect(state.notifications[0]?.occurrenceCount).toBe(2);
+    expect(state.notifications[0]?.isRead).toBe(false);
+  });
+
+  describe('enqueue notifications', () => {
+    it('records an enqueue notification when submitResolvedInvocationSnapshot adds a queue item', () => {
+      const state = primeGenerate();
+
+      const next = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+
+      expect(getActiveProject(next).queue.items.length).toBeGreaterThan(0);
+      expect(next.notifications[0]?.title).toBe('Invocation queued');
+      expect(next.notifications[0]?.category).toBe('enqueue');
+      expect(next.notifications[0]?.kind).toBe('success');
+    });
+
+    it('does not record a notification when the submit adds no queue item', () => {
+      let state = createInitialWorkbenchState();
+
+      state = workbenchReducer(state, { sourceId: 'upscale', type: 'setInvocationSource' });
+
+      const notificationCount = state.notifications.length;
+
+      const next = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        route: { destination: 'canvas', destinationLocked: false, sourceId: 'upscale', sourceLocked: true },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+
+      expect(getActiveProject(next).queue.items).toEqual([]);
+      expect(next.notifications).toHaveLength(notificationCount);
+    });
+
+    it('notifies for a background-project canvas enqueue', () => {
+      const graph: GraphContract = {
+        edges: [],
+        id: 'canvas-graph',
+        label: 'Canvas',
+        nodes: [],
+        updatedAt: '2026-06-09T00:00:00.000Z',
+        version: 1,
+      };
+
+      let state = createInitialWorkbenchState();
+      const originatingProjectId = state.activeProjectId;
+      state = workbenchReducer(state, { type: 'createProject' });
+      const otherProjectId = state.activeProjectId;
+
+      expect(otherProjectId).not.toBe(originatingProjectId);
+
+      // Project A (originating) stays active; the canvas submission below
+      // targets project B, simulating an async canvas enqueue that lands
+      // after the user has switched away.
+      state = workbenchReducer(state, { projectId: originatingProjectId, type: 'switchProject' });
+
+      expect(state.activeProjectId).toBe(originatingProjectId);
+
+      state = workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        canvas: structuredClone(getProject(state, otherProjectId).canvas),
+        destination: 'canvas',
+        generate: {
+          negativePromptNodeId: 'negative_prompt',
+          positivePromptNodeId: 'positive_prompt',
+          seedNodeId: 'seed',
+          values: createGenerateValues({ positivePrompt: 'canvas prompt', seed: 101, shouldRandomizeSeed: false }),
+        },
+        graph,
+        projectId: otherProjectId,
+        type: 'submitCanvasInvocationSnapshot',
+      });
+
+      expect(getProject(state, otherProjectId).queue.items).toHaveLength(1);
+      expect(state.notifications[0]?.title).toBe('Invocation queued');
+      expect(state.notifications[0]?.projectId).toBe(otherProjectId);
+    });
   });
 
   it('accepts the project graph source but does not queue an empty project graph', () => {

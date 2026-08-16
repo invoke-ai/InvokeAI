@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 
 import { Badge, Box, HStack, Icon } from '@chakra-ui/react';
 import { Button } from '@platform/ui';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon, FolderIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -30,34 +31,37 @@ export const BundleChips = ({
   return (
     <HStack align="center" gap="2" minW="0" px="3" pb="1">
       {bundles.length > 0 ? (
-        <HStack
+        <Scrollable
           flex="1"
-          gap="1.5"
+          label={t('modelManager.launchpad.starterBundles')}
           minW="0"
-          overflowX="auto"
-          css={{ scrollbarWidth: 'thin', '&::-webkit-scrollbar': { height: '4px' } }}
+          orientation="horizontal"
+          size="xs"
+          variant="hover"
         >
-          <BundleChip
-            isSelected={selectedName === null}
-            label={t('common.all')}
-            subLabel={`${starterCount}`}
-            onSelect={() => onSelect(null)}
-          />
-          {bundles.map((bundle) => {
-            const missingCount = bundle.models.filter((model) => !model.is_installed).length;
+          <HStack gap="1.5">
+            <BundleChip
+              isSelected={selectedName === null}
+              label={t('common.all')}
+              subLabel={`${starterCount}`}
+              onSelect={() => onSelect(null)}
+            />
+            {bundles.map((bundle) => {
+              const missingCount = bundle.models.filter((model) => !model.is_installed).length;
 
-            return (
-              <BundleChip
-                key={bundle.name}
-                isComplete={missingCount === 0}
-                isSelected={selectedName === bundle.name}
-                label={bundle.name}
-                subLabel={`${bundle.models.length}`}
-                onSelect={() => onSelect(bundle.name)}
-              />
-            );
-          })}
-        </HStack>
+              return (
+                <BundleChip
+                  key={bundle.name}
+                  isComplete={missingCount === 0}
+                  isSelected={selectedName === bundle.name}
+                  label={bundle.name}
+                  subLabel={`${bundle.models.length}`}
+                  onSelect={() => onSelect(bundle.name)}
+                />
+              );
+            })}
+          </HStack>
+        </Scrollable>
       ) : (
         <Box flex="1" minW="0" />
       )}

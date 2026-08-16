@@ -7,6 +7,7 @@ import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDial
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { Button } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, TriangleAlertIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -42,9 +43,7 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
         <Stack flex="1" gap="1.5" minW="0">
           <HStack gap="2" minW="0">
             <Icon as={BlocksIcon} boxSize="4" color="fg.muted" flexShrink={0} />
-            <Text fontSize="sm" fontWeight="700" minW="0" truncate>
-              {pack.name}
-            </Text>
+            <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={pack.name} />
           </HStack>
           <Text color="fg.muted" fontFamily="mono" fontSize="2xs" overflowWrap="anywhere">
             {pack.path}

@@ -1,12 +1,13 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { NodePackInfo } from '@features/nodes/core/catalog';
 
-import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack } from '@chakra-ui/react';
 import { filterNodePacks, isProblemPack, type NodePackFilters } from '@features/nodes/core/library';
 import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
 import { openNodesManagerTab } from '@features/nodes/ui/nodesUiStore';
 import { Button, Row, Scrollable, Tooltip } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ArrowRightIcon, BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -163,9 +164,7 @@ const PackRow = ({
     }}
   >
     <Icon as={BlocksIcon} boxSize="4" color={isActive ? 'accent.contrast' : 'fg.subtle'} flexShrink={0} />
-    <Text fontSize="xs" fontWeight="600" maxW="full" truncate>
-      {pack.name}
-    </Text>
+    <MiddleTruncate fontSize="xs" fontWeight="600" maxW="full" text={pack.name} />
     {isProblemPack(pack) ? (
       // Zero nodes is the strongest health signal the catalog carries: the
       // pack's import failed or a reload/restart is pending.
