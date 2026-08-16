@@ -49,7 +49,7 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
         <ChakraProvider value={system}>
-          <Box aria-hidden bg="bg.emphasized" data-testid="row-hover-style-probe" />
+          <Box aria-hidden bg="bg.muted/60" data-testid="row-hover-style-probe" />
           <Box aria-hidden bg="bg.muted" data-testid="popover-surface-style-probe" />
           <Row asChild>
             <button aria-label="Row probe" type="button">

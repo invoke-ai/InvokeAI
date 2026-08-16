@@ -10,6 +10,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -50,9 +51,7 @@ const SystemPromptRow = ({
 
   return (
     <HStack justify="space-between" px="1" py="0.5">
-      <Text fontSize="xs" truncate>
-        {prompt.name}
-      </Text>
+      <MiddleTruncate fontSize="xs" minW="0" text={prompt.name} />
       {canEdit ? (
         <HStack gap="0.5">
           <Tooltip content={t('common.edit')}>

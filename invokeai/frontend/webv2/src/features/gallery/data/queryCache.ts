@@ -2,13 +2,16 @@ import type {
   GalleryItem,
   GalleryItemKey,
   GalleryItemMutationResult,
+  GalleryItemRef,
   GalleryItemsPage,
 } from '@features/gallery/core/items';
+import type { GalleryBoard } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { rollBackUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { hashKey } from '@tanstack/react-query';
 
 import { ALL_READABLE_BOARDS_ID, isDateBoardId } from './backend';
@@ -169,10 +172,6 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
       continue;
     }
 
-    if (patch.kind === 'star' && filter.starredFirst) {
-      continue;
-    }
-
     const after = patchItemsInfiniteData(before, filter, patch, itemKeys);
 
     if (after === before) {
@@ -186,13 +185,145 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
     }
   }
 
-  return () => {
-    for (const { after, before, queryKey } of rollbackEntries) {
-      if (client.getQueryData(queryKey) === after) {
-        client.setQueryData(queryKey, before);
+  return () =>
+    rollBackUnclaimedEntries(
+      rollbackEntries,
+      (entry) => client.getQueryData<InfiniteData<GalleryItemsPage, number>>(entry.queryKey),
+      (entry) => client.setQueryData(entry.queryKey, entry.before)
+    );
+};
+
+/**
+ * Reads the board each requested item currently sits on, from whichever list
+ * cache holds it. Optimistic moves capture this before patching so a rejected
+ * ref can be put back without waiting for the reconciling refetch.
+ */
+export const getGalleryItemBoardIdsFromCaches = (
+  client: QueryClient,
+  refs: readonly GalleryItemRef[]
+): Map<GalleryItemKey, string> => {
+  const wanted = new Set(refs.map(toGalleryItemKey));
+  const boardIds = new Map<GalleryItemKey, string>();
+
+  for (const query of getGalleryItemListQueries(client)) {
+    if (boardIds.size === wanted.size) {
+      break;
+    }
+
+    const data = query.state.data;
+
+    if (!isGalleryItemsData(data)) {
+      continue;
+    }
+
+    for (const page of data.pages) {
+      for (const item of page.items) {
+        const key = toGalleryItemKey(item);
+
+        if (wanted.has(key) && !boardIds.has(key)) {
+          boardIds.set(key, item.boardId);
+        }
       }
     }
-  };
+  }
+
+  return boardIds;
+};
+
+/**
+ * Reads the starred flag each requested item currently has, from whichever
+ * list cache holds it. Optimistic star/unstar captures this before patching
+ * so a totally-failed batch can restore each item's actual prior flag rather
+ * than blanket-inverting the whole request.
+ */
+export const getGalleryItemStarredFromCaches = (
+  client: QueryClient,
+  refs: readonly GalleryItemRef[]
+): Map<GalleryItemKey, boolean> => {
+  const wanted = new Set(refs.map(toGalleryItemKey));
+  const starred = new Map<GalleryItemKey, boolean>();
+
+  for (const query of getGalleryItemListQueries(client)) {
+    if (starred.size === wanted.size) {
+      break;
+    }
+
+    const data = query.state.data;
+
+    if (!isGalleryItemsData(data)) {
+      continue;
+    }
+
+    for (const page of data.pages) {
+      for (const item of page.items) {
+        const key = toGalleryItemKey(item);
+
+        if (wanted.has(key) && !starred.has(key)) {
+          starred.set(key, item.starred);
+        }
+      }
+    }
+  }
+
+  return starred;
+};
+
+interface BoardCacheRollbackEntry {
+  after: GalleryBoard[];
+  before: GalleryBoard[];
+  queryKey: QueryKey;
+}
+
+const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
+  Array.isArray(value) && value.every((board) => typeof board === 'object' && board !== null && 'id' in board);
+
+/**
+ * Patches one board across every cached board list and returns a rollback
+ * that restores the prior lists — skipping any list something else has
+ * written to since, the same conflict rule as `patchGalleryItemCaches`.
+ */
+export const patchGalleryBoardCaches = (
+  client: QueryClient,
+  boardId: string,
+  changes: Partial<Pick<GalleryBoard, 'archived' | 'name'>>
+): (() => void) => {
+  const owner = captureAccountScope();
+  const rollbackEntries: BoardCacheRollbackEntry[] = [];
+
+  for (const query of client.getQueryCache().findAll({ queryKey: galleryKeys.boardsForAccount(owner) })) {
+    const before = query.state.data;
+
+    if (!isGalleryBoardsData(before)) {
+      continue;
+    }
+
+    let changed = false;
+    const after = before.map((board) => {
+      if (board.id !== boardId) {
+        return board;
+      }
+
+      changed = true;
+      return { ...board, ...changes };
+    });
+
+    if (!changed) {
+      continue;
+    }
+
+    const applied = client.setQueryData<GalleryBoard[]>(query.queryKey, after);
+
+    if (applied) {
+      rollbackEntries.push({ after: applied, before, queryKey: query.queryKey });
+    }
+  }
+
+  return () =>
+    rollBackUnclaimedEntries(
+      rollbackEntries,
+      (entry) => client.getQueryData<InfiniteData<GalleryItemsPage, number>>(entry.queryKey),
+      (entry) => client.setQueryData(entry.queryKey, entry.before)
+    );
 };
 
 const runGalleryInvalidation = async (

@@ -13,6 +13,7 @@ import { GalleryItemSearch } from './GalleryItemSearch';
 import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GALLERY_SPLIT_HANDLE_SIZE_PX, GallerySplitHandle } from './GallerySplitHandle';
+import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -123,6 +124,11 @@ export const GalleryStackedLayout = () => {
             <GalleryViewTabs />
             <Spacer />
             <GalleryItemSortMenu />
+            <GalleryUploadButton
+              boards={gallery.boards}
+              selectedBoardId={gallery.selectedBoardId}
+              onUploadFiles={actions.uploadFiles}
+            />
           </HStack>
           <GalleryItemSearch />
         </Stack>

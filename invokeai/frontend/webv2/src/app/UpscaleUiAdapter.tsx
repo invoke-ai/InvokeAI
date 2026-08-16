@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 
 /**
  * Production binding of Upscale's UI port: maps the upscale widget instance
@@ -37,17 +37,33 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
   );
   const commands = useWorkbenchCommands();
   const queryClient = useQueryClient();
+  // The port's callbacks are keyed to the project, not to its contents: rebuilding
+  // them whenever `rawValues` changes would hand every consumer new function
+  // identities on each keystroke, re-rendering memoized fields that did not change.
+  const { projectId } = project;
+  const patchPromptDraft = useCallback<UpscaleUiAdapter['patchPromptDraft']>(
+    (values) => commands.generation.patchPromptDraft(values, 'upscale', projectId),
+    [commands, projectId]
+  );
+  const patchValues = useCallback<UpscaleUiAdapter['patchValues']>(
+    (values, origin) => commands.widgets.patchValues('upscale', values, projectId, origin),
+    [commands, projectId]
+  );
+  const reportError = useCallback<UpscaleUiAdapter['reportError']>(
+    (message) => commands.notifications.reportError({ area: 'upscale', message, namespace: 'generation' }),
+    [commands]
+  );
+  const touchGalleryImages = useCallback(() => void invalidateGallery(queryClient), [queryClient]);
   const adapter = useMemo<UpscaleUiAdapter>(
     () => ({
       ...project,
-      patchPromptDraft: (values) => commands.generation.patchPromptDraft(values, 'upscale', project.projectId),
-      patchValues: (values, origin) => commands.widgets.patchValues('upscale', values, project.projectId, origin),
-      reportError: (message) =>
-        commands.notifications.reportError({ area: 'upscale', message, namespace: 'generation' }),
+      patchPromptDraft,
+      patchValues,
+      reportError,
       showPromptSyntaxHighlighting,
-      touchGalleryImages: () => void invalidateGallery(queryClient),
+      touchGalleryImages,
     }),
-    [commands, project, queryClient, showPromptSyntaxHighlighting]
+    [patchPromptDraft, patchValues, project, reportError, showPromptSyntaxHighlighting, touchGalleryImages]
   );
 
   return <UpscaleUiProvider adapter={adapter}>{children}</UpscaleUiProvider>;

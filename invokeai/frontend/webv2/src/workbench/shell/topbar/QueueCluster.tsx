@@ -3,22 +3,24 @@ import type { QueueItem } from '@features/queue/contracts';
 import type { QueueItemProgress } from '@features/queue/react';
 import type { ReactNode } from 'react';
 
-import { Badge, Box, chakra, HStack, Icon, Menu, Portal, Progress, Stack, Text } from '@chakra-ui/react';
+import { Badge, chakra, HStack, Icon, Menu, Portal, Progress, Stack, Text } from '@chakra-ui/react';
 import { useModelLoads } from '@features/models';
 import {
+  getDeterminateProgressFraction,
   getQueueItemExpectedImageCount,
   getQueueItemSnapshotPositivePrompt,
-  getQueueSummary,
 } from '@features/queue/contracts';
 import { QueueMenuItems, useQueueMenuActions } from '@features/queue/menu';
-import { useIsProcessorPaused, useQueueItemProgress } from '@features/queue/react';
+import { useIsProcessorPaused } from '@features/queue/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Group } from '@platform/ui/Group';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDestinationLabel, getSourceLabel } from '@workbench/invocation';
+import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { ChevronDownIcon, ListOrderedIcon, PauseIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,16 +37,13 @@ const tonePalettes: Record<QueueTone, string | undefined> = {
 
 export const QueueCluster = () => {
   const { t } = useTranslation();
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
   const modelLoads = useModelLoads();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
-  const actions = useQueueMenuActions();
+  const actions = useQueueMenuActions({ includeOpenQueue: true });
   const cancelCurrent = actions[0];
 
-  const baseSummary = getQueueSummary(queueItems);
-  const runningProgress = useQueueItemProgress(baseSummary.runningQueueItemId ?? '');
-  const summary = getQueueSummary(queueItems, runningProgress);
+  const { progress: runningProgress, queueItems, summary } = useActiveQueueProgress();
   const { current, remaining, total } = summary;
   const runningItem = summary.runningQueueItemId
     ? queueItems.find((item) => item.id === summary.runningQueueItemId)
@@ -54,7 +53,7 @@ export const QueueCluster = () => {
   const isPaused = useIsProcessorPaused();
   const hasOpenWork = total > 0;
   const tone: QueueTone = isPaused && hasOpenWork ? 'paused' : hasOpenWork && isConnected ? 'running' : 'idle';
-  const progressValue = runningProgress?.percentage ?? null;
+  const progressValue = getDeterminateProgressFraction(runningProgress?.percentage);
   const isCancellable = !cancelCurrent?.disabled;
 
   const handleOpenQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
@@ -79,19 +78,10 @@ export const QueueCluster = () => {
             variant={tone === 'idle' ? 'outline' : 'subtle'}
             onClick={handleOpenQueue}
           >
-            {tone === 'running' && progressValue !== null ? (
-              <Box
-                aria-hidden="true"
-                bg="colorPalette.solid"
-                bottom="0"
-                left="0"
-                opacity="0.35"
-                position="absolute"
-                top="0"
-                transition="width var(--wb-motion-duration-fast) linear"
-                width={`${Math.round(progressValue * 100)}%`}
-              />
-            ) : null}
+            {/* No background fill here any more: the top bar's progress rail is
+                twenty pixels below this button and says the same thing at
+                viewport width, where a 35%-opacity wash behind a number never
+                really did. The count and the tooltip are this control's job. */}
             <Icon as={isPaused ? PauseIcon : ListOrderedIcon} position="relative" zIndex="1" />
             <chakra.span fontVariantNumeric="tabular-nums" position="relative" textAlign="center" zIndex="1">
               {remaining}
@@ -104,7 +94,7 @@ export const QueueCluster = () => {
             <IconButton
               aria-label={cancelCurrent.label}
               color="fg.error"
-              size="sm"
+              size="xs"
               variant="outline"
               onClick={cancelCurrent.onClick}
             >
@@ -264,31 +254,25 @@ const QueueTooltip = ({
           {progressLabel}
         </Text>
         {modelLoads.length ? <ModelLoadList modelLoads={modelLoads} /> : null}
-        {progress?.percentage !== null && progress?.percentage !== undefined ? (
-          <Progress.Root
-            aria-label={t('topbar.queue.currentImageProgress')}
-            max={1}
-            size="xs"
-            value={progress.percentage}
-          >
-            <Progress.Track>
-              <Progress.Range />
-            </Progress.Track>
-          </Progress.Root>
-        ) : null}
+        <Progress.Root
+          aria-label={t('topbar.queue.currentImageProgress')}
+          max={1}
+          size="xs"
+          value={getDeterminateProgressFraction(progress?.percentage)}
+        >
+          <Progress.Track>
+            <Progress.Range />
+          </Progress.Track>
+        </Progress.Root>
       </Stack>
       <Stack gap="1" color="fg.subtle" fontSize="2xs">
         <Text fontVariantNumeric="tabular-nums">
           {t('topbar.queue.batchImage', { current: activeItemIndex, total: expectedCount })}
           {activeBackendItemId !== undefined ? ` · ${t('topbar.queue.backendItem', { id: activeBackendItemId })}` : ''}
         </Text>
-        <Text fontFamily="mono" truncate>
-          {t('topbar.queue.queueItem', { id: item.id })}
-        </Text>
+        <MiddleTruncate fontFamily="mono" text={t('topbar.queue.queueItem', { id: item.id })} />
         {item.backendBatchId ? (
-          <Text fontFamily="mono" truncate>
-            {t('topbar.queue.backendBatch', { id: item.backendBatchId })}
-          </Text>
+          <MiddleTruncate fontFamily="mono" text={t('topbar.queue.backendBatch', { id: item.backendBatchId })} />
         ) : null}
         <Text truncate>
           {t('topbar.queue.route', {
@@ -326,9 +310,7 @@ const ModelLoadList = ({ modelLoads }: { modelLoads: ModelLoadInfo[] }) => {
   return (
     <Stack gap="0.5" color="fg.muted" fontSize="2xs">
       {modelLoads.slice(0, 3).map((modelLoad, index) => (
-        <Text key={`${modelLoad.label}:${index}`} truncate>
-          {modelLoad.label}
-        </Text>
+        <MiddleTruncate key={`${modelLoad.label}:${index}`} text={modelLoad.label} />
       ))}
       {modelLoads.length > 3 ? <Text>{t('topbar.queue.more', { count: modelLoads.length - 3 })}</Text> : null}
     </Stack>

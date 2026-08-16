@@ -1,6 +1,7 @@
 import type { WidgetLabelProps } from '@workbench/widgetContracts';
 
 import { HStack, Text } from '@chakra-ui/react';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useTranslation } from 'react-i18next';
 
 import { usePreviewHeaderContext } from './previewHeaderStore';
@@ -30,9 +31,7 @@ export const PreviewWidgetLabel = (_props: WidgetLabelProps) => {
       <Text color="fg.muted" flexShrink={0} fontSize="xs">
         /
       </Text>
-      <Text color="fg.muted" fontSize="xs" truncate>
-        {itemName}
-      </Text>
+      <MiddleTruncate color="fg.muted" fontSize="xs" minW="0" text={itemName} />
     </HStack>
   );
 };

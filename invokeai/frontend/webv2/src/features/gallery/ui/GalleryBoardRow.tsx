@@ -1,11 +1,12 @@
 import type { GalleryItemKey } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { Badge, Box, Text } from '@chakra-ui/react';
+import { Badge, Box } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { MoreVerticalIcon } from 'lucide-react';
 import { useCallback, useMemo, type MouseEvent, type PointerEvent } from 'react';
@@ -93,9 +94,13 @@ export const GalleryBoardRow = ({
   const subtitle = useMemo(
     () =>
       board.ownerName ? (
-        <Text color={isSelected ? 'inherit' : 'fg.muted'} fontSize="2xs" lineHeight="shorter" minW="0" truncate>
-          {board.ownerName}
-        </Text>
+        <MiddleTruncate
+          color={isSelected ? 'inherit' : 'fg.muted'}
+          fontSize="2xs"
+          lineHeight="shorter"
+          minW="0"
+          text={board.ownerName}
+        />
       ) : null,
     [board.ownerName, isSelected]
   );

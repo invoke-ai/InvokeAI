@@ -169,7 +169,7 @@ export const GalleryBoardMenu = ({
           <Dialog.Positioner>
             <Dialog.Content>
               <Dialog.Header>
-                <Dialog.Title fontSize="sm">{t('widgets.gallery.renameBoard')}</Dialog.Title>
+                <Dialog.Title>{t('widgets.gallery.renameBoard')}</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 <Input
@@ -199,7 +199,7 @@ export const GalleryBoardMenu = ({
           <Dialog.Positioner>
             <Dialog.Content>
               <Dialog.Header>
-                <Dialog.Title fontSize="sm">
+                <Dialog.Title>
                   {t('widgets.gallery.deleteBoardQuestion', { name: deleteTarget?.name ?? '' })}
                 </Dialog.Title>
               </Dialog.Header>

@@ -161,7 +161,9 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
     root: {
       ...chakraSlotRecipes.segmentGroup.base?.root,
       '--segment-radius': 'radii.sm',
-      '--segment-indicator-bg': 'colors.bg.emphasized',
+      // A neutral fill disappears against the lighter section surfaces these
+      // controls sit on, so the selection reads through the accent palette.
+      '--segment-indicator-bg': 'colors.accent.solid',
       '--segment-indicator-shadow': 'none',
       bg: 'transparent',
       borderColor: 'border.subtle',
@@ -176,12 +178,12 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       transitionDuration: 'faster',
       transitionProperty: 'background, color',
       _before: { display: 'none' },
-      _checked: { color: 'fg' },
+      _checked: { color: 'accent.contrast' },
       _hover: {
         '&:not([data-state=checked])': { color: 'fg' },
       },
       '&[data-state=checked][data-ssr]': {
-        bg: 'bg.emphasized',
+        bg: 'accent.solid',
         shadow: 'none',
       },
     },
@@ -192,13 +194,37 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
   },
   variants: {
     ...chakraSlotRecipes.segmentGroup.variants,
+    // Item heights are the button height of the same size name minus the
+    // root's 1px border, so a segment group's outer box lands exactly on the
+    // buttons it sits beside — Chakra's defaults run one size-name small
+    // (their `xs` item is button-`2xs` height). Text styles mirror the
+    // button recipe's `xs` cap.
     size: {
       ...chakraSlotRecipes.segmentGroup.variants?.size,
+      // Repo extension (like the button's own `2xs`): Chakra ships no
+      // segment-group `2xs`, so this borrows the `xs` item styles as its base.
+      '2xs': {
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
+          height: 'calc({sizes.6} - 2px)',
+          px: '2',
+          textStyle: 'xs',
+        },
+      },
       xs: {
-        item: { ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item, px: '2.5' },
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.xs?.item,
+          height: 'calc({sizes.8} - 2px)',
+          px: '2.5',
+        },
       },
       sm: {
-        item: { ...chakraSlotRecipes.segmentGroup.variants?.size?.sm?.item, px: '3', textStyle: 'xs' },
+        item: {
+          ...chakraSlotRecipes.segmentGroup.variants?.size?.sm?.item,
+          height: 'calc({sizes.9} - 2px)',
+          px: '3.5',
+          textStyle: 'xs',
+        },
       },
     },
   } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
@@ -327,6 +353,8 @@ export const dropdownGroupLabel = {
   fontSize: '2xs',
   fontWeight: '600',
   letterSpacing: '0.02em',
+  lineHeight: 'shorter',
+  py: '1',
   textTransform: 'uppercase',
 };
 
@@ -459,6 +487,13 @@ export const dialogSlotRecipe = defineSlotRecipe({
       borderColor: 'border.subtle',
       borderWidth: '1px',
     },
+    // Chakra's stock `lg` title reads as a page heading; dialogs here are
+    // compact tool windows, so titles match the app's `sm`/700 convention.
+    title: {
+      ...chakraSlotRecipes.dialog.base?.title,
+      fontWeight: '700',
+      textStyle: 'sm',
+    },
   },
 });
 
@@ -473,6 +508,39 @@ export const sliderSlotRecipe = defineSlotRecipe({
       lineHeight: '1',
     },
   },
+  variants: {
+    ...chakraSlotRecipes.slider.variants,
+    size: {
+      // Chakra's thumb sizes are touch targets. With a mouse the track itself
+      // is the drag target, so fine-pointer devices get a much smaller thumb.
+      // `--slider-marker-center` must shrink with it: it is the marker group's
+      // top offset, (thumb - marker) / 2, keeping marks centered on the track.
+      // `--slider-marker-inset` is zeroed at every size: zag already offsets
+      // marks by half the thumb within the group, so any extra inset shifts
+      // the end marks off the thumb positions they label.
+      lg: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.lg?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3.5' },
+        },
+      },
+      md: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.md?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '4px', '--slider-thumb-size': 'sizes.3' },
+        },
+      },
+      sm: {
+        root: {
+          ...chakraSlotRecipes.slider.variants?.size?.sm?.root,
+          '--slider-marker-inset': '0px',
+          '@media (pointer: fine)': { '--slider-marker-center': '3px', '--slider-thumb-size': 'sizes.2.5' },
+        },
+      },
+    },
+  } as unknown as typeof chakraSlotRecipes.slider.variants,
 });
 
 export const progressCircleSlotRecipe = defineSlotRecipe({
@@ -485,6 +553,15 @@ export const progressCircleSlotRecipe = defineSlotRecipe({
         circle: {
           '--size': '16px',
           '--thickness': '3px',
+        },
+        valueText: {
+          textStyle: '2xs',
+        },
+      },
+      '3xs': {
+        circle: {
+          '--size': '14px',
+          '--thickness': '2px',
         },
         valueText: {
           textStyle: '2xs',
@@ -602,7 +679,9 @@ export const rowRecipe = defineRecipe({
     textAlign: 'start',
     transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
     w: 'full',
-    _hover: { bg: 'bg.emphasized' },
+    // A pointer hint, not a state: it stays under the `muted` (selected)
+    // variant's own `bg.muted` so hovering never reads as selecting.
+    _hover: { bg: 'bg.muted/60' },
     _focusVisible: {
       outline: '2px solid',
       outlineColor: 'accent.solid',
@@ -727,4 +806,28 @@ export const themeCardRecipe = defineSlotRecipe({
     },
   },
   defaultVariants: { selected: false },
+});
+
+/**
+ * Hairline dividers between rows. Metadata lists carry values of very
+ * different heights — a seed next to a wrapped prompt — and a bare row gap
+ * stops reading as separation once values grow tall; the rule keeps each
+ * label/value pair visually bound. `paddingTop` mirrors the 1.5-unit row gap
+ * the metadata lists use, so the line sits centered between rows.
+ */
+export const dataListSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.dataList,
+  base: {
+    ...chakraSlotRecipes.dataList.base,
+    item: {
+      ...chakraSlotRecipes.dataList.base?.item,
+      '&:not(:first-child)': {
+        // `borderColor` + top-only width, like the chrome islands: the
+        // side-specific color property does not resolve the semantic token.
+        borderColor: 'border.subtle',
+        borderTopWidth: '1px',
+        paddingTop: '1.5',
+      },
+    },
+  },
 });

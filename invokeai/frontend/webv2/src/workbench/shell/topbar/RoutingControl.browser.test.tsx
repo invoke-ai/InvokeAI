@@ -56,6 +56,12 @@ const LOCKED_STATE = {
   ...BASE_STATE,
   invocation: { ...BASE_STATE.invocation, destinationLocked: true, sourceLocked: true },
 } satisfies InvocationState;
+const SAME_SOURCE_AND_DESTINATION_STATE = {
+  ...BASE_STATE,
+  invocation: { ...BASE_STATE.invocation, destination: 'canvas', sourceId: 'canvas' },
+  placedTypeIds: new Set(['canvas']),
+  visibleTypeIds: new Set(['canvas']),
+} satisfies InvocationState;
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -91,6 +97,22 @@ afterEach(async () => {
 });
 
 describe('RoutingControl', () => {
+  it('shows one centered icon when source and destination match', async () => {
+    await renderControl(SAME_SOURCE_AND_DESTINATION_STATE);
+
+    const button = document.querySelector<HTMLButtonElement>('[data-routing-control]');
+    const icon = button?.querySelector<SVGElement>('svg');
+
+    expect(button).not.toBeNull();
+    expect(icon).not.toBeNull();
+    expect(button?.querySelectorAll('svg')).toHaveLength(1);
+
+    const buttonBounds = button!.getBoundingClientRect();
+    const iconBounds = icon!.getBoundingClientRect();
+    expect(iconBounds.left + iconBounds.width / 2).toBeCloseTo(buttonBounds.left + buttonBounds.width / 2, 1);
+    expect(iconBounds.top + iconBounds.height / 2).toBeCloseTo(buttonBounds.top + buttonBounds.height / 2, 1);
+  });
+
   it('uses narrow diagonal route geometry without an arrow and adds only a top-right dot when locked', async () => {
     await renderControl(BASE_STATE);
 

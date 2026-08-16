@@ -16,6 +16,7 @@ import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { clampPanelSize, getPanelSizeBounds } from '@workbench/workbenchState';
 import { SettingsIcon } from 'lucide-react';
 import {
   useCallback,
@@ -32,26 +33,8 @@ import { WidgetIdentityIcon } from './WidgetIdentityIcon';
 import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 
 const PANEL_SIZE_STEP_PX = 16;
-const MIN_PANEL_SIZE_PX = 180;
-const MAX_PANEL_SIZE_PX = 520;
-const MIN_BOTTOM_PANEL_SIZE_PX = 96;
-const MAX_BOTTOM_PANEL_SIZE_PX = 420;
 const RESIZE_HANDLE_HOVER_PROPS = { bg: 'accent.solid', opacity: 0.45 };
 const RESIZE_HANDLE_FOCUS_PROPS = { bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' };
-
-const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
-  if (region === 'bottom') {
-    return { max: MAX_BOTTOM_PANEL_SIZE_PX, min: MIN_BOTTOM_PANEL_SIZE_PX };
-  }
-
-  return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
-};
-
-const clampSize = (region: WidgetRegion, sizePx: number): number => {
-  const { max, min } = getPanelSizeBounds(region);
-
-  return Math.min(max, Math.max(min, sizePx));
-};
 
 export const WidgetPanelFrame = ({
   children,
@@ -70,13 +53,15 @@ export const WidgetPanelFrame = ({
   const [dragSizePx, setDragSizePx] = useState<number | null>(null);
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
-  const displaySizePx = dragSizePx ?? regionState.sizePx;
+  // Clamped at render, not just on commit, so a persisted size from before a
+  // bounds change heals on screen immediately instead of on the next resize.
+  const displaySizePx = clampPanelSize(region, dragSizePx ?? regionState.sizePx);
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
   const commitSize = useCallback(
     (sizePx: number) => {
-      const nextSizePx = clampSize(region, sizePx);
+      const nextSizePx = clampPanelSize(region, sizePx);
 
       if (nextSizePx !== regionState.sizePx) {
         layout.setRegionSize(region, nextSizePx);
@@ -99,7 +84,7 @@ export const WidgetPanelFrame = ({
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
 
-        nextSizePx = clampSize(region, startSizePx + deltaPx);
+        nextSizePx = clampPanelSize(region, startSizePx + deltaPx);
         setDragSizePx(nextSizePx);
       };
 

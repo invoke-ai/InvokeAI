@@ -13,6 +13,7 @@ import { setPickerCompactView, useModelsUiSelector } from '@features/models/ui/u
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, IconButton, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
 import { dropdownContent } from '@theme/recipes';
@@ -457,9 +458,7 @@ const BaseChip = ({
 
 const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   <HStack as="span" flex="1" gap="2" minW="0">
-    <Text as="span" fontSize="xs" minW="0" title={model.name} truncate>
-      {model.name}
-    </Text>
+    <MiddleTruncate as="span" fontSize="xs" minW="0" text={model.name} />
     <Badge
       colorPalette={getModelBaseColorPalette(model.base)}
       flexShrink={0}
@@ -514,9 +513,7 @@ const ModelOptionContent = ({
               />
             </Tooltip>
           ) : null}
-          <Text fontSize="xs" minW="0" truncate>
-            {model.name}
-          </Text>
+          <MiddleTruncate fontSize="xs" minW="0" text={model.name} />
           {showType ? (
             <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="xs" variant="surface">
               {getModelTypeLabel(model.type)}

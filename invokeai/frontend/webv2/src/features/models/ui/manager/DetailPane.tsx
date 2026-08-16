@@ -7,6 +7,7 @@ import { ModelDetail } from '@features/models/ui/detail/ModelDetail';
 import { InstallQueueBar } from '@features/models/ui/install-queue/InstallQueueBar';
 import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@features/models/ui/uiStore';
 import { Scrollable, Tabs } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,9 +41,7 @@ export const DetailPane = () => {
           <Tabs.List mb="-1px">
             <Tabs.Trigger value="details">
               <Icon as={BoxIcon} boxSize="3" />
-              <Text maxW="14rem" truncate>
-                {detailLabel}
-              </Text>
+              <MiddleTruncate maxW="14rem" text={detailLabel} />
             </Tabs.Trigger>
             <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />

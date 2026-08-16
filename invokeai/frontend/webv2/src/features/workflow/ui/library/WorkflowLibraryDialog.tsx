@@ -3,14 +3,12 @@ import type { ProjectGraphState } from '@features/workflow/contracts';
 
 import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Spinner, Stack, Tabs, Text } from '@chakra-ui/react';
 import {
-  createLibraryWorkflow,
   deleteLibraryWorkflow,
   getCachedWorkflowPage,
   getLibraryWorkflowCached,
   invalidateWorkflowLibraryCache,
   listLibraryWorkflowsCached,
   touchLibraryWorkflowOpenedAt,
-  updateLibraryWorkflow,
   type WorkflowLibraryCategory,
   type WorkflowLibraryListItem,
 } from '@features/workflow/queries';
@@ -26,8 +24,12 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, ConfirmDialog, JsonPreview, Scrollable } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { markLibraryGraphSynced } from './librarySyncBridge';
+import { useSaveWorkflowToLibrary } from './useSaveWorkflowToLibrary';
 
 /**
  * Backend workflow library browser: list/search user and default workflows,
@@ -68,9 +70,7 @@ const WorkflowPreviewPane = ({
           <Button size="2xs" variant="ghost" onClick={onBack}>
             ← Back
           </Button>
-          <Text fontSize="xs" fontWeight="600" minW="0" truncate>
-            {preview.item.name || 'Untitled Workflow'}
-          </Text>
+          <MiddleTruncate fontSize="xs" fontWeight="600" minW="0" text={preview.item.name || 'Untitled Workflow'} />
         </HStack>
         <HStack flexShrink={0} gap="2">
           <SegmentGroup.Root
@@ -109,9 +109,11 @@ export const WorkflowLibraryDialog = ({
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
+  const { t } = useTranslation();
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
-  const { bindLibraryWorkflow, replace } = useProjectGraphCommands();
+  const { replace } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
+  const { saveAsNew, saveToLibrary: saveExistingToLibrary } = useSaveWorkflowToLibrary();
   const [category, setCategory] = useState<WorkflowLibraryCategory>('user');
   const [searchTerm, setSearchTerm] = useState('');
   const [items, setItems] = useState<WorkflowLibraryListItem[]>([]);
@@ -223,6 +225,10 @@ export const WorkflowLibraryDialog = ({
 
       assertAccountScopeCurrent(owner);
       replace(parsed.document, `Loaded "${item.name}" from library`);
+      // The freshly-loaded graph is already in sync with the library record it
+      // came from — mark it synced so the autosaver does not immediately
+      // queue a redundant (echo) save the moment the graph reference changes.
+      markLibraryGraphSynced(serializeWorkflowJson(parsed.document));
 
       for (const warning of parsed.warnings) {
         notify.info('Workflow load warning', warning);
@@ -275,29 +281,14 @@ export const WorkflowLibraryDialog = ({
     setIsSaving(true);
 
     try {
-      const serialized = serializeWorkflowJson(projectGraph);
+      // useSaveWorkflowToLibrary already notifies on success/failure and
+      // invalidates the library cache; this dialog only needs to refresh its
+      // own list once the save (and any resulting bind) has landed.
+      const workflowId = asNew ? await saveAsNew() : await saveExistingToLibrary();
 
-      if (!asNew && projectGraph.libraryWorkflowId) {
-        await updateLibraryWorkflow(projectGraph.libraryWorkflowId, serialized, owner.signal);
-
-        assertAccountScopeCurrent(owner);
-        notify.success('Workflow saved', `Updated "${projectGraph.name || 'Untitled Workflow'}" in the library.`);
-      } else {
-        const workflowId = await createLibraryWorkflow(serialized, owner.signal);
-
-        assertAccountScopeCurrent(owner);
-        bindLibraryWorkflow(workflowId);
-        notify.success('Workflow saved', `Saved "${projectGraph.name || 'Untitled Workflow'}" to the library.`);
+      if (workflowId && isAccountScopeCurrent(owner)) {
+        refresh(page, owner);
       }
-
-      invalidateWorkflowLibraryCache();
-      refresh(page, owner);
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error('Failed to save workflow', getApiErrorMessage(error, 'The workflow could not be saved.'));
     } finally {
       if (isAccountScopeCurrent(owner)) {
         setIsSaving(false);
@@ -346,9 +337,7 @@ export const WorkflowLibraryDialog = ({
                 </Stack>
               ) : null}
               <Dialog.Header>
-                <Dialog.Title fontSize="sm" fontWeight="700">
-                  Workflow Library
-                </Dialog.Title>
+                <Dialog.Title>Workflow Library</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 {preview ? (
@@ -385,7 +374,7 @@ export const WorkflowLibraryDialog = ({
                         {items.map((item) => (
                           <Box
                             key={item.workflow_id}
-                            _hover={{ bg: 'bg.emphasized' }}
+                            _hover={{ bg: 'bg.muted/60' }}
                             alignItems="center"
                             display="grid"
                             gap="2"
@@ -418,9 +407,11 @@ export const WorkflowLibraryDialog = ({
                               }}
                             >
                               <Stack gap="0" minW="0">
-                                <Text fontSize="xs" fontWeight="600" truncate>
-                                  {item.name || 'Untitled Workflow'}
-                                </Text>
+                                <MiddleTruncate
+                                  fontSize="xs"
+                                  fontWeight="600"
+                                  text={item.name || 'Untitled Workflow'}
+                                />
                                 {item.description ? (
                                   <Text color="fg.subtle" fontSize="2xs" truncate>
                                     {item.description}
@@ -501,15 +492,19 @@ export const WorkflowLibraryDialog = ({
                         </Text>
                         <HStack flexShrink={0} gap="2">
                           {projectGraph.libraryWorkflowId ? (
+                            <Text color="fg.subtle" fontSize="2xs">
+                              {t('widgets.workflow.autosavesToLibrary')}
+                            </Text>
+                          ) : (
                             <Button
                               loading={isSaving}
                               size="2xs"
                               variant="outline"
                               onClick={() => void saveToLibrary(false)}
                             >
-                              Save
+                              {t('widgets.workflow.saveToLibrary')}
                             </Button>
-                          ) : null}
+                          )}
                           <Button
                             loading={isSaving}
                             size="2xs"

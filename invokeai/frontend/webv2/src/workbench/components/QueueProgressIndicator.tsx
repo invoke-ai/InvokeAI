@@ -1,7 +1,7 @@
 import type { QueueProgressBarState } from '@features/queue/contracts';
 import type { ComponentProps } from 'react';
 
-import { Progress, ProgressCircle } from '@chakra-ui/react';
+import { ProgressCircle } from '@chakra-ui/react';
 
 const getProgressValuePercent = (state: QueueProgressBarState): number | null =>
   state.kind === 'determinate' ? state.value * 100 : state.value;
@@ -35,31 +35,5 @@ export const QueueCircularProgress = ({
         <ProgressCircle.Range stroke="{colors.accent.solid}" />
       </ProgressCircle.Circle>
     </ProgressCircle.Root>
-  );
-};
-
-export const QueueTabBackgroundProgress = ({
-  state,
-  ...props
-}: Omit<ComponentProps<typeof Progress.Root>, 'value'> & { state: QueueProgressBarState }) => {
-  if (state.kind === 'idle') {
-    return null;
-  }
-
-  return (
-    <Progress.Root
-      aria-label="Widget queue progress"
-      h="full"
-      inset="0"
-      max={1}
-      pointerEvents="none"
-      position="absolute"
-      value={state.value}
-      {...props}
-    >
-      <Progress.Track bg="transparent" h="full" boxShadow="none">
-        <Progress.Range bg="accent.subtle" />
-      </Progress.Track>
-    </Progress.Root>
   );
 };

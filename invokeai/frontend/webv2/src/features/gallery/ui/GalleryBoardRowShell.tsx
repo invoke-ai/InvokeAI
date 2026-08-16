@@ -1,4 +1,5 @@
-import { HStack, Stack, type SystemStyleObject, Text } from '@chakra-ui/react';
+import { HStack, Stack, type SystemStyleObject } from '@chakra-ui/react';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Row } from '@platform/ui/Row';
 import { useMemo, type MouseEvent, type ReactNode, type Ref } from 'react';
 
@@ -68,9 +69,12 @@ export const GalleryBoardRowShell = ({
         >
           {cover}
           <Stack align="stretch" flex="1" gap="0" minW="0" textAlign="start">
-            <Text fontSize="xs" fontWeight={labelWeight ?? (isSelected ? '600' : '500')} minW="0" truncate>
-              {label}
-            </Text>
+            <MiddleTruncate
+              fontSize="xs"
+              fontWeight={labelWeight ?? (isSelected ? '600' : '500')}
+              minW="0"
+              text={label}
+            />
             {subtitle}
           </Stack>
           {children}

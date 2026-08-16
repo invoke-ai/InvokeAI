@@ -1,7 +1,7 @@
 import { getLibraryWorkflow, touchLibraryWorkflowOpenedAt } from '@features/workflow/data/api';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
-import { parseWorkflowJson } from '@features/workflow/utility';
+import { parseWorkflowJson, serializeWorkflowJson } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -11,6 +11,7 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { useTranslation } from 'react-i18next';
 
+import { markLibraryGraphSynced } from './library/librarySyncBridge';
 import { startWorkflowUiPendingLoadRuntime } from './pendingLibraryWorkflowLoadRuntime';
 
 /**
@@ -36,6 +37,10 @@ export const PendingLibraryWorkflowLoader = () => {
         const name = typeof raw.name === 'string' && raw.name.length > 0 ? raw.name : 'workflow';
 
         replace(document, t('commandPalette.workflowLoad.loaded', { name }));
+        // Same reasoning as the library dialog's load path: the graph just
+        // loaded is already in sync with the library record it came from, so
+        // mark it synced before the autosaver's graph-changed effect sees it.
+        markLibraryGraphSynced(serializeWorkflowJson(document));
 
         for (const warning of warnings) {
           notify.info(t('commandPalette.workflowLoad.warning'), warning);

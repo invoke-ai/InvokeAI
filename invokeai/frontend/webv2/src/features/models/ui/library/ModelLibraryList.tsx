@@ -13,6 +13,7 @@ import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@features/mo
 import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } from '@features/models/ui/uiStore';
 import { Button, Row } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
@@ -315,9 +316,7 @@ const ModelRow = memo(function ModelRow({
             modelKey={modelKey}
           />
           <Stack flex="1" gap="0.5" minW="0">
-            <Text fontSize="xs" fontWeight="600" truncate>
-              {name}
-            </Text>
+            <MiddleTruncate fontSize="xs" fontWeight="600" text={name} />
             <HStack gap="1" minW="0" wrap="wrap">
               <ModelBaseBadge base={base} />
               <ModelFormatBadge format={format} />

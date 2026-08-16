@@ -258,10 +258,10 @@ export const LayoutPresetDialog = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="sm" type="button" variant="outline" onClick={onClose}>
+                <Button size="xs" type="button" variant="outline" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={!canSubmit} size="sm" type="submit">
+                <Button disabled={!canSubmit} size="xs" type="submit">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>

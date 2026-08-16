@@ -1,4 +1,4 @@
-import { Grid, HStack, Separator } from '@chakra-ui/react';
+import { Grid, HStack } from '@chakra-ui/react';
 import { SettingsDialogHost } from '@workbench/settings/SettingsDialogHost';
 
 import { AppMenu } from './AppMenu';
@@ -7,20 +7,19 @@ import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
 import { LayoutPresetManagerDialog } from './LayoutPresetManagerDialog';
 import { LayoutPresetStrip } from './LayoutPresetStrip';
 import { ProjectSwitcher } from './ProjectSwitcher';
+import { TopbarProgressRail } from './TopbarProgressRail';
 
 /**
  * The workbench top bar.
  *
- * Three columns, not a flex row: the `1fr` sides let the preset strip stay
- * geometrically centred no matter how long the project name is. A flex layout moves
- * the strip horizontally every time the user switches projects, which is highly
- * visible on a bar that is always on screen. `minmax(0, 1fr)` rather than `1fr`
- * so the left column can actually shrink and truncate instead of pushing the
- * grid wider than its container.
+ * Three columns, not a flex row: the `1fr` sides keep the preset strip
+ * geometrically centred whatever the project name's length, where flex would
+ * shift it on every project switch — highly visible on an always-on-screen bar.
+ * `minmax(0, 1fr)` so the left column truncates instead of widening the grid.
  *
- * The zones degrade from the left: labels, then the project name, before
- * anything in the invocation cluster gives way. The routing indicator and the
- * queue readout never collapse at any width (§10).
+ * Zones degrade from the left: labels, then the project name, before anything in
+ * the invocation cluster gives way. The routing indicator and queue readout
+ * never collapse at any width (§10).
  */
 const TOPBAR_COLUMNS = 'minmax(0, 1fr) auto minmax(0, 1fr)';
 
@@ -36,18 +35,22 @@ export const TopBar = () => (
       gap="2"
       gridTemplateColumns={TOPBAR_COLUMNS}
       h="44px"
+      // Positioning context for the progress rail, which overlays the bottom
+      // border rather than taking a row of its own.
+      position="relative"
       px="1.5"
       w="full"
     >
-      <HStack gap="1" minW="0">
+      <HStack gap="0.5" minW="0">
         <AppMenu />
-        <Separator borderColor="border.subtle" h="5" orientation="vertical" />
         <ProjectSwitcher />
       </HStack>
 
       <LayoutPresetStrip />
 
       <InvocationCluster />
+
+      <TopbarProgressRail />
     </Grid>
     {/* Dialog hosts, not controls: every surface that can open one writes to a
         store, so the body cannot belong to whichever trigger happens to be

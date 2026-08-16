@@ -5,6 +5,7 @@ import { Badge, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useActiveInstallSources } from '@features/models/data/installsStore';
 import { openInstallQueue } from '@features/models/ui/uiStore';
 import { Button, Panel } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { DownloadIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -29,9 +30,7 @@ export const SourceListItem = ({
   <Panel alignItems="center" flexDirection="row" gap="3" p="2.5">
     <Stack flex="1" gap="0.5" minW="0">
       <HStack gap="1.5" minW="0">
-        <Text fontSize="xs" fontWeight="600" title={titleTooltip} truncate>
-          {title}
-        </Text>
+        <MiddleTruncate fontSize="xs" fontWeight="600" text={title} title={titleTooltip} />
         {badges}
       </HStack>
       {description ? (

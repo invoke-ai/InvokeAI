@@ -1,5 +1,6 @@
-import { Avatar, Badge, Box, HStack, Icon, Menu, Stack, Text } from '@chakra-ui/react';
+import { Avatar, Badge, Box, HStack, Icon, Menu, Stack } from '@chakra-ui/react';
 import { logoutSession, useAuthSession } from '@features/identity/session';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useNavigate } from '@tanstack/react-router';
 import { LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -49,12 +50,8 @@ export const AccountMenuSection = () => {
               <Avatar.Fallback fontSize="2xs" name={label} />
             </Avatar.Root>
             <Stack gap="0" minW="0">
-              <Text fontSize="xs" fontWeight="600" truncate>
-                {label}
-              </Text>
-              <Text color="fg.muted" fontSize="2xs" truncate>
-                {user.email}
-              </Text>
+              <MiddleTruncate fontSize="xs" fontWeight="600" text={label} />
+              <MiddleTruncate color="fg.muted" fontSize="2xs" text={user.email} />
             </Stack>
           </HStack>
           {user.is_admin ? (

@@ -11,6 +11,7 @@ import {
   toGalleryItemKey,
 } from '@features/gallery';
 import { MenuContent, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
@@ -907,9 +908,7 @@ const ChangeBoardMenuItem = ({ board, onMove }: { board: GalleryBoard; onMove: (
 
   return (
     <Menu.Item value={`move-to-${board.id}`} onClick={handleClick}>
-      <Text fontSize="xs" minW="0" truncate>
-        {board.name}
-      </Text>
+      <MiddleTruncate fontSize="xs" minW="0" text={board.name} />
     </Menu.Item>
   );
 };

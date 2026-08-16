@@ -47,7 +47,7 @@ const renderPanel = async (
       <ChakraProvider value={system}>
         {includeRowProbe ? (
           <>
-            <Box aria-hidden bg="bg.emphasized" data-testid="row-hover-style-probe" />
+            <Box aria-hidden bg="bg.muted/60" data-testid="row-hover-style-probe" />
             <Row asChild>
               <button aria-label="Row probe" type="button">
                 Row probe
