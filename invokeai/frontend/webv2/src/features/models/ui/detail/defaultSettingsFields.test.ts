@@ -2,7 +2,7 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { getFieldsForModel, supportsFp8Storage } from './DefaultSettingsSection';
+import { getFieldsForModel, supportsFp8Storage, validateDefaults } from './defaultSettingsFields';
 
 const model = (base: string, type: string): Pick<ModelConfig, 'base' | 'type'> =>
   ({ base, type }) as Pick<ModelConfig, 'base' | 'type'>;
@@ -46,6 +46,7 @@ describe('getFieldsForModel', () => {
 
     expect(keys).toContain('fp8_storage');
     expect(keys.slice(0, -1)).toEqual([
+      'vae',
       'scheduler',
       'steps',
       'cfg_scale',
@@ -64,8 +65,8 @@ describe('getFieldsForModel', () => {
     expect(zImage).toEqual(fieldKeys(model('sdxl', 'main')).filter((key) => key !== 'fp8_storage'));
   });
 
-  it('leaves the LoRA field list untouched', () => {
-    expect(fieldKeys(model('sdxl', 'lora'))).toEqual(['weight']);
+  it('gives LoRAs the weight and its slider bounds', () => {
+    expect(fieldKeys(model('sdxl', 'lora'))).toEqual(['weight', 'weight_min', 'weight_max']);
   });
 
   it('adds fp8_storage alongside the preprocessor for a ControlNet', () => {
@@ -74,5 +75,28 @@ describe('getFieldsForModel', () => {
 
   it('gives a ControlLoRA the preprocessor only', () => {
     expect(fieldKeys(model('sdxl', 'control_lora'))).toEqual(['preprocessor']);
+  });
+});
+
+describe('validateDefaults', () => {
+  const t = ((key: string) => key) as Parameters<typeof validateDefaults>[2];
+
+  it('accepts the vae sentinel and a model key, rejects an empty string', () => {
+    expect(validateDefaults(model('sdxl', 'main'), { vae: 'default' }, t)).toBeNull();
+    expect(validateDefaults(model('sdxl', 'main'), { vae: 'some-model-key' }, t)).toBeNull();
+    expect(validateDefaults(model('sdxl', 'main'), { vae: '' }, t)).not.toBeNull();
+  });
+
+  it('mirrors the backend LoRA bound validator: effective min must stay below max', () => {
+    expect(validateDefaults(model('sdxl', 'lora'), { weight_max: 2, weight_min: -1 }, t)).toBeNull();
+    expect(validateDefaults(model('sdxl', 'lora'), { weight_max: -1, weight_min: 1 }, t)).not.toBeNull();
+    // Fallbacks are [-1, 2]: a min alone above 2 is invalid.
+    expect(validateDefaults(model('sdxl', 'lora'), { weight_min: 3 }, t)).not.toBeNull();
+  });
+
+  it('requires an enabled weight to sit inside the effective range', () => {
+    expect(validateDefaults(model('sdxl', 'lora'), { weight: 1.5 }, t)).toBeNull();
+    expect(validateDefaults(model('sdxl', 'lora'), { weight: 2.5 }, t)).not.toBeNull();
+    expect(validateDefaults(model('sdxl', 'lora'), { weight: 2.5, weight_max: 3 }, t)).toBeNull();
   });
 });

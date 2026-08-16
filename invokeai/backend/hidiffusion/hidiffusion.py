@@ -141,6 +141,13 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
         # Save for unpatching later
         _parent = block_class
 
+        # NOTE: `__call__` below builds its control images with `dtype=controlnet.dtype`. That is
+        # unsafe for a ControlNet loaded with fp8_storage: `.dtype` then reports the float8 *storage*
+        # dtype, which has no arithmetic kernels (see `invokeai.backend.util.fp8`). It is inert today
+        # — InvokeAI imports only `apply_hidiffusion` / `remove_hidiffusion` from this vendored file
+        # and never runs this pipeline — but if it is ever wired up, those reads must go through
+        # `get_model_compute_dtype()`.
+
         @torch.no_grad()
         def __call__(
             self,
@@ -897,6 +904,11 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
     return sdxl_controlnet_ppl
 
 
+def _resize_controlnet_residual(residual: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Resize a ControlNet residual to the current HiDiffusion feature-map size."""
+    return F.interpolate(residual, target.shape[-2:], mode="bicubic")
+
+
 def make_diffusers_unet_2d_condition(block_class):
     class unet_2d_condition(block_class):
         # Save for unpatching later
@@ -1203,9 +1215,8 @@ def make_diffusers_unet_2d_condition(block_class):
                 for down_block_res_sample, down_block_additional_residual in zip(
                     down_block_res_samples, down_block_additional_residuals, strict=False
                 ):
-                    _, _, ori_H, ori_W = down_block_res_sample.shape
-                    down_block_additional_residual = F.interpolate(
-                        down_block_additional_residual, (ori_H, ori_W), mode="bicubic"
+                    down_block_additional_residual = _resize_controlnet_residual(
+                        down_block_additional_residual, down_block_res_sample
                     )
                     down_block_res_sample = down_block_res_sample + down_block_additional_residual
                     new_down_block_res_samples = new_down_block_res_samples + (down_block_res_sample,)
@@ -1235,10 +1246,7 @@ def make_diffusers_unet_2d_condition(block_class):
                     sample += down_intrablock_additional_residuals.pop(0)
 
             if is_controlnet:
-                _, _, ori_H, ori_W = sample.shape
-                mid_block_additional_residual = F.interpolate(
-                    mid_block_additional_residual, (ori_H, ori_W), mode="bicubic"
-                )
+                mid_block_additional_residual = _resize_controlnet_residual(mid_block_additional_residual, sample)
                 sample = sample + mid_block_additional_residual
 
             # 5. up
@@ -2035,6 +2043,8 @@ def apply_hidiffusion(
     apply_window_attn: bool = True,
     is_playground=False,
     generator: torch.Generator | None = None,
+    has_controlnet: bool = False,
+    is_controlnet_text_to_image: bool = False,
 ):
     """
     model: diffusers model. We support SD 1.5, 2.1, XL, XL Turbo.
@@ -2052,7 +2062,9 @@ def apply_hidiffusion(
     if not is_diffusers:
         raise RuntimeError("Provided model was not a diffusers model/pipeline, as expected.")
     else:
-        # Check if the pipeline is a ControlNet pipeline
+        # Check if the pipeline is a ControlNet pipeline. InvokeAI's modular
+        # denoise passes a bare UNet, so it reports ControlNet separately.
+        has_controlnet = has_controlnet or hasattr(model, "controlnet")
         is_sdxl_controlnet = hasattr(model, "controlnet") and isinstance_str(
             model, "StableDiffusionXLControlNet", prefix=True
         )
@@ -2084,6 +2096,14 @@ def apply_hidiffusion(
 
         diffusion_model = model.unet if hasattr(model, "unet") else model
 
+        if (
+            has_controlnet
+            and apply_raunet
+            and not (is_sdxl_controlnet_inpaint or is_sd_controlnet_inpaint or is_sdxl_controlnet or is_sd_controlnet)
+        ):
+            make_block_fn = make_diffusers_unet_2d_condition
+            diffusion_model.__class__ = make_block_fn(diffusion_model.__class__)
+
     for _, module in diffusion_model.named_modules():
         _snapshot_hidiffusion_state(module)
 
@@ -2104,7 +2124,7 @@ def apply_hidiffusion(
         "size": None,
         "upsample_size": None,
         "hooks": [],
-        "text_to_img_controlnet": hasattr(model, "controlnet"),
+        "text_to_img_controlnet": has_controlnet and is_controlnet_text_to_image,
         "is_inpainting_task": model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values(),
         "is_playground": is_playground,
         "pipeline": model,

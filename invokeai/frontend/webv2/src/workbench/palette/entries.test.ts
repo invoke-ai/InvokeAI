@@ -2,7 +2,9 @@ import type { TFunction } from 'i18next';
 
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
+import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
 import { DEFAULT_PREFERENCES } from '@workbench/settings/store';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { PaletteEntry } from './entries';
@@ -88,6 +90,27 @@ describe('buildCatalogCommandEntries', () => {
 
     expect(invoke).toMatchObject({ group: 'Generation', title: 'Invoke' });
     expect(generateTab).toMatchObject({ group: 'Navigation', showInEmptyState: true, title: 'Go to Generate' });
+  });
+
+  it('uses account-renamed layout preset titles in palette rows', () => {
+    const initial = createInitialWorkbenchState();
+    const account = {
+      ...initial.account,
+      layoutPresetMetadataOverrides: { compose: { label: 'Writing' } },
+    };
+    const entries = buildCatalogCommandEntries({
+      catalog: firstPartyHotkeyCatalog,
+      customHotkeys: {},
+      execute: noop,
+      formatHotkey: formatHotkeyForPlatform,
+      presentWidgetTypeIds: new Set(),
+      t,
+      titleOverrides: getLayoutPresetCommandTitleOverrides(account, (name) =>
+        t('commandPalette.layoutPresetCommand', { defaultValue: '{{name}} layout', name })
+      ),
+    });
+
+    expect(entries.find((entry) => entry.id === 'app.selectComposePreset')?.title).toBe('Writing layout');
   });
 
   it('hides unimplemented and hotkey-only commands', () => {

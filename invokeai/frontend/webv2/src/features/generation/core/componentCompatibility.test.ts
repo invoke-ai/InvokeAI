@@ -7,6 +7,7 @@ import {
   isAnimaQwen3Encoder,
   isAnimaVae,
   isFlux2DiffusersSourceForModel,
+  isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
   isVaeCompatibleWithGenerateModel,
@@ -55,6 +56,24 @@ describe('Generate component compatibility', () => {
     expect(filter(candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'klein_4b' }))).toBe(false);
     expect(filter(candidate({ base: 'flux2', format: 'checkpoint', type: 'main', variant: 'klein_9b' }))).toBe(false);
     expect(filter(candidate({ base: 'flux2', format: 'diffusers', type: 'main' }))).toBe(false);
+  });
+
+  it('uses Mistral components and dev Diffusers sources for FLUX.2 [dev]', () => {
+    const model = flux2Model('dev');
+
+    expect(isFlux2MistralEncoder(candidate({ type: 'mistral_encoder' }))).toBe(true);
+    expect(isFlux2MistralEncoder(candidate({ type: 'qwen3_encoder' }))).toBe(false);
+    expect(isFlux2Qwen3EncoderForModel(model)(candidate({ variant: 'qwen3_8b' }))).toBe(false);
+    expect(
+      isFlux2DiffusersSourceForModel(model)(
+        candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'dev' })
+      )
+    ).toBe(true);
+    expect(
+      isFlux2DiffusersSourceForModel(model)(
+        candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'klein_9b' })
+      )
+    ).toBe(false);
   });
 
   it('allows only backend-supported Anima VAE families', () => {

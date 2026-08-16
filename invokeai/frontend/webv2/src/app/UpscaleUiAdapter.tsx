@@ -5,6 +5,7 @@ import { invalidateGallery } from '@features/gallery/queries';
 import { areProjectPromptDraftsEqual, getPromptDraftFromValues } from '@features/generation/settings';
 import { UpscaleUiProvider } from '@features/upscale';
 import { useQueryClient } from '@tanstack/react-query';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
@@ -22,14 +23,17 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
         projectId: activeProject.id,
         promptDraft: getPromptDraftFromValues(getProjectWidgetValues(activeProject, 'generate')),
         rawValues: instance?.state.values ?? {},
-        showPromptSyntaxHighlighting: activeProject.settings.showPromptSyntaxHighlighting,
       };
     },
     (left, right) =>
       left.projectId === right.projectId &&
       areProjectPromptDraftsEqual(left.promptDraft, right.promptDraft) &&
-      left.rawValues === right.rawValues &&
-      left.showPromptSyntaxHighlighting === right.showPromptSyntaxHighlighting
+      left.rawValues === right.rawValues
+  );
+  // Syntax highlighting is a per-user preference, not a property of the
+  // project, so it is joined here rather than read off the document.
+  const showPromptSyntaxHighlighting = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.showPromptSyntaxHighlighting
   );
   const commands = useWorkbenchCommands();
   const queryClient = useQueryClient();
@@ -40,9 +44,10 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
       patchValues: (values, origin) => commands.widgets.patchValues('upscale', values, project.projectId, origin),
       reportError: (message) =>
         commands.notifications.reportError({ area: 'upscale', message, namespace: 'generation' }),
+      showPromptSyntaxHighlighting,
       touchGalleryImages: () => void invalidateGallery(queryClient),
     }),
-    [commands, project, queryClient]
+    [commands, project, queryClient, showPromptSyntaxHighlighting]
   );
 
   return <UpscaleUiProvider adapter={adapter}>{children}</UpscaleUiProvider>;

@@ -38,6 +38,28 @@ def test_non_multiple_of_16_dimensions_are_preserved(tmp_path: Path) -> None:
     assert first.shape[:2] == (height, width)
 
 
+def _ffmpeg_has_encoder(name: str) -> bool:
+    """True if the ffmpeg binary imageio will actually invoke can encode with ``name``.
+
+    imageio-ffmpeg's bundled binaries carry libmp3lame, but ``IMAGEIO_FFMPEG_EXE``
+    can point at a distro build that does not.
+    """
+    import subprocess
+
+    import imageio_ffmpeg
+
+    try:
+        encoders = subprocess.run(
+            [imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-encoders"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return any(line.split()[1:2] == [name] for line in encoders.splitlines() if line.strip())
+
+
 def _write_sine_wav(path: Path, duration_s: float, sample_rate: int = 32_000) -> None:
     t = np.arange(int(duration_s * sample_rate)) / sample_rate
     samples = np.stack([np.sin(2 * np.pi * 440 * t), np.sin(2 * np.pi * 660 * t)])
@@ -69,6 +91,7 @@ def test_audio_path_muxes_an_aac_stream(tmp_path: Path) -> None:
     assert meta["size"] == (120, 84)
 
 
+@pytest.mark.skipif(not _ffmpeg_has_encoder("libmp3lame"), reason="ffmpeg build lacks the libmp3lame encoder")
 def test_audio_codec_is_forwarded_not_defaulted(tmp_path: Path) -> None:
     # ffmpeg's default MP4 audio encoder is aac, so the aac test above cannot
     # distinguish "audio_codec forwarded" from "audio_codec dropped". A
@@ -133,6 +156,30 @@ def test_write_stereo_wav_format_and_clipping(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match=r"\(2, n_samples\)"):
         write_stereo_wav(tmp_path / "b.wav", np.zeros((100,)), sample_rate)
+
+
+def test_write_stereo_wav_rounds_rather_than_truncates(tmp_path: Path) -> None:
+    import wave
+
+    # In-range values only — the clipping test above pins full scale via clip(),
+    # so it cannot see whether the scaled value is rounded or truncated toward
+    # zero. Truncation would give 32766 and 1 here.
+    samples = np.stack([np.full(4, 0.99999), np.full(4, 1.9 / 32767.0)])
+    path = tmp_path / "round.wav"
+    write_stereo_wav(path, samples, 32_000)
+
+    with wave.open(str(path), "rb") as wav:
+        frames = np.frombuffer(wav.readframes(4), dtype=np.int16).reshape(-1, 2)
+    assert frames[0, 0] == 32767
+    assert frames[0, 1] == 2
+
+
+def test_write_stereo_wav_rejects_empty_samples(tmp_path: Path) -> None:
+    # A zero-frame WAV is not an ffmpeg error: it muxes into an MP4 with no
+    # audio stream and no diagnostic, which is the silent failure the writer's
+    # existence check exists to prevent.
+    with pytest.raises(ValueError, match="empty WAV"):
+        write_stereo_wav(tmp_path / "empty.wav", np.zeros((2, 0)), 32_000)
 
 
 def test_write_stereo_wav_float16_and_nan_are_safe(tmp_path: Path) -> None:

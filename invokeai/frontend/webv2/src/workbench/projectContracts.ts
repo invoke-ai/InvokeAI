@@ -5,9 +5,12 @@ import type { CanvasStateContractV2 } from './canvas-engine/api';
 import type { GraphContract } from './graphContracts';
 import type { InvocationControllerState } from './invocationContracts';
 import type {
+  FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
+  LayoutPresetMetadataOverrides,
   LayoutPresetOverrides,
+  LayoutPresetRouteOverrides,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
@@ -36,6 +39,13 @@ export interface Project {
   projectGraph: ProjectGraphState;
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+  /**
+   * Widget instances detached into floating windows. Optional and additive:
+   * projects persisted before this field existed hydrate with no floating
+   * windows. A floated instance is removed from its region's instanceIds
+   * while it floats.
+   */
+  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV2;
   graphHistory: GraphHistorySnapshot[];
@@ -112,6 +122,8 @@ export interface ProjectUndoSnapshot {
   projectGraph: ProjectGraphState;
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>;
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
+  /** Captured with widgetRegions: regions and floating windows are one placement fact. */
+  floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
 }
 
@@ -129,6 +141,12 @@ export interface AutosaveState {
 export interface AccountState {
   activeLayoutPresetId: LayoutPresetId;
   customLayoutPresets?: LayoutPreset[];
+  /** One account-wide order shared by every layout-preset surface. */
+  layoutPresetOrder?: LayoutPresetId[];
+  /** Saved name and icon edits for built-in presets. */
+  layoutPresetMetadataOverrides?: LayoutPresetMetadataOverrides;
   /** Saved edits to a built-in preset's arrangement; see {@link LayoutPresetOverrides}. */
   layoutPresetOverrides?: LayoutPresetOverrides;
+  /** Saved edits to built-in preset routes, kept separate from spatial layout drift. */
+  layoutPresetRouteOverrides?: LayoutPresetRouteOverrides;
 }

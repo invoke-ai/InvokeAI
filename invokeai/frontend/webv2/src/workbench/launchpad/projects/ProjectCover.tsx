@@ -5,10 +5,9 @@ import { useCallback, useState } from 'react';
 /**
  * A project's thumbnail.
  *
- * Nothing sets `coverUrl` yet — covers arrive with the `.invk` project-file
- * work, where a cover is just another entry in the archive. This exists now so
- * that landing them is a data change rather than a layout change: the box is
- * reserved unconditionally, so cards do not reflow when images appear.
+ * `coverUrl` comes from the per-user cover index (`projects/covers.ts`), which
+ * records each project's newest result as it saves. The box is reserved
+ * unconditionally, so a card does not reflow when its cover resolves.
  *
  * The glyph is not a placeholder awaiting an image. It is the permanent state
  * for a project that has produced nothing, and for a cover whose image has

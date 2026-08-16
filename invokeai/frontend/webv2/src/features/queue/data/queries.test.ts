@@ -19,6 +19,7 @@ const createBackend = (): QueueBackendPort => ({
   enqueueWorkflow: vi.fn(),
   getItem: vi.fn(),
   getResultImages: vi.fn(),
+  getResultVideoNames: vi.fn().mockResolvedValue([]),
   listItems: vi.fn(),
   on: vi.fn(),
   onConnectionChange: vi.fn(),

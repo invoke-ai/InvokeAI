@@ -29,6 +29,12 @@ const flux2Model: MainModelConfig = {
   name: 'FLUX.2',
   type: 'main',
 };
+const flux2DevModel: MainModelConfig = {
+  ...flux2Model,
+  key: 'flux2-dev-model',
+  name: 'FLUX.2 [dev]',
+  variant: 'dev',
+};
 const cogView4Model: MainModelConfig = { base: 'cogview4', key: 'cog-model', name: 'CogView4', type: 'main' };
 const qwenImageModel: MainModelConfig = {
   base: 'qwen-image',
@@ -776,6 +782,14 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_klein_text_encoder' });
     expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'qwen3_encoder')?.source.node_id).toBe('model_loader');
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
+  });
+
+  it('grafts FLUX.2 [dev] regions through Mistral conditioning', () => {
+    const { backendGraph } = compile(flux2DevModel, 'txt2img', { regionalGuidance: [region('r1')] });
+
+    expect(backendGraph.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'flux2_dev_text_encoder' });
+    expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'mistral_encoder')?.source.node_id).toBe('model_loader');
+    expect(getEdge(backendGraph, 'rg_pos_cond_r1', 'max_seq_len')?.source.node_id).toBe('model_loader');
   });
 
   it('grafts Krea-2 regions through uniquely named conditioning enhancers into the shared collector', () => {

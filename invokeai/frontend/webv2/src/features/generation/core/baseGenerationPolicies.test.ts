@@ -45,6 +45,12 @@ const createSettings = (model: GenerateModelConfig, overrides: Partial<GenerateS
 
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
 const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const mistralEncoder: ComponentModelConfig = {
+  base: 'any',
+  key: 'mistral',
+  name: 'Mistral Encoder',
+  type: 'mistral_encoder',
+};
 const qwenVlEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'qwen-vl',
@@ -313,6 +319,37 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
+  it('validates FLUX.2 [dev] Mistral and VAE requirements and allows bundled alternatives', () => {
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'dev' });
+    const source = createModel('flux2', { format: 'diffusers', key: 'flux2-dev-source', variant: 'dev' });
+    const kleinSource = createModel('flux2', {
+      format: 'diffusers',
+      key: 'flux2-klein-source',
+      variant: 'klein_9b',
+    });
+
+    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
+      'Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.',
+      'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+    ]);
+    expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: kleinSource }))).toEqual(
+      ['Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.']
+    );
+    expect(
+      getGenerationValidationReasons(
+        model,
+        createSettings(model, { mistralEncoderModel: mistralEncoder, vae: flux2Vae })
+      )
+    ).toEqual([]);
+    expect(getComponentSectionPolicy(model, createSettings(model)).slots.map((slot) => slot.key)).toEqual([
+      'mistralEncoderModel',
+      'vae',
+      'pidDecoderModel',
+      'gemma2EncoderModel',
+    ]);
+  });
+
   it('keeps FLUX.2 component source hidden and auto-selects installed Diffusers sources', () => {
     const model = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
     const source = createModel('flux2', { format: 'diffusers', variant: 'klein_9b' });
@@ -524,6 +561,20 @@ describe('component policies', () => {
     expect(result.settings.componentSourceModel).toBe(source);
   });
 
+  it('auto-selects a matching FLUX.2 [dev] source and rejects Klein sources', () => {
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'dev' });
+    const devSource = createModel('flux2', { format: 'diffusers', key: 'flux2-dev-source', variant: 'dev' });
+    const kleinSource = createModel('flux2', { format: 'diffusers', key: 'flux2-klein-source', variant: 'klein_9b' });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl')),
+      model,
+      models: [kleinSource, devSource],
+    });
+
+    expect(result.settings.componentSourceModel).toBe(devSource);
+  });
+
   it('reconciles dimensions to the new model grid when the selected model changes', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
@@ -578,6 +629,26 @@ describe('component policies', () => {
     expect(result.settings.qwen3EncoderModel).toBeNull();
     expect(result.settings.vae).toEqual(flux2Vae);
     expect(result.clearedLabels).toEqual(['Qwen3 Encoder']);
+  });
+
+  it('clears Klein and dev encoders when switching FLUX.2 variants', () => {
+    const devModel = createModel('flux2', { format: 'gguf_quantized', variant: 'dev' });
+    const kleinModel = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+    const toDev = getGenerateModelSelectionResult({
+      currentValues: createSettings(kleinModel, { qwen3EncoderModel: qwen3Encoder, vae: flux2Vae }),
+      model: devModel,
+      models: [],
+    });
+    const toKlein = getGenerateModelSelectionResult({
+      currentValues: createSettings(devModel, { mistralEncoderModel: mistralEncoder, vae: flux2Vae }),
+      model: kleinModel,
+      models: [],
+    });
+
+    expect(toDev.settings.qwen3EncoderModel).toBeNull();
+    expect(toDev.clearedLabels).toContain('Qwen3 Encoder');
+    expect(toKlein.settings.mistralEncoderModel).toBeNull();
+    expect(toKlein.clearedLabels).toContain('Mistral Encoder');
   });
 
   it('requires enabled IP Adapter reference images to have an image and compatible adapter model', () => {

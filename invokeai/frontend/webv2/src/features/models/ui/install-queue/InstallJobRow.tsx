@@ -2,7 +2,6 @@
 import type { ModelInstallJob } from '@features/models/core/types';
 
 import { Badge, HStack, Icon, Stack, Text } from '@chakra-ui/react';
-import { getInstallSourceLabel } from '@features/models/core/taxonomy';
 import {
   cancelModelInstall,
   pauseModelInstall,
@@ -10,16 +9,17 @@ import {
   restartModelInstallFile,
   resumeModelInstall,
 } from '@features/models/data/api';
-import { isActiveInstallStatus, refreshInstalls, replaceInstallJob } from '@features/models/data/installsStore';
 import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+  getInstallSourceLabel,
+  isActiveInstallStatus,
+  refreshInstalls,
+  replaceInstallJob,
+} from '@features/models/data/installsStore';
+import { useScopedAction } from '@platform/react/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { IconButton, Tooltip } from '@platform/ui';
 import { PauseIcon, PlayIcon, RotateCcwIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { InstallJobProgress } from './InstallJobProgress';
@@ -36,9 +36,13 @@ export const InstallJobRow = ({
   onError: (title: string, message: string) => void;
 }) => {
   const { t } = useTranslation();
-  const [isActing, setIsActing] = useState(false);
+  const { isBusy: isActing, run } = useScopedAction();
   const connectionStatus = useConnectionStatusSelector((snapshot) => snapshot.status);
-  const badge = STATUS_BADGES[job.status] ?? { label: job.status, palette: 'gray' };
+  // The Record is total for typed statuses; the fallback guards unknown
+  // statuses from an untyped backend payload.
+  const badge = STATUS_BADGES[job.status] as { labelKey: string; palette: string } | undefined;
+  const badgeLabel = badge ? t(badge.labelKey) : job.status;
+  const badgePalette = badge?.palette ?? 'gray';
   const sourceLabel = getInstallSourceLabel(job.source);
   const displayName = getInstallJobDisplayName(job);
   // Parts the backend could not resume (or that errored) need a manual restart.
@@ -47,32 +51,23 @@ export const InstallJobRow = ({
   );
   const showDisconnected = connectionStatus !== 'connected' && isActiveInstallStatus(job.status);
 
-  const runAction = async (action: (signal: AbortSignal) => Promise<unknown>, failureTitle: string) => {
-    const owner = captureAccountScope();
+  const runAction = (action: (signal: AbortSignal) => Promise<unknown>, failureTitle: string) =>
+    run(
+      async (owner) => {
+        const result = await action(owner.signal);
 
-    setIsActing(true);
-
-    try {
-      const result = await action(owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      if (result && typeof result === 'object' && 'id' in (result as ModelInstallJob)) {
-        replaceInstallJob(result as ModelInstallJob);
-      } else {
-        await refreshInstalls(owner);
-      }
-    } catch (actionError) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      onError(failureTitle, actionError instanceof Error ? actionError.message : String(actionError));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsActing(false);
-      }
-    }
-  };
+        assertAccountScopeCurrent(owner);
+        if (result && typeof result === 'object' && 'id' in (result as ModelInstallJob)) {
+          replaceInstallJob(result as ModelInstallJob);
+          // A coalesced refresh already in flight can clobber the optimistic
+          // row with a stale snapshot; revalidating converges on server truth.
+          void refreshInstalls(owner);
+        } else {
+          await refreshInstalls(owner);
+        }
+      },
+      (message) => onError(failureTitle, message)
+    );
 
   return (
     <Stack
@@ -92,8 +87,8 @@ export const InstallJobRow = ({
             <Icon as={TriangleAlertIcon} boxSize="3" color="fg.warning" flexShrink={0} />
           </Tooltip>
         ) : null}
-        <Badge colorPalette={badge.palette} flexShrink={0} fontSize="2xs" size="sm" variant="surface">
-          {badge.label}
+        <Badge colorPalette={badgePalette} flexShrink={0} fontSize="2xs" size="sm" variant="surface">
+          {badgeLabel}
         </Badge>
         <HStack flexShrink={0} gap="0.5">
           {job.status === 'downloading' ? (
@@ -214,4 +209,3 @@ export const InstallJobRow = ({
     </Stack>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

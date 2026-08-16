@@ -52,6 +52,18 @@ describe('graph widget sources', () => {
     );
   });
 
+  it('counts a floated widget as both visible and placed', () => {
+    // A widget in a window is on screen; reading only the rails would drop the
+    // first graph-bearing widget that floats out of the invoke-source list.
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
+    state = workbenchReducer(state, { instanceId: 'upscale', type: 'floatWidget' });
+    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
+
+    expect(project.floatingWidgets?.upscale).toBeDefined();
+    expect(getVisibleWidgetTypeIds(project).has('upscale')).toBe(true);
+    expect(getPlacedWidgetTypeIds(project).has('upscale')).toBe(true);
+  });
+
   it('maps each source to its natural output target', () => {
     expect(getNaturalDestination('canvas')).toBe('canvas');
     expect(getNaturalDestination('generate')).toBe('gallery');

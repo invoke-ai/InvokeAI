@@ -6,11 +6,12 @@ import pytest
 import torch
 
 from invokeai.backend.hidiffusion.hidiffusion import (
-    remove_hidiffusion as real_remove_hidiffusion,
-)
-from invokeai.backend.hidiffusion.hidiffusion import (
+    _resize_controlnet_residual,
     switching_threshold_ratio_dict,
     text_to_img_controlnet_switching_threshold_ratio_dict,
+)
+from invokeai.backend.hidiffusion.hidiffusion import (
+    remove_hidiffusion as real_remove_hidiffusion,
 )
 from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch
 
@@ -122,6 +123,52 @@ def test_hidiffusion_window_attention_uses_seeded_generator_instead_of_global_rn
     second = run_with_global_seed(1)
 
     torch.testing.assert_close(first, second)
+
+
+@pytest.mark.parametrize("is_text_to_image", [False, True])
+def test_hidiffusion_patch_uses_controlnet_aware_forward_for_bare_unet(is_text_to_image: bool):
+    model = ModelMixin()
+    original_class = model.__class__
+
+    with hidiffusion_patch(
+        model,
+        name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
+        apply_raunet=True,
+        apply_window_attn=False,
+        has_controlnet=True,
+        is_controlnet_text_to_image=is_text_to_image,
+    ):
+        assert model.__class__ is not original_class
+        assert model.__class__._parent is original_class
+        assert model.info["text_to_img_controlnet"] is is_text_to_image
+
+    assert model.__class__ is original_class
+
+
+def test_hidiffusion_patch_does_not_replace_unet_forward_for_window_attention_only():
+    model = ModelMixin()
+    original_class = model.__class__
+
+    with hidiffusion_patch(
+        model,
+        name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
+        apply_raunet=False,
+        apply_window_attn=True,
+        has_controlnet=True,
+    ):
+        assert model.__class__ is original_class
+
+
+@pytest.mark.parametrize(("source_size", "target_size"), [(32, 16), (46, 23), (48, 24), (64, 32)])
+def test_hidiffusion_resizes_controlnet_residuals_to_current_feature_map(source_size: int, target_size: int):
+    residual = torch.ones(1, 2, source_size, source_size)
+    feature_map = torch.zeros(1, 2, target_size, target_size)
+
+    resized_residual = _resize_controlnet_residual(residual, feature_map)
+    combined = feature_map + resized_residual
+
+    assert combined.shape == feature_map.shape
+    torch.testing.assert_close(combined, torch.ones_like(feature_map))
 
 
 def test_hidiffusion_patch_resets_cached_runtime_state_when_reenabled():

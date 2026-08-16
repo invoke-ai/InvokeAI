@@ -10,11 +10,6 @@ export interface GalleryBoardGroups {
   dateBoards: GalleryBoard[];
   /** Any row at all survived the search — drives the "no matches" copy. */
   hasAnyMatch: boolean;
-  /**
-   * True when the project has no board yet and the search does not hide the
-   * row, so the panel can offer to create one on demand.
-   */
-  hasProjectBoardPlaceholder: boolean;
   /** Project board (if any), then other boards, then Uncategorized last. */
   yourBoards: GalleryBoard[];
 }
@@ -63,9 +58,7 @@ export const getGalleryBoardGroups = ({
     ...(uncategorizedBoard && matchesBoardSearch(uncategorizedBoard) ? [uncategorizedBoard] : []),
   ];
 
-  const hasProjectBoardPlaceholder = projectBoard === null && matchesSearch(projectRowName);
-  const hasAnyMatch =
-    yourBoards.length > 0 || dateBoards.length > 0 || archivedBoards.length > 0 || hasProjectBoardPlaceholder;
+  const hasAnyMatch = yourBoards.length > 0 || dateBoards.length > 0 || archivedBoards.length > 0;
   const hasExactMatch =
     boards.some((board) => getGalleryBoardLabel(board, t).toLowerCase() === normalizedSearchTerm) ||
     projectRowName.toLowerCase() === normalizedSearchTerm;
@@ -75,7 +68,6 @@ export const getGalleryBoardGroups = ({
     canCreateFromSearch: normalizedSearchTerm.length > 0 && !hasExactMatch,
     dateBoards,
     hasAnyMatch,
-    hasProjectBoardPlaceholder,
     yourBoards,
   };
 };

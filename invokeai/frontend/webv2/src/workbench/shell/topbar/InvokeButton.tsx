@@ -55,7 +55,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         cursor={isValid ? undefined : 'not-allowed'}
         flexShrink={0}
         opacity={isValid ? undefined : 0.55}
-        size="sm"
+        size="xs"
         onClick={isValid ? handleClick : undefined}
         zIndex="2"
       >

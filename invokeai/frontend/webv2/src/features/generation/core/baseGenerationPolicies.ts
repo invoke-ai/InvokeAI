@@ -24,6 +24,7 @@ import {
   isClipVariant,
   isDiffusersMainForBase,
   isFlux2DiffusersSourceForModel,
+  isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
   isVaeForBases,
@@ -639,6 +640,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     componentSourceModel: null,
     height,
     loras: [],
+    mistralEncoderModel: null,
     modelKey: model?.key ?? '',
     negativePromptEnabled: true,
     negativePrompt: '',
@@ -713,6 +715,7 @@ export type GenerateComponentValueKey =
   | 'clipEmbedModel'
   | 'clipLEmbedModel'
   | 'clipGEmbedModel'
+  | 'mistralEncoderModel'
   | 'qwen3EncoderModel'
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
@@ -755,6 +758,7 @@ export interface GenerateModelSelectionResult {
 
 const TYPE_CLIP_EMBED: ModelTaxonomyType[] = ['clip_embed'];
 const TYPE_MAIN: ModelTaxonomyType[] = ['main'];
+const TYPE_MISTRAL: ModelTaxonomyType[] = ['mistral_encoder'];
 const TYPE_QWEN3: ModelTaxonomyType[] = ['qwen3_encoder'];
 const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
@@ -893,6 +897,16 @@ const qwen3EncoderSlot = (helpText: string, filter?: GenerateComponentFilter): C
       : (candidate) => candidate.type === 'qwen3_encoder',
   });
 
+const mistralEncoderSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'mistralEncoderModel',
+    label: 'Mistral Encoder',
+    modelTypes: TYPE_MISTRAL,
+    valueKind: 'component',
+    helpText,
+    filter: wrapFilter(isFlux2MistralEncoder),
+  });
+
 const clipVariantSlot = (
   key: 'clipLEmbedModel' | 'clipGEmbedModel',
   label: string,
@@ -931,7 +945,7 @@ const hasFlux2DiffusersVaeSource = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
   (ctx.model.format === 'diffusers' || isFlux2DiffusersSource(ctx.settings.componentSourceModel));
 
-const hasFlux2DiffusersQwen3Source = (ctx: ComponentPolicyContext): boolean =>
+const hasFlux2DiffusersEncoderSource = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
   (ctx.model.format === 'diffusers' ||
     Boolean(
@@ -948,7 +962,9 @@ export const getFlux2DiffusersComponentSource = (
     return undefined;
   }
 
-  if (settings.qwen3EncoderModel) {
+  const hasStandaloneEncoder = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
+
+  if (hasStandaloneEncoder) {
     return source;
   }
 
@@ -957,21 +973,23 @@ export const getFlux2DiffusersComponentSource = (
 
 export const getAutoFlux2ComponentSourceModel = (
   model: GenerateModelConfig | undefined,
-  settings: Pick<GenerateSettings, 'qwen3EncoderModel' | 'vae'>,
+  settings: Pick<GenerateSettings, 'mistralEncoderModel' | 'qwen3EncoderModel' | 'vae'>,
   models: readonly ComponentSourceCandidate[]
 ): MainModelConfig | null | undefined => {
   if (!model || model.type === 'external_image_generator' || model.base !== 'flux2') {
     return undefined;
   }
 
-  if (model.format === 'diffusers' || (settings.qwen3EncoderModel && settings.vae)) {
+  const encoderModel = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
+
+  if (model.format === 'diffusers' || (encoderModel && settings.vae)) {
     return null;
   }
 
   const diffusersModels = models.filter(isFlux2DiffusersSource);
   const variantMatch = diffusersModels.find(isFlux2DiffusersSourceForModel(model));
 
-  if (!settings.qwen3EncoderModel && settings.vae) {
+  if (!encoderModel && settings.vae) {
     return variantMatch ?? null;
   }
 
@@ -1039,15 +1057,28 @@ const getBaseComponentSectionPolicy = (
           ...validateSlots(getBaseComponentSectionPolicy(ctx.model, ctx.settings), ctx),
         ],
       };
-    case 'flux2':
+    case 'flux2': {
+      const encoderSlot: ComponentSlotPolicy =
+        model.variant === 'dev'
+          ? {
+              ...mistralEncoderSlot(
+                'Optional override; otherwise a compatible installed FLUX.2 [dev] Diffusers model is used.'
+              ),
+              required: (ctx) => !hasFlux2DiffusersEncoderSource(ctx),
+              missingMessage: 'Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.',
+            }
+          : {
+              ...qwen3EncoderSlot(
+                'Optional override; otherwise a compatible installed FLUX.2 Diffusers model is used.'
+              ),
+              filter: (candidate, ctx) =>
+                ctx.model.type !== 'external_image_generator' && isFlux2Qwen3EncoderForModel(ctx.model)(candidate),
+              required: (ctx) => !hasFlux2DiffusersEncoderSource(ctx),
+              missingMessage: 'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
+            };
+
       return createPolicy(model.format !== 'diffusers', [
-        {
-          ...qwen3EncoderSlot('Optional override; otherwise a compatible installed FLUX.2 Diffusers model is used.'),
-          filter: (candidate, ctx) =>
-            ctx.model.type !== 'external_image_generator' && isFlux2Qwen3EncoderForModel(ctx.model)(candidate),
-          required: (ctx) => !hasFlux2DiffusersQwen3Source(ctx),
-          missingMessage: 'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
-        },
+        encoderSlot,
         {
           ...vaeSlot(
             'Optional override; otherwise an installed FLUX.2 Diffusers model is used.',
@@ -1057,6 +1088,7 @@ const getBaseComponentSectionPolicy = (
           missingMessage: 'Generate needs a VAE for non-Diffusers FLUX.2 models.',
         },
       ]);
+    }
     case 'sd-3':
       return createPolicy(false, [
         t5EncoderSlot('Optional override; the main model is used when omitted.'),
@@ -1189,6 +1221,7 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     clipGEmbedModel: settings.clipGEmbedModel,
     clipLEmbedModel: settings.clipLEmbedModel,
     componentSourceModel: settings.componentSourceModel,
+    mistralEncoderModel: settings.mistralEncoderModel,
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
@@ -1205,6 +1238,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   clipEmbedModel: 'CLIP Embed',
   clipGEmbedModel: 'CLIP G',
   clipLEmbedModel: 'CLIP L',
+  mistralEncoderModel: 'Mistral Encoder',
   qwen3EncoderModel: 'Qwen3 Encoder',
   qwenVLEncoderModel: 'Qwen VL Encoder',
   qwen3VLEncoderModel: 'Qwen3-VL Encoder',

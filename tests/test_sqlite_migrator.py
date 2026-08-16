@@ -582,6 +582,61 @@ def test_migrator_makes_no_changes_on_failed_migration(
     assert [row[0] for row in cursor.fetchall()] == ["migration_1"]
 
 
+def test_migrator_rolls_back_ddl_a_failed_migration_already_issued(
+    migrator: SqliteMigrator, migration_no_op: Migration
+) -> None:
+    """A migration that only ever issues DDL must still be all-or-nothing.
+
+    Python's sqlite3 opens an implicit transaction before DML and never before DDL, so without an
+    explicit `BEGIN` every `CREATE`/`DROP`/`ALTER` here would commit on its own and survive the
+    failure. That is not a theoretical tidiness point: a table rebuild that drops the original and
+    dies before renaming the replacement leaves the database with no such table *and* the migration
+    unrecorded, so every subsequent start re-runs it and fails again.
+    """
+
+    def migrate(cursor: sqlite3.Cursor, **kwargs) -> None:
+        cursor.execute("CREATE TABLE ddl_only (id INTEGER PRIMARY KEY);")
+        cursor.execute("DROP TABLE ddl_only;")
+        cursor.execute("CREATE TABLE ddl_only_replacement (id INTEGER PRIMARY KEY);")
+        raise Exception("Bad migration")
+
+    cursor = migrator._db._conn.cursor()
+    migrator.register_migration(migration_no_op)
+    migrator.run_migrations()
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=migrate))
+
+    with pytest.raises(MigrationError, match="Bad migration"):
+        migrator.run_migrations()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ddl_only_replacement';")
+    assert cursor.fetchone() is None
+    assert migrator._get_current_version(cursor) == 1
+    cursor.execute("SELECT migration_id FROM applied_migrations ORDER BY migration_id;")
+    assert [row[0] for row in cursor.fetchall()] == ["migration_1"]
+
+
+def test_migrator_rolls_back_a_failed_migration_that_mixed_ddl_and_dml(
+    migrator: SqliteMigrator, migration_no_op: Migration
+) -> None:
+    """The same guarantee where the DDL precedes the first row written."""
+
+    def migrate(cursor: sqlite3.Cursor, **kwargs) -> None:
+        cursor.execute("CREATE TABLE mixed (id INTEGER PRIMARY KEY);")
+        cursor.execute("INSERT INTO mixed (id) VALUES (1);")
+        raise Exception("Bad migration")
+
+    cursor = migrator._db._conn.cursor()
+    migrator.register_migration(migration_no_op)
+    migrator.run_migrations()
+    migrator.register_migration(Migration(from_version=1, to_version=2, callback=migrate))
+
+    with pytest.raises(MigrationError, match="Bad migration"):
+        migrator.run_migrations()
+
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='mixed';")
+    assert cursor.fetchone() is None
+
+
 def test_idempotent_migrations(migrator: SqliteMigrator, migration_create_test_table: Migration) -> None:
     cursor = migrator._db._conn.cursor()
     migrator.register_migration(migration_create_test_table)

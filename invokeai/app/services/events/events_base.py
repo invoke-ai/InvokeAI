@@ -15,6 +15,9 @@ from invokeai.app.services.events.events_common import (
     DownloadProgressEvent,
     DownloadStartedEvent,
     EventBase,
+    ImageIndexStatusEvent,
+    ImageIndexUpdatedEvent,
+    ImageMapProjectionReadyEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     InvocationProgressEvent,
@@ -314,5 +317,21 @@ class EventServiceBase:
                 bulk_download_id, bulk_download_item_id, bulk_download_item_name, error, user_id
             )
         )
+
+    # endregion
+
+    # region Image index
+
+    def emit_image_index_status(self, total: int, embedded: int, pending: int, failed: int = 0) -> None:
+        """Emitted when the image embedding index makes progress"""
+        self.dispatch(ImageIndexStatusEvent.build(total=total, embedded=embedded, pending=pending, failed=failed))
+
+    def emit_image_index_updated(self, user_id: str) -> None:
+        """Emitted to one user when their images were just (re)embedded"""
+        self.dispatch(ImageIndexUpdatedEvent.build(user_id=user_id))
+
+    def emit_image_map_projection_ready(self, user_id: str, point_count: int) -> None:
+        """Emitted when a user's image map projection has been recomputed"""
+        self.dispatch(ImageMapProjectionReadyEvent.build(user_id=user_id, point_count=point_count))
 
     # endregion

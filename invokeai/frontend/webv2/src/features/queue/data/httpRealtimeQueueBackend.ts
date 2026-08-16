@@ -22,7 +22,7 @@ import {
   retryItemsById,
   resumeQueueProcessor,
 } from './serverApi';
-import { enqueueGenerate, enqueueWorkflow, getResultImages } from './submissionApi';
+import { enqueueGenerate, enqueueWorkflow, getResultImages, getResultVideoNames } from './submissionApi';
 
 /** Production adapter for the queue backend port. */
 export const queueBackend: QueueBackendPort = {
@@ -42,6 +42,7 @@ export const queueBackend: QueueBackendPort = {
   enqueueWorkflow,
   getItem: async (itemId) => mapQueueBackendItemDTO(await getQueueItem(itemId)),
   getResultImages,
+  getResultVideoNames,
   listItems: async () => (await listAllQueueItems()).map(mapQueueBackendItemDTO),
   on: socketHub.on,
   onConnectionChange: socketHub.onConnectionChange,
