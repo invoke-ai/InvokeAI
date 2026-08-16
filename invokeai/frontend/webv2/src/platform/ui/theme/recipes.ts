@@ -226,13 +226,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
           textStyle: 'xs',
         },
       },
-      md: {
-        item: {
-          ...chakraSlotRecipes.segmentGroup.variants?.size?.md?.item,
-          height: 'calc({sizes.10} - 2px)',
-          textStyle: 'xs',
-        },
-      },
     },
   } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
   defaultVariants: {

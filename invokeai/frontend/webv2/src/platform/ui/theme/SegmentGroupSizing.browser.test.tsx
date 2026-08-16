@@ -15,9 +15,7 @@ afterEach(async () => {
   root = null;
 });
 
-const renderPair = async (
-  size: '2xs' | 'xs' | 'sm' | 'md'
-): Promise<{ button: HTMLElement; segmentRoot: HTMLElement }> => {
+const renderPair = async (size: '2xs' | 'xs' | 'sm'): Promise<{ button: HTMLElement; segmentRoot: HTMLElement }> => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -51,7 +49,7 @@ const renderPair = async (
 describe('segmentGroup slot recipe sizing', () => {
   // Segment groups sit beside buttons in toolbars; a size name must mean the
   // same outer height on both (Chakra's defaults run one size-name small).
-  (['2xs', 'xs', 'sm', 'md'] as const).forEach((size) => {
+  (['2xs', 'xs', 'sm'] as const).forEach((size) => {
     it(`matches the ${size} button height`, async () => {
       const { button, segmentRoot } = await renderPair(size);
 
