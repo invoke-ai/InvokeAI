@@ -2,7 +2,7 @@ import json
 import math
 from contextlib import ExitStack
 from pathlib import Path
-from typing import Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -435,15 +435,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
             )
 
-            # Krea-2 uses grouped-query attention (48 query / 12 KV heads). The stock attention processor asks
-            # SDPA for enable_gqa=True, which PyTorch only supports on the math backend — that materializes the
-            # full O(seq^2) score matrix (~5.7 GB per attention at 1280x720, ~40 GB at 2560x1440) and OOMs. Swap
-            # in a memory-efficient processor that expands the KV heads and uses the O(seq) SDPA kernel instead.
-            regional_prompting_state = Krea2RegionalPromptingState()
-            transformer.set_attn_processor(build_krea2_attention_processors(transformer, regional_prompting_state))
-            # The processors remain installed on the cached transformer after this invocation. Do not let them
-            # retain a potentially multi-GB regional mask between generations, including when denoising raises.
-            exit_stack.callback(regional_prompting_state.set_attention_mask, None)
+            attention_state = self._install_attention_processors(transformer, exit_stack)
 
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
@@ -456,14 +448,16 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             )
 
-            pos_regional_attention_mask = pos_extension.get_attention_mask()
-            neg_regional_attention_mask = neg_extension.get_attention_mask() if neg_extension is not None else None
+            pos_attention_payload = self._build_attention_payload(pos_extension, inference_dtype)
+            neg_attention_payload = (
+                self._build_attention_payload(neg_extension, inference_dtype) if neg_extension is not None else None
+            )
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / num_train_timesteps to the transformer.
                 timestep = (t / num_train_timesteps).expand(latents.shape[0]).to(inference_dtype)
 
-                regional_prompting_state.set_attention_mask(pos_regional_attention_mask)
+                self._install_attention_payload(attention_state, pos_attention_payload)
                 noise_pred_cond = transformer(
                     hidden_states=latents,
                     encoder_hidden_states=pos_prompt_embeds,
@@ -476,7 +470,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 if self._should_apply_cfg_for_step(
                     cfg_scale[step_idx], has_negative_conditioning=neg_prompt_embeds is not None
                 ):
-                    regional_prompting_state.set_attention_mask(neg_regional_attention_mask)
+                    self._install_attention_payload(attention_state, neg_attention_payload)
                     noise_pred_uncond = transformer(
                         hidden_states=latents,
                         encoder_hidden_states=neg_prompt_embeds,
@@ -518,6 +512,47 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = unpack_latents(latents, latent_height, latent_width)
         latents = latents.unsqueeze(2)
         return latents
+
+    def _install_attention_processors(
+        self, transformer: torch.nn.Module, exit_stack: ExitStack
+    ) -> Krea2RegionalPromptingState:
+        """Swap in the memory-efficient attention processors and return the state they share.
+
+        Krea-2 uses grouped-query attention (48 query / 12 KV heads). The stock attention processor asks
+        SDPA for enable_gqa=True, which PyTorch only supports on the math backend — that materializes the
+        full O(seq^2) score matrix (~5.7 GB per attention at 1280x720, ~40 GB at 2560x1440) and OOMs. The
+        replacement expands the KV heads and uses the O(seq) SDPA kernel instead.
+
+        Extension point: subclasses may install their own processors and a richer state object here, as
+        long as the state still carries the attention mask this node installs per pass.
+        """
+        state = Krea2RegionalPromptingState()
+        transformer.set_attn_processor(build_krea2_attention_processors(transformer, state))
+        # The processors remain installed on the cached transformer after this invocation. Do not let them
+        # retain a potentially multi-GB regional mask between generations, including when denoising raises.
+        exit_stack.callback(self._clear_attention_state, state)
+        return state
+
+    @staticmethod
+    def _clear_attention_state(state: Krea2RegionalPromptingState) -> None:
+        """Drop every tensor the shared attention state retains. Override alongside the state object."""
+        state.set_attention_mask(None)
+
+    def _build_attention_payload(self, extension: Krea2RegionalPromptingExtension, inference_dtype: torch.dtype) -> Any:
+        """Build the per-conditioning attention payload once, before the denoise loop.
+
+        Returns the regional attention mask (or None). Subclasses may return a richer payload; whatever
+        comes back is handed straight to ``_install_attention_payload`` before the matching pass.
+        """
+        return extension.get_attention_mask()
+
+    @staticmethod
+    def _install_attention_payload(state: Krea2RegionalPromptingState, payload: Any) -> None:
+        """Install one conditioning's payload for the upcoming transformer call.
+
+        Called separately for the conditional and unconditional pass, so nothing leaks between them.
+        """
+        state.set_attention_mask(payload)
 
     @staticmethod
     def _regional_attention_mask_bytes(
