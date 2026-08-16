@@ -234,6 +234,12 @@ def estimate_vae_working_memory_qwen_image(
     #    the path Qwen Image Edit exercises.
     #  - On ROCm the linear model under-estimates for decodes well above 2048^2, but those OOM on a
     #    48GB card regardless; on CUDA the curve stays linear so no extra term is needed.
+    #  - XPU (Intel Arc) takes the CUDA constants deliberately, not by omission. Measured on
+    #    Arc Pro B70 / torch 2.13+xpu: SDPA peak memory doubles when the sequence length doubles
+    #    (2.00x at 2048 -> 4096 -> 8192 -> 16384, 2.0 MB at seq=16384 against 512 MB for a
+    #    materialised seq^2 score matrix), i.e. XPU gets an efficient kernel and is in the same
+    #    O(area) regime as CUDA. If a future driver regresses to math attention, this branch --
+    #    not the constants -- is what needs to change.
     is_rocm = torch.version.hip is not None
     if operation == "decode":
         scaling_constant = 5500 if is_rocm else 2900

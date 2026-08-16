@@ -1971,8 +1971,8 @@
         "general": "General",
         "generation": "Generation",
         "generationDevices": "Generation Devices",
-        "generationDevicesAuto": "Auto (all GPUs)",
-        "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU.",
+        "generationDevicesAuto": "Auto",
+        "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU — unless the legacy 'device' setting in invokeai.yaml pins a specific device, in which case only that device is used. An explicit selection here overrides 'device'.",
         "generationDevicesRestart": "Restart InvokeAI for changes to take effect.",
         "generationDevicesSaveFailed": "Failed to save Generation Devices",
         "imageSubfolderStrategy": "Image Subfolder Strategy",
@@ -2058,6 +2058,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "imageStorageMaintenanceActive": "Image storage maintenance is active. Recover it before retrying the upload.",
         "videoUploaded": "Video Uploaded",
         "videoUploadFailed": "Video Upload Failed",
         "videoPlaybackFailed": "Unable to Play Video",
@@ -2703,7 +2704,7 @@
             "heading": "FP8 Storage",
             "paragraphs": [
                 "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
-                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs, and on Intel GPUs that support FP8 storage."
             ]
         }
     },

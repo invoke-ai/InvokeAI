@@ -1,11 +1,16 @@
 """Tests for the TextLLMPipeline class."""
 
+import importlib
+import queue
 import threading
 from unittest.mock import MagicMock, patch
 
+import pytest
 import torch
+from transformers import LlamaConfig, LlamaForCausalLM
 
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
+from invokeai.backend import text_llm_pipeline
+from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline, _SeededMultinomialMode
 
 
 def _make_mock_tokenizer(has_chat_template: bool = True) -> MagicMock:
@@ -40,6 +45,61 @@ class FakeStreamer:
 
     def __iter__(self):
         return iter(self._chunks)
+
+
+class _TokenStreamer:
+    """Minimal streamer that exposes model-generated token ids as text chunks."""
+
+    def __init__(self, *args, **kwargs):
+        self._queue: queue.Queue[str | None] = queue.Queue()
+        self._skip_prompt = True
+
+    def put(self, value: torch.Tensor) -> None:
+        if self._skip_prompt:
+            self._skip_prompt = False
+            return
+        tokens = value.detach().cpu().reshape(-1).tolist()
+        self._queue.put(" ".join(str(token) for token in tokens) + " ")
+
+    def end(self) -> None:
+        self._queue.put(None)
+
+    def __iter__(self):
+        while (chunk := self._queue.get()) is not None:
+            yield chunk
+
+
+class _TokenBatch(dict):
+    def to(self, device: torch.device):
+        return _TokenBatch({key: value.to(device) for key, value in self.items()})
+
+
+class _TinyTokenizer:
+    chat_template = None
+
+    def __call__(self, prompt: str, return_tensors: str, add_special_tokens: bool = True) -> _TokenBatch:
+        return _TokenBatch(input_ids=torch.tensor([[1, 2]], dtype=torch.long))
+
+    def encode(self, text: str, add_special_tokens: bool = False) -> list[str]:
+        return text.split()
+
+
+def _make_tiny_model() -> LlamaForCausalLM:
+    torch.manual_seed(123)
+    model = LlamaForCausalLM(
+        LlamaConfig(
+            vocab_size=32,
+            hidden_size=16,
+            intermediate_size=32,
+            num_hidden_layers=1,
+            num_attention_heads=2,
+            num_key_value_heads=2,
+            max_position_embeddings=64,
+            pad_token_id=0,
+            eos_token_id=None,
+        )
+    )
+    return model.eval()
 
 
 def _patch_streamer(chunks: list[str] | None = None):
@@ -113,6 +173,239 @@ def test_pipeline_passes_generation_params():
     assert generate_kwargs["temperature"] == 0.7
     assert generate_kwargs["top_p"] == 0.9
     assert "streamer" in generate_kwargs
+
+
+def test_seeded_multinomial_is_repeatable_despite_concurrent_global_rng_use():
+    """Unrelated RNG use must not alter sampling for a controlled seed."""
+    probabilities = torch.ones(100)
+    global_rng_state = torch.random.get_rng_state()
+
+    with _SeededMultinomialMode(seed=42):
+        expected = torch.multinomial(probabilities, num_samples=10, replacement=True)
+
+    assert torch.equal(torch.random.get_rng_state(), global_rng_state)
+
+    interference_done = threading.Event()
+
+    def _interfere() -> None:
+        torch.multinomial(probabilities, num_samples=10, replacement=True)
+        interference_done.set()
+
+    with _SeededMultinomialMode(seed=42):
+        thread = threading.Thread(target=_interfere)
+        thread.start()
+        assert interference_done.wait(timeout=1)
+        actual = torch.multinomial(probabilities, num_samples=10, replacement=True)
+        thread.join()
+
+    assert torch.equal(actual, expected)
+
+
+def test_seeded_multinomial_generator_advances_and_covers_tensor_method():
+    """A seeded context must advance one generator for both multinomial call forms."""
+    probabilities = torch.ones(100)
+
+    with _SeededMultinomialMode(seed=42):
+        first = torch.multinomial(probabilities, num_samples=100, replacement=True)
+        second = probabilities.multinomial(num_samples=100, replacement=True)
+    with _SeededMultinomialMode(seed=42):
+        method_repeat = probabilities.multinomial(num_samples=100, replacement=True)
+
+    assert not torch.equal(first, second)
+    assert torch.equal(first, method_repeat)
+
+
+def test_seeded_processor_consumes_seed_before_explicit_generator():
+    """A sampling call with an explicit generator still consumes the armed seed once."""
+    probabilities = torch.ones(100)
+    mode = text_llm_pipeline._SeededMultinomialMode(seed=42)
+    processor = text_llm_pipeline._SeededMultinomialProcessor(mode)
+    processor(torch.zeros((1, 1), dtype=torch.long), torch.zeros((1, 100)))
+
+    actual = torch.multinomial(
+        probabilities,
+        num_samples=100,
+        replacement=True,
+        generator=torch.Generator().manual_seed(1234),
+    )
+    with text_llm_pipeline._SeededMultinomialMode(seed=42):
+        expected = torch.multinomial(probabilities, num_samples=100, replacement=True)
+
+    assert torch.equal(actual, expected)
+    assert not hasattr(text_llm_pipeline._seeded_multinomial_state, "next_mode")
+
+
+def test_seeded_multinomial_patch_is_idempotent_on_reload():
+    """Reloading the module must not stack wrappers around torch.multinomial."""
+    original = text_llm_pipeline._original_torch_multinomial
+    importlib.reload(text_llm_pipeline)
+
+    assert text_llm_pipeline._original_torch_multinomial is original
+    with text_llm_pipeline._SeededMultinomialMode(seed=42):
+        samples = torch.multinomial(torch.ones(8), num_samples=4, replacement=True)
+    assert samples.shape == (4,)
+
+
+def test_pipeline_seeds_real_causal_lm_generation_end_to_end():
+    """The seed must cover the worker's real generate call, not only direct sampler tests."""
+    model = _make_tiny_model()
+    tokenizer = _TinyTokenizer()
+    pipeline = TextLLMPipeline(model, tokenizer)
+
+    with patch(
+        "invokeai.backend.text_llm_pipeline.TextIteratorStreamer",
+        _TokenStreamer,
+    ):
+        torch.manual_seed(1)
+        first = pipeline.run("test", max_new_tokens=12, seed=42, device=torch.device("cpu"), dtype=torch.float32)
+        torch.rand(100)
+        second = pipeline.run("test", max_new_tokens=12, seed=42, device=torch.device("cpu"), dtype=torch.float32)
+        third = pipeline.run("test", max_new_tokens=12, seed=43, device=torch.device("cpu"), dtype=torch.float32)
+
+    assert first == second
+    assert third != first
+    assert len(set(first.split())) > 1
+
+
+def test_pipeline_seeded_generations_are_isolated_when_concurrent():
+    """Concurrent production runs must match isolated runs for each seed."""
+    model = _make_tiny_model()
+    tokenizer = _TinyTokenizer()
+
+    def _run(seed: int) -> str:
+        return TextLLMPipeline(model, tokenizer).run(
+            "test", max_new_tokens=8, seed=seed, device=torch.device("cpu"), dtype=torch.float32
+        )
+
+    seeds = (42, 1234)
+    with patch("invokeai.backend.text_llm_pipeline.TextIteratorStreamer", _TokenStreamer):
+        expected = {seed: _run(seed) for seed in seeds}
+        barrier = threading.Barrier(len(seeds))
+        actual: dict[int, str] = {}
+        errors: list[BaseException] = []
+
+        def _run_concurrently(seed: int) -> None:
+            try:
+                barrier.wait(timeout=5)
+                actual[seed] = _run(seed)
+            except BaseException as e:  # noqa: BLE001 - surface worker failures below
+                errors.append(e)
+
+        threads = [threading.Thread(target=_run_concurrently, args=(seed,), daemon=True) for seed in seeds]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=10)
+
+    assert not errors
+    assert all(not thread.is_alive() for thread in threads)
+    assert actual == expected
+
+
+@pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS is unavailable")
+def test_seeded_multinomial_is_repeatable_on_mps():
+    """MPS uses the CPU generator fallback and returns samples on the MPS device."""
+    try:
+        torch.mps.empty_cache()
+        probabilities = torch.ones(16, device="mps")
+        with _SeededMultinomialMode(seed=42):
+            first = torch.multinomial(probabilities, num_samples=4, replacement=True)
+        with _SeededMultinomialMode(seed=42):
+            second = probabilities.multinomial(num_samples=4, replacement=True)
+    except RuntimeError as e:
+        if "mps backend out of memory" in str(e).lower():
+            pytest.skip("MPS does not have enough memory for this test")
+        raise
+    finally:
+        torch.mps.empty_cache()
+
+    assert first.device.type == "mps"
+    assert torch.equal(first.cpu(), second.cpu())
+
+
+@pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS is unavailable")
+def test_pipeline_seeds_real_causal_lm_generation_on_mps():
+    """The production pipeline must use the CPU generator fallback on MPS."""
+    model = None
+    pipeline = None
+    try:
+        torch.mps.empty_cache()
+        model = _make_tiny_model().to("mps")
+        pipeline = TextLLMPipeline(model, _TinyTokenizer())
+        with patch("invokeai.backend.text_llm_pipeline.TextIteratorStreamer", _TokenStreamer):
+            first = pipeline.run("test", max_new_tokens=4, seed=42, device=torch.device("mps"), dtype=torch.float32)
+            second = pipeline.run("test", max_new_tokens=4, seed=42, device=torch.device("mps"), dtype=torch.float32)
+    except RuntimeError as e:
+        if "mps backend out of memory" in str(e).lower():
+            pytest.skip("MPS does not have enough memory for this test")
+        raise
+    finally:
+        del pipeline
+        del model
+        torch.mps.empty_cache()
+
+    assert first == second
+
+
+def test_seeded_multinomial_contexts_are_isolated_when_interleaved_on_cpu():
+    """Concurrent seeded contexts must retain independent RNG sequences."""
+    probabilities = torch.arange(1, 101, dtype=torch.float32)
+    seeds = (42, 1234)
+    draw_count = 100
+
+    expected: dict[int, list[int]] = {}
+    for seed in seeds:
+        with _SeededMultinomialMode(seed=seed):
+            expected[seed] = [torch.multinomial(probabilities, num_samples=1).item() for _ in range(draw_count)]
+
+    barrier = threading.Barrier(len(seeds))
+    actual: dict[int, list[int]] = {}
+
+    def _sample(seed: int) -> None:
+        samples: list[int] = []
+        with _SeededMultinomialMode(seed=seed):
+            for _ in range(draw_count):
+                barrier.wait(timeout=5)
+                samples.append(torch.multinomial(probabilities, num_samples=1).item())
+        actual[seed] = samples
+
+    threads = [threading.Thread(target=_sample, args=(seed,), daemon=True) for seed in seeds]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=5)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert actual == expected
+
+
+def test_stalled_generation_does_not_block_later_generation(monkeypatch: pytest.MonkeyPatch):
+    """A timed-out worker must not own shared state needed by later runs."""
+    monkeypatch.setattr(text_llm_pipeline, "STREAM_TIMEOUT", 0.05)
+    stalled_model = MagicMock()
+    release_stalled_model = threading.Event()
+    stalled_model.generate.side_effect = lambda **kwargs: release_stalled_model.wait()
+
+    with pytest.raises(RuntimeError, match="Text generation stalled"):
+        TextLLMPipeline(stalled_model, _make_mock_tokenizer()).run("test", device=torch.device("cpu"))
+
+    healthy_model = MagicMock()
+
+    def _generate(**kwargs):
+        streamer = kwargs["streamer"]
+        streamer.put(torch.tensor([[1, 2, 3, 4, 5]]))
+        streamer.put(torch.tensor([6]))
+        streamer.end()
+
+    healthy_model.generate.side_effect = _generate
+    healthy_tokenizer = _make_mock_tokenizer()
+    healthy_tokenizer.decode.return_value = "ok"
+    try:
+        TextLLMPipeline(healthy_model, healthy_tokenizer).run("test", device=torch.device("cpu"))
+    finally:
+        release_stalled_model.set()
+
+    healthy_model.generate.assert_called_once()
 
 
 def test_pipeline_returns_joined_streamed_chunks():
