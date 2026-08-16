@@ -447,6 +447,18 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'minimax-h3' && model.format === 'diffusers' && model.components_only) {
+    // A slim ("components-only") install ships only the shared components (tokenizer, processor,
+    // VAEs) - the transformer and text encoder must come from single-file installs selected in
+    // Advanced settings, or generation fails at model-load time.
+    if (!params.minimaxH3TransformerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TransformerModelSelected') });
+    }
+    if (!params.minimaxH3TextEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TextEncoderModelSelected') });
+    }
+  }
+
   if (model) {
     for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
       if (model.base !== lora.model.base) {
@@ -1199,6 +1211,18 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     // Video output only exists on the Generate tab - the canvas compositing pipeline is
     // image-based. The image output mode works on canvas like any other txt2img model.
     reasons.push({ content: i18n.t('parameters.invoke.minimaxH3VideoOnGenerateTab') });
+  }
+
+  if (model?.base === 'minimax-h3' && model.format === 'diffusers' && model.components_only) {
+    // A slim ("components-only") install ships only the shared components (tokenizer, processor,
+    // VAEs) - the transformer and text encoder must come from single-file installs selected in
+    // Advanced settings, or generation fails at model-load time.
+    if (!params.minimaxH3TransformerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TransformerModelSelected') });
+    }
+    if (!params.minimaxH3TextEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TextEncoderModelSelected') });
+    }
   }
 
   if (model) {
