@@ -473,7 +473,7 @@
       "post": {
         "tags": ["utilities"],
         "summary": "Parse Dynamicprompts",
-        "description": "Creates a batch process",
+        "description": "Expands a prompt's dynamic syntax against the current user's wildcards.",
         "operationId": "parse_dynamicprompts",
         "requestBody": {
           "content": {
@@ -763,6 +763,32 @@
         ]
       }
     },
+    "/api/v2/models/models_dir": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Models Dir",
+        "description": "Get the absolute path of the directory managed models are stored in.\n\nModel config `path` values are relative to this directory unless they are\nabsolute (in-place installs from outside it).",
+        "operationId": "get_models_dir",
+        "responses": {
+          "200": {
+            "description": "The absolute path of the models directory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "title": "Response Get Models Dir"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/models/get_by_attrs": {
       "get": {
         "tags": ["model_manager"],
@@ -857,6 +883,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -885,6 +914,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1065,6 +1097,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -1276,6 +1311,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1304,6 +1342,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1484,6 +1525,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -1695,6 +1739,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -1723,6 +1770,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1903,6 +1953,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -2159,6 +2212,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -2187,6 +2243,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2367,6 +2426,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -2647,6 +2709,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -2675,6 +2740,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -2855,6 +2923,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -3415,6 +3486,24 @@
               "title": "Access Token"
             },
             "description": "access token for the remote resource"
+          },
+          {
+            "name": "X-Model-Source-Access-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "access token for the remote resource",
+              "title": "X-Model-Source-Access-Token"
+            },
+            "description": "access token for the remote resource"
           }
         ],
         "requestBody": {
@@ -3965,6 +4054,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                     },
                     {
@@ -3993,6 +4085,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -4173,6 +4268,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -4405,7 +4503,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/EmptyModelCacheResponse"
+                }
               }
             }
           }
@@ -4900,10 +5000,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find images without a board.",
+              "description": "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for images on every readable, non-archived board plus authorized uncategorized images. If omitted, non-admin results remain limited to images owned by the current user.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find images without a board."
+            "description": "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for images on every readable, non-archived board plus authorized uncategorized images. If omitted, non-admin results remain limited to images owned by the current user."
           },
           {
             "name": "offset",
@@ -4969,6 +5069,44 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
           }
         ],
         "responses": {
@@ -5603,6 +5741,51 @@
         ]
       }
     },
+    "/api/v1/images/copy": {
+      "post": {
+        "tags": ["images"],
+        "summary": "Copy Images To Board",
+        "description": "Copies images, optionally onto a board, and returns the new names.\n\nEach copy is a genuinely new image with its own name, because `board_images` keys on\n`image_name` \u2014 one image can sit on exactly one board, so sharing a name between two boards is\nnot representable. Duplicating a project needs that: its copy must own its media outright.\n\nThe pixels never leave the server, and never leave the disk either: `images.copy` clones the\nrecord and copies the file byte for byte, so the embedded metadata, workflow and graph travel\nwithout being parsed and rewritten. Category and origin travel; the originating session and\nnode do not. Starring is not copied \u2014 callers that want it use `POST /images/star`, the same\npath an import uses.\n\nPer-image failures are reported rather than raised, so one unreadable source cannot cost the\ncaller the whole batch.\n\nA sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a\nboard's worth of them on the event loop would stall every other request for the duration.\n\nRead access is enough to copy, which means an image on a board shared with you can be copied\ninto something you own, and the copy outlives the share. That is deliberate \u2014 it is what makes\na shared board usable as a source \u2014 but it is a real widening of what \"read-only\" means, so it\nis stated rather than left to be discovered.",
+        "operationId": "copy_images_to_board",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_copy_images_to_board"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyImagesResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/images/star": {
       "post": {
         "tags": ["images"],
@@ -5863,10 +6046,10 @@
                   "type": "null"
                 }
               ],
-              "description": "The board id to filter by. Use 'none' to find images without a board.",
+              "description": "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for images on every readable, non-archived board plus authorized uncategorized images. If omitted, non-admin results remain limited to images owned by the current user.",
               "title": "Board Id"
             },
-            "description": "The board id to filter by. Use 'none' to find images without a board."
+            "description": "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for images on every readable, non-archived board plus authorized uncategorized images. If omitted, non-admin results remain limited to images owned by the current user."
           },
           {
             "name": "order_dir",
@@ -5908,6 +6091,44 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
           }
         ],
         "responses": {
@@ -5971,6 +6192,127 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_map/points": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Points",
+        "description": "Gets the current user's semantic image map.\n\nServes the cached UMAP projection (never blocks on a UMAP fit) and runs\nDBSCAN per request, so `eps` is live-adjustable. If the cache is missing\nor stale, a recompute is enqueued and reflected in `state`/`stale`.",
+        "operationId": "get_image_map_points",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 2.0,
+                  "minimum": 0.01
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span.",
+              "title": "Eps"
+            },
+            "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span."
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 2,
+              "description": "DBSCAN min_samples for clustering",
+              "default": 10,
+              "title": "Min Samples"
+            },
+            "description": "DBSCAN min_samples for clustering"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapPointsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/image_map/refresh": {
+      "post": {
+        "tags": ["image_map"],
+        "summary": "Refresh Image Map",
+        "description": "Requests a recompute of the current user's image map projection.",
+        "operationId": "refresh_image_map",
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapRefreshResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/image_map/status": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Status",
+        "description": "Gets embedding index progress and the user's projection cache status.",
+        "operationId": "get_image_map_status",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapStatusResponse"
                 }
               }
             }
@@ -6983,6 +7325,51 @@
         }
       }
     },
+    "/api/v1/videos/copy": {
+      "post": {
+        "tags": ["videos"],
+        "summary": "Copy Videos To Board",
+        "description": "Copies videos, optionally onto a board, and returns the new names.\n\nThe image twin of this route explains why copies rather than shared references: `board_videos`\nkeys on `video_name`, so one video sits on exactly one board.\n\nBlocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of\nthis being a sync `def`, so a large batch cannot stall the event loop.\n\n`move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,\nbecause every other caller hands it a temp file. Here the path is the *source's own* file.\n\nRead access is enough to copy, which means a video on a board shared with you can be copied\ninto something you own, and the copy outlives the share. That is deliberate \u2014 it is what makes\na shared board usable as a source \u2014 but it is a real widening of what \"read-only\" means, so it\nis stated rather than left to be discovered.",
+        "operationId": "copy_videos_to_board",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_copy_videos_to_board"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CopyVideosResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/videos/star": {
       "post": {
         "tags": ["videos"],
@@ -7311,6 +7698,44 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
           }
         ],
         "responses": {
@@ -7464,6 +7889,44 @@
               "title": "Search Term"
             },
             "description": "The term to search for"
+          },
+          {
+            "name": "created_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created From"
+            },
+            "description": "Inclusive start date (YYYY-MM-DD) to filter by created_at."
+          },
+          {
+            "name": "created_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at.",
+              "title": "Created To"
+            },
+            "description": "Inclusive end date (YYYY-MM-DD) to filter by created_at."
           }
         ],
         "responses": {
@@ -9210,6 +9673,24 @@
               "default": "DESC"
             },
             "description": "The order of sort"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -9788,6 +10269,24 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -9850,6 +10349,24 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -9912,6 +10429,24 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "origin_prefix",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only include queue items whose origin starts with this prefix",
+              "title": "Origin Prefix"
+            },
+            "description": "Only include queue items whose origin starts with this prefix"
           }
         ],
         "responses": {
@@ -11542,6 +12077,177 @@
         ]
       }
     },
+    "/api/v1/wildcards/": {
+      "get": {
+        "tags": ["wildcards"],
+        "summary": "List Wildcards",
+        "description": "Lists the current user's wildcards.",
+        "operationId": "list_wildcards",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WildcardRecordDTO"
+                  },
+                  "type": "array",
+                  "title": "Response 200 List Wildcards"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["wildcards"],
+        "summary": "Create Wildcard",
+        "description": "Creates a wildcard owned by the current user.",
+        "operationId": "create_wildcard",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WildcardWithoutId",
+                "description": "The wildcard to create"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WildcardRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/wildcards/{wildcard_id}": {
+      "patch": {
+        "tags": ["wildcards"],
+        "summary": "Update Wildcard",
+        "description": "Updates a wildcard owned by the current user.",
+        "operationId": "update_wildcard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wildcard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the wildcard to update",
+              "title": "Wildcard Id"
+            },
+            "description": "The id of the wildcard to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WildcardChanges",
+                "description": "The changes to apply"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WildcardRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["wildcards"],
+        "summary": "Delete Wildcard",
+        "description": "Deletes a wildcard owned by the current user.",
+        "operationId": "delete_wildcard",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "wildcard_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the wildcard to delete",
+              "title": "Wildcard Id"
+            },
+            "description": "The id of the wildcard to delete"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/system_prompts/": {
       "get": {
         "tags": ["system_prompts"],
@@ -12061,6 +12767,271 @@
           },
           "204": {
             "description": "Client state deleted"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "List Projects",
+        "description": "Lists the current user's projects as lightweight summaries (no documents).",
+        "operationId": "list_projects",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectSummaryDTO"
+                  },
+                  "type": "array",
+                  "title": "Response List Projects"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["projects"],
+        "summary": "Create Project",
+        "description": "Creates a project, and the private board it owns, for the current user.",
+        "operationId": "create_project",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateRequest",
+                "description": "The project to create"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{project_id}": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "Get Project",
+        "description": "Gets one of the current user's projects, including its document.",
+        "operationId": "get_project",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project to get",
+              "title": "Project Id"
+            },
+            "description": "The id of the project to get"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["projects"],
+        "summary": "Update Project",
+        "description": "Saves a project. Returns 409 with the current revision when the save is based on a stale revision.",
+        "operationId": "update_project",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project to save",
+              "title": "Project Id"
+            },
+            "description": "The id of the project to save"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectUpdateRequest",
+                "description": "The project document and the revision it is based on"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["projects"],
+        "summary": "Delete Project",
+        "description": "Deletes one of the current user's projects, and the board it owns, in one transaction.\n\nIdempotent. The media survives: deleting the board drops its memberships, so the images and\nvideos on it return to Uncategorized, exactly as they would if the board were deleted without\n`include_images`. There is deliberately no option to take them with it \u2014 a project is a\nworkspace, and emptying someone's gallery is not what deleting one should be able to mean.\nNothing is reported back for the same reason: nothing was destroyed to report.",
+        "operationId": "delete_project",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project to delete",
+              "title": "Project Id"
+            },
+            "description": "The id of the project to delete"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project_id}/board-snapshot": {
+      "get": {
+        "tags": ["projects"],
+        "summary": "Get Project Board Snapshot",
+        "description": "Lists everything on the project's board that the gallery would show.\n\nIntermediates and the canvas's private `other` category are excluded. Unpaginated: the caller\nthat needs this \u2014 exporting a project \u2014 has to hold the whole list anyway. It is still bounded,\nbecause the answer is built entirely in memory and any client with a project id can ask for it;\na board past the ceiling is one an export could not have packed either, so it is refused as a\n413 rather than paged.",
+        "operationId": "get_project_board_snapshot",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The id of the project whose board to enumerate",
+              "title": "Project Id"
+            },
+            "description": "The id of the project whose board to enumerate"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectBoardSnapshotDTO"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -14154,6 +15125,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
           },
           {
@@ -14182,6 +15156,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
           },
           {
             "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -14362,6 +15339,9 @@
           },
           {
             "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -14774,6 +15754,7 @@
           "anima",
           "krea-2",
           "wan",
+          "minimax-h3",
           "unknown"
         ],
         "title": "BaseModelType",
@@ -15473,6 +16454,18 @@
             ],
             "title": "Owner Username",
             "description": "The username of the board owner (for admin view)."
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "The id of the project that owns this board, if any."
           }
         },
         "type": "object",
@@ -15566,6 +16559,62 @@
         "type": "object",
         "required": ["batch_ids"],
         "title": "Body_cancel_by_batch_ids"
+      },
+      "Body_copy_images_to_board": {
+        "properties": {
+          "image_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Image Names",
+            "description": "The names of the images to copy"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "The board to put the copies on, if any"
+          }
+        },
+        "type": "object",
+        "required": ["image_names"],
+        "title": "Body_copy_images_to_board"
+      },
+      "Body_copy_videos_to_board": {
+        "properties": {
+          "video_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Video Names",
+            "description": "The names of the videos to copy"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "The board to put the copies on, if any"
+          }
+        },
+        "type": "object",
+        "required": ["video_names"],
+        "title": "Body_copy_videos_to_board"
       },
       "Body_create_image_upload_entry": {
         "properties": {
@@ -15898,6 +16947,12 @@
             ],
             "title": "Image",
             "description": "The image file to upload"
+          },
+          "preserve_image": {
+            "type": "boolean",
+            "title": "Preserve Image",
+            "description": "Preserve the existing image when no replacement image is supplied",
+            "default": false
           },
           "data": {
             "type": "string",
@@ -17238,6 +18293,11 @@
           "high_watermark": {
             "type": "integer",
             "title": "High Watermark",
+            "default": 0
+          },
+          "cache_used": {
+            "type": "integer",
+            "title": "Cache Used",
             "default": 0
           },
           "in_cache": {
@@ -21894,6 +22954,86 @@
         "title": "ControlOutput",
         "type": "object"
       },
+      "CopiedImage": {
+        "properties": {
+          "source_image_name": {
+            "type": "string",
+            "title": "Source Image Name",
+            "description": "The image that was copied"
+          },
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The name assigned to the copy"
+          }
+        },
+        "type": "object",
+        "required": ["source_image_name", "image_name"],
+        "title": "CopiedImage"
+      },
+      "CopiedVideo": {
+        "properties": {
+          "source_video_name": {
+            "type": "string",
+            "title": "Source Video Name",
+            "description": "The video that was copied"
+          },
+          "video_name": {
+            "type": "string",
+            "title": "Video Name",
+            "description": "The name assigned to the copy"
+          }
+        },
+        "type": "object",
+        "required": ["source_video_name", "video_name"],
+        "title": "CopiedVideo"
+      },
+      "CopyImagesResult": {
+        "properties": {
+          "copied": {
+            "items": {
+              "$ref": "#/components/schemas/CopiedImage"
+            },
+            "type": "array",
+            "title": "Copied",
+            "description": "The copies that were made, in request order"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "The source image names that could not be copied"
+          }
+        },
+        "type": "object",
+        "required": ["copied", "failed"],
+        "title": "CopyImagesResult"
+      },
+      "CopyVideosResult": {
+        "properties": {
+          "copied": {
+            "items": {
+              "$ref": "#/components/schemas/CopiedVideo"
+            },
+            "type": "array",
+            "title": "Copied",
+            "description": "The copies that were made, in request order"
+          },
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "The source video names that could not be copied"
+          }
+        },
+        "type": "object",
+        "required": ["copied", "failed"],
+        "title": "CopyVideosResult"
+      },
       "CoreMetadataInvocation": {
         "additionalProperties": true,
         "category": "metadata",
@@ -21976,7 +23116,10 @@
                   "wan_img2img",
                   "wan_inpaint",
                   "wan_outpaint",
-                  "wan_i2v"
+                  "wan_i2v",
+                  "minimax_h3_t2v",
+                  "minimax_h3_i2v",
+                  "minimax_h3_txt2img"
                 ],
                 "type": "string"
               },
@@ -25154,7 +26297,7 @@
         "tags": ["prompt", "collection"],
         "title": "Dynamic Prompt",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/StringCollectionOutput"
         }
@@ -25337,6 +26480,21 @@
         "type": "object",
         "required": ["node_id", "field"],
         "title": "EdgeConnection"
+      },
+      "EmptyModelCacheResponse": {
+        "properties": {
+          "models_cleared": {
+            "type": "integer",
+            "title": "Models Cleared"
+          },
+          "bytes_freed": {
+            "type": "integer",
+            "title": "Bytes Freed"
+          }
+        },
+        "type": "object",
+        "required": ["models_cleared", "bytes_freed"],
+        "title": "EmptyModelCacheResponse"
       },
       "EnqueueBatchResult": {
         "properties": {
@@ -26935,7 +28093,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed).\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -27055,7 +28213,7 @@
         "tags": ["video", "trim", "range", "frames"],
         "title": "Frame Range from Video",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/ExtractVideoRangeOutput"
         }
@@ -34954,6 +36112,27 @@
                   "$ref": "#/components/schemas/MetadataToVAEInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ModelIdentifierInvocation"
                 },
                 {
@@ -35525,6 +36704,18 @@
                 },
                 {
                   "$ref": "#/components/schemas/MetadataToSDXLModelOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/ModelIdentifierOutput"
@@ -39760,6 +40951,82 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "ImageIndexStatus": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Number of gallery images eligible for indexing"
+          },
+          "embedded": {
+            "type": "integer",
+            "title": "Embedded",
+            "description": "Number of eligible images that have an embedding"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "description": "Eligible images that repeatedly failed to embed; excluded from pending so it can drain",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": ["total", "embedded"],
+        "title": "ImageIndexStatus",
+        "description": "Progress of the embedding index for one embedding model."
+      },
+      "ImageIndexStatusEvent": {
+        "description": "Event model for image_index_status",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "total": {
+            "description": "Number of gallery images eligible for embedding",
+            "title": "Total",
+            "type": "integer"
+          },
+          "embedded": {
+            "description": "Number of eligible images that have an embedding",
+            "title": "Embedded",
+            "type": "integer"
+          },
+          "pending": {
+            "description": "Number of eligible images awaiting embedding",
+            "title": "Pending",
+            "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "description": "Eligible images that repeatedly failed to embed and were given up on. Excluded from `pending`, so `total != embedded` with `pending == 0` means this many were skipped.",
+            "title": "Failed",
+            "type": "integer"
+          }
+        },
+        "required": ["timestamp", "total", "embedded", "pending", "failed"],
+        "title": "ImageIndexStatusEvent",
+        "type": "object"
+      },
+      "ImageIndexUpdatedEvent": {
+        "description": "Event model for image_index_updated.\n\nA counts-free poke to one user whose images were just (re)embedded, so\ntheir client can refresh views built on the index. Kept separate from\nImageIndexStatusEvent because the counts aggregate every user's images\nand are therefore admin-only, while this event is safe to route to the\nowning user's room.",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "user_id": {
+            "description": "The user whose images were embedded",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "user_id"],
+        "title": "ImageIndexUpdatedEvent",
+        "type": "object"
+      },
       "ImageInverseLerpInvocation": {
         "category": "image",
         "class": "invocation",
@@ -40060,6 +41327,214 @@
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
+      },
+      "ImageMapPoint": {
+        "properties": {
+          "x": {
+            "type": "number",
+            "title": "X",
+            "description": "UMAP x coordinate"
+          },
+          "y": {
+            "type": "number",
+            "title": "Y",
+            "description": "UMAP y coordinate"
+          },
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The image this point represents"
+          },
+          "cluster": {
+            "type": "integer",
+            "title": "Cluster",
+            "description": "DBSCAN cluster label; -1 means unclustered"
+          }
+        },
+        "type": "object",
+        "required": ["x", "y", "image_name", "cluster"],
+        "title": "ImageMapPoint",
+        "description": "One image's position on the 2D semantic map."
+      },
+      "ImageMapPointsResponse": {
+        "properties": {
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/ImageMapPoint"
+            },
+            "type": "array",
+            "title": "Points",
+            "description": "The projected points"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["disabled", "model_missing", "empty", "computing", "ready"],
+            "title": "State",
+            "description": "disabled: indexing is off; model_missing: indexing is enabled but the configured embedding model is not installed; empty: nothing to show; computing: a projection is being built; ready: points are served"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name",
+            "description": "The configured embedding model's name; only set when state is model_missing, so the client can tell the user which model to install"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "True when the accessible image set has changed since this projection was computed; a refresh has been requested"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count",
+            "description": "Number of points returned"
+          },
+          "cluster_eps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cluster Eps",
+            "description": "The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). Pass it back explicitly to get an identical clustering from a later request."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the served projection was computed"
+          }
+        },
+        "type": "object",
+        "required": ["points", "state", "stale", "point_count"],
+        "title": "ImageMapPointsResponse",
+        "description": "The current user's semantic map."
+      },
+      "ImageMapProjectionReadyEvent": {
+        "description": "Event model for image_map_projection_ready",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "user_id": {
+            "description": "The user whose image map projection was recomputed",
+            "title": "User Id",
+            "type": "string"
+          },
+          "point_count": {
+            "description": "Number of points in the recomputed projection",
+            "title": "Point Count",
+            "type": "integer"
+          }
+        },
+        "required": ["timestamp", "user_id", "point_count"],
+        "title": "ImageMapProjectionReadyEvent",
+        "type": "object"
+      },
+      "ImageMapProjectionStatus": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["disabled", "model_missing", "empty", "computing", "ready"],
+            "title": "State",
+            "description": "Projection cache state"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "description": "Whether the cached projection lags the accessible image set"
+          },
+          "point_count": {
+            "type": "integer",
+            "title": "Point Count",
+            "description": "Points in the cached projection"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the cached projection was computed"
+          }
+        },
+        "type": "object",
+        "required": ["state", "stale", "point_count"],
+        "title": "ImageMapProjectionStatus",
+        "description": "Status of the current user's cached projection."
+      },
+      "ImageMapRefreshResponse": {
+        "properties": {
+          "enqueued": {
+            "type": "boolean",
+            "title": "Enqueued",
+            "description": "True if the recompute was accepted (or already pending)"
+          }
+        },
+        "type": "object",
+        "required": ["enqueued"],
+        "title": "ImageMapRefreshResponse",
+        "description": "Result of a projection refresh request."
+      },
+      "ImageMapStatusResponse": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "description": "Whether the embedding index is running"
+          },
+          "model_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Name",
+            "description": "The configured embedding model's name; only set when the projection state is model_missing"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageIndexStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Embedding index progress counts. Admin-only: the counts aggregate over all users' images, so they are omitted for regular users."
+          },
+          "projection": {
+            "$ref": "#/components/schemas/ImageMapProjectionStatus",
+            "description": "The user's projection cache status"
+          }
+        },
+        "type": "object",
+        "required": ["enabled", "projection"],
+        "title": "ImageMapStatusResponse",
+        "description": "Combined index + projection status for the current user."
       },
       "ImageMaskToTensorInvocation": {
         "category": "mask",
@@ -43489,6 +44964,27 @@
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
               },
               {
@@ -44017,6 +45513,18 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToSDXLModelOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierOutput"
@@ -44835,6 +46343,27 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
@@ -45802,6 +47331,27 @@
           "metadata_to_vae": {
             "$ref": "#/components/schemas/VAEOutput"
           },
+          "minimax_h3_denoise": {
+            "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+          },
+          "minimax_h3_frame_conditioning": {
+            "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+          },
+          "minimax_h3_ideal_dimensions": {
+            "$ref": "#/components/schemas/IdealSizeOutput"
+          },
+          "minimax_h3_latents_to_image": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "minimax_h3_latents_to_video": {
+            "$ref": "#/components/schemas/VideoOutput"
+          },
+          "minimax_h3_model_loader": {
+            "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
+          },
+          "minimax_h3_text_encoder": {
+            "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+          },
           "mlsd_detection": {
             "$ref": "#/components/schemas/ImageOutput"
           },
@@ -46311,6 +47861,13 @@
           "metadata_to_string_collection",
           "metadata_to_t2i_adapters",
           "metadata_to_vae",
+          "minimax_h3_denoise",
+          "minimax_h3_frame_conditioning",
+          "minimax_h3_ideal_dimensions",
+          "minimax_h3_latents_to_image",
+          "minimax_h3_latents_to_video",
+          "minimax_h3_model_loader",
+          "minimax_h3_text_encoder",
           "mlsd_detection",
           "model_identifier",
           "mul",
@@ -47096,6 +48653,27 @@
               },
               {
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
@@ -48155,6 +49733,27 @@
                 "$ref": "#/components/schemas/MetadataToVAEInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3IdealDimensionsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ModelIdentifierInvocation"
               },
               {
@@ -49075,6 +50674,37 @@
             "description": "Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.",
             "default": false
           },
+          "image_index_enabled": {
+            "type": "boolean",
+            "title": "Image Index Enabled",
+            "description": "Maintain a semantic embedding index of gallery images, used by the image map and semantic search features.",
+            "default": false
+          },
+          "image_index_model": {
+            "type": "string",
+            "title": "Image Index Model",
+            "description": "Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.",
+            "default": "clip-vit-large-patch14"
+          },
+          "image_index_device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Index Device",
+            "description": "Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress."
+          },
+          "image_index_batch_size": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Image Index Batch Size",
+            "description": "Number of images embedded per batch by the image index worker.",
+            "default": 8
+          },
           "external_alibabacloud_api_key": {
             "anyOf": [
               {
@@ -49175,7 +50805,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    image_index_enabled: Maintain a semantic embedding index of gallery images, used by the image map and semantic search features.\n    image_index_model: Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.\n    image_index_device: Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.\n    image_index_batch_size: Number of images embedded per batch by the image index worker.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -57151,6 +58781,181 @@
         "title": "Main_Checkpoint_Krea2_Config",
         "description": "Model config for Krea-2 single-file checkpoint models (safetensors, etc)."
       },
+      "Main_Checkpoint_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MiniMaxH3VariantType"
+          },
+          "pruned": {
+            "type": "boolean",
+            "title": "Pruned",
+            "description": "Whether this is an AdaLN-pruned ('adaln curves') checkpoint."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant",
+          "pruned"
+        ],
+        "title": "Main_Checkpoint_MiniMaxH3_Config",
+        "description": "Model config for MiniMax H3 single-file transformer checkpoints (safetensors).\n\nCovers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or\nComfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned (\"adaln curves\"). The\nfile holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come\nfrom an installed H3 diffusers-layout folder.\n\nA Ref2VA transformer single file is key-for-key indistinguishable from FL2VA, so Ref2VA is\nexcluded only by filename; a renamed Ref2VA file would load and run but produce degraded\noutput (it expects reference conditioning rows this integration never packs)."
+      },
       "Main_Checkpoint_QwenImage_Config": {
         "properties": {
           "key": {
@@ -59136,6 +60941,167 @@
         ],
         "title": "Main_Diffusers_Krea2_Config",
         "description": "Model config for Krea-2 diffusers models (Krea-2-Turbo)."
+      },
+      "Main_Diffusers_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/MiniMaxH3VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_MiniMaxH3_Config",
+        "description": "Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."
       },
       "Main_Diffusers_QwenImage_Config": {
         "properties": {
@@ -65556,6 +67522,1069 @@
           "$ref": "#/components/schemas/VAEOutput"
         }
       },
+      "MiniMaxH3ConditioningField": {
+        "description": "A MiniMax H3 conditioning primitive value.\n\nH3 conditioning is the layer-50 Qwen3-VL hidden state plus the per-row modality tags the\npacked-sequence layout is built from (vision-block rows are tagged as video).",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "MiniMaxH3ConditioningField",
+        "type": "object"
+      },
+      "MiniMaxH3ConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a MiniMax H3 conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/MiniMaxH3ConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_conditioning_output",
+            "default": "minimax_h3_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "MiniMaxH3ConditioningOutput",
+        "type": "object"
+      },
+      "MiniMaxH3DenoiseInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the MiniMax H3 joint audio-video denoising loop.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "MiniMax H3 FL2VA transformer.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "frame_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3FrameConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "First/last-keyframe (VAE-latent) conditioning for MiniMax H3",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Frame Conditioning"
+          },
+          "width": {
+            "default": 1344,
+            "description": "Width of the generated video. H3's native canvas has a 768px short edge (max 768x1344).",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1344,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 768,
+            "description": "Height of the generated video.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 768,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "num_frames": {
+            "default": 124,
+            "description": "Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 5,
+            "orig_default": 124,
+            "orig_required": false,
+            "title": "Number of Frames",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 50,
+            "description": "Number of denoising steps (sigma grid points, terminal included: N steps = N-1 model evaluations).",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 2,
+            "orig_default": 50,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_denoise",
+            "default": "minimax_h3_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "video", "audio", "minimax"],
+        "title": "Denoise - MiniMax H3",
+        "type": "object",
+        "version": "1.1.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
+        }
+      },
+      "MiniMaxH3DenoiseOutput": {
+        "class": "output",
+        "description": "Joint video + audio latents from one MiniMax H3 denoise run.",
+        "properties": {
+          "video_latents": {
+            "$ref": "#/components/schemas/LatentsField",
+            "description": "5D video latents [1, 24, T_lat, H/16, W/16].",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "audio_latents": {
+            "$ref": "#/components/schemas/LatentsField",
+            "description": "Audio latents [2, 32, T_audio] (one item per stereo channel).",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "width": {
+            "description": "Pixel width of the video latents.",
+            "field_kind": "output",
+            "title": "Width",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "height": {
+            "description": "Pixel height of the video latents.",
+            "field_kind": "output",
+            "title": "Height",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "num_frames": {
+            "description": "Pixel-frame count of the video latents.",
+            "field_kind": "output",
+            "title": "Num Frames",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_denoise_output",
+            "default": "minimax_h3_denoise_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "video_latents", "audio_latents", "width", "height", "num_frames", "type", "type"],
+        "title": "MiniMaxH3DenoiseOutput",
+        "type": "object"
+      },
+      "MiniMaxH3FrameConditioningField": {
+        "description": "First/last-keyframe conditioning for MiniMax H3 (FL2VA).\n\nCarries the CLEAN (not yet noise-augmented) packed keyframe conditioning rows; the denoise\nnode noise-augments them to t=0.999 with the request seed's first draws. Width/height ride\nalong so the denoise node can reject a canvas mismatch instead of failing inside the\ntransformer.",
+        "properties": {
+          "condition_rows_name": {
+            "description": "Name of the saved (num_condition_rows, 96) rows tensor.",
+            "title": "Condition Rows Name",
+            "type": "string"
+          },
+          "keyframe_anchors": {
+            "description": "Which end each keyframe anchors, in packed order (\"first\" / \"last\").",
+            "items": {
+              "type": "string"
+            },
+            "title": "Keyframe Anchors",
+            "type": "array"
+          },
+          "width": {
+            "description": "Canvas width used during VAE encoding (matches denoise width).",
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "description": "Canvas height used during VAE encoding (matches denoise height).",
+            "title": "Height",
+            "type": "integer"
+          }
+        },
+        "required": ["condition_rows_name", "keyframe_anchors", "width", "height"],
+        "title": "MiniMaxH3FrameConditioningField",
+        "type": "object"
+      },
+      "MiniMaxH3FrameConditioningInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "VAE-encodes first/last keyframes into MiniMax H3 conditioning rows.\n\nThe rows are clean (the denoise node noise-augments them with the request seed). The same\nimages and width/height must also be wired to the Prompt - MiniMax H3 node: the keyframes\nare part of both the packed sequence and the text conditioning.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "first_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keyframe the video starts from (stretched onto the canvas).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "last_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Keyframe the video ends on (cover-cropped onto the canvas).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Video VAE"
+          },
+          "width": {
+            "default": 1344,
+            "description": "Target canvas width.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1344,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 768,
+            "description": "Target canvas height.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 768,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_frame_conditioning",
+            "default": "minimax_h3_frame_conditioning",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["conditioning", "minimax", "video", "i2v"],
+        "title": "Frame Conditioning - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+        }
+      },
+      "MiniMaxH3FrameConditioningOutput": {
+        "class": "output",
+        "description": "Output of the MiniMax H3 keyframe VAE-encoder.",
+        "properties": {
+          "frame_conditioning": {
+            "$ref": "#/components/schemas/MiniMaxH3FrameConditioningField",
+            "description": "First/last-keyframe (VAE-latent) conditioning for MiniMax H3",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_frame_conditioning_output",
+            "default": "minimax_h3_frame_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "frame_conditioning", "type", "type"],
+        "title": "MiniMaxH3FrameConditioningOutput",
+        "type": "object"
+      },
+      "MiniMaxH3IdealDimensionsInvocation": {
+        "category": "video",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\nApplies the released pipeline's canvas policy: short edge 768, soft area cap of\n768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of\nthe inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image\nPrimitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax\nH3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three\nmust share the same canvas).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Source image width in pixels.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Source image height in pixels.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_ideal_dimensions",
+            "default": "minimax_h3_ideal_dimensions",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["minimax", "video", "dimensions", "math"],
+        "title": "MiniMax H3 Ideal Dimensions",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/IdealSizeOutput"
+        }
+      },
+      "MiniMaxH3LatentsToImageInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode MiniMax H3 video latents and save a single frame as an image.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "video_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Video VAE"
+          },
+          "frame_index": {
+            "default": 0,
+            "description": "Which decoded frame to save.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Frame Index",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_latents_to_image",
+            "default": "minimax_h3_latents_to_image",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "minimax"],
+        "title": "Latents to Image - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "MiniMaxH3LatentsToVideoInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Decode MiniMax H3 video+audio latents and encode an MP4 with an AAC stereo track.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "video_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "audio_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Audio latents [2, 32, T_audio] from the denoise node. Omit for a silent video.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Video VAE"
+          },
+          "audio_vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Audio VAE (stereo, 32 kHz) for MiniMax H3",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Audio VAE"
+          },
+          "type": {
+            "const": "minimax_h3_latents_to_video",
+            "default": "minimax_h3_latents_to_video",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "video", "audio", "vae", "l2v", "minimax"],
+        "title": "Latents to Video - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/VideoOutput"
+        }
+      },
+      "MiniMaxH3ModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a MiniMax H3 (FL2VA) model, outputting its submodels.\n\nAll six submodels (transformer, text encoder, tokenizer, processor, video VAE, audio VAE)\ncome from the one diffusers-layout install. Optionally, a single-file transformer checkpoint\n(e.g. the pruned int8 repack) replaces the folder's transformer, and/or a single-file\ntruncated Qwen3-VL encoder (e.g. the int8 repack) replaces the folder's text encoder, while\neverything else keeps coming from the folder install.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "MiniMax H3 model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Model",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_format": ["diffusers"],
+            "ui_model_type": ["main"]
+          },
+          "transformer_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional single-file MiniMax H3 transformer (e.g. pruned int8) used in place of the main model's transformer. Text encoder and VAEs still come from the main model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer (single file)",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_format": ["checkpoint"],
+            "ui_model_type": ["main"]
+          },
+          "text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional single-file MiniMax H3 Qwen3-VL text encoder (e.g. the truncated int8 repack) used in place of the main model's text encoder. The tokenizer and processor still come from the main model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Text Encoder (single file)",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_format": ["checkpoint"],
+            "ui_model_type": ["qwen3_vl_encoder"]
+          },
+          "type": {
+            "const": "minimax_h3_model_loader",
+            "default": "minimax_h3_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "minimax", "video"],
+        "title": "Main Model - MiniMax H3",
+        "type": "object",
+        "version": "1.2.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
+        }
+      },
+      "MiniMaxH3ModelLoaderOutput": {
+        "class": "output",
+        "description": "MiniMax H3 model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/MiniMaxH3TransformerField",
+            "description": "MiniMax H3 FL2VA transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/MiniMaxH3TextEncoderField",
+            "description": "Qwen3-VL-32B tokenizer, processor and text encoder for MiniMax H3",
+            "field_kind": "output",
+            "title": "Qwen3-VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "Video VAE",
+            "ui_hidden": false
+          },
+          "audio_vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "Audio VAE (stereo, 32 kHz) for MiniMax H3",
+            "field_kind": "output",
+            "title": "Audio VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_model_loader_output",
+            "default": "minimax_h3_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "text_encoder", "vae", "audio_vae", "type", "type"],
+        "title": "MiniMaxH3ModelLoaderOutput",
+        "type": "object"
+      },
+      "MiniMaxH3TextEncoderField": {
+        "description": "Field for the Qwen3-VL-32B conditioner used by MiniMax H3 models.\n\nUnlike :class:`Qwen3VLEncoderField`, H3 also needs the Qwen3VLProcessor \u2014 even for\ntext-only prompts (its multimodal token-type ids drive Qwen3-VL's 3D rotary layout), and\nfor feeding first/last keyframes to the conditioner as vision context.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer submodel"
+          },
+          "processor": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load processor submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          }
+        },
+        "required": ["tokenizer", "processor", "text_encoder"],
+        "title": "MiniMaxH3TextEncoderField",
+        "type": "object"
+      },
+      "MiniMaxH3TextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes a prompt (and optional first/last keyframes) for MiniMax H3.\n\nThe conditioning is Qwen3-VL-32B's *unnormalized* layer-50 hidden state. H3 is\nguidance-distilled: there is no negative prompt. For first/last-frame video, the keyframes\nare ALSO part of the text conditioning (a \"<Picture i>: \" label plus a vision block per\nkeyframe), so the same images must be wired here and to the Frame Conditioning node, with\nthe same width/height as the denoise node.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt for MiniMax H3.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "text_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TextEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3-VL-32B tokenizer, processor and text encoder for MiniMax H3",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3-VL Encoder"
+          },
+          "first_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional keyframe the video starts from (must match Frame Conditioning).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "last_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional keyframe the video ends on (must match Frame Conditioning).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "width": {
+            "default": 1344,
+            "description": "Target canvas width.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 1344,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 768,
+            "description": "Target canvas height.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 32,
+            "orig_default": 768,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "type": {
+            "const": "minimax_h3_text_encoder",
+            "default": "minimax_h3_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "minimax", "video"],
+        "title": "Prompt - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3ConditioningOutput"
+        }
+      },
+      "MiniMaxH3TransformerField": {
+        "description": "Transformer field for MiniMax H3 models (FL2VA).",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load Transformer submodel"
+          }
+        },
+        "required": ["transformer"],
+        "title": "MiniMaxH3TransformerField",
+        "type": "object"
+      },
+      "MiniMaxH3VariantType": {
+        "type": "string",
+        "enum": ["fl2va"],
+        "title": "MiniMaxH3VariantType",
+        "description": "MiniMax H3 model variants (task-specific transformer checkpoints sharing every other component)."
+      },
       "Mistral3EncoderField": {
         "description": "Field for Mistral3 text encoder used by ERNIE-Image models.",
         "properties": {
@@ -66357,6 +69386,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -66385,6 +69417,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -66565,6 +69600,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -67022,6 +70060,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                   },
                   {
@@ -67050,6 +70091,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -67230,6 +70274,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -67572,6 +70619,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -67600,6 +70650,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -67780,6 +70833,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -67978,6 +71034,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
               },
               {
@@ -68006,6 +71065,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -68186,6 +71248,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -68639,6 +71704,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/MistralVariantType"
               },
               {
@@ -68854,6 +71922,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_Krea2_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_MiniMaxH3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
                 },
                 {
@@ -68882,6 +71953,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_Anima_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -69062,6 +72136,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_Config"
@@ -71859,6 +74936,201 @@
         "title": "ProgressImage",
         "type": "object"
       },
+      "ProjectBoardItemDTO": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["general", "control", "mask", "user"],
+            "title": "Category",
+            "description": "The item's gallery category"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["image", "video"],
+            "title": "Kind",
+            "description": "Which namespace the name belongs to"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The server-assigned image or video name"
+          },
+          "starred": {
+            "type": "boolean",
+            "title": "Starred",
+            "description": "Whether the item is starred"
+          }
+        },
+        "type": "object",
+        "required": ["category", "kind", "name", "starred"],
+        "title": "ProjectBoardItemDTO",
+        "description": "One visible item on a project's board."
+      },
+      "ProjectBoardSnapshotDTO": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectBoardItemDTO"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The board's visible items, ordered by kind then name"
+          }
+        },
+        "type": "object",
+        "required": ["items"],
+        "title": "ProjectBoardSnapshotDTO",
+        "description": "Everything a project's board holds that the gallery would show.\n\nThis is the enumeration an export needs in order to carry a project's whole workspace rather\nthan only the media its document happens to reference. Intermediates and the canvas's private\n`other` category are excluded, because neither is something the gallery shows on the board.\n\nDeliberately unversioned: `.invk`'s `board.json` carries its own version, so the archive format\nis free to change without the wire format following it, and vice versa."
+      },
+      "ProjectCreateRequest": {
+        "properties": {
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id",
+            "description": "Client-generated project id (e.g. for imports); generated when omitted"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id",
+            "description": "An existing unclaimed private board for the project to adopt, renamed to match. Omit to create one. Restoring a project uploads its media into such a board first, so that creating the project is the single commit point for an import."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project document"
+          }
+        },
+        "type": "object",
+        "required": ["name", "data"],
+        "title": "ProjectCreateRequest",
+        "description": "Request body for creating a project."
+      },
+      "ProjectRecordDTO": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The project's client-generated identifier"
+          },
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The project's private board; only project APIs may rename or delete it"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic revision, incremented on every save"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the project was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the project was last saved"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project document"
+          }
+        },
+        "type": "object",
+        "required": ["project_id", "board_id", "name", "revision", "created_at", "updated_at", "data"],
+        "title": "ProjectRecordDTO",
+        "description": "Full project record including the client-owned document."
+      },
+      "ProjectSummaryDTO": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id",
+            "description": "The project's client-generated identifier"
+          },
+          "board_id": {
+            "type": "string",
+            "title": "Board Id",
+            "description": "The project's private board; only project APIs may rename or delete it"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic revision, incremented on every save"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the project was created"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the project was last saved"
+          }
+        },
+        "type": "object",
+        "required": ["project_id", "board_id", "name", "revision", "created_at", "updated_at"],
+        "title": "ProjectSummaryDTO",
+        "description": "Lightweight project listing entry; the document payload is omitted."
+      },
+      "ProjectUpdateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The project's display name"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data",
+            "description": "The opaque client-owned project document"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "title": "Expected Revision",
+            "description": "The revision this save is based on; mismatch returns 409"
+          }
+        },
+        "type": "object",
+        "required": ["name", "data", "expected_revision"],
+        "title": "ProjectUpdateRequest",
+        "description": "Request body for saving a project with optimistic concurrency."
+      },
       "PromptEnhancerField": {
         "description": "Field for the optional ERNIE-Image prompt-enhancer (Ministral3ForCausalLM).",
         "properties": {
@@ -73219,6 +76491,142 @@
         ],
         "title": "Qwen3VLEncoder_Checkpoint_Config",
         "description": "Configuration for a single-file Qwen3-VL text encoder checkpoint (e.g. ComfyUI ``qwen3vl_4b_*``).\n\nDistinguished from the text-only ``Qwen3Encoder`` checkpoint (Z-Image) by the presence of the\nQwen3-VL visual tower. The tokenizer is not bundled in single-file checkpoints and is pulled from\nHuggingFace (``Qwen/Qwen3-VL-4B-Instruct``) by the loader."
+      },
+      "Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_vl_encoder",
+            "title": "Type",
+            "default": "qwen3_vl_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format"
+        ],
+        "title": "Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config",
+        "description": "Configuration for MiniMax H3's truncated Qwen3-VL-32B conditioning encoder single files\n(Comfy-Org ``qwen3vl_32b_minimax_h3_*.safetensors`` and mirrors).\n\nThese are NOT complete Qwen3-VL-32B checkpoints: the language stack is truncated to the 50\nlayers H3 conditions on (the file's ``minimax_h3_te`` metadata records the contract:\n\"unnormalized_hidden_after_layer_50\"), the final norm and LM head are omitted, and the\nbf16/int8-convrot repacks quantize only the 50 language layers (vision tower stays bf16).\n\nIdentified primarily by the explicit ``minimax_h3_te`` safetensors metadata; a structural\nfallback covers metadata-stripped re-uploads. Krea-2's ``Qwen3VLEncoder_Checkpoint_Config``\nis locked to the 4B shape (hidden 2560), so neither config can claim the other's files.\n\nThe nvfp4 repacks share this layout and are accepted here, but the loader rejects their\nquantization format early (header-only check) with a clear error - mirroring how the H3\ntransformer checkpoint config treats fp8_scaled files."
       },
       "Qwen3VLEncoder_Qwen3VLEncoder_Config": {
         "properties": {
@@ -79703,7 +83111,7 @@
               }
             ],
             "title": "User Pending",
-            "description": "Number of the requesting user's queue items with status 'pending' (None for admins/global callers)"
+            "description": "Number of the requesting user's queue items with status 'pending' (None for global callers)"
           },
           "user_in_progress": {
             "anyOf": [
@@ -79715,7 +83123,7 @@
               }
             ],
             "title": "User In Progress",
-            "description": "Number of the requesting user's queue items with status 'in_progress' (None for admins/global callers)"
+            "description": "Number of the requesting user's queue items with status 'in_progress' (None for global callers)"
           }
         },
         "type": "object",
@@ -80526,6 +83934,9 @@
                 "$ref": "#/components/schemas/Krea2VariantType"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
+              },
+              {
                 "$ref": "#/components/schemas/MistralVariantType"
               },
               {
@@ -80699,6 +84110,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
               },
               {
                 "$ref": "#/components/schemas/MistralVariantType"
@@ -81598,11 +85012,13 @@
           "tokenizer",
           "tokenizer_2",
           "tokenizer_3",
+          "processor",
           "pe",
           "pe_tokenizer",
           "vae",
           "vae_decoder",
           "vae_encoder",
+          "audio_vae",
           "scheduler",
           "safety_checker"
         ],
@@ -81649,6 +85065,9 @@
               },
               {
                 "$ref": "#/components/schemas/Krea2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3VariantType"
               },
               {
                 "$ref": "#/components/schemas/MistralVariantType"
@@ -87281,7 +90700,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Join two or more videos into a single MP4.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nAll inputs must share the same pixel dimensions. Output frame rate defaults to the\nfirst input's fps; override with ``fps`` to force a specific rate (the frames are not\nresampled, only the container is encoded at the new rate).",
+        "description": "Join two or more videos into a single MP4.\n\nAudio: if any input carries an audio track, the output gets an AAC track assembled on\nthe emitted timeline \u2014 silent inputs contribute silence, `cut` splices the tracks,\n`crossfade` blends them equal-power over the transition window, and\n`fade_through_black` fades the outgoing track to silence and the incoming one up from\nit, mirroring the video. An fps override retimes audio with the video (a deliberate\nspeed/pitch change). If no input has audio, the output has no audio stream.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nAll inputs must share the same pixel dimensions. Output frame rate defaults to the\nfirst input's fps; override with ``fps`` to force a specific rate (the frames are not\nresampled, only the container is encoded at the new rate).",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -87414,7 +90833,7 @@
         "tags": ["video", "concat", "transition"],
         "title": "Concatenate Videos",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }
@@ -89913,6 +93332,90 @@
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
+      },
+      "WildcardChanges": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "The wildcard's new name."
+          },
+          "values": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Values",
+            "description": "The wildcard's new values."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "WildcardChanges"
+      },
+      "WildcardRecordDTO": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The wildcard's name, referenced in a prompt as `__name__`."
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "The values this wildcard expands to."
+          },
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "The wildcard ID."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The user who owns this wildcard."
+          }
+        },
+        "type": "object",
+        "required": ["name", "values", "id", "user_id"],
+        "title": "WildcardRecordDTO"
+      },
+      "WildcardWithoutId": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "The wildcard's name, referenced in a prompt as `__name__`."
+          },
+          "values": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Values",
+            "description": "The values this wildcard expands to."
+          }
+        },
+        "type": "object",
+        "required": ["name", "values"],
+        "title": "WildcardWithoutId"
       },
       "Workflow": {
         "properties": {
