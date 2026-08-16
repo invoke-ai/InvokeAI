@@ -172,10 +172,18 @@ class WanModelLoaderInvocation(BaseInvocation):
                 if getattr(low_config, "variant", None) != main_variant:
                     raise ValueError("The high-noise and low-noise GGUF models must use the same Wan variant.")
 
-                # Expert tags come from filenames and may be absent or wrong on
-                # community models. Explicit graph wiring is authoritative:
+                # Expert tags are usually inferred from filenames, but may be
+                # explicit config overrides. Two models claiming the same
+                # non-empty phase cannot form a valid A14B expert pair.
+                if primary_expert == low_expert != "none":
+                    raise ValueError(
+                        f"Both selected GGUF models are tagged as the {primary_expert}-noise expert. "
+                        "A Wan A14B expert pair must contain one high and one low expert."
+                    )
+
+                # Explicit graph wiring remains authoritative for ordering:
                 # Transformer is high-noise and Transformer (Low Noise) is
-                # low-noise. Tags can only trigger an advisory warning.
+                # low-noise. Reversed or missing tags are advisory only.
                 if primary_expert == "none" and low_expert == "none":
                     context.logger.warning(
                         "Neither Wan A14B GGUF filename identifies its expert, so 'Transformer' is assumed to "
@@ -183,7 +191,7 @@ class WanModelLoaderInvocation(BaseInvocation):
                         "output looks wrong, swap the two models."
                     )
 
-                elif primary_expert == "low" or low_expert == "high" or primary_expert == low_expert:
+                elif primary_expert == "low" or low_expert == "high":
                     context.logger.warning(
                         "The Wan A14B GGUF filename tags disagree with the explicit transformer wiring. "
                         "The wiring is authoritative: 'Transformer' runs as the high-noise expert and "

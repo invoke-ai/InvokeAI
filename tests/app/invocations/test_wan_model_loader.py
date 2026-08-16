@@ -94,7 +94,7 @@ def _warnings(context: MagicMock) -> list[str]:
 @pytest.mark.parametrize("variant", [WanVariantType.T2V_A14B, WanVariantType.I2V_A14B])
 @pytest.mark.parametrize(
     "main_expert,low_expert",
-    [("high", "low"), ("low", "high"), ("high", "high"), ("low", "low"), ("none", "none")],
+    [("high", "low"), ("low", "high"), ("none", "none")],
 )
 def test_gguf_loader_preserves_explicit_slot_wiring_regardless_of_filename_tags(
     variant: WanVariantType, main_expert: str, low_expert: str
@@ -108,6 +108,15 @@ def test_gguf_loader_preserves_explicit_slot_wiring_regardless_of_filename_tags(
     assert output.transformer.transformer.key == "main"
     assert output.transformer.transformer_low_noise is not None
     assert output.transformer.transformer_low_noise.key == "low"
+
+
+@pytest.mark.parametrize("expert", ["high", "low"])
+def test_gguf_loader_rejects_same_phase_expert_pairs(expert: str) -> None:
+    with pytest.raises(ValueError, match="one high and one low"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, expert),
+            _config("low", WanVariantType.T2V_A14B, expert),
+        )
 
 
 @pytest.mark.parametrize(
