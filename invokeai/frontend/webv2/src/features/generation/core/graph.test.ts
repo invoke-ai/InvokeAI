@@ -451,6 +451,35 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
   });
 
+  it('uses a complete FLUX.2 SDNQ component source without standalone overrides', () => {
+    const source: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-sdnq-source',
+      submodels: completeSdnqPipeline,
+    };
+    const graph = compile(flux2Klein9bModel, { componentSourceModel: source });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_encoder_model: undefined,
+      qwen3_source_model: source,
+      vae_model: undefined,
+    });
+  });
+
+  it('rejects a partial FLUX.2 SDNQ component source during graph compilation', () => {
+    const source: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-partial-sdnq-source',
+      submodels: { text_encoder: {}, transformer: {}, vae: {} },
+    };
+
+    expect(() => compile(flux2Klein9bModel, { componentSourceModel: source })).toThrow(
+      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+    );
+  });
+
   it('does not enable FLUX.2 CFG without negative conditioning', () => {
     const graph = compile(flux2Model, { cfgScale: 4 });
 

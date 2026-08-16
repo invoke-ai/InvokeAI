@@ -31,6 +31,12 @@ const candidate = (overrides: Partial<GenerateComponentCandidate>): GenerateComp
   ...overrides,
 });
 
+const STANDARD_SDNQ_COMPONENTS = ['transformer', 'vae', 'text_encoder', 'tokenizer'] as const;
+const FLUX1_SDNQ_COMPONENTS = [...STANDARD_SDNQ_COMPONENTS, 'text_encoder_2', 'tokenizer_2'] as const;
+
+const submodelsWithout = (components: readonly string[], missing: string): Record<string, object> =>
+  Object.fromEntries(components.filter((component) => component !== missing).map((component) => [component, {}]));
+
 describe('Generate component compatibility', () => {
   it('only treats SDNQ folders with every required pipeline component as self-contained', () => {
     const complete = candidate({
@@ -44,6 +50,14 @@ describe('Generate component compatibility', () => {
 
     expect(isSelfContainedSDNQPipeline(complete)).toBe(true);
     expect(isSelfContainedSDNQPipeline(partial)).toBe(false);
+  });
+
+  it.each(STANDARD_SDNQ_COMPONENTS)('rejects a standard SDNQ pipeline missing %s', (missing) => {
+    expect(
+      isSelfContainedSDNQPipeline(
+        candidate({ format: 'sdnq_quantized', submodels: submodelsWithout(STANDARD_SDNQ_COMPONENTS, missing) })
+      )
+    ).toBe(false);
   });
 
   it('requires both text-encoder pairs before a FLUX.1 SDNQ folder is self-contained', () => {
@@ -65,6 +79,14 @@ describe('Generate component compatibility', () => {
 
     expect(isSelfContainedSDNQFlux1Pipeline(complete)).toBe(true);
     expect(isSelfContainedSDNQFlux1Pipeline(missingT5Pair)).toBe(false);
+  });
+
+  it.each(FLUX1_SDNQ_COMPONENTS)('rejects a FLUX.1 SDNQ pipeline missing %s', (missing) => {
+    expect(
+      isSelfContainedSDNQFlux1Pipeline(
+        candidate({ format: 'sdnq_quantized', submodels: submodelsWithout(FLUX1_SDNQ_COMPONENTS, missing) })
+      )
+    ).toBe(false);
   });
 
   it('separates Anima Qwen3 0.6B encoders from other Qwen3 encoders', () => {

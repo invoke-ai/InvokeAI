@@ -42,11 +42,11 @@ export const resolveRandDeviceMetadata = (useCpuNoise: boolean, options: readonl
 };
 
 /**
- * Map device id → display label, disambiguating identically-named GPUs with a
+ * Map device id → display label, disambiguating identically-named accelerators with a
  * 1-based `#N` suffix. A uniquely-named device gets no suffix.
  *
  * The ordinal follows the order the options are given, and the backend returns
- * every installed CUDA device in index order — not just the ones enabled in
+ * every installed indexed accelerator in backend order — not just the ones enabled in
  * `generation_devices`. That matters: numbering off a filtered list would renumber
  * the survivors when a device is disabled, so `cuda:2` would stop being `#3`.
  */

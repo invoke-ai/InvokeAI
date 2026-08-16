@@ -401,6 +401,28 @@ describe('component policies', () => {
     ).toBe(incompatibleSource.key);
   });
 
+  it('auto-selects complete FLUX.2 SDNQ component sources and rejects partial folders', () => {
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+    const completeSource = createModel('flux2', {
+      format: 'sdnq_quantized',
+      key: 'flux2-complete-sdnq-source',
+      submodels: { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} },
+      variant: 'klein_9b',
+    });
+    const partialSource = createModel('flux2', {
+      format: 'sdnq_quantized',
+      key: 'flux2-partial-sdnq-source',
+      submodels: { text_encoder: {}, transformer: {}, vae: {} },
+      variant: 'klein_9b',
+    });
+    const settings = createSettings(model);
+
+    expect(getAutoFlux2ComponentSourceModel(model, settings, [partialSource, completeSource])?.key).toBe(
+      completeSource.key
+    );
+    expect(getAutoFlux2ComponentSourceModel(model, settings, [partialSource])).toBeNull();
+  });
+
   it('validates Qwen Image Qwen-VL and VAE requirements', () => {
     const model = createModel('qwen-image', { format: 'checkpoint' });
 

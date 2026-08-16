@@ -29,7 +29,41 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RunCanvasInvocationDeps } from './prepareCanvasInvocation';
 
 import { DEFAULT_CANVAS_COMPOSITING } from './canvasCompositing';
-import { resolveRegionalReferenceImages, runCanvasInvocation } from './prepareCanvasInvocation';
+import {
+  prepareCanvasInvocation,
+  resolveRegionalReferenceImages,
+  runCanvasInvocation,
+} from './prepareCanvasInvocation';
+
+const canvasBoundaryMocks = vi.hoisted(() => ({
+  getCanvasEngine: vi.fn(),
+  getCanvasOperations: vi.fn(),
+  generationDeviceOptions: [] as { device: string; name: string }[],
+}));
+
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+
+  return {
+    ...original,
+    getCanvasEngine: canvasBoundaryMocks.getCanvasEngine,
+    getCanvasOperations: canvasBoundaryMocks.getCanvasOperations,
+  };
+});
+
+vi.mock('@features/queue/devices', async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+
+  return {
+    ...original,
+    getGenerationDevicesSnapshot: () => ({
+      error: null,
+      loadState: 'loaded' as const,
+      options: canvasBoundaryMocks.generationDeviceOptions,
+      setting: 'auto' as const,
+    }),
+  };
+});
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const externalModel: GenerateModelConfig = {
@@ -284,6 +318,43 @@ const controlLayer = (
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'control',
   withTransparencyEffect: true,
+});
+
+describe('prepareCanvasInvocation generation-device boundary', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    canvasBoundaryMocks.getCanvasEngine.mockReset();
+    canvasBoundaryMocks.getCanvasOperations.mockReset();
+    canvasBoundaryMocks.generationDeviceOptions = [];
+  });
+
+  it('passes the XPU runtime snapshot into the compiled canvas graph metadata', async () => {
+    const harness = makeHarness({ document: makeDoc([]) });
+    canvasBoundaryMocks.generationDeviceOptions = [{ device: 'xpu:0', name: 'Intel Arc' }];
+    canvasBoundaryMocks.getCanvasEngine.mockReturnValue({
+      lifecycle: { flushPendingUploads: harness.flushPendingUploads },
+    });
+    canvasBoundaryMocks.getCanvasOperations.mockReturnValue({
+      composeForGeneration: (options: Parameters<typeof composeForGeneration>[1]) =>
+        composeForGeneration(harness.host, options),
+    });
+
+    await prepareCanvasInvocation({
+      commands: harness.deps.commands,
+      compositing: harness.deps.compositing,
+      destination: harness.deps.destination,
+      generateValues: harness.deps.generateValues,
+      models: harness.deps.models,
+      projectId: harness.deps.projectId,
+      projectSettings: { useCpuNoise: false },
+      strength: harness.deps.strength,
+    });
+
+    const nodes = harness.submittedGraphs()[0]?.graph.backendGraph?.nodes ?? {};
+    const metadata = Object.values(nodes).find((node) => node.type === 'core_metadata');
+
+    expect(metadata?.rand_device).toBe('xpu');
+  });
 });
 
 describe('runCanvasInvocation', () => {
