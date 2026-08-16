@@ -1,8 +1,9 @@
-import { Box, Flex, ScrollArea, Spinner, Text } from '@chakra-ui/react';
+import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem } from '@features/gallery/core/items';
+import { isDateBoardId } from '@features/gallery/data/backend';
 import { DropZone } from '@platform/ui';
-import { UploadIcon } from 'lucide-react';
+import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -12,20 +13,27 @@ import {
   useRef,
   useState,
   type DragEvent,
+  type KeyboardEvent,
 } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
-import type { GalleryQueuePlaceholder } from './galleryStateView';
-
-import { GALLERY_GRID_GAP_PX, getGalleryCellSizePx, getGalleryColumnCount } from './galleryGridLayout';
+import {
+  buildGalleryGridRows,
+  GALLERY_GRID_GAP_PX,
+  GALLERY_STARRED_HEADER_HEIGHT_PX,
+  getGalleryCellSizePx,
+  getGalleryColumnCount,
+  getGalleryGridRowHeightPx,
+  getGalleryGridRowIndexForItem,
+} from './galleryGridLayout';
 import { GalleryQueuePlaceholderCell } from './GalleryQueuePlaceholderCell';
-import { getGalleryPlaceholderInsertionIndex } from './galleryStateView';
 import { GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
 import { useGalleryGridSelection } from './useGalleryGridSelection';
+import { useGalleryUploadInput } from './useGalleryUploadInput';
 
 /**
  * Seeds the measured width per region so remounting the gallery in a placement
@@ -33,12 +41,77 @@ import { useGalleryGridSelection } from './useGalleryGridSelection';
  * tiles before the ResizeObserver reports.
  */
 const viewportWidthCache = new Map<string, number>();
+const STARRED_TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
 
-type GridCell =
-  | { kind: 'item'; item: GalleryItem; itemIndex: number }
-  | { kind: 'placeholder'; placeholder: GalleryQueuePlaceholder };
+/** The disclosure row above the starred items, styled to match board rows. */
+const GalleryStarredSectionHeader = ({
+  isOpen,
+  itemCount,
+  offsetPx,
+  onToggle,
+}: {
+  isOpen: boolean;
+  itemCount: number;
+  offsetPx: number;
+  onToggle: () => void;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex
+      align="center"
+      h={`${GALLERY_STARRED_HEADER_HEIGHT_PX}px`}
+      left="0"
+      position="absolute"
+      px="1"
+      top="0"
+      transform={`translateY(${offsetPx}px)`}
+      w="full"
+    >
+      <chakra.button
+        aria-expanded={isOpen}
+        aria-label={t(isOpen ? 'widgets.gallery.collapseStarredItems' : 'widgets.gallery.expandStarredItems')}
+        alignItems="center"
+        color="fg.muted"
+        cursor="pointer"
+        display="flex"
+        flex="1"
+        gap="1"
+        minW="0"
+        transition="color var(--wb-motion-duration-fast) ease"
+        type="button"
+        _hover={STARRED_TRIGGER_HOVER_STYLES}
+        onClick={onToggle}
+      >
+        <Icon
+          as={ChevronRightIcon}
+          boxSize="3"
+          transform={isOpen ? 'rotate(90deg)' : undefined}
+          transition="transform var(--wb-motion-duration-medium) ease"
+        />
+        <Icon as={StarIcon} boxSize="3" fill="currentColor" />
+        <HStack gap="1">
+          <Text
+            as="span"
+            fontSize="2xs"
+            fontWeight="600"
+            letterSpacing="wide"
+            lineHeight="1"
+            textTransform="uppercase"
+            truncate
+          >
+            {t('widgets.gallery.starredItems')}
+          </Text>
+          <Text as="span" color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1">
+            {itemCount}
+          </Text>
+        </HStack>
+      </chakra.button>
+    </Flex>
+  );
+};
 
 /**
  * The virtualized thumbnail grid. Column count comes from the measured
@@ -50,11 +123,11 @@ export const GalleryImageGrid = () => {
   const { actions, gallery, isWindowTruncated, itemActions, region } = useGalleryWidget();
   const { account, antialiasProgressImages, ImageContextMenu } = useGalleryUi();
   const [isDropActive, setIsDropActive] = useState(false);
+  const [isStarredOpen, setIsStarredOpen] = useState(true);
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(region) ?? 0);
   const dragDepthRef = useRef(0);
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, starredFirst, thumbnailFit } =
-    gallery.settings;
+  const { imageDensityPercent, imageOrderDir, paginationMode, showImageDimensions, thumbnailFit } = gallery.settings;
 
   const {
     actionSelectionRefs,
@@ -79,36 +152,39 @@ export const GalleryImageGrid = () => {
     ? getGalleryBoardLabel(selectedBoard, t)
     : t('widgets.gallery.selectedBoardFallback');
   const isEmpty = gallery.items.length === 0 && gallery.pendingPlaceholders.length === 0;
+  const hasActiveSearch = gallery.searchTerm.trim() !== '';
+  const isVirtualBoard = isDateBoardId(gallery.selectedBoardId);
 
-  const placeholderInsertionIndex = getGalleryPlaceholderInsertionIndex(gallery.items, imageOrderDir, starredFirst);
+  const rows = useMemo(
+    () =>
+      buildGalleryGridRows({
+        columnCount,
+        imageOrderDir,
+        isStarredOpen,
+        items: gallery.items,
+        pendingPlaceholders: gallery.pendingPlaceholders,
+      }),
+    [columnCount, gallery.items, gallery.pendingPlaceholders, imageOrderDir, isStarredOpen]
+  );
 
-  const cells = useMemo<GridCell[]>(() => {
-    const itemCells: GridCell[] = gallery.items.map((item, itemIndex) => ({
-      item,
-      itemIndex,
-      kind: 'item',
-    }));
-    const placeholderCells: GridCell[] = gallery.pendingPlaceholders.map((placeholder) => ({
-      kind: 'placeholder',
-      placeholder,
-    }));
-
-    return [
-      ...itemCells.slice(0, placeholderInsertionIndex),
-      ...placeholderCells,
-      ...itemCells.slice(placeholderInsertionIndex),
-    ];
-  }, [gallery.items, gallery.pendingPlaceholders, placeholderInsertionIndex]);
-
-  const rowCount = Math.ceil(cells.length / columnCount);
+  const rowCount = rows.length;
   const cellSizePx = getGalleryCellSizePx({ columnCount, widthPx: viewportWidth });
   const rowHeightPx = cellSizePx + GALLERY_GRID_GAP_PX;
-  const estimateRowSize = useCallback(() => rowHeightPx, [rowHeightPx]);
+  const estimateRowSize = useCallback(
+    (index: number) => {
+      const row = rows[index];
+
+      return row ? getGalleryGridRowHeightPx(row, rowHeightPx) : rowHeightPx;
+    },
+    [rowHeightPx, rows]
+  );
+  const getRowKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
   const getScrollElement = useCallback(() => viewportRef.current, []);
 
   const virtualizer = useVirtualizer({
     count: rowCount,
     estimateSize: estimateRowSize,
+    getItemKey: getRowKey,
     getScrollElement,
     overscan: 4,
   });
@@ -122,10 +198,11 @@ export const GalleryImageGrid = () => {
   // identity would buy nothing and pinning the mutable virtualizer into a
   // dependency array defeats the compiler's own memoization.
   const scrollToItemIndex = (itemIndex: number) => {
-    const cellIndex =
-      itemIndex >= placeholderInsertionIndex ? itemIndex + gallery.pendingPlaceholders.length : itemIndex;
+    const rowIndex = getGalleryGridRowIndexForItem(rows, itemIndex);
 
-    virtualizer.scrollToIndex(Math.floor(cellIndex / columnCount));
+    if (rowIndex >= 0) {
+      virtualizer.scrollToIndex(rowIndex);
+    }
   };
 
   useGalleryGridHotkeys({ actionSelectionRefs, columnCount, scrollToItemIndex });
@@ -160,9 +237,16 @@ export const GalleryImageGrid = () => {
     return () => observer.disconnect();
   }, [isEmpty, region]);
 
-  useEffect(() => {
+  // The virtualizer only recomputes offsets lazily and only notifies
+  // subscribers when the visible index range changes, so a row-model change
+  // that keeps the range identical — collapsing the starred section, items
+  // moving between sections, a view switch swapping the item list — would
+  // paint the new rows at the previous rows' offsets. measure() recomputes
+  // from the current estimates and notifies unconditionally; running it as a
+  // layout effect keeps the stale frame from ever reaching the screen.
+  useLayoutEffect(() => {
     measureVirtualizer();
-  }, [rowHeightPx]);
+  }, [rowHeightPx, rows]);
 
   const virtualRows = virtualizer.virtualItems;
   const lastVisibleRowIndex = virtualRows[virtualRows.length - 1]?.index ?? 0;
@@ -216,9 +300,25 @@ export const GalleryImageGrid = () => {
     [actions]
   );
 
+  const { inputProps: uploadInputProps, openPicker: openUploadPicker } = useGalleryUploadInput(actions.uploadFiles);
+
+  const handleUploadKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openUploadPicker();
+      }
+    },
+    [openUploadPicker]
+  );
+
   const handleShowProgressImages = useCallback(() => {
     account.enableLiveFollow();
   }, [account]);
+
+  const handleToggleStarredSection = useCallback(() => {
+    setIsStarredOpen((isOpen) => !isOpen);
+  }, []);
 
   const handleToggleStarred = useCallback(
     (item: GalleryItem) => void itemActions.setItemsStarred([{ kind: item.kind, name: item.name }], !item.starred),
@@ -229,6 +329,7 @@ export const GalleryImageGrid = () => {
     <Box
       ref={syncRangeInteractionContext}
       flex="1"
+      h="full"
       maxW="full"
       minH="0"
       minW="0"
@@ -240,32 +341,74 @@ export const GalleryImageGrid = () => {
       onDrop={handleDrop}
     >
       {isEmpty ? (
-        <Flex align="center" color="fg.muted" h="full" justify="center" minH="8rem">
-          <Text fontSize="xs">
-            {gallery.isLoading ? t('widgets.gallery.loadingBackendGallery') : t('widgets.gallery.noImagesMatch')}
-          </Text>
-        </Flex>
+        gallery.isLoading || hasActiveSearch || isVirtualBoard ? (
+          <Flex align="center" color="fg.muted" h="full" justify="center" minH="8rem">
+            <Text fontSize="xs">
+              {gallery.isLoading ? t('widgets.gallery.loadingBackendGallery') : t('widgets.gallery.noImagesMatch')}
+            </Text>
+          </Flex>
+        ) : (
+          <Flex align="stretch" h="full" minH="8rem" p="2">
+            <input {...uploadInputProps} />
+            <DropZone
+              alignItems="center"
+              cursor="pointer"
+              display="flex"
+              flex="1"
+              fontSize="xs"
+              isOver={isDropActive}
+              justifyContent="center"
+              role="button"
+              tabIndex={0}
+              onClick={openUploadPicker}
+              onKeyDown={handleUploadKeyDown}
+            >
+              <Stack align="center" gap="1">
+                <Icon as={UploadIcon} boxSize="4" color="fg.subtle" />
+                <Text color="fg.muted">{t('widgets.gallery.emptyBoardUploadHint')}</Text>
+              </Stack>
+            </DropZone>
+          </Flex>
+        )
       ) : (
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
           <ScrollArea.Viewport ref={viewportRef} h="full" outline="none" w="full">
             <ScrollArea.Content aria-label={t('widgets.gallery.itemsAriaLabel')} role="list">
               <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
-                {virtualRows.map((virtualRow) => (
-                  <Box
-                    key={virtualRow.key}
-                    display="grid"
-                    gap={`${GALLERY_GRID_GAP_PX}px`}
-                    gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
-                    left="0"
-                    position="absolute"
-                    role="presentation"
-                    top="0"
-                    transform={`translateY(${virtualRow.start}px)`}
-                    w="full"
-                  >
-                    {cells
-                      .slice(virtualRow.index * columnCount, (virtualRow.index + 1) * columnCount)
-                      .map((cell) =>
+                {virtualRows.map((virtualRow) => {
+                  const row = rows[virtualRow.index];
+
+                  if (!row || row.kind === 'starred-gap') {
+                    return null;
+                  }
+
+                  if (row.kind === 'starred-header') {
+                    return (
+                      <GalleryStarredSectionHeader
+                        key={virtualRow.key}
+                        isOpen={isStarredOpen}
+                        itemCount={row.itemCount}
+                        offsetPx={virtualRow.start}
+                        onToggle={handleToggleStarredSection}
+                      />
+                    );
+                  }
+
+                  return (
+                    <Box
+                      key={virtualRow.key}
+                      data-gallery-section={row.section}
+                      display="grid"
+                      gap={`${GALLERY_GRID_GAP_PX}px`}
+                      gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
+                      left="0"
+                      position="absolute"
+                      role="presentation"
+                      top="0"
+                      transform={`translateY(${virtualRow.start}px)`}
+                      w="full"
+                    >
+                      {row.cells.map((cell) =>
                         cell.kind === 'placeholder' ? (
                           <GalleryQueuePlaceholderCell
                             key={cell.placeholder.id}
@@ -301,8 +444,9 @@ export const GalleryImageGrid = () => {
                           />
                         )
                       )}
-                  </Box>
-                ))}
+                    </Box>
+                  );
+                })}
               </Box>
               {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
                 <Flex align="center" justify="center" py="2">

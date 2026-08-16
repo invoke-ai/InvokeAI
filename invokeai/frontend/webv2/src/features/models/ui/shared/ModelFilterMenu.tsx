@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
-import { IconButton, MenuContent } from '@platform/ui';
+import { IconButton, MenuContent, Scrollable } from '@platform/ui';
 import { CheckIcon, SlidersHorizontalIcon } from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -76,57 +76,59 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <MenuContent maxH="70vh" minW="13rem" overflowY="auto" py="1">
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                {t('models.modelType')}
-              </Menu.ItemGroupLabel>
-              <AllTypesFilterMenuItem
-                isChecked={typeAllChecked ?? typeFilter === null}
-                label={t('models.allModels')}
-                onTypeFilterChange={onTypeFilterChange}
-              />
-              {extraTypeItems}
-              {availableTypes.map((type) => (
-                <TypeFilterMenuItem
-                  key={type}
-                  type={type}
-                  typeFilter={typeFilter}
+          <MenuContent minW="13rem" py="1">
+            <Scrollable maxH="70vh">
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                  {t('models.modelType')}
+                </Menu.ItemGroupLabel>
+                <AllTypesFilterMenuItem
+                  isChecked={typeAllChecked ?? typeFilter === null}
+                  label={t('models.allModels')}
                   onTypeFilterChange={onTypeFilterChange}
                 />
-              ))}
-            </Menu.ItemGroup>
-            <Menu.Separator />
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                {t('models.baseArchitecture')}
-              </Menu.ItemGroupLabel>
-              <AllBasesFilterMenuItem isChecked={baseFilter === null} onBaseFilterChange={onBaseFilterChange} />
-              {availableBases.map((base) => (
-                <BaseFilterMenuItem
-                  key={base}
-                  base={base}
-                  baseFilter={baseFilter}
-                  onBaseFilterChange={onBaseFilterChange}
-                />
-              ))}
-            </Menu.ItemGroup>
-            <Menu.Separator />
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                {t('models.sortBy')}
-              </Menu.ItemGroupLabel>
-              {sortFields.map(({ field, labelKey }) => (
-                <SortFilterMenuItem
-                  key={field}
-                  field={field}
-                  labelKey={labelKey}
-                  sortDirection={sortDirection}
-                  sortField={sortField}
-                  onSortChange={reportSort}
-                />
-              ))}
-            </Menu.ItemGroup>
+                {extraTypeItems}
+                {availableTypes.map((type) => (
+                  <TypeFilterMenuItem
+                    key={type}
+                    type={type}
+                    typeFilter={typeFilter}
+                    onTypeFilterChange={onTypeFilterChange}
+                  />
+                ))}
+              </Menu.ItemGroup>
+              <Menu.Separator />
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                  {t('models.baseArchitecture')}
+                </Menu.ItemGroupLabel>
+                <AllBasesFilterMenuItem isChecked={baseFilter === null} onBaseFilterChange={onBaseFilterChange} />
+                {availableBases.map((base) => (
+                  <BaseFilterMenuItem
+                    key={base}
+                    base={base}
+                    baseFilter={baseFilter}
+                    onBaseFilterChange={onBaseFilterChange}
+                  />
+                ))}
+              </Menu.ItemGroup>
+              <Menu.Separator />
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                  {t('models.sortBy')}
+                </Menu.ItemGroupLabel>
+                {sortFields.map(({ field, labelKey }) => (
+                  <SortFilterMenuItem
+                    key={field}
+                    field={field}
+                    labelKey={labelKey}
+                    sortDirection={sortDirection}
+                    sortField={sortField}
+                    onSortChange={reportSort}
+                  />
+                ))}
+              </Menu.ItemGroup>
+            </Scrollable>
           </MenuContent>
         </Menu.Positioner>
       </Portal>

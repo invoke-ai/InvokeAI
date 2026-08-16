@@ -8,19 +8,17 @@ import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useNavigate } from '@tanstack/react-router';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
-import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   BookOpenTextIcon,
   BlocksIcon,
   BoxIcon,
+  ChevronDownIcon,
+  FolderIcon,
   ListOrderedIcon,
-  MenuIcon,
   MessagesSquareIcon,
   SearchIcon,
   SettingsIcon,
@@ -28,6 +26,8 @@ import {
 } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DOCS_URL = 'https://invoke-ai.github.io/InvokeAI/';
@@ -42,6 +42,9 @@ export const AppMenu = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
+  const openProjects = useCallback(() => {
+    void navigate({ to: '/projects' });
+  }, [navigate]);
   const openModels = useCallback(() => {
     void navigate({ search: { project: projectId }, to: '/models' });
   }, [navigate, projectId]);
@@ -54,7 +57,7 @@ export const AppMenu = () => {
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={t('topbar.appMenu.open')} className="group" size="xs" variant="ghost">
+        <IconButton aria-label={t('topbar.appMenu.open')} className="group" pe="1.5" size="xs" variant="ghost">
           <AppMenuGlyph />
         </IconButton>
       </Menu.Trigger>
@@ -74,6 +77,10 @@ export const AppMenu = () => {
               <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                 {t('topbar.appMenu.manage')}
               </Menu.ItemGroupLabel>
+              <Menu.Item value="projects" onClick={openProjects}>
+                <Icon as={FolderIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
+              </Menu.Item>
               {canManageModels ? (
                 <Menu.Item value="models" onClick={openModels}>
                   <Icon as={BoxIcon} boxSize="3.5" />
@@ -103,9 +110,9 @@ export const AppMenu = () => {
               </>
             ) : null}
             <Menu.Separator />
-            <HStack gap="0.5" px="1" py="0.5">
+            <HStack gap="0.5" px="0" py="0">
               <SearchMenuAction />
-              <AppMenuAction icon={SettingsIcon} label={t('common.settings')} value="settings" onClick={openSettings} />
+              <SettingsMenuAction onClick={openSettings} />
               <AppMenuLink
                 href={DOCS_URL}
                 icon={BookOpenTextIcon}
@@ -121,61 +128,54 @@ export const AppMenu = () => {
   );
 };
 
-const MARK_SWAP_PROPS = { opacity: 0 } as const;
-const GLYPH_SWAP_PROPS = { opacity: 1 } as const;
+const CHEVRON_HOVER_PROPS = { color: 'fg' } as const;
 
 const AppMenuGlyph = () => (
-  <Box boxSize="4" position="relative" role="presentation">
-    <Box
-      alignItems="center"
-      display="flex"
-      inset="0"
-      justifyContent="center"
-      position="absolute"
-      transition="opacity var(--wb-motion-duration-fast) ease"
-      _groupHover={MARK_SWAP_PROPS}
-      _groupFocusVisible={MARK_SWAP_PROPS}
-      _groupExpanded={MARK_SWAP_PROPS}
-    >
+  <HStack gap="0" role="presentation">
+    <Box alignItems="center" display="flex" justifyContent="center" w="8">
       <InvokeMark size={14} />
     </Box>
-    <Box
-      alignItems="center"
-      display="flex"
-      inset="0"
-      justifyContent="center"
-      opacity="0"
-      position="absolute"
-      transition="opacity var(--wb-motion-duration-fast) ease"
-      _groupHover={GLYPH_SWAP_PROPS}
-      _groupFocusVisible={GLYPH_SWAP_PROPS}
-      _groupExpanded={GLYPH_SWAP_PROPS}
-    >
-      <Icon as={MenuIcon} boxSize="4" />
-    </Box>
-  </Box>
+    <Icon
+      as={ChevronDownIcon}
+      boxSize="3"
+      color="fg.subtle"
+      transition="color var(--wb-motion-duration-fast) ease"
+      _groupHover={CHEVRON_HOVER_PROPS}
+      _groupExpanded={CHEVRON_HOVER_PROPS}
+    />
+  </HStack>
 );
 
 const SearchMenuAction = () => {
   const { t } = useTranslation();
-  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
-  const firstHotkey = applyCustomHotkeys(OPEN_COMMAND_PALETTE_HOTKEY, customHotkeys).keys[0];
-  const hotkeyLabel = firstHotkey ? formatHotkeyForPlatform(firstHotkey).join('+') : null;
-  const label = hotkeyLabel
-    ? t('commandPalette.buttonTooltip', { hotkey: hotkeyLabel })
-    : t('commandPalette.buttonLabel');
+  // Same formatter as every other shortcut hint in the top bar, so the two
+  // hinted actions in this row read alike (and macOS gets ⌘K, not "cmd+k").
+  const shortcut = useTopbarShortcut(OPEN_COMMAND_PALETTE_HOTKEY.commandId);
+  const label = shortcut ? t('commandPalette.buttonTooltip', { hotkey: shortcut }) : t('commandPalette.buttonLabel');
 
   return <AppMenuAction icon={SearchIcon} label={label} value="command-palette" onClick={openCommandPalette} />;
 };
 
+const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
+  const { t } = useTranslation();
+  // Reads the effective binding, so a remapped or unbound shortcut is never
+  // advertised as one that still works.
+  const shortcut = useTopbarShortcut('app.openSettings');
+  const label = shortcut ? t('common.settingsWithShortcut', { hotkey: shortcut }) : t('common.settings');
+
+  return <AppMenuAction icon={SettingsIcon} label={label} value="settings" onClick={onClick} />;
+};
+
+// Sized like the 2xs icon buttons in widget headers; menu items default to a
+// much roomier padding than an icon-only action needs.
 const FOOTER_ITEM_PROPS = {
   alignItems: 'center',
   flex: '0 0 auto',
-  h: '8',
+  h: '7',
   justifyContent: 'center',
-  minW: '8',
+  minW: '7',
   p: '0',
-  w: '8',
+  w: '7',
 } as const;
 
 const AppMenuAction = ({

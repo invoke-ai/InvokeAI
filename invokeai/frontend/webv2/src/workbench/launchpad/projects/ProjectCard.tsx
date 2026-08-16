@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 
 import { Box, Flex, Icon, Menu, Stack, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Link } from '@tanstack/react-router';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { EllipsisVerticalIcon, PinIcon } from 'lucide-react';
@@ -79,9 +80,7 @@ export const ProjectCard = ({
       </Box>
       <Flex align="center" gap="2" p="3" pointerEvents="none">
         <Stack flex="1" gap="0" minW="0">
-          <Text fontSize="xs" fontWeight="600" truncate>
-            {summary.name}
-          </Text>
+          <MiddleTruncate fontSize="xs" fontWeight="600" text={summary.name} />
           <Text color="fg.muted" fontSize="2xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>

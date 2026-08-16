@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   invalidateGallery: vi.fn(),
   notificationsAdd: vi.fn(),
   notificationsReportError: vi.fn(),
+  patchGalleryBoardCaches: vi.fn((..._args: unknown[]) => vi.fn()),
+  updateGalleryBoard: vi.fn(),
   uploadGalleryImage: vi.fn(),
   uploadGalleryVideo: vi.fn(),
 }));
@@ -39,7 +41,7 @@ vi.mock('@features/gallery/data/backend', () => ({
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
   downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
-  updateGalleryBoard: vi.fn(),
+  updateGalleryBoard: (...args: unknown[]) => mocks.updateGalleryBoard(...args),
   uploadGalleryImage: (...args: unknown[]) => mocks.uploadGalleryImage(...args),
   uploadGalleryVideo: (...args: unknown[]) => mocks.uploadGalleryVideo(...args),
 }));
@@ -82,6 +84,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('@features/gallery/data/queryCache', () => ({
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+  patchGalleryBoardCaches: (...args: unknown[]) => mocks.patchGalleryBoardCaches(...args),
 }));
 
 vi.mock('@platform/browser/downloadBlob', () => ({
@@ -92,6 +95,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const actionsRef = createRef<GalleryActions>();
 const reconcileDeletedBoardOutcome = vi.fn();
+const selectBoard = vi.fn();
 const selectItem = vi.fn();
 const setItemMultiSelection = vi.fn();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -155,7 +159,7 @@ const adapter: GalleryUiAdapter = {
   exportProject: vi.fn(),
   gallery: {
     reconcileDeletedBoardOutcome,
-    selectBoard: noop,
+    selectBoard,
     selectImage: noop,
     selectItem,
     setCompareImage: noop,
@@ -261,6 +265,97 @@ describe('deleteBoard', () => {
       message: 'Deleted 2 images and 1 videos; 1 images and 1 videos failed.',
       title: 'Deleted board "Board 1" with partial media cleanup',
     });
+  });
+});
+
+describe('optimistic board updates', () => {
+  it('renames before the request and rolls back when the backend rejects', async () => {
+    mocks.updateGalleryBoard.mockRejectedValue(new Error('rename failed'));
+
+    await act(async () => {
+      await actionsRef.current?.renameBoard('board-1', 'Renamed');
+    });
+
+    expect(mocks.patchGalleryBoardCaches).toHaveBeenCalledWith(expect.anything(), 'board-1', { name: 'Renamed' });
+    expect(mocks.patchGalleryBoardCaches.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.updateGalleryBoard.mock.invocationCallOrder[0] ?? 0
+    );
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('keeps a successful rename applied without rolling back', async () => {
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await actionsRef.current?.renameBoard('board-1', 'Renamed');
+    });
+
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+
+  it('archives the viewed board and steps off it before the request resolves', async () => {
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await actionsRef.current?.archiveBoard('board-1', true);
+    });
+
+    expect(mocks.patchGalleryBoardCaches).toHaveBeenCalledWith(expect.anything(), 'board-1', { archived: true });
+    expect(selectBoard).toHaveBeenCalledWith('none');
+    expect(selectBoard.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.updateGalleryBoard.mock.invocationCallOrder[0] ?? 0
+    );
+  });
+
+  it('restores the archived board selection on failure only while still on Uncategorized', async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+
+    let archive!: Promise<void>;
+    await act(() => {
+      archive = actionsRef.current!.archiveBoard('board-1', true);
+    });
+
+    // Reflect the optimistic step-off in the live location the failure path reads.
+    selectedBoardId = 'none';
+    await renderProbe();
+    rejectUpdate(new Error('archive failed'));
+    await act(() => archive);
+
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(selectBoard).toHaveBeenNthCalledWith(1, 'none');
+    expect(selectBoard).toHaveBeenNthCalledWith(2, 'board-1');
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+  });
+
+  it('does not fight a user who navigated elsewhere while an archive was failing', async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+
+    let archive!: Promise<void>;
+    await act(() => {
+      archive = actionsRef.current!.archiveBoard('board-1', true);
+    });
+
+    // The user moved on to a different board before the failure arrived.
+    selectedBoardId = 'board-2';
+    await renderProbe();
+    rejectUpdate(new Error('archive failed'));
+    await act(() => archive);
+
+    expect(selectBoard).toHaveBeenCalledOnce();
+    expect(selectBoard).toHaveBeenCalledWith('none');
   });
 });
 

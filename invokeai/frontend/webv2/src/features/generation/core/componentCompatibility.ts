@@ -30,7 +30,7 @@ export const isDiffusersMainForBase =
 export const isVaeForBases =
   (bases: readonly string[]): GenerateComponentFilter =>
   (model) =>
-    model.type === 'vae' && (bases.length === 0 || bases.includes(model.base));
+    model.type === 'vae' && bases.length > 0 && bases.includes(model.base);
 
 export const isClipVariant =
   (variant: string): GenerateComponentFilter =>

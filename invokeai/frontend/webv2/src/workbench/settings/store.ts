@@ -68,6 +68,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   launchpadPinnedProjectIds: [],
   launchpadProjectsSort: 'edited',
   launchpadProjectsView: 'grid',
+  notifyOnEnqueue: true,
   preferNumericAttentionStyle: false,
   queueJobsScope: 'all',
   reduceMotion: false,
@@ -292,6 +293,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   launchpadProjectsView: isProjectsViewId(preferences?.launchpadProjectsView)
     ? preferences.launchpadProjectsView
     : DEFAULT_PREFERENCES.launchpadProjectsView,
+  notifyOnEnqueue:
+    typeof preferences?.notifyOnEnqueue === 'boolean'
+      ? preferences.notifyOnEnqueue
+      : DEFAULT_PREFERENCES.notifyOnEnqueue,
   preferNumericAttentionStyle:
     typeof preferences?.preferNumericAttentionStyle === 'boolean'
       ? preferences.preferNumericAttentionStyle

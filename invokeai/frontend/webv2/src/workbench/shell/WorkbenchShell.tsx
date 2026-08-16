@@ -41,12 +41,25 @@ import { useTranslation } from 'react-i18next';
 
 import { BottomPanel } from './BottomPanel';
 import { CenterArea } from './CenterArea';
+import { DocumentTitleProgress } from './DocumentTitleProgress';
 import { WorkbenchNotificationToaster } from './notifications';
 import { LeftPanel, RightPanel } from './Panels';
 import { StatusBar } from './StatusBar';
 import { TopBar } from './topbar';
 
 const DND_MODIFIERS = [restrictToWindowEdges];
+
+/**
+ * Default 20% edge zones, at half the default scroll speed. The zones must
+ * stay full-size: in the side layout the board list is under 250px tall, so
+ * a narrower band excludes the first and last visible rows — the places an
+ * image is actually held to scroll the list. Speed is halved because at
+ * dnd-kit's default a list this small dumps its full range in under half a
+ * second, far too fast to pick a row. Phantom off-screen targets triggering
+ * scrolls from afar are prevented by the visibility check inside
+ * widgetCollisionDetection, not by shrinking zones.
+ */
+const DND_AUTO_SCROLL = { acceleration: 5 };
 
 export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
@@ -214,6 +227,7 @@ export const WorkbenchShell = () => {
   return (
     <FocusRegionProvider>
       <DndContext
+        autoScroll={DND_AUTO_SCROLL}
         collisionDetection={widgetCollisionDetection}
         modifiers={DND_MODIFIERS}
         sensors={sensors}
@@ -223,6 +237,7 @@ export const WorkbenchShell = () => {
       >
         <Flex direction="column" h="100vh" w="100vw">
           <WorkbenchNotificationToaster />
+          <DocumentTitleProgress />
           <TopBar />
 
           <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">

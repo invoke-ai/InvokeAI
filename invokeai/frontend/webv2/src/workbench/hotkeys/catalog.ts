@@ -17,6 +17,7 @@ const implemented = new Set([
   'app.invokeFront',
   'app.invokeToOtherDestination',
   'app.openProjectSwitcher',
+  'app.openSettings',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
   'app.promptWeightDown',
@@ -87,6 +88,9 @@ const editableAppHotkeys = new Set([
   'app.invokeFront',
   'app.invokeToOtherDestination',
   'app.openProjectSwitcher',
+  // Settings is a global destination with no meaning inside a text field, so
+  // the caret's location should not decide whether it opens.
+  'app.openSettings',
   'app.promptHistoryNext',
   'app.promptHistoryPrev',
   'app.promptWeightDown',
@@ -142,6 +146,9 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'invokeToOtherDestination', ['alt+mod+enter']),
   hotkey('app', 'invokeFront', ['mod+shift+enter']),
   hotkey('app', 'openProjectSwitcher', ['mod+p']),
+  // `mod` rather than a literal ctrl: this is ⌘, on macOS and ctrl+, elsewhere,
+  // which is the platform-standard settings shortcut on both.
+  hotkey('app', 'openSettings', ['mod+,']),
   hotkey('app', 'saveLayoutPreset', []),
   hotkey('app', 'selectComposePreset', ['alt+1']),
   hotkey('app', 'selectEditPreset', ['alt+2']),

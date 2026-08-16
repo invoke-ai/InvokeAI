@@ -1,4 +1,5 @@
-import { Box, HStack, Icon, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon } from '@chakra-ui/react';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { WorkflowIcon } from 'lucide-react';
 
 import type { WorkflowWidgetViewProps } from './contracts';
@@ -22,9 +23,7 @@ const WorkflowStatusBarItem = () => {
   return (
     <HStack gap="1" maxW="14rem" minW="0" px="2">
       <Icon as={WorkflowIcon} boxSize="3" color={isRunning ? 'brand.solid' : undefined} flexShrink={0} />
-      <Text fontSize="2xs" minW="0" truncate>
-        {workflowName || 'Untitled Workflow'}
-      </Text>
+      <MiddleTruncate fontSize="2xs" minW="0" text={workflowName || 'Untitled Workflow'} />
       {isRunning ? <Box bg="brand.solid" boxSize="1.5" flexShrink={0} rounded="full" /> : null}
     </HStack>
   );

@@ -9,6 +9,7 @@ import {
   eventToHotkeyString,
   useExtensionHotkeyDefinitions,
 } from '@workbench/hotkeys';
+import { ShortcutKeyGlyph } from '@workbench/hotkeys/keyGlyphs';
 import { patchWorkbenchPreferences, useWorkbenchPreferences } from '@workbench/settings/store';
 import { CheckIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -557,7 +558,7 @@ const HotkeyChip = ({
       {formatHotkeyForPlatform(hotkey).map((part, index, parts) => (
         <Fragment key={`${part}:${index}`}>
           <Kbd size="sm" textTransform="lowercase">
-            {part}
+            <ShortcutKeyGlyph fallback={part} part={part} />
           </Kbd>
           {index < parts.length - 1 ? (
             <Text color="fg.subtle" fontSize="2xs">

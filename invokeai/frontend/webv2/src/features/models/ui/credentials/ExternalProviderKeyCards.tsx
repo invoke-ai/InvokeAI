@@ -17,10 +17,10 @@ import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
+import { AlibabaCloudIcon, ByteDanceIcon, GoogleGeminiIcon } from '@platform/ui/BrandIcon';
 import { BotIcon, HexagonIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiAlibabacloud, SiBytedance, SiGooglegemini } from 'react-icons/si';
 
 interface ProviderPresentation {
   icon: ElementType;
@@ -31,10 +31,10 @@ interface ProviderPresentation {
 }
 
 const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
-  alibabacloud: { icon: SiAlibabacloud, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
-  gemini: { icon: SiGooglegemini, placeholder: 'AIza…', title: 'Google Gemini' },
+  alibabacloud: { icon: AlibabaCloudIcon, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
+  gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
   openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
-  seedream: { icon: SiBytedance, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
+  seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
 };
 
 /** One key card per provider the backend reports, from the shared store. */

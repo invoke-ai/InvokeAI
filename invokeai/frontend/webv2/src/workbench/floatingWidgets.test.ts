@@ -129,24 +129,23 @@ describe('dockFloatingWidget', () => {
   });
 
   it('docks to the end when the remembered index is gone or nonsensical', () => {
-    const floated = workbenchReducer(createInitialWorkbenchState(), {
-      instanceId: 'image-map',
-      type: 'floatWidget',
-    });
+    // 'gallery' leads the right rail, so a docked-to-the-end result is only
+    // reachable by discarding the remembered index rather than honouring it.
+    const floated = floatGallery();
     const withBadIndex: WorkbenchState = {
       ...floated,
       projects: floated.projects.map((project) => ({
         ...project,
         floatingWidgets: project.floatingWidgets && {
           ...project.floatingWidgets,
-          'image-map': { ...project.floatingWidgets['image-map']!, returnIndex: Number.NaN },
+          gallery: { ...project.floatingWidgets.gallery!, returnIndex: Number.NaN },
         },
       })),
     };
 
-    const state = workbenchReducer(withBadIndex, { instanceId: 'image-map', type: 'dockFloatingWidget' });
+    const state = workbenchReducer(withBadIndex, { instanceId: 'gallery', type: 'dockFloatingWidget' });
 
-    expect(getActiveProject(state).widgetRegions.right.instanceIds.at(-1)).toBe('image-map');
+    expect(getActiveProject(state).widgetRegions.right.instanceIds.at(-1)).toBe('gallery');
   });
 
   it('is a no-op when nothing is floating', () => {
@@ -284,17 +283,17 @@ describe('pure helpers', () => {
 
 describe('normalization of persisted floating windows', () => {
   it('keeps a floated widget floating across a reload instead of re-docking it', () => {
-    // The right rail migration re-adds `image-map` to any rail that reads as a
-    // pre-image-map default — which is exactly the shape floating it leaves.
-    const state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'image-map', type: 'floatWidget' });
+    // The bottom rail migration re-adds `queue-status` to any rail that reads as
+    // a pre-queue-status default — which is exactly the shape floating it leaves.
+    const state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'queue-status', type: 'floatWidget' });
     const project = normalizeWorkbenchProject(getActiveProject(state));
 
-    expect(project.floatingWidgets?.['image-map']).toBeDefined();
-    expect(getRegionsHolding(project, 'image-map')).toEqual([]);
+    expect(project.floatingWidgets?.['queue-status']).toBeDefined();
+    expect(getRegionsHolding(project, 'queue-status')).toEqual([]);
   });
 
   it('survives a second normalization pass unchanged', () => {
-    const state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'image-map', type: 'floatWidget' });
+    const state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'queue-status', type: 'floatWidget' });
     const once = normalizeWorkbenchProject(getActiveProject(state));
     const twice = normalizeWorkbenchProject(once);
 
@@ -308,18 +307,20 @@ describe('normalization of persisted floating windows', () => {
       ...project,
       floatingWidgets: {
         // Would crash `dockFloatingWidget` on `widgetRegions[returnRegion]`.
-        'image-map': { ...project.floatingWidgets!.gallery, returnRegion: 'nowhere' },
+        queue: { ...project.floatingWidgets!.gallery, returnRegion: 'nowhere' },
         // Would reach the window's fixed-position CSS as `NaNpx`.
         preview: { ...project.floatingWidgets!.gallery, x: Number.NaN },
         // No such instance to render.
         'no-such-widget': { ...project.floatingWidgets!.gallery },
-        queue: { ...project.floatingWidgets!.gallery, mode: 'iconified' },
+        notifications: { ...project.floatingWidgets!.gallery, mode: 'iconified' },
       } as unknown as Project['floatingWidgets'],
     });
 
+    // Dropping the entry must leave the instance docked where it already was,
+    // rather than floating by a malformed description or vanishing entirely.
     expect(normalized.floatingWidgets).toBeUndefined();
-    for (const instanceId of ['image-map', 'preview', 'queue']) {
-      expect(getRegionsHolding(normalized, instanceId)).toContain('right');
+    for (const instanceId of ['queue', 'preview', 'notifications']) {
+      expect(getRegionsHolding(normalized, instanceId)).not.toEqual([]);
     }
   });
 

@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
@@ -421,9 +422,7 @@ const PresetMenu = ({
           {preset ? (
             <MenuContent minW="16rem">
               <HStack justify="space-between" px="3" py="2">
-                <Text fontSize="xs" fontWeight="700" truncate>
-                  {preset.label}
-                </Text>
+                <MiddleTruncate fontSize="xs" fontWeight="700" text={preset.label} />
                 {showDrift ? (
                   <Text color="fg.muted" fontSize="2xs" flexShrink={0}>
                     {t('topbar.presets.unsaved')}

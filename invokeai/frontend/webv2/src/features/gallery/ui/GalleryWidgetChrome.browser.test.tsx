@@ -139,20 +139,12 @@ describe('GalleryWidgetLabel', () => {
 });
 
 describe('GalleryWidgetHeaderActions', () => {
-  it('offers upload and settings in every region, since the body renders neither', async () => {
+  it('offers settings in every region, since the body renders neither (upload now lives in the toolbar)', async () => {
     for (const region of ['center', 'right'] as const) {
       await renderChrome(GalleryWidgetHeaderActions, { selectedBoardId: 'dogs' }, region);
 
-      expect(host?.querySelector('button[aria-label^="widgets.gallery.upload"]'), region).not.toBeNull();
       expect(host?.querySelector('button[aria-label="widgets.gallery.settings"]'), region).not.toBeNull();
+      expect(host?.querySelector('button[aria-label^="widgets.gallery.upload"]'), region).toBeNull();
     }
-  });
-
-  it('disables upload for a date board, which cannot receive one', async () => {
-    await renderChrome(GalleryWidgetHeaderActions, { selectedBoardId: 'by_date:2026-07-30' });
-
-    const upload = host?.querySelector<HTMLButtonElement>('button[aria-label^="widgets.gallery.upload"]');
-
-    expect(upload?.disabled).toBe(true);
   });
 });

@@ -11102,7 +11102,10 @@ export type components = {
          *     emits 41 frames. Negative indices count from the end (``end_frame=-1``
          *     is the final frame), matching ``video_frame_extract``. The output frame
          *     rate defaults to the source video's frame rate; set ``fps=0`` to inherit
-         *     it (or 16 fps if the source rate can't be probed).
+         *     it (or 16 fps if the source rate can't be probed). If the source has an
+         *     audio track, the same range of it is carried into the output (retimed
+         *     with the video when the output fps changes playback speed); silent
+         *     sources stay silent.
          *
          *     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
          *     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
@@ -39843,6 +39846,13 @@ export type components = {
         /**
          * Concatenate Videos
          * @description Join two or more videos into a single MP4.
+         *
+         *     Audio: if any input carries an audio track, the output gets an AAC track assembled on
+         *     the emitted timeline — silent inputs contribute silence, `cut` splices the tracks,
+         *     `crossfade` blends them equal-power over the transition window, and
+         *     `fade_through_black` fades the outgoing track to silence and the incoming one up from
+         *     it, mirroring the video. An fps override retimes audio with the video (a deliberate
+         *     speed/pitch change). If no input has audio, the output has no audio stream.
          *
          *     Transitions:
          *

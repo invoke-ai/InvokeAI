@@ -179,7 +179,7 @@ describe('gallery state view', () => {
     });
   });
 
-  it('parses persisted gallery settings with safe defaults', () => {
+  it('parses persisted gallery settings with safe defaults and keeps the starred section complete', () => {
     const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredFirst: false }, boards, [], false);
 
     expect(gallery.settings).toEqual({
@@ -196,7 +196,7 @@ describe('gallery state view', () => {
       showDateBoards: false,
       showImageDimensions: false,
       showPendingItems: true,
-      starredFirst: false,
+      starredFirst: true,
       thumbnailFit: 'square',
     });
   });

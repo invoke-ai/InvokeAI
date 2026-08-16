@@ -19,6 +19,7 @@ import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { IconButton, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { PauseIcon, PlayIcon, RotateCcwIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -79,9 +80,7 @@ export const InstallJobRow = ({
       rounded="md"
     >
       <HStack gap="2" justify="space-between">
-        <Text flex="1" fontSize="2xs" fontWeight="600" minW="0" truncate title={sourceLabel}>
-          {displayName}
-        </Text>
+        <MiddleTruncate flex="1" fontSize="2xs" fontWeight="600" minW="0" text={displayName} title={sourceLabel} />
         {showDisconnected ? (
           <Tooltip content={t('models.backendDisconnectedProgressStale')}>
             <Icon as={TriangleAlertIcon} boxSize="3" color="fg.warning" flexShrink={0} />
@@ -147,11 +146,7 @@ export const InstallJobRow = ({
           ) : null}
         </HStack>
       </HStack>
-      {displayName !== sourceLabel ? (
-        <Text color="fg.subtle" fontSize="2xs" truncate>
-          {sourceLabel}
-        </Text>
-      ) : null}
+      {displayName !== sourceLabel ? <MiddleTruncate color="fg.subtle" fontSize="2xs" text={sourceLabel} /> : null}
       {job.status === 'downloading' || job.status === 'waiting' ? <InstallJobProgress job={job} /> : null}
       {job.status === 'error' && job.error ? (
         <Text color="fg.error" fontSize="2xs" overflowWrap="anywhere">
@@ -167,9 +162,7 @@ export const InstallJobRow = ({
           <Stack key={part.url ?? part.source ?? partFileName(part)} bg="bg.muted" gap="0.5" p="1.5" rounded="sm">
             <HStack gap="1.5">
               <Icon as={TriangleAlertIcon} boxSize="3" color={isResume ? 'fg.warning' : 'fg.error'} flexShrink={0} />
-              <Text flex="1" fontSize="2xs" minW="0" title={partFileName(part)} truncate>
-                {partFileName(part)}
-              </Text>
+              <MiddleTruncate flex="1" fontSize="2xs" minW="0" text={partFileName(part)} />
               <Badge
                 colorPalette={isResume ? 'orange' : 'red'}
                 flexShrink={0}

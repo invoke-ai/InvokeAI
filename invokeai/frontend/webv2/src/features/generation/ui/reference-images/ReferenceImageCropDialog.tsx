@@ -304,9 +304,7 @@ export const ReferenceImageCropDialog = ({
         <Dialog.Positioner>
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title fontSize="sm" fontWeight="700">
-                {t('widgets.generate.cropReferenceImage')}
-              </Dialog.Title>
+              <Dialog.Title>{t('widgets.generate.cropReferenceImage')}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="3">
@@ -392,16 +390,16 @@ export const ReferenceImageCropDialog = ({
             <Dialog.Footer>
               <Button
                 disabled={isApplying || isFullReferenceImageCropBox(cropBox)}
-                size="sm"
+                size="xs"
                 variant="outline"
                 onClick={resetCrop}
               >
                 {t('common.reset')}
               </Button>
-              <Button disabled={isApplying} size="sm" variant="outline" onClick={close}>
+              <Button disabled={isApplying} size="xs" variant="outline" onClick={close}>
                 {t('common.cancel')}
               </Button>
-              <Button loading={isApplying} size="sm" onClick={applyCrop}>
+              <Button loading={isApplying} size="xs" onClick={applyCrop}>
                 {t('common.apply')}
               </Button>
             </Dialog.Footer>
