@@ -17,7 +17,11 @@ const handleRefresh = () => {
 export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
   const { data, indexCounts, loadState } = imageMapStore.useSnapshot();
 
-  if (loadState === 'idle' || !data) {
+  // Only the states that actually show a map. `disabled`, `model_missing` and
+  // `empty` all carry data too, and each renders its own explanation — a
+  // "0 points" line with a Refresh button under "Image indexing is off" says
+  // nothing, and `computing` already offers its own "Check again".
+  if (loadState === 'idle' || !data || data.state !== 'ready') {
     return null;
   }
 

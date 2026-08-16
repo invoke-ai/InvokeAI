@@ -173,6 +173,10 @@ describe('attachImageMapDataRuntime', () => {
     const onConnection = mocks.onConnectionChange.mock.calls[0][0];
 
     imageMapStore.patchSnapshot({ loadState: 'error' });
+    // The subscribe-time replay establishes the baseline, nothing more.
+    onConnection('disconnected');
+    expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
+
     onConnection('connected');
     expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(1);
     onConnection('disconnected');
@@ -181,5 +185,25 @@ describe('attachImageMapDataRuntime', () => {
     detach();
     expect(detachSocket).toHaveBeenCalledTimes(3);
     expect(detachConnection).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch when it attaches to an already-connected socket', () => {
+    imageMapStore.patchSnapshot({ loadState: 'loaded' });
+
+    // `onConnectionChange` replays the current status synchronously, and every
+    // Launchpad -> Editor navigation remounts this runtime; treating that
+    // replay as a reconnect refetched the whole point set on each entry.
+    const detach = attachImageMapDataRuntime();
+    const onConnection = mocks.onConnectionChange.mock.calls[0][0];
+
+    onConnection('connected');
+    expect(mocks.refreshImageMapPoints).not.toHaveBeenCalled();
+
+    // A genuine drop and recovery still refreshes.
+    onConnection('disconnected');
+    onConnection('connected');
+    expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(1);
+
+    detach();
   });
 });

@@ -220,7 +220,12 @@ const ImageMapPlot = () => {
           const { clientX, clientY } = mouse;
           hoverTimerRef.current = setTimeout(() => {
             void getThumbnailUrl(imageName).then((url) => {
-              if (url && hoverSessionRef.current === session && !disposed) {
+              // Deliberately not gated on `disposed`: that belongs to this
+              // effect, which re-runs on every socket-driven refresh, so a
+              // refresh landing mid-dwell would drop the thumbnail — and no
+              // new `plotly_hover` fires while the pointer sits still.
+              // Unmount is covered by the session bump in the cleanup below.
+              if (url && hoverSessionRef.current === session) {
                 setHoverPreview({ clientX, clientY, imageName, url });
               }
             });
@@ -256,6 +261,10 @@ const ImageMapPlot = () => {
   // this, but it reruns on every `points` change.
   useEffect(() => clearHover, []);
 
+  // Ending the session retires the hover for good. Hiding it alone is not
+  // enough: an image that leaves the map never fires `plotly_unhover`, so a
+  // later refresh restoring it would pop the thumbnail back up at coordinates
+  // captured long before, wherever the pointer has since moved.
   // Live gold target on the currently selected gallery image, with a gentle
   // recenter (zoom width preserved) when it drifts near or beyond an edge.
   useEffect(() => {
@@ -376,11 +385,11 @@ const ImageMapPlot = () => {
   }, []);
 
   // A live refresh can drop the hovered image from the map, which makes the
-  // preview stale. Derived rather than cleared from an effect: `points`
-  // changes on every socket-driven refresh, so clearing on that dependency
-  // would silently cancel hovers on a busy server — and they would not come
-  // back, since `Plotly.react` resets hover state and no new `plotly_hover`
-  // fires until the pointer moves.
+  // preview stale. Derived from whether the image is still on the map, not
+  // from `points` changing: that changes on every socket-driven refresh, and
+  // clearing on it would silently cancel live hovers — they would not come
+  // back either, since `Plotly.react` resets hover state and no new
+  // `plotly_hover` fires until the pointer moves.
   const hoverPreview =
     pendingHoverPreview && points && !points.some((point) => point.imageName === pendingHoverPreview.imageName)
       ? null

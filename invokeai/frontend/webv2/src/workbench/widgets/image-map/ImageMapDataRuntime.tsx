@@ -88,8 +88,19 @@ export const attachImageMapDataRuntime = (): (() => void) => {
       }
     }),
   ];
+  // `onConnectionChange` replays the current status synchronously on subscribe,
+  // and this runtime is remounted by every Launchpad -> Editor navigation. That
+  // replay only establishes the baseline: an already-connected socket has
+  // missed nothing, and refetching on it costs a full point set on every entry
+  // into the editor. Only a real disconnected -> connected transition can have
+  // gaps to close.
+  let previousStatus: string | null = null;
   const detachConnection = socketHub.onConnectionChange((status) => {
-    if (status === 'connected') {
+    const isReconnect = previousStatus !== null && previousStatus !== 'connected' && status === 'connected';
+
+    previousStatus = status;
+
+    if (isReconnect) {
       refreshIfLoaded();
     }
   });
