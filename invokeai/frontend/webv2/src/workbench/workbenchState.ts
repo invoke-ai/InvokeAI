@@ -1409,13 +1409,6 @@ const isFloatingWidgetMode = (value: unknown): value is FloatingWidgetMode =>
 const isWidgetRegionId = (value: unknown): value is WidgetRegion => WIDGET_REGION_IDS.includes(value as WidgetRegion);
 
 /**
- * Persisted floating windows are an unsafe-cast boundary like every other
- * sub-shape here. An entry naming a region that does not exist crashes the
- * reducer the moment it is docked, and a non-numeric geometry reaches the
- * window's fixed-position CSS, so anything malformed is dropped rather than
- * carried: the widget then reappears docked instead of not at all.
- */
-/**
  * Put a docking widget back where it was, not on the end.
  *
  * The rail is an ordered tab strip, so appending turned float-then-dock — a
@@ -1439,6 +1432,13 @@ const insertAtReturnIndex = (
   return next;
 };
 
+/**
+ * Persisted floating windows are an unsafe-cast boundary like every other
+ * sub-shape here: an entry naming a region that does not exist crashes the
+ * reducer the moment it is docked, and non-numeric geometry reaches the
+ * window's fixed-position CSS. Anything malformed is dropped, so the widget
+ * reappears docked rather than not at all.
+ */
 const normalizeFloatingWidgets = (
   value: unknown,
   widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>
@@ -1676,19 +1676,16 @@ export const withAuthoritativeProjectBoard = (project: Project, boardId: string)
 /**
  * The project a recovery fork should become, preferring live content over the snapshot.
  *
- * A fork is created by the sync engine from the document it was *pushing* — serialized when the
- * save began. By the time the answer comes back, anything typed since is newer than that snapshot
- * and is what the person is looking at. Adopting the snapshot would therefore delete precisely the
- * edits the fork exists to rescue, and do it in the case the mechanism is most likely to fire: a
- * save is stale exactly when a keystroke landed while it was in flight.
+ * The fork is serialized when the save begins, so anything typed since is newer than it. Adopting
+ * the snapshot would delete precisely the edits the fork exists to rescue, in the case the
+ * mechanism most often fires: a save is stale exactly when a keystroke landed mid-flight.
  *
  * So the live project is re-labelled instead. The server-side fork already holds the older document
- * under this identity, and the sync entry recorded for it says as much, so the next push sees a
- * difference and sends the current content up its revision chain. Nothing is lost and nothing has
- * to be merged.
+ * under this identity, so the next push sees a difference and sends the current content up its
+ * revision chain — nothing lost, nothing to merge.
  *
- * The snapshot is still the answer when there is no live project — a tab closed while the save was
- * in flight — because then it is the only copy of that work left anywhere local.
+ * The snapshot still wins when there is no live project (a tab closed mid-save), because then it is
+ * the only local copy of that work.
  */
 const recoverProjectUnderNewIdentity = (
   localProject: Project | undefined,

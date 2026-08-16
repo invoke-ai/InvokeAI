@@ -19,15 +19,10 @@ import { PanelModeToggle } from './WorkflowLinearPanel';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// This app is built with the React Compiler (`vite.config.mts`), which
-// auto-memoizes plain value computations inside components based on their
-// detected dependencies — so a spy on a pure helper a card's render calls
-// (e.g. `isFormDescendantOrSelf`) can't be trusted as a "did this card's
-// render function run" probe: the compiler can (and does) skip re-running
-// such a call even when the surrounding component *was* invoked. `dnd-kit`'s
-// `useDroppable` is a hook, and hook calls can never be skipped by the
-// compiler (they must run unconditionally, in order, every render), so a
-// real passthrough spy on it is a reliable per-card render probe instead.
+// The React Compiler auto-memoizes plain value computations, so a spy on a pure
+// helper a card renders through is not a reliable "did this render" probe — the
+// compiler can skip the call even when the component did run. Hooks can never be
+// skipped, so a passthrough spy on `useDroppable` is the reliable probe.
 vi.mock('@dnd-kit/core', async (importOriginal) => {
   const actual = await importOriginal<typeof DndKitCoreModule>();
 
@@ -99,13 +94,10 @@ describe('Workflow Linear panel mode toggle', () => {
 });
 
 /**
- * Regression coverage for the native-DnD bug: dropping a card into a
- * container reparents it, React remounts the card under its new parent, and
- * the native `dragend` event (bound to the old node) never fires — leaving
- * the module's dragging state stuck and killing every drag after it. The
- * dnd-kit port resolves moves only in `onDragEnd` at the `DndContext` level,
- * which fires regardless of node unmounts, so a second drag right after a
- * reparenting drop must still work.
+ * Regression coverage for the native-DnD bug: a reparenting drop remounts the
+ * card, so `dragend` (bound to the old node) never fired and every later drag
+ * died. dnd-kit resolves in `onDragEnd` at the `DndContext` level, which fires
+ * regardless of unmounts, so a second drag straight after must still work.
  */
 describe('Form builder drag and drop (dnd-kit)', () => {
   let host: HTMLDivElement;
@@ -208,11 +200,9 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code }));
   };
 
-  // dnd-kit's continuous droppable re-measuring (`MeasuringStrategy.Always`)
-  // and sensor activation run on their own rAF-scheduled updates outside
-  // React's synchronous event handling, so each step needs a real tick to
-  // settle before the next one — a bare `act(() => pointer(...))` leaves
-  // `over` stale and the drop resolves against the wrong (or no) target.
+  // Re-measuring and sensor activation run on rAF outside React's synchronous
+  // event handling, so each step needs a real tick — a bare `act()` leaves
+  // `over` stale and the drop resolves against the wrong target.
   const interact = (action: () => void): Promise<void> =>
     act(async () => {
       action();
@@ -231,23 +221,16 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     await interact(() => pointer('pointerdown', handle, startX, startY));
     await interact(() => pointer('pointermove', handle.ownerDocument, startX + 8, startY));
     await interact(() => pointer('pointermove', handle.ownerDocument, x, y));
-    // A `MeasuringStrategy.Always` remeasure lands one tick after the move
-    // that triggered it, so the move's own `onDragMove` can still report a
-    // stale `over`. A no-op settle move re-runs collision detection against
-    // the now-current rects before the drop.
+    // The remeasure lands a tick after the move that triggered it, so a no-op
+    // settle move re-runs collision detection against current rects.
     await interact(() => pointer('pointermove', handle.ownerDocument, x, y + 1));
     await interact(() => pointer('pointerup', handle.ownerDocument, x, y + 1));
   };
 
   /**
-   * Drags `sourceTitle`'s title bar to vertical position `targetCenterY` via
-   * the keyboard: `Space` lifts, `ArrowDown`/`ArrowUp` steps 25px at a time
-   * toward the target (dnd-kit's `defaultKeyboardCoordinateGetter`), `Space`
-   * drops. Ends with a net-zero nudge in the same direction as the last real
-   * step — the keyboard analogue of `dragTo`'s no-op settle move:
-   * `MeasuringStrategy.Always`'s remeasure lands one tick after the arrow
-   * press that triggered it, so the last press's own `onDragMove` can still
-   * report a stale `over`.
+   * Keyboard drag: `Space` lifts, arrows step 25px toward the target, `Space`
+   * drops. Ends with a net-zero nudge — the keyboard analogue of `dragTo`'s
+   * settle move, for the same one-tick remeasure lag.
    */
   const dragToWithKeyboard = async (sourceTitle: string, targetCenterY: number): Promise<void> => {
     const handle = titleBarFor(sourceTitle);

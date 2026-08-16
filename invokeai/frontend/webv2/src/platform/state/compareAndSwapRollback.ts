@@ -1,22 +1,15 @@
 /**
- * The one rule for undoing an optimistic write: put a slot back only if it
- * still holds exactly what this mutation painted there.
+ * The one rule for undoing an optimistic write: restore a slot only if it still
+ * holds exactly what this mutation painted there.
  *
- * An optimistic mutation writes a value, the server rejects it, and the
- * rollback wants the old value back. Between those two moments anything may
- * have written to the same slot — a generation completing, a refetch landing,
- * the person re-selecting, a second mutation on the same item. Restoring
- * unconditionally would throw that newer work away, and the failure is silent:
- * the UI shows stale state that no longer corresponds to anything.
+ * Between the optimistic write and the server's rejection, anything may have
+ * written to the same slot — a generation completing, a refetch landing, a
+ * second mutation on the same item. Restoring unconditionally throws that newer
+ * work away, and it fails silently.
  *
- * So the restore is a compare-and-swap. `after` is what we painted; if the slot
- * still reads as `after`, we are the last writer and may safely revert. If it
- * reads as anything else, someone newer owns it and we leave it alone.
- *
- * This lived in three separate places — the gallery query cache, the per-project
- * widget-value snapshot, and the per-item board/starred rollback — each with its
- * own copy of the check and a comment pointing at the other two. One wrong copy
- * is a data-loss bug, so there is one copy.
+ * This lived in four places (twice in the gallery query cache, plus the widget-
+ * value snapshot and the per-item rollback), each with a comment pointing at the
+ * others. One wrong copy is data loss, so there is one copy.
  */
 
 /** What a rollback needs to know about a slot: what was there, and what we put there. */

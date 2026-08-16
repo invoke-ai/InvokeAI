@@ -12,16 +12,14 @@ import { TopbarProgressRail } from './TopbarProgressRail';
 /**
  * The workbench top bar.
  *
- * Three columns, not a flex row: the `1fr` sides let the preset strip stay
- * geometrically centred no matter how long the project name is. A flex layout moves
- * the strip horizontally every time the user switches projects, which is highly
- * visible on a bar that is always on screen. `minmax(0, 1fr)` rather than `1fr`
- * so the left column can actually shrink and truncate instead of pushing the
- * grid wider than its container.
+ * Three columns, not a flex row: the `1fr` sides keep the preset strip
+ * geometrically centred whatever the project name's length, where flex would
+ * shift it on every project switch — highly visible on an always-on-screen bar.
+ * `minmax(0, 1fr)` so the left column truncates instead of widening the grid.
  *
- * The zones degrade from the left: labels, then the project name, before
- * anything in the invocation cluster gives way. The routing indicator and the
- * queue readout never collapse at any width (§10).
+ * Zones degrade from the left: labels, then the project name, before anything in
+ * the invocation cluster gives way. The routing indicator and queue readout
+ * never collapse at any width (§10).
  */
 const TOPBAR_COLUMNS = 'minmax(0, 1fr) auto minmax(0, 1fr)';
 

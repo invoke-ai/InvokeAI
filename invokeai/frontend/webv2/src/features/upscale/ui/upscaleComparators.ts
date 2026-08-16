@@ -4,18 +4,13 @@ import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 /**
  * Content comparators for the Upscale widget's memo boundaries.
  *
- * `values` is re-derived from the raw widget state on every patch. Its nested
- * members are mostly identity-stable — `normalizeUpscaleWidgetValues` preserves
- * them across a patch that didn't touch them — but that's an incidental
- * property of the normalizer, not a contract the widget should lean on. These
- * compare by content instead, so no section depends on that incidental
- * stability to avoid re-rendering (e.g. the prompt editors on a scale edit).
+ * `values` is re-derived on every patch. Its members happen to be
+ * identity-stable, but that is a property of the normalizer rather than a
+ * contract, so these compare by content instead.
  *
- * They live apart from the components that pass them to `memo` because that is
- * the only way they can be tested directly: a comparator that is wrong in the
- * conservative direction merely re-renders, while one that is wrong in the
- * permissive direction silently shows stale data, and only the second is a bug
- * you can miss by looking at the screen.
+ * Kept apart from the components that pass them to `memo` so they can be tested
+ * directly: a comparator wrong in the permissive direction silently shows stale
+ * data, which you cannot catch by looking at the screen.
  */
 
 export const areStringArraysEqual = (left: readonly string[], right: readonly string[]): boolean =>

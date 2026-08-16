@@ -3,14 +3,13 @@ import type { Ref } from 'react';
 import { Box, Flex, type BoxProps, type FlexProps, type SystemStyleObject } from '@chakra-ui/react';
 
 /**
- * The two pieces of chrome every preview surface shares, extracted so the
- * image, video, live, and empty branches stop carrying their own copies:
+ * The chrome every preview surface shares, so the image, video, live, and empty
+ * branches stop carrying their own copies:
  *
- * - `PreviewStage` — the dot-grid floor. Centers its content, establishes the
- *   size container that `getFittedFrameCss` measures against, and reserves top
- *   clearance for the centre region's floating chrome islands.
- * - `FittedFrame` — the media card: aspect-fitted, bordered, rounded, with the
- *   deep drop shadow that lifts it off the grid.
+ * - `PreviewStage` — the dot-grid floor. Centres content, is the size container
+ *   `getFittedFrameCss` measures against, and reserves top clearance for the
+ *   centre region's floating islands.
+ * - `FittedFrame` — the media card: aspect-fitted, bordered, shadowed.
  */
 
 export const previewGridCss = {

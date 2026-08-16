@@ -171,15 +171,11 @@ export const useImageActions = ({
 
       return project ? getProjectWidgetValues(project, 'generate') : {};
     };
-    // A deleted item can be visible only through a project's `gallery` widget
-    // values (e.g. the `recentImages` overlay for a just-generated image that
-    // hasn't reached the backend query cache yet) or the `upscale` widget's
-    // locked input, none of which `patchGalleryItemCaches` can restore.
-    // Snapshot the fields `removeGalleryItems` can touch, across every open
-    // project (images aren't project-scoped), diffed before/after so the
-    // restore can apply the same "still current" conflict rule
-    // `patchGalleryItemCaches`'s own rollback uses instead of clobbering
-    // whatever a concurrent generation or selection wrote in the meantime.
+    // A deleted item can be visible only through widget values — the
+    // `recentImages` overlay, or upscale's locked input — which the cache patch
+    // cannot restore. Snapshot those fields across every open project (images
+    // aren't project-scoped), diffed before/after so the restore applies the
+    // shared compare-and-swap rule rather than clobbering concurrent writes.
     const applyGalleryItemRemoval = (itemKeys: GalleryItemKey[]): GalleryWidgetKeySnapshotEntry[] => {
       const before = captureGalleryWidgetKeyValues(queries.getSnapshot().projects);
 
@@ -284,13 +280,11 @@ export const useImageActions = ({
       reportMutationOutcome(action, requested.length, result, boardId);
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      // Optimistic: the items vanish immediately. Capture the action context
-      // first — successor selection reasons about the pre-removal item list —
-      // and keep a snapshot rollback so a failed delete resurrects the lists
-      // before the confirmed subset is re-applied. On a partial failure, the
-      // trailing invalidation is left to bring a failed ref's recent-image
-      // overlay entry back from the backend list; on a total failure it can't
-      // be relied on, so the gallery widget snapshot restores it directly.
+      // Optimistic: items vanish immediately. Capture the action context first
+      // (successor selection reasons about the pre-removal list) and keep a
+      // snapshot rollback. A partial failure leans on the trailing invalidation
+      // to restore overlay entries; a total failure cannot, so the widget
+      // snapshot restores them directly.
       const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
@@ -445,15 +439,11 @@ export const useImageActions = ({
         ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
         : deleteItemsConfirmed(items);
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
-      // Optimistic: the items leave the current board view immediately. A
-      // vanished item cannot be restored by another patch, so the failure
-      // path rolls the lists back wholesale and re-applies the confirmed
-      // subset; the trailing invalidation reconciles anything the rollback
-      // had to skip as conflicted. `getGalleryItemBoardIdsFromCaches` only
-      // sees items a list query has already fetched, so a just-generated
-      // image known only through the recent-image overlay would otherwise
-      // have no prior board to restore — read that from the store too, cache
-      // taking precedence where both know the item.
+      // Optimistic: items leave the board view immediately, so the failure path
+      // rolls back wholesale and re-applies the confirmed subset, with the
+      // trailing invalidation reconciling whatever the rollback skipped as
+      // conflicted. The cache only knows items a list query fetched, so prior
+      // boards also come from the store, cache winning where both know.
       const previousBoardIds = new Map<GalleryItemKey, string>(
         [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
           key,
@@ -482,14 +472,11 @@ export const useImageActions = ({
         cachesRolledBack = true;
         rollbackCaches();
       };
-      // The cache rollback above is already CAS-guarded per query
-      // (`patchGalleryItemCaches`'s own `if (current === after)` rule), but
-      // the store patch below is a separate, unconditional write: a second
-      // move that painted this item onto yet another board while the first
-      // request was still hanging offline must not get clobbered back to the
-      // first move's prior board. Only restore items still on the board
-      // *this* move painted them onto, and group survivors by prior board id
-      // to dispatch one store patch per group instead of one per item.
+      // The cache rollback is CAS-guarded per query, but this store patch is a
+      // separate write: a second move that painted the item onto another board
+      // while the first request hung must not be clobbered back. Restore only
+      // items still on the board *this* move painted, grouped by prior board so
+      // each group is one patch.
       const restorePreviousBoardIds = () => {
         const currentStoreBoardIds = collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items);
         const safeKeys = new Set(
@@ -574,14 +561,10 @@ export const useImageActions = ({
       gallery.patchItems(keys, { starred });
     };
     const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> => {
-      // Optimistic: a star toggle's outcome is the request itself except for
-      // the rare rejected ref, so paint the whole selection immediately and
-      // flip back only what the backend refuses. The trailing gallery
-      // invalidation reconciles either path with the server. A total failure
-      // can't rely on that invalidation, so capture each item's actual prior
-      // flag up front (cache, falling back to the store overlay for items a
-      // list query hasn't fetched) — blanket-inverting the whole batch would
-      // wrongly flip items that already matched the target flag beforehand.
+      // Optimistic: paint the whole selection and flip back only what the
+      // backend refuses. A total failure cannot lean on the trailing
+      // invalidation, so capture each item's actual prior flag up front — a
+      // blanket invert would wrongly flip items that already matched.
       const previousStarred = new Map<GalleryItemKey, boolean>(
         [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
           key,
@@ -600,15 +583,11 @@ export const useImageActions = ({
         applyConfirmed: (result) => patchItemsStarred(result.failed, !starred),
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
-        // Total failure: nothing was confirmed. Restore each item to its
-        // actual prior flag rather than blanket-inverting the batch. An item
-        // with no known prior flag is left as painted — there's nothing safe
-        // to revert it to. Unlike the cache half of delete/move,
-        // `patchGalleryItemCaches` here is a fresh forward patch with no
-        // built-in CAS of its own (star's optimistic apply is a value flip,
-        // not a snapshot/restore pair) — so both the cache and the store
-        // writes need their own "still painted, nothing moved on" check
-        // before a concurrent single-item toggle gets clobbered.
+        // Total failure: restore each item's actual prior flag, leaving items
+        // with no known prior as painted. Star's optimistic apply is a value
+        // flip rather than a snapshot/restore pair, so unlike delete/move the
+        // patch carries no CAS of its own — both the cache and store writes
+        // need their own "still painted" check.
         rollback: () => {
           const requestedKeys = items.map(toGalleryItemKey);
           const currentCacheStarred = getGalleryItemStarredFromCaches(queryClient, items);

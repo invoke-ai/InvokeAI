@@ -3,15 +3,11 @@ import type { QueueItem } from './historyTypes';
 import { isOpenQueueItem } from './historySummary';
 
 /**
- * The read model behind the top bar's progress rail — the one full-width,
- * always-present generation indicator.
+ * The read model behind the top bar's progress rail.
  *
- * It is deliberately a *list* of segments rather than a single value. With
- * `generation_devices` (default `auto`) the backend runs one session per GPU,
- * so several images render at once; every other progress surface in the app
- * collapses to `runningQueueItemId` and therefore reports one of them as if it
- * were the whole story. The rail gives each live session its own segment, the
- * way the legacy progress bar did.
+ * Deliberately a *list* of segments: with `generation_devices` the backend runs
+ * one session per GPU, and every other progress surface collapses to
+ * `runningQueueItemId` and reports one of them as the whole story.
  */
 
 export type ProgressRailModel =

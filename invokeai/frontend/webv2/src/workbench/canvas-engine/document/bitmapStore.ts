@@ -1,49 +1,30 @@
 /**
- * The bitmap store: paint persistence via content-hashed server images.
+ * Paint persistence via content-hashed server images.
  *
- * Painting bakes strokes straight into a layer's raster cache surface (see
- * `strokeSession`/`paintTool`), but nothing persists — a reload would lose the
- * strokes. This store closes that loop: on each committed stroke it marks the
- * layer dirty, and after a short idle window it encodes the layer's full cache
- * surface to a PNG, content-hashes it (SHA-256), dedupes against already
- * uploaded bitmaps, uploads new ones, and — only once the upload succeeds —
- * dispatches `updateCanvasLayerSource` so the reducer-owned document points its
- * paint layer at the persisted image name. The reducer stays pixel-free: only a
- * `CanvasImageRef` (name + dims + hash) ever crosses the boundary.
+ * Strokes bake into a layer's raster cache surface but nothing persists. On each
+ * committed stroke this marks the layer dirty; after an idle window it encodes
+ * the cache surface to PNG, SHA-256s it, dedupes, uploads, and only on success
+ * dispatches `updateCanvasLayerSource`. The reducer stays pixel-free — only a
+ * `CanvasImageRef` crosses the boundary.
  *
- * Key invariants:
- * - **Swap-on-success**: the contract keeps its previous ref until the upload
- *   resolves. A failed upload never dispatches; the layer stays dirty and the
- *   old ref stays valid, so a reload still shows the last persisted pixels.
- * - **Debounce per layer** (~1.5 s idle): a new stroke resets the timer, so a
- *   burst of strokes uploads once.
- * - **Content-hash dedupe**: identical pixels reuse the previously uploaded
- *   image name and skip the upload entirely. This is what makes undo cheap
- *   (restoring old pixels re-hashes to the already-uploaded image).
- * - **Self-echo guard**: the dispatch round-trips back through the document
- *   mirror as a source change for the layer. {@link BitmapStore.isSelfEcho}
- *   lets the engine skip re-rasterizing/invalidating the cache for the exact
- *   bitmap ref this store just applied (the pixels already match).
- * - **Source-type guard**: a layer's cache surface survives a source-type
- *   change (e.g. rasterize's paint bake, then an undo back to shape/gradient)
- *   — only the document's source pointer changes, not the cache. So every
- *   flush re-checks `getLayerSource` (at entry AND again right before the
- *   dispatch, since encode/hash/upload all await) and drops the pending work
- *   without dispatching if the layer is no longer `paint` (or no longer
- *   exists). Otherwise a stale debounced flush would silently convert a
- *   parametric layer back to `paint` with wrong-extent pixels.
- * - **Redundant-dispatch skip is ground-truth, not memory**: right before
- *   dispatching, a flush skips if the DOCUMENT's current bitmap ref (via
- *   `getLayerSource`) already equals the resolved image name — not if
- *   `lastApplied` (this store's memory of what it last dispatched) does. A
- *   round trip through a non-`paint` source and back (rasterize → undo →
- *   redo) leaves `lastApplied` pointing at a name the document no longer
- *   references (the redo lands on `{ bitmap: null }`); comparing against that
- *   stale memory would suppress the re-dispatch forever. Comparing against
- *   the document itself self-heals regardless of how it drifted.
+ * Invariants:
+ * - **Swap-on-success**: a failed upload never dispatches, so the layer stays
+ *   dirty and a reload still shows the last persisted pixels.
+ * - **Debounce per layer** (~1.5 s): a stroke burst uploads once.
+ * - **Content-hash dedupe**: identical pixels skip the upload, which is what
+ *   makes undo cheap.
+ * - **Self-echo guard**: the dispatch round-trips back as a source change;
+ *   {@link BitmapStore.isSelfEcho} lets the engine skip re-rasterizing it.
+ * - **Source-type guard**: a cache surface survives a source-type change, so
+ *   every flush re-checks `getLayerSource` both at entry and again before
+ *   dispatching (encode/hash/upload all await). Otherwise a stale flush would
+ *   convert a parametric layer back to `paint` with wrong-extent pixels.
+ * - **Redundant-dispatch skip reads the document, not `lastApplied`**: a round
+ *   trip through a non-`paint` source (rasterize → undo → redo) leaves
+ *   `lastApplied` naming an image the document no longer references, and
+ *   comparing against it would suppress the re-dispatch forever.
  *
- * Every side-effecting dependency (encode, upload, hash, dispatch, timers) is
- * injectable, so this runs in node tests with fakes. Zero React.
+ * Every side effect is injectable, so this runs in node tests. Zero React.
  */
 
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
@@ -346,33 +327,20 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   };
 
   /**
-   * One failure bookkeeping path shared by both ways a flush can fail: an
-   * upload/dispatch throwing (a real network/server error) and a decline
-   * (`accepted !== true` — not an error, but still bounded by the same
-   * breaker). Always advances `failureCounts` and re-dirties the layer with
-   * reason `'failure'`, so `runFlush`'s `finally` schedules the next attempt
-   * with growing backoff — or, once `failures` reaches
-   * `maxConsecutiveFailures`, stops rescheduling entirely (a fresh stroke via
-   * `markLayerDirty` is the only way back in).
+   * Shared bookkeeping for both ways a flush fails: a throw, and a decline
+   * (`accepted !== true` — not an error, but bounded by the same breaker).
+   * Advances `failureCounts` and re-dirties the layer, so `runFlush` reschedules
+   * with backoff until `maxConsecutiveFailures`, after which only a fresh stroke
+   * gets back in.
    *
-   * Reporting policy: the FIRST non-silent failure of a streak `reportedStreaks`
-   * hasn't already reported, plus — unconditionally — the failure that opens
-   * the circuit, even when that one is itself a silent decline: once the
-   * circuit is open, strokes stop persisting at all, and that transition must
-   * be heard no matter how the streak got there. Everything else (silent
-   * declines that don't open the circuit, and any retry after the streak's
-   * first report) stays quiet — an unreachable server would otherwise toast
-   * once per retry, including barrier-driven retries `flushPendingUploads`
-   * still attempts against an already-open circuit on every Generate/export/
-   * blur, forever. `reportedStreaks` is cleared everywhere `failureCounts` is
-   * (a fresh stroke, a successful flush, `discardLayer`, `reset`, `dispose`),
-   * so the next streak reports its own first failure again.
+   * Reports the first non-silent failure of a streak, plus — unconditionally —
+   * the failure that opens the circuit, even a silent decline: once open,
+   * strokes stop persisting entirely and that has to be heard. Everything else
+   * stays quiet, or an unreachable server would toast once per retry forever,
+   * including the barrier retries every Generate/export/blur attempts.
    *
-   * Bookkeeping is committed BEFORE the `reportError` call: an injected
-   * observer may itself call back into this store (e.g. `reset`/
-   * `discardLayer`), and its outcome must be the final word, not overwritten
-   * by a bookkeeping write landing after it returns. Observer exceptions are
-   * caught and ignored — ancillary to the store's own retry state.
+   * Bookkeeping commits BEFORE `reportError`, because an observer may call back
+   * into this store and its outcome must be the final word.
    */
   const recordFlushFailure = (layerId: string, error: unknown, options: { silent: boolean }): void => {
     const failures = (failureCounts.get(layerId) ?? 0) + 1;
@@ -483,32 +451,17 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     if (!sourceNow || sourceNow.type !== 'paint') {
       return;
     }
-    // The DOCUMENT already points at this exact image (e.g. a re-flush of
-    // identical pixels that hash-deduped to an already-applied ref): skip a
-    // redundant dispatch and its self-echo round-trip.
+    // The document already points at this image, so skip the dispatch and its
+    // self-echo round-trip.
     //
-    // This is checked against `sourceNow` (the document's CURRENT bitmap ref),
-    // not `lastApplied` (this store's memory of what it last dispatched) — the
-    // two can diverge. `lastApplied` is never cleared when a layer's source is
-    // converted away from `paint` and back (e.g. `rasterizeLayer` → undo →
-    // redo: the document round-trips through a parametric source and back to
-    // `paint`, landing on `{ bitmap: null }`, while `lastApplied` still holds
-    // the previously-uploaded name from before the undo). Comparing against
-    // `lastApplied` in that case would suppress the dispatch forever, leaving
-    // the document permanently pointed at `bitmap: null` even though the
-    // dedupe correctly resolved the identical baked pixels back to the prior
-    // image. Comparing against the document's actual current ref is the
-    // ground truth for "is this dispatch a no-op" and self-heals regardless
-    // of how the document's source got out of sync with this store's memory.
+    // Compared against `sourceNow`, not `lastApplied`: a round trip away from
+    // `paint` and back (rasterize → undo → redo) lands the document on
+    // `{ bitmap: null }` while `lastApplied` still names the pre-undo image, so
+    // comparing against memory would suppress the dispatch forever.
     //
-    // The OFFSET must match too: a pure-translation transform (drag + Apply)
-    // bakes byte-identical pixels → same hash → dedupe resolves to the
-    // already-referenced image, but the paint offset moved. Comparing only
-    // `imageName` would skip the dispatch that persists the new offset, so the
-    // translation would be silently lost on reload (and every re-flush would
-    // re-skip it forever). Compare the captured `offset` (which travels with
-    // this dispatch) against the document's current offset — absent offsets are
-    // the legacy origin `{ x: 0, y: 0 }`.
+    // The offset must match too. A pure translation bakes byte-identical pixels
+    // that dedupe to the same image, so comparing `imageName` alone would skip
+    // the dispatch that persists the new offset and lose the move on reload.
     const currentOffset = sourceNow.bitmap ? (sourceNow.offset ?? { x: 0, y: 0 }) : null;
     if (
       sourceNow.bitmap?.imageName === result.imageName &&

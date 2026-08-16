@@ -89,24 +89,15 @@ const formContainerDepth = (form: WorkflowForm, containerId: string): number => 
 };
 
 /**
- * Innermost-wins tiebreak for overlapping droppables — restores the native-DnD
- * `stopPropagation` semantics the port lost. A container's own `edge:X` and
- * `into:X` are the same ambiguity dnd-kit's rect-based collision can't avoid:
- * `into:X` is DOM-nested inside `edge:X`'s box, so hovering its dropzone
- * always matches both. Comparing by landing container resolves it the same
- * way as any other nesting — the deeper one wins, so `into:X` (lands inside
- * `X`) beats `edge:X` (lands inside `X`'s parent).
+ * Innermost-wins tiebreak for overlapping droppables, restoring the native-DnD
+ * `stopPropagation` semantics the port lost. `into:X` is DOM-nested inside
+ * `edge:X`'s box, so hovering it always matches both; the deeper landing
+ * container wins, and among equal depths an edge beats an into (a specific
+ * insertion point is more precise intent than "append here").
  *
- * The rule, precisely: every candidate's landing container has a *depth*
- * (its distance from the form root); the candidate with the greatest depth
- * wins outright, and among candidates tied on depth, an edge wins over an
- * into (a specific insertion point next to a sibling is a more precise
- * intent than "append to this container"). Depth is computed independently
- * per candidate — not by comparing each new candidate only against the
- * current winner — so the result doesn't depend on the order `collisions`
- * arrives in: two incomparable siblings (say containers `C` and `B`, neither
- * nested under the other) plus a deeper `D` nested under `B` must still pick
- * `D`, even if `C` happened to be evaluated first.
+ * Depth is computed per candidate rather than against the running winner, so
+ * the result does not depend on collision order — two incomparable siblings
+ * plus a deeper third must still pick the deepest.
  */
 export const pickInnermostFormCollision = (collisions: { id: string }[], form: WorkflowForm): string | null => {
   if (collisions.length === 0) {

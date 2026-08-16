@@ -14,27 +14,21 @@ import { useActiveProjectSelector, useWorkbenchSelector } from '@workbench/Workb
 import { useMemo } from 'react';
 
 /**
- * The application's primary generation indicator: a hairline that lights up
- * along the whole bottom edge of the top bar while work is in flight.
+ * The primary generation indicator: a hairline lighting up along the top bar's
+ * bottom edge while work is in flight.
  *
- * Everything else that shows progress — the Invoke icon ring, the queue
- * readout, the preview overlay, the gallery placeholders — is small, and most
- * of it only exists if the user happens to have that widget on screen. A rail
- * spanning the viewport is detectable without being looked at, and it is
- * present in every layout, which is what the legacy bar under the Invoke button
- * had and this app lost.
+ * Every other progress surface is small and most only exists if that widget is
+ * on screen. A rail spanning the viewport is detectable without being looked
+ * at, and it is present in every layout.
  *
- * It sits *over* the top bar's 1px divider rather than below it, so appearing
- * and disappearing costs no reflow and reads as the existing line lighting up
- * rather than as a new element shoving the workspace down.
+ * It sits *over* the 1px divider rather than below it, so appearing costs no
+ * reflow and reads as the existing line lighting up.
  *
- * Sessions divide the width instead of stacking: a 2px rail cannot stack to
- * four GPUs without either growing into the workspace or shrinking below
- * visibility, and side-by-side segments filling in parallel say "four things are
- * running" at a glance.
+ * Sessions divide the width instead of stacking — 2px cannot stack to four GPUs
+ * without growing into the workspace or dropping below visibility.
  *
- * Not exposed to assistive tech — the queue cluster already owns a throttled
- * live region for this, and a second announcer would only double the chatter.
+ * Not exposed to assistive tech: the queue cluster already owns a throttled
+ * live region, and a second announcer would double the chatter.
  */
 
 const RAIL_SX: SystemStyleObject = {

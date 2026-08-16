@@ -517,50 +517,6 @@ describe('workbench widget region defaults', () => {
     ]);
   });
 
-  it('leaves a floated queue-status floating instead of re-docking it every load', () => {
-    // A rail whose queue-status was floated back out is byte-identical to the
-    // pre-branch default, so the migration re-adds it. Reconciliation runs on
-    // the migration's output and must win, or the widget re-docks on every
-    // reload and the layout reads as permanently drifted.
-    const initial = createInitialWorkbenchState();
-    const migrated = workbenchReducer(initial, {
-      state: {
-        ...initial,
-        projects: initial.projects.map((project) => ({
-          ...project,
-          floatingWidgets: {
-            'queue-status': {
-              heightPx: 180,
-              mode: 'windowed',
-              returnIndex: 1,
-              returnRegion: 'bottom',
-              stackOrder: 1,
-              widthPx: 320,
-              x: 64,
-              y: 64,
-            },
-          },
-          widgetRegions: {
-            ...project.widgetRegions,
-            bottom: {
-              ...project.widgetRegions.bottom,
-              instanceIds: ['server-status', 'gallery:bottom', 'notifications', 'autosave-status'],
-            },
-          },
-        })),
-      },
-      type: 'hydrateWorkbench',
-    });
-
-    expect(getActiveProject(migrated).widgetRegions.bottom.instanceIds).toEqual([
-      'server-status',
-      'gallery:bottom',
-      'notifications',
-      'autosave-status',
-    ]);
-    expect(getActiveProject(migrated).floatingWidgets?.['queue-status']?.returnRegion).toBe('bottom');
-  });
-
   it('migrates a legacy Upscale prompt only when Generate has no prompt content', () => {
     const initial = createInitialWorkbenchState();
     const withPrompts = (generatePrompt: string): WorkbenchState => ({

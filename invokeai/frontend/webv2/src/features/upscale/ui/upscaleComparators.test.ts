@@ -21,13 +21,10 @@ const image = (overrides: Partial<{ height: number; image_name: string; width: n
   ({ height: 512, image_name: 'a.png', width: 512, ...overrides }) as UpscaleWidgetValues['inputImage'];
 
 describe('areStringArraysEqual', () => {
-  it('accepts the same reference without walking it', () => {
+  it('compares by content and position, short-circuiting on identity', () => {
     const phrases = ['alpha', 'beta'];
 
     expect(areStringArraysEqual(phrases, phrases)).toBe(true);
-  });
-
-  it('compares by content and by position', () => {
     expect(areStringArraysEqual(['alpha', 'beta'], ['alpha', 'beta'])).toBe(true);
     expect(areStringArraysEqual(['alpha', 'beta'], ['beta', 'alpha'])).toBe(false);
     expect(areStringArraysEqual(['alpha'], ['alpha', 'beta'])).toBe(false);
@@ -35,12 +32,9 @@ describe('areStringArraysEqual', () => {
 });
 
 describe('getModelTriggerPhrases', () => {
-  it('is empty for a missing model or a model that declares none', () => {
+  it('is empty without a model, and drops non-string entries a foreign config could carry', () => {
     expect(getModelTriggerPhrases(null)).toEqual([]);
     expect(getModelTriggerPhrases(model({ trigger_phrases: undefined }))).toEqual([]);
-  });
-
-  it('drops non-string entries a hand-edited or foreign config could carry', () => {
     expect(getModelTriggerPhrases(model({ trigger_phrases: ['alpha', 7, null] as unknown as string[] }))).toEqual([
       'alpha',
     ]);

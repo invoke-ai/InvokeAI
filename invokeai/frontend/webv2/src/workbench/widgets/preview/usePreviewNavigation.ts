@@ -237,17 +237,14 @@ export const usePreviewNavigation = ({
     [queueItems]
   );
   const navigationLocalItems = useMemo(() => {
-    // recentImages exists precisely to bridge the gap between "generation
-    // finished" and "the backend list has the row" — the refetch is coalesced
-    // and takes time, and dropping a completed batch from the merge for that
-    // window made arrow keys skip the images just generated. So local items
-    // stay in the sequence unconditionally, with two exceptions where the
-    // backend window is a *subset* of the board and the dedupe cannot save us:
-    // under an active search (the backend list is search-filtered, local items
-    // are not) and in paginated mode (the window anchors mid-board, so settled
-    // recents from the board's top would splice in permanently — the gallery
-    // grid guards this the same way via `shouldOverlayRecentItems`). There,
-    // only in-flight work and the selected item itself may merge.
+    // recentImages bridges "generation finished" to "the backend list has the
+    // row"; dropping a completed batch during that window made arrow keys skip
+    // the images just generated. So local items stay unconditionally, except
+    // where the backend window is a *subset* of the board and dedupe cannot
+    // help: an active search (backend-filtered, local items are not) and
+    // paginated mode (the window anchors mid-board, so settled recents would
+    // splice in permanently). There, only in-flight work and the selection
+    // merge.
     const hasActiveSearch =
       !shouldFollowLive && (selectedImageSearch.text.trim() !== '' || selectedImageSearch.range !== undefined);
     const isPaginatedWindow = !shouldFollowLive && selectedImageQuery.paginationMode === 'paginated';

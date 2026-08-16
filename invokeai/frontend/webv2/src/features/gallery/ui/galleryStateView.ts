@@ -227,17 +227,12 @@ export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
 /**
  * Where new results land, resolved against the boards this install actually has.
  *
- * A saved selection survives whenever it still resolves — it is a deliberate choice, and a project
- * opened where its destination still exists should keep using it. When it does not resolve the
- * project's own board is the better answer than Uncategorized: a project arriving from another
- * install, or one whose pre-migration board was rejected as ambiguous, names a board id that means
- * nothing here, and dropping it to Uncategorized would quietly scatter that project's output.
+ * A saved selection survives whenever it still resolves, since it is a deliberate choice. When it
+ * does not — a project from another install, or one whose pre-migration board was ambiguous — the
+ * project's own board beats Uncategorized, which would quietly scatter that project's output. No
+ * saved selection at all is the same case rather than a choice of Uncategorized.
  *
- * No saved selection at all is the same case, not a choice of Uncategorized. A project saved before
- * it owned a board — or by a build that never wrote a destination — should still work on its own
- * board, which is where everything else it has made already lives.
- *
- * An empty board list means "still loading", not "no such board", so nothing is resolved yet.
+ * An empty board list means "still loading", not "no such board", so nothing resolves yet.
  */
 export const getGallerySelectedBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string => {
   const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;

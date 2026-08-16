@@ -312,26 +312,19 @@ export const WorkflowDialogHost = () => {
   const isNewWorkflowConfirmOpen = workflowUiStore.useSelector((snapshot) => snapshot.isNewWorkflowConfirmOpen);
   const lastImportRequestRef = useRef(importRequestCount);
 
-  // Library autosave: bound project graphs save themselves back to the
-  // library after edits settle. This host is always mounted alongside the
-  // workflow widget, so one autosaver instance tracks the graph for the
-  // widget's whole lifetime — but that instance is created AND disposed
-  // within a single mount effect (held in a ref, not a `useState`
-  // initializer). A `useState` initializer only runs once per fiber, while
-  // its disposal lived in a separate effect's cleanup; React StrictMode's
-  // dev-only mount→cleanup→mount simulation ran that cleanup once without
-  // ever re-running the initializer, permanently disposing the one instance
-  // still in use (autosave silently no-oped for the rest of the session).
-  // Creating and disposing in the same effect makes the simulation produce a
-  // fresh, live instance instead. `read()` pulls straight from the project
-  // store's synchronous snapshot (`projectStore.getSnapshot()`, the same
-  // accessor `useWorkflowProjectSelector` subscribes through) rather than a
-  // component-owned ref, so it is always current whenever the autosaver's
-  // debounce timer or `flush()` calls it. The same effect subscribes
-  // directly to the project store to notify the autosaver of edits (skipping
-  // the initial snapshot so loading a workflow does not itself count as an
-  // edit) — a plain subscription rather than a selector, since nothing here
-  // needs to re-render on graph edits, only to poke the autosaver.
+  // Library autosave: bound graphs save themselves back after edits settle.
+  //
+  // The autosaver is created AND disposed inside one mount effect, held in a
+  // ref. A `useState` initializer runs once per fiber while its disposal lived
+  // in a separate effect's cleanup, so StrictMode's mount→cleanup→mount
+  // simulation disposed the one live instance without recreating it — autosave
+  // silently no-oped for the rest of the session.
+  //
+  // `read()` pulls from `projectStore.getSnapshot()` rather than a
+  // component-owned ref, so it is current whenever the debounce or `flush()`
+  // calls it. The same effect subscribes to the store to poke the autosaver
+  // (skipping the initial snapshot, so loading is not an edit) — a plain
+  // subscription, since nothing here re-renders on graph edits.
   //
   // `hostScope` guards `onStatus`: account rotation aborts the in-flight
   // save's signal and synchronously resets the (account-owned)
