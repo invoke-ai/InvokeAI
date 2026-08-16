@@ -1,32 +1,22 @@
-import type { DragEndEvent } from '@dnd-kit/core';
-import type { GenerateLora, MainModelConfig, PromptHistoryItem } from '@features/generation/contracts';
-import type { ProjectPromptDraft, ProjectPromptDraftPatch } from '@features/generation/settings';
+import type { GenerateLora, MainModelConfig } from '@features/generation/contracts';
+import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
-import type { ChangeEvent } from 'react';
 
 import {
   Badge,
-  Box,
   createListCollection,
   DataList,
   HStack,
-  Image,
-  Input,
   NumberInput,
   SegmentGroup,
   SimpleGrid,
-  Spinner,
   Stack,
   Switch,
   Text,
 } from '@chakra-ui/react';
-import { useDndMonitor } from '@dnd-kit/core';
-import { galleryImages, galleryTransfers } from '@features/gallery';
-import { galleryImageUrls, isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
-import { GenerationSettingsSection, NegativePromptField, PositivePromptField } from '@features/generation/components';
+import { GenerationSettingsSection } from '@features/generation/components';
 import {
-  areProjectPromptDraftsEqual,
   SCHEDULER_OPTIONS,
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
@@ -58,19 +48,16 @@ import {
   UPSCALE_TILE_SIZE_MIN,
 } from '@features/upscale/core/settings';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
-import { Button, Combobox, DropZone, Field, IconButton, Select, Tooltip } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Combobox, Field, IconButton, Select, Tooltip } from '@platform/ui';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { toaster } from '@platform/ui/toaster';
-import { DicesIcon, ImagePlusIcon, Trash2Icon, UploadIcon, XIcon } from 'lucide-react';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { DicesIcon } from 'lucide-react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { areInputImagesEquivalent, valuesAreEqual } from './upscaleComparators';
+import { UpscaleLoraRow, UpscalePromptFields } from './UpscaleFormFields';
+import { UpscaleImageField } from './UpscaleImageField';
 import { useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
 
 /**
@@ -83,7 +70,6 @@ import { useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
  * they were previously disabled file-wide.
  */
 
-const DROP_ID = 'upscale-input-image';
 const VAE_PRECISION_COLLECTION = createListCollection({
   items: [
     { label: 'FP16', value: 'fp16' },
@@ -109,88 +95,14 @@ const TILE_OVERLAP_MARKS = [UPSCALE_TILE_OVERLAP_MIN, 128, 256, UPSCALE_TILE_OVE
 const GENERATION_GRID_COLUMNS = { base: 2, md: 3 };
 const ADVANCED_GRID_COLUMNS = { base: 1, md: 2 };
 const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
-const DROP_ZONE_FOCUS_PROPS = {
-  outlineColor: 'accent.focusRing',
-  outlineOffset: '2px',
-  outlineStyle: 'solid',
-  outlineWidth: '2px',
-};
-const DROP_ZONE_DISABLED_PROPS = { cursor: 'wait', opacity: 0.7 };
-// `DropZone` types its props as `BoxProps`, which has no `disabled`; spreading a
-// hoisted object keeps the button attribute without a per-render object.
-const DROP_ZONE_BUSY_PROPS = { disabled: true };
-const DROP_ZONE_HOVER_PROPS = { bg: 'bg.muted', color: 'fg' };
-const UPLOAD_ACCEPT_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
-const UPLOAD_ACCEPT_ATTR = [...UPLOAD_ACCEPT_TYPES, '.png', '.jpg', '.jpeg', '.webp'].join(',');
 const PRESET_ENTRIES = Object.entries(UPSCALE_PRESETS);
 
 const isSelectableMainModel = (model: ModelConfig): boolean => isSupportedUpscaleMainModel(model);
 
 const formatScale = (scale: number): string => `${scale}×`;
 
-const valuesAreEqual = (left: UpscaleWidgetValues, right: UpscaleWidgetValues): boolean =>
-  JSON.stringify(left) === JSON.stringify(right);
-
 const getRangeError = (label: string, value: number, min: number, max: number): string | undefined =>
   Number.isFinite(value) && value >= min && value <= max ? undefined : `${label} must be between ${min} and ${max}.`;
-
-/**
- * `values` is re-derived from the raw widget state on every patch. Its nested
- * members are mostly identity-stable — `normalizeUpscaleWidgetValues`
- * preserves them across a patch that didn't touch them — but that's an
- * incidental property of the normalizer, not a contract this file should
- * lean on. The comparators below compare by content instead, so no section
- * depends on that incidental stability to avoid re-rendering (e.g. the
- * prompt editors on a scale edit).
- */
-const areLorasEquivalent = (left: readonly GenerateLora[], right: readonly GenerateLora[]): boolean =>
-  left.length === right.length &&
-  left.every((lora, index) => {
-    const other = right[index];
-
-    return (
-      other !== undefined &&
-      lora.model.key === other.model.key &&
-      lora.isEnabled === other.isEnabled &&
-      lora.weight === other.weight
-    );
-  });
-
-const areStringArraysEqual = (left: readonly string[], right: readonly string[]): boolean =>
-  left === right || (left.length === right.length && left.every((value, index) => value === right[index]));
-
-const getModelTriggerPhrases = (model: UpscaleWidgetValues['model']): readonly string[] => {
-  const phrases = (model as { trigger_phrases?: unknown } | null)?.trigger_phrases;
-
-  return Array.isArray(phrases) ? phrases.filter((phrase): phrase is string => typeof phrase === 'string') : [];
-};
-
-/**
- * `key` alone is not enough: a catalog refresh swaps in a fresh config under
- * the same key, and the prompt editors consume per-config data (trigger
- * phrases, used both to populate the autocomplete and to label its group;
- * `base`, used to filter compatible embeddings). Identity short-circuits the
- * common case.
- */
-const areModelsEquivalent = (left: UpscaleWidgetValues['model'], right: UpscaleWidgetValues['model']): boolean =>
-  left === right ||
-  (left !== null &&
-    right !== null &&
-    left.key === right.key &&
-    left.base === right.base &&
-    left.name === right.name &&
-    areStringArraysEqual(getModelTriggerPhrases(left), getModelTriggerPhrases(right)));
-
-const areInputImagesEquivalent = (
-  left: UpscaleWidgetValues['inputImage'],
-  right: UpscaleWidgetValues['inputImage']
-): boolean =>
-  left === right ||
-  (left !== null &&
-    right !== null &&
-    left.image_name === right.image_name &&
-    left.width === right.width &&
-    left.height === right.height);
 
 const UpscaleOutputPreflight = memo(
   function UpscaleOutputPreflight({
@@ -313,353 +225,6 @@ const UpscaleModelReconciler = ({
 
   return null;
 };
-
-const UpscalePromptFields = memo(
-  function UpscalePromptFields({
-    loras,
-    model,
-    negativePromptHeightPx,
-    onPatchPromptDraft,
-    onPatchValues,
-    positivePromptHeightPx,
-    promptDraft,
-    projectId,
-    showSyntaxHighlighting,
-  }: {
-    loras: GenerateLora[];
-    model: MainModelConfig | null;
-    negativePromptHeightPx: number;
-    onPatchPromptDraft: (patch: ProjectPromptDraftPatch) => void;
-    onPatchValues: (patch: Partial<UpscaleWidgetValues>) => void;
-    positivePromptHeightPx: number;
-    promptDraft: ProjectPromptDraft;
-    projectId: string;
-    showSyntaxHighlighting: boolean;
-  }) {
-    const { t } = useTranslation();
-    const handleUsePrompt = useCallback(
-      (prompt: PromptHistoryItem) =>
-        onPatchPromptDraft({
-          negativePrompt: prompt.negativePrompt ?? '',
-          negativePromptEnabled: prompt.negativePrompt ? true : promptDraft.negativePromptEnabled,
-          positivePrompt: prompt.positivePrompt,
-        }),
-      [onPatchPromptDraft, promptDraft.negativePromptEnabled]
-    );
-    const handlePositiveChange = useCallback(
-      (positivePrompt: string) => onPatchPromptDraft({ positivePrompt }),
-      [onPatchPromptDraft]
-    );
-    const handleNegativeChange = useCallback(
-      (negativePrompt: string) => onPatchPromptDraft({ negativePrompt }),
-      [onPatchPromptDraft]
-    );
-    const handleNegativeEnabledChange = useCallback(
-      (negativePromptEnabled: boolean) => onPatchPromptDraft({ negativePromptEnabled }),
-      [onPatchPromptDraft]
-    );
-    const handlePositiveResizeEnd = useCallback(
-      (positivePromptHeight: number) => onPatchValues({ positivePromptHeightPx: positivePromptHeight }),
-      [onPatchValues]
-    );
-    const handleNegativeResizeEnd = useCallback(
-      (negativePromptHeight: number) => onPatchValues({ negativePromptHeightPx: negativePromptHeight }),
-      [onPatchValues]
-    );
-
-    return (
-      <Stack gap="2" p="2">
-        <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
-          {t('widgets.upscale.sharedPromptDescription')}
-        </Text>
-        <PositivePromptField
-          heightPx={positivePromptHeightPx}
-          loras={loras}
-          projectId={projectId}
-          selectedModel={model ?? undefined}
-          showSyntaxHighlighting={showSyntaxHighlighting}
-          value={promptDraft.positivePrompt}
-          onChange={handlePositiveChange}
-          onResizeEnd={handlePositiveResizeEnd}
-          onUsePrompt={handleUsePrompt}
-        />
-        <NegativePromptField
-          heightPx={negativePromptHeightPx}
-          isEnabled={promptDraft.negativePromptEnabled}
-          loras={loras}
-          projectId={projectId}
-          selectedModel={model ?? undefined}
-          showSyntaxHighlighting={showSyntaxHighlighting}
-          value={promptDraft.negativePrompt}
-          onChange={handleNegativeChange}
-          onEnabledChange={handleNegativeEnabledChange}
-          onResizeEnd={handleNegativeResizeEnd}
-        />
-      </Stack>
-    );
-  },
-  (previous, next) =>
-    previous.negativePromptHeightPx === next.negativePromptHeightPx &&
-    previous.onPatchPromptDraft === next.onPatchPromptDraft &&
-    previous.onPatchValues === next.onPatchValues &&
-    previous.positivePromptHeightPx === next.positivePromptHeightPx &&
-    previous.projectId === next.projectId &&
-    areProjectPromptDraftsEqual(previous.promptDraft, next.promptDraft) &&
-    previous.showSyntaxHighlighting === next.showSyntaxHighlighting &&
-    areModelsEquivalent(previous.model, next.model) &&
-    areLorasEquivalent(previous.loras, next.loras)
-);
-
-const UpscaleImageField = memo(
-  function UpscaleImageField({
-    inputImage,
-    onChange,
-  }: {
-    inputImage: UpscaleWidgetValues['inputImage'];
-    onChange: (image: UpscaleWidgetValues['inputImage']) => void;
-  }) {
-    const { t } = useTranslation();
-    const { reportError, touchGalleryImages } = useUpscaleUiActions();
-    const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const { isOver, setNodeRef } = useGalleryImageDroppable({
-      data: { kind: DROP_ID },
-      disabled: isLoading,
-      id: DROP_ID,
-    });
-
-    const setGalleryImage = useCallback(
-      async (imageName: string) => {
-        setErrorMessage(null);
-        setIsLoading(true);
-
-        try {
-          const [image] = await galleryImages.resolveMany([imageName]);
-
-          if (image) {
-            onChange({ height: image.height, image_name: image.imageName, width: image.width });
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          setErrorMessage(message);
-          reportError(message);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      [onChange, reportError]
-    );
-
-    const handleDragEnd = useCallback(
-      (event: DragEndEvent) => {
-        const data = event.active.data.current;
-
-        if (!isLoading && event.over?.id === DROP_ID && isGalleryImageDragData(data) && data.items.length === 1) {
-          const imageName = data.items[0]?.name;
-
-          if (imageName) {
-            void setGalleryImage(imageName);
-          }
-        }
-      },
-      [isLoading, setGalleryImage]
-    );
-
-    useDndMonitor({ onDragEnd: handleDragEnd });
-
-    const uploadFile = useCallback(
-      async (file: File) => {
-        setErrorMessage(null);
-
-        if (!UPLOAD_ACCEPT_TYPES.includes(file.type)) {
-          setErrorMessage(t('widgets.upscale.unsupportedFile'));
-          reportError(t('widgets.upscale.unsupportedFile'));
-          return;
-        }
-
-        const owner = captureAccountScope();
-        setIsLoading(true);
-
-        try {
-          const image = await galleryTransfers.upload(file, 'none', { signal: owner.signal });
-
-          assertAccountScopeCurrent(owner);
-          onChange({ height: image.height, image_name: image.imageName, width: image.width });
-          touchGalleryImages();
-        } catch (error) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          const message = error instanceof Error ? error.message : String(error);
-          setErrorMessage(message);
-          reportError(message);
-        } finally {
-          setIsLoading(false);
-        }
-      },
-      [onChange, reportError, t, touchGalleryImages]
-    );
-
-    const handleFileChange = useCallback(
-      (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.currentTarget.files?.[0];
-
-        if (file) {
-          void uploadFile(file);
-        }
-        event.currentTarget.value = '';
-      },
-      [uploadFile]
-    );
-    const handlePickFile = useCallback(() => fileInputRef.current?.click(), []);
-    const handleClear = useCallback(() => onChange(null), [onChange]);
-
-    return (
-      <Stack gap="2">
-        <DropZone
-          ref={setNodeRef}
-          as="button"
-          aria-busy={isLoading}
-          aria-label={inputImage ? t('widgets.upscale.replaceImage') : t('widgets.upscale.uploadImage')}
-          cursor="pointer"
-          isOver={isOver}
-          {...(isLoading ? DROP_ZONE_BUSY_PROPS : undefined)}
-          minH="24"
-          overflow="hidden"
-          position="relative"
-          _focusVisible={DROP_ZONE_FOCUS_PROPS}
-          _disabled={DROP_ZONE_DISABLED_PROPS}
-          _hover={isLoading ? undefined : DROP_ZONE_HOVER_PROPS}
-          onClick={handlePickFile}
-        >
-          {inputImage ? (
-            <HStack align="stretch" gap="3" h="24" p="2">
-              <Box bg="blackAlpha.300" boxSize="20" flexShrink="0" overflow="hidden" rounded="sm">
-                <Image
-                  alt={t('widgets.upscale.inputImageAlt')}
-                  boxSize="full"
-                  objectFit="contain"
-                  outline="1px solid"
-                  outlineColor="border.image"
-                  outlineOffset="-1px"
-                  rounded="sm"
-                  src={galleryImageUrls.thumbnail(inputImage.image_name)}
-                />
-              </Box>
-              <Stack align="start" flex="1" gap="1" justify="center" minW="0">
-                <MiddleTruncate color="fg" fontSize="xs" fontWeight="semibold" text={inputImage.image_name} />
-                <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
-                  {inputImage.width} × {inputImage.height}
-                </Text>
-                <HStack color="fg.muted" gap="1">
-                  {isLoading ? <Spinner size="xs" /> : <UploadIcon aria-hidden="true" size="12" />}
-                  <Text fontSize="2xs">
-                    {isLoading ? t('widgets.upscale.uploadingImage') : t('widgets.upscale.replaceOrDrop')}
-                  </Text>
-                </HStack>
-              </Stack>
-            </HStack>
-          ) : (
-            <Stack align="center" color="fg.muted" gap="2" justify="center" minH="24" px="4">
-              {isLoading ? <Spinner size="sm" /> : <ImagePlusIcon aria-hidden="true" size="20" />}
-              <Text fontSize="xs" textAlign="center">
-                {isLoading ? t('widgets.upscale.uploadingImage') : t('widgets.upscale.uploadOrDrop')}
-              </Text>
-            </Stack>
-          )}
-        </DropZone>
-        <HStack justify="end">
-          {inputImage ? (
-            <Button disabled={isLoading} size="xs" variant="ghost" onClick={handleClear}>
-              <XIcon aria-hidden="true" size="12" />
-              {t('widgets.upscale.removeImage')}
-            </Button>
-          ) : null}
-        </HStack>
-        {errorMessage ? (
-          <Text aria-live="polite" color="fg.error" fontSize="2xs" role="alert" textWrap="pretty">
-            {errorMessage}
-          </Text>
-        ) : null}
-        <Input
-          ref={fileInputRef}
-          accept={UPLOAD_ACCEPT_ATTR}
-          aria-hidden="true"
-          display="none"
-          tabIndex={-1}
-          type="file"
-          onChange={handleFileChange}
-        />
-      </Stack>
-    );
-  },
-  (previous, next) =>
-    previous.onChange === next.onChange && areInputImagesEquivalent(previous.inputImage, next.inputImage)
-);
-
-/**
- * One LoRA row. Split out so editing a single weight re-renders that row rather
- * than the whole list; the handlers bind the key here instead of at the call
- * site, where they would be new closures per row per render.
- */
-const UpscaleLoraRow = memo(function UpscaleLoraRow({
-  lora,
-  onRemove,
-  onUpdate,
-}: {
-  lora: GenerateLora;
-  onRemove: (key: string) => void;
-  onUpdate: (key: string, update: Partial<GenerateLora>) => void;
-}) {
-  const { t } = useTranslation();
-  const modelKey = lora.model.key;
-  const handleToggle = useCallback(
-    (details: { checked: boolean }) => onUpdate(modelKey, { isEnabled: details.checked }),
-    [modelKey, onUpdate]
-  );
-  const handleWeightChange = useCallback(
-    ({ valueAsNumber }: NumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        onUpdate(modelKey, { weight: valueAsNumber });
-      }
-    },
-    [modelKey, onUpdate]
-  );
-  const handleRemove = useCallback(() => onRemove(modelKey), [modelKey, onRemove]);
-
-  return (
-    <HStack bg="bg.subtle" gap="2" p="2" rounded="md">
-      <Switch.Root aria-label={lora.model.name} checked={lora.isEnabled} size="sm" onCheckedChange={handleToggle}>
-        <Switch.HiddenInput />
-        <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
-          <Switch.Thumb />
-        </Switch.Control>
-      </Switch.Root>
-      <MiddleTruncate flex="1" fontSize="xs" minW="0" text={lora.model.name} />
-      <NumberInput.Root
-        max={10}
-        min={-10}
-        size="xs"
-        step={0.05}
-        value={String(lora.weight)}
-        w="20"
-        onValueChange={handleWeightChange}
-      >
-        <NumberInput.Input aria-label={t('widgets.upscale.loraWeight', { name: lora.model.name })} />
-      </NumberInput.Root>
-      <IconButton
-        aria-label={t('widgets.upscale.removeLora', { name: lora.model.name })}
-        size="xs"
-        variant="ghost"
-        onClick={handleRemove}
-      >
-        <Trash2Icon />
-      </IconButton>
-    </HStack>
-  );
-});
 
 export const UpscaleWidgetView = () => {
   const { t } = useTranslation();
