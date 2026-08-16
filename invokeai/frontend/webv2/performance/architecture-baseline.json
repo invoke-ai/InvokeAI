@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 830924,
+        "brotliBytes": 831092,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 829530,
+        "gzipBytes": 829649,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1929616,
+        "initialRawBytes": 1929955,
         "largestAssetRawBytes": 746314,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66668,
+        "ownedRawBytes": 66666,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -279,15 +279,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 839234,
+        "brotliBytes": 839403,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 837826,
+        "gzipBytes": 837946,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1948913,
+        "initialRawBytes": 1949255,
         "largestAssetRawBytes": 753778,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66668,
+        "ownedRawBytes": 66666,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -297,12 +297,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1024234,
+        "brotliBytes": 1024541,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1019774,
+        "gzipBytes": 1020050,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2511015,
+        "initialRawBytes": 2511355,
         "largestAssetRawBytes": 746314,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 107337,
@@ -815,12 +815,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1034477,
+        "brotliBytes": 1034787,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1029972,
+        "gzipBytes": 1030251,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2536126,
+        "initialRawBytes": 2536469,
         "largestAssetRawBytes": 753778,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 107337,
@@ -832,7 +832,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-15",
+  "capturedAt": "2026-08-16",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
