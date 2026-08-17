@@ -232,7 +232,7 @@ def test_gguf_loader_warns_when_neither_expert_is_tagged() -> None:
     )
     invocation.invoke(context)
 
-    assert any("Neither Wan A14B GGUF filename identifies its expert" in warning for warning in _warnings(context))
+    assert any("Neither Wan A14B filename identifies its expert" in warning for warning in _warnings(context))
 
 
 @pytest.mark.parametrize(
@@ -417,3 +417,84 @@ def test_loader_rejects_forged_component_source_even_with_standalone_components(
                 type=ModelType.Main,
             ),
         )
+
+
+# --- Single-file safetensors checkpoints (#9463) ---------------------------------
+
+
+@pytest.mark.parametrize("variant", [WanVariantType.T2V_A14B, WanVariantType.I2V_A14B])
+def test_checkpoint_main_accepts_expert_pair(variant: WanVariantType) -> None:
+    output = _invoke(
+        _config("main", variant, "high", format=ModelFormat.Checkpoint),
+        _config("low", variant, "low", format=ModelFormat.Checkpoint),
+    )
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == "low"
+
+
+@pytest.mark.parametrize(
+    "main_format,low_format",
+    [
+        (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized),
+        (ModelFormat.GGUFQuantized, ModelFormat.Checkpoint),
+    ],
+)
+def test_experts_may_mix_single_file_formats(main_format: ModelFormat, low_format: ModelFormat) -> None:
+    """Both single-file loaders produce a plain WanTransformer3DModel, so a GGUF
+    high-noise expert pairs fine with a safetensors low-noise one."""
+    output = _invoke(
+        _config("main", WanVariantType.T2V_A14B, "high", format=main_format),
+        _config("low", WanVariantType.T2V_A14B, "low", format=low_format),
+    )
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == "low"
+
+
+def test_checkpoint_ti2v_5b_runs_unpaired() -> None:
+    output = _invoke(_config("main", WanVariantType.TI2V_5B, "none", format=ModelFormat.Checkpoint))
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
+
+
+@pytest.mark.parametrize("expert", ["high", "low", "none"])
+def test_checkpoint_main_runs_unpaired_whatever_its_tag(expert: str) -> None:
+    """The checkpoint path takes the same wiring-first rule #9505 gave the GGUF path: a
+    single wired transformer is explicit intent, and the tag is only a filename guess.
+    Untagged community checkpoints are the common case this branch exists to support, so
+    they must not be fatal here when the paired path accepts them."""
+    invocation, context = _prepare(_config("main", WanVariantType.T2V_A14B, expert, format=ModelFormat.Checkpoint))
+    output = invocation.invoke(context)
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
+    assert any("only this one expert will run" in warning.lower() for warning in _warnings(context))
+
+
+def test_low_noise_slot_rejects_a_diffusers_model() -> None:
+    with pytest.raises(ValueError, match="single-file"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, "high", format=ModelFormat.Checkpoint),
+            _config("low", WanVariantType.T2V_A14B, "low", format=ModelFormat.Diffusers),
+        )
+
+
+def test_checkpoint_main_uses_component_source_boundary() -> None:
+    output = _invoke(
+        _config("main", WanVariantType.T2V_A14B, "high", format=ModelFormat.Checkpoint),
+        _config("low", WanVariantType.T2V_A14B, "low", format=ModelFormat.Checkpoint),
+        _config(
+            "component",
+            WanVariantType.T2V_A14B,
+            "none",
+            format=ModelFormat.Diffusers,
+            has_dual_expert=True,
+            boundary_ratio=0.5,
+        ),
+    )
+
+    assert output.transformer.boundary_ratio == 0.5
