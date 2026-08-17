@@ -44,10 +44,17 @@ class CacheRecord:
     # by the next admission: a warm get()'s wrapper can legitimately sit un-entered across another
     # model's cold load (a node retrieves several models before entering their contexts), and its
     # finalizer guarantees the release the sweep exists to backstop. The only recovery sweep is
-    # ModelCache._ensure_deferred_worker() zeroing the counts after the deferred worker — the
-    # thread that carries finalizer-initiated releases — is found dead, since holds released into
-    # a dead worker are dropped and would otherwise shield the record forever.
+    # ModelCache zeroing the counts after the deferred worker — the thread that carries
+    # finalizer-initiated releases — is found dead (at the next worker start, and at shutdown),
+    # since a release dispatched toward a dead worker may be dropped and would otherwise shield
+    # the record forever.
     first_use_holds: int = 0
+    # Bumped whenever stranded holds are zeroed (dead-worker recovery). Every hold release
+    # carries the epoch it was armed under and is ignored across a bump: without this, a
+    # surviving wrapper's late release — or a release enqueued before the old worker died and
+    # drained after the restart — would decrement a FRESH hold armed by a different wrapper
+    # under the healthy replacement worker, silently unshielding that wrapper's window.
+    first_use_holds_epoch: int = 0
 
     def lock(self) -> None:
         """Lock this record."""

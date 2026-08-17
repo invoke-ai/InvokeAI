@@ -56,22 +56,34 @@ class LoadedModelWithoutConfig:
     def __init__(self, cache_record: CacheRecord, cache: ModelCache):
         self._cache_record = cache_record
         self._cache = cache
-        # Shield the record for the window between get() and this wrapper's first lock: without
-        # it, an eviction sweep racing that gap — a peer's budget reconcile, another model's
-        # make-room, or the cache's shutdown() — would evict the record out from under this
-        # wrapper, detaching it from the cache's RAM accounting and (for shared weights) from
-        # store ownership while its tensors live on. The hold is released exactly once: on the
+        # Shield the record for the window between this wrapper's construction and its first
+        # lock: without it, an eviction sweep racing that gap — a peer's budget reconcile,
+        # another model's make-room, or the cache's shutdown() — would evict the record out from
+        # under this wrapper, detaching it from the cache's RAM accounting and (for shared
+        # weights) from store ownership while its tensors live on. The few instructions between
+        # get() returning and this constructor arming the hold remain unshielded — an eviction
+        # landing exactly there is the pre-existing, tolerated issue-7513 detached path, and
+        # register_first_use_hold declines to arm on a record that already lost that race. The
+        # hold is released exactly once: on the
         # first lock (_end_first_use_window), or by the finalizer below if this wrapper is
         # dropped without ever locking. The finalizer also covers the put()-set admission grace
-        # for a record whose hold could not be armed (no deferred worker running).
+        # for a record whose hold could not be armed (no deferred worker running). Both release
+        # routes quote the epoch the hold was armed under, so a hold the cache's dead-worker
+        # recovery already zeroed is never re-released against a successor hold.
         release_grace = getattr(cache, "release_first_use_grace", None)
         register_hold = getattr(cache, "register_first_use_hold", None)
-        self._holds_first_use = (
-            bool(register_hold(cache_record)) if register_hold is not None and release_grace is not None else False
+        self._first_use_hold_epoch: Optional[int] = (
+            register_hold(cache_record) if register_hold is not None and release_grace is not None else None
         )
         self._first_use_finalizer = None
-        if release_grace is not None and (self._holds_first_use or cache_record.awaiting_first_use):
-            self._first_use_finalizer = finalize(self, release_grace, cache_record, self._holds_first_use)
+        if release_grace is not None and (self._first_use_hold_epoch is not None or cache_record.awaiting_first_use):
+            self._first_use_finalizer = finalize(
+                self,
+                release_grace,
+                cache_record,
+                self._first_use_hold_epoch is not None,
+                self._first_use_hold_epoch if self._first_use_hold_epoch is not None else 0,
+            )
             self._first_use_finalizer.atexit = False
 
     def _end_first_use_window(self) -> None:
@@ -81,11 +93,12 @@ class LoadedModelWithoutConfig:
         if self._first_use_finalizer is not None:
             self._first_use_finalizer.detach()
             self._first_use_finalizer = None
-        if self._holds_first_use:
-            self._holds_first_use = False
+        if self._first_use_hold_epoch is not None:
+            hold_epoch = self._first_use_hold_epoch
+            self._first_use_hold_epoch = None
             release_hold = getattr(self._cache, "release_first_use_hold", None)
             if release_hold is not None:
-                release_hold(self._cache_record)
+                release_hold(self._cache_record, hold_epoch)
 
     def __enter__(self) -> AnyModel:
         # Hold the MODEL_LOAD_LOCK read lock across the VRAM load (lock() runs

@@ -454,6 +454,120 @@ def test_worker_death_zeroes_stranded_first_use_holds(mock_logger):
         cache.shutdown()
 
 
+def test_stale_hold_release_cannot_steal_a_fresh_hold(mock_logger):
+    """A release from before a dead-worker zeroing sweep must not decrement a hold armed after
+    it: the zeroing bumps the record's hold epoch, and releases quote the epoch they were armed
+    under. Without that, a surviving wrapper's late first-lock release would silently consume a
+    different wrapper's fresh shield, and a shutdown() in that wrapper's window would evict the
+    record out from under it — the exact defect the holds exist to prevent."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("m", DummyModule())
+        _use_and_release(cache, "m")
+        wrapper_a = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+        record = wrapper_a._cache_record
+        assert record.first_use_holds == 1
+
+        # The worker dies; the next admission zeroes the stranded hold and bumps the epoch.
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        assert cache._deferred_work_thread is not None
+        cache._deferred_work_thread.join(timeout=10)
+        cache.put("x", DummyModule())
+        assert record.first_use_holds == 0
+
+        # A fresh wrapper arms a new-epoch hold under the healthy replacement worker.
+        wrapper_b = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+        assert record.first_use_holds == 1
+
+        # Wrapper A's late first-lock release quotes the old epoch: it must be a no-op.
+        with wrapper_a as _model:
+            pass
+        assert record.first_use_holds == 1, "a stale release consumed the fresh wrapper's hold"
+
+        # And shutdown() in wrapper B's window therefore still retains the record for it.
+        cache.shutdown()
+        assert cache._cached_models.get("m") is record, "shutdown() evicted the record out from under its holder"
+        with wrapper_b as _model:
+            assert cache._cached_models.get("m") is record, "locked a detached record"
+        assert "m" not in cache._cached_models
+        assert store.refcount("m") == 0
+    finally:
+        cache.shutdown()
+
+
+def test_stale_release_drained_after_worker_restart_is_rejected_by_epoch(mock_logger):
+    """A release enqueued while the old worker was alive survives its death in the SimpleQueue
+    (the queue is never cleared on restart) and is drained by the replacement worker AFTER
+    dead-worker recovery zeroed the holds and bumped the epoch. The abandonment handler must
+    reject it: the hold it quotes was already accounted for by the zeroing, so honoring it would
+    consume a FRESH hold armed by a different wrapper under the healthy worker."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("m", DummyModule())
+        _use_and_release(cache, "m")
+        record = cache.get("m")
+        epoch_before = cache.register_first_use_hold(record)  # wrapper A's hold
+        assert epoch_before is not None and record.first_use_holds == 1
+
+        # The worker dies; A's abandonment release is already sitting in the queue, undrained.
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        assert cache._deferred_work_thread is not None
+        cache._deferred_work_thread.join(timeout=10)
+
+        # The next admission runs recovery (zero + epoch bump) and starts the replacement worker.
+        cache.put("x", DummyModule())
+        assert record.first_use_holds == 0
+        assert record.first_use_holds_epoch == epoch_before + 1
+
+        # Wrapper B arms a fresh hold under the healthy worker.
+        epoch_after = cache.register_first_use_hold(record)
+        assert epoch_after == epoch_before + 1 and record.first_use_holds == 1
+
+        # The replacement worker drains A's stale release (invoked directly here — it is exactly
+        # what _run_deferred_work does with the surviving queue item): it must be a no-op.
+        cache._release_abandoned_holder(record, True, epoch_before)
+        assert record.first_use_holds == 1, "a stale queued release consumed the fresh wrapper's hold"
+
+        # B's own release, quoting the current epoch, works normally.
+        cache.release_first_use_hold(record, epoch_after)
+        assert record.first_use_holds == 0
+    finally:
+        cache.shutdown()
+
+
+def test_shutdown_clears_holds_stranded_by_a_dead_worker(mock_logger):
+    """shutdown() must run the dead-worker hold recovery itself: a hold whose abandonment
+    release was dropped by the dead-thread dispatch check has no other releaser — no unlock() is
+    coming for a never-locked holder, and after shutdown no put() is guaranteed to run the usual
+    next-start recovery — so without this the sweep would stale-retain the record, its
+    shared-store refcount and its budget bytes for the life of the process."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+    record = loaded_model._cache_record
+    assert record.first_use_holds == 1
+
+    # The worker dies; the wrapper is dropped and its release is dispatched into the void.
+    cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+    assert cache._deferred_work_thread is not None
+    cache._deferred_work_thread.join(timeout=10)
+    del loaded_model
+    gc.collect()
+    assert record.first_use_holds == 1, "the release was not dropped — dead-worker premise broken"
+
+    cache.shutdown()
+    assert "m" not in cache._cached_models, "shutdown() stale-retained a record nothing can ever release"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
 def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
     """A cache dropped without shutdown() must not strand its shared-weights references:
     the store's refcount and bytes — and therefore the budget total — must return to zero once the
