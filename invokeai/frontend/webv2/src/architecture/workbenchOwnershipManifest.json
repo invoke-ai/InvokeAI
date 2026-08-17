@@ -86,6 +86,7 @@
     "WorkbenchWidgetRegistryContext.tsx": "workbench",
     "activeInvocationSubmission.ts": "workbench",
     "autoRoutePolicy.ts": "workbench",
+    "bootWidgetPreload.ts": "workbench",
     "canvasDimsSync.ts": "workbench",
     "canvasLayerContent.ts": "workbench",
     "canvasLayerOps.ts": "workbench",

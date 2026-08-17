@@ -34,4 +34,37 @@ describe('layout preset activation', () => {
 
     expect(appliedPresetIds).toEqual(['edit']);
   });
+
+  it('applies at the deadline when a widget implementation is still loading', async () => {
+    const appliedPresetIds: string[] = [];
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      applyDeadlineMs: 0,
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => true,
+      load: () => new Promise(() => {}),
+    });
+
+    await activator.activate(layoutPresets[0]);
+
+    expect(appliedPresetIds).toEqual([layoutPresets[0].id]);
+  });
+
+  it('discards a deadline apply when the request was superseded before it fired', async () => {
+    const appliedPresetIds: string[] = [];
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      applyDeadlineMs: 0,
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => true,
+      load: () => new Promise(() => {}),
+    });
+
+    const activation = activator.activate(layoutPresets[0]);
+
+    activator.invalidate();
+    await activation;
+
+    expect(appliedPresetIds).toEqual([]);
+  });
 });
