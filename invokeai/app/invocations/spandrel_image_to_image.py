@@ -115,9 +115,18 @@ class SpandrelImageToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Crop the current tile from the input image and convert it on demand. Converting the
             # whole image up front would keep a float32 copy of it in memory for the entire loop,
             # even though only one tile is ever used at a time.
-            input_tile = SpandrelImageToImageModel.pil_to_tensor(
-                image.crop((tile.coords.left, tile.coords.top, tile.coords.right, tile.coords.bottom))
-            ).to(device=device, dtype=spandrel_model.dtype)
+            if (
+                tile.coords.top == 0
+                and tile.coords.bottom == image.height
+                and tile.coords.left == 0
+                and tile.coords.right == image.width
+            ):
+                input_image = image
+            else:
+                input_image = image.crop((tile.coords.left, tile.coords.top, tile.coords.right, tile.coords.bottom))
+            input_tile = SpandrelImageToImageModel.pil_to_tensor(input_image).to(
+                device=device, dtype=spandrel_model.dtype
+            )
 
             # Run the model on the tile.
             output_tile = spandrel_model.run(input_tile)
