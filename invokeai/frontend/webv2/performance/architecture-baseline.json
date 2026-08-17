@@ -2,12 +2,12 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 833020,
+        "brotliBytes": 833040,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 832899,
+        "gzipBytes": 832930,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1936327,
+        "initialRawBytes": 1936493,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 67300,
@@ -282,12 +282,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 841351,
+        "brotliBytes": 841371,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 841228,
+        "gzipBytes": 841260,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1955691,
+        "initialRawBytes": 1955858,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 67300,
@@ -300,15 +300,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1034219,
+        "brotliBytes": 1034195,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1031683,
+        "gzipBytes": 1031756,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2539121,
+        "initialRawBytes": 2539377,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112650,
+        "ownedRawBytes": 112715,
         "requestCount": 89,
         "scriptRequestCount": 73,
         "sourceOwners": [
@@ -842,15 +842,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1044562,
+        "brotliBytes": 1044537,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1042000,
+        "gzipBytes": 1042074,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2564513,
+        "initialRawBytes": 2564771,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112650,
+        "ownedRawBytes": 112715,
         "requestCount": 89,
         "scriptRequestCount": 73
       },
