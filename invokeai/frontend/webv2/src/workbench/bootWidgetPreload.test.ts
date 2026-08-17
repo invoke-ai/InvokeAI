@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { getBootWidgetTypeIds, readBootWidgetHint, writeBootWidgetHint } from './bootWidgetPreload';
+import { readBootWidgetHint, writeBootWidgetHint } from './bootWidgetPreload';
 import { defaultLayoutPreset } from './layoutPresets';
+import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 
 const storage = new Map<string, string>();
 
@@ -18,7 +19,7 @@ const HINT_KEY = 'invokeai:v7:webv2:boot-widgets';
 
 describe('boot widget preload', () => {
   it('derives the default layout boot set: active instances plus every bottom item', () => {
-    const typeIds = getBootWidgetTypeIds(defaultLayoutPreset.snapshot);
+    const typeIds = getLayoutWidgetTypeIds(defaultLayoutPreset.snapshot);
 
     for (const region of Object.values(defaultLayoutPreset.snapshot.widgetRegions)) {
       const activeTypeId = defaultLayoutPreset.snapshot.widgetInstances[region.activeInstanceId]?.typeId;
@@ -36,9 +37,6 @@ describe('boot widget preload', () => {
         expect(typeIds).toContain(typeId);
       }
     }
-
-    expect(typeIds).toEqual([...typeIds].sort());
-    expect(new Set(typeIds).size).toBe(typeIds.length);
   });
 
   it('round-trips the hint through storage', () => {

@@ -1,4 +1,5 @@
-import { getBootWidgetTypeIds, writeBootWidgetHint } from '@workbench/bootWidgetPreload';
+import { writeBootWidgetHint } from '@workbench/bootWidgetPreload';
+import { getLayoutWidgetTypeIds } from '@workbench/layoutWidgetSet';
 import { shallowEqual, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useEffect } from 'react';
 
@@ -10,7 +11,7 @@ import { useEffect } from 'react';
  * Renders nothing.
  */
 export const BootWidgetHintController = () => {
-  const typeIds = useActiveProjectSelector(getBootWidgetTypeIds, shallowEqual);
+  const typeIds = useActiveProjectSelector(getLayoutWidgetTypeIds, shallowEqual);
 
   useEffect(() => {
     writeBootWidgetHint(typeIds);

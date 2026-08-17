@@ -1,6 +1,7 @@
 import type { LayoutPreset, LayoutPresetId } from './layoutContracts';
 
-import { loadWidget, preloadWidget } from './widgetRegistry';
+import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
+import { loadWidgets, warmWidgets } from './widgetRegistry';
 
 /**
  * How long an activation waits for widget implementations before applying the
@@ -62,21 +63,8 @@ export const createLayoutPresetActivator = ({
 };
 
 export const preloadLayoutPresetWidgets = (preset: LayoutPreset): void => {
-  for (const region of Object.values(preset.snapshot.widgetRegions)) {
-    const typeId = preset.snapshot.widgetInstances[region.activeInstanceId]?.typeId;
-
-    if (typeId) {
-      preloadWidget(typeId);
-    }
-  }
+  warmWidgets(getLayoutWidgetTypeIds(preset.snapshot));
 };
 
 export const loadLayoutPresetWidgets = (preset: LayoutPreset): Promise<unknown> =>
-  Promise.allSettled(
-    Object.values(preset.snapshot.widgetRegions).flatMap((region) => {
-      const typeId = preset.snapshot.widgetInstances[region.activeInstanceId]?.typeId;
-      const pending = typeId ? loadWidget(typeId) : null;
-
-      return pending ? [pending] : [];
-    })
-  );
+  loadWidgets(getLayoutWidgetTypeIds(preset.snapshot));

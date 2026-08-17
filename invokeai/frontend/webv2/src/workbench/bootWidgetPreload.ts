@@ -1,7 +1,8 @@
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { defaultLayoutPreset } from './layoutPresets';
-import { getWidgetHosts, preloadWidget } from './widgetRegistry';
+import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
+import { getWidgetHosts, warmWidgets } from './widgetRegistry';
 
 /**
  * The widget implementations a boot will render are only knowable for certain
@@ -20,38 +21,6 @@ const BOOT_WIDGET_HINT_STORAGE_KEY = 'invokeai:v7:webv2:boot-widgets';
 
 /** Sanity cap so a corrupt hint cannot fan out unbounded chunk fetches. */
 const BOOT_WIDGET_HINT_LIMIT = 32;
-
-/**
- * The subset of a project or preset snapshot the boot preloader reads. Both
- * `Project` and `LayoutPresetSnapshot` satisfy it structurally.
- */
-interface BootWidgetLayout {
-  widgetInstances: Record<string, { typeId: WidgetTypeId }>;
-  widgetRegions: Record<string, { activeInstanceId: string; instanceIds: string[] }>;
-}
-
-/**
- * The widget types a layout renders at boot: each region's active instance,
- * plus every placed bottom instance — the status bar mounts all of its items
- * as compact widgets, not just the active one.
- */
-export const getBootWidgetTypeIds = (layout: BootWidgetLayout): WidgetTypeId[] => {
-  const typeIds = new Set<WidgetTypeId>();
-
-  for (const [region, state] of Object.entries(layout.widgetRegions)) {
-    const instanceIds = region === 'bottom' ? [state.activeInstanceId, ...state.instanceIds] : [state.activeInstanceId];
-
-    for (const instanceId of instanceIds) {
-      const typeId = layout.widgetInstances[instanceId]?.typeId;
-
-      if (typeId) {
-        typeIds.add(typeId);
-      }
-    }
-  }
-
-  return [...typeIds].sort();
-};
 
 export const readBootWidgetHint = (): WidgetTypeId[] | null => {
   try {
@@ -96,7 +65,5 @@ export const preloadBootWidgets = (): void => {
     widget.host?.preload();
   }
 
-  for (const typeId of readBootWidgetHint() ?? getBootWidgetTypeIds(defaultLayoutPreset.snapshot)) {
-    preloadWidget(typeId);
-  }
+  warmWidgets(readBootWidgetHint() ?? getLayoutWidgetTypeIds(defaultLayoutPreset.snapshot));
 };

@@ -114,6 +114,7 @@
     "layoutPresetRouting.ts": "workbench",
     "layoutPresetSnapshots.ts": "workbench",
     "layoutPresets.ts": "workbench",
+    "layoutWidgetSet.ts": "workbench",
     "panZoom.ts": "workbench",
     "performanceMarks.ts": "workbench",
     "persistence.ts": "workbench",
