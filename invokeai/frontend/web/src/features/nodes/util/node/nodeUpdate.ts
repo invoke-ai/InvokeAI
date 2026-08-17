@@ -3,6 +3,7 @@ import { compare, satisfies } from 'compare-versions';
 import { defaultsDeep, keys, pick } from 'es-toolkit/compat';
 import { NodeUpdateError } from 'features/nodes/types/error';
 import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
+import { isEnumFieldInputTemplate } from 'features/nodes/types/field';
 import type { InvocationNode, InvocationNodeData, InvocationTemplate } from 'features/nodes/types/invocation';
 import { zParsedSemver } from 'features/nodes/types/semver';
 
@@ -79,6 +80,42 @@ export const migrateImageCollectionInputValues = (
 };
 
 /**
+ * `minimax_h3_denoise.num_frames` became a grid-aligned choice list in 1.3.0, having been a free
+ * integer. The recursive merge below preserves the stored number, which no longer validates
+ * against the enum instance schema - the field then renders as nothing at all, leaving the user
+ * no way to fix it from the editor. Convert a stored count that is still on the offered grid, and
+ * fall back to the template's default for one that is not.
+ */
+export const migrateMiniMaxH3NumFramesValue = (
+  node: InvocationNode,
+  template: InvocationTemplate,
+  sourceVersion?: string
+) => {
+  if (node.data.type !== 'minimax_h3_denoise') {
+    return;
+  }
+  if (sourceVersion && compare(sourceVersion, '1.3.0', '>=')) {
+    return;
+  }
+
+  const field = node.data.inputs.num_frames;
+  const fieldTemplate = template.inputs.num_frames;
+  if (!field || !fieldTemplate || !isEnumFieldInputTemplate(fieldTemplate)) {
+    return;
+  }
+
+  // Annotated `unknown` so the typeof check below narrows the local, not `field.value` itself -
+  // the assignment that follows has to widen back to a string.
+  const storedCount: unknown = field.value;
+  if (typeof storedCount !== 'number') {
+    return;
+  }
+
+  const asChoice = String(storedCount);
+  field.value = fieldTemplate.options.includes(asChoice) ? asChoice : fieldTemplate.default;
+};
+
+/**
  * Updates a node to the latest version of its template:
  * - Create a new node data object with the latest version of the template.
  * - Recursively merge new node data object into the node to be updated.
@@ -111,6 +148,7 @@ export const updateNode = (
   clone.data.version = template.version;
   defaultsDeep(clone, defaults); // mutates!
   migrateImageCollectionInputValues(clone, { ...options, sourceVersion });
+  migrateMiniMaxH3NumFramesValue(clone, template, sourceVersion);
 
   // Remove any fields that are not in the template. Nodes that accept extras (pydantic
   // `extra='allow'`, e.g. `core_metadata`) may carry undeclared inputs that are not in the template

@@ -28658,10 +28658,11 @@ export type components = {
             height?: number;
             /**
              * Number of Frames
-             * @description Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.
+             * @description Number of output frames at the fixed 24 fps. Only the video VAE's 17n+5 grid points are offered: 90 (3.75 s) through 345 (14.38 s), plus the single 5-frame block used by the still-image path. The model was trained for 5-15 s, so counts below 124 are usable but off-distribution - handy for quick test renders.
              * @default 124
+             * @enum {string}
              */
-            num_frames?: number;
+            num_frames?: "5" | "90" | "107" | "124" | "141" | "158" | "175" | "192" | "209" | "226" | "243" | "260" | "277" | "294" | "311" | "328" | "345";
             /**
              * Steps
              * @description Number of denoising steps (sigma grid points, terminal included: N steps = N-1 model evaluations).
@@ -28822,12 +28823,15 @@ export type components = {
          * MiniMax H3 Ideal Dimensions
          * @description Ideal dimensions for MiniMax H3 from a source image's aspect ratio.
          *
-         *     Applies the released pipeline's canvas policy: short edge 768, soft area cap of
-         *     768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of
-         *     the inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image
-         *     Primitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax
-         *     H3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three
-         *     must share the same canvas).
+         *     "768 highres" applies the released pipeline's canvas policy: short edge 768, soft
+         *     area cap of 768x1344. "768 lowres" pins the LONG edge to 768 instead, giving a
+         *     canvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes
+         *     512x768 instead of 768x1152) — faster and cheaper, at some cost in fidelity since it
+         *     is below the model's training resolution. Both presets round each axis to the
+         *     nearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios
+         *     beyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs
+         *     and into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax
+         *     H3`` and ``Denoise - MiniMax H3`` (all three must share the same canvas).
          */
         MiniMaxH3IdealDimensionsInvocation: {
             /**
@@ -28859,6 +28863,13 @@ export type components = {
              * @default 1024
              */
             height?: number;
+            /**
+             * Target Resolution
+             * @description Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.
+             * @default 768 highres
+             * @enum {string}
+             */
+            target_resolution?: "768 highres" | "768 lowres";
             /**
              * type
              * @default minimax_h3_ideal_dimensions
