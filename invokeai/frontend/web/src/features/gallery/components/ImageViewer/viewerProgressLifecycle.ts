@@ -102,9 +102,15 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
 
   /**
    * Arm (or, with null, disarm) the pending "resolve" illusion. Every write to
-   * `pendingResolveItemId` goes through here so the safety timeout is always in sync with it —
-   * whoever takes over or clears the shared preview also cancels the timeout, so it can never
-   * clear a preview that has since been handed to another session.
+   * `pendingResolveItemId` goes through here, so the safety timeout exists exactly while the
+   * illusion is pending: anything that ends the illusion — a load, a takeover by another session,
+   * a reset — also cancels the timeout, and it can never clear a preview that some other session
+   * has since taken over.
+   *
+   * The timeout bounds the illusion only. A preview left standing by a path that does not arm one
+   * (a progress event that carries no image replaces $progressEvent but not $progressImage, so the
+   * previous session's frame stays up while the next queue item spins up) is unbounded here, as it
+   * is today — that frame is taken down by the next preview image rather than by this timeout.
    */
   const setPendingResolve = (itemId: number | null): void => {
     if (resolveTimeoutId !== null) {

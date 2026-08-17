@@ -237,9 +237,14 @@ describe('viewerProgressLifecycle', () => {
       const eventA = buildProgressEvent({ item_id: 1, image: buildProgressImage(1) });
       lifecycle.recordProgress(eventA);
       lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      expect(vi.getTimerCount()).toBe(1);
       takeOver();
-      const eventAfterTakeOver = stores.$progressEvent.get();
       // The timeout must never fire against a preview that has since been replaced or dropped.
+      // Asserting the timer is gone, not just that the state survives it, is what makes this bite
+      // for the takeovers that leave the stores null — there, a leaked timer would clear state
+      // that is already clear.
+      expect(vi.getTimerCount()).toBe(0);
+      const eventAfterTakeOver = stores.$progressEvent.get();
       vi.advanceTimersByTime(RESOLVE_TIMEOUT_MS * 2);
       expect(stores.$progressEvent.get()).toBe(eventAfterTakeOver);
     });
