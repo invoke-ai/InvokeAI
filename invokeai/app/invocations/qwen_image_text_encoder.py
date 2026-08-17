@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
@@ -303,7 +304,13 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
         context.util.signal_progress("Loading Qwen2.5-VL encoder (quantized)")
-        with warnings.catch_warnings():
+        # Torch module construction is not thread-safe process-wide (see
+        # _ModelLoadReadWriteLock); serialize with the model-load machinery. The lock is
+        # the OUTER context on purpose: warnings.catch_warnings() swaps the process-global
+        # filter list, so holding it across an unbounded wait for the lock would leave this
+        # thread's filter installed — and clobberable by any other thread's
+        # SilenceWarnings — for the whole duration of someone else's model load.
+        with MODEL_LOAD_LOCK.write_lock(), warnings.catch_warnings():
             # BnB int8 internally casts bfloat16→float16; the warning is harmless
             warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
             text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
