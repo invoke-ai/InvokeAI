@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 832217,
+        "brotliBytes": 832275,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 832184,
+        "gzipBytes": 832279,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1934317,
+        "initialRawBytes": 1934798,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66817,
+        "ownedRawBytes": 67298,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -174,6 +174,7 @@
           "source:src/platform/i18n/client.ts",
           "source:src/platform/i18n/languages.ts",
           "source:src/platform/performance/semanticReady.ts",
+          "source:src/platform/pwa/registerServiceWorker.ts",
           "source:src/platform/query/client.ts",
           "source:src/platform/react/useMountEffect.ts",
           "source:src/platform/react/useZodForm.ts",
@@ -280,15 +281,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840540,
+        "brotliBytes": 840598,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 840506,
+        "gzipBytes": 840602,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1953661,
+        "initialRawBytes": 1954146,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66817,
+        "ownedRawBytes": 67298,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -298,15 +299,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1031650,
+        "brotliBytes": 1032129,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1029036,
+        "gzipBytes": 1029460,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2530634,
+        "initialRawBytes": 2531682,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 111432,
+        "ownedRawBytes": 112318,
         "requestCount": 89,
         "scriptRequestCount": 73,
         "sourceOwners": [
@@ -419,6 +420,7 @@
           "package:use-sync-external-store",
           "package:zod",
           "package:zustand",
+          "source:src/app/BootWidgetHintController.tsx",
           "source:src/app/GalleryUiAdapter.tsx",
           "source:src/app/GenerateWidgetSyncRuntime.tsx",
           "source:src/app/GenerationUiAdapter.tsx",
@@ -662,6 +664,7 @@
           "source:src/workbench/WorkbenchWidgetRegistryContext.tsx",
           "source:src/workbench/activeInvocationSubmission.ts",
           "source:src/workbench/autoRoutePolicy.ts",
+          "source:src/workbench/bootWidgetPreload.ts",
           "source:src/workbench/canvas-engine/api.ts",
           "source:src/workbench/canvas-engine/capabilities.ts",
           "source:src/workbench/canvas-engine/document/sources.ts",
@@ -833,15 +836,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1041967,
+        "brotliBytes": 1042451,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1039327,
+        "gzipBytes": 1039755,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2555941,
+        "initialRawBytes": 2556999,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 111432,
+        "ownedRawBytes": 112318,
         "requestCount": 89,
         "scriptRequestCount": 73
       },

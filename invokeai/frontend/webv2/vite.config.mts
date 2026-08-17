@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
+import { serviceWorkerPlugin } from './scripts/service-worker-plugin.mjs';
 
 // Override with e.g. INVOKEAI_DEV_BACKEND=http://127.0.0.1:9091 when the
 // backend dev server runs on a non-default port.
@@ -179,6 +180,7 @@ export default defineConfig({
       presets: [reactCompilerPreset()],
     }),
     chunkSourceManifest({ projectRoot: PROJECT_ROOT }),
+    serviceWorkerPlugin({ projectRoot: PROJECT_ROOT }),
   ],
   resolve: {
     alias: {
