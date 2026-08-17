@@ -878,6 +878,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1297,6 +1300,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
@@ -1714,6 +1720,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -2178,6 +2187,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -2666,6 +2678,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -3984,6 +3999,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -14173,6 +14191,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -48915,6 +48936,12 @@
             "description": "Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.",
             "default": false
           },
+          "wan_memory_optimization": {
+            "type": "boolean",
+            "title": "Wan Memory Optimization",
+            "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
+            "default": false
+          },
           "pid_memory_optimization": {
             "type": "boolean",
             "title": "Pid Memory Optimization",
@@ -49203,7 +49230,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.\n    pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`\n    clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.\n    max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    allow_private_download_urls: Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.\n    download_proxy: Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.\n    external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.\n    external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.\n    external_gemini_api_key: API key for Gemini image generation.\n    external_openai_api_key: API key for OpenAI image generation.\n    external_gemini_base_url: Base URL override for Gemini image generation.\n    external_openai_base_url: Base URL override for OpenAI image generation.\n    external_seedream_api_key: API key for Seedream image generation.\n    external_seedream_base_url: Base URL override for Seedream image generation.\n    base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.\n    forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -58043,6 +58070,183 @@
         ],
         "title": "Main_Checkpoint_SDXL_Config"
       },
+      "Main_Checkpoint_Wan_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "wan",
+            "title": "Base",
+            "default": "wan"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/WanVariantType"
+          },
+          "expert": {
+            "type": "string",
+            "enum": ["high", "low", "none"],
+            "title": "Expert",
+            "description": "For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, 'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).",
+            "default": "none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant",
+          "expert"
+        ],
+        "title": "Main_Checkpoint_Wan_Config",
+        "description": "Model config for single-file Wan 2.2 transformer checkpoints (safetensors).\n\nThis is the format the community ships on CivitAI and in ComfyUI-oriented\nHugging Face repos: one ``.safetensors`` per transformer, in either the native\nupstream key layout or the diffusers one, optionally under a\n``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``\nquantized. The loader normalises all of those.\n\nAs with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``\nrecords which one this is so the Wan model loader invocation can pair them.\nTI2V-5B is single-transformer and stores ``expert='none'``."
+      },
       "Main_Checkpoint_ZImage_Config": {
         "properties": {
           "key": {
@@ -66406,6 +66610,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -67071,6 +67278,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                   },
                   {
@@ -67621,6 +67831,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
@@ -68025,6 +68238,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -68901,6 +69117,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_Wan_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
@@ -88771,7 +88990,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a collection of LoRAs to the Wan 2.2 transformer(s).\n\nEach LoRA is routed to the primary and/or low-noise list based on its\nrecorded ``expert`` tag (set by the probe from the filename). Untagged\nLoRAs go to both lists.",
+        "description": "Apply a collection of LoRAs to the Wan 2.2 transformer(s).\n\nEach LoRA is routed to the primary and/or low-noise list based on its\nrecorded ``expert`` tag (set by the probe from the filename). Untagged\nLoRAs go to both lists.\n\nAgainst a TI2V-5B main, which is a single transformer with no low-noise\nexpert, a LoRA that would land only in the low-noise list is applied to\nthe transformer instead, with a warning.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -88861,7 +89080,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime; a LoRA routed only to the low-noise list would be inert, so that\nrouting logs a warning.",
+        "description": "Apply a LoRA to the Wan 2.2 transformer(s).\n\nFor A14B (dual expert) the LoRA's recorded ``expert`` field determines\nwhich expert list it lands in: ``\"high\"`` -> primary list, ``\"low\"`` ->\nlow-noise list, ``None`` (untagged) -> both lists. Use the ``target``\nfield to override.\n\nFor TI2V-5B (single transformer) only the primary list is used at denoise\ntime, so a LoRA that would land only in the low-noise list is applied to\nthe transformer instead, with a warning. The alternative is to accept the\nLoRA and silently have no effect.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -88918,7 +89137,7 @@
           },
           "target": {
             "default": "auto",
-            "description": "Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it.",
+            "description": "Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it. On the single-transformer TI2V-5B, which has no low-noise expert, 'low' is applied to the transformer instead of being discarded.",
             "enum": ["auto", "both", "high", "low"],
             "field_kind": "input",
             "input": "any",
@@ -89002,7 +89221,7 @@
         "category": "model",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Loads a Wan 2.2 model, outputting its submodels.\n\nComponents can be mixed and matched, mirroring the Qwen Image loader pattern:\n\n- Transformer(s):\n    * Diffusers main: emits ``transformer/`` and (for A14B) ``transformer_2/``\n      from the same model record.\n    * GGUF main: emits the single GGUF as the primary transformer; for A14B\n      the second-expert GGUF must be wired to ``Transformer (Low Noise)``.\n- VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).\n- UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >\n  Component Source (Diffusers).\n\nThe Component Source slot lets users supply a Diffusers Wan main model purely\nfor VAE / encoder extraction when the actual transformer is in a single-file\nformat. Together, the standalone VAE + standalone encoder let a GGUF\ntransformer run without a full ~30 GB Diffusers install.",
+        "description": "Loads a Wan 2.2 model, outputting its submodels.\n\nComponents can be mixed and matched, mirroring the Qwen Image loader pattern:\n\n- Transformer(s):\n    * Diffusers main: emits ``transformer/`` and (for A14B) ``transformer_2/``\n      from the same model record.\n    * Single-file main (GGUF or safetensors checkpoint): emits the file as the\n      primary transformer; for A14B the second-expert file must be wired to\n      ``Transformer (Low Noise)``.\n- VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).\n- UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >\n  Component Source (Diffusers).\n\nThe Component Source slot lets users supply a Diffusers Wan main model purely\nfor VAE / encoder extraction when the actual transformer is in a single-file\nformat. Together, the standalone VAE + standalone encoder let a single-file\ntransformer run without a full ~30 GB Diffusers install.",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -89049,14 +89268,14 @@
               }
             ],
             "default": null,
-            "description": "Optional second GGUF transformer for the A14B low-noise expert. Only relevant when the main model is a single-file GGUF and the variant is A14B; ignored when the main is a Diffusers A14B (both experts are pulled from transformer/ and transformer_2/ already) or when the variant is TI2V-5B.",
+            "description": "Optional second single-file transformer for the A14B low-noise expert. Only relevant when the main model is a single-file GGUF or safetensors checkpoint and the variant is A14B; ignored when the main is a Diffusers A14B (both experts are pulled from transformer/ and transformer_2/ already) or when the variant is TI2V-5B.",
             "field_kind": "input",
             "input": "direct",
             "orig_default": null,
             "orig_required": false,
             "title": "Transformer (Low Noise)",
             "ui_model_base": ["wan"],
-            "ui_model_format": ["gguf_quantized"],
+            "ui_model_format": ["gguf_quantized", "checkpoint"],
             "ui_model_type": ["main"]
           },
           "vae_model": {
