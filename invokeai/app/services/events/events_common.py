@@ -140,7 +140,7 @@ class InvocationProgressEvent(InvocationEventBase):
     )
     device: str | None = Field(
         default=None,
-        description="The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+        description="The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)",
     )
 
     @classmethod
@@ -156,14 +156,18 @@ class InvocationProgressEvent(InvocationEventBase):
         # thread-local session device is temporarily re-pinned to a borrowed idle GPU during
         # offloaded encoder nodes, and using it here would make the UI's device badge jump to the
         # borrowed GPU and back within a single queue item.
-        device: str | None = queue_item.device if queue_item.device and queue_item.device.startswith("cuda") else None
+        device: str | None = (
+            queue_item.device if queue_item.device and queue_item.device.startswith(("cuda", "xpu")) else None
+        )
         if device is None:
             # Legacy single-device mode tags queue items with device=None; fall back to the worker
             # thread's pinned device (set via TorchDevice.set_session_device()).
             from invokeai.backend.util.devices import TorchDevice
 
             session_device = TorchDevice.get_session_device()
-            device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
+            device = (
+                str(session_device) if session_device is not None and session_device.type in ("cuda", "xpu") else None
+            )
 
         return cls(
             queue_id=queue_item.queue_id,
