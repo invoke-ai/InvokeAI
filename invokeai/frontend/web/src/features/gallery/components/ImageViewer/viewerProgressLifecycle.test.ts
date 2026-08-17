@@ -1,10 +1,10 @@
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { atom, map } from 'nanostores';
 import type { S } from 'services/api/types';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ViewerProgressDataMap, ViewerProgressStores } from './viewerProgressLifecycle';
-import { createViewerProgressLifecycle } from './viewerProgressLifecycle';
+import { createViewerProgressLifecycle, RESOLVE_TIMEOUT_MS } from './viewerProgressLifecycle';
 
 const buildProgressImage = (itemId: number): ProgressImageType =>
   ({
@@ -52,6 +52,7 @@ describe('viewerProgressLifecycle', () => {
   let lifecycle: ReturnType<typeof createViewerProgressLifecycle>;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     stores = {
       $progressEvent: atom<S['InvocationProgressEvent'] | null>(null),
       $progressImage: atom<ProgressImageType | null>(null),
@@ -61,6 +62,10 @@ describe('viewerProgressLifecycle', () => {
       itemIdBySessionId: new Map<string, number>(),
     };
     lifecycle = createViewerProgressLifecycle(stores);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   const startTwoSessions = () => {
@@ -155,6 +160,13 @@ describe('viewerProgressLifecycle', () => {
       expect(stores.$isProgressImageResolving.get()).toBe(false);
     });
 
+    it('runs no resolve illusion when the completed item never reported progress', () => {
+      // Nothing is retained, so arming the illusion would only leave the resolving flag stuck on.
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+      expect(stores.$progressEvent.get()).toBeNull();
+    });
+
     it('ignores repeat terminal events for an already-finished item', () => {
       const { eventA } = startTwoSessions();
       lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true);
@@ -183,6 +195,55 @@ describe('viewerProgressLifecycle', () => {
       expect(stores.$isProgressImageResolving.get()).toBe(false);
     });
 
+    it('clears the retained preview on a timeout when its final image never loads', () => {
+      // The retained session's image may never load: the load can fail (the viewer's <Image>
+      // reports errors through onError, not onLoad), or auto-switch may end up selecting a
+      // concurrently-completed session's image, so the retained session's image is never
+      // rendered. An ignored load may have been the last one coming, so the preview — an opaque
+      // overlay — must not be left covering the viewer until the next generation.
+      const { eventB } = startTwoSessions();
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'completed' }), true);
+      lifecycle.onFinalImageLoaded('session-1');
+      expect(stores.$progressEvent.get()).toBe(eventB);
+      vi.advanceTimersByTime(RESOLVE_TIMEOUT_MS);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+    });
+
+    it.each([
+      [
+        'a still-running session takes the preview over',
+        () => {
+          lifecycle.recordProgress(
+            buildProgressEvent({ item_id: 2, session_id: 'session-2', image: buildProgressImage(2) })
+          );
+        },
+      ],
+      [
+        'the final image loads first',
+        () => {
+          lifecycle.onFinalImageLoaded('session-1');
+        },
+      ],
+      [
+        'the preview state is reset',
+        () => {
+          lifecycle.reset();
+        },
+      ],
+    ])('disarms the resolve timeout when %s', (_desc, takeOver) => {
+      const eventA = buildProgressEvent({ item_id: 1, image: buildProgressImage(1) });
+      lifecycle.recordProgress(eventA);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      takeOver();
+      const eventAfterTakeOver = stores.$progressEvent.get();
+      // The timeout must never fire against a preview that has since been replaced or dropped.
+      vi.advanceTimersByTime(RESOLVE_TIMEOUT_MS * 2);
+      expect(stores.$progressEvent.get()).toBe(eventAfterTakeOver);
+    });
+
     it.each([
       ['an image with no session (e.g. an upload)', null],
       ['an image from a session this viewer never tracked', 'session-from-a-previous-visit'],
@@ -196,6 +257,20 @@ describe('viewerProgressLifecycle', () => {
       lifecycle.onFinalImageLoaded(sessionId);
       expect(stores.$progressEvent.get()).toBeNull();
       expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+    });
+
+    it('clears on a load from a session tracked before a reset', () => {
+      // Attributions are dropped along with the state they describe, so images generated before a
+      // disconnect or socket swap can still end a later session's illusion.
+      startTwoSessions();
+      lifecycle.reset();
+      const eventC = buildProgressEvent({ item_id: 3, session_id: 'session-3', image: buildProgressImage(3) });
+      lifecycle.recordProgress(eventC);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 3, status: 'completed' }), true);
+      expect(stores.$isProgressImageResolving.get()).toBe(true);
+      lifecycle.onFinalImageLoaded('session-1');
+      expect(stores.$progressEvent.get()).toBeNull();
       expect(stores.$isProgressImageResolving.get()).toBe(false);
     });
   });
@@ -215,6 +290,22 @@ describe('viewerProgressLifecycle', () => {
       // this event — its trailing progress must not repopulate the preview.
       expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 1, image: buildProgressImage(1) }))).toBe(false);
       expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 2, image: buildProgressImage(2) }))).toBe(false);
+    });
+
+    it('blocks trailing progress from an item claimed after the clear cancelled the running ones', () => {
+      // The clear cancels the items already running before deleting the rows, so a worker that
+      // claims an item in between never gets a terminal event: only its in_progress claim, which
+      // precedes the deletion, tells the viewer the item exists. Its first progress event arrives
+      // seconds later — a preview for a deleted item that nothing would ever take down.
+      expect(lifecycle.onItemStarted(7)).toBe(true);
+      expect(lifecycle.onQueueCleared(buildQueueClearedEvent(null), 'user-1')).toBe(true);
+      expect(
+        lifecycle.recordProgress(
+          buildProgressEvent({ item_id: 7, session_id: 'session-7', image: buildProgressImage(7) })
+        )
+      ).toBe(false);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
     });
 
     it('blocks trailing progress from a session that had not produced a preview image yet', () => {

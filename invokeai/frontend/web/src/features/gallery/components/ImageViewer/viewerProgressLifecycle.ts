@@ -25,7 +25,18 @@ type FinishedQueueItemIds = {
 type ItemIdBySessionId = {
   get: (sessionId: string) => number | undefined;
   set: (sessionId: string, itemId: number) => unknown;
+  clear: () => unknown;
 };
+
+/**
+ * How long a completed session's retained preview may wait for its final image to load before it
+ * is cleared anyway. The "resolve" illusion normally ends on that image's load event, but nothing
+ * guarantees the event arrives: the load can fail (the viewer's <Image> reports errors through
+ * onError, not onLoad), or auto-switch can end up selecting a concurrently-completed session's
+ * image instead, in which case the retained session's image is never rendered at all. Without this
+ * bound the preview — an opaque overlay — could cover the viewer until the next generation.
+ */
+export const RESOLVE_TIMEOUT_MS = 3000;
 
 export type ViewerProgressStores = {
   $progressEvent: WritableAtom<S['InvocationProgressEvent'] | null>;
@@ -73,21 +84,69 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
   let seq = 0;
   // The queue item whose retained preview the final gallery image's onLoad should clear — the tail
   // end of the "resolve" illusion for a completed session (see onTerminal / onFinalImageLoaded).
-  // Null when no illusion is pending.
+  // Null when no illusion is pending. Always written through setPendingResolve, which keeps the
+  // safety timeout in sync.
   let pendingResolveItemId: number | null = null;
   // Every item we have seen progress for and not yet seen terminate, including items that have not
   // produced a preview image (those are absent from $progressData). A queue clear deletes items
   // without emitting a per-item terminal event, so this is the set that must be marked finished
   // there — otherwise an image-less session could later emit an image and resurrect the preview.
   const unfinishedItemIds = new Set<number>();
+  let resolveTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-  const clearAll = (): void => {
-    pendingResolveItemId = null;
-    unfinishedItemIds.clear();
+  const clearRetainedPreview = (): void => {
     $isProgressImageResolving.set(false);
     $progressEvent.set(null);
     $progressImage.set(null);
+  };
+
+  /**
+   * Arm (or, with null, disarm) the pending "resolve" illusion. Every write to
+   * `pendingResolveItemId` goes through here so the safety timeout is always in sync with it —
+   * whoever takes over or clears the shared preview also cancels the timeout, so it can never
+   * clear a preview that has since been handed to another session.
+   */
+  const setPendingResolve = (itemId: number | null): void => {
+    if (resolveTimeoutId !== null) {
+      clearTimeout(resolveTimeoutId);
+      resolveTimeoutId = null;
+    }
+    pendingResolveItemId = itemId;
+    if (itemId === null) {
+      return;
+    }
+    resolveTimeoutId = setTimeout(() => {
+      resolveTimeoutId = null;
+      pendingResolveItemId = null;
+      clearRetainedPreview();
+    }, RESOLVE_TIMEOUT_MS);
+  };
+
+  const clearAll = (): void => {
+    setPendingResolve(null);
+    unfinishedItemIds.clear();
+    // Session attributions describe state this reset just dropped. Keeping them would make later
+    // loads of those images look like another session's, suppressing clears they should perform.
+    itemIdBySessionId.clear();
+    clearRetainedPreview();
     $progressData.set({});
+  };
+
+  /**
+   * A worker claimed this queue item (`in_progress`). Tracked so a queue clear can mark it
+   * finished: the clear cancels the items that were already running before it deletes the rows,
+   * but a worker that claims an item in between gets no terminal event at all — its row is gone —
+   * and its first progress event would otherwise appear seconds after the clear and put a preview
+   * for a deleted item on screen, with nothing left to ever take it down.
+   *
+   * Returns false if the item already finished (event ignored).
+   */
+  const onItemStarted = (itemId: number): boolean => {
+    if (finishedQueueItemIds.has(itemId)) {
+      return false;
+    }
+    unfinishedItemIds.add(itemId);
+    return true;
   };
 
   /** Record a progress event. Returns false if the item already finished (event ignored). */
@@ -97,7 +156,7 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
     }
     unfinishedItemIds.add(data.item_id);
     itemIdBySessionId.set(data.session_id, data.item_id);
-    pendingResolveItemId = null;
+    setPendingResolve(null);
     $isProgressImageResolving.set(false);
     $progressEvent.set(data);
     if (data.image) {
@@ -139,10 +198,17 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
       // through these globals — leaving them cleared (or parked on the finished session's stale
       // frame via the resolve illusion) would hide a still-running preview. This applies to every
       // terminal status, including successful completion with auto-switch.
-      pendingResolveItemId = null;
+      setPendingResolve(null);
       $isProgressImageResolving.set(false);
       $progressEvent.set(successor.progressEvent);
       $progressImage.set(successor.progressImage);
+      return true;
+    }
+    if (globalProgressEvent === null) {
+      // Nothing is retained (this item never reported progress), so there is no illusion to run —
+      // arming one would leave $isProgressImageResolving stuck on until the next generation.
+      setPendingResolve(null);
+      $isProgressImageResolving.set(false);
       return true;
     }
     // Completed queue items have the progress event cleared by the onLoadImage callback. This allows the viewer to
@@ -163,12 +229,10 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
       // will be stuck on the viewer.
       (data.origin === 'canvas' && data.destination !== 'canvas')
     ) {
-      pendingResolveItemId = null;
-      $isProgressImageResolving.set(false);
-      $progressEvent.set(null);
-      $progressImage.set(null);
+      setPendingResolve(null);
+      clearRetainedPreview();
     } else {
-      pendingResolveItemId = data.item_id;
+      setPendingResolve(data.item_id);
       $isProgressImageResolving.set(true);
     }
     return true;
@@ -186,8 +250,12 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
    * finish loading. Clearing on A's load would cut B's illusion short — exactly the flicker the
    * illusion exists to hide — so a load is ignored when it can be positively attributed to another
    * session we tracked. Loads we cannot attribute (uploads, images from before this viewer
-   * mounted, an unrelated image the user selected) still clear, keeping the safety net that stops
-   * a retained preview from covering the viewer indefinitely.
+   * mounted) still clear.
+   *
+   * Ignoring a load must never be the difference between the preview clearing and not clearing:
+   * the retained session's own image may never load at all (see RESOLVE_TIMEOUT_MS), and the
+   * ignored load may have been the last one coming. The timeout armed alongside the illusion is
+   * what bounds it — this check only decides whether the illusion ends early.
    */
   const onFinalImageLoaded = (sessionId: string | null): void => {
     if (pendingResolveItemId === null) {
@@ -199,10 +267,8 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
         return;
       }
     }
-    pendingResolveItemId = null;
-    $isProgressImageResolving.set(false);
-    $progressEvent.set(null);
-    $progressImage.set(null);
+    setPendingResolve(null);
+    clearRetainedPreview();
   };
 
   /**
@@ -243,5 +309,5 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
     clearAll();
   };
 
-  return { onFinalImageLoaded, onQueueCleared, onTerminal, recordProgress, reset };
+  return { onFinalImageLoaded, onItemStarted, onQueueCleared, onTerminal, recordProgress, reset };
 };

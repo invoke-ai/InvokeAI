@@ -119,6 +119,14 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       if (getEventScope(store.getState, data) !== 'own') {
         return;
       }
+      if (data.status === 'in_progress') {
+        // Track the claim itself, not just the progress events that follow it: a queue clear
+        // cancels the items already running before it deletes the rows, so a worker that claims an
+        // item in between never gets a terminal event and its first progress event lands after the
+        // clear (see the lifecycle's onItemStarted).
+        lifecycle.onItemStarted(data.item_id);
+        return;
+      }
       if (data.status !== 'completed' && data.status !== 'canceled' && data.status !== 'failed') {
         return;
       }
