@@ -1,4 +1,4 @@
-import type { WorkflowPreviewState } from '@features/workflow/ui/library/WorkflowLibraryDialog';
+import type { ProjectGraphState } from '@features/workflow/contracts';
 
 import { Box } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
@@ -13,7 +13,7 @@ import { documentToPreviewGraph, GraphPreviewFlow } from './GraphPreviewFlow';
  * renderer, so importing it for the conversion alone pulled xyflow and d3
  * (~174 KB) into every editor boot through the workflow widget's host.
  */
-export const GraphPreviewPane = ({ document }: { document: WorkflowPreviewState['document'] }) => {
+export const GraphPreviewPane = ({ document }: { document: ProjectGraphState }) => {
   const { t } = useTranslation();
   const { graph, positionHints } = documentToPreviewGraph(document, t('widgets.labels.workflow'));
 

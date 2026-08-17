@@ -38,7 +38,7 @@ import { useSaveWorkflowToLibrary } from './useSaveWorkflowToLibrary';
  * cache instantly and revalidate in the background.
  */
 
-export interface WorkflowPreviewState {
+interface WorkflowPreviewState {
   document: ProjectGraphState;
   item: WorkflowLibraryListItem;
   raw: Record<string, unknown>;
