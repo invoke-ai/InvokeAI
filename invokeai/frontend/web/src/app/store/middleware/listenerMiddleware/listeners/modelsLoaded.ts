@@ -53,6 +53,7 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -132,11 +133,19 @@ type ModelHandler = (
   log: Logger<JsonObject>
 ) => undefined;
 
-const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
+export const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedMainModel = state.params.model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
-  const firstModel = allMainModels[0];
+  // Availability and offerability are different questions, and conflating them here
+  // would be destructive. `selectPrimaryMainModelOptions` hides a Wan low-noise expert
+  // once its partner is installed — so if the *selected* model were tested against the
+  // filtered list, installing that partner would read as "your model vanished" and swap
+  // the user onto an unrelated model, firing the whole base-changed cascade (LoRAs
+  // disabled, VAE cleared, bbox resized) for an action that was just a file install.
+  // Keep the selection test on what exists; filter only what we may pick *for* them.
+  const selectableModels = selectPrimaryMainModelOptions(allMainModels);
+  const firstModel = selectableModels[0] ?? allMainModels[0];
 
   // If we have no models, we may need to clear the selected model
   if (!firstModel) {
