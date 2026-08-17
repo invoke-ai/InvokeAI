@@ -309,6 +309,7 @@ const runSample = async (browser, fixture, sample) => {
 
     let activatedResourcePaths = new Set();
     let layoutSwitchMs = 0;
+    let layoutAckMs = 0;
     if (fixture.layoutPreset || fixture.centerView) {
       await waitForRequiredRequests({
         context: `${fixture.id}/${fixture.stateProfile} before activation`,
@@ -326,6 +327,7 @@ const runSample = async (browser, fixture, sample) => {
       const beforeActivation = await resourceCollector.settle();
       const beforePaths = new Set(beforeActivation.map((resource) => resource.path));
       const interactionMark = `invokeai:interaction:${fixture.id}:${fixture.stateProfile}:layout-switch`;
+      const ackMark = `invokeai:interaction:${fixture.id}:${fixture.stateProfile}:layout-ack`;
       let activationTarget = activationTrigger;
       if (fixture.centerView) {
         await activationTrigger.click();
@@ -333,9 +335,10 @@ const runSample = async (browser, fixture, sample) => {
         await activationTarget.waitFor({ timeout: 10_000 });
       }
       await page.evaluate(
-        ({ interactionMarkName, readyMark }) => {
+        ({ ackMarkName, interactionMarkName, presetId, readyMark }) => {
           performance.clearMarks(interactionMarkName);
           performance.clearMarks(readyMark);
+          performance.clearMarks(ackMarkName);
           document.addEventListener(
             'pointerdown',
             () => {
@@ -343,8 +346,32 @@ const runSample = async (browser, fixture, sample) => {
             },
             { capture: true, once: true }
           );
+
+          if (!presetId) {
+            return;
+          }
+
+          const target = document.querySelector(`[data-layout-preset-id="${presetId}"]`);
+
+          if (!target) {
+            return;
+          }
+
+          const observer = new MutationObserver(() => {
+            if (target.getAttribute('aria-selected') === 'true') {
+              performance.mark(ackMarkName);
+              observer.disconnect();
+            }
+          });
+
+          observer.observe(target, { attributes: true, attributeFilter: ['aria-selected'] });
         },
-        { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
+        {
+          ackMarkName: ackMark,
+          interactionMarkName: interactionMark,
+          presetId: fixture.layoutPresetId ?? null,
+          readyMark: fixture.readyMark,
+        }
       );
       await activationTarget.click();
       if (fixture.layoutPreset) {
@@ -368,6 +395,16 @@ const runSample = async (browser, fixture, sample) => {
       );
       if (layoutSwitchMs === null) {
         throw new Error(`${fixture.id}/${fixture.stateProfile} did not record a layout-switch interaction.`);
+      }
+      if (fixture.layoutPreset) {
+        layoutAckMs = await page.evaluate(
+          ({ ackMarkName, interactionMarkName }) => {
+            const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1);
+            const end = performance.getEntriesByName(ackMarkName, 'mark').at(-1);
+            return start && end ? Math.max(0, end.startTime - start.startTime) : 0;
+          },
+          { ackMarkName: ackMark, interactionMarkName: interactionMark }
+        );
       }
       const afterActivation = await resourceCollector.settle();
       activatedResourcePaths = new Set(
@@ -474,6 +511,7 @@ const runSample = async (browser, fixture, sample) => {
       scriptSourceOwners: getScriptSourceOwners(scripts),
       timing: {
         ...timing,
+        layoutAckMs,
         layoutSwitchMs,
         projectSwitchMs,
         routeReadyMs,
@@ -563,6 +601,7 @@ try {
 
     const timingKeys = [
       'domContentLoadedMs',
+      'layoutAckMs',
       'layoutSwitchMs',
       'loadMs',
       'longestTaskMs',
@@ -577,6 +616,7 @@ try {
           : getZeroResourceSummary(),
       domContentLoadedMedianMs: median(timingValues('domContentLoadedMs')),
       id: fixture.id,
+      layoutAckMedianMs: median(timingValues('layoutAckMs')),
       layoutSwitchMedianMs: median(timingValues('layoutSwitchMs')),
       loadMedianMs: median(timingValues('loadMs')),
       longestTaskMaxMs: Math.max(...timingValues('longestTaskMs')),
@@ -617,6 +657,7 @@ try {
         activatedResourceLimits: createResourceLimits(route.activatedResources),
         domContentLoadedMedianMs: route.domContentLoadedMedianMs,
         id: route.id,
+        layoutAckMedianMs: route.layoutAckMedianMs,
         layoutSwitchMedianMs: route.layoutSwitchMedianMs,
         loadMedianMs: route.loadMedianMs,
         longestTaskMaxMs: route.longestTaskMaxMs,
