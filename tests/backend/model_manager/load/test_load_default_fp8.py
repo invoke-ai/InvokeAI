@@ -57,12 +57,22 @@ def _make_config(model_type: ModelType, fp8: bool, base: BaseModelType = BaseMod
     )
 
 
+def _make_quantized_config(fmt: str = "gguf_quantized"):
+    """A config carrying a quantized `format`, which `_make_config` deliberately omits."""
+    config = _make_config(ModelType.Main, fp8=True)
+    config.format = fmt
+    return config
+
+
 @pytest.mark.parametrize(
     "config,submodel",
     [
         (_make_config(ModelType.VAE, fp8=True), None),
         (_make_config(ModelType.LoRA, fp8=True), None),
-        (_make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage), None),
+        # Z-Image used to be listed here. It is no longer excluded — see
+        # `test_should_use_fp8_allows_z_image` for why the exclusion became obsolete. A quantized
+        # model takes its place: its guard must also sit ahead of the device probe.
+        (_make_quantized_config(), None),
         (_make_config(ModelType.Main, fp8=True), SubModelType.Tokenizer),
         (_make_config(ModelType.Main, fp8=False), None),
     ],
