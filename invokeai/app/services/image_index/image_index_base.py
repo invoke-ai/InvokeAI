@@ -70,6 +70,19 @@ class ImageIndexServiceBase(ABC):
         pass
 
     @abstractmethod
+    def get_vocab_embeddings(self) -> tuple[list[str], np.ndarray]:
+        """Get the cluster-labeling vocabulary and its phrase embeddings.
+
+        Slow on the first call per model (the whole vocabulary is embedded
+        through the text tower, then disk-cached); cheap afterwards. Call off
+        the event loop.
+
+        Raises:
+            TextSearchUnavailableError: No usable text encoder is installed.
+        """
+        pass
+
+    @abstractmethod
     def search_similar(self, user_id: str | None, query_embedding: np.ndarray, limit: int) -> list[tuple[str, float]]:
         """Rank the user's accessible embedded images by cosine similarity.
 

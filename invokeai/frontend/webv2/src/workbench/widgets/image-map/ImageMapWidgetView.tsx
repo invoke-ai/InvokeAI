@@ -1,8 +1,13 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
-import { getImageMapClickSelectsCluster } from '@workbench/image-map/imageMapSettings';
-import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@workbench/image-map/imageMapSettings';
+import {
+  ensureImageMapLoaded,
+  imageMapStore,
+  refreshImageMapPoints,
+  setClusterLabelsEnabled,
+} from '@workbench/image-map/imageMapStore';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
 
@@ -31,10 +36,17 @@ const plotLoadingFallback = (
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
+  const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
 
   useEffect(() => {
     ensureImageMapLoaded();
   }, []);
+
+  // Pushed into the store so turning labels off stops the request, not just the
+  // drawing of what it returns.
+  useEffect(() => {
+    setClusterLabelsEnabled(showClusterLabels);
+  }, [showClusterLabels]);
 
   // Checked before the plot: this is the canvas failing, not a fetch, so
   // re-mounting the plot would just fail again and render an empty box with no
@@ -63,7 +75,7 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     // mounted and the spinner where the plot will appear.
     return (
       <Suspense fallback={plotLoadingFallback}>
-        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} />
+        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} showClusterLabels={showClusterLabels} />
       </Suspense>
     );
   }

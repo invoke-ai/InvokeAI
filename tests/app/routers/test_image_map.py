@@ -39,6 +39,7 @@ class FakeImageIndexService(ImageIndexServiceBase):
 
     def __init__(self, model_id: str | None = MODEL_ID) -> None:
         self._model_id = model_id
+        self.index_records: ImageIndexRecordsSqlite | None = None
         self.projection_requests: list[tuple[str, bool]] = []
         self.spent_failed_scopes: dict[str, str] = {}
         self.search_calls: list[tuple[str | None, int]] = []
@@ -73,11 +74,26 @@ class FakeImageIndexService(ImageIndexServiceBase):
         return vector
 
     def get_accessible_embeddings(self, user_id: str | None) -> tuple[list[str], np.ndarray]:
-        return [], np.empty((0, 0), dtype=np.float32)
+        # Wired to the real records store by the mock_services fixture so
+        # endpoints exercising the accessible matrix see seeded embeddings.
+        if self.index_records is None:
+            return [], np.empty((0, 0), dtype=np.float32)
+        names = self.index_records.list_accessible_embedded_images(user_id, MODEL_ID)
+        return self.index_records.get_embeddings(names, MODEL_ID)
 
     def search_similar(self, user_id: str | None, query_embedding: np.ndarray, limit: int) -> list[tuple[str, float]]:
         self.search_calls.append((user_id, limit))
         return self.search_results[:limit]
+
+    def get_vocab_embeddings(self) -> tuple[list[str], np.ndarray]:
+        from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+        if self.text_unavailable:
+            raise TextSearchUnavailableError("no text encoder installed")
+        # A tiny vocabulary aligned with the seeded DIM-dimensional space:
+        # phrase i points along axis i.
+        vocabulary = ["alpha", "beta", "gamma", "delta"]
+        return vocabulary, np.eye(DIM, dtype=np.float32)
 
     def request_projection(
         self,
@@ -130,7 +146,7 @@ def mock_services(image_index_service: FakeImageIndexService) -> InvocationServi
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(configuration, logger)
 
-    return InvocationServices(
+    services = InvocationServices(
         board_image_records=SqliteBoardImageRecordStorage(db=db),
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),
@@ -169,10 +185,13 @@ def mock_services(image_index_service: FakeImageIndexService) -> InvocationServi
         video_records=None,  # type: ignore
         board_video_records=None,  # type: ignore
         gallery=None,  # type: ignore
-        image_index_records=ImageIndexRecordsSqlite(db=db),
+        image_index_records=(index_records := ImageIndexRecordsSqlite(db=db)),
         image_index=image_index_service,
         external_generation=None,  # type: ignore
     )
+    image_index_service.index_records = index_records
+
+    return services
 
 
 @pytest.fixture
@@ -825,6 +844,38 @@ def test_image_search_reports_an_encoder_fault_as_a_server_error(
     assert client.get("/api/v1/image_map/search", params={"image_name": "not-indexed.png"}).status_code == 500
 
 
+def test_cluster_labels_skips_the_embedding_gather_when_nothing_clustered(
+    monkeypatch, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # Above MAX_CLUSTERED_POINTS every id is -1 by design, and label_clusters
+    # returns {} for that. Gathering the accessible rows first copies
+    # len(visible) x D float32 for nothing — gigabytes on the large galleries
+    # /points is written for, once per points refresh.
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, ["a.png"], np.zeros((1, 2), dtype=np.float32))
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.image_map.compute_clusters",
+        lambda coords, eps=None, min_samples=None: np.full((coords.shape[0],), -1, dtype=np.int64),
+    )
+
+    gathered = []
+    original = image_index_service.get_accessible_embeddings
+
+    def _spy(scope_user):
+        gathered.append(scope_user)
+
+        return original(scope_user)
+
+    monkeypatch.setattr(image_index_service, "get_accessible_embeddings", _spy)
+
+    response = client.get("/api/v1/image_map/cluster_labels")
+
+    assert response.status_code == 200
+    assert response.json()["labels"] == {}
+    assert gathered == [], "the accessible matrix was gathered for a fully-unclustered map"
+
+
 def test_search_by_image_upload_returns_ranked_results(
     image_index_service: FakeImageIndexService, client: TestClient
 ) -> None:
@@ -951,3 +1002,105 @@ def test_multiuser_image_search_enforces_read_access_and_user_scope(
         headers=user2_headers,
     )
     assert image_index_service.search_calls[-1] == (user2_id, 100)
+
+
+# --- Cluster labels ---
+
+
+def test_cluster_labels_align_with_served_clusters(mock_invoker: Invoker, client: TestClient) -> None:
+    # Two tight pairs; each pair's images embed along a distinct axis, so the
+    # expected label is that axis's vocabulary phrase.
+    def axis_vec(index: int) -> np.ndarray:
+        v = np.zeros(DIM, dtype=np.float32)
+        v[index] = 1.0
+        return v
+
+    for name, vec in [
+        ("a1.png", axis_vec(0)),
+        ("a2.png", axis_vec(0)),
+        ("b1.png", axis_vec(1)),
+        ("b2.png", axis_vec(1)),
+    ]:
+        _save_unembedded_image(mock_invoker, name)
+        _records(mock_invoker).upsert_embedding(name, MODEL_ID, vec)
+    coords = np.array([[0.0, 0.0], [0.4, 0.0], [30.0, 30.0], [30.4, 30.0]], dtype=np.float32)
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, ["a1.png", "a2.png", "b1.png", "b2.png"], coords)
+
+    points = client.get("/api/v1/image_map/points", params={"eps": 0.5, "min_samples": 2}).json()
+    labels = client.get("/api/v1/image_map/cluster_labels", params={"eps": 0.5, "min_samples": 2, "top_k": 2}).json()[
+        "labels"
+    ]
+
+    label_by_name = {p["image_name"]: p["cluster"] for p in points["points"]}
+    a_cluster = str(label_by_name["a1.png"])
+    b_cluster = str(label_by_name["b1.png"])
+    assert labels[a_cluster]["label"] == "alpha"
+    assert labels[b_cluster]["label"] == "beta"
+    assert labels[a_cluster]["score"] > 0.9
+    assert len(labels[a_cluster]["alternates"]) == 1
+
+    # Adaptive default: with eps omitted on BOTH endpoints, each resolves the
+    # same adaptive value over the same visible set, so labels still align.
+    points = client.get("/api/v1/image_map/points", params={"min_samples": 2}).json()
+    assert points["cluster_eps"] is not None
+    labels_response = client.get("/api/v1/image_map/cluster_labels", params={"min_samples": 2, "top_k": 2}).json()
+    # Matching fingerprints are the client's proof the two responses were
+    # computed over the same visible set.
+    assert labels_response["visible_hash"] == points["visible_hash"]
+    labels = labels_response["labels"]
+    label_by_name = {p["image_name"]: p["cluster"] for p in points["points"]}
+    assert labels[str(label_by_name["a1.png"])]["label"] == "alpha"
+    assert labels[str(label_by_name["b1.png"])]["label"] == "beta"
+
+    # Pinned round trip: the reported eps is accepted back verbatim.
+    labels = client.get(
+        "/api/v1/image_map/cluster_labels",
+        params={"eps": points["cluster_eps"], "min_samples": 2, "top_k": 2},
+    ).json()["labels"]
+    assert labels[str(label_by_name["a1.png"])]["label"] == "alpha"
+    assert labels[str(label_by_name["b1.png"])]["label"] == "beta"
+
+
+def test_cluster_labels_survive_a_non_finite_row_the_way_points_does(mock_invoker: Invoker, client: TestClient) -> None:
+    """A projection row predating the writer's isfinite guard.
+
+    /points drops the non-finite rows, so labels computed over the undropped set
+    hash a different name list: every response fails the visible_hash comparison
+    the client is told to make, and all labels are discarded. Handing the NaN to
+    sklearn also raised, 500ing the user until their gallery changed.
+    """
+    names = ["a1.png", "a2.png", "bad.png"]
+    for index, name in enumerate(names):
+        vector = np.zeros(DIM, dtype=np.float32)
+        vector[index % 2] = 1.0
+        _save_unembedded_image(mock_invoker, name)
+        _records(mock_invoker).upsert_embedding(name, MODEL_ID, vector)
+    coords = np.array([[0.0, 0.0], [0.2, 0.0], [np.nan, np.nan]], dtype=np.float32)
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, names, coords)
+
+    points = client.get("/api/v1/image_map/points", params={"min_samples": 2}).json()
+    labels_response = client.get("/api/v1/image_map/cluster_labels", params={"min_samples": 2})
+
+    assert labels_response.status_code == 200
+    assert [p["image_name"] for p in points["points"]] == ["a1.png", "a2.png"]
+    assert labels_response.json()["visible_hash"] == points["visible_hash"], (
+        "labels the client cannot match to its points are labels it throws away"
+    )
+
+
+def test_cluster_labels_unavailable_text_encoder_conflicts(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, ["a.png"], np.zeros((1, 2), dtype=np.float32))
+    image_index_service.text_unavailable = True
+
+    assert client.get("/api/v1/image_map/cluster_labels").status_code == 409
+
+
+def test_cluster_labels_empty_without_projection(client: TestClient) -> None:
+    assert client.get("/api/v1/image_map/cluster_labels").json() == {
+        "labels": {},
+        "updated_at": None,
+        "visible_hash": None,
+    }
