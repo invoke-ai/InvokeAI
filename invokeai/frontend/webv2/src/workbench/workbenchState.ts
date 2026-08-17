@@ -103,6 +103,7 @@ import {
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
+import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
   cloneUpscaleWidgetValues,
@@ -2233,6 +2234,7 @@ const compileInvocationSnapshot = (
   models?: readonly ModelConfig[]
 ): { graph: GraphContract; widgetStates: WidgetStateMap } | null => {
   const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
+  const randDevice = resolveRandDeviceMetadata(project.settings.useCpuNoise, getGenerationDevicesSnapshot().options);
 
   if (route.sourceId === 'workflow') {
     // Compiles the workflow document into an immutable snapshot. Templates are
@@ -2264,7 +2266,7 @@ const compileInvocationSnapshot = (
     }
 
     const resolvedValues: UpscaleWidgetValues = { ...currentValues, seed: resolveUpscaleSeed(currentValues) };
-    const compiledGraph = compileUpscaleGraph(resolvedValues, route.destination, project.settings).graph;
+    const compiledGraph = compileUpscaleGraph(resolvedValues, route.destination, project.settings, randDevice).graph;
 
     widgetStates.upscale = {
       ...widgetStates.upscale,
@@ -2304,7 +2306,8 @@ const compileInvocationSnapshot = (
     resolvedSettings,
     resolvedSettings.model,
     route.destination,
-    project.settings
+    project.settings,
+    randDevice
   ).graph;
 
   widgetStates.generate = {

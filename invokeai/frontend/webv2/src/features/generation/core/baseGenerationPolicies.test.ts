@@ -286,6 +286,33 @@ describe('component policies', () => {
     ).toEqual(['Generate needs a T5 Encoder for FLUX models.', 'Generate needs a CLIP Embed model for FLUX models.']);
   });
 
+  it('requires standalone components for partial SDNQ folders but not complete pipelines', () => {
+    const completePipeline = { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} };
+    const completeFlux1Pipeline = { ...completePipeline, text_encoder_2: {}, tokenizer_2: {} };
+
+    for (const model of [
+      createModel('flux', { format: 'sdnq_quantized', submodels: completeFlux1Pipeline }),
+      createModel('flux2', { format: 'sdnq_quantized', submodels: completePipeline, variant: 'klein_9b' }),
+      createModel('z-image', { format: 'sdnq_quantized', submodels: completePipeline }),
+    ]) {
+      expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([]);
+    }
+
+    expect(
+      getGenerationValidationReasons(
+        createModel('flux', { format: 'sdnq_quantized', submodels: { transformer: {} } }),
+        createSettings(createModel('flux', { format: 'sdnq_quantized', submodels: { transformer: {} } }))
+      )
+    ).toContain('Generate needs a T5 Encoder for FLUX models.');
+
+    for (const model of [
+      createModel('flux2', { format: 'sdnq_quantized', submodels: { transformer: {} }, variant: 'klein_9b' }),
+      createModel('z-image', { format: 'sdnq_quantized', submodels: { transformer: {} } }),
+    ]) {
+      expect(getGenerationValidationReasons(model, createSettings(model))).not.toEqual([]);
+    }
+  });
+
   it('rejects unsupported FLUX dev_fill variant', () => {
     const model = createModel('flux', { variant: 'dev_fill' });
 
@@ -374,6 +401,28 @@ describe('component policies', () => {
     ).toBe(incompatibleSource.key);
   });
 
+  it('auto-selects complete FLUX.2 SDNQ component sources and rejects partial folders', () => {
+    const model = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+    const completeSource = createModel('flux2', {
+      format: 'sdnq_quantized',
+      key: 'flux2-complete-sdnq-source',
+      submodels: { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} },
+      variant: 'klein_9b',
+    });
+    const partialSource = createModel('flux2', {
+      format: 'sdnq_quantized',
+      key: 'flux2-partial-sdnq-source',
+      submodels: { text_encoder: {}, transformer: {}, vae: {} },
+      variant: 'klein_9b',
+    });
+    const settings = createSettings(model);
+
+    expect(getAutoFlux2ComponentSourceModel(model, settings, [partialSource, completeSource])?.key).toBe(
+      completeSource.key
+    );
+    expect(getAutoFlux2ComponentSourceModel(model, settings, [partialSource])).toBeNull();
+  });
+
   it('validates Qwen Image Qwen-VL and VAE requirements', () => {
     const model = createModel('qwen-image', { format: 'checkpoint' });
 
@@ -399,6 +448,25 @@ describe('component policies', () => {
     expect(
       getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
     ).toEqual([]);
+  });
+
+  it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
+    const model = createModel('z-image', { format: 'checkpoint' });
+    const settings = createSettings(model);
+    const sourceFilter = getComponentSectionPolicy(model, settings).slots.find(
+      (slot) => slot.key === 'componentSourceModel'
+    )?.filter;
+    const complete = createModel('z-image', {
+      format: 'sdnq_quantized',
+      submodels: { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} },
+    });
+    const partial = createModel('z-image', {
+      format: 'sdnq_quantized',
+      submodels: { transformer: {} },
+    });
+
+    expect(sourceFilter?.(complete, { model, selectedComponents: { ...settings }, settings })).toBe(true);
+    expect(sourceFilter?.(partial, { model, selectedComponents: { ...settings }, settings })).toBe(false);
   });
 
   it('validates Anima Qwen3 and allowed VAE bases', () => {

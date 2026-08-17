@@ -1674,3 +1674,53 @@ def test_lazy_model_construction_takes_the_process_global_load_lock() -> None:
             assert "MODEL_LOAD_LOCK.write_lock()" in source, (
                 f"{fn.__qualname__} patches torch globally without the process-global load lock"
             )
+
+
+def test_vocab_embeddings_are_never_built_on_the_caller(service: ImageIndexService) -> None:
+    # The build is minutes of encoder work and callers reach it through
+    # asyncio.to_thread on the loop's shared executor. Blocking there — worse,
+    # blocking there under _vocab_lock — starves every other to_thread in the
+    # app, /points and image search included. The request only asks the worker.
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._invoker = SimpleNamespace()  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+
+    with pytest.raises(TextSearchUnavailableError, match="still being prepared"):
+        service.get_vocab_embeddings()
+
+    assert service._vocab_build_requested.is_set()
+
+
+def test_a_failed_vocabulary_build_is_not_retried_on_every_request(service: ImageIndexService) -> None:
+    # A vision-only install has no text tower. Without remembering the failure,
+    # every points refresh retries from_pretrained inside MODEL_LOAD_LOCK,
+    # contending with generation's model loads for as long as the app runs.
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._vocab_failure = TextSearchUnavailableError("no text encoder")  # type: ignore[assignment]
+
+    with pytest.raises(TextSearchUnavailableError, match="no text encoder"):
+        service.get_vocab_embeddings()
+
+    # Not even queued: there is nothing for the worker to retry.
+    assert not service._vocab_build_requested.is_set()
+
+
+def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:
+    # One bad row out of ~11,700 must not discard the whole vocabulary build:
+    # that raises past the endpoint's handling as a 500 and, nothing having been
+    # cached, repeats the full embed on the next request. A zeroed row scores 0
+    # against everything, so the phrase simply never wins a label.
+    from invokeai.app.services.image_index.image_index_default import _normalize_batch
+
+    matrix = np.ones((3, DIM), dtype=np.float32)
+    matrix[1] = 0.0
+    matrix[2, 0] = np.inf
+
+    normalized = _normalize_batch(matrix)
+
+    assert np.isfinite(normalized).all()
+    assert float(np.linalg.norm(normalized[0])) == pytest.approx(1.0, rel=1e-5)
+    assert not normalized[1].any()
+    assert not normalized[2].any()

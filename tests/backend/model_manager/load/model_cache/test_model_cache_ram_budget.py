@@ -13,6 +13,7 @@ import weakref
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
 
 from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 from invokeai.backend.model_manager.load.model_cache import model_cache as model_cache_module
@@ -89,6 +90,150 @@ def test_shared_model_counts_once_in_global_budget(mock_logger):
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
+
+
+def _collect_until(predicate, attempts: int = 5) -> bool:
+    """gc.collect() until predicate() holds — finalizer chains can need more than one pass."""
+    for _ in range(attempts):
+        gc.collect()
+        if predicate():
+            return True
+    return predicate()
+
+
+def test_shutdown_releases_shared_weights_synchronously(mock_logger):
+    """shutdown() must release its resident records' shared references itself: the finalizer
+    fallback only enqueues, and at teardown there may be no later store operation to drain the
+    queue — so relying on collection would leave the canonical tensors pinned indefinitely."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    assert store.refcount("m") == 1
+
+    cache.shutdown()
+    # No gc, no further store activity needed: the release was synchronous.
+    assert store._entries.get("m") is None
+    assert store._deferred_releases.qsize() == 0
+
+
+def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
+    """A cache dropped without shutdown() must not strand its shared-weights references:
+    the store's refcount and bytes — and therefore the budget total — must return to zero once the
+    cache is collected."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)  # keep_ram_copy=True -> shared weights
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _collect_until(lambda: cache_ref() is None)
+    assert store.refcount("m") == 0
+    assert store.total_bytes_in_use() == 0
+    assert budget.total_in_use() == 0
+
+
+def test_collection_release_is_deferred_not_taken_under_the_store_lock(mock_logger):
+    """The collection-time release must only ENQUEUE: it runs in GC context, where taking the
+    store's non-reentrant lock (e.g. while another frame on the same thread is inside acquire())
+    would self-deadlock the process. The queue is drained by the next store operation."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _collect_until(lambda: cache_ref() is None)
+    # The finalizer has fired, but it must not have touched the entries directly: the refcount is
+    # still 1 when read without the public (draining) API, and the release sits in the queue.
+    assert store._entries["m"].refcount == 1
+    assert store._deferred_releases.qsize() == 1
+    # The next public operation applies it.
+    assert store.refcount("m") == 0
+    assert store._deferred_releases.qsize() == 0
+
+
+def test_normal_eviction_and_collection_release_exactly_once(mock_logger):
+    """An entry evicted through _delete_cache_entry (which calls release_shared_weights) must not
+    be released AGAIN when its wrapper is later collected — the second device's reference would be
+    freed out from under it."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    cache_a.put("m", DummyModule())
+    cache_b.put("m", DummyModule())
+    _use_and_release(cache_a, "m")
+    _use_and_release(cache_b, "m")
+    assert store.refcount("m") == 2
+
+    # Normal eviction on cache_a releases its reference synchronously (and detaches the fallback).
+    assert cache_a.evict_unlocked_for_peer(lambda: False) == 1
+    assert store.refcount("m") == 1
+
+    # Collecting cache_a afterwards must not decrement again on cache_b's behalf.
+    ref_a = weakref.ref(cache_a)
+    del cache_a
+    assert _collect_until(lambda: ref_a() is None)
+    assert store.refcount("m") == 1
+    assert budget.total_in_use() == S
+
+    ref_b = weakref.ref(cache_b)
+    del cache_b
+    assert _collect_until(lambda: ref_b() is None)
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_dropped_cache_releases_a_retired_shared_entry(mock_logger):
+    """invalidate() moves a still-referenced entry to the retired list, matched later by state-dict
+    identity. A holder that is collected (rather than evicted) must still free the retired entry's
+    accounting via the deferred release."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    assert store.invalidate("m") == 1
+    assert store.retired_bytes() == S
+
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _collect_until(lambda: cache_ref() is None)
+    assert store.retired_bytes() == 0
+    assert store.total_bytes_in_use() == 0
+    assert budget.total_in_use() == 0
+
+
+def test_collected_partial_load_wrapper_releases_shared_weights(mock_logger):
+    """CachedModelWithPartialLoad (the partial-loading wrapper) has the same collection-time
+    release as CachedModelOnlyFullLoad."""
+    from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+        CachedModelWithPartialLoad,
+    )
+
+    store = SharedCpuWeightsStore()
+    wrapped = CachedModelWithPartialLoad(
+        model=DummyModule(),
+        compute_device=torch.device("cpu"),
+        keep_ram_copy=True,
+        shared_store=store,
+        cache_key="m",
+    )
+    assert store.refcount("m") == 1
+
+    wrapped_ref = weakref.ref(wrapped)
+    del wrapped
+    assert _collect_until(lambda: wrapped_ref() is None)
+    assert store.refcount("m") == 0
+    assert store.total_bytes_in_use() == 0
 
 
 def test_non_shared_model_counts_per_device(mock_logger):
@@ -268,6 +413,45 @@ def test_get_vram_in_use_queries_this_caches_execution_device(mock_logger):
             mock_alloc.assert_called_with(torch.device("cuda:1"))
         finally:
             cache.shutdown()
+
+
+def test_max_vram_cache_reserves_per_operation_working_memory(mock_logger):
+    """An explicit cache cap must still leave room for decode/diffusion activations.
+
+    The capped-branch arithmetic is device-independent, so use a CPU cache to keep this test
+    runnable on CI hosts without a CUDA driver.
+    """
+    cache = ModelCache(
+        execution_device_working_mem_gb=3.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=16.0,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=mock_logger,
+    )
+    try:
+        with patch.object(cache, "_get_vram_in_use", return_value=2 * GB):
+            assert cache._get_vram_available(working_mem_bytes=5 * GB) == 9 * GB
+    finally:
+        cache.shutdown()
+
+
+def test_loaded_model_unload_drops_cache_entry_when_move_fails(mock_logger):
+    """A failed expert trim must not leave a half-moved model cache hit."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("broken", DummyModule())
+        record = cache.get("broken")
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache)
+        with patch.object(record.cached_model, "full_unload_from_vram", side_effect=RuntimeError("move failed")):
+            with pytest.raises(RuntimeError, match="move failed"):
+                loaded_model.unload_from_vram(1)
+        assert "broken" not in cache._cached_models
+    finally:
+        cache.shutdown()
 
 
 def test_cuda_cache_init_queries_total_vram_without_mem_get_info(mock_logger):

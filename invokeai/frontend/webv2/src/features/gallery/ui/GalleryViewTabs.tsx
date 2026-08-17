@@ -11,6 +11,7 @@ const GALLERY_VIEW_TABS = [
   { labelKey: 'common.media', value: 'images' },
   { labelKey: 'common.assets', value: 'assets' },
 ] satisfies { labelKey: string; value: GalleryView }[];
+const CHECKED_VIEW_TAB_STYLES = { bg: 'accent.solid', color: 'accent.contrast' } as const;
 
 /**
  * Media / Assets, each carrying the selected board's count for that view so
@@ -48,7 +49,7 @@ export const GalleryViewTabs = () => {
         const count = selectedBoard ? getGalleryCountForView(selectedBoard, value) : null;
 
         return (
-          <SegmentGroup.Item key={value} value={value}>
+          <SegmentGroup.Item key={value} value={value} _checked={CHECKED_VIEW_TAB_STYLES}>
             <SegmentGroup.ItemHiddenInput />
             <SegmentGroup.ItemText display="flex" fontSize="xs" gap="1.5">
               {t(labelKey)}

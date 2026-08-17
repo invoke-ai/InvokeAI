@@ -5,11 +5,13 @@ export interface ExpandPromptRequest {
   model_key: string;
   task_id: string;
   max_tokens?: number;
+  seed?: number | null;
   system_prompt?: string | null;
 }
 
 export interface ExpandPromptResponse {
   expanded_prompt: string;
+  seed: number;
   error?: string | null;
 }
 

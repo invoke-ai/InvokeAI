@@ -107,6 +107,20 @@ class ImageService(ImageServiceABC):
             raise
         except ImageFileSaveException:
             self.__invoker.services.logger.error("Failed to save image file")
+            try:
+                self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(
+                    f"Failed to clean up image files after save failure: {str(cleanup_error)}"
+                )
+            try:
+                # Deleting the record also removes any board association through the database
+                # foreign key cascade. Both cleanup operations are attempted independently.
+                self.__invoker.services.image_records.delete(image_name)
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(
+                    f"Failed to clean up image record after save failure: {str(cleanup_error)}"
+                )
             raise
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")

@@ -10,7 +10,7 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
 
 /**
- * The GPUs available for generation, and which of them the server is configured to
+ * The accelerators available for generation, and which of them the server is configured to
  * use. Pull-based like `modelCacheStore`: there are no socket events for app config.
  *
  * `generation_devices` is server-wide app config (admin-only, `PATCH
@@ -18,11 +18,11 @@ import { apiFetchJson, getApiErrorMessage } from '@platform/transport/http';
  * deliberately not treated as live state — nothing here re-reads on a timer.
  */
 
-/** `auto` uses every available GPU; an explicit list pins generation to those devices. */
+/** `auto` uses every available accelerator; an explicit list pins generation to those devices. */
 export type GenerationDevicesSetting = 'auto' | string[];
 
 export interface GenerationDevicesSnapshot {
-  /** Every installed device, in CUDA-index order. Empty until loaded. */
+  /** Every installed generation device, in backend order. Empty until loaded. */
   options: GenerationDeviceOption[];
   /** The configured setting, or null while unknown. */
   setting: GenerationDevicesSetting | null;

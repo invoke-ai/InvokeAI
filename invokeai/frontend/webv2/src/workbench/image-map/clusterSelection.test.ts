@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { ImageMapPoint } from './api';
 
 import { collectClusterSelection } from './clusterSelection';
-import { buildHighlightedPointsTrace, HIGHLIGHTED_POINTS_TRACE } from './imageMapTraces';
+import { buildClusterAnnotations, buildHighlightedPointsTrace, HIGHLIGHTED_POINTS_TRACE } from './imageMapTraces';
 
 const point = (imageName: string, x: number, y: number, cluster: number): ImageMapPoint => ({
   cluster,
@@ -46,5 +46,29 @@ describe('buildHighlightedPointsTrace', () => {
     expect(multi.customdata).toEqual(['a.png', 'c.png']);
     expect(multi.marker.size).toBe(8);
     expect(multi.marker.line).toEqual({ color: '#FFFFFF', width: 1 });
+  });
+});
+
+describe('buildClusterAnnotations', () => {
+  it('places one annotation per labeled cluster, centered above its topmost point', () => {
+    const varied = [point('a.png', 0, 1, 0), point('b.png', 3, 5, 0), point('c.png', 1, 3, 0)];
+    const annotations = buildClusterAnnotations(varied, { '0': 'landscapes' });
+
+    expect(annotations).toHaveLength(1);
+    const landscapes = annotations[0];
+    // Centered on the cluster's x centroid, anchored above its topmost point
+    // with a pixel lift so the label never covers the points it names.
+    expect(landscapes?.x).toBeCloseTo(4 / 3);
+    expect(landscapes?.y).toBeCloseTo(5);
+    expect(landscapes?.yanchor).toBe('bottom');
+    expect(landscapes?.yshift).toBeGreaterThan(0);
+    // Readable on any theme: white text on a dark pill.
+    expect(landscapes?.font.color).toBe('#FFFFFF');
+  });
+
+  it('skips noise, unlabeled clusters, and null label maps', () => {
+    expect(buildClusterAnnotations(POINTS, null)).toEqual([]);
+    const onlyOne = buildClusterAnnotations(POINTS, { '1': 'portraits' });
+    expect(onlyOne.map((annotation) => annotation.text)).toEqual(['portraits']);
   });
 });

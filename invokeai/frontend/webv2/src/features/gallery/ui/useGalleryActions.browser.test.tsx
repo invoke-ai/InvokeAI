@@ -620,7 +620,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
   });
 
-  it('reports unsupported and rejected files once without aborting supported uploads', async () => {
+  it('reports the first actionable rejection when every accepted upload fails alongside unsupported files', async () => {
     mocks.uploadGalleryVideo.mockRejectedValue(new Error('corrupt video'));
 
     await act(async () => {
@@ -634,7 +634,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
     expect(mocks.notificationsReportError).toHaveBeenCalledWith({
       area: 'gallery-upload',
-      message: 'No files uploaded. 2 failed.',
+      message: 'corrupt video',
       namespace: 'gallery',
     });
   });

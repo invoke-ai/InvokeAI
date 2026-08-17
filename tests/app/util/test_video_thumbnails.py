@@ -279,6 +279,56 @@ class TestStreamedDecoderIsBounded:
         assert len(errors) == 1
         assert isinstance(errors[0], TimeoutError)
 
+    def test_capacity_wait_and_first_frame_share_one_deadline(self, hanging_worker, tmp_path: Path) -> None:
+        """Waiting for capacity and waiting for the first frame draw on ONE budget.
+
+        Each used to get a full ``timeout``: a caller that waited nearly the whole budget
+        for a stream slot then got a fresh full budget on the hung decoder, so the call
+        could take ~2x the bound it advertised. Later frames still get a full timeout
+        each — after the first frame the budget is an inactivity bound, not a queueing one.
+        """
+        target = tmp_path / "malicious.mp4"
+        target.write_bytes(b"pretend this hangs the decoder")
+        timeout = 2.0
+        # Occupy the single stream slot for most (but not all) of the budget, so the
+        # decode still starts and the two waits are distinguishable in the total.
+        hold = 1.6
+        errors: list[BaseException] = []
+        finished = Event()
+        assert video_thumbnails._VIDEO_STREAM_SLOTS.acquire(timeout=1)
+        released = False
+
+        def consume() -> None:
+            try:
+                next(iter_video_frames(target, timeout=timeout))
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                finished.set()
+
+        started = time.monotonic()
+        thread = threading.Thread(target=consume)
+        thread.start()
+        try:
+            time.sleep(hold)
+            video_thumbnails._VIDEO_STREAM_SLOTS.release()
+            released = True
+            assert finished.wait(timeout=10), "decoder never gave up"
+        finally:
+            if not released:
+                video_thumbnails._VIDEO_STREAM_SLOTS.release()
+            thread.join(timeout=10)
+        elapsed = time.monotonic() - started
+
+        assert len(errors) == 1
+        # "Timed out decoding" (not "Timed out waiting to decode") — the slot was acquired
+        # and the worker was spawned, so this is the first-frame wait expiring.
+        assert isinstance(errors[0], TimeoutError)
+        assert "Timed out decoding" in str(errors[0])
+        # Midway between the fixed behavior (~timeout) and the old one (hold + timeout),
+        # leaving room for worker-spawn and scheduling jitter on CI.
+        assert elapsed < timeout + hold / 2, f"first frame got a fresh timeout after the capacity wait ({elapsed:.2f}s)"
+
     def test_probe_timeout_includes_waiting_for_decoder_capacity(self, tmp_path: Path) -> None:
         target = tmp_path / "never-opened.mp4"
         errors: list[BaseException] = []

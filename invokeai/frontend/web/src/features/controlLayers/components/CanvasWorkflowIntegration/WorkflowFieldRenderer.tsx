@@ -363,6 +363,8 @@ export const WorkflowFieldRenderer = memo(({ el }: WorkflowFieldRendererProps) =
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const options = (fieldTemplate as any)?.options ?? (fieldTemplate as any)?.ui_choice_labels ?? [];
     const optionsList = Array.isArray(options) ? options : Object.keys(options);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const choiceLabels = (fieldTemplate as any)?.ui_choice_labels as Record<string, string> | undefined;
 
     return (
       <FormControl>
@@ -370,7 +372,7 @@ export const WorkflowFieldRenderer = memo(({ el }: WorkflowFieldRendererProps) =
         <Select value={String(currentValue)} onChange={handleSelectChange}>
           {optionsList.map((option: string) => (
             <option key={option} value={option}>
-              {option}
+              {choiceLabels?.[option] ?? option}
             </option>
           ))}
         </Select>

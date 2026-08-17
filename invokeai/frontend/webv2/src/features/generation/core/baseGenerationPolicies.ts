@@ -18,6 +18,7 @@ import type {
 
 import {
   getCompatibleDiffusersComponentSource,
+  isBundledMainForBase,
   isAnimaQwen3Encoder,
   isAnimaVae,
   isKrea2Vae,
@@ -27,6 +28,8 @@ import {
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
+  isSelfContainedSDNQFlux1Pipeline,
+  isSelfContainedSDNQPipeline,
   isVaeForBases,
   type GenerateComponentFilter,
 } from './componentCompatibility';
@@ -939,15 +942,15 @@ type ComponentSourceCandidate = {
 };
 
 const isFlux2DiffusersSource = (source: ComponentSourceCandidate | null | undefined): source is MainModelConfig =>
-  Boolean(source && source.type === 'main' && source.base === 'flux2' && source.format === 'diffusers');
+  Boolean(source && isBundledMainForBase('flux2')(source));
 
 const hasFlux2DiffusersVaeSource = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
-  (ctx.model.format === 'diffusers' || isFlux2DiffusersSource(ctx.settings.componentSourceModel));
+  (isBundledMainForBase('flux2')(ctx.model) || isFlux2DiffusersSource(ctx.settings.componentSourceModel));
 
 const hasFlux2DiffusersEncoderSource = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
-  (ctx.model.format === 'diffusers' ||
+  (isBundledMainForBase('flux2')(ctx.model) ||
     Boolean(
       ctx.settings.componentSourceModel && isFlux2DiffusersSourceForModel(ctx.model)(ctx.settings.componentSourceModel)
     ));
@@ -982,7 +985,7 @@ export const getAutoFlux2ComponentSourceModel = (
 
   const encoderModel = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
 
-  if (model.format === 'diffusers' || (encoderModel && settings.vae)) {
+  if (isBundledMainForBase('flux2')(model) || (encoderModel && settings.vae)) {
     return null;
   }
 
@@ -999,7 +1002,7 @@ export const getAutoFlux2ComponentSourceModel = (
 // Split/quantized families can satisfy required encoder/VAE slots from a bundled Diffusers source.
 const isBundledOrDiffusersSourceSatisfied = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
-  (ctx.model.format === 'diffusers' || hasCompatibleComponentSource(ctx));
+  (isBundledMainForBase(ctx.model.base)(ctx.model) || hasCompatibleComponentSource(ctx));
 
 // Slot validation is shared by invocation readiness and graph preflight so picker requirements cannot drift.
 const validateSlots = (policy: Pick<ComponentSectionPolicy, 'slots'>, ctx: ComponentPolicyContext): string[] =>
@@ -1033,20 +1036,20 @@ const getBaseComponentSectionPolicy = (
   switch (model.base) {
     case 'flux':
       return {
-        ...createPolicy(false, [
+        ...createPolicy(!isSelfContainedSDNQFlux1Pipeline(model), [
           {
             ...t5EncoderSlot('Required for FLUX.1 models.'),
-            required: () => true,
+            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
             missingMessage: 'Generate needs a T5 Encoder for FLUX models.',
           },
           {
             ...clipEmbedSlot('Required for FLUX.1 models.'),
-            required: () => true,
+            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
             missingMessage: 'Generate needs a CLIP Embed model for FLUX models.',
           },
           {
             ...vaeSlot('Required for FLUX.1 models.', isVaeForBases(['flux'])),
-            required: () => true,
+            required: (ctx) => !isSelfContainedSDNQFlux1Pipeline(ctx.model),
             missingMessage: 'Generate needs a VAE for FLUX models.',
           },
         ]),
@@ -1077,7 +1080,7 @@ const getBaseComponentSectionPolicy = (
               missingMessage: 'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
             };
 
-      return createPolicy(model.format !== 'diffusers', [
+      return createPolicy(!isSelfContainedSDNQPipeline(model) && model.format !== 'diffusers', [
         encoderSlot,
         {
           ...vaeSlot(
@@ -1117,10 +1120,10 @@ const getBaseComponentSectionPolicy = (
         },
       ]);
     case 'z-image':
-      return createPolicy(model.format !== 'diffusers', [
+      return createPolicy(!isBundledMainForBase('z-image')(model), [
         componentSourceSlot(
-          (candidate) => isDiffusersMainForBase('z-image')(candidate),
-          'Select a Diffusers Z-Image model to provide VAE and Qwen3 components.'
+          (candidate) => isBundledMainForBase('z-image')(candidate),
+          'Select a bundled Z-Image pipeline to provide VAE and Qwen3 components.'
         ),
         {
           ...qwen3EncoderSlot('Required unless a Diffusers component source is available.', isNonAnimaQwen3Encoder),
