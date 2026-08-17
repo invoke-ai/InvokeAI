@@ -58,6 +58,7 @@ describe('viewerProgressLifecycle', () => {
       $progressData: map<ViewerProgressDataMap>({}),
       $isProgressImageResolving: atom(false),
       finishedQueueItemIds: new Map<number, boolean>(),
+      itemIdBySessionId: new Map<string, number>(),
     };
     lifecycle = createViewerProgressLifecycle(stores);
   });
@@ -102,7 +103,7 @@ describe('viewerProgressLifecycle', () => {
         expect(stores.$progressData.get()[2]?.itemId).toBe(2);
         // No resolve illusion may be pending — it would swap B's live preview for A's final image.
         expect(stores.$isProgressImageResolving.get()).toBe(false);
-        lifecycle.onFinalImageLoaded();
+        lifecycle.onFinalImageLoaded('session-1');
         expect(stores.$progressEvent.get()).toBe(eventB);
         expect(stores.$progressImage.get()).toBe(eventB.image);
       }
@@ -148,7 +149,7 @@ describe('viewerProgressLifecycle', () => {
       // The preview is retained until the final image loads, "resolving" into it.
       expect(stores.$progressEvent.get()).toBe(eventA);
       expect(stores.$isProgressImageResolving.get()).toBe(true);
-      lifecycle.onFinalImageLoaded();
+      lifecycle.onFinalImageLoaded('session-1');
       expect(stores.$progressEvent.get()).toBeNull();
       expect(stores.$progressImage.get()).toBeNull();
       expect(stores.$isProgressImageResolving.get()).toBe(false);
@@ -159,6 +160,43 @@ describe('viewerProgressLifecycle', () => {
       lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true);
       expect(lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true)).toBe(false);
       expect(stores.$progressEvent.get()).toBe(eventA);
+    });
+  });
+
+  describe('onFinalImageLoaded', () => {
+    it('ignores a late load from a session that finished before the current preview owner', () => {
+      const { eventB } = startTwoSessions();
+      // A completes first and hands the shared preview to the still-running B...
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      // ...then B completes and starts its own resolve illusion, retaining B's last frame.
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'completed' }), true);
+      expect(stores.$isProgressImageResolving.get()).toBe(true);
+      // A's final image only now finishes loading. Clearing here would cut B's illusion short.
+      lifecycle.onFinalImageLoaded('session-1');
+      expect(stores.$progressEvent.get()).toBe(eventB);
+      expect(stores.$progressImage.get()).toBe(eventB.image);
+      expect(stores.$isProgressImageResolving.get()).toBe(true);
+      // B's own final image ends the illusion.
+      lifecycle.onFinalImageLoaded('session-2');
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+    });
+
+    it.each([
+      ['an image with no session (e.g. an upload)', null],
+      ['an image from a session this viewer never tracked', 'session-from-a-previous-visit'],
+    ])('still clears the retained preview on %s', (_desc, sessionId) => {
+      const eventA = buildProgressEvent({ item_id: 1, image: buildProgressImage(1) });
+      lifecycle.recordProgress(eventA);
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      expect(stores.$isProgressImageResolving.get()).toBe(true);
+      // Unattributable loads keep the safety net: a retained preview must not cover the viewer
+      // indefinitely just because the completed item's own image never loads.
+      lifecycle.onFinalImageLoaded(sessionId);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
     });
   });
 
@@ -177,6 +215,21 @@ describe('viewerProgressLifecycle', () => {
       // this event — its trailing progress must not repopulate the preview.
       expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 1, image: buildProgressImage(1) }))).toBe(false);
       expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 2, image: buildProgressImage(2) }))).toBe(false);
+    });
+
+    it('blocks trailing progress from a session that had not produced a preview image yet', () => {
+      // Item 1 has only reported progress without an image, so it is absent from $progressData and
+      // does not own the shared globals once item 2 reports an image.
+      lifecycle.recordProgress(buildProgressEvent({ item_id: 1, session_id: 'session-1', image: null }));
+      lifecycle.recordProgress(
+        buildProgressEvent({ item_id: 2, session_id: 'session-2', image: buildProgressImage(2) })
+      );
+      expect(lifecycle.onQueueCleared(buildQueueClearedEvent(null), 'user-1')).toBe(true);
+      // Its first image event must not resurrect the preview the clear just dropped.
+      expect(lifecycle.recordProgress(buildProgressEvent({ item_id: 1, image: buildProgressImage(1) }))).toBe(false);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+      expect(stores.$progressData.get()).toEqual({});
     });
 
     it.each([

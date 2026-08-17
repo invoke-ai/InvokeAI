@@ -31,7 +31,11 @@ type ImageViewerContextValue = {
   $activeProgressData: Atom<ViewerProgressDatum[]>;
   $isProgressImageResolving: Atom<boolean>;
   $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
-  onLoadImage: () => void;
+  /**
+   * The viewer finished loading the final image/video for the given session (its DTO's
+   * `session_id`, or null when it has none). Ends the completed session's "resolve" illusion.
+   */
+  onLoadImage: (sessionId: string | null) => void;
 };
 
 const ImageViewerContext = createContext<ImageViewerContextValue | null>(null);
@@ -59,6 +63,9 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
+  // Session id -> queue item id, learned from progress events. Outlives the item's terminal event
+  // so a late final-image load can be attributed to the session that produced it.
+  const [itemIdBySessionId] = useState(() => new LRUCache<string, number>({ max: 200 }));
   // All store mutations live in the lifecycle (extracted for unit testing); the effects below own
   // the socket subscriptions and the ownership/scope checks on incoming events.
   const lifecycle = useState(() =>
@@ -68,6 +75,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       $progressData,
       $isProgressImageResolving,
       finishedQueueItemIds,
+      itemIdBySessionId,
     })
   )[0];
 
@@ -170,9 +178,12 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     };
   }, [lifecycle, socket]);
 
-  const onLoadImage = useCallback(() => {
-    lifecycle.onFinalImageLoaded();
-  }, [lifecycle]);
+  const onLoadImage = useCallback(
+    (sessionId: string | null) => {
+      lifecycle.onFinalImageLoaded(sessionId);
+    },
+    [lifecycle]
+  );
 
   const value = useMemo(
     () => ({

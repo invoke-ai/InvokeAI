@@ -21,6 +21,12 @@ type FinishedQueueItemIds = {
   set: (itemId: number, value: boolean) => unknown;
 };
 
+/** The subset of LRUCache the lifecycle needs — kept minimal so tests can pass a plain Map. */
+type ItemIdBySessionId = {
+  get: (sessionId: string) => number | undefined;
+  set: (sessionId: string, itemId: number) => unknown;
+};
+
 export type ViewerProgressStores = {
   $progressEvent: WritableAtom<S['InvocationProgressEvent'] | null>;
   $progressImage: WritableAtom<ProgressImageType | null>;
@@ -29,6 +35,10 @@ export type ViewerProgressStores = {
   $isProgressImageResolving: WritableAtom<boolean>;
   /** Finished queue items, tracked so trailing progress events cannot repopulate the preview. */
   finishedQueueItemIds: FinishedQueueItemIds;
+  /** Queue item id of each session we have seen progress for, keyed by session id. Outlives the
+   * item's terminal event so a late final-image load can be attributed to the session that
+   * produced it (see onFinalImageLoaded). */
+  itemIdBySessionId: ItemIdBySessionId;
 };
 
 const pickLatestDatum = (data: ViewerProgressDataMap): ViewerProgressDatum | null => {
@@ -52,14 +62,28 @@ const pickLatestDatum = (data: ViewerProgressDataMap): ViewerProgressDatum | nul
  *   that most recently reported progress.
  */
 export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
-  const { $progressEvent, $progressImage, $progressData, $isProgressImageResolving, finishedQueueItemIds } = stores;
+  const {
+    $progressEvent,
+    $progressImage,
+    $progressData,
+    $isProgressImageResolving,
+    finishedQueueItemIds,
+    itemIdBySessionId,
+  } = stores;
   let seq = 0;
-  // Whether the final gallery image's onLoad should clear the retained preview — the tail end of
-  // the "resolve" illusion for a completed session (see onTerminal / onFinalImageLoaded).
-  let clearProgressOnFinalImageLoad = false;
+  // The queue item whose retained preview the final gallery image's onLoad should clear — the tail
+  // end of the "resolve" illusion for a completed session (see onTerminal / onFinalImageLoaded).
+  // Null when no illusion is pending.
+  let pendingResolveItemId: number | null = null;
+  // Every item we have seen progress for and not yet seen terminate, including items that have not
+  // produced a preview image (those are absent from $progressData). A queue clear deletes items
+  // without emitting a per-item terminal event, so this is the set that must be marked finished
+  // there — otherwise an image-less session could later emit an image and resurrect the preview.
+  const unfinishedItemIds = new Set<number>();
 
   const clearAll = (): void => {
-    clearProgressOnFinalImageLoad = false;
+    pendingResolveItemId = null;
+    unfinishedItemIds.clear();
     $isProgressImageResolving.set(false);
     $progressEvent.set(null);
     $progressImage.set(null);
@@ -71,7 +95,9 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
     if (finishedQueueItemIds.has(data.item_id)) {
       return false;
     }
-    clearProgressOnFinalImageLoad = false;
+    unfinishedItemIds.add(data.item_id);
+    itemIdBySessionId.set(data.session_id, data.item_id);
+    pendingResolveItemId = null;
     $isProgressImageResolving.set(false);
     $progressEvent.set(data);
     if (data.image) {
@@ -93,6 +119,7 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
       return false;
     }
     finishedQueueItemIds.set(data.item_id, true);
+    unfinishedItemIds.delete(data.item_id);
     // Remove this session's tile from the multi-session preview as soon as it reaches a terminal
     // state. The single-image "resolve" illusion below is handled separately via onLoadImage.
     $progressData.setKey(data.item_id, undefined);
@@ -112,7 +139,7 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
       // through these globals — leaving them cleared (or parked on the finished session's stale
       // frame via the resolve illusion) would hide a still-running preview. This applies to every
       // terminal status, including successful completion with auto-switch.
-      clearProgressOnFinalImageLoad = false;
+      pendingResolveItemId = null;
       $isProgressImageResolving.set(false);
       $progressEvent.set(successor.progressEvent);
       $progressImage.set(successor.progressImage);
@@ -136,27 +163,43 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
       // will be stuck on the viewer.
       (data.origin === 'canvas' && data.destination !== 'canvas')
     ) {
-      clearProgressOnFinalImageLoad = false;
+      pendingResolveItemId = null;
       $isProgressImageResolving.set(false);
       $progressEvent.set(null);
       $progressImage.set(null);
     } else {
-      clearProgressOnFinalImageLoad = true;
+      pendingResolveItemId = data.item_id;
       $isProgressImageResolving.set(true);
     }
     return true;
   };
 
   /**
-   * The final gallery image finished loading. If a completed session's "resolve" illusion is
-   * pending, this is its tail end: the retained preview is cleared so the final image shows.
-   * A no-op otherwise (e.g. when the preview was handed to a still-running session).
+   * The final gallery image (or video) finished loading. If a completed session's "resolve"
+   * illusion is pending, this is its tail end: the retained preview is cleared so the final image
+   * shows. A no-op otherwise (e.g. when the preview was handed to a still-running session).
+   *
+   * `sessionId` identifies the item that was loaded (ImageDTO/VideoDTO `session_id`). Several
+   * sessions run concurrently under multi-GPU and auto-switch, so a load can arrive late, after a
+   * *different* session took over the retained preview: session A completes and hands the preview
+   * to B, B then completes and starts its own resolve illusion, and only then does A's final image
+   * finish loading. Clearing on A's load would cut B's illusion short — exactly the flicker the
+   * illusion exists to hide — so a load is ignored when it can be positively attributed to another
+   * session we tracked. Loads we cannot attribute (uploads, images from before this viewer
+   * mounted, an unrelated image the user selected) still clear, keeping the safety net that stops
+   * a retained preview from covering the viewer indefinitely.
    */
-  const onFinalImageLoaded = (): void => {
-    if (!clearProgressOnFinalImageLoad) {
+  const onFinalImageLoaded = (sessionId: string | null): void => {
+    if (pendingResolveItemId === null) {
       return;
     }
-    clearProgressOnFinalImageLoad = false;
+    if (sessionId !== null) {
+      const loadedItemId = itemIdBySessionId.get(sessionId);
+      if (loadedItemId !== undefined && loadedItemId !== pendingResolveItemId) {
+        return;
+      }
+    }
+    pendingResolveItemId = null;
     $isProgressImageResolving.set(false);
     $progressEvent.set(null);
     $progressImage.set(null);
@@ -179,16 +222,13 @@ export const createViewerProgressLifecycle = (stores: ViewerProgressStores) => {
     if (clearedUserId !== null && clearedUserId !== currentUserId) {
       return false;
     }
-    // Mark every tracked session finished so a trailing invocation_progress event from a worker
-    // that the clear is still stopping cannot repopulate the preview.
-    for (const datum of Object.values($progressData.get())) {
-      if (datum !== undefined) {
-        finishedQueueItemIds.set(datum.itemId, true);
-      }
-    }
-    const globalProgressEvent = $progressEvent.get();
-    if (globalProgressEvent !== null) {
-      finishedQueueItemIds.set(globalProgressEvent.item_id, true);
+    // Mark every session we have seen progress for and not yet seen terminate as finished, so a
+    // trailing invocation_progress event from a worker that the clear is still stopping cannot
+    // repopulate the preview. This must cover sessions that have not produced a preview image yet
+    // — they are absent from $progressData and may not own the shared globals, but their first
+    // image event would otherwise resurrect the preview after the clear.
+    for (const itemId of unfinishedItemIds) {
+      finishedQueueItemIds.set(itemId, true);
     }
     clearAll();
     return true;
