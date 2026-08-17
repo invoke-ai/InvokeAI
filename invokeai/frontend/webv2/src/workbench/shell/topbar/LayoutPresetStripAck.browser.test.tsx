@@ -10,15 +10,26 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+type ActivatePreset = (presetId: LayoutPresetId) => Promise<LayoutPresetId | null>;
+
 // The store is read for real but never written: `activatePreset` is a stub the
 // test can freeze outright, which is the point of the suite. If the tab only
 // acknowledges the press once the store has caught up, nothing here passes.
 let store: WorkbenchInternalStore;
-let activatePreset: (presetId: LayoutPresetId) => Promise<void> = () => Promise.resolve();
+
+// Rebuilt per render rather than read from a module slot at call time. The
+// strip dispatches activation from a `requestAnimationFrame`, so a frame that
+// outlives its test would otherwise reach into the *next* test's spy and
+// satisfy its assertions with a stale call.
+const noop = () => undefined;
+let commands = { layout: { activatePreset: (() => Promise.resolve(null)) as ActivatePreset } };
+
+const createCommands = (activatePreset: ActivatePreset) => ({
+  layout: { activatePreset, createPreset: noop, reorderPresets: noop, reset: noop, savePreset: noop },
+});
 
 vi.mock('@workbench/WorkbenchContext', () => {
   const useSnapshot = () => useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
-  const noop = () => undefined;
 
   return {
     shallowEqual: Object.is,
@@ -27,15 +38,7 @@ vi.mock('@workbench/WorkbenchContext', () => {
     ) => selector(useSnapshot().activeProject),
     useDebouncedWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
       selector(useSnapshot()),
-    useWorkbenchCommands: () => ({
-      layout: {
-        activatePreset: (presetId: LayoutPresetId) => activatePreset(presetId),
-        createPreset: noop,
-        reorderPresets: noop,
-        reset: noop,
-        savePreset: noop,
-      },
-    }),
+    useWorkbenchCommands: () => commands,
     useWorkbenchSelector: <Selected,>(selector: (snapshot: ReturnType<typeof useSnapshot>) => Selected) =>
       selector(useSnapshot()),
   };
@@ -56,11 +59,15 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const render = async (options: {
-  activatePreset: (presetId: LayoutPresetId) => Promise<void>;
-  activePresetId: LayoutPresetId;
-}) => {
-  activatePreset = options.activatePreset;
+const nextFrame = (): Promise<void> =>
+  act(async () => {
+    await new Promise((resolve) => {
+      requestAnimationFrame(() => resolve(null));
+    });
+  });
+
+const render = async (options: { activatePreset: ActivatePreset; activePresetId: LayoutPresetId }) => {
+  commands = createCommands(options.activatePreset);
   store = createWorkbenchStore();
   store.commands.layout.applyPreset(options.activePresetId);
   host = document.createElement('div');
@@ -90,68 +97,55 @@ const presetTab = (id: string): HTMLElement => {
   return tab;
 };
 
-const press = (element: Element): Promise<void> =>
+const press = (element: Element, button = 0): Promise<void> =>
   act(async () => {
-    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button, cancelable: true }));
     await Promise.resolve();
   });
 
-const nextFrame = (): Promise<void> =>
-  act(async () => {
-    await new Promise((resolve) => {
-      requestAnimationFrame(() => resolve(null));
-    });
-  });
-
 afterEach(async () => {
+  // Drained while the tree that queued it is still mounted, so no activation
+  // frame can leak into the next test.
+  await nextFrame();
   await act(() => root?.unmount());
   host?.remove();
   host = null;
   root = null;
-  activatePreset = () => Promise.resolve();
+  commands = createCommands(() => Promise.resolve(null));
 });
 
 describe('LayoutPresetStrip acknowledgment', () => {
-  it('marks the pressed tab active on pointerdown, before any store update', async () => {
+  // The selected paint, `aria-selected` for assistive technology, and the mark
+  // the performance gate observes are all the same attribute pair, written by
+  // the tabs machine from the controlled `value`. Pinning it here means a
+  // future release that defers those writes fails a test rather than silently
+  // regressing the budget.
+  it('selects the pressed tab on pointerdown, before any store update', async () => {
     // activatePreset never resolves: the store is deliberately frozen.
-    const activate = vi.fn(() => new Promise<void>(() => {}));
+    const activate = vi.fn<ActivatePreset>(() => new Promise<LayoutPresetId | null>(() => {}));
 
     await render({ activatePreset: activate, activePresetId: 'compose' });
 
-    const editTab = presetTab('edit');
-
-    expect(editTab.hasAttribute('data-preset-active')).toBe(false);
-
-    await press(editTab);
-
-    expect(presetTab('edit').hasAttribute('data-preset-active')).toBe(true);
-    expect(presetTab('compose').hasAttribute('data-preset-active')).toBe(false);
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
-  });
-
-  // The performance gate watches `aria-selected`, and assistive technology reads
-  // it: the acknowledgment is only real if the tabs machine moves with it.
-  it('moves the tabs machine selection in the same commit as the acknowledgment', async () => {
-    const activate = vi.fn(() => new Promise<void>(() => {}));
-
-    await render({ activatePreset: activate, activePresetId: 'compose' });
+    expect(presetTab('edit').getAttribute('aria-selected')).toBe('false');
 
     await press(presetTab('edit'));
 
     expect(presetTab('edit').getAttribute('aria-selected')).toBe('true');
+    expect(presetTab('edit').hasAttribute('data-selected')).toBe(true);
     expect(presetTab('compose').getAttribute('aria-selected')).toBe('false');
     expect(presetTab('compose').hasAttribute('data-selected')).toBe(false);
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
   });
 
   it('activates on the frame after the acknowledgment, not inside the handler', async () => {
-    const activate = vi.fn(() => Promise.resolve());
+    const activate = vi.fn<ActivatePreset>(() => Promise.resolve('edit'));
 
     await render({ activatePreset: activate, activePresetId: 'compose' });
 
     const editTab = presetTab('edit');
 
     await act(async () => {
-      editTab.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+      editTab.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, cancelable: true }));
 
       // Checked before yielding: the handler itself must not have dispatched.
       expect(activate).not.toHaveBeenCalled();
@@ -164,7 +158,7 @@ describe('LayoutPresetStrip acknowledgment', () => {
   });
 
   it('does not re-activate the preset that is already active', async () => {
-    const activate = vi.fn(() => Promise.resolve());
+    const activate = vi.fn<ActivatePreset>(() => Promise.resolve('compose'));
 
     await render({ activatePreset: activate, activePresetId: 'compose' });
 
@@ -172,5 +166,55 @@ describe('LayoutPresetStrip acknowledgment', () => {
     await nextFrame();
 
     expect(activate).not.toHaveBeenCalled();
+  });
+
+  // `pointerdown` fires for the secondary button too, ahead of `contextmenu`.
+  // Switching on right-click would strip the menu of the "switch to this
+  // preset" item that is the whole reason to open it on an inactive tab.
+  it('ignores a secondary-button press', async () => {
+    const activate = vi.fn<ActivatePreset>(() => Promise.resolve('edit'));
+
+    await render({ activatePreset: activate, activePresetId: 'compose' });
+
+    await press(presetTab('edit'), 2);
+    await nextFrame();
+
+    expect(activate).not.toHaveBeenCalled();
+    expect(presetTab('edit').getAttribute('aria-selected')).toBe('false');
+    expect(presetTab('compose').getAttribute('aria-selected')).toBe('true');
+  });
+
+  // Three activations are silently dropped by the store — superseded, overtaken
+  // by a project switch, or aimed at a replaced preset definition. Painting the
+  // selection ahead of the store means the tab has to be handed back when that
+  // happens, or it shows a preset nothing ever applied, permanently.
+  it('gives the selection back to the store when the activation is dropped', async () => {
+    // Settled by hand inside `act` rather than pre-resolved: it pins the
+    // handoff to the moment the outcome is known, instead of to whichever
+    // microtask turn happens to win the race.
+    let reportOutcome!: (appliedPresetId: LayoutPresetId | null) => void;
+    const outcome = new Promise<LayoutPresetId | null>((resolve) => {
+      reportOutcome = resolve;
+    });
+    const activate = vi.fn<ActivatePreset>(() => outcome);
+
+    await render({ activatePreset: activate, activePresetId: 'compose' });
+
+    await press(presetTab('edit'));
+
+    expect(presetTab('edit').getAttribute('aria-selected')).toBe('true');
+
+    await nextFrame();
+
+    expect(activate).toHaveBeenCalledWith('edit');
+    expect(presetTab('edit').getAttribute('aria-selected')).toBe('true');
+
+    await act(async () => {
+      reportOutcome(null);
+      await outcome;
+    });
+
+    expect(presetTab('edit').getAttribute('aria-selected')).toBe('false');
+    expect(presetTab('compose').getAttribute('aria-selected')).toBe('true');
   });
 });

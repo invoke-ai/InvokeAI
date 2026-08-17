@@ -53,13 +53,6 @@ import { useActiveLayoutPresetId, useLayoutDrift } from './useLayoutDrift';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
-// The selected paint is ours, not the tabs machine's: React writes this
-// attribute in the same commit as the press, so the tab cannot lag the press
-// even by a machine transition. Same tokens the `subtle` tabs recipe emits for
-// `_selected`, so the tab is pixel-identical to the one it replaces.
-const PRESET_TAB_ACTIVE_CSS = {
-  '&[data-preset-active]': { bg: 'colorPalette.subtle', color: 'colorPalette.fg' },
-} as const;
 const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 const PRESET_TAB_KEYS_BLOCKED_DURING_DRAG = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'End', 'Home']);
 const DND_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
@@ -127,7 +120,15 @@ export const LayoutPresetStrip = () => {
     (presetId: LayoutPresetId) => {
       setPendingPresetId(presetId);
       requestAnimationFrame(() => {
-        void layout.activatePreset(presetId);
+        void layout.activatePreset(presetId).then((appliedPresetId) => {
+          // An activation can be dropped — superseded, overtaken by a project
+          // switch, or aimed at a preset the account has since replaced. Give
+          // the tab back to the store rather than leave it painting a preset
+          // nothing ever applied. Guarded so a newer request keeps its own.
+          if (appliedPresetId !== presetId) {
+            setPendingPresetId((pending) => (pending === presetId ? null : pending));
+          }
+        });
       });
     },
     [layout]
@@ -306,17 +307,21 @@ const PresetTab = ({
     [onOpenMenu, preset]
   );
 
-  // The press, not the click, is what the user is waiting on. Chakra's tabs
-  // machine would still land the selection correctly, but only after the click
-  // it never sees until the button is released.
+  // The press, not the click, is what the user is waiting on: the tabs machine
+  // lands the selection correctly either way, but only once the button is
+  // released. Primary button only — `pointerdown` fires for the secondary
+  // button too, ahead of `contextmenu`, and right-clicking an inactive preset
+  // to reach its menu must not switch to it first and strip the menu of the
+  // very item it was opened for. dnd-kit's own `MouseSensor` bails the same way.
   const handlePointerDown = useCallback(
     (event: PointerEvent<HTMLButtonElement>) => {
-      // dnd-kit owns the drag gesture; chain rather than replace.
+      // dnd-kit owns the drag gesture; chain rather than replace. Inert today —
+      // the strip's sensors activate on `onMouseDown`/`onTouchStart`/`onKeyDown`
+      // and only the unused `PointerSensor` would put a listener here — kept so
+      // a future sensor swap does not silently lose its activator.
       (listeners as { onPointerDown?: (value: unknown) => void } | undefined)?.onPointerDown?.(event);
 
-      const trigger = event.target instanceof Element ? event.target.closest(`[${PRESET_MENU_ATTRIBUTE}]`) : null;
-
-      if (!trigger && !isActive) {
+      if (event.button === 0 && !isActive) {
         onRequest(preset.id);
       }
     },
@@ -363,10 +368,8 @@ const PresetTab = ({
       {...listeners}
       aria-label={showDrift ? `${preset.label}, ${t('topbar.presets.unsaved')}` : preset.label}
       aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}
-      css={PRESET_TAB_ACTIVE_CSS}
       cursor={isDragging ? 'grabbing' : 'pointer'}
       data-layout-preset-id={preset.id}
-      data-preset-active={isActive ? '' : undefined}
       gap="1.5"
       style={dndStyle}
       touchAction="pan-x"

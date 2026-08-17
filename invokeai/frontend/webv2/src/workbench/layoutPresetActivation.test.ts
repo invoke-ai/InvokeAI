@@ -28,11 +28,45 @@ describe('layout preset activation', () => {
     const editActivation = activator.activate(layoutPresets[1]);
 
     editLoad.resolve();
-    await editActivation;
+    await expect(editActivation).resolves.toBe('edit');
     composeLoad.resolve();
-    await composeActivation;
+    await expect(composeActivation).resolves.toBeNull();
 
     expect(appliedPresetIds).toEqual(['edit']);
+  });
+
+  // Callers paint the selection before the store has it; a dropped activation
+  // that resolved silently would strand the control on a preset nothing applied.
+  it('reports the dropped activation when the active project changed under it', async () => {
+    const appliedPresetIds: string[] = [];
+    let activeProjectId = 'project-a';
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      applyDeadlineMs: 0,
+      getActiveProjectId: () => activeProjectId,
+      isCurrent: () => true,
+      load: () => new Promise(() => {}),
+    });
+
+    const activation = activator.activate(layoutPresets[0]);
+    activeProjectId = 'project-b';
+
+    await expect(activation).resolves.toBeNull();
+    expect(appliedPresetIds).toEqual([]);
+  });
+
+  it('reports the dropped activation when the preset definition was replaced under it', async () => {
+    const appliedPresetIds: string[] = [];
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      applyDeadlineMs: 0,
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => false,
+      load: () => new Promise(() => {}),
+    });
+
+    await expect(activator.activate(layoutPresets[0])).resolves.toBeNull();
+    expect(appliedPresetIds).toEqual([]);
   });
 
   it('applies at the deadline when a widget implementation is still loading', async () => {
@@ -45,7 +79,7 @@ describe('layout preset activation', () => {
       load: () => new Promise(() => {}),
     });
 
-    await activator.activate(layoutPresets[0]);
+    await expect(activator.activate(layoutPresets[0])).resolves.toBe(layoutPresets[0].id);
 
     expect(appliedPresetIds).toEqual([layoutPresets[0].id]);
   });
@@ -63,7 +97,7 @@ describe('layout preset activation', () => {
     const activation = activator.activate(layoutPresets[0]);
 
     activator.invalidate();
-    await activation;
+    await expect(activation).resolves.toBeNull();
 
     expect(appliedPresetIds).toEqual([]);
   });

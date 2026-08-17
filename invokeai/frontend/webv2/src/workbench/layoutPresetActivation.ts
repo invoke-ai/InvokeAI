@@ -47,14 +47,28 @@ export const createLayoutPresetActivator = ({
   let latestRequestId = 0;
 
   return {
-    activate: async (preset: LayoutPreset): Promise<void> => {
+    /**
+     * Resolves to the preset id that was applied, or `null` if this activation
+     * was dropped — superseded by a later request, overtaken by a project
+     * switch, or aimed at a preset definition the account has since replaced.
+     *
+     * The outcome is reported rather than swallowed because callers paint the
+     * selection optimistically: a dropped activation that stayed silent would
+     * leave a control showing a preset the store never adopted, with nothing
+     * left to correct it.
+     */
+    activate: async (preset: LayoutPreset): Promise<LayoutPresetId | null> => {
       const projectId = getActiveProjectId();
       const requestId = ++latestRequestId;
       await waitForLoadOrDeadline(load(preset), applyDeadlineMs);
 
-      if (requestId === latestRequestId && projectId === getActiveProjectId() && isCurrent(preset)) {
-        apply(preset.id);
+      if (requestId !== latestRequestId || projectId !== getActiveProjectId() || !isCurrent(preset)) {
+        return null;
       }
+
+      apply(preset.id);
+
+      return preset.id;
     },
     invalidate: (): void => {
       latestRequestId += 1;
