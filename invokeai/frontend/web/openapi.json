@@ -12515,10 +12515,18 @@
             "type": "array",
             "title": "Added Images",
             "description": "The image names that were added to the board"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of authorized images that could not be added"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "added_images"],
+        "required": ["affected_boards", "added_images", "failed_images"],
         "title": "AddImagesToBoardResult"
       },
       "AddInvocation": {
@@ -23765,7 +23773,7 @@
           }
         },
         "type": "object",
-        "required": ["affected_boards", "deleted_images"],
+        "required": ["affected_boards", "deleted_images", "failed_images"],
         "title": "DeleteImagesResult"
       },
       "DeleteOrphanedModelsRequest": {
@@ -75241,10 +75249,18 @@
             "type": "array",
             "title": "Removed Images",
             "description": "The image names that were removed from their board"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of authorized images that could not be removed"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "removed_images"],
+        "required": ["affected_boards", "removed_images", "failed_images"],
         "title": "RemoveImagesFromBoardResult"
       },
       "RemoveVideosFromBoardResult": {

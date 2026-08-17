@@ -1,5 +1,4 @@
 import { toast } from 'features/toast/toast';
-import i18n from 'i18next';
 import { buildChunkedImageBatchQueryFn, chunkImageNames, mergeImageBatchResults } from 'services/api/endpoints/images';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -50,7 +49,7 @@ describe('mergeImageBatchResults', () => {
 
 describe('buildChunkedImageBatchQueryFn', () => {
   type Arg = { image_names: string[]; board_id?: string };
-  type Result = { added_images: string[]; affected_boards: string[] };
+  type Result = { added_images: string[]; failed_images: string[]; affected_boards: string[] };
   type Request = { url: string; method: string; body: Arg };
   type Response = { data: Result } | { error: { status: number; data: string } };
 
@@ -58,7 +57,6 @@ describe('buildChunkedImageBatchQueryFn', () => {
 
   beforeEach(() => {
     vi.mocked(toast).mockClear();
-    vi.mocked(i18n.t).mockClear();
   });
 
   const run = (baseQuery: (args: Request) => Promise<Response>, arg: Arg) => {
@@ -74,7 +72,8 @@ describe('buildChunkedImageBatchQueryFn', () => {
 
   it('sends one request per chunk, carrying the non-name body fields on each', async () => {
     const baseQuery = vi.fn(
-      (_args: Request): Promise<Response> => Promise.resolve({ data: { added_images: [], affected_boards: [] } })
+      (_args: Request): Promise<Response> =>
+        Promise.resolve({ data: { added_images: [], failed_images: [], affected_boards: [] } })
     );
 
     const { result } = run(baseQuery, { image_names: names(2500), board_id: 'board-1' });
@@ -90,13 +89,15 @@ describe('buildChunkedImageBatchQueryFn', () => {
     let call = 0;
     const baseQuery = vi.fn((_args: Request): Promise<Response> => {
       call += 1;
-      return Promise.resolve({ data: { added_images: [`chunk-${call}.png`], affected_boards: ['board-1'] } });
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
     });
 
     const { result } = run(baseQuery, { image_names: names(1500) });
 
     expect(await result).toEqual({
-      data: { added_images: ['chunk-1.png', 'chunk-2.png'], affected_boards: ['board-1'] },
+      data: { added_images: ['chunk-1.png', 'chunk-2.png'], failed_images: [], affected_boards: ['board-1'] },
     });
   });
 
@@ -111,19 +112,27 @@ describe('buildChunkedImageBatchQueryFn', () => {
       if (call === 3) {
         return Promise.resolve({ error: { status: 500, data: 'boom' } });
       }
-      return Promise.resolve({ data: { added_images: [`chunk-${call}.png`], affected_boards: ['board-1'] } });
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
     });
 
     const { dispatch, result } = run(baseQuery, { image_names: names(2500) });
 
+    // The failing chunk's 500 names are unreached, not merely un-reported, so they are folded
+    // into failed_images -- one place, so the endpoint's single toast reports one true total.
     expect(await result).toEqual({
-      data: { added_images: ['chunk-1.png', 'chunk-2.png'], affected_boards: ['board-1'] },
+      data: {
+        added_images: ['chunk-1.png', 'chunk-2.png'],
+        failed_images: names(2500).slice(2000),
+        affected_boards: ['board-1'],
+      },
     });
     expect(baseQuery).toHaveBeenCalledTimes(3); // stopped, did not keep firing chunks
     expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags(getTags()));
-    // The failing chunk's 500 names are unreached, not merely un-reported.
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ id: 'IMAGES_FAILED_TO_UPDATE', status: 'warning' }));
-    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToUpdate', { count: 500 });
+    // Toasting from here as well would fire twice on one toast id, and the toast system
+    // updates in place -- the second count would replace the first rather than adding to it.
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it('reports an error when the first chunk fails, since nothing was applied', async () => {

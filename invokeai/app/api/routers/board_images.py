@@ -5,6 +5,7 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE, ImageName
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult
 
 board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
@@ -79,6 +80,8 @@ async def add_image_to_board(
 
         return AddImagesToBoardResult(
             added_images=list(added_images),
+            # Single-image route: a failure here is a 500, never a partial success.
+            failed_images=[],
             affected_boards=list(affected_boards),
         )
     except Exception:
@@ -112,6 +115,8 @@ async def remove_image_from_board(
         affected_boards.add(old_board_id)
         return RemoveImagesFromBoardResult(
             removed_images=list(removed_images),
+            # Single-image route: a failure here is a 500, never a partial success.
+            failed_images=[],
             affected_boards=list(affected_boards),
         )
 
@@ -147,9 +152,17 @@ async def add_images_to_board(
         raise
 
     try:
+        # Skip — but do not re-raise — auth failures so a foreign name mid-batch doesn't
+        # discard the response payload for images that were already moved. Re-raising turned
+        # partial successes into an error-shaped response, so the client never invalidated
+        # caches for the images that did move and the UI kept showing them on their old board
+        # until the next full refresh. Matches star_images_in_list and delete_images_from_list.
         added_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
-        for image_name in image_names:
+        # Dedup while preserving order — a repeated name would otherwise be processed twice
+        # and could land in both added_images and failed_images.
+        for image_name in dict.fromkeys(image_names):
             try:
                 _assert_image_direct_owner(image_name, current_user)
                 old_board_id = (
@@ -164,11 +177,15 @@ async def add_images_to_board(
                 affected_boards.add(old_board_id)
 
             except HTTPException:
-                raise
+                continue
             except Exception:
-                pass
+                # A genuine storage failure, not an auth/404 skip: it used to be swallowed by
+                # `pass`, so the client counted the image as moved and the move silently
+                # reverted on reload.
+                failed_images.add(image_name)
         return AddImagesToBoardResult(
             added_images=list(added_images),
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
     except HTTPException:
@@ -197,29 +214,73 @@ async def remove_images_from_board(
         assert_image_move_maintenance_inactive()
     except HTTPException:
         for image_name in image_names:
-            old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
+            try:
+                old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
+            except ImageRecordNotFoundException:
+                # A name deleted by a concurrent session. The main loop treats that as a skip;
+                # letting it escape from inside this handler would replace the 409 with a 500.
+                continue
             if old_board_id != "none":
                 _assert_board_write_access(old_board_id, current_user)
         raise
 
     try:
+        # Skip — but do not re-raise — auth failures, for the same reason as add_images_to_board
+        # above: one name on a board the caller cannot write must not discard the payload for
+        # the images already removed.
         removed_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
-        for image_name in image_names:
+        # Decided once per board rather than once per name. The skip removed the early abort
+        # that used to cap an unauthorized batch at one check, and _assert_board_write_access
+        # goes through boards.get_dto() -- six queries including three COUNT aggregates over
+        # the board's contents. Unmemoized, a 1000-name batch on one board is 6000 synchronous
+        # queries on the event loop, which is exactly what MAX_IMAGE_BATCH_SIZE exists to stop.
+        board_is_writable: dict[str, bool] = {}
+
+        def _may_write(board_id: str) -> bool:
+            if board_id not in board_is_writable:
+                try:
+                    _assert_board_write_access(board_id, current_user)
+                    board_is_writable[board_id] = True
+                except HTTPException:
+                    board_is_writable[board_id] = False
+            return board_is_writable[board_id]
+
+        # Dedup while preserving order — a repeated name would otherwise be processed twice
+        # and could land in both removed_images and failed_images.
+        for image_name in dict.fromkeys(image_names):
             try:
                 old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
-                if old_board_id != "none":
-                    _assert_board_write_access(old_board_id, current_user)
+            except ImageRecordNotFoundException:
+                # The image is gone — deleted by a concurrent session between the client
+                # building its selection and this request. That is a skip, not a failure, and
+                # must not be toasted as one. Resolved in its own block because unlike the
+                # other routes this one reads the DTO *before* any authorization check, so a
+                # 404 here would otherwise be indistinguishable from a storage failure below.
+                # Narrow on purpose: a real storage error must still reach failed_images.
+                continue
+            except Exception:
+                failed_images.add(image_name)
+                continue
+
+            # The one authorization decision, outside the try below so that the only way to
+            # skip a name for auth is this branch. Folding it into the try would leave two
+            # paths to the same outcome, and neither would be individually load-bearing.
+            if old_board_id != "none" and not _may_write(old_board_id):
+                continue
+
+            try:
                 ApiDependencies.invoker.services.board_images.remove_image_from_board(image_name=image_name)
                 removed_images.add(image_name)
                 affected_boards.add("none")
                 affected_boards.add(old_board_id)
-            except HTTPException:
-                raise
             except Exception:
-                pass
+                # A genuine storage failure, not an auth/404 skip — see add_images_to_board.
+                failed_images.add(image_name)
         return RemoveImagesFromBoardResult(
             removed_images=list(removed_images),
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
     except HTTPException:

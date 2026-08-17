@@ -237,6 +237,9 @@ async def delete_image(
 
     return DeleteImagesResult(
         deleted_images=list(deleted_images),
+        # Single-image route: the swallowed failure above already leaves deleted_images empty,
+        # which is how this route has always reported it.
+        failed_images=[],
         affected_boards=list(affected_boards),
     )
 
