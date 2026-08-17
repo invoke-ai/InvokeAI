@@ -1,7 +1,7 @@
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 
 import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
 import {
@@ -49,10 +49,17 @@ import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
-import { useLayoutDrift } from './useLayoutDrift';
+import { useActiveLayoutPresetId, useLayoutDrift } from './useLayoutDrift';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
+// The selected paint is ours, not the tabs machine's: React writes this
+// attribute in the same commit as the press, so the tab cannot lag the press
+// even by a machine transition. Same tokens the `subtle` tabs recipe emits for
+// `_selected`, so the tab is pixel-identical to the one it replaces.
+const PRESET_TAB_ACTIVE_CSS = {
+  '&[data-preset-active]': { bg: 'colorPalette.subtle', color: 'colorPalette.fg' },
+} as const;
 const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 const PRESET_TAB_KEYS_BLOCKED_DURING_DRAG = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'End', 'Home']);
 const DND_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
@@ -74,7 +81,6 @@ const selectPlacedGraphWidgetSources = (project: Project) => {
 
 export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
-  const { activePreset, hasDrifted } = useLayoutDrift();
   const { layout } = useWorkbenchCommands();
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
@@ -84,6 +90,20 @@ export const LayoutPresetStrip = () => {
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
   const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
+  const { hasDrifted } = useLayoutDrift();
+  const activePresetId = useActiveLayoutPresetId();
+  const [pendingPresetId, setPendingPresetId] = useState<LayoutPresetId | null>(null);
+
+  // The store caught up; stop overriding it.
+  if (pendingPresetId !== null && pendingPresetId === activePresetId) {
+    setPendingPresetId(null);
+  }
+
+  const selectedPresetId = pendingPresetId ?? activePresetId;
+  const activePreset = useMemo(
+    () => presets.find(({ id }) => id === selectedPresetId) ?? presets[0]!,
+    [presets, selectedPresetId]
+  );
   const dndAccessibility = useMemo(
     () => ({ screenReaderInstructions: { draggable: t('topbar.presets.reorderInstructions') } }),
     [t]
@@ -97,13 +117,28 @@ export const LayoutPresetStrip = () => {
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
     [invocation.destination, invocation.sourceId]
   );
+  /**
+   * Desktop semantics: the control acknowledges the press on its own frame,
+   * then the workspace rearranges. Activating inside the handler put a
+   * ~100ms blocking React commit between the click and any pixel changing,
+   * and the tab itself did not repaint for ~330ms.
+   */
+  const requestPreset = useCallback(
+    (presetId: LayoutPresetId) => {
+      setPendingPresetId(presetId);
+      requestAnimationFrame(() => {
+        void layout.activatePreset(presetId);
+      });
+    },
+    [layout]
+  );
   const applyPreset = useCallback(
     (preset: LayoutPreset) => {
-      if (preset.id !== activePreset.id) {
-        void layout.activatePreset(preset.id);
+      if (preset.id !== selectedPresetId) {
+        requestPreset(preset.id);
       }
     },
-    [activePreset.id, layout]
+    [requestPreset, selectedPresetId]
   );
   const handleValueChange = useCallback(
     (event: { value: string }) => {
@@ -151,7 +186,7 @@ export const LayoutPresetStrip = () => {
             <Tabs.Root
               minW="max-content"
               size="xs"
-              value={activePreset.id}
+              value={selectedPresetId}
               variant="subtle"
               onValueChange={handleValueChange}
             >
@@ -163,9 +198,10 @@ export const LayoutPresetStrip = () => {
                     <PresetTab
                       key={preset.id}
                       hasDrifted={hasDrifted}
-                      isActive={preset.id === activePreset.id}
+                      isActive={preset.id === selectedPresetId}
                       preset={preset}
                       onOpenMenu={setMenuTarget}
+                      onRequest={requestPreset}
                     />
                   ))}
                 </Tabs.List>
@@ -196,7 +232,7 @@ export const LayoutPresetStrip = () => {
       </HStack>
 
       <PresetMenu
-        isActive={menuTarget?.preset.id === activePreset.id}
+        isActive={menuTarget?.preset.id === selectedPresetId}
         hasDrifted={hasDrifted}
         target={menuTarget}
         onApply={applyPreset}
@@ -225,12 +261,14 @@ const PresetTab = ({
   hasDrifted,
   isActive,
   onOpenMenu,
+  onRequest,
   preset,
 }: {
   hasDrifted: boolean;
   isActive: boolean;
   preset: LayoutPreset;
   onOpenMenu: (target: { anchor: DOMRect; preset: LayoutPreset }) => void;
+  onRequest: (presetId: LayoutPresetId) => void;
 }) => {
   const { t } = useTranslation();
   const icon = resolveLayoutPresetIcon(preset.iconId);
@@ -266,6 +304,23 @@ const PresetTab = ({
       }
     },
     [onOpenMenu, preset]
+  );
+
+  // The press, not the click, is what the user is waiting on. Chakra's tabs
+  // machine would still land the selection correctly, but only after the click
+  // it never sees until the button is released.
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      // dnd-kit owns the drag gesture; chain rather than replace.
+      (listeners as { onPointerDown?: (value: unknown) => void } | undefined)?.onPointerDown?.(event);
+
+      const trigger = event.target instanceof Element ? event.target.closest(`[${PRESET_MENU_ATTRIBUTE}]`) : null;
+
+      if (!trigger && !isActive) {
+        onRequest(preset.id);
+      }
+    },
+    [isActive, listeners, onRequest, preset.id]
   );
 
   const handleContextMenu = useCallback(
@@ -308,8 +363,10 @@ const PresetTab = ({
       {...listeners}
       aria-label={showDrift ? `${preset.label}, ${t('topbar.presets.unsaved')}` : preset.label}
       aria-keyshortcuts={isActive ? 'ArrowDown' : undefined}
+      css={PRESET_TAB_ACTIVE_CSS}
       cursor={isDragging ? 'grabbing' : 'pointer'}
       data-layout-preset-id={preset.id}
+      data-preset-active={isActive ? '' : undefined}
       gap="1.5"
       style={dndStyle}
       touchAction="pan-x"
@@ -318,6 +375,7 @@ const PresetTab = ({
       onContextMenu={handleContextMenu}
       onFocus={handlePreload}
       onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
       onPointerEnter={handlePreload}
     >
       <Icon as={icon} boxSize="3.5" flexShrink={0} />
