@@ -13,6 +13,7 @@ import { getClusterColor } from './clusterPalette';
  */
 
 export const ALL_POINTS_TRACE = 'All Points';
+export const HIGHLIGHTED_POINTS_TRACE = 'Highlighted Points';
 export const CURRENT_IMAGE_TRACE = 'Current Image';
 
 /** Opacity for DBSCAN noise points (cluster -1); clustered points are solid. */
@@ -51,6 +52,36 @@ export const buildAllPointsTrace = (points: ImageMapPoint[]): ScatterTrace => ({
   x: points.map((point) => point.x),
   y: points.map((point) => point.y),
 });
+
+/**
+ * The gallery's multi-selection (e.g. a cluster click), drawn larger with a
+ * white outline over the base points. Empty when fewer than two images are
+ * selected — a single selection is already marked by the gold target.
+ */
+export const buildHighlightedPointsTrace = (
+  points: ImageMapPoint[],
+  selectedNames: ReadonlySet<string>
+): ScatterTrace => {
+  const selected = selectedNames.size >= 2 ? points.filter((point) => selectedNames.has(point.imageName)) : [];
+
+  return {
+    customdata: selected.map((point) => point.imageName),
+    // 'skip': highlighted points sit over their base points, which carry the
+    // same customdata — hit-testing should fall through to them.
+    hoverinfo: 'skip',
+    marker: {
+      color: selected.map((point) => getClusterColor(point.cluster)),
+      line: { color: '#FFFFFF', width: 1 },
+      opacity: 1,
+      size: 8,
+    },
+    mode: 'markers',
+    name: HIGHLIGHTED_POINTS_TRACE,
+    type: 'scattergl',
+    x: selected.map((point) => point.x),
+    y: selected.map((point) => point.y),
+  };
+};
 
 /**
  * The gold target marking the current gallery image. Built empty here; a later
