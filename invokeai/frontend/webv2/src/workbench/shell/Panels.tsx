@@ -4,11 +4,16 @@ import { MissingWidgetFrame, WidgetRendererById } from '@workbench/widget-frame'
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getWidgetById } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { Activity } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useMountedInstanceIds } from './useMountedInstanceIds';
+import {
+  areInstanceIdListsEqual,
+  getActiveInstanceIdsOutside,
+  useMountedInstanceIds,
+  withoutInstancesShownElsewhere,
+} from './useMountedInstanceIds';
 
 /** Left panel — hosts the active registered widget panel view. */
 export const LeftPanel = ({ instanceId }: { instanceId: WidgetInstanceId }) => (
@@ -32,13 +37,22 @@ const panelRegions = {
  * independent of the region's `instanceIds`, which a preset replaces wholesale.
  */
 const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; panel: keyof typeof panelRegions }) => {
-  const mountedIds = useMountedInstanceIds(instanceId);
+  const projectId = useActiveProjectId();
+  const activeIdsElsewhere = useActiveProjectSelector(
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, panelRegions[panel]),
+    areInstanceIdListsEqual
+  );
+  const mountedIds = withoutInstancesShownElsewhere(
+    useMountedInstanceIds(instanceId, projectId),
+    instanceId,
+    activeIdsElsewhere
+  );
 
   return (
     <>
       {mountedIds.map((id) => (
         <Activity key={id} mode={id === instanceId ? 'visible' : 'hidden'}>
-          <WidgetPanelInstance instanceId={id as WidgetInstanceId} panel={panel} />
+          <WidgetPanelInstance instanceId={id} panel={panel} />
         </Activity>
       ))}
     </>

@@ -24,37 +24,62 @@ const keepAliveMocks = vi.hoisted(() => {
       status: 'enabled',
     },
   };
-  const typeIdByInstanceId: Record<string, string> = { canvas: 'canvas', 'workflow:center': 'workflow' };
+  const typeIdByInstanceId: Record<string, string> = {
+    canvas: 'canvas',
+    layers: 'canvas',
+    preview: 'workflow',
+    'workflow:center': 'workflow',
+  };
   const widgetInstances = {
     canvas: { createdAt: 1, id: 'canvas', typeId: 'canvas' },
+    layers: { createdAt: 1, id: 'layers', typeId: 'canvas' },
+    preview: { createdAt: 1, id: 'preview', typeId: 'workflow' },
     'workflow:center': { createdAt: 1, id: 'workflow:center', typeId: 'workflow' },
   };
-  const createProject = (activeInstanceId: string) => ({
+  const createProject = ({
+    activeInstanceId,
+    projectId = 'project-a',
+    rightInstanceId = 'layers',
+  }: {
+    activeInstanceId: string | undefined;
+    projectId?: string;
+    rightInstanceId?: string;
+  }) => ({
     floatingWidgets: [],
-    id: 'test-project',
+    id: projectId,
     invocation: { sourceId: 'generate' },
     queue: { items: [] },
     widgetInstances,
     widgetRegions: {
-      center: { activeInstanceId, instanceIds: [activeInstanceId], isCollapsed: false, sizePx: 0 },
+      center: {
+        activeInstanceId: activeInstanceId ?? '',
+        instanceIds: activeInstanceId === undefined ? [] : [activeInstanceId],
+        isCollapsed: false,
+        sizePx: 0,
+      },
+      right: { activeInstanceId: rightInstanceId, instanceIds: [rightInstanceId], isCollapsed: false, sizePx: 0 },
     },
   });
 
-  let project = createProject('canvas');
+  let project = createProject({ activeInstanceId: 'canvas' });
   const listeners = new Set<() => void>();
+  const publish = (next: ReturnType<typeof createProject>) => {
+    project = next;
+    for (const listener of listeners) {
+      listener();
+    }
+  };
 
   return {
     getProject: () => project,
     getWidgetById: (typeId: string) => widgets[typeId],
     reset: () => {
-      project = createProject('canvas');
+      project = createProject({ activeInstanceId: 'canvas' });
     },
-    setActiveInstanceId: (activeInstanceId: string) => {
-      project = createProject(activeInstanceId);
-      for (const listener of listeners) {
-        listener();
-      }
-    },
+    setActiveInstanceId: (activeInstanceId: string | undefined) => publish(createProject({ activeInstanceId })),
+    setProjectId: (projectId: string) => publish(createProject({ activeInstanceId: 'canvas', projectId })),
+    setRightInstanceId: (rightInstanceId: string) =>
+      publish(createProject({ activeInstanceId: project.widgetRegions.center.activeInstanceId, rightInstanceId })),
     subscribe: (listener: () => void) => {
       listeners.add(listener);
 
@@ -98,6 +123,7 @@ vi.mock('@workbench/WorkbenchContext', async () => {
   const { useSyncExternalStore } = await import('react');
 
   return {
+    useActiveProjectId: () => useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject).id,
     useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
       selector(useSyncExternalStore(keepAliveMocks.subscribe, keepAliveMocks.getProject)),
     useWorkbenchCommands: () => ({ widgets: {} }),
@@ -150,13 +176,18 @@ const renderCenterArea = async () => {
     await Promise.resolve();
   });
 
+  const publish = async (mutate: () => void) => {
+    await act(async () => {
+      mutate();
+      await Promise.resolve();
+    });
+  };
+
   return {
-    setActiveInstanceId: async (instanceId: string) => {
-      await act(async () => {
-        keepAliveMocks.setActiveInstanceId(instanceId);
-        await Promise.resolve();
-      });
-    },
+    setActiveInstanceId: (instanceId: string | undefined) =>
+      publish(() => keepAliveMocks.setActiveInstanceId(instanceId)),
+    setProjectId: (projectId: string) => publish(() => keepAliveMocks.setProjectId(projectId)),
+    setRightInstanceId: (instanceId: string) => publish(() => keepAliveMocks.setRightInstanceId(instanceId)),
   };
 };
 
@@ -209,6 +240,45 @@ describe('preset switch keep-alive', () => {
     // `display: none` takes the subtree out of the accessibility tree, so it is
     // unreachable by pointer hit-testing and by sequential focus navigation.
     expect(hiddenCanvas?.getClientRects().length).toBe(0);
+  });
+
+  it('drops a kept instance once another region starts showing it', async () => {
+    const { setActiveInstanceId, setRightInstanceId } = await renderCenterArea();
+
+    await setActiveInstanceId('preview');
+    await setActiveInstanceId('workflow:center');
+
+    // Kept and hidden while the right rail shows something else.
+    expect(centerWidget('preview')).not.toBeNull();
+
+    await setRightInstanceId('preview');
+
+    // The right rail is now rendering this instance for real; a hidden centre
+    // copy would be the same instance mounted twice, one of them a ghost.
+    expect(centerWidget('preview')).toBeNull();
+  });
+
+  it('forgets what the previous project had shown', async () => {
+    const { setActiveInstanceId, setProjectId } = await renderCenterArea();
+
+    await setActiveInstanceId('workflow:center');
+    expect(centerWidget('canvas')).not.toBeNull();
+
+    await setProjectId('project-b');
+
+    // Instance ids repeat across projects, so a kept id would resolve to a real
+    // instance of the new project carrying the old project's local state.
+    expect(centerWidget('workflow:center')).toBeNull();
+    expect(centerWidget('canvas')).not.toBeNull();
+  });
+
+  it('says the centre is unavailable rather than rendering nothing', async () => {
+    const { setActiveInstanceId } = await renderCenterArea();
+
+    await setActiveInstanceId(undefined);
+
+    expect(centerWidget('canvas')).toBeNull();
+    expect(host?.textContent).toContain('Center widget unavailable');
   });
 
   it('keeps chrome on the live region rather than on the kept widget', async () => {

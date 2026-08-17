@@ -25,12 +25,17 @@ import {
   isRequiredCenterView,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
 import { Activity, Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useMountedInstanceIds } from './useMountedInstanceIds';
+import {
+  areInstanceIdListsEqual,
+  getActiveInstanceIdsOutside,
+  useMountedInstanceIds,
+  withoutInstancesShownElsewhere,
+} from './useMountedInstanceIds';
 
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
@@ -78,7 +83,16 @@ export const CenterArea = () => {
     ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
-  const mountedCenterIds = useMountedInstanceIds(activeCenterViewId);
+  const projectId = useActiveProjectId();
+  const activeIdsElsewhere = useActiveProjectSelector(
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center'),
+    areInstanceIdListsEqual
+  );
+  const mountedCenterIds = withoutInstancesShownElsewhere(
+    useMountedInstanceIds(activeCenterViewId, projectId),
+    activeCenterViewId,
+    activeIdsElsewhere
+  );
   const focusRegionProps = useFocusRegionProps('center');
 
   const openCenterWidget = useCallback(
@@ -140,7 +154,7 @@ export const CenterArea = () => {
     >
       <Box flex="1" minH="0" position="relative">
         <Box aria-label={t('widgets.centerRegion')} h="full" role="region">
-          {mountedCenterIds.length > 0 ? (
+          {activeCenterViewId !== undefined && mountedCenterIds.length > 0 ? (
             mountedCenterIds.map((instanceId) => (
               <Activity key={instanceId} mode={instanceId === activeCenterViewId ? 'visible' : 'hidden'}>
                 <KeptCenterViewSlot instanceId={instanceId} />
