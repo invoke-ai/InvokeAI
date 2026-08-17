@@ -97,9 +97,9 @@ const presetTab = (id: string): HTMLElement => {
   return tab;
 };
 
-const press = (element: Element, button = 0): Promise<void> =>
+const press = (element: Element, button = 0, pointerType = 'mouse'): Promise<void> =>
   act(async () => {
-    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button, cancelable: true }));
+    element.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button, cancelable: true, pointerType }));
     await Promise.resolve();
   });
 
@@ -166,6 +166,24 @@ describe('LayoutPresetStrip acknowledgment', () => {
     await nextFrame();
 
     expect(activate).not.toHaveBeenCalled();
+  });
+
+  // The strip is horizontally scrollable and its tabs carry `touchAction:
+  // 'pan-x'`, so a finger landing on an inactive tab to begin a pan is a
+  // supported gesture, not a click. Activating on touch `pointerdown` would
+  // switch the layout before the pan even starts. Touch keeps activating on
+  // `click`, same as before this component acknowledged presses at all.
+  it('ignores a touch-pointer press', async () => {
+    const activate = vi.fn<ActivatePreset>(() => Promise.resolve('edit'));
+
+    await render({ activatePreset: activate, activePresetId: 'compose' });
+
+    await press(presetTab('edit'), 0, 'touch');
+    await nextFrame();
+
+    expect(activate).not.toHaveBeenCalled();
+    expect(presetTab('edit').getAttribute('aria-selected')).toBe('false');
+    expect(presetTab('compose').getAttribute('aria-selected')).toBe('true');
   });
 
   // `pointerdown` fires for the secondary button too, ahead of `contextmenu`.

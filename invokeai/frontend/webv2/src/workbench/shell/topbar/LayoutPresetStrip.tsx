@@ -321,7 +321,7 @@ const PresetTab = ({
       // a future sensor swap does not silently lose its activator.
       (listeners as { onPointerDown?: (value: unknown) => void } | undefined)?.onPointerDown?.(event);
 
-      if (event.button === 0 && !isActive) {
+      if (event.button === 0 && event.pointerType !== 'touch' && !isActive) {
         onRequest(preset.id);
       }
     },
