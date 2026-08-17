@@ -401,10 +401,15 @@ const runSample = async (browser, fixture, sample) => {
           ({ ackMarkName, interactionMarkName }) => {
             const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1);
             const end = performance.getEntriesByName(ackMarkName, 'mark').at(-1);
-            return start && end ? Math.max(0, end.startTime - start.startTime) : 0;
+            return start && end ? Math.max(0, end.startTime - start.startTime) : null;
           },
           { ackMarkName: ackMark, interactionMarkName: interactionMark }
         );
+        if (layoutAckMs === null) {
+          throw new Error(
+            `${fixture.id}/${fixture.stateProfile} did not record a layout-ack interaction for preset ${fixture.layoutPresetId}.`
+          );
+        }
       }
       const afterActivation = await resourceCollector.settle();
       activatedResourcePaths = new Set(
