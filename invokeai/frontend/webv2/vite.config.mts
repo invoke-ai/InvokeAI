@@ -72,24 +72,26 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/settings/SettingsDialogHost.tsx',
 ] as const;
 
-const WORKBENCH_TOPBAR_MODULES = [
-  '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
-  '/workbench/shell/topbar/LayoutPresetStrip.tsx',
-  '/workbench/shell/topbar/ProjectSwitcher.tsx',
-] as const;
-
-// Modules the always-static editor shell and the boot-time `widget-hosts`
-// chunk both reach for. Editor-only — folding them into `route-shared`
-// would cost the Launchpad code it never loads, the trade the
-// `route-shared` comments above warn against. Splitting the widget hosts
-// out of their view chunks (see `WIDGET_HOST_MODULES`) gave each of these a
-// second, independent consumer; without grouping, that crosses the
-// automatic chunking algorithm's single-consumer threshold and each gets
-// extracted into its own file — several extra editor-only requests for code
-// that was previously duplicated inline for free. Riding the existing
-// `workbench-topbar` chunk rather than a new one costs it bytes, not a
-// request: `workbench-topbar` is already fetched by every editor boot.
-const EDITOR_SHARED_RUNTIME_MODULES = [
+// Everything the editor route fetches on every boot, folded into one chunk:
+// the topbar UI (project switcher, layout preset admin) and the realtime
+// runtime the boot-time `widget-hosts` chunk shares with it (queue's live
+// progress/device stores, workflow's validation). Named for what it is —
+// "always fetched on every editor boot" — rather than for the topbar alone,
+// so it stays accurate as more editor-eager modules land here; a name tied
+// to one UI feature would send whoever reads a network panel or a chunk
+// budget chasing that feature instead of the runtime code actually there.
+//
+// The runtime modules are here because splitting the widget hosts out of
+// their view chunks (see `WIDGET_HOST_MODULES`) gave each a second,
+// independent consumer alongside the always-static editor shell; without
+// grouping, that crosses the automatic chunking algorithm's single-consumer
+// threshold and each gets extracted into its own file — several extra
+// editor-only requests for code that was previously duplicated inline for
+// free. Folding them into the chunk the editor shell already pays for once
+// costs it bytes, not a request — the same trade `route-shared` makes for
+// both routes above, scoped here to the editor alone because none of this
+// is reachable from the Launchpad.
+const EDITOR_BOOT_SHARED_MODULES = [
   '/features/queue/core/graphInputMedia.ts',
   '/features/queue/core/progressImage.ts',
   '/features/queue/data/activeProgressTargetStore.ts',
@@ -103,6 +105,9 @@ const EDITOR_SHARED_RUNTIME_MODULES = [
   '/features/queue/runtime/coordinator.ts',
   '/features/queue/ui/queueConfirmationStore.ts',
   '/features/workflow/core/validation.ts',
+  '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
+  '/workbench/shell/topbar/LayoutPresetStrip.tsx',
+  '/workbench/shell/topbar/ProjectSwitcher.tsx',
 ] as const;
 
 // The singleton widget hosts the editor mounts once at boot: workflow's
@@ -203,10 +208,9 @@ export default defineConfig({
             },
             {
               includeDependenciesRecursively: false,
-              name: 'workbench-topbar',
+              name: 'editor-boot-shared',
               priority: 30,
-              test: (id) =>
-                matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES) || matchesAnySuffix(id, EDITOR_SHARED_RUNTIME_MODULES),
+              test: (id) => matchesAnySuffix(id, EDITOR_BOOT_SHARED_MODULES),
             },
             {
               includeDependenciesRecursively: false,
