@@ -265,7 +265,7 @@ class SessionQueueItem(BaseModel):
     )
     device: Optional[str] = Field(
         default=None,
-        description="The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+        description="The device that processed this queue item, e.g. 'cuda:1' (set only when running on a GPU)",
     )
     workflow_call_id: Optional[str] = Field(
         default=None, description="The active workflow-call relationship id when this queue item is a child execution."

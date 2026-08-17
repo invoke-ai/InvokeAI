@@ -1793,7 +1793,11 @@
             "noFlux2DevVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 [dev] models require a standalone FLUX.2 VAE",
             "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
-            "noWanComponentSourceSelected": "GGUF Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "noWanComponentSourceSelected": "Single-file Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "incompatibleWanVae": "The selected VAE does not match the Wan transformer. TI2V-5B needs the 48-channel Wan 2.2 VAE; A14B needs the 16-channel Wan 2.1 VAE.",
+            "incompatibleWanComponentSource": "The selected Component Source does not match the Wan transformer. Pick a Diffusers Wan model of the same family (TI2V-5B or A14B).",
+            "incompatibleWanLowNoiseExpert": "The Transformer (Low Noise) model is a different Wan variant from the main transformer. Both experts must be the same variant.",
+            "duplicateWanTransformer": "The same model is selected as both Transformer and Transformer (Low Noise). An A14B expert pair needs two different models.",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",
@@ -2696,7 +2700,7 @@
             "heading": "FP8 Storage",
             "paragraphs": [
                 "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
-                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs, and on Intel GPUs that support FP8 storage."
             ]
         }
     },
