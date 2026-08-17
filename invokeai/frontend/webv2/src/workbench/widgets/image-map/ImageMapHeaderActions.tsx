@@ -1,10 +1,7 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ToggleIconButton } from '@platform/ui';
-import {
-  getImageMapClickSelectsCluster,
-  getImageMapShowClusterLabels,
-} from '@workbench/image-map/imageMapSettings';
+import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@workbench/image-map/imageMapSettings';
 import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { GroupIcon, TagsIcon } from 'lucide-react';
 import { useCallback } from 'react';
