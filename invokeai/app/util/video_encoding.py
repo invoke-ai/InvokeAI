@@ -55,12 +55,20 @@ def write_stereo_wav(path: Path | str, samples: np.ndarray, sample_rate: int) ->
     [-1, 1]; anything outside is clipped rather than wrapped, and NaN becomes
     silence (0) rather than undefined int16 garbage. The conversion is done in
     float64 regardless of input dtype: in float16, ``1.0 * 32767.0`` rounds up
-    to 32770 and would wrap full-scale peaks to -32768.
+    to 32770 and would wrap full-scale peaks to -32768. Scaled values are
+    rounded rather than truncated — ``astype`` alone truncates toward zero,
+    which costs up to a full LSB and biases the signal toward silence.
+
+    An empty ``samples`` is rejected: a zero-frame WAV is not an ffmpeg error,
+    so it would mux as an MP4 with no audio stream at all, which is exactly the
+    silent failure ``make_mp4_writer``'s existence check exists to prevent.
     """
     if samples.ndim != 2 or samples.shape[0] != 2:
         raise ValueError(f"Expected samples shaped (2, n_samples), got {samples.shape}")
+    if samples.shape[1] == 0:
+        raise ValueError("Refusing to write an empty WAV: it would mux as an MP4 with no audio stream")
     widened = np.nan_to_num(samples.astype(np.float64), nan=0.0)
-    int16 = (np.clip(widened, -1.0, 1.0) * 32767.0).astype(np.int16)
+    int16 = np.round(np.clip(widened, -1.0, 1.0) * 32767.0).astype(np.int16)
     with wave.open(str(path), "wb") as wav:
         wav.setnchannels(2)
         wav.setsampwidth(2)

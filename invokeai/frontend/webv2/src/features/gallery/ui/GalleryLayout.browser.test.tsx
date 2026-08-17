@@ -39,17 +39,18 @@ const board: GalleryBoard = {
   imageCount: 50,
   kind: 'board',
   name: 'dogs',
+  projectId: null,
   videoCount: 0,
 };
 
 const createItem = (name: string) => ({
   boardId: 'dogs',
-  category: 'general',
+  category: 'general' as const,
   createdAt: '2026-07-30T00:00:00.000Z',
   fullUrl: `/full/${name}`,
   height: 64,
   isIntermediate: false,
-  kind: 'image',
+  kind: 'image' as const,
   name,
   starred: false,
   thumbnailUrl: `/thumb/${name}`,
@@ -165,6 +166,23 @@ afterEach(async () => {
 });
 
 describe('gallery layout shells', () => {
+  it('keeps the center gallery scroll area above the selection actions', async () => {
+    const items = Array.from({ length: 80 }, (_, index) => createItem(`image-${index}.png`));
+
+    setGallery(createGallery({ items }));
+    await renderLayout(GalleryWideLayout);
+
+    const list = host?.querySelector<HTMLElement>('[role="list"]');
+    const viewport = list?.closest<HTMLElement>('[data-part="viewport"]');
+    const selectionActions = host?.querySelector<HTMLElement>('[role="toolbar"]');
+
+    if (!viewport || !selectionActions) {
+      throw new Error('gallery viewport or selection actions did not render');
+    }
+
+    expect(viewport.getBoundingClientRect().bottom).toBeLessThanOrEqual(selectionActions.getBoundingClientRect().top);
+  });
+
   it('keeps a long board list inside the board panel instead of spilling it over the grid', async () => {
     const boards = Array.from({ length: 40 }, (_, index) => ({
       ...board,
@@ -232,6 +250,25 @@ describe('gallery layout shells', () => {
     });
 
     expect(contextBase.actions.updateSettings).toHaveBeenLastCalledWith({ boardPanelHeightPx: measuredMaximum });
+  });
+
+  it('puts the upload control in the toolbar row for both shells, disabled for date boards', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      setGallery(gallery);
+      await renderLayout(Layout);
+
+      const upload = host?.querySelector<HTMLButtonElement>('button[aria-label^="widgets.gallery.upload"]');
+
+      expect(upload, 'upload control did not render in the toolbar').not.toBeNull();
+      expect(upload?.disabled).toBe(false);
+
+      setGallery(createGallery({ selectedBoardId: 'by_date:2026-07-30' }));
+      await renderLayout(Layout);
+
+      const uploadForDateBoard = host?.querySelector<HTMLButtonElement>('button[aria-label^="widgets.gallery.upload"]');
+
+      expect(uploadForDateBoard?.disabled).toBe(true);
+    }
   });
 
   it('hides the board column and its handle in both shells when collapsed', async () => {

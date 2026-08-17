@@ -77,7 +77,9 @@ export const WidgetBar = ({
   return (
     <WidgetStrip
       align="center"
-      aria-label={t('widgets.visibilityLabel', { region: side === 'left' ? 'Left' : 'Right' })}
+      aria-label={t('widgets.visibilityLabel', {
+        region: side === 'left' ? t('widgets.rail.create') : t('widgets.rail.inspect'),
+      })}
       as="nav"
       bg="bg.subtle"
       borderColor="border.subtle"
@@ -107,11 +109,11 @@ export const WidgetBar = ({
 
       <WidgetEnableMenu
         contextTarget={enableMenuTarget}
-        groupLabel={t('widgets.groupLabel')}
+        groupLabel={region === 'left' ? t('widgets.rail.createWidgets') : t('widgets.rail.inspectWidgets')}
         items={menuItems}
         positioning={positioning}
         trigger={trigger}
-        triggerLabel={t('widgets.visibilityLabel', { region: region === 'left' ? 'Left' : 'Right' })}
+        triggerLabel={region === 'left' ? t('widgets.rail.createWidgets') : t('widgets.rail.inspectWidgets')}
         onContextClose={handleContextClose}
         onToggle={handleMenuToggle}
       />

@@ -59,23 +59,10 @@ MINIMAX_H3_MAX_ASPECT_RATIO = 4
 MINIMAX_H3_MIN_DURATION = 5.0
 MINIMAX_H3_MAX_DURATION = 15.0
 
-# The released model targets the 5-15 s window above, but shorter grid-aligned clips render and are useful as fast
-# test passes. 90 frames (3.75 s) is the floor we accept for video requests; below that only the 5-frame
-# still-image block is meaningful.
-MINIMAX_H3_MIN_VIDEO_FRAMES = 90
-
 # The video VAE encodes 17 pixel frames per chunk and drops the 3 trailing latent frames of every chunk, so
 # `17 * n + 5` pixel frames map to `5 * n + 2` latent frames.
 MINIMAX_H3_FRAMES_PER_CHUNK = 17
 MINIMAX_H3_LATENTS_PER_CHUNK = 5
-
-# Every legal video frame count, i.e. the `17n + 5` grid points from the accepted floor up to the 15 s ceiling
-# (90 ... 345). The nodes offer exactly these as a choice list, so a request can never miss the grid.
-MINIMAX_H3_VIDEO_FRAME_CHOICES = tuple(
-    n
-    for n in range(MINIMAX_H3_MIN_VIDEO_FRAMES, int(MINIMAX_H3_MAX_DURATION * MINIMAX_H3_FPS) + 1)
-    if n % MINIMAX_H3_FRAMES_PER_CHUNK == MINIMAX_H3_LATENTS_PER_CHUNK
-)
 
 # The pixel convention of the video VAE: ImageNet-normalized RGB over a `[0, 1]` base range.
 MINIMAX_H3_PIXEL_MEAN = (0.485, 0.456, 0.406)
@@ -139,19 +126,6 @@ class MiniMaxH3PackedSequence:
     num_condition_audio_rows: int
 
 
-def _validated_aspect_ratio(aspect_width: float, aspect_height: float) -> float:
-    """Validate an aspect pair against H3's 1:4 – 4:1 envelope and return width/height."""
-    if aspect_width <= 0 or aspect_height <= 0:
-        raise ValueError(f"The aspect ratio must be positive, got {aspect_width}:{aspect_height}.")
-
-    ratio = aspect_width / aspect_height
-    if not MINIMAX_H3_MIN_ASPECT_RATIO <= ratio <= MINIMAX_H3_MAX_ASPECT_RATIO:
-        raise ValueError(
-            f"MiniMax-H3 supports aspect ratios from 1:4 to 4:1, got {aspect_width}:{aspect_height} ({ratio:g})."
-        )
-    return ratio
-
-
 def resolve_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int, int]:
     r"""
     Resolve a display aspect ratio into a MiniMax-H3 canvas.
@@ -167,7 +141,14 @@ def resolve_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int,
     Returns:
         `tuple[int, int]`: the `(height, width)` of the canvas.
     """
-    ratio = _validated_aspect_ratio(aspect_width, aspect_height)
+    if aspect_width <= 0 or aspect_height <= 0:
+        raise ValueError(f"The aspect ratio must be positive, got {aspect_width}:{aspect_height}.")
+
+    ratio = aspect_width / aspect_height
+    if not MINIMAX_H3_MIN_ASPECT_RATIO <= ratio <= MINIMAX_H3_MAX_ASPECT_RATIO:
+        raise ValueError(
+            f"MiniMax-H3 supports aspect ratios from 1:4 to 4:1, got {aspect_width}:{aspect_height} ({ratio:g})."
+        )
 
     if ratio >= 1.0:
         width, height = MINIMAX_H3_SHORT_EDGE * ratio, float(MINIMAX_H3_SHORT_EDGE)
@@ -178,34 +159,6 @@ def resolve_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int,
     if area > MINIMAX_H3_MAX_PIXELS:
         scale = (MINIMAX_H3_MAX_PIXELS / area) ** 0.5
         width, height = width * scale, height * scale
-
-    multiple = MINIMAX_H3_CANVAS_MULTIPLE
-    return max(multiple, round(height / multiple) * multiple), max(multiple, round(width / multiple) * multiple)
-
-
-def resolve_lowres_canvas_size(aspect_width: float, aspect_height: float) -> tuple[int, int]:
-    r"""
-    Resolve a display aspect ratio into a reduced-size MiniMax-H3 canvas with a 768 px LONG edge.
-
-    This is not a released H3 canvas family: the model was trained for a 768 short edge
-    (see :func:`resolve_canvas_size`). Pinning the long edge instead yields a canvas with roughly half the pixels
-    for non-square ratios — useful for fast preview/test renders at some cost in fidelity. The short edge follows
-    the aspect ratio and both axes are rounded to the nearest multiple of 32; the area always sits far below the
-    `768 * 1344` cap, so no cap scaling is applied. Only the ratio of the two arguments matters.
-
-    Args:
-        aspect_width (`float`): Width of the target ratio.
-        aspect_height (`float`): Height of the target ratio.
-
-    Returns:
-        `tuple[int, int]`: the `(height, width)` of the canvas.
-    """
-    ratio = _validated_aspect_ratio(aspect_width, aspect_height)
-
-    if ratio >= 1.0:
-        width, height = float(MINIMAX_H3_SHORT_EDGE), MINIMAX_H3_SHORT_EDGE / ratio
-    else:
-        width, height = MINIMAX_H3_SHORT_EDGE * ratio, float(MINIMAX_H3_SHORT_EDGE)
 
     multiple = MINIMAX_H3_CANVAS_MULTIPLE
     return max(multiple, round(height / multiple) * multiple), max(multiple, round(width / multiple) * multiple)
@@ -240,7 +193,9 @@ def video_latent_num_frames(num_frames: int) -> int:
     """
     if num_frames % MINIMAX_H3_FRAMES_PER_CHUNK != MINIMAX_H3_LATENTS_PER_CHUNK:
         raise ValueError(f"`num_frames` must be of the form 17 * n + 5, got {num_frames}.")
-    return (num_frames - MINIMAX_H3_LATENTS_PER_CHUNK) // MINIMAX_H3_FRAMES_PER_CHUNK * MINIMAX_H3_LATENTS_PER_CHUNK + 2
+    return (
+        num_frames - MINIMAX_H3_LATENTS_PER_CHUNK
+    ) // MINIMAX_H3_FRAMES_PER_CHUNK * MINIMAX_H3_LATENTS_PER_CHUNK + 2
 
 
 def audio_latent_num_frames(num_frames: int) -> int:

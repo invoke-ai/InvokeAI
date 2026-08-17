@@ -13,6 +13,7 @@ import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@features/mo
 import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } from '@features/models/ui/uiStore';
 import { Button, Row } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
@@ -29,8 +30,8 @@ const MODEL_ROW_HEIGHT_PX = 56;
  * header is rendered as a pinned overlay above the scroll viewport — CSS
  * sticky positioning is unreliable inside ScrollArea's content wrapper — and
  * the virtual content lives in ScrollArea.Content so the scrollbar thumb is
- * measured correctly. Rows carry a thumbnail, a right-click action menu, and —
- * when `onToggleSelected` is provided — bulk-select checkboxes.
+ * measured correctly. Rows carry a thumbnail, a right-click action menu, and
+ * bulk-select checkboxes.
  */
 export const ModelLibraryList = ({
   activeModelKey,
@@ -42,12 +43,11 @@ export const ModelLibraryList = ({
 }: {
   activeModelKey: string | null;
   filters: ModelLibraryFilters;
-  /** Identifies this list's scroll-offset slot ('panel', 'manager', ...). */
+  /** Identifies this list's scroll-offset slot ('manager'). */
   instanceId: string;
   onActivate: (modelKey: string) => void;
-  /** Present in the manager library: enables bulk-select checkboxes. */
-  onToggleSelected?: (modelKey: string) => void;
-  selectedKeys?: ReadonlySet<string>;
+  onToggleSelected: (modelKey: string) => void;
+  selectedKeys: ReadonlySet<string>;
 }) => {
   const { t } = useTranslation();
   const { coverImageVersions, error, missingModelKeys, models, status } = useModelsSelector(
@@ -175,7 +175,7 @@ export const ModelLibraryList = ({
                     imageVersion={coverImageVersions[row.model.key]}
                     isActive={row.model.key === activeModelKey}
                     isMissing={missingModelKeys.has(row.model.key)}
-                    isSelected={selectedKeys?.has(row.model.key) ?? false}
+                    isSelected={selectedKeys.has(row.model.key)}
                     modelKey={row.model.key}
                     name={row.model.name}
                     virtualStart={virtualRow.start}
@@ -242,7 +242,7 @@ interface ModelRowProps {
   name: string;
   onActivate: (modelKey: string) => void;
   onContextMenu: (modelKey: string, x: number, y: number) => void;
-  onToggleSelected?: (modelKey: string) => void;
+  onToggleSelected: (modelKey: string) => void;
 }
 
 interface VirtualModelRowProps extends ModelRowProps {
@@ -281,23 +281,21 @@ const ModelRow = memo(function ModelRow({
         onContextMenu(modelKey, event.clientX, event.clientY);
       }}
     >
-      {onToggleSelected ? (
-        <Checkbox.Root
-          aria-label={`Select ${name}`}
-          checked={isSelected}
-          colorPalette="accent"
-          insetStart="2"
-          position="absolute"
-          size="xs"
-          top="50%"
-          transform="translateY(-50%)"
-          zIndex={1}
-          onCheckedChange={() => onToggleSelected(modelKey)}
-        >
-          <Checkbox.HiddenInput />
-          <Checkbox.Control />
-        </Checkbox.Root>
-      ) : null}
+      <Checkbox.Root
+        aria-label={`Select ${name}`}
+        checked={isSelected}
+        colorPalette="accent"
+        insetStart="2"
+        position="absolute"
+        size="xs"
+        top="50%"
+        transform="translateY(-50%)"
+        zIndex={1}
+        onCheckedChange={() => onToggleSelected(modelKey)}
+      >
+        <Checkbox.HiddenInput />
+        <Checkbox.Control />
+      </Checkbox.Root>
       <Row
         active={isActive ? 'accent' : isSelected ? 'muted' : 'none'}
         aria-current={isActive || undefined}
@@ -305,7 +303,7 @@ const ModelRow = memo(function ModelRow({
         h={`${MODEL_ROW_HEIGHT_PX - 4}px`}
         minW="0"
         pe="2"
-        ps={onToggleSelected ? '9' : '2'}
+        ps="9"
         rounded="md"
         _focusVisible={{ boxShadow: 'inset 0 0 0 2px {colors.accent.solid}', outline: 'none' }}
       >
@@ -318,9 +316,7 @@ const ModelRow = memo(function ModelRow({
             modelKey={modelKey}
           />
           <Stack flex="1" gap="0.5" minW="0">
-            <Text fontSize="xs" fontWeight="600" truncate>
-              {name}
-            </Text>
+            <MiddleTruncate fontSize="xs" fontWeight="600" text={name} />
             <HStack gap="1" minW="0" wrap="wrap">
               <ModelBaseBadge base={base} />
               <ModelFormatBadge format={format} />
@@ -379,4 +375,3 @@ const ModelRowThumbnail = ({
     />
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

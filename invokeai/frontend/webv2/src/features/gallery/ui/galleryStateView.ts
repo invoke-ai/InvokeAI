@@ -13,6 +13,11 @@ import {
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/core/selection';
+import {
+  gallerySemanticReferenceKey,
+  parseGallerySemanticReference,
+  type GallerySemanticReference,
+} from '@features/gallery/core/semanticImageQuery';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -28,6 +33,7 @@ const UNCATEGORIZED_BOARD: GalleryBoard = {
   imageCount: 0,
   kind: 'uncategorized',
   name: '',
+  projectId: null,
   videoCount: 0,
 };
 
@@ -79,6 +85,8 @@ export interface GalleryStateView {
   selectedBoardId: string;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
+  /** Active image-similarity query, rendered as a chip in place of the search text. */
+  semanticImageQuery: GallerySemanticReference | null;
   settings: GallerySettings;
 }
 
@@ -92,17 +100,15 @@ interface GalleryOrderImage {
   starred?: boolean;
 }
 
+// Starred-first placement is pinned in gallery/core/settings.ts, so this
+// always inserts after the leading starred block rather than branching on a
+// flag that no longer varies.
 export const getGalleryPlaceholderInsertionIndex = (
   images: GalleryOrderImage[],
-  imageOrderDir: GalleryOrderDir,
-  starredFirst: boolean
+  imageOrderDir: GalleryOrderDir
 ): number => {
   if (imageOrderDir !== 'DESC') {
     return images.length;
-  }
-
-  if (!starredFirst) {
-    return 0;
   }
 
   const firstUnstarredIndex = images.findIndex((image) => !image.starred);
@@ -225,11 +231,48 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
 
-export const getGallerySelectedBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string => {
-  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none';
+// The parser builds a fresh object per call, but selectors and memo
+// dependencies need identity stability: reuse the previous object while its
+// key is unchanged. (The gallery widget is single-instance, so one slot is
+// enough; a second consumer with a different value would still be correct,
+// merely unmemoized.)
+let lastSemanticReference: GallerySemanticReference | null = null;
 
-  if (backendBoards.length === 0 || backendBoards.some((board) => board.id === selectedBoardId)) {
+export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null => {
+  const parsed = parseGallerySemanticReference(values.semanticImageQuery);
+
+  if (gallerySemanticReferenceKey(parsed) !== gallerySemanticReferenceKey(lastSemanticReference)) {
+    lastSemanticReference = parsed;
+  }
+
+  return lastSemanticReference;
+};
+
+/**
+ * Where new results land, resolved against the boards this install actually has.
+ *
+ * A saved selection survives whenever it still resolves, since it is a deliberate choice. When it
+ * does not — a project from another install, or one whose pre-migration board was ambiguous — the
+ * project's own board beats Uncategorized, which would quietly scatter that project's output. No
+ * saved selection at all is the same case rather than a choice of Uncategorized.
+ *
+ * An empty board list means "still loading", not "no such board", so nothing resolves yet.
+ */
+export const getGallerySelectedBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string => {
+  const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
+
+  if (backendBoards.length === 0) {
+    return selectedBoardId ?? 'none';
+  }
+
+  if (selectedBoardId !== null && backendBoards.some((board) => board.id === selectedBoardId)) {
     return selectedBoardId;
+  }
+
+  const projectBoardId = getGalleryProjectBoardId(values);
+
+  if (projectBoardId !== null && backendBoards.some((board) => board.id === projectBoardId)) {
+    return projectBoardId;
   }
 
   return 'none';
@@ -252,7 +295,6 @@ export interface GallerySelectedImageQuery {
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
-  starredFirst: boolean;
 }
 
 export const getGallerySelectedImageQuery = (values: Record<string, unknown>): GallerySelectedImageQuery => {
@@ -286,7 +328,6 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
         ? query.paginationMode
         : settings.paginationMode,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
-    starredFirst: typeof query?.starredFirst === 'boolean' ? query.starredFirst : settings.starredFirst,
   };
 };
 
@@ -372,6 +413,7 @@ export const getGalleryStateView = (
         {
           ...UNCATEGORIZED_BOARD,
           imageCount: items.filter((item) => item.kind === 'image' && item.category === 'general').length,
+          projectId: null,
           videoCount: items.filter((item) => item.kind === 'video').length,
         },
       ];
@@ -383,8 +425,12 @@ export const getGalleryStateView = (
     compareImageKey !== null &&
     compareImageKey !== visibleSelectedItemKey;
   const generationSequence = getGalleryGenerationSequence(queueItems, liveTarget);
+  // A ranked similarity result has no chronological insertion point, so
+  // pending placeholders (which stand in for images-to-come) are hidden while
+  // a semantic query is active — exactly as they are for a text search.
+  const semanticImageQuery = getGallerySemanticImageQuery(values);
   const visibleActivePlaceholder =
-    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === ''
+    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === '' && semanticImageQuery === null
       ? generationSequence.liveSlot?.boardId === selectedBoardId
         ? generationSequence.liveSlot
         : null
@@ -403,14 +449,15 @@ export const getGalleryStateView = (
     galleryView,
     items,
     isLoading,
-    pendingPlaceholders: settings.showPendingItems
-      ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
-          galleryView,
-          imageOrderDir: settings.imageOrderDir,
-          searchTerm,
-          selectedBoardId,
-        })
-      : [],
+    pendingPlaceholders:
+      settings.showPendingItems && semanticImageQuery === null
+        ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
+            galleryView,
+            imageOrderDir: settings.imageOrderDir,
+            searchTerm,
+            selectedBoardId,
+          })
+        : [],
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,
@@ -419,6 +466,7 @@ export const getGalleryStateView = (
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
         ? [visibleSelectedItemKey, ...selectedItemKeys]
         : selectedItemKeys,
+    semanticImageQuery,
     settings,
   };
 };

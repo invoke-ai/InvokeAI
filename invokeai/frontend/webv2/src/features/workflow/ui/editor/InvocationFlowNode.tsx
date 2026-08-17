@@ -23,6 +23,7 @@ import {
   isModelFieldType,
 } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import {
   ChevronDownIcon,
@@ -34,11 +35,12 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
-import { getWorkflowNodeChromeProps } from './nodeChrome';
+import { getWorkflowNodeChromeProps, WORKFLOW_NODE_DENSITY } from './nodeChrome';
 
 const NODE_WIDTH = '18rem';
 const HANDLE_SIZE = 12;
@@ -165,17 +167,15 @@ const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: strin
   }
 
   return (
-    <Text
+    <MiddleTruncate
       fontWeight="700"
       minW="0"
+      text={title}
       title="Double-click to rename"
-      truncate
       // Editing always starts from the displayed title: an unset label
       // prefills with the template title rather than an empty input.
       onDoubleClick={() => setDraftLabel(title)}
-    >
-      {title}
-    </Text>
+    />
   );
 };
 
@@ -217,15 +217,19 @@ const InputFieldTooltip = ({
   </Stack>
 );
 
-const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => (
-  <Stack gap="0.5" maxW="18rem">
-    <Text fontWeight="700">{template.title}</Text>
-    <Text color="fg.subtle">Field: {template.name}</Text>
-    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
-    <Text color="fg.subtle">Output</Text>
-    {template.description ? <Text>{template.description}</Text> : null}
-  </Stack>
-);
+const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="0.5" maxW="18rem">
+      <Text fontWeight="700">{template.title}</Text>
+      <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
+      <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
+      <Text color="fg.subtle">{t('nodes.output')}</Text>
+      {template.description ? <Text>{template.description}</Text> : null}
+    </Stack>
+  );
+};
 
 const NodeInfoTooltipContent = ({
   node,
@@ -234,17 +238,18 @@ const NodeInfoTooltipContent = ({
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => {
+  const { t } = useTranslation();
   const title = node.data.label ? `${node.data.label} (${template.title})` : template.title;
   const nodePack = node.data.nodePack || template.nodePack;
 
   return (
     <Stack gap="1" maxW="20rem">
       <Text fontWeight="700">{title}</Text>
-      <Text color="fg.subtle">Type: {template.type}</Text>
-      <Text color="fg.subtle">Node pack: {nodePack}</Text>
-      <Text color="fg.subtle">Version: {node.data.version}</Text>
-      <Text color="fg.subtle">Classification: {template.classification}</Text>
-      <Text color="fg.subtle">Category: {template.category}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeType', { type: template.type })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodePackLabel', { name: nodePack })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeVersion', { version: node.data.version })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
+      <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
       {node.data.notes ? <Text>{node.data.notes}</Text> : null}
     </Stack>
@@ -289,7 +294,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
       justify="space-between"
       minH="8"
       px="2.5"
-      py="1"
+      py={WORKFLOW_NODE_DENSITY.rowPaddingY}
     >
       <HStack gap="4">
         {canUseCache ? (
@@ -352,7 +357,7 @@ const InputFieldRow = ({
 
   if (isSkeleton) {
     return (
-      <Box px="3" py="1.5">
+      <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
         <HStack gap="1.5" h="5" position="relative">
           {template.input !== 'direct' ? (
             <Tooltip content={handleTooltip} showArrow>
@@ -372,7 +377,7 @@ const InputFieldRow = ({
   }
 
   return (
-    <Box px="3" py="1.5" w="full">
+    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY} w="full">
       <Field.Root gap="0" invalid={isInvalid} minW="0" w="full">
         {/* The handle lives inside the label row so it stays centered on the
             label even when the value control below grows the row. */}
@@ -463,6 +468,7 @@ const InputFieldRow = ({
             <WorkflowFieldInput
               id={`${node.id}-${template.name}-value`}
               invalid={isInvalid}
+              nodeId={node.id}
               template={template}
               value={instance?.value}
               onChange={(value) =>
@@ -481,7 +487,7 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
   const handleTooltip = getHandleTypeTooltip(template.type);
 
   return (
-    <Box px="3" py="1">
+    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
       <Flex align="center" h="5" justify="flex-end" position="relative">
         <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
           <Handle
@@ -498,18 +504,15 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
         ) : (
           <Box textAlign="end">
             <Tooltip content={<OutputFieldTooltip template={template} />} positioning={{ placement: 'top-end' }}>
-              <Text
+              <MiddleTruncate
                 as="span"
                 color="fg.muted"
-                display="inline-block"
                 fontSize="2xs"
+                justifyContent="flex-end"
                 lineHeight="shorter"
                 maxW="full"
-                textAlign="end"
-                truncate
-              >
-                {template.title}
-              </Text>
+                text={template.title}
+              />
             </Tooltip>
           </Box>
         )}
@@ -582,8 +585,8 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
     color="fg.muted"
     fontSize="2xs"
     gap="2"
-    px="3"
-    py="2"
+    px={WORKFLOW_NODE_DENSITY.rowPaddingX}
+    py={WORKFLOW_NODE_DENSITY.bodyPaddingY}
   >
     <Text>
       {inputCount} input{inputCount === 1 ? '' : 's'}
@@ -613,11 +616,9 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
         borderTopRadius="lg"
         gap="1"
         px="3"
-        py="2"
+        py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
-        <Text fontSize="sm" fontWeight="700" minW="0" title={title} truncate>
-          {title}
-        </Text>
+        <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={title} />
       </Flex>
       {templateView ? (
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
@@ -683,7 +684,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
         gap="1"
         ps="1.5"
         pe="2"
-        py="1.5"
+        py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
         <IconButton
           aria-label={isOpen ? 'Collapse node' : 'Expand node'}
@@ -696,9 +697,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <Icon as={isOpen ? ChevronDownIcon : ChevronRightIcon} boxSize="3.5" />
         </IconButton>
         {isZoomedOut ? (
-          <Text fontSize="sm" fontWeight="700" minW="0" truncate>
-            {node.data.label || template.title}
-          </Text>
+          <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={node.data.label || template.title} />
         ) : (
           <>
             <NodeTitle node={node} title={node.data.label || template.title} />
@@ -714,7 +713,11 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
         </>
       ) : isOpen ? (
-        <Box bg="bg.muted" borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'} py="1">
+        <Box
+          bg="bg.muted"
+          borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'}
+          py={WORKFLOW_NODE_DENSITY.bodyPaddingY}
+        >
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
           ))}

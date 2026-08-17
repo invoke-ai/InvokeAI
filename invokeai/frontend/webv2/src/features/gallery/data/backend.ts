@@ -6,6 +6,7 @@ import type {
   GalleryItemsPage,
   GalleryVideoItem,
 } from '@features/gallery/core/items';
+import type { GallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import type {
   GalleryBoard,
   GalleryBoardDeletionResult,
@@ -18,6 +19,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
+import { getExternalImageFile } from '@features/gallery/core/semanticImageQuery';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import {
   AccountScopeExpiredError,
@@ -50,6 +52,11 @@ interface BackendBoardDTO {
   created_at?: string | null;
   /** Board owner's display name; populated only for admins on multi-user backends. */
   owner_username?: string | null;
+  /**
+   * The project that owns this board. The backend's board DTO excludes nulls, so
+   * an ordinary board omits the key entirely rather than sending `null`.
+   */
+  project_id?: string | null;
 }
 
 /**
@@ -211,6 +218,7 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   kind: 'board',
   name: board.board_name,
   ownerName: board.owner_username ?? null,
+  projectId: board.project_id ?? null,
   videoCount: board.video_count ?? 0,
 });
 
@@ -381,6 +389,8 @@ export const listGalleryBoards = async ({
       // Synthesized, not stored: `kind` is the durable fact and the UI resolves
       // the label from it, so no untranslatable name crosses the transport.
       name: '',
+      // A virtual board is nobody's project board.
+      projectId: null,
       videoCount: uncategorizedVideoCount,
     },
     ...boards.filter((board) => includeArchived || !board.archived).map(mapBoard),
@@ -415,6 +425,8 @@ export const listGalleryDateBoards = async (signal?: AbortSignal): Promise<Galle
     imageCount: board.image_count,
     kind: 'date',
     name: board.board_name,
+    // A virtual board is nobody's project board.
+    projectId: null,
     videoCount: board.video_count ?? 0,
   }));
 };
@@ -768,6 +780,90 @@ export const listGalleryItems = async ({
   };
 };
 
+/** The backend caps search results; ranked pagination slices this window. */
+export const SEMANTIC_SEARCH_MAX_RESULTS = 500;
+
+export interface GallerySemanticResult {
+  imageName: string;
+  /** Cosine similarity to the query; higher is more similar. */
+  score: number;
+}
+
+type SemanticSearchBody = { results: { image_name: string; score: number }[] };
+
+const toSemanticResults = (body: SemanticSearchBody): GallerySemanticResult[] =>
+  body.results.map((result) => ({ imageName: result.image_name, score: result.score }));
+
+/**
+ * Ranks the caller's accessible images by similarity to the query. Text and
+ * gallery-image queries hit the GET endpoint; URLs and dropped files POST to
+ * the by-image endpoint (the file as multipart from the external-image
+ * registry).
+ */
+export const searchGallerySemantic = async (
+  query: GallerySemanticQuery,
+  { limit = SEMANTIC_SEARCH_MAX_RESULTS, signal }: { limit?: number; signal?: AbortSignal } = {}
+): Promise<GallerySemanticResult[]> => {
+  if (query.kind === 'url') {
+    const params = toSearchParams({ image_url: query.url, limit });
+
+    return toSemanticResults(
+      await apiFetchJson<SemanticSearchBody>(`/api/v1/image_map/search_by_image?${params}`, {
+        method: 'POST',
+        signal,
+      })
+    );
+  }
+
+  if (query.kind === 'file') {
+    const entry = getExternalImageFile(query.fileId);
+
+    if (!entry) {
+      throw new Error('The dropped image is no longer available; drop it again to search.');
+    }
+
+    const form = new FormData();
+
+    form.append('image', entry.blob, entry.label || 'image');
+
+    return toSemanticResults(
+      await apiFetchJson<SemanticSearchBody>(`/api/v1/image_map/search_by_image?${toSearchParams({ limit })}`, {
+        body: form,
+        method: 'POST',
+        signal,
+      })
+    );
+  }
+
+  const params = toSearchParams(
+    query.kind === 'text' ? { limit, q: query.query } : { image_name: query.imageName, limit }
+  );
+
+  return toSemanticResults(await apiFetchJson<SemanticSearchBody>(`/api/v1/image_map/search?${params}`, { signal }));
+};
+
+/**
+ * The ranked result set as item refs, in relevance order. Pages hydrate
+ * slices of this list (`hydrateGalleryDateBoardItemPage`), and range
+ * selection / deletion neighbors read it directly. Semantic results are
+ * image-only and carry no starred information.
+ */
+export const listSemanticGalleryItemNames = async ({
+  query,
+  signal,
+}: {
+  query: GallerySemanticQuery;
+  signal?: AbortSignal;
+}): Promise<GalleryItemNames> => {
+  const results = await searchGallerySemantic(query, { signal });
+
+  return {
+    items: results.map((result) => ({ kind: 'image', name: result.imageName })),
+    starredCount: 0,
+    total: results.length,
+  };
+};
+
 export const listPaletteImages = async ({
   boardId,
   createdFrom,
@@ -1022,7 +1118,7 @@ const emptyGalleryItemOrganizationTransportResult = (): GalleryItemOrganizationT
   succeededNames: [],
 });
 
-const isInvalidGalleryBoardDestination = (boardId: string): boolean =>
+export const isInvalidGalleryBoardDestination = (boardId: string): boolean =>
   boardId === 'generated' || boardId === 'assets' || isDateBoardId(boardId);
 
 export const addGalleryImageItemsToBoard = async (

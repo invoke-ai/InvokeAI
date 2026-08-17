@@ -12,7 +12,7 @@ from invokeai.app.invocations.minimax_h3_denoise import (
     MINIMAX_H3_NUM_FRAMES_LABELS,
     MiniMaxH3DenoiseInvocation,
 )
-from invokeai.backend.minimax_h3.packing import MINIMAX_H3_VIDEO_FRAME_CHOICES
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES
 from invokeai.backend.minimax_h3.sampling import MINIMAX_H3_STILL_NUM_FRAMES, validate_num_frames
 
 

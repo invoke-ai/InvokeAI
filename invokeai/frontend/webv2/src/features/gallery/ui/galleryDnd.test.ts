@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   forwardGalleryBoardDrop,
+  GALLERY_SEMANTIC_SEARCH_DROP_ID,
   getGalleryBoardDropData,
   getGalleryItemDragData,
   getGalleryItemDragId,
@@ -11,6 +12,7 @@ import {
   isGalleryImageDragData,
   isGalleryItemDragData,
   resolveGalleryBoardDrop,
+  resolveGallerySemanticSearchDrop,
 } from './galleryDnd';
 
 const createItem = (kind: GalleryItem['kind'], name: string, boardId: string): GalleryItem => {
@@ -192,5 +194,33 @@ describe('forwardGalleryBoardDrop', () => {
       })
     ).toBe(false);
     expect(moveItemsToBoard).not.toHaveBeenCalled();
+  });
+});
+
+describe('resolveGallerySemanticSearchDrop', () => {
+  it('resolves the first image in a drag released over the search field', () => {
+    expect(
+      resolveGallerySemanticSearchDrop(
+        getGalleryItemDragData([
+          { kind: 'video', name: 'clip' },
+          { kind: 'image', name: 'ref.png' },
+        ]),
+        GALLERY_SEMANTIC_SEARCH_DROP_ID
+      )
+    ).toEqual({ imageName: 'ref.png' });
+  });
+
+  it('resolves nothing for video-only drags, other drop targets, or foreign drag data', () => {
+    const imageDrag = getGalleryItemDragData([{ kind: 'image', name: 'ref.png' }]);
+
+    expect(
+      resolveGallerySemanticSearchDrop(
+        getGalleryItemDragData([{ kind: 'video', name: 'clip' }]),
+        GALLERY_SEMANTIC_SEARCH_DROP_ID
+      )
+    ).toBe(null);
+    expect(resolveGallerySemanticSearchDrop(imageDrag, 'gallery-board:board-a')).toBe(null);
+    expect(resolveGallerySemanticSearchDrop(imageDrag, undefined)).toBe(null);
+    expect(resolveGallerySemanticSearchDrop({ kind: 'other' }, GALLERY_SEMANTIC_SEARCH_DROP_ID)).toBe(null);
   });
 });

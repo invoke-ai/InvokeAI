@@ -45,10 +45,51 @@ describe('models store loading', () => {
     expect(api.listModels).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps the by-key index in lockstep with every models write', async () => {
+    api.listModels.mockResolvedValueOnce([
+      { base: 'sdxl', key: 'a', name: 'A', type: 'main' },
+      { base: 'sdxl', key: 'b', name: 'B', type: 'main' },
+    ]);
+    const store = await import('./modelsStore');
+
+    await store.refreshModels();
+    expect(store.getModelsSnapshot().modelsByKey.get('b')?.name).toBe('B');
+
+    store.patchModelInStore('a', { name: 'A2' });
+    expect(store.getModelsSnapshot().modelsByKey.get('a')?.name).toBe('A2');
+
+    store.removeModelsFromStore(['b']);
+    expect(store.getModelsSnapshot().modelsByKey.has('b')).toBe(false);
+    expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a']);
+  });
+
+  it('unwraps FastAPI detail bodies into the snapshot error', async () => {
+    const { ApiError } = await import('@platform/transport/http');
+    api.listModels.mockRejectedValueOnce(new ApiError('{"detail":"Model records unavailable"}', 500));
+    const { getModelsSnapshot, refreshModels } = await import('./modelsStore');
+
+    await refreshModels();
+
+    expect(getModelsSnapshot()).toMatchObject({ error: 'Model records unavailable', status: 'error' });
+  });
+
   it('keeps the new account request authoritative when the old request resolves last', async () => {
     const account = await import('@platform/state/accountLifecycle');
     account.accountLifecycle.activate('user-a');
     const modelsStore = await import('./modelsStore');
+    const modelB: ModelConfig = {
+      base: 'sdxl',
+      description: null,
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash-b',
+      key: 'model-b',
+      name: 'Model B',
+      path: 'model-b.safetensors',
+      source: 'model-b.safetensors',
+      source_type: 'path',
+      type: 'main',
+    } as ModelConfig;
     let resolveA: ((value: ModelConfig[]) => void) | undefined;
     let resolveB: ((value: ModelConfig[]) => void) | undefined;
     api.listModels
@@ -61,7 +102,9 @@ describe('models store loading', () => {
         new Promise((resolve) => {
           resolveB = resolve;
         })
-      );
+      )
+      // The join during user B's flight queues a trailing rerun.
+      .mockResolvedValueOnce([modelB]);
     const userARefresh = modelsStore.refreshModels();
 
     account.accountLifecycle.invalidate();
@@ -72,23 +115,16 @@ describe('models store loading', () => {
     await userARefresh;
     expect(modelsStore.refreshModels()).toBe(userBRefresh);
 
-    resolveB?.([
-      {
-        base: 'sdxl',
-        description: null,
-        file_size: 1,
-        format: 'checkpoint',
-        hash: 'hash-b',
-        key: 'model-b',
-        name: 'Model B',
-        path: 'model-b.safetensors',
-        source: 'model-b.safetensors',
-        source_type: 'path',
-        type: 'main',
-      },
-    ]);
+    resolveB?.([modelB]);
     await userBRefresh;
 
+    expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
+
+    // The mid-flight join re-fetches once more after the shared flight settles.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(api.listModels).toHaveBeenCalledTimes(3);
     expect(modelsStore.getModelsSnapshot().models.map((model) => model.key)).toEqual(['model-b']);
   });
 });

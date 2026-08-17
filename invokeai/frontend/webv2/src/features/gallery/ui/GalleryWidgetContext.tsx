@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryView } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
@@ -19,15 +20,18 @@ export interface GalleryActions {
   createBoard: (boardName: string) => Promise<void>;
   deleteBoard: (boardId: string, includeImages: boolean) => Promise<void>;
   downloadBoard: (boardId: string) => Promise<void>;
+  /** Export the project that owns this board as a complete `.invk` archive. */
+  exportProject: (projectId: string, projectName: string) => void;
   loadMore: () => void;
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
   selectBoard: (boardId: string) => void;
   selectItem: (item: GalleryItem) => void;
   selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem) => void;
-  selectProjectBoard: () => Promise<void>;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
+  /** Sets (or clears) the image-similarity query shown as a chip in the search field. */
+  setSemanticImageQuery: (reference: GallerySemanticReference | null) => void;
   setView: (galleryView: GalleryView) => void;
   toggleItemInSelection: (item: GalleryItem, nextPrimaryItem: GalleryItem | null) => void;
   updateSettings: (settings: Partial<GallerySettings>) => void;

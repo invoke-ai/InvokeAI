@@ -11,6 +11,8 @@ import {
 } from '@features/generation/core/baseGenerationPolicies';
 import { isGenerateModelConfig, SEED_MAX } from '@features/generation/core/settings';
 import { Combobox, IconButton, Field, Tooltip } from '@platform/ui';
+import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { DicesIcon } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,8 +21,6 @@ import { GenerateConditioningRebalanceField } from './GenerateConditioningRebala
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { ModelDefaultButton } from './shared/ModelDefaultButton';
-import { SliderNumberField } from './shared/SliderNumberField';
 
 const STEPS_SLIDER_MAX = 100;
 

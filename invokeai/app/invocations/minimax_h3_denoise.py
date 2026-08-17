@@ -37,13 +37,13 @@ from invokeai.backend.minimax_h3.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_CANVAS_MULTIPLE,
     MINIMAX_H3_FPS,
-    MINIMAX_H3_VIDEO_FRAME_CHOICES,
     MiniMaxH3PackedSequence,
     audio_latent_num_frames,
     unpack_audio_tokens,
     unpatchify_video_tokens,
     video_latent_num_frames,
 )
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES
 from invokeai.backend.minimax_h3.pruned_adaln_lora import (
     MINIMAX_H3_SILU_TEMB_GRID_URL,
     MiniMaxH3SiluTembGrid,
@@ -55,6 +55,7 @@ from invokeai.backend.minimax_h3.sampling import (
     MINIMAX_H3_STILL_NUM_FRAMES,
     MINIMAX_H3_VAE_LATENT_CHANNELS,
     build_denoise_state,
+    validate_canvas,
     validate_num_frames,
 )
 from invokeai.backend.minimax_h3.taehv_decoder import TAEH3_PREVIEW_MODEL_URL, TAEH3Decoder
@@ -228,6 +229,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
         # bypasses the dropdown still fails here rather than deep in the VAE.
         num_frames = int(self.num_frames)
         validate_num_frames(num_frames)
+        validate_canvas(self.height, self.width)
 
         device = TorchDevice.choose_torch_device()
 

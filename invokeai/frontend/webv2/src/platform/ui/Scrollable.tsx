@@ -14,6 +14,7 @@ export const Scrollable = ({
   children,
   contentProps,
   label,
+  orientation = 'vertical',
   viewportRef,
   ...rootProps
 }: ScrollAreaRootProps & {
@@ -22,16 +23,18 @@ export const Scrollable = ({
   contentProps?: ScrollAreaContentProps;
   /** Accessible name for the scroll viewport. */
   label?: string;
+  /** Scroll axis; the scrollbar and content sizing follow it. Defaults to vertical. */
+  orientation?: 'horizontal' | 'vertical';
   /** The scrolling element itself — what a virtualizer needs to observe. */
   viewportRef?: Ref<HTMLDivElement>;
 }) => (
   <ScrollArea.Root size="xs" variant="hover" {...rootProps}>
     <ScrollArea.Viewport aria-label={label} h="full" ref={viewportRef} role={label ? 'region' : undefined} w="full">
-      <ScrollArea.Content w="full" {...contentProps}>
+      <ScrollArea.Content w={orientation === 'horizontal' ? 'max-content' : 'full'} {...contentProps}>
         {children}
       </ScrollArea.Content>
     </ScrollArea.Viewport>
-    <ScrollArea.Scrollbar>
+    <ScrollArea.Scrollbar orientation={orientation}>
       <ScrollArea.Thumb />
     </ScrollArea.Scrollbar>
   </ScrollArea.Root>

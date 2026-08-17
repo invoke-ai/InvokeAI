@@ -32,6 +32,7 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     clipGEmbedModel: settings.clipGEmbedModel,
     clipLEmbedModel: settings.clipLEmbedModel,
     componentSourceModel: settings.componentSourceModel,
+    mistralEncoderModel: settings.mistralEncoderModel,
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,

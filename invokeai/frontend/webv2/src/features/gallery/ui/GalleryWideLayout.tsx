@@ -9,6 +9,7 @@ import { GalleryItemSearch } from './GalleryItemSearch';
 import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GallerySplitHandle } from './GallerySplitHandle';
+import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -69,6 +70,11 @@ export const GalleryWideLayout = () => {
             <GalleryItemSearch />
           </Box>
           <GalleryItemSortMenu />
+          <GalleryUploadButton
+            boards={gallery.boards}
+            selectedBoardId={gallery.selectedBoardId}
+            onUploadFiles={actions.uploadFiles}
+          />
         </HStack>
         <Box flex="1" minH="0" minW="0" pb="2" pe="3" ps="3">
           <GalleryImageGrid />

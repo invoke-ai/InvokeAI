@@ -5,7 +5,6 @@ import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { Link } from '@tanstack/react-router';
-import { useOpenProjectsSelector } from '@workbench/projects/openProjects';
 import { ArrowRightIcon, CopyIcon, FileDownIcon, PencilIcon, PinIcon, PinOffIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,14 +48,6 @@ export const ProjectActionsMenu = ({
   const { t } = useTranslation();
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  /**
-   * Deleting a project another tab still has open with unsaved edits does not
-   * stick: that tab's next autosave sees a 404 and deliberately recreates the
-   * project rather than discard the work. That policy is right, but silently
-   * losing a delete is not — so say so before confirming.
-   */
-  const isProjectOpen = useOpenProjectsSelector((snapshot) => snapshot.ids?.includes(projectId) ?? false);
-
   const projectSearch = useMemo(() => ({ project: projectId }), [projectId]);
   const positioning = useMemo(
     () =>
@@ -98,16 +89,18 @@ export const ProjectActionsMenu = ({
       <RenameDialog
         initialName={projectName}
         isOpen={isRenameOpen}
+        label={t('projects.renameProjectNameLabel')}
+        submitLabel={t('common.rename')}
+        title={t('projects.renameProject')}
         onClose={closeRenameDialog}
         onSubmit={actions.rename}
       />
 
       <ConfirmDialog
-        body={
-          isProjectOpen
-            ? `${t('projects.deleteProjectCardBody', { name: projectName })} ${t('projects.deleteProjectOpenWarning')}`
-            : t('projects.deleteProjectCardBody', { name: projectName })
-        }
+        // No "it is open, so it may come back" caveat any more: an open project is deleted through
+        // the editor's own sync handle, so the deletion is final either way. What is worth saying
+        // instead is what else goes — the project's board — and what does not.
+        body={`${t('projects.deleteProjectCardBody', { name: projectName })} ${t('projects.deleteProjectBoardNote')}`}
         confirmLabel={t('projects.deleteProject')}
         isOpen={isDeleteOpen}
         title={t('projects.deleteProjectQuestion')}

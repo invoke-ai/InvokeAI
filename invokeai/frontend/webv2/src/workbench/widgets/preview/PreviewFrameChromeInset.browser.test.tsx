@@ -72,7 +72,6 @@ const render = async (hasFloatingChrome: boolean) => {
                 frameHeight={128}
                 frameWidth={128}
                 isLive={false}
-                liveBadgeLabel="Generating"
                 padding={STAGE_PADDING}
                 shouldAntialiasLiveImage
                 source={MEDIA_SOURCE}

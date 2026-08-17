@@ -8,7 +8,7 @@ import {
   downloadGalleryArchive,
   updateGalleryBoard,
 } from '@features/gallery/data/backend';
-import { invalidateGallery } from '@features/gallery/data/queryCache';
+import { invalidateGallery, patchGalleryBoardCaches } from '@features/gallery/data/queryCache';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import {
   assertAccountScopeCurrent,
@@ -30,18 +30,14 @@ export const useGalleryActions = ({
   boards,
   getCurrentGalleryLocation,
   loadMore,
-  projectBoardId,
-  projectName,
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
   getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
-  projectBoardId: string | null;
-  projectName: string;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { gallery, notifications } = useGalleryUi();
+  const { exportProject, gallery, notifications, widgets } = useGalleryUi();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -63,6 +59,14 @@ export const useGalleryActions = ({
     return {
       archiveBoard: async (boardId, archived) => {
         const owner = captureAccountScope();
+        // Optimistic: the board moves between sections immediately, and
+        // archiving the board being viewed steps off it right away.
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
+        const movedSelectionAway = archived && boardId === selectedBoardId;
+
+        if (movedSelectionAway) {
+          gallery.selectBoard('none');
+        }
 
         try {
           await updateGalleryBoard(boardId, { archived }, owner.signal);
@@ -73,15 +77,16 @@ export const useGalleryActions = ({
               name: getBoardName(boardId),
             })
           );
-
-          if (archived && boardId === selectedBoardId) {
-            gallery.selectBoard('none');
-          }
-
           refresh();
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
+          }
+
+          rollback();
+
+          if (movedSelectionAway && getCurrentGalleryLocation().selectedBoardId === 'none') {
+            gallery.selectBoard(boardId);
           }
 
           recordError(error);
@@ -171,10 +176,14 @@ export const useGalleryActions = ({
           recordError(error);
         }
       },
+      exportProject,
       loadMore,
       refresh,
       renameBoard: async (boardId, boardName) => {
         const owner = captureAccountScope();
+        // Optimistic: the new name paints everywhere at once; the refresh
+        // re-sorts name-ordered lists once the backend confirms.
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { name: boardName });
 
         try {
           await updateGalleryBoard(boardId, { name: boardName }, owner.signal);
@@ -187,42 +196,25 @@ export const useGalleryActions = ({
             return;
           }
 
+          rollback();
           recordError(error);
         }
       },
       selectBoard: gallery.selectBoard,
       selectItem: gallery.selectItem,
       selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
-      selectProjectBoard: async () => {
-        const owner = captureAccountScope();
-
-        if (projectBoardId && boards.some((board) => board.id === projectBoardId)) {
-          gallery.selectBoard(projectBoardId);
-          return;
-        }
-
-        if (boards.length === 0) {
-          return;
-        }
-
-        try {
-          const board = await createGalleryBoard(projectName, owner.signal);
-
-          assertAccountScopeCurrent(owner);
-          gallery.setProjectBoard(board.id);
-          gallery.selectBoard(board.id);
-          recordSuccess(t('widgets.gallery.projectBoardCreated', { name: board.name }));
-          refresh();
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          recordError(error);
-        }
-      },
       setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
+      // The similarity reference is widget state rather than a workbench
+      // command: it patches the gallery widget's persisted values, the same
+      // surface the parsed query is read back from. Changing the query resets
+      // pagination (mirroring setGallerySearchTerm) and clears the text term
+      // the chip visually replaces — left behind, a stale term would keep
+      // filtering invisibly and poison the preview widget's navigation query.
+      // Filmstrip/preview navigation under semantic ranking still follows
+      // board chronology, not similarity rank — an inherited limitation.
+      setSemanticImageQuery: (reference) =>
+        widgets.patchGalleryValues({ galleryPage: 0, searchTerm: '', semanticImageQuery: reference }),
       setView: gallery.setView,
       toggleItemInSelection: gallery.toggleItemSelection,
       updateSettings: gallery.updateSettings,
@@ -230,14 +222,15 @@ export const useGalleryActions = ({
     };
   }, [
     boards,
+    exportProject,
     gallery,
+    getCurrentGalleryLocation,
     loadMore,
     notifications,
-    projectBoardId,
-    projectName,
     queryClient,
     selectedBoardId,
     t,
     uploadFiles,
+    widgets,
   ]);
 };

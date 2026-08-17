@@ -3,10 +3,11 @@ import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch, KeyboardEvent, MouseEvent } from 'react';
 
-import { Badge, Box, chakra, HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, chakra, HStack, Input, Stack } from '@chakra-ui/react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton, Row, ToggleDot } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
 import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -294,9 +295,12 @@ export const LayerListItem = ({
                 onPointerDown={stopPropagation}
               />
             ) : (
-              <Text aria-disabled={!interaction.canRename} fontSize="2xs" fontWeight="700" truncate>
-                {layer.name}
-              </Text>
+              <MiddleTruncate
+                aria-disabled={!interaction.canRename}
+                fontSize="2xs"
+                fontWeight="700"
+                text={layer.name}
+              />
             )}
             <HStack alignSelf="flex-start" gap="1">
               <Badge colorPalette="gray" size="xs" variant="subtle">

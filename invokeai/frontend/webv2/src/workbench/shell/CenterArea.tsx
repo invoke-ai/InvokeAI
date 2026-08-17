@@ -5,11 +5,7 @@ import type {
 } from '@workbench/widgetRegionViewModel';
 
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { useModelLoads } from '@features/models';
-import { getProjectQueueIndicatorState, type QueueProgressBarState } from '@features/queue/contracts';
-import { useQueueItemProgress } from '@features/queue/react';
 import { IconButton, MenuContent } from '@platform/ui';
-import { QueueTabBackgroundProgress } from '@workbench/components/QueueProgressIndicator';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
@@ -28,7 +24,7 @@ import {
   isRequiredCenterView,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
 import { Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,10 +40,6 @@ export const CenterArea = () => {
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
-  const invocation = useActiveProjectSelector((project) => project.invocation);
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
-  const modelLoads = useModelLoads();
   const { widgets } = useWorkbenchCommands();
   const getWidgetLabel = useCallback(
     (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
@@ -131,23 +123,6 @@ export const CenterArea = () => {
     [centerWidgetMenuItems]
   );
 
-  const baseIndicatorState = getProjectQueueIndicatorState({
-    isConnected: backendConnectionStatus === 'connected',
-    loadingModelsCount: modelLoads.length,
-    progress: null,
-    queueItems,
-  });
-
-  const progress = useQueueItemProgress(baseIndicatorState.runningQueueItemId ?? '');
-
-  const indicatorState = getProjectQueueIndicatorState({
-    isConnected: backendConnectionStatus === 'connected',
-    loadingModelsCount: modelLoads.length,
-    progress,
-    queueItems,
-  });
-  const showProgress = indicatorState.hasOpenQueueWork && activeItem?.typeId === invocation.sourceId;
-
   return (
     <Flex
       as="section"
@@ -182,8 +157,6 @@ export const CenterArea = () => {
               availableItems={availableCenterItems}
               isCloseDisabled={isActiveViewRequired}
               items={centerViewItems}
-              progressState={indicatorState.progressState}
-              showProgress={showProgress}
               onClose={closeActiveCenterView}
               onOpen={openCenterWidget}
               onSelect={selectCenterView}
@@ -199,7 +172,7 @@ export const CenterArea = () => {
           </ChromeIsland>
 
           {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
-            <ChromeIsland>
+            <ChromeIsland flexShrink={0}>
               {centerToolbarItems.map((toolbarItem) => (
                 <WidgetRendererById
                   key={toolbarItem.id}
@@ -220,11 +193,12 @@ export const CenterArea = () => {
   );
 };
 
-const ChromeIsland = ({ children }: { children: ReactNode }) => (
+const ChromeIsland = ({ children, flexShrink = 1 }: { children: ReactNode; flexShrink?: 0 | 1 }) => (
   <HStack
     bg="bg.subtle"
     borderColor="border.subtle"
     borderWidth="1px"
+    flexShrink={flexShrink}
     gap="0.5"
     h="8"
     minW="0"
@@ -246,8 +220,6 @@ const CenterViewMenu = ({
   onClose,
   onOpen,
   onSelect,
-  progressState,
-  showProgress,
 }: {
   activeItem?: CenterWidgetItem;
   availableItems: WidgetEnableMenuItem[];
@@ -256,8 +228,6 @@ const CenterViewMenu = ({
   onClose: () => void;
   onOpen: (item: WidgetEnableMenuItem) => void;
   onSelect: (instanceId: string) => void;
-  progressState: QueueProgressBarState;
-  showProgress: boolean;
 }) => {
   const { t } = useTranslation();
   const label = activeItem?.label ?? t('widgets.centerViewEmpty');
@@ -286,7 +256,6 @@ const CenterViewMenu = ({
           size="2xs"
           variant="ghost"
         >
-          {showProgress ? <QueueTabBackgroundProgress state={progressState} zIndex="-1" /> : null}
           <HStack gap="2" minW="0" position="relative" zIndex="1">
             {activeItem ? <WidgetIcon icon={activeItem.widget.manifest.icon} boxSize="3.5" /> : null}
             <Text fontSize="xs" fontWeight="700" truncate>

@@ -81,9 +81,7 @@ export const RenameDialog = ({
           <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
             <chakra.form onSubmit={handleSubmit}>
               <Dialog.Header>
-                <Dialog.Title fontSize="sm" fontWeight="700">
-                  {title}
-                </Dialog.Title>
+                <Dialog.Title>{title}</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 <Stack gap="2">

@@ -6,9 +6,54 @@ import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createBitmapStore } from './bitmapStore';
+import type { BitmapStoreTimers } from './bitmapStore';
+
+import { createBitmapStore, DEFAULT_FAILURE_BACKOFF_MS } from './bitmapStore';
 
 const LAYER = 'layer-1';
+
+/**
+ * A manual, fully-controlled timer stub for the ambient-failure tests: jobs
+ * queue up (recording their requested delay) and only run when explicitly
+ * fired via `fireNext`, so a test can assert the exact reschedule delay at
+ * each step without depending on fake-timer advancement matching it.
+ */
+interface ManualTimers extends BitmapStoreTimers {
+  /** Every delay ever passed to `setTimeout`, in call order. */
+  readonly scheduledDelays: number[];
+  /** Runs the oldest still-pending job's handler synchronously, if any. */
+  fireNext(): void;
+  /** Count of jobs queued but not yet fired or cleared. */
+  pendingCount(): number;
+}
+
+const createManualTimers = (): ManualTimers => {
+  let nextHandle = 1;
+  const jobs = new Map<number, () => void>();
+  const scheduledDelays: number[] = [];
+  return {
+    clearTimeout: (handle) => {
+      jobs.delete(handle);
+    },
+    fireNext: () => {
+      const next = jobs.entries().next();
+      if (next.done) {
+        return;
+      }
+      const [handle, handler] = next.value;
+      jobs.delete(handle);
+      handler();
+    },
+    pendingCount: () => jobs.size,
+    scheduledDelays,
+    setTimeout: (handler, ms) => {
+      const handle = nextHandle++;
+      jobs.set(handle, handler);
+      scheduledDelays.push(ms);
+      return handle;
+    },
+  };
+};
 
 /** A resolvable deferred, so a test can hold an upload pending on demand. */
 const createDeferred = <T>(): {
@@ -37,10 +82,14 @@ interface HarnessOptions {
   hashBlob?: (blob: Blob) => Promise<string>;
   uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
   maxUploadAttempts?: number;
-  onError?: (error: unknown, layerId: string) => void;
+  failureBackoffMs?: readonly number[];
+  maxConsecutiveFailures?: number;
+  onError?: (error: unknown, layerId: string, info: { consecutiveFailures: number; willRetry: boolean }) => void;
   /** The layer-local content-rect origin the surface sits at (default 0,0). */
   offset?: { x: number; y: number };
   sleep?: (ms: number) => Promise<void>;
+  /** Overrides the debounce/backoff timer seam (default: real fake timers via `vi`). */
+  timers?: BitmapStoreTimers;
 }
 
 /** The default source: a plain paint layer, matching every pre-existing test's assumption. */
@@ -68,15 +117,18 @@ const createHarness = (options: HarnessOptions = {}) => {
     debounceMs: 1500,
     dispatch,
     encodeSurface,
+    failureBackoffMs: options.failureBackoffMs,
     getLayerSource: () => source,
     getLayerSurface: () => ({ offset, surface }),
     // Deterministic content hash: the encoded blob's own text.
     hashBlob: options.hashBlob ?? ((blob) => blob.text()),
+    maxConsecutiveFailures: options.maxConsecutiveFailures,
     maxUploadAttempts: options.maxUploadAttempts ?? 3,
     onError: options.onError,
     retryDelaysMs: [1],
     // Immediate backoff so retries don't depend on timer advancement.
     sleep: options.sleep ?? (() => Promise.resolve()),
+    timers: options.timers,
     uploadImage,
   });
 
@@ -705,6 +757,10 @@ describe('createBitmapStore', () => {
       debounceMs: 1500,
       dispatch,
       encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+      // A fixed 1500ms ambient retry delay, unrelated to this test's subject
+      // (the barrier's own anti-spin): the growing-backoff schedule is covered
+      // by the dedicated 'ambient failure handling' tests below.
+      failureBackoffMs: [1500],
       getLayerSource: () => PAINT_SOURCE,
       getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
       hashBlob: (blob) => blob.text(),
@@ -726,7 +782,8 @@ describe('createBitmapStore', () => {
     expect(dispatch).not.toHaveBeenCalled();
     expect(onError).toHaveBeenCalledTimes(1);
 
-    // The layer is still dirty (deferred, not dropped): a later debounce retries it.
+    // The layer is still dirty (deferred, not dropped): a later ambient retry
+    // (at the fixed backoff configured above) fires it again.
     await vi.advanceTimersByTimeAsync(1500);
     expect(uploadImage.mock.calls.length).toBeGreaterThan(2);
 
@@ -1129,6 +1186,298 @@ describe('createBitmapStore', () => {
         source: { type: 'paint' },
         type: 'updateCanvasLayerSource',
       });
+      h.store.dispose();
+    });
+  });
+
+  describe('ambient failure handling', () => {
+    it('reschedules a failed layer with growing backoff instead of the base debounce', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const h = createHarness({ maxUploadAttempts: 1, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      // The very first schedule is a fresh stroke: the base debounce, not backoff.
+      expect(timers.scheduledDelays).toEqual([1500]);
+
+      timers.fireNext(); // 1st ambient flush → fails.
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      expect(timers.scheduledDelays[1]).toBe(DEFAULT_FAILURE_BACKOFF_MS[0]);
+
+      timers.fireNext(); // 2nd ambient flush → fails again.
+      await drainUntil(() => timers.scheduledDelays.length === 3);
+      expect(timers.scheduledDelays[2]).toBe(DEFAULT_FAILURE_BACKOFF_MS[1]);
+
+      timers.fireNext(); // 3rd ambient flush → fails again.
+      await drainUntil(() => timers.scheduledDelays.length === 4);
+      expect(timers.scheduledDelays[3]).toBe(DEFAULT_FAILURE_BACKOFF_MS[2]);
+
+      h.store.dispose();
+    });
+
+    it('opens the circuit after maxConsecutiveFailures and stops rescheduling', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 3, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // failure 1 of 3 → still retrying.
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      timers.fireNext(); // failure 2 of 3 → still retrying.
+      await drainUntil(() => timers.scheduledDelays.length === 3);
+      timers.fireNext(); // failure 3 of 3 → circuit opens.
+      await drainUntil(() => onError.mock.calls.length === 2);
+      // Let the settling flush's `finally` run to completion (it schedules
+      // nothing on this branch, so there is no state change to await directly).
+      await drainUntil(() => false, 10);
+
+      expect(timers.pendingCount()).toBe(0);
+      expect(timers.scheduledDelays).toHaveLength(3);
+
+      // The layer remains dirty, not dropped: a fresh barrier call still
+      // attempts it (the breaker only gates the AMBIENT reschedule).
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      expect(uploadImage).toHaveBeenCalledTimes(4);
+
+      h.store.dispose();
+    });
+
+    it('reports the first failure and the final failure only', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 3, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext();
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      timers.fireNext();
+      await drainUntil(() => timers.scheduledDelays.length === 3);
+      timers.fireNext();
+      await drainUntil(() => onError.mock.calls.length === 2);
+
+      expect(onError).toHaveBeenCalledTimes(2);
+      expect(onError).toHaveBeenNthCalledWith(1, expect.any(Error), LAYER, {
+        consecutiveFailures: 1,
+        willRetry: true,
+      });
+      expect(onError).toHaveBeenNthCalledWith(2, expect.any(Error), LAYER, {
+        consecutiveFailures: 3,
+        willRetry: false,
+      });
+
+      h.store.dispose();
+    });
+
+    it('does not re-report when a barrier retries an already-open circuit', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 3, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // failure 1 of 3.
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      timers.fireNext(); // failure 2 of 3.
+      await drainUntil(() => timers.scheduledDelays.length === 3);
+      timers.fireNext(); // failure 3 of 3 → circuit opens.
+      await drainUntil(() => onError.mock.calls.length === 2);
+      await drainUntil(() => false, 10);
+
+      expect(uploadImage).toHaveBeenCalledTimes(3);
+      expect(onError).toHaveBeenCalledTimes(2);
+
+      // flushPendingUploads() runs before every Generate/export and on
+      // blur/pagehide/visibilitychange; it still attempts a circuit-open layer
+      // (the breaker only gates the AMBIENT reschedule), so a persistently
+      // failing layer must not re-report on every one of those barrier retries.
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(uploadImage).toHaveBeenCalledTimes(5);
+      expect(onError).toHaveBeenCalledTimes(2);
+
+      h.store.dispose();
+    });
+
+    it('reports exactly once when maxConsecutiveFailures is 1 (opens on the very first failure)', async () => {
+      const timers = createManualTimers();
+      const uploadImage = vi.fn(() => Promise.reject(new Error('upload failed')));
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 1, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // the only ambient attempt: the circuit opens immediately.
+      await drainUntil(() => onError.mock.calls.length === 1);
+      await drainUntil(() => false, 10);
+
+      expect(timers.pendingCount()).toBe(0);
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenNthCalledWith(1, expect.any(Error), LAYER, {
+        consecutiveFailures: 1,
+        willRetry: false,
+      });
+
+      // Further barrier retries against the already-open circuit stay silent.
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      h.store.dispose();
+    });
+
+    it('reports a real failure even when silent declines already advanced the streak', async () => {
+      const surface = createTestStubRasterBackend().createSurface(10, 10);
+      let content = 'pixels-A';
+      let uploadShouldFail = false;
+      const encodeSurface = vi.fn(() => Promise.resolve(new Blob([content], { type: 'image/png' })));
+      const uploadImage = vi.fn(() => {
+        if (uploadShouldFail) {
+          return Promise.reject(new Error('network unreachable'));
+        }
+        return Promise.resolve<CanvasImageUploadResult>({ height: 10, imageName: 'img-decline', width: 10 });
+      });
+      const dispatchBitmap = vi.fn(() => false);
+      const onError = vi.fn();
+      const store = createBitmapStore({
+        debounceMs: 1500,
+        dispatch: vi.fn(() => true),
+        dispatchBitmap,
+        encodeSurface,
+        getLayerSource: () => PAINT_SOURCE,
+        getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+        hashBlob: (blob) => blob.text(),
+        maxUploadAttempts: 2,
+        onError,
+        retryDelaysMs: [1],
+        sleep: () => Promise.resolve(),
+        uploadImage,
+      });
+
+      store.markLayerDirty(LAYER);
+      // Two silent declines advance the streak without reporting anything.
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+      expect(onError).not.toHaveBeenCalled();
+
+      // A real upload failure lands mid-streak (position 3 of a 5-max streak):
+      // under the old `failures === 1 || failures === max` check this matched
+      // neither condition and would have gone unreported.
+      content = 'pixels-B';
+      uploadShouldFail = true;
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), LAYER, { consecutiveFailures: 3, willRetry: true });
+
+      store.dispose();
+    });
+
+    it('reports when silent declines alone open the circuit', async () => {
+      const surface = createTestStubRasterBackend().createSurface(10, 10);
+      const dispatchBitmap = vi.fn(() => false);
+      const onError = vi.fn();
+      const store = createBitmapStore({
+        debounceMs: 1500,
+        dispatch: vi.fn(() => true),
+        dispatchBitmap,
+        encodeSurface: () => Promise.resolve(new Blob(['pixels'], { type: 'image/png' })),
+        getLayerSource: () => PAINT_SOURCE,
+        getLayerSurface: () => ({ offset: { x: 0, y: 0 }, surface }),
+        hashBlob: (blob) => blob.text(),
+        maxConsecutiveFailures: 3,
+        onError,
+        uploadImage: () => Promise.resolve({ height: 10, imageName: 'img-decline', width: 10 }),
+      });
+
+      store.markLayerDirty(LAYER);
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed'); // decline 1 of 3.
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed'); // decline 2 of 3.
+      expect(onError).not.toHaveBeenCalled();
+
+      // decline 3 of 3 opens the circuit — silently opened, but must still be heard.
+      await expect(store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+      expect(onError).toHaveBeenCalledOnce();
+      expect(onError).toHaveBeenCalledWith(expect.any(Error), LAYER, { consecutiveFailures: 3, willRetry: false });
+
+      store.dispose();
+    });
+
+    it('a new stroke closes the circuit and resets the failure count', async () => {
+      const timers = createManualTimers();
+      let shouldFail = true;
+      const uploadImage = vi.fn(() =>
+        shouldFail
+          ? Promise.reject(new Error('upload failed'))
+          : Promise.resolve<CanvasImageUploadResult>({ height: 10, imageName: 'img-recovered', width: 10 })
+      );
+      const onError = vi.fn();
+      const h = createHarness({ maxConsecutiveFailures: 2, maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // failure 1 of 2.
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      timers.fireNext(); // failure 2 of 2 → circuit opens.
+      await drainUntil(() => onError.mock.calls.length === 2);
+      await drainUntil(() => false, 10);
+
+      expect(timers.pendingCount()).toBe(0);
+
+      // A fresh stroke closes the circuit: it schedules again at the base
+      // debounce (not a backoff delay), and the now-succeeding upload clears
+      // everything.
+      shouldFail = false;
+      h.store.markLayerDirty(LAYER);
+      expect(timers.scheduledDelays.at(-1)).toBe(1500);
+
+      timers.fireNext();
+      await drainUntil(() => h.dispatch.mock.calls.length === 1);
+
+      expect(h.dispatch).toHaveBeenCalledTimes(1);
+      // The recovered flush does not report anything new.
+      expect(onError).toHaveBeenCalledTimes(2);
+
+      h.store.dispose();
+    });
+
+    it('a successful flush resets the failure count', async () => {
+      const timers = createManualTimers();
+      let shouldFail = true;
+      const uploadImage = vi.fn(() =>
+        shouldFail
+          ? Promise.reject(new Error('upload failed'))
+          : Promise.resolve<CanvasImageUploadResult>({ height: 10, imageName: 'img-ok', width: 10 })
+      );
+      const onError = vi.fn();
+      const h = createHarness({ maxUploadAttempts: 1, onError, timers, uploadImage });
+
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext(); // fails once → reported, backoff[0] scheduled.
+      await drainUntil(() => timers.scheduledDelays.length === 2);
+      expect(timers.scheduledDelays[1]).toBe(DEFAULT_FAILURE_BACKOFF_MS[0]);
+      expect(onError).toHaveBeenCalledTimes(1);
+
+      shouldFail = false;
+      timers.fireNext(); // succeeds → clears the failure count.
+      await drainUntil(() => h.dispatch.mock.calls.length === 1);
+
+      // A later failure, on fresh pixels, is a new streak (consecutiveFailures:
+      // 1), not a continuation of the earlier one.
+      shouldFail = true;
+      h.setEncoded('pixels-B');
+      h.store.markLayerDirty(LAYER);
+      timers.fireNext();
+      await drainUntil(() => onError.mock.calls.length === 2);
+
+      expect(onError).toHaveBeenNthCalledWith(2, expect.any(Error), LAYER, {
+        consecutiveFailures: 1,
+        willRetry: true,
+      });
+      expect(timers.scheduledDelays.at(-1)).toBe(DEFAULT_FAILURE_BACKOFF_MS[0]);
+
       h.store.dispose();
     });
   });

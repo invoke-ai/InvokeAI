@@ -8,6 +8,9 @@ import {
   getMockBackendFixtureCounts,
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
+  MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  PROJECT_FILE_BOARD,
+  PROJECT_FILE_BOARD_ID,
   validateMockBackendFixture,
 } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
@@ -77,6 +80,61 @@ test('representative fixtures keep node discovery and heavy project data coheren
   assert.equal(new Set(project.data.canvas.document.layers.map((layer) => layer.id)).size, 64);
 });
 
+test('Fixture Project 002 carries the image and video references used by the project-file journey', () => {
+  const fixture = createMockBackendFixture('representative');
+  const project = fixture.projects[1];
+
+  assert.equal(project.project_id, 'fixture-project-002');
+  assert.deepEqual(
+    project.data.canvas.document.layers.map((layer) => layer.source.image.imageName),
+    ['fixture-image-0001.png', 'fixture-image-0002.png', 'fixture-image-0003.png', 'fixture-image-0004.png']
+  );
+  assert.equal(
+    project.data.canvas.document.layers.every((layer) => layer.type === 'raster'),
+    true
+  );
+  assert.deepEqual(project.data.projectGraph.nodes[0]?.data.inputs.video?.value, {
+    video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
+  });
+});
+
+/**
+ * The board path can only be proved end to end if the fixture contains the cases: an item that is
+ * both board membership and a canvas reference, one that is only membership, each visible category,
+ * the two kinds of media that must be excluded, and references that live outside the board.
+ */
+test('Fixture Project 002 owns a board carrying every case the project-file journey exercises', () => {
+  const fixture = createMockBackendFixture('representative');
+  const project = fixture.projects[1];
+  const byName = new Map(fixture.images.map((image) => [image.image_name, image]));
+  const onBoard = (name) => byName.get(name)?.board_id;
+
+  assert.equal(project.board_id, PROJECT_FILE_BOARD_ID);
+  assert.equal(onBoard(PROJECT_FILE_BOARD.referencedImage), PROJECT_FILE_BOARD_ID);
+  assert.equal(onBoard(PROJECT_FILE_BOARD.unreferencedImage), PROJECT_FILE_BOARD_ID);
+  assert.equal(byName.get(PROJECT_FILE_BOARD.userAsset)?.image_category, 'user');
+  assert.equal(byName.get(PROJECT_FILE_BOARD.maskAsset)?.image_category, 'mask');
+  assert.equal(byName.get(PROJECT_FILE_BOARD.starredImage)?.starred, true);
+  assert.equal(byName.get(PROJECT_FILE_BOARD.canvasOwnedImage)?.image_category, 'other');
+  assert.equal(byName.get(PROJECT_FILE_BOARD.intermediateImage)?.is_intermediate, true);
+  assert.equal(
+    fixture.videos.find((video) => video.video_name === PROJECT_FILE_BOARD.video)?.board_id,
+    PROJECT_FILE_BOARD_ID
+  );
+
+  // The canvas draws with these, and no project owns them: on import they deduplicate against the
+  // destination, and on duplication they are not copied at all.
+  const layerNames = project.data.canvas.document.layers.map((layer) => layer.source.image.imageName);
+
+  for (const name of PROJECT_FILE_BOARD.externalImages) {
+    assert.ok(layerNames.includes(name), `${name} must stay a canvas reference`);
+    assert.notEqual(onBoard(name), PROJECT_FILE_BOARD_ID);
+  }
+
+  assert.ok(layerNames.includes(PROJECT_FILE_BOARD.referencedImage));
+  assert.ok(!layerNames.includes(PROJECT_FILE_BOARD.unreferencedImage));
+});
+
 test('the HTTP reset contract selects profiles explicitly and restores the startup profile by default', async () => {
   const backend = await startMockBackend(0, { profile: 'empty' });
 
@@ -101,17 +159,23 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       profile: 'representative',
     });
 
-    const [images, itemIds, models, nodeCatalog, openApi, projects] = await Promise.all([
-      readJson('/api/v1/images/?limit=17&offset=0'),
-      readJson('/api/v1/queue/default/item_ids'),
-      readJson('/api/v2/models/'),
-      readJson('/api/v2/custom_nodes/'),
-      readJson('/openapi.json'),
-      readJson('/api/v1/projects/'),
-    ]);
+    const [generationDevices, images, itemIds, models, nodeCatalog, openApi, projects, runtimeConfig] =
+      await Promise.all([
+        readJson('/api/v1/app/generation_device_options'),
+        readJson('/api/v1/images/?limit=17&offset=0'),
+        readJson('/api/v1/queue/default/item_ids'),
+        readJson('/api/v2/models/'),
+        readJson('/api/v2/custom_nodes/'),
+        readJson('/openapi.json'),
+        readJson('/api/v1/projects/'),
+        readJson('/api/v1/app/runtime_config'),
+      ]);
 
+    assert.deepEqual(generationDevices, [{ device: 'cpu', name: 'CPU' }]);
     assert.equal(images.items.length, 17);
-    assert.equal(images.total, 1_000);
+    // One of the thousand is an intermediate on Fixture Project 002's board, which every gallery
+    // listing hides — it exists so the project-file journey can prove it never travels.
+    assert.equal(images.total, 999);
     assert.equal(itemIds.item_ids.length, 500);
     assert.equal(models.models.length, 100);
     assert.equal(nodeCatalog.node_packs.flatMap((pack) => pack.node_types).length, 100);
@@ -120,6 +184,7 @@ test('the HTTP reset contract selects profiles explicitly and restores the start
       100
     );
     assert.equal(projects.length, 40);
+    assert.deepEqual(runtimeConfig, { config: { generation_devices: 'auto' }, set_fields: [] });
 
     assert.deepEqual(await readJson('/__reset', { method: 'POST' }), {
       counts: MOCK_BACKEND_PROFILE_COUNTS.empty,
@@ -321,6 +386,58 @@ test('video DTO, Details, poster, full media, HEAD, and Range routes use the che
   });
 });
 
+test('image upload preserves restore metadata and is retrievable through every image route', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const form = new FormData();
+    form.append('file', new Blob(['fixture upload'], { type: 'image/webp' }), 'uploaded fixture.webp');
+    const response = await fetch(
+      `${backend.origin}/api/v1/images/upload?image_category=other&is_intermediate=false&board_id=fixture-board-02`,
+      { body: form, method: 'POST' }
+    );
+    const expectedName = 'fixture-upload-1001-uploaded-fixture.webp.png';
+    const expectedDto = {
+      board_id: 'fixture-board-02',
+      created_at: '2026-01-15T12:00:00.000Z',
+      deleted_at: null,
+      has_workflow: false,
+      height: 1,
+      image_category: 'other',
+      image_name: expectedName,
+      image_origin: 'external',
+      image_subfolder: '',
+      image_url: `/api/v1/images/i/${expectedName}/full`,
+      is_intermediate: false,
+      node_id: null,
+      session_id: null,
+      starred: false,
+      thumbnail_url: `/api/v1/images/i/${expectedName}/thumbnail`,
+      updated_at: '2026-01-15T12:00:00.000Z',
+      width: 1,
+    };
+
+    assert.equal(response.status, 201);
+    assert.equal(response.headers.get('location'), expectedDto.image_url);
+    assert.deepEqual(await response.json(), expectedDto);
+    assert.deepEqual(
+      await getJson(backend, '/api/v1/images/images_by_names', {
+        body: JSON.stringify({ image_names: [expectedName, 'missing.png'] }),
+        headers: { 'content-type': 'application/json' },
+        method: 'POST',
+      }),
+      [expectedDto]
+    );
+    assert.deepEqual(await getJson(backend, `/api/v1/images/i/${encodeURIComponent(expectedName)}`), expectedDto);
+
+    for (const variant of ['full', 'thumbnail']) {
+      const asset = await fetch(`${backend.origin}/api/v1/images/i/${encodeURIComponent(expectedName)}/${variant}`);
+
+      assert.equal(asset.status, 200);
+      assert.equal(asset.headers.get('content-type'), 'image/png');
+      assert.ok((await asset.arrayBuffer()).byteLength > 0);
+    }
+  });
+});
+
 test('video upload, star, delete, board movement, counts, covers, and board deletion return authoritative outcomes', async () => {
   await withRepresentativeBackend(async (backend) => {
     const boards = await getJson(backend, '/api/v1/boards/?all=true');
@@ -429,4 +546,137 @@ test('the representative video accessibility journey owns the only generated-med
   assert.match(source, /workbench-video-preview-representative/);
   assert.match(source, /getByRole\('list', \{ exact: true, name: 'Gallery items' \}\)/);
   assert.match(source, /INVOKEAI_ACCESSIBILITY_JOURNEY/);
+});
+
+test('project boards are owned, protected from the generic board routes, and enumerable', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const projects = await getJson(backend, '/api/v1/projects/');
+    const project = projects.find((entry) => entry.project_id === 'fixture-project-002');
+
+    // Every project owns exactly one board, and no two share one.
+    assert.equal(new Set(projects.map((entry) => entry.board_id)).size, projects.length);
+    assert.ok(project.board_id);
+
+    const board = await getJson(backend, `/api/v1/boards/${project.board_id}`);
+    assert.equal(board.project_id, project.project_id);
+    assert.equal(board.board_name, project.name);
+
+    // An unclaimed board omits the key entirely, matching the backend's null-excluding DTO.
+    const plainBoard = await getJson(backend, '/api/v1/boards/fixture-board-02');
+    assert.equal('project_id' in plainBoard, false);
+
+    // The generic routes refuse a claimed board; only the project APIs may touch it.
+    for (const [method, path, body] of [
+      ['PATCH', `/api/v1/boards/${project.board_id}`, { board_name: 'Renamed' }],
+      ['DELETE', `/api/v1/boards/${project.board_id}?include_images=true`, undefined],
+    ]) {
+      const refused = await fetch(`${backend.origin}${path}`, {
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: { 'content-type': 'application/json' },
+        method,
+      });
+      assert.equal(refused.status, 409, `${method} ${path} should be refused`);
+    }
+    assert.equal((await getJson(backend, `/api/v1/boards/${project.board_id}`)).board_name, project.name);
+
+    // Renaming the project renames its board; the two never disagree.
+    await getJson(backend, `/api/v1/projects/${project.project_id}`, {
+      body: JSON.stringify({ data: project.data, expected_revision: project.revision, name: 'Renamed Project' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'PUT',
+    });
+    assert.equal((await getJson(backend, `/api/v1/boards/${project.board_id}`)).board_name, 'Renamed Project');
+  });
+});
+
+test('the board snapshot lists only what the gallery would show on a project board', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const [project] = await getJson(backend, '/api/v1/projects/');
+    const boardId = project.board_id;
+    const upload = async (category, isIntermediate) => {
+      const form = new FormData();
+      form.append('file', new Blob(['x'], { type: 'image/png' }), `${category}-${isIntermediate}.png`);
+      const created = await fetch(
+        `${backend.origin}/api/v1/images/upload?image_category=${category}` +
+          `&is_intermediate=${isIntermediate}&board_id=${boardId}`,
+        { body: form, method: 'POST' }
+      );
+      return (await created.json()).image_name;
+    };
+
+    const general = await upload('general', false);
+    const control = await upload('control', false);
+    await upload('other', false);
+    await upload('general', true);
+
+    const snapshot = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
+
+    // `other` is the canvas's private category and intermediates are hidden — neither travels.
+    assert.deepEqual(snapshot.items.map((item) => item.name).sort(), [control, general].sort());
+    assert.deepEqual(snapshot.items.map((item) => item.category).sort(), ['control', 'general']);
+    assert.equal(
+      snapshot.items.every((item) => item.kind === 'image' && item.starred === false),
+      true
+    );
+
+    await getJson(backend, '/api/v1/images/star', {
+      body: JSON.stringify({ image_names: [general] }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    const starred = await getJson(backend, `/api/v1/projects/${project.project_id}/board-snapshot`);
+    assert.equal(starred.items.find((item) => item.name === general).starred, true);
+
+    assert.equal((await fetch(`${backend.origin}/api/v1/projects/nope/board-snapshot`)).status, 404);
+  });
+});
+
+test('copying media mints fresh identities and deleting a project keeps its media', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const [project] = await getJson(backend, '/api/v1/projects/');
+    const source = 'fixture-image-0002.png';
+
+    const staging = await getJson(backend, '/api/v1/boards/?board_name=Staging', { method: 'POST' });
+    const copied = await getJson(backend, '/api/v1/images/copy', {
+      body: JSON.stringify({ board_id: staging.board_id, image_names: [source, 'missing.png'] }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+
+    assert.deepEqual(copied.failed, ['missing.png']);
+    assert.equal(copied.copied.length, 1);
+    const [{ image_name: copyName }] = copied.copied;
+    // A copy is a new identity, because board membership keys on the name.
+    assert.notEqual(copyName, source);
+    const copy = await getJson(backend, `/api/v1/images/i/${copyName}`);
+    assert.equal(copy.board_id, staging.board_id);
+    assert.equal(copy.image_category, (await getJson(backend, `/api/v1/images/i/${source}`)).image_category);
+    // The source keeps its own board.
+    assert.notEqual((await getJson(backend, `/api/v1/images/i/${source}`)).board_id, staging.board_id);
+
+    // The staging board can then be claimed, which is how an import commits.
+    const claimed = await getJson(backend, '/api/v1/projects/', {
+      body: JSON.stringify({ board_id: staging.board_id, data: {}, name: 'Imported', project_id: 'imported-1' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    assert.equal(claimed.board_id, staging.board_id);
+    // ...but only once.
+    const second = await fetch(`${backend.origin}/api/v1/projects/`, {
+      body: JSON.stringify({ board_id: staging.board_id, data: {}, name: 'Again', project_id: 'imported-2' }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    });
+    assert.equal(second.status, 409);
+
+    // Deleting a project removes its board but leaves the media uncategorized.
+    await fetch(`${backend.origin}/api/v1/projects/${claimed.project_id}`, { method: 'DELETE' });
+    assert.equal((await fetch(`${backend.origin}/api/v1/boards/${staging.board_id}`)).status, 404);
+    assert.equal((await getJson(backend, `/api/v1/images/i/${copyName}`)).board_id, null);
+
+    assert.equal(
+      (await getJson(backend, '/api/v1/projects/')).some((entry) => entry.project_id === project.project_id),
+      true
+    );
+  });
 });

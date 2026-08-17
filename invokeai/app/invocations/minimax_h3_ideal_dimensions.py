@@ -7,7 +7,7 @@ of 768x1344, both axes rounded to the nearest multiple of 32, aspect ratios limi
 the released pipeline's canvas resolution). This node wraps it for workflow graphs so
 image-to-video workflows can derive the canvas from the uploaded keyframe instead of
 asking the user to type matching width/height values, and adds a reduced "768 lowres"
-preset (:func:`~invokeai.backend.minimax_h3.packing.resolve_lowres_canvas_size`) that
+preset (:func:`~invokeai.backend.minimax_h3.presets.resolve_lowres_canvas_size`) that
 pins the LONG edge to 768 for cheaper preview/test renders.
 """
 
@@ -17,7 +17,8 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, Classificati
 from invokeai.app.invocations.fields import InputField
 from invokeai.app.invocations.ideal_size import IdealSizeOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.minimax_h3.packing import resolve_canvas_size, resolve_lowres_canvas_size
+from invokeai.backend.minimax_h3.packing import resolve_canvas_size
+from invokeai.backend.minimax_h3.presets import resolve_lowres_canvas_size
 
 MiniMaxH3TargetResolution = Literal["768 highres", "768 lowres"]
 

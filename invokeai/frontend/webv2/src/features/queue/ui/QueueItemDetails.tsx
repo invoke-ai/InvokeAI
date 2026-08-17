@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { Box, DataList, Separator, Text } from '@chakra-ui/react';
 import { extractGenerationMeta } from '@features/queue/core/generationMeta';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -50,9 +51,7 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
       <DetailRow label={t('common.created')}>{new Date(item.createdAt).toLocaleString()}</DetailRow>
       <DetailRow label={t('widgets.queue.took')}>{duration ?? '—'}</DetailRow>
       <DetailRow label={t('widgets.queue.batch')}>
-        <Text as="span" truncate>
-          {item.batchId}
-        </Text>
+        <MiddleTruncate as="span" text={item.batchId} />
       </DetailRow>
       <DetailRow label={t('common.item')}>
         <Text as="span" fontVariantNumeric="tabular-nums">

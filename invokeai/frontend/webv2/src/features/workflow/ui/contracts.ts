@@ -1,7 +1,7 @@
 import type { ProjectGraphAction } from '@features/workflow/core/document';
 import type { ProjectGraphState } from '@features/workflow/core/types';
 
-export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover';
+export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover' | 'floating';
 
 /**
  * Panel regions workflow surfaces may open/select widgets in. Structural

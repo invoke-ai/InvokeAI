@@ -13,6 +13,7 @@ const backend = vi.hoisted(() => ({
   listGalleryItemNames: vi.fn(),
   listGalleryItems: vi.fn(),
   listPaletteImages: vi.fn(),
+  listSemanticGalleryItemNames: vi.fn(),
 }));
 
 vi.mock('./backend', () => backend);
@@ -22,8 +23,10 @@ import {
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
+  galleryItemNamesOptions,
   galleryItemsInfiniteOptions,
   getGalleryItemListQueries,
+  canonicalizeGalleryItemsFilter,
   type GalleryItemsFilter,
 } from './queries';
 import { invalidateGalleryItems } from './queryCache';
@@ -86,6 +89,7 @@ describe('Gallery item query read model', () => {
     backend.listGalleryItemNames.mockReset();
     backend.listGalleryItems.mockReset();
     backend.listPaletteImages.mockReset();
+    backend.listSemanticGalleryItemNames.mockReset();
 
     backend.isDateBoardId.mockImplementation((boardId: string) => boardId.startsWith('by_date:'));
     backend.listGalleryItems.mockResolvedValue({ items: [], total: 0 });
@@ -139,6 +143,55 @@ describe('Gallery item query read model', () => {
     } finally {
       observer.destroy();
     }
+  });
+
+  it('routes a semantic reference through one shared ranked name list and keys it by label-free identity', async () => {
+    const queryClient = createQueryClient();
+    const semanticFilter: GalleryItemsFilter = {
+      ...baseFilter,
+      semanticQuery: { fileId: 'external-3', kind: 'file', label: 'cat.png' },
+    };
+    const rankedNames = {
+      items: [{ kind: 'image', name: 'ranked.png' }],
+      starredCount: 0,
+      total: 1,
+    };
+
+    backend.listSemanticGalleryItemNames.mockResolvedValue(rankedNames);
+    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue({ items: [], total: 1 });
+
+    const options = galleryItemsInfiniteOptions(semanticFilter);
+
+    await queryClient.fetchInfiniteQuery(options);
+    expect(backend.listSemanticGalleryItemNames).toHaveBeenCalledWith(
+      expect.objectContaining({ query: { fileId: 'external-3', kind: 'file' } })
+    );
+    expect(backend.hydrateGalleryDateBoardItemPage).toHaveBeenCalledWith(
+      expect.objectContaining({ items: rankedNames.items, limit: GALLERY_PAGE_SIZE, offset: 0, total: 1 })
+    );
+    expect(backend.listGalleryItems).not.toHaveBeenCalled();
+
+    // Range selection reads the same cached ranked list: a dropped-file
+    // reference must not re-upload its blob once per consumer or per page.
+    await expect(queryClient.fetchQuery(galleryItemNamesOptions(semanticFilter))).resolves.toEqual(rankedNames);
+    expect(backend.listSemanticGalleryItemNames).toHaveBeenCalledOnce();
+    expect(backend.listGalleryItemNames).not.toHaveBeenCalled();
+
+    // The label is presentation, not identity: relabels reuse the cache entry
+    // while a different registered file (or no reference at all) does not.
+    expect(
+      galleryItemsInfiniteOptions({
+        ...semanticFilter,
+        semanticQuery: { fileId: 'external-3', kind: 'file', label: 'renamed.png' },
+      }).queryKey
+    ).toEqual(options.queryKey);
+    expect(
+      galleryItemsInfiniteOptions({
+        ...semanticFilter,
+        semanticQuery: { fileId: 'external-4', kind: 'file', label: 'cat.png' },
+      }).queryKey
+    ).not.toEqual(options.queryKey);
+    expect(galleryItemsInfiniteOptions(baseFilter).queryKey).not.toEqual(options.queryKey);
   });
 
   it('keeps semantic filters in the key while page params stay inside one cache entry', async () => {
@@ -303,5 +356,66 @@ describe('Gallery item query read model', () => {
       pages: [{ items: [{ name: 'shared-date-0' }], total: 1 }],
     });
     await pageRequest.catch(() => undefined);
+  });
+});
+
+describe('canonicalizeGalleryItemsFilter under a semantic query', () => {
+  const reference = { fileId: 'external-1-abc', kind: 'file', label: 'shot.png' } as const;
+
+  it('ignores the controls a ranked result set does not answer to', () => {
+    // The semantic branch sends only the reference, so board, view, order,
+    // starred-first and the date range change nothing about the response.
+    // While they stayed in the key, clicking a board minted a fresh key and
+    // re-ran the search — re-uploading the dropped blob, or making the server
+    // re-download a remote URL, to render byte-identical results.
+    const base = canonicalizeGalleryItemsFilter({
+      boardId: 'board-a',
+      galleryView: 'images',
+      searchTerm: '',
+      semanticQuery: reference,
+    });
+
+    for (const variant of [
+      { boardId: 'board-b' },
+      { galleryView: 'assets' as const },
+      { orderDir: 'ASC' as const },
+      { starredFirst: true },
+      { createdFrom: '2026-01-01' },
+    ]) {
+      expect(
+        canonicalizeGalleryItemsFilter({
+          boardId: 'board-a',
+          galleryView: 'images',
+          searchTerm: '',
+          semanticQuery: reference,
+          ...variant,
+        })
+      ).toEqual(base);
+    }
+  });
+
+  it('still distinguishes one reference from another', () => {
+    const other = canonicalizeGalleryItemsFilter({
+      boardId: 'board-a',
+      galleryView: 'images',
+      searchTerm: '',
+      semanticQuery: { fileId: 'external-2-def', kind: 'file', label: 'shot.png' },
+    });
+
+    expect(other).not.toEqual(
+      canonicalizeGalleryItemsFilter({
+        boardId: 'board-a',
+        galleryView: 'images',
+        searchTerm: '',
+        semanticQuery: reference,
+      })
+    );
+  });
+
+  it('leaves a non-semantic filter keyed on all of its controls', () => {
+    const onBoardA = canonicalizeGalleryItemsFilter({ boardId: 'board-a', galleryView: 'images', searchTerm: '' });
+    const onBoardB = canonicalizeGalleryItemsFilter({ boardId: 'board-b', galleryView: 'images', searchTerm: '' });
+
+    expect(onBoardA).not.toEqual(onBoardB);
   });
 });

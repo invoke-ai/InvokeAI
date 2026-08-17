@@ -30,6 +30,16 @@ export const addCustomNodeInstallLogEntry = (
   return nextEntry;
 };
 
+/** Resolve an entry in place (installing -> completed/error) so the activity badge can settle. */
+export const updateCustomNodeInstallLogEntry = (
+  id: number,
+  patch: Partial<Pick<CustomNodeInstallLogEntry, 'message' | 'name' | 'status'>>
+): void => {
+  store.patchSnapshot({
+    log: store.getSnapshot().log.map((entry) => (entry.id === id ? { ...entry, ...patch } : entry)),
+  });
+};
+
 export const clearCustomNodeInstallLog = (): void => {
   store.patchSnapshot({ log: [] });
 };
@@ -43,3 +53,5 @@ registerAccountOwnedResource({
 });
 
 export const useCustomNodeInstallLog = (): CustomNodeInstallLogEntry[] => store.useSelector((snapshot) => snapshot.log);
+
+export const getCustomNodeInstallLogForTests = (): CustomNodeInstallLogEntry[] => store.getSnapshot().log;

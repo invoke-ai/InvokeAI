@@ -7,8 +7,8 @@ describe('firstPartyHotkeyCatalog', () => {
     // 91 legacy-parity entries + `canvas.newSession` (webv2 new-canvas command,
     // no default keys — Task 46) + `app.openCommandPalette` (webv2-only, mod+k)
     // + the six top-bar redesign commands (alt+mod+enter, mod+p, an unbound save,
-    // and alt+1..3).
-    expect(firstPartyHotkeyCatalog).toHaveLength(99);
+    // and alt+1..3) + `app.openSettings` (mod+,).
+    expect(firstPartyHotkeyCatalog).toHaveLength(100);
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.invoke');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.openCommandPalette');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('canvas.mergeDown');
@@ -27,6 +27,12 @@ describe('firstPartyHotkeyCatalog', () => {
     expect(firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.openCommandPalette')).toBe(
       OPEN_COMMAND_PALETTE_HOTKEY
     );
+  });
+
+  it('binds settings to the platform-standard shortcut, reachable from a text field', () => {
+    const openSettings = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'app.openSettings');
+
+    expect(openSettings).toMatchObject({ allowInEditable: true, defaultKeys: ['mod+,'], implemented: true });
   });
 
   it('keeps layout saving explicit and out of editable controls', () => {

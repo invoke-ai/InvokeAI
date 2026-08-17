@@ -5,7 +5,9 @@ import { Badge, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useActiveInstallSources } from '@features/models/data/installsStore';
 import { openInstallQueue } from '@features/models/ui/uiStore';
 import { Button, Panel } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { DownloadIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * The shared row used by every installable-source list (starter models,
@@ -28,9 +30,7 @@ export const SourceListItem = ({
   <Panel alignItems="center" flexDirection="row" gap="3" p="2.5">
     <Stack flex="1" gap="0.5" minW="0">
       <HStack gap="1.5" minW="0">
-        <Text fontSize="xs" fontWeight="600" title={titleTooltip} truncate>
-          {title}
-        </Text>
+        <MiddleTruncate fontSize="xs" fontWeight="600" text={title} title={titleTooltip} />
         {badges}
       </HStack>
       {description ? (
@@ -63,13 +63,14 @@ export const InstallSourceButton = ({
   /** Source string used to match an active install job. */
   source: string;
 }) => {
+  const { t } = useTranslation();
   const activeSources = useActiveInstallSources();
   const isInstalling = isPending || activeSources.has(source);
 
   if (isInstalled) {
     return (
       <Badge colorPalette="green" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
-        Installed
+        {t('models.installed')}
       </Badge>
     );
   }
@@ -79,7 +80,7 @@ export const InstallSourceButton = ({
       <HStack flexShrink={0} gap="1.5">
         <Badge colorPalette="blue" fontSize="2xs" size="sm" variant="surface">
           <Spinner borderWidth="1.5px" boxSize="2.5" />
-          Installing
+          {t('models.installing')}
         </Badge>
         <Button
           size="2xs"
@@ -89,7 +90,7 @@ export const InstallSourceButton = ({
             openInstallQueue();
           }}
         >
-          View queue
+          {t('models.viewQueue')}
         </Button>
       </HStack>
     );
@@ -106,8 +107,7 @@ export const InstallSourceButton = ({
       }}
     >
       <Icon as={DownloadIcon} boxSize="3" />
-      Install
+      {t('models.install')}
     </Button>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

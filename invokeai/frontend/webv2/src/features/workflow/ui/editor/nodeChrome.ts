@@ -4,6 +4,14 @@ const NODE_HOVER_RING = '0 0 0 2px {colors.accent.solid/50}, {shadows.md}';
 const NODE_RUNNING_RING = '0 0 0 2px {colors.brand.solid/70}, 0 0 10px {colors.brand.solid/50}';
 const NODE_SELECTED_RING = '0 0 0 2px {colors.accent.solid}, {shadows.md}';
 
+/** Shared spacing keeps editable workflow nodes aligned with their manager previews. */
+export const WORKFLOW_NODE_DENSITY = {
+  bodyPaddingY: '1',
+  headerPaddingY: '1.5',
+  rowPaddingX: '3',
+  rowPaddingY: '0.5',
+} as const;
+
 export const getWorkflowNodeChromeProps = ({
   invalid = false,
   running = false,
