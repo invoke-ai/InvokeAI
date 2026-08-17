@@ -1153,6 +1153,153 @@ flux2_klein_9b_gguf_q8 = StarterModel(
 )
 # endregion
 
+# region FLUX.2 [dev]
+#
+# FLUX.2 [dev] is BFL's 32B guidance-distilled rectified-flow model. The bf16
+# transformer alone is ~64 GB, so most users want the GGUF quantizations from
+# the curated `gguf-org/flux2-dev-gguf` repo (the same repo also ships the
+# matching "cow-mistral3-small" text encoder — a FLUX.2-specific 30-layer
+# Mistral distillation that BFL trained the joint attention against; the
+# README notes "Q2 works, but use a higher tier encoder for better prompt
+# adherence"). All FLUX.2 [dev] releases are governed by the FLUX.2
+# Non-Commercial License.
+
+# --- Text encoders ---
+# FLUX.2 [dev] reads Mistral hidden states at indices (10, 20, 30). Two encoders work:
+#   - The 40-layer Mistral Small 3 (24B) that BFL ships as the canonical
+#     FLUX.2-dev/text_encoder — the default; loads fine but has visibly weaker prompt
+#     adherence because those indices land at different relative depths.
+#   - The 30-layer "cow-mistral3-small" distillation — recommended for best adherence
+#     (on a 30-layer model the indices hit 1/3, 2/3, last, matching what the joint
+#     attention was trained against). The gguf-org cow GGUFs and Comfy-Org's safetensors
+#     are the same 30-layer cow weights, just packaged differently.
+
+# Comfy-Org safetensors (single-file, 30-layer cow, with embedded Tekken tokenizer).
+# Higher precision than the cow GGUFs and avoids the Tekken-via-HF-Hub fetch.
+flux2_dev_comfy_mistral_fp8 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (Comfy FP8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
+    description="Comfy-Org FP8 of BFL's 30-layer cow-mistral3-small. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
+    type=ModelType.MistralEncoder,
+)
+
+flux2_dev_comfy_mistral_bf16 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (Comfy BF16)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors",
+    description="Comfy-Org BF16 of BFL's 30-layer cow-mistral3-small. Reference precision; embeds Tekken tokenizer. ~35.6GB",
+    type=ModelType.MistralEncoder,
+)
+
+flux2_dev_comfy_mistral_fp4 = StarterModel(
+    name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
+    description="Comfy-Org FP4-mixed of BFL's 30-layer cow-mistral3-small. Smallest safetensors variant; embeds Tekken tokenizer. ~12.3GB",
+    type=ModelType.MistralEncoder,
+)
+
+# gguf-org cow GGUF variants (30-layer cow, llama.cpp packaging, also embed Tekken).
+# Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
+flux2_dev_cow_mistral_q4 = StarterModel(
+    name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q4)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q4_0.gguf",
+    description="cow-mistral3-small Q4_0 — 30-layer cow distillation BFL trained against. ~11.6GB",
+    type=ModelType.MistralEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+flux2_dev_cow_mistral_q8 = StarterModel(
+    name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q8_0.gguf",
+    description="cow-mistral3-small Q8_0 — best prompt adherence among cow GGUF quants. ~20GB",
+    type=ModelType.MistralEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+flux2_dev_cow_mistral_iq4_xs = StarterModel(
+    name="FLUX.2 [dev] cow Mistral Encoder (GGUF IQ4_XS)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-iq4_xs.gguf",
+    description="cow-mistral3-small IQ4_XS — smallest usable quant with reasonable adherence. ~11.1GB",
+    type=ModelType.MistralEncoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+# --- Diffusers transformer ---
+flux2_dev_diffusers = StarterModel(
+    name="FLUX.2 [dev] (Diffusers)",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-dev",
+    description="FLUX.2 [dev] full Diffusers pipeline - includes transformer, VAE, and Mistral text encoder. ~80GB. Non-Commercial License.",
+    type=ModelType.Main,
+)
+
+flux2_dev_diffusers_nf4 = StarterModel(
+    name="FLUX.2 [dev] (Diffusers, NF4)",
+    base=BaseModelType.Flux2,
+    source="diffusers/FLUX.2-dev-bnb-4bit",
+    description="FLUX.2 [dev] with NF4-quantized DiT and text encoder - runs on ~18GB VRAM with offload. Non-Commercial License.",
+    type=ModelType.Main,
+)
+
+# --- GGUF transformers from gguf-org/flux2-dev-gguf (canonical repo) ---
+# These are the GGUFs BFL/community curate for cow-paired inference. Default
+# encoder dependency is cow Q4 to make starter installs work out of the box.
+flux2_dev_gguf_q3_k_m = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q3_K_M)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q3_k_m.gguf",
+    description="FLUX.2 [dev] transformer Q3_K_M — fits ~12GB VRAM with offload. ~15.9GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q4],
+)
+
+flux2_dev_gguf_q4_k_m = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q4_K_M)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q4_k_m.gguf",
+    description="FLUX.2 [dev] transformer Q4_K_M — good quality / size tradeoff. ~20GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q4],
+)
+
+flux2_dev_gguf_q5_k_m = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q5_K_M)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q5_k_m.gguf",
+    description="FLUX.2 [dev] transformer Q5_K_M — higher fidelity than Q4. ~24GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+
+flux2_dev_gguf_q6_k = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q6_K)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q6_k.gguf",
+    description="FLUX.2 [dev] transformer Q6_K — near-Q8 quality at lower size. ~27.9GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+
+flux2_dev_gguf_q8_0 = StarterModel(
+    name="FLUX.2 [dev] Transformer (GGUF Q8_0)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/flux2-dev-q8_0.gguf",
+    description="FLUX.2 [dev] transformer Q8_0 — highest GGUF fidelity. ~35.5GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+# endregion
+
 # region Z-Image
 z_image_qwen3_encoder = StarterModel(
     name="Z-Image Qwen3 Text Encoder",
@@ -1739,6 +1886,67 @@ wan_22_ti2v_5b_gguf_q8_0 = StarterModel(
 )
 # endregion
 
+# region MiniMax H3 (local)
+# License note: the MiniMax H3 Community License requires prominent "MiniMax H3" attribution
+# (keep it verbatim in every name/description below) and restricts use by territory (excludes
+# the US, EU, UK and South Korea, extending to outputs). These entries live in their own
+# droppable commit so a release can exclude them without touching anything else.
+#
+# The full huggingface.co/MiniMaxAI/MiniMax-H3 repo is ~498 GB (it also carries the Ref2VA
+# transformer and the original remote-code checkpoints). The slim main below downloads only the
+# shared components (tokenizer, processor, video/audio VAEs) plus the two config JSONs that
+# identification needs (~11 GB); the transformer and text encoder come from Comfy-Org's int8
+# single-file repacks, selected in the MiniMax H3 Model Loader. Total ~59 GB.
+
+minimax_h3_components = StarterModel(
+    name="MiniMax H3 Components",
+    base=BaseModelType.MiniMaxH3,
+    source="MiniMaxAI/MiniMax-H3::modular_model_index.json+transformer/config.json+tokenizer+processor+vae+audio_vae",
+    description="MiniMax H3 shared components: tokenizer, processor and video/audio VAEs, without "
+    "transformer or text-encoder weights (~11 GB). Pair with the MiniMax H3 single-file transformer "
+    "and text encoder. NOTE: This model is distributed under a restrictive license that forbids its "
+    "use in certain territories. Please see https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+)
+
+minimax_h3_int8_text_encoder = StarterModel(
+    name="MiniMax H3 Text Encoder (int8)",
+    base=BaseModelType.MiniMaxH3,
+    source="Comfy-Org/MiniMax-H3::text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+    description="Truncated Qwen3-VL-32B conditioning encoder for MiniMax H3, int8 quantized (~27 GB). "
+    "Select it in the MiniMax H3 Model Loader's text encoder field. NOTE: This model is distributed "
+    "under a restrictive license that forbids its use in certain territories. Please see "
+    "https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
+minimax_h3_int8_transformer = StarterModel(
+    name="MiniMax H3 FL2VA Transformer (int8, pruned)",
+    base=BaseModelType.MiniMaxH3,
+    source="Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    description="MiniMax H3 video+audio generation. AdaLN-pruned int8 single-file transformer (~21 GB); "
+    "select it in the MiniMax H3 Model Loader's transformer field. Total size with dependencies: ~59 GB. "
+    "NOTE: This model is distributed under a restrictive license that forbids its use in certain "
+    "territories. Please see https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[minimax_h3_components, minimax_h3_int8_text_encoder],
+)
+
+minimax_h3_turbo_lora = StarterModel(
+    name="MiniMax H3 Turbo LoRA",
+    base=BaseModelType.MiniMaxH3,
+    source="larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors",
+    description="Step-distillation LoRA for MiniMax H3 (Apache 2.0): renders video+audio in 4-8 "
+    "denoising steps instead of ~50. Apply at strength 1.0 and lower Steps to 6-8. Works with the "
+    "full and the pruned int8 transformers.",
+    type=ModelType.LoRA,
+    format=ModelFormat.LyCORIS,
+)
+# endregion
+
 alibabacloud_wan26_t2i = StarterModel(
     name="Wan 2.6 Text-to-Image",
     base=BaseModelType.External,
@@ -2165,6 +2373,7 @@ STARTER_MODELS: list[StarterModel] = [
     t5_gguf_q3_k_s_encoder,
     t5_gguf_q6_k_encoder,
     clip_l_encoder,
+    clip_vit_l_image_encoder,
     siglip,
     flux_redux,
     llava_onevision,
@@ -2185,6 +2394,19 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_9b_gguf_q8,
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
+    flux2_dev_comfy_mistral_bf16,
+    flux2_dev_comfy_mistral_fp4,
+    flux2_dev_comfy_mistral_fp8,
+    flux2_dev_cow_mistral_iq4_xs,
+    flux2_dev_cow_mistral_q4,
+    flux2_dev_cow_mistral_q8,
+    flux2_dev_diffusers,
+    flux2_dev_diffusers_nf4,
+    flux2_dev_gguf_q3_k_m,
+    flux2_dev_gguf_q4_k_m,
+    flux2_dev_gguf_q5_k_m,
+    flux2_dev_gguf_q6_k,
+    flux2_dev_gguf_q8_0,
     cogview4,
     qwen_image_vae,
     qwen_vl_encoder_fp8,
@@ -2239,6 +2461,10 @@ STARTER_MODELS: list[StarterModel] = [
     wan_22_ti2v_5b_diffusers,
     wan_22_ti2v_5b_gguf_q4_k_m,
     wan_22_ti2v_5b_gguf_q8_0,
+    minimax_h3_int8_transformer,
+    minimax_h3_int8_text_encoder,
+    minimax_h3_components,
+    minimax_h3_turbo_lora,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
@@ -2410,6 +2636,15 @@ ideogram_bundle: list[StarterModel] = [
     ideogram_4_nf4,
 ]
 
+# The minimal working set for MiniMax H3 video+audio generation (~59 GB): shared components from
+# the official repo plus Comfy-Org's int8 single-file transformer and text encoder. See the
+# license note in the MiniMax H3 region above.
+minimax_h3_bundle: list[StarterModel] = [
+    minimax_h3_components,
+    minimax_h3_int8_text_encoder,
+    minimax_h3_int8_transformer,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
@@ -2422,6 +2657,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),
     "wan_t2v": StarterModelBundle(name="Wan 2.2 Text-to-Video", models=wan_t2v_bundle),
     "wan_i2v": StarterModelBundle(name="Wan 2.2 Image-to-Video", models=wan_i2v_bundle),
+    BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
     BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 

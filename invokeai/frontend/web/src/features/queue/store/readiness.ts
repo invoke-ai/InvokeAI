@@ -44,7 +44,7 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
+import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainOrExternalModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
@@ -121,6 +121,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
       isConnected,
       model,
@@ -130,6 +131,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -140,6 +142,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
       isConnected,
       model,
@@ -155,6 +158,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -251,6 +255,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   dynamicPrompts: DynamicPromptsState;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -261,6 +266,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     dynamicPrompts,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -302,14 +308,24 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   if (model?.base === 'flux2' && model.format !== 'diffusers') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
-    if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-    }
-    if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+    // Non-diffusers FLUX.2 models need standalone VAE + text encoder unless a Diffusers
+    // pipeline of the matching variant family is installed to extract from.
+    if ('variant' in model && model.variant === 'dev') {
+      // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
+      if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+      }
+      if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+      }
+    } else {
+      // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
+      if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+      }
+      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+      }
     }
   }
 
@@ -428,6 +444,18 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
     if (!params.animaQwen3EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noAnimaQwen3EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'minimax-h3' && model.format === 'diffusers' && model.components_only) {
+    // A slim ("components-only") install ships only the shared components (tokenizer, processor,
+    // VAEs) - the transformer and text encoder must come from single-file installs selected in
+    // Advanced settings, or generation fails at model-load time.
+    if (!params.minimaxH3TransformerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TransformerModelSelected') });
+    }
+    if (!params.minimaxH3TextEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TextEncoderModelSelected') });
     }
   }
 
@@ -605,6 +633,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsSelectingObject: boolean;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -621,6 +650,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsSelectingObject,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -729,15 +759,23 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
+    // Non-diffusers FLUX.2 models need standalone VAE + text encoder unless a Diffusers
+    // pipeline of the matching variant family is installed to extract from.
     if (model.format !== 'diffusers') {
-      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-      }
-      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+      if ('variant' in model && model.variant === 'dev') {
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
       }
     }
 
@@ -1166,6 +1204,24 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
     if (!params.animaQwen3EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noAnimaQwen3EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'minimax-h3' && params.minimaxH3OutputMode === 'video') {
+    // Video output only exists on the Generate tab - the canvas compositing pipeline is
+    // image-based. The image output mode works on canvas like any other txt2img model.
+    reasons.push({ content: i18n.t('parameters.invoke.minimaxH3VideoOnGenerateTab') });
+  }
+
+  if (model?.base === 'minimax-h3' && model.format === 'diffusers' && model.components_only) {
+    // A slim ("components-only") install ships only the shared components (tokenizer, processor,
+    // VAEs) - the transformer and text encoder must come from single-file installs selected in
+    // Advanced settings, or generation fails at model-load time.
+    if (!params.minimaxH3TransformerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TransformerModelSelected') });
+    }
+    if (!params.minimaxH3TextEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noMiniMaxH3TextEncoderModelSelected') });
     }
   }
 

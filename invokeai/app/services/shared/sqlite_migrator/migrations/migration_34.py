@@ -22,7 +22,13 @@ class Migration34Callback:
             """--sql
             CREATE TABLE IF NOT EXISTS image_subfolder_move_items (
                 job_id INTEGER NOT NULL REFERENCES image_subfolder_move_jobs(id),
-                image_name TEXT NOT NULL REFERENCES images(image_name),
+                -- ON DELETE CASCADE: move items are an audit trail of a completed
+                -- move, never deleted on their own. Without the cascade the FK is
+                -- NO ACTION, which blocks deletion of any image that was ever moved
+                -- (foreign keys are enforced on the app connection). Databases that
+                -- predate this clause are repaired by
+                -- migration_2026_08_08_repair_image_subfolder_move_tables.
+                image_name TEXT NOT NULL REFERENCES images(image_name) ON DELETE CASCADE,
                 old_subfolder TEXT NOT NULL,
                 new_subfolder TEXT NOT NULL,
                 is_intermediate BOOLEAN NOT NULL DEFAULT FALSE,

@@ -118,6 +118,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
+export type MistralEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'mistral_encoder' }>;
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
 export type Qwen3VLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_vl_encoder' }>;
 export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'wan_t5_encoder' }>;
@@ -405,12 +406,29 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
   return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
 };
 
+export const isMistralEncoderModelConfig = (config: AnyModelConfig): config is MistralEncoderModelConfig => {
+  return config.type === 'mistral_encoder';
+};
+
 export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
   return config.type === 'qwen_vl_encoder';
 };
 
 export const isQwen3VLEncoderModelConfig = (config: AnyModelConfig): config is Qwen3VLEncoderModelConfig => {
   return config.type === 'qwen3_vl_encoder';
+};
+
+/** Qwen3-VL encoders usable by Krea-2. Excludes MiniMax H3's truncated 32B conditioning
+ *  encoders, which share the model type but are useless to Krea-2 (50-layer truncation, no
+ *  final norm) and have their own guard below. */
+export const isKrea2Qwen3VLEncoderModelConfig = (config: AnyModelConfig): config is Qwen3VLEncoderModelConfig => {
+  return config.type === 'qwen3_vl_encoder' && config.base !== 'minimax-h3';
+};
+
+/** MiniMax H3 single-file truncated Qwen3-VL-32B encoders (e.g. the int8 repack). These serve
+ *  only the Text Encoder (single file) override slot of the MiniMax H3 advanced section. */
+export const isMiniMaxH3TextEncoderModelConfig = (config: AnyModelConfig): config is Qwen3VLEncoderModelConfig => {
+  return config.type === 'qwen3_vl_encoder' && config.base === 'minimax-h3' && config.format === 'checkpoint';
 };
 
 export const isWanT5EncoderModelConfig = (config: AnyModelConfig): config is WanT5EncoderModelConfig => {
@@ -512,13 +530,24 @@ const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainMo
   return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
 };
 
+const isFlux2DevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.variant === 'dev';
+};
+
+export const isFlux2DevDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return isFlux2DevMainModelConfig(config) && config.format === 'diffusers';
+};
+
 const isIdeogram4MainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'ideogram-4';
 };
 
 export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return (
-    isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config) || isIdeogram4MainModelConfig(config)
+    isFluxDevMainModelConfig(config) ||
+    isFlux2Klein9BMainModelConfig(config) ||
+    isFlux2DevMainModelConfig(config) ||
+    isIdeogram4MainModelConfig(config)
   );
 };
 
@@ -549,6 +578,13 @@ export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config
   return (
     config.type === 'main' && config.base === 'wan' && config.format === 'gguf_quantized' && config.expert === 'low'
   );
+};
+
+/** MiniMax H3 single-file transformer checkpoints (e.g. the pruned int8 repack). These serve
+ *  only the Transformer (single file) override slot of the MiniMax H3 advanced section; the
+ *  primary main dropdown shows only diffusers-format H3 installs. */
+export const isMiniMaxH3CheckpointMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'minimax-h3' && config.format === 'checkpoint';
 };
 
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {

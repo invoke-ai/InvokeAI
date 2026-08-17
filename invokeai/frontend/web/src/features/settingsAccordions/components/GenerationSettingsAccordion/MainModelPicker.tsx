@@ -1,7 +1,10 @@
 import { Flex, FormLabel, Icon } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { isExternalModelUnsupportedForTab } from 'features/parameters/components/MainModel/mainModelPickerUtils';
+import {
+  isExternalModelUnsupportedForTab,
+  isSecondarySlotMainModelConfig,
+} from 'features/parameters/components/MainModel/mainModelPickerUtils';
 import { UseDefaultSettingsButton } from 'features/parameters/components/MainModel/UseDefaultSettingsButton';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -18,23 +21,8 @@ export const MainModelPicker = memo(() => {
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
   const [allModelConfigs] = useMainModels();
-  // Low-noise Wan GGUFs belong in the Transformer (Low Noise) slot of the
-  // Wan advanced section, not as a primary main. Filter them out of the main
-  // model dropdown so users can't accidentally wire them backwards.
   const modelConfigs = useMemo(
-    () =>
-      allModelConfigs.filter((c) => {
-        if (
-          c.type === 'main' &&
-          c.base === 'wan' &&
-          c.format === 'gguf_quantized' &&
-          'expert' in c &&
-          c.expert === 'low'
-        ) {
-          return false;
-        }
-        return true;
-      }),
+    () => allModelConfigs.filter((c) => !isSecondarySlotMainModelConfig(c)),
     [allModelConfigs]
   );
   const selectedModelConfig = useSelectedModelConfig();

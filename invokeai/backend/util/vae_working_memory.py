@@ -125,6 +125,36 @@ def estimate_vae_working_memory_anima(
     return int(working_memory)
 
 
+def estimate_vae_working_memory_minimax_h3(
+    operation: Literal["encode", "decode"],
+    vae: "torch.nn.Module",
+    pixel_height: int,
+    pixel_width: int,
+    pixel_frames: int,
+) -> int:
+    """Estimate the working memory to encode/decode with the MiniMax H3 video VAE.
+
+    The H3 VAE always tiles spatially (``use_tiling`` defaults to True with 256px tiles / 64px
+    overlap, and the released frames are the blended-tile ones), so the conv working set is
+    per-tile, not per-frame: the tile geometry is read from the instance. The full RGB clip is
+    still assembled on the execution device (fp32 — the VAE's weights are pinned fp32), plus
+    one transient copy. The Wan per-pixel calibration constant is kept as a conservative
+    stand-in until an H3-specific calibration exists.
+    """
+    element_size = next(vae.parameters()).element_size()
+
+    scaling_constant = 2900 if operation == "decode" else 1450
+    tile_height = min(int(getattr(vae, "tile_sample_min_height", 256)), pixel_height)
+    tile_width = min(int(getattr(vae, "tile_sample_min_width", 256)), pixel_width)
+    # 1.25 accounts for tile overlap.
+    tile_working = tile_height * tile_width * element_size * scaling_constant * 1.25
+
+    clip_copies = 2 if operation == "decode" else 1
+    clip_bytes = clip_copies * 3 * pixel_frames * pixel_height * pixel_width * element_size
+
+    return int(tile_working + clip_bytes)
+
+
 def estimate_vae_working_memory_wan(
     operation: Literal["encode", "decode"],
     vae: AutoencoderKLWan,

@@ -18,6 +18,7 @@ import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildEx
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildIdeogram4Graph } from 'features/nodes/util/graph/generation/buildIdeogram4Graph';
 import { buildKrea2Graph } from 'features/nodes/util/graph/generation/buildKrea2Graph';
+import { buildMiniMaxH3Graph } from 'features/nodes/util/graph/generation/buildMiniMaxH3Graph';
 import { buildQwenImageGraph } from 'features/nodes/util/graph/generation/buildQwenImageGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -78,6 +79,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
         return await buildAnimaGraph(graphBuilderArg);
       case 'wan':
         return await buildWanGraph(graphBuilderArg);
+      case 'minimax-h3':
+        return await buildMiniMaxH3Graph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }

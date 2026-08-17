@@ -12,13 +12,14 @@ import {
   MIN_HIDIFFUSION_T1_RATIO,
 } from '@features/generation/core/settings';
 import { Field, Select } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { ModelDefaultButton } from './shared/ModelDefaultButton';
-import { SliderNumberField } from './shared/SliderNumberField';
 
 interface GenerateAdvancedFieldsProps {
   settings: GenerateSettings;
@@ -153,8 +154,8 @@ export const GenerateAdvancedFields = ({
       {settings.colorCompensation && <Badge size="xs">{t('widgets.generate.colorCompensation')}</Badge>}
       {settings.hiDiffusionEnabled && <Badge size="xs">{t('widgets.generate.hiDiffusion')}</Badge>}
       {customVae && (
-        <Badge maxW="32" size="xs" truncate>
-          {settings.vae?.name}
+        <Badge maxW="32" size="xs">
+          <MiddleTruncate as="span" minW="0" text={settings.vae?.name ?? ''} />
         </Badge>
       )}
     </>

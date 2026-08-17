@@ -10,7 +10,7 @@ import onnxruntime as ort
 import torch
 from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
-from transformers import CLIPTokenizer, PreTrainedTokenizerBase, T5Tokenizer
+from transformers import CLIPTokenizer, PreTrainedTokenizerBase, ProcessorMixin, T5Tokenizer
 
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
@@ -73,6 +73,11 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     elif isinstance(model, PreTrainedTokenizerBase):
         # Catch-all for other tokenizer types (e.g., Qwen2Tokenizer, Qwen3Tokenizer).
         # Tokenizers are small relative to models, so returning 0 is acceptable.
+        return 0
+    elif isinstance(model, ProcessorMixin):
+        # Multimodal processors (e.g. Qwen3VLProcessor, loaded as the MiniMax H3 Processor
+        # submodel) bundle a tokenizer with image/video preprocessor configs - a few MB of
+        # non-tensor state, so 0 is acceptable like the tokenizers above.
         return 0
     else:
         # TODO(ryand): Promote this from a log to an exception once we are confident that we are handling all of the

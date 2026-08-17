@@ -12,6 +12,7 @@ import {
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
+  isMistralEncoderModelConfig,
   isNonRefinerMainModelConfig,
   isPiDDecoderModelConfig,
   isQwen3EncoderModelConfig,
@@ -88,6 +89,11 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     category: 'qwen_vl_encoder',
     i18nKey: 'modelManager.qwenVLEncoder',
     filter: isQwenVLEncoderModelConfig,
+  },
+  mistral_encoder: {
+    category: 'mistral_encoder',
+    i18nKey: 'modelManager.mistralEncoder',
+    filter: isMistralEncoderModelConfig,
   },
   qwen3_vl_encoder: {
     category: 'qwen3_vl_encoder',
@@ -193,6 +199,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   external: 'orange',
   anima: 'invokePurple',
   wan: 'cyan',
+  'minimax-h3': 'yellow',
   unknown: 'red',
 };
 
@@ -215,6 +222,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen2.5-VL Encoder',
+  mistral_encoder: 'Mistral Encoder',
   qwen3_vl_encoder: 'Qwen3-VL Encoder',
   wan_t5_encoder: 'Wan T5 Encoder',
   gemma2_encoder: 'Gemma-2 Encoder',
@@ -249,6 +257,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   external: 'External',
   anima: 'Anima',
   wan: 'Wan 2.2',
+  'minimax-h3': 'MiniMax H3',
   unknown: 'Unknown',
 };
 
@@ -273,6 +282,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   external: 'External',
   anima: 'Anima',
   wan: 'Wan',
+  'minimax-h3': 'MiniMax H3',
   unknown: 'Unknown',
 };
 
@@ -295,6 +305,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   gigantic: 'CLIP G',
   generate: 'Qwen Image',
   edit: 'Qwen Image Edit',
+  fl2va: 'MiniMax H3 FL2VA',
   t2v_a14b: 'Wan 2.2 T2V A14B',
   i2v_a14b: 'Wan 2.2 I2V A14B',
   ti2v_5b: 'Wan 2.2 TI2V 5B',
@@ -303,6 +314,8 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
   qwen3_06b: 'Qwen3 0.6B',
+  cow_mistral3_small: 'cow-mistral3-small (FLUX.2)',
+  mistral3_24b: 'Mistral Small 3 (24B, FLUX.2)',
   res2k_sr4x: 'PiD 2K (4x SR)',
   res2kto4k_sr4x: 'PiD 4K (4x SR Upscale)',
 };
@@ -321,6 +334,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   t5_encoder: 'T5 Encoder',
   qwen3_encoder: 'Qwen3 Encoder',
   qwen_vl_encoder: 'Qwen2.5-VL Encoder',
+  mistral_encoder: 'Mistral Encoder',
   qwen3_vl_encoder: 'Qwen3-VL Encoder',
   wan_t5_encoder: 'Wan T5 Encoder (UMT5-XXL)',
   gemma2_encoder: 'Gemma-2 Encoder',
@@ -332,7 +346,15 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
 
 export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
 
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image', 'wan'];
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sdxl',
+  'flux',
+  'flux2',
+  'qwen-image',
+  'wan',
+  'minimax-h3',
+];
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',

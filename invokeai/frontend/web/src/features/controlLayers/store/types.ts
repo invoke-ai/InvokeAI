@@ -438,6 +438,15 @@ const zWanReferenceImageConfig = z.object({
 });
 export type WanReferenceImageConfig = z.infer<typeof zWanReferenceImageConfig>;
 
+// MiniMax H3 first-frame conditioning uses the model's own VAE + vision
+// context - no separate adapter model needed. Consumed only in video output
+// mode (the first enabled ref image becomes the video's first frame).
+const zMiniMaxH3ReferenceImageConfig = z.object({
+  type: z.literal('minimax_h3_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type MiniMaxH3ReferenceImageConfig = z.infer<typeof zMiniMaxH3ReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -455,6 +464,7 @@ export const zRefImageState = z.object({
     zFlux2ReferenceImageConfig,
     zQwenImageReferenceImageConfig,
     zWanReferenceImageConfig,
+    zMiniMaxH3ReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -478,6 +488,10 @@ export const isQwenImageReferenceImageConfig = (
 
 export const isWanReferenceImageConfig = (config: RefImageState['config']): config is WanReferenceImageConfig =>
   config.type === 'wan_reference_image';
+
+export const isMiniMaxH3ReferenceImageConfig = (
+  config: RefImageState['config']
+): config is MiniMaxH3ReferenceImageConfig => config.type === 'minimax_h3_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -817,7 +831,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(4),
+  _version: z.literal(8),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -897,9 +911,13 @@ export const zParamsState = z.object({
   animaScheduler: zParameterAnimaScheduler,
   animaLLLiteModel: zModelIdentifierField.nullable().default(null), // Optional: ControlNet-LLLite inpaint adapter for Anima
   animaLLLiteWeight: z.number().min(-10).max(10).default(1),
-  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
-  kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
+  // FLUX.2 VAE shared by Klein and [dev] — both use the same 32-channel AutoencoderKLFlux2 pool,
+  // so a single slot avoids losing the selection when switching a GGUF between the two.
+  flux2VaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE (Klein + [dev])
+  // Flux2 Klein text encoder - uses Qwen3 instead of CLIP+T5
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Flux2 [dev] text encoder - uses Mistral Small 3.1 (24B)
+  flux2DevMistralEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Mistral encoder for [dev]
   // PiD (Pixel Diffusion Decoder) - optional 4x super-resolution decode replacing the VAE decode.
   // - 'off':    regular VAE decode
   // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
@@ -921,6 +939,12 @@ export const zParamsState = z.object({
   wanVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Wan VAE checkpoint
   wanT5EncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone UMT5-XXL encoder
   wanGuidanceScaleLowNoise: z.number().nullable(), // Optional: separate CFG for low-noise expert (A14B). null = same as primary
+  // MiniMax H3 joint audio-video generation (fixed 24 fps; frame counts snap to the 17n+5 grid,
+  // so the effective duration ceiling is 345 frames = 14.375 s).
+  minimaxH3DurationSeconds: z.number().int().min(5).max(14),
+  minimaxH3OutputMode: z.enum(['video', 'image']),
+  minimaxH3TransformerModel: zParameterModel.nullable(), // Optional: single-file transformer override (e.g. pruned int8)
+  minimaxH3TextEncoderModel: zParameterModel.nullable(), // Optional: single-file truncated Qwen3-VL encoder override (e.g. int8)
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -951,7 +975,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 4,
+  _version: 8,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -1023,8 +1047,9 @@ export const getInitialParamsState = (): ParamsState => ({
   animaScheduler: 'euler',
   animaLLLiteModel: null,
   animaLLLiteWeight: 1,
-  kleinVaeModel: null,
+  flux2VaeModel: null,
   kleinQwen3EncoderModel: null,
+  flux2DevMistralEncoderModel: null,
   pidMode: 'off',
   pidDecoderModel: null,
   gemma2EncoderModel: null,
@@ -1039,6 +1064,10 @@ export const getInitialParamsState = (): ParamsState => ({
   wanVaeModel: null,
   wanT5EncoderModel: null,
   wanGuidanceScaleLowNoise: null,
+  minimaxH3DurationSeconds: 5,
+  minimaxH3OutputMode: 'video',
+  minimaxH3TransformerModel: null,
+  minimaxH3TextEncoderModel: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

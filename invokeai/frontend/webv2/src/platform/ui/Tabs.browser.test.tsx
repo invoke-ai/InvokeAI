@@ -79,7 +79,7 @@ describe('tab hover styles', () => {
 
       await act(async () => {
         await userEvent.hover(idle);
-        await waitForTransition();
+        await waitForSettledStyles(idle);
       });
       const idleHovered = getInteractionStyles(idle);
       expect(idleHovered.transitionDuration).toBe('0.1s');
@@ -97,14 +97,14 @@ describe('tab hover styles', () => {
       await act(async () => {
         await userEvent.unhover(idle);
         await userEvent.hover(selected);
-        await waitForTransition();
+        await waitForSettledStyles(selected);
       });
       expect(getInteractionStyles(selected)).toEqual(selectedBefore);
 
       await act(async () => {
         await userEvent.unhover(selected);
         await userEvent.hover(disabled);
-        await waitForTransition();
+        await waitForSettledStyles(disabled);
       });
       expect(getInteractionStyles(disabled)).toEqual(disabledBefore);
       await act(() => userEvent.unhover(disabled));
@@ -122,7 +122,7 @@ describe('tab hover styles', () => {
 
     await act(async () => {
       await userEvent.hover(lineIdle);
-      await waitForTransition();
+      await waitForSettledStyles(lineIdle);
     });
     expect(getComputedStyle(lineIdle).outline).toBe(focusOutline);
     expect(lineSelected.dataset.selected).toBe('');
@@ -141,9 +141,48 @@ const getInteractionStyles = (element: HTMLElement) => {
   };
 };
 
-const waitForTransition = () =>
-  new Promise<void>((resolve) => {
-    globalThis.setTimeout(resolve, 200);
+/** Consecutive unchanged samples that count as "the transition has finished". */
+const STABLE_SAMPLES = 3;
+const SAMPLE_INTERVAL_MS = 16;
+
+/**
+ * Waits until an element's interaction styles stop changing, rather than
+ * sleeping a fixed interval after each hover.
+ *
+ * These transitions run for 0.1s, but the test hovers fifteen triggers and
+ * used to wait 200ms every time — three seconds of sleeping against a 15s
+ * test timeout, which is what made this fail on a loaded CI runner. Sampling
+ * until the values hold still takes as long as the machine actually needs,
+ * and usually far less.
+ */
+const waitForSettledStyles = (element: HTMLElement, timeoutMs = 5000): Promise<void> =>
+  new Promise<void>((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+    let previous = JSON.stringify(getInteractionStyles(element));
+    let stableSamples = 0;
+
+    const sample = () => {
+      const current = JSON.stringify(getInteractionStyles(element));
+
+      stableSamples = current === previous ? stableSamples + 1 : 0;
+      previous = current;
+
+      if (stableSamples >= STABLE_SAMPLES) {
+        resolve();
+
+        return;
+      }
+
+      if (Date.now() > deadline) {
+        reject(new Error(`Timed out after ${timeoutMs}ms waiting for styles to settle; last value ${current}`));
+
+        return;
+      }
+
+      globalThis.setTimeout(sample, SAMPLE_INTERVAL_MS);
+    };
+
+    globalThis.setTimeout(sample, SAMPLE_INTERVAL_MS);
   });
 
 const getProbeStyle = (container: HTMLElement, label: string) =>

@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.configs.base import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
+from invokeai.backend.model_manager.configs.flux2_variant import flux2_variant_from_context_dim
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     common_config_paths,
@@ -28,6 +29,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    MiniMaxH3VariantType,
     ModelFormat,
     ModelType,
     ModelVariantType,
@@ -73,6 +75,7 @@ class MainModelDefaultSettings(BaseModel):
         | WanVariantType
         | ZImageVariantType
         | Krea2VariantType
+        | MiniMaxH3VariantType
         | None = None,
         name: str | None = None,
         path: str | None = None,
@@ -114,7 +117,10 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(steps=48, cfg_scale=7.0, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
-                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                if variant == Flux2VariantType.Dev:
+                    # FLUX.2 [dev] is guidance-distilled (recommended guidance=3.5, 28 steps, CFG disabled)
+                    return cls(steps=28, cfg_scale=1.0, guidance=3.5, width=1024, height=1024)
+                elif variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
                     # Undistilled base models need more steps
                     return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
                 else:
@@ -136,6 +142,11 @@ class MainModelDefaultSettings(BaseModel):
                     return cls(steps=30, cfg_scale=5.0, width=1024, height=1024)
                 # Default to A14B settings (also used when variant is unknown).
                 return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
+            case BaseModelType.MiniMaxH3:
+                # H3 is guidance-distilled (no CFG; cfg_scale 1.0 means "no guidance") and was
+                # released for a fixed 768px short edge; 1344x768 is its native 16:9 canvas.
+                # Dimensions must be multiples of 32.
+                return cls(steps=50, cfg_scale=1.0, width=1344, height=768)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -464,9 +475,10 @@ def _filename_suggests_base(name: str) -> bool:
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
-    Distinguishes between Klein 4B and Klein 9B based on context embedding dimension:
+    Distinguishes between variants based on context embedding dimension:
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
     - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
+    - Dev:      context_in_dim = 15360 (3 × Mistral Small 3.1 hidden_size 5120)
 
     Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
     and cannot be distinguished from the state dict alone. This function defaults to Klein9B
@@ -476,10 +488,6 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     - BFL format: txt_in.weight (context embedder)
     - Diffusers format: context_embedder.weight
     """
-    # Context dimensions for each variant
-    KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-    KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-
     # Check context_embedder to determine variant
     # Support both BFL format (txt_in.weight) and diffusers format (context_embedder.weight)
     context_keys = {
@@ -502,14 +510,12 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                 continue
             if len(shape) >= 2:
                 context_in_dim = shape[1]
-                # Determine variant based on context dimension
-                if context_in_dim == KLEIN_9B_CONTEXT_DIM:
-                    # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
-                    return Flux2VariantType.Klein9B
-                elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
-                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
-                    return Flux2VariantType.Klein4B
-                elif context_in_dim > 4096:
+                # Determine variant based on context dimension. Callers use filename
+                # heuristics to upgrade Klein4B/Klein9B to their Base variants.
+                variant = flux2_variant_from_context_dim(context_in_dim)
+                if variant is not None:
+                    return variant
+                if context_in_dim > 4096:
                     # Unknown FLUX.2 variant, default to 4B
                     return Flux2VariantType.Klein4B
 
@@ -945,7 +951,7 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
 
 
 class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."""
+    """Model config for FLUX.2 models in diffusers format (FLUX.2 Klein and FLUX.2 [dev])."""
 
     base: Literal[BaseModelType.Flux2] = Field(BaseModelType.Flux2)
     variant: Flux2VariantType = Field()
@@ -956,11 +962,28 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         raise_for_override_fields(cls, override_fields)
 
+        # A FLUX.2 *main* model is a full diffusers pipeline: a `model_index.json` at
+        # the root, or at least the transformer packaged as a `transformer/` subfolder.
+        # A loose transformer-only checkout — just the contents of `transformer/`, with
+        # a root `config.json` whose `_class_name` is `Flux2Transformer2DModel` — is NOT
+        # a usable main model: the loader unconditionally appends `vae/` / `text_encoder/`
+        # subfolders that don't exist and fails with an OSError mid-queue. Reject that
+        # layout here so it falls through to a non-main classification instead of
+        # registering as a broken pipeline. (The standalone `transformer/` still matches
+        # via the pipeline layout below when it ships inside a full folder.)
+        if not (mod.path / "model_index.json").exists() and not (mod.path / "transformer").exists():
+            raise NotAMatchError(
+                "directory is not a full FLUX.2 pipeline (no model_index.json and no transformer/ subfolder); "
+                "a loose transformer-only checkout cannot be used as a FLUX.2 main model"
+            )
+
         # Check for FLUX.2-specific pipeline class names
         raise_for_class_name(
             common_config_paths(mod.path),
             {
                 "Flux2KleinPipeline",
+                "Flux2Pipeline",
+                "Flux2Transformer2DModel",
             },
         )
 
@@ -978,34 +1001,37 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
         """Determine the FLUX.2 variant from the transformer config.
 
-        FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
-        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
-        - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        FLUX.2 variants are distinguished by joint_attention_dim (= 3 × text encoder hidden_size):
+        - Klein 4B/4B Base: 7680 (3 × Qwen3-4B 2560)
+        - Klein 9B/9B Base: 12288 (3 × Qwen3-8B 4096)
+        - Dev:              15360 (3 × Mistral Small 3.1 5120)
 
-        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
+        Klein distilled and Base variants share identical architectures; the Base variant
+        is detected by a filename heuristic.
         """
-        KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-        KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-
-        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        # Try transformer/config.json first (full pipeline), fall back to root config.json
+        # (loose transformer-only checkouts).
+        transformer_config_path = mod.path / "transformer" / "config.json"
+        root_config_path = mod.path / "config.json"
+        if transformer_config_path.exists():
+            transformer_config = get_config_dict_or_raise(transformer_config_path)
+        else:
+            transformer_config = get_config_dict_or_raise(root_config_path)
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
 
-        # Determine variant based on joint_attention_dim
-        if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein9BBase
-            return Flux2VariantType.Klein9B
-        elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein4BBase
+        # Determine variant based on joint_attention_dim (= context_in_dim).
+        variant = flux2_variant_from_context_dim(joint_attention_dim)
+        if variant is None:
+            # Unknown or FLUX.1-sized joint_attention_dim — default to Klein 4B.
             return Flux2VariantType.Klein4B
-        elif joint_attention_dim > 4096:
-            # Unknown FLUX.2 variant, default to 4B
-            return Flux2VariantType.Klein4B
-
-        # Default to 4B
-        return Flux2VariantType.Klein4B
+        # Klein 4B/9B share their architecture with the corresponding Base variant; use the
+        # filename heuristic to distinguish. Dev has no Base variant.
+        if variant is Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant is Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+        return variant
 
 
 class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
@@ -1473,6 +1499,134 @@ class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         if config.get("is_distilled", False) is False:
             return Krea2VariantType.Base
         return Krea2VariantType.Turbo
+
+
+class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."""
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(BaseModelType.MiniMaxH3)
+    variant: MiniMaxH3VariantType = Field()
+    components_only: bool = Field(
+        default=False,
+        description="Whether the folder holds only the shared components (tokenizer, processor, VAEs) "
+        "without transformer weights - a slim install whose transformer and text encoder must be "
+        "supplied as single-file overrides at generation time.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # H3 ships as a Modular Diffusers pipeline: the root config is modular_model_index.json, not
+        # model_index.json, and the class name implies the base type. The HF repo's FL2VA/ and
+        # Ref2VA/ subtrees are the original remote-code checkpoints and declare "MiniMaxH3Pipeline"
+        # instead - deliberately not matched, since their custom Python cannot be run here.
+        raise_for_class_name(
+            mod.path / "modular_model_index.json",
+            {"MiniMaxH3ModularPipeline"},
+        )
+
+        # The jointly-denoised audio track is what distinguishes H3 from every other video family.
+        # Require the audio VAE so a partial download fails identification rather than failing
+        # mid-generation.
+        raise_for_class_name(
+            mod.path / "audio_vae" / "config.json",
+            {"AutoencoderKLMiniMaxH3Audio"},
+        )
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        # A slim ("components-only") install carries the transformer's config.json for variant
+        # identification but no weight shards - the transformer and text encoder come from
+        # single-file installs selected in the model loader instead. Record that here so the UI
+        # can require those selections up front rather than failing mid-generation.
+        components_only = override_fields.pop("components_only", None)
+        if components_only is None:
+            transformer_dir = mod.path / "transformer"
+            components_only = not any(
+                any(transformer_dir.glob(pattern)) for pattern in ("*.safetensors", "*.bin", "*.pth", "*.pt", "*.ckpt")
+            )
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+            components_only=components_only,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> MiniMaxH3VariantType:
+        """Determine the H3 variant from which task transformer is present.
+
+        H3's task checkpoints share every component except the transformer folder: ``transformer``
+        (FL2VA: text / first/last-frame to audio-video) vs ``transformer_ref`` (Ref2VA: multi-
+        reference). Only FL2VA is supported so far. A Ref2VA-only download is a real H3 model this
+        version cannot run, so identification fails rather than mislabeling it as FL2VA.
+        """
+        transformer_config = mod.path / "transformer" / "config.json"
+        if not transformer_config.exists():
+            raise NotAMatchError(
+                "no FL2VA transformer folder (`transformer/`); Ref2VA-only installs are not supported yet"
+            )
+        raise_for_class_name(transformer_config, {"MiniMaxH3Transformer3DModel"})
+        return MiniMaxH3VariantType.FL2VA
+
+
+def _has_minimax_h3_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Fingerprint for MiniMax H3 single-file transformer checkpoints (remote-code key layout,
+    as shipped by MiniMax's release and the Comfy-Org repacks, bf16 or int8 alike).
+
+    The joint audio+video patch projections are unique to H3 across every family probed here
+    (Wan keys on `patch_embedding`, FLUX on `double_blocks`, Z-Image on `cap_embedder`, ...);
+    the fused-qkv block key pins the remote-code layout the loader's converter expects.
+    """
+    return all(
+        k in state_dict for k in ("audio_patch_proj.weight", "video_patch_proj.weight", "blocks.0.attn.qkv_proj.weight")
+    )
+
+
+class Main_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MiniMax H3 single-file transformer checkpoints (safetensors).
+
+    Covers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or
+    Comfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned ("adaln curves"). The
+    file holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come
+    from an installed H3 diffusers-layout folder.
+
+    A Ref2VA transformer single file is key-for-key indistinguishable from FL2VA, so Ref2VA is
+    excluded only by filename; a renamed Ref2VA file would load and run but produce degraded
+    output (it expects reference conditioning rows this integration never packs).
+    """
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: MiniMaxH3VariantType = Field()
+    pruned: bool = Field(description="Whether this is an AdaLN-pruned ('adaln curves') checkpoint.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if "ref2va" in mod.path.name.lower():
+            raise NotAMatchError("Ref2VA single-file transformers are not supported yet")
+
+        state_dict = mod.load_state_dict()
+        if not _has_minimax_h3_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MiniMax H3 transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("GGUF-quantized MiniMax H3 checkpoints are not supported yet")
+
+        variant = override_fields.pop("variant", None) or MiniMaxH3VariantType.FL2VA
+        pruned = "adaln_t_table" in state_dict
+
+        return cls(**override_fields, variant=variant, pruned=pruned)
 
 
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):

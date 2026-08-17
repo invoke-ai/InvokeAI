@@ -1,4 +1,6 @@
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import type { AnyModelConfig } from 'services/api/types';
+import { isKrea2Qwen3VLEncoderModelConfig } from 'services/api/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock model configs returned by selectors - these simulate what RTK Query provides
@@ -62,6 +64,17 @@ const mockKrea2Qwen3VlEncoder = {
   base: 'any' as const,
   type: 'qwen3_vl_encoder' as const,
   format: 'qwen3_vl_encoder' as const,
+};
+
+// MiniMax H3's truncated 32B conditioning encoder shares the qwen3_vl_encoder model type but
+// must never be auto-selected for Krea-2 (50-layer truncation, no final norm).
+const mockMiniMaxH3TruncatedEncoder = {
+  key: 'h3-te-key',
+  hash: 'h3-te-hash',
+  name: 'MiniMax H3 Qwen3-VL 32B int8',
+  base: 'minimax-h3' as const,
+  type: 'qwen3_vl_encoder' as const,
+  format: 'checkpoint' as const,
 };
 
 const mockZImageTurboDiffusers = {
@@ -170,7 +183,10 @@ vi.mock('services/api/endpoints/models', () => ({
   selectModelConfigsQuery: (state: unknown) => mockSelectModelConfigsQuery(state),
 }));
 
-vi.mock('services/api/types', () => ({
+vi.mock('services/api/types', async (importOriginal) => ({
+  // Keep the real type guards (the Krea-2 encoder test below exercises the real
+  // isKrea2Qwen3VLEncoderModelConfig filtering) and stub only what the listener needs stubbed.
+  ...(await importOriginal<Record<string, unknown>>()),
   isFluxKontextModelConfig: vi.fn(() => false),
   isFluxReduxModelConfig: vi.fn(() => false),
 }));
@@ -262,8 +278,9 @@ function buildMockState(overrides: Record<string, unknown> = {}) {
       animaVaeModel: null,
       animaQwen3EncoderModel: null,
       animaScheduler: 'euler',
-      kleinVaeModel: null,
+      flux2VaeModel: null,
       kleinQwen3EncoderModel: null,
+      flux2DevMistralEncoderModel: null,
       zImageScheduler: 'euler',
       ...overrides,
     },
@@ -529,6 +546,38 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
     expect(zModelIdentifierField.safeParse(encoderDispatch!.payload).success).toBe(true);
     expect(vaeDispatch!.payload).toMatchObject({ key: mockKrea2Vae.key, type: 'vae' });
     expect(encoderDispatch!.payload).toMatchObject({ key: mockKrea2Qwen3VlEncoder.key, type: 'qwen3_vl_encoder' });
+  });
+
+  it('never auto-selects the MiniMax H3 truncated encoder for Krea-2', () => {
+    // The production selector is built from isKrea2Qwen3VLEncoderModelConfig; feed the mock
+    // through the REAL guard so this test exercises the actual filtering, not the mock.
+    const installed = [mockKrea2Qwen3VlEncoder, mockMiniMaxH3TruncatedEncoder] as unknown as AnyModelConfig[];
+    mockSelectQwen3VLEncoderModels.mockReturnValue(
+      installed.filter(isKrea2Qwen3VLEncoderModelConfig) as unknown as (typeof mockKrea2Qwen3VlEncoder)[]
+    );
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    capturedEffect!(modelSelected(zParameterModel.parse(mockKrea2MainModel)), {
+      getState: () => state,
+      dispatch: mockDispatch,
+    });
+
+    const encoderDispatch = dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type);
+    expect(encoderDispatch).toBeDefined();
+    expect(encoderDispatch!.payload).toMatchObject({ key: mockKrea2Qwen3VlEncoder.key });
+
+    // With ONLY the H3 encoder installed, the guard filters it out entirely - Krea-2 must not
+    // auto-select it even when nothing else is available.
+    dispatched.length = 0;
+    const onlyH3 = [mockMiniMaxH3TruncatedEncoder] as unknown as AnyModelConfig[];
+    mockSelectQwen3VLEncoderModels.mockReturnValue(
+      onlyH3.filter(isKrea2Qwen3VLEncoderModelConfig) as unknown as (typeof mockKrea2Qwen3VlEncoder)[]
+    );
+    capturedEffect!(modelSelected(zParameterModel.parse(mockKrea2MainModel)), {
+      getState: () => state,
+      dispatch: mockDispatch,
+    });
+    expect(dispatched.find((a) => a.type === krea2Qwen3VlEncoderModelSelected.type)).toBeUndefined();
   });
 
   it('falls back to an Anima-tagged VAE when no Qwen-Image VAE is installed', () => {

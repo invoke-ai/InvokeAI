@@ -193,3 +193,65 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         _validate_krea2_qwen3_vl_checkpoint_shape(state_dict)
 
         return cls(**override_fields)
+
+
+_MINIMAX_H3_TE_METADATA_KEY = "minimax_h3_te"
+_MINIMAX_H3_TE_HIDDEN_SIZE = 5120
+
+
+class Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for MiniMax H3's truncated Qwen3-VL-32B conditioning encoder single files
+    (Comfy-Org ``qwen3vl_32b_minimax_h3_*.safetensors`` and mirrors).
+
+    These are NOT complete Qwen3-VL-32B checkpoints: the language stack is truncated to the 50
+    layers H3 conditions on (the file's ``minimax_h3_te`` metadata records the contract:
+    "unnormalized_hidden_after_layer_50"), the final norm and LM head are omitted, and the
+    bf16/int8-convrot repacks quantize only the 50 language layers (vision tower stays bf16).
+
+    Identified primarily by the explicit ``minimax_h3_te`` safetensors metadata; a structural
+    fallback covers metadata-stripped re-uploads. Krea-2's ``Qwen3VLEncoder_Checkpoint_Config``
+    is locked to the 4B shape (hidden 2560), so neither config can claim the other's files.
+
+    The nvfp4 repacks share this layout and are accepted here, but the loader rejects their
+    quantization format early (header-only check) with a clear error - mirroring how the H3
+    transformer checkpoint config treats fp8_scaled files.
+    """
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
+    type: Literal[ModelType.Qwen3VLEncoder] = Field(default=ModelType.Qwen3VLEncoder)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        state_dict = mod.load_state_dict()
+        # The structural minimum holds on BOTH paths: a re-tagged arbitrary file must not install
+        # on the strength of its metadata alone and fail only after the ~25 GiB load.
+        if (
+            "model.layers.0.self_attn.q_proj.weight" not in state_dict
+            or "visual.blocks.0.attn.qkv.weight" not in state_dict
+        ):
+            raise NotAMatchError("state dict does not look like a MiniMax H3 Qwen3-VL-32B encoder")
+
+        if _MINIMAX_H3_TE_METADATA_KEY not in mod.metadata():
+            # Structural fallback for metadata-stripped re-uploads: additionally require the
+            # 32B hidden size and no layer beyond the H3 truncation point. (A full 64-layer 32B
+            # encoder is deliberately NOT matched - H3 conditioning requires the truncated stack
+            # or the diffusers folder install.)
+            embed = state_dict.get("model.embed_tokens.weight")
+            shape = getattr(embed, "shape", ())
+            if len(shape) < 2 or shape[1] != _MINIMAX_H3_TE_HIDDEN_SIZE:
+                raise NotAMatchError("state dict does not look like a MiniMax H3 Qwen3-VL-32B encoder")
+            if any(isinstance(key, str) and ".layers.50." in key for key in state_dict):
+                raise NotAMatchError(
+                    "state dict looks like a full (untruncated) Qwen3-VL-32B - MiniMax H3 requires the "
+                    "50-layer truncated conditioning encoder"
+                )
+
+        return cls(**override_fields)

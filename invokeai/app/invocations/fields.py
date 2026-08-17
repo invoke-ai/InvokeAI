@@ -163,6 +163,7 @@ class FieldDescriptions:
     glm_encoder = "GLM (THUDM) tokenizer and text encoder"
     qwen3_encoder = "Qwen3 tokenizer and text encoder"
     qwen3_vl_encoder = "Qwen3-VL tokenizer and text encoder"
+    mistral_encoder = "Mistral tokenizer/processor and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
@@ -179,12 +180,17 @@ class FieldDescriptions:
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
     z_image_model = "Z-Image model (Transformer) to load"
+    flux2_dev_model = "FLUX.2 [dev] model (Transformer) to load"
     krea2_model = "Krea-2 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     wan_model = "Wan 2.2 model (Transformer) to load"
     wan_t5_encoder = "UMT5-XXL tokenizer and text encoder for Wan 2.2"
     wan_ref_image = "Reference-image (VAE-latent) conditioning for Wan 2.2 I2V."
+    minimax_h3_model = "MiniMax H3 model (Transformer) to load"
+    minimax_h3_text_encoder = "Qwen3-VL-32B tokenizer, processor and text encoder for MiniMax H3"
+    minimax_h3_frame_conditioning = "First/last-keyframe (VAE-latent) conditioning for MiniMax H3"
+    minimax_h3_audio_vae = "Audio VAE (stereo, 32 kHz) for MiniMax H3"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -442,6 +448,33 @@ class WanRefImageConditioningField(BaseModel):
         description="Pixel-frame count the condition was built for. 1 for single-frame I2V "
         "(image output), 81+ for video.",
     )
+
+
+class MiniMaxH3ConditioningField(BaseModel):
+    """A MiniMax H3 conditioning primitive value.
+
+    H3 conditioning is the layer-50 Qwen3-VL hidden state plus the per-row modality tags the
+    packed-sequence layout is built from (vision-block rows are tagged as video).
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class MiniMaxH3FrameConditioningField(BaseModel):
+    """First/last-keyframe conditioning for MiniMax H3 (FL2VA).
+
+    Carries the CLEAN (not yet noise-augmented) packed keyframe conditioning rows; the denoise
+    node noise-augments them to t=0.999 with the request seed's first draws. Width/height ride
+    along so the denoise node can reject a canvas mismatch instead of failing inside the
+    transformer.
+    """
+
+    condition_rows_name: str = Field(description="Name of the saved (num_condition_rows, 96) rows tensor.")
+    keyframe_anchors: list[str] = Field(
+        description='Which end each keyframe anchors, in packed order ("first" / "last").'
+    )
+    width: int = Field(description="Canvas width used during VAE encoding (matches denoise width).")
+    height: int = Field(description="Canvas height used during VAE encoding (matches denoise height).")
 
 
 class ConditioningField(BaseModel):

@@ -39,6 +39,9 @@ dependencies = [
   "diffusers[torch]==0.39.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
+  "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
+                                          # loader depends on private surface (Tekkenizer internals) that
+                                          # moves across majors, so cap below 2.x (validated against 1.11.6)
   "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
@@ -51,6 +54,12 @@ dependencies = [
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
   # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
   # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
+  # Deliberately NOT capped below 2.12 here. torch 2.12.x+rocm7.1 is reported to break generation (#9410), but
+  # this range is what every backend-agnostic install resolves against — manual installs use
+  # `--torch-backend=<x>` with no extra (see docs/start-here/manual), so a blanket cap would also
+  # reject torch>=2.12 on Windows/Linux CUDA, CPU and ARM64, where 2.12 has no known problem.
+  # The ROCm path is constrained where it can actually be targeted: the `rocm` extra below pins an
+  # exact version, and the manual docs carry the ROCm-specific caveat.
   "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
@@ -87,6 +96,16 @@ dependencies = [
   "requests",
   "semver~=3.0.1",
   "PyWavelets",
+
+  # Semantic image index (image map / semantic search).
+  # numba is a umap-learn transitive, pinned to the range this stack has been
+  # exercised against rather than for numpy compatibility: every release from
+  # 0.59 to at least 0.63 accepts the numpy 1.26.x resolved under numpy<2.0
+  # above (0.62 widened its floor back to >=1.22). Raise the ceiling once a
+  # newer numba has been run against the image map, not just resolved.
+  "umap-learn~=0.5.7",
+  "scikit-learn~=1.5",
+  "numba>=0.59,<0.62",
 ]
 
 [project.optional-dependencies]
@@ -300,6 +319,22 @@ ignore = [
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
 select = ["B", "C", "E", "F", "W", "I", "TID"]
+
+[tool.ruff.lint.per-file-ignores]
+# Vendored from the diffusers MiniMax-H3 branch (see invokeai/backend/minimax_h3/__init__.py);
+# kept as close to upstream as possible, so upstream's zip() style is tolerated.
+"invokeai/backend/minimax_h3/transformer_minimax_h3.py" = ["B905"]
+"invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py" = ["B905"]
+"invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py" = ["B905"]
+"invokeai/backend/minimax_h3/scheduling_minimax_h3.py" = ["B905"]
+
+[tool.ruff.format]
+# Same vendored files as above. They are kept byte-identical to upstream diffusers (modulo the
+# absolute-import rewrite) so that re-syncing when a tagged diffusers ships the H3 classes is a
+# clean copy rather than a manual re-application of formatting. Upstream wraps at a narrower line
+# length than this project, so `ruff format` would rewrap a handful of lines for no semantic gain.
+# `ruff check` still runs on them, so the import sorting this project does enforce stays enforced.
+exclude = ["invokeai/backend/minimax_h3/*.py"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.

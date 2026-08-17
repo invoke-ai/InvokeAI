@@ -182,6 +182,40 @@ class AnimaConditioningInfo:
 
 
 @dataclass
+class MiniMaxH3ConditioningInfo:
+    """MiniMax H3 text conditioning from the Qwen3-VL-32B conditioner.
+
+    ``prompt_embeds`` is the *unnormalized* hidden state after the conditioner's 50th decoder
+    layer. ``text_token_tags`` is the per-row modality tag of every embedding row (text rows
+    tagged 1, keyframe vision-block rows tagged 0 = video); the denoise node builds the packed
+    sequence layout from it, so it must travel with the embeddings.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Qwen3-VL layer-50 hidden states. Shape: (1, num_text_tokens, 5120)."""
+
+    text_token_tags: torch.Tensor
+    """Per-row modality tags. Shape: (num_text_tokens,), dtype long."""
+
+    keyframe_anchors: tuple[str, ...] = ()
+    """Which keyframes ("first"/"last", packed order) were part of the vision context. The
+    denoise node cross-checks this against its frame-conditioning input: keyframes must reach
+    the text conditioning and the VAE condition rows together, or not at all."""
+
+    width: int | None = None
+    """Canvas width the keyframes were prepared at (None when no keyframes)."""
+
+    height: int | None = None
+    """Canvas height the keyframes were prepared at (None when no keyframes)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        # Tags are structural (long); only the device moves.
+        self.text_token_tags = self.text_token_tags.to(device=device)
+        return self
+
+
+@dataclass
 class WanConditioningInfo:
     """Wan 2.2 text conditioning information from the UMT5-XXL encoder.
 
@@ -220,6 +254,7 @@ class ConditioningFieldData:
         | List[Krea2ConditioningInfo]
         | List[AnimaConditioningInfo]
         | List[WanConditioningInfo]
+        | List[MiniMaxH3ConditioningInfo]
     )
 
 

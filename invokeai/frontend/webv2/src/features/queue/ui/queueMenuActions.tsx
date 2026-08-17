@@ -22,6 +22,8 @@ interface QueueMenuActionInputs {
     pauseProcessor: string;
     resumeProcessor: string;
   };
+  /** Only menus rendered outside the queue widget should offer to open it. */
+  includeOpenQueue: boolean;
   cancellableCount: number;
   hasPendingQueueWork: boolean;
   hasRunningItem: boolean;
@@ -45,6 +47,7 @@ export interface QueueMenuAction {
 
 export const getQueueMenuActions = ({
   labels,
+  includeOpenQueue,
   cancellableCount,
   hasPendingQueueWork,
   hasRunningItem,
@@ -90,15 +93,21 @@ export const getQueueMenuActions = ({
     label: labels.pauseProcessor,
     onClick: onPauseProcessor,
   },
-  {
-    disabled: false,
-    icon: ListOrderedIcon,
-    label: labels.openQueue,
-    onClick: onOpenQueue,
-  },
+  ...(includeOpenQueue
+    ? [
+        {
+          disabled: false,
+          icon: ListOrderedIcon,
+          label: labels.openQueue,
+          onClick: onOpenQueue,
+        },
+      ]
+    : []),
 ];
 
-export const useQueueMenuActions = (): QueueMenuAction[] => {
+export const useQueueMenuActions = ({
+  includeOpenQueue = false,
+}: { includeOpenQueue?: boolean } = {}): QueueMenuAction[] => {
   const { t } = useTranslation();
   const counts = useQueueCounts();
   const { current } = useNowNextItems();
@@ -197,6 +206,7 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
         canManageProcessor,
         hasPendingQueueWork,
         hasRunningItem,
+        includeOpenQueue,
         isConnected,
         onCancelAll: cancelAll,
         onCancelAllExceptCurrent: cancelAllExceptCurrent,
@@ -213,6 +223,7 @@ export const useQueueMenuActions = (): QueueMenuAction[] => {
       canManageProcessor,
       hasPendingQueueWork,
       hasRunningItem,
+      includeOpenQueue,
       isConnected,
       openQueue,
       pauseProcessor,

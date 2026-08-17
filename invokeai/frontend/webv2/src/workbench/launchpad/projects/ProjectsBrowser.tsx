@@ -1,19 +1,19 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 
-import { Alert, Box, Flex, Icon, SimpleGrid, Skeleton, Stack, Text } from '@chakra-ui/react';
+import { Alert, Box, Flex, Icon, SimpleGrid, Skeleton, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { Scrollable } from '@platform/ui/Scrollable';
+import { Link } from '@tanstack/react-router';
 import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { useOpenProjectsSelector } from '@workbench/projects/openProjects';
-import { FolderIcon, SearchXIcon } from 'lucide-react';
+import { FolderIcon, PlusIcon, SearchXIcon } from 'lucide-react';
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectGroupId, ProjectRowModel, ProjectSortId, ProjectsViewId } from './projectLibraryView';
 
-import { NewProjectCard } from './NewProjectCard';
 import { ProjectCard } from './ProjectCard';
 import { PROJECT_COVER_ASPECT_RATIO } from './ProjectCover';
 import { buildProjectGroups, flattenProjectGroupsToRows } from './projectLibraryView';
@@ -57,6 +57,7 @@ const GROUP_LABEL_KEY: Record<ProjectGroupId, string> = {
 const SKELETON_GRID_COLUMNS = { base: 1, lg: 3, sm: 2 } as const;
 const NO_MATCHES_ICON = <Icon as={SearchXIcon} />;
 const NO_PROJECTS_ICON = <Icon as={FolderIcon} />;
+const NEW_PROJECT_SEARCH = { new: true } as const;
 
 export interface ProjectsBrowserProps {
   /**
@@ -259,18 +260,28 @@ const VirtualProjectsRow = ({
         </SimpleGrid>
       ) : (
         row.projects.map((project) => (
-          <ProjectRow
-            isPinned={pinnedIds.includes(project.id)}
-            key={project.id}
-            summary={project}
-            onTogglePin={onTogglePin}
-          />
+          // The wrapper owns the virtualizer's full row pitch. No divider: the
+          // row's own rounded hover fill separates the items, and a hairline
+          // running under a rounded fill only cuts across its corners.
+          <Box h={`${PROJECT_ROW_HEIGHT_PX}px`} key={project.id}>
+            <ProjectRow isPinned={pinnedIds.includes(project.id)} summary={project} onTogglePin={onTogglePin} />
+          </Box>
         ))
       )}
     </Box>
   );
 };
 
+/**
+ * Both empty states align to `start`, on the same axis as the page heading,
+ * the description and the search field. A centered block under a left-aligned
+ * page shares an edge with nothing above it.
+ *
+ * The action is a button, not the dashed tile this used to render. That tile
+ * was a grid cell with no grid around it — floating at an arbitrary width, and
+ * shown even in list view — and it repeated a call to action the header
+ * already carries. A button matches what the no-matches state beside it does.
+ */
 const ProjectsEmptyState = ({
   isSearching,
   onClearSearch,
@@ -285,6 +296,7 @@ const ProjectsEmptyState = ({
   if (isSearching) {
     return (
       <EmptyState
+        align="start"
         description={t('projects.noSearchMatchesDescription')}
         icon={NO_MATCHES_ICON}
         title={t('projects.noSearchMatches', { search: searchTerm.trim() })}
@@ -297,15 +309,22 @@ const ProjectsEmptyState = ({
   }
 
   return (
-    <Stack gap="4">
-      <EmptyState
-        description={t('projects.noSavedProjectsDescription')}
-        icon={NO_PROJECTS_ICON}
-        title={t('projects.noSavedProjects')}
-      />
-      <Box maxW="xs" mx="auto" w="full">
-        <NewProjectCard />
-      </Box>
-    </Stack>
+    <EmptyState
+      align="start"
+      description={t('projects.noSavedProjectsDescription')}
+      icon={NO_PROJECTS_ICON}
+      title={t('projects.noSavedProjects')}
+    >
+      {/* Outline, not solid: the header already carries this action as the
+          page's one accent, and repeating that weight a few hundred pixels
+          away doubles the loudest thing on an otherwise quiet screen without
+          adding a choice. */}
+      <Button asChild size="xs" variant="outline">
+        <Link search={NEW_PROJECT_SEARCH} to="/app">
+          <Icon as={PlusIcon} boxSize="3.5" />
+          {t('projects.newProject')}
+        </Link>
+      </Button>
+    </EmptyState>
   );
 };

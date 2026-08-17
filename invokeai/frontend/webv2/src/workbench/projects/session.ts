@@ -2,18 +2,15 @@ import type { LaunchpadIntentId } from '@workbench/launchpad/intents';
 import type { AccountState, WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
-import { getClientStateValue } from './api';
+import { getClientStateValue, setClientStateValue } from './api';
 
 /**
- * The per-user session blob in the client-state KV: the editor session — which
- * projects are open as tabs and which is active — plus a legacy account snapshot
- * for older installs. Current settings live in `settings.ts` so Home can load
- * them without mounting the workbench provider.
+ * The per-user session blob in the client-state KV: which projects are open as tabs and which is
+ * active, plus a legacy account snapshot. Settings live in `settings.ts` so Home can load them
+ * without mounting the workbench provider.
  *
- * `openProjectIds` arrived with the library/session split. Blobs written
- * before it have no open set; `undefined` there means "unknown — open every
- * project", which is exactly what those versions did, so old sessions migrate
- * without anything visibly changing.
+ * An `undefined` `openProjectIds` means "unknown — open every project", which is what the versions
+ * predating the library/session split did, so old sessions migrate without visible change.
  */
 
 export const SESSION_STATE_KEY = 'webv2:workbench-account';
@@ -77,6 +74,35 @@ export const fetchSessionBlob = async (signal?: AbortSignal): Promise<WorkbenchS
     signal?.throwIfAborted();
 
     return null;
+  }
+};
+
+/**
+ * Take a deleted project out of the saved session, which the `/app` guard and the Launchpad's
+ * "open" grouping read. Best-effort and silent: the deletion has already happened, and failing to
+ * tidy up after it is not a reason to say the project was not deleted.
+ */
+export const pruneSessionProject = async (projectId: string, signal?: AbortSignal): Promise<void> => {
+  try {
+    const blob = await fetchSessionBlob(signal);
+
+    if (!blob?.openProjectIds?.includes(projectId)) {
+      return;
+    }
+
+    const openProjectIds = blob.openProjectIds.filter((id) => id !== projectId);
+
+    await setClientStateValue(
+      SESSION_STATE_KEY,
+      JSON.stringify({
+        account: blob.account,
+        activeProjectId: blob.activeProjectId === projectId ? (openProjectIds[0] ?? '') : blob.activeProjectId,
+        openProjectIds,
+      } satisfies WorkbenchSessionBlob),
+      signal
+    );
+  } catch {
+    signal?.throwIfAborted();
   }
 };
 

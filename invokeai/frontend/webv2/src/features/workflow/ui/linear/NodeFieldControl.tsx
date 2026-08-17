@@ -166,6 +166,7 @@ export const NodeFieldControl = ({
           <WorkflowFieldInput
             id={valueInputId}
             invalid={isInvalid}
+            nodeId={nodeId}
             template={template}
             value={instance?.value}
             onChange={onValueChange}

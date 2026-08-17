@@ -17,11 +17,15 @@ from invokeai.app.api.routers._access import (
     assert_board_read_access as _assert_board_read_access,
 )
 from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
+from invokeai.app.api.routers._access import (
     assert_image_owner as _assert_image_owner,
 )
 from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
@@ -102,19 +106,7 @@ async def upload_image(
     """Uploads an image for the current user"""
     # If uploading into a board, verify the user has write access.
     # Public boards allow uploads from any authenticated user.
-    if board_id is not None:
-        from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Board not found")
-        if (
-            not current_user.is_admin
-            and board.user_id != current_user.user_id
-            and board.board_visibility != BoardVisibility.Public
-        ):
-            raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+    _assert_board_write_access(board_id, current_user)
 
     assert_image_move_maintenance_inactive()
 
@@ -579,6 +571,67 @@ async def delete_uncategorized_images(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")
+
+
+class CopiedImage(BaseModel):
+    source_image_name: str = Field(description="The image that was copied")
+    image_name: str = Field(description="The name assigned to the copy")
+
+
+class CopyImagesResult(BaseModel):
+    copied: list[CopiedImage] = Field(description="The copies that were made, in request order")
+    failed: list[str] = Field(description="The source image names that could not be copied")
+
+
+@images_router.post("/copy", operation_id="copy_images_to_board", response_model=CopyImagesResult)
+def copy_images_to_board(
+    current_user: CurrentUserOrDefault,
+    image_names: list[str] = Body(description="The names of the images to copy", max_length=MAX_COPY_BATCH_SIZE),
+    board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
+) -> CopyImagesResult:
+    """Copies images, optionally onto a board, and returns the new names.
+
+    Each copy is a genuinely new image with its own name, because `board_images` keys on
+    `image_name` — one image can sit on exactly one board, so sharing a name between two boards is
+    not representable. Duplicating a project needs that: its copy must own its media outright.
+
+    The pixels never leave the server, and never leave the disk either: `images.copy` clones the
+    record and copies the file byte for byte, so the embedded metadata, workflow and graph travel
+    without being parsed and rewritten. Category and origin travel; the originating session and
+    node do not. Starring is not copied — callers that want it use `POST /images/star`, the same
+    path an import uses.
+
+    Per-image failures are reported rather than raised, so one unreadable source cannot cost the
+    caller the whole batch.
+
+    A sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a
+    board's worth of them on the event loop would stall every other request for the duration.
+
+    Read access is enough to copy, which means an image on a board shared with you can be copied
+    into something you own, and the copy outlives the share. That is deliberate — it is what makes
+    a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+    is stated rather than left to be discovered.
+    """
+    _assert_board_write_access(board_id, current_user)
+    assert_image_move_maintenance_inactive()
+
+    copied: list[CopiedImage] = []
+    failed: list[str] = []
+
+    for image_name in image_names:
+        try:
+            _assert_image_read_access(image_name, current_user)
+            image_dto = ApiDependencies.invoker.services.images.copy(
+                source_image_name=image_name,
+                board_id=board_id,
+                user_id=current_user.user_id,
+            )
+            copied.append(CopiedImage(source_image_name=image_name, image_name=image_dto.image_name))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy image {image_name}", exc_info=True)
+            failed.append(image_name)
+
+    return CopyImagesResult(copied=copied, failed=failed)
 
 
 class ImagesUpdatedFromListResult(BaseModel):

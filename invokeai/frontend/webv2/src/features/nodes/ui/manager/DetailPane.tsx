@@ -1,4 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { NodePackInfo } from '@features/nodes/core/catalog';
+
 import { Box, Flex, Icon, Text } from '@chakra-ui/react';
 import { useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { NodeActivityBar } from '@features/nodes/ui/activity/NodeActivityBar';
@@ -6,6 +8,7 @@ import { AddNodesView } from '@features/nodes/ui/add-nodes/AddNodesView';
 import { NodePackDetail } from '@features/nodes/ui/detail/NodePackDetail';
 import { updateNodesUi, useNodesUiSelector, type NodesManagerTab } from '@features/nodes/ui/nodesUiStore';
 import { Scrollable, Tabs } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,9 +37,7 @@ export const DetailPane = () => {
           <Tabs.List mb="-1px">
             <Tabs.Trigger value="details">
               <Icon as={BlocksIcon} boxSize="3" />
-              <Text maxW="14rem" truncate>
-                {detailLabel}
-              </Text>
+              <MiddleTruncate maxW="14rem" text={detailLabel} />
             </Tabs.Trigger>
             <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />
@@ -47,7 +48,7 @@ export const DetailPane = () => {
 
         <Box flex="1" minH="0">
           <Tabs.Content h="full" p="0" value="details">
-            <DetailTab packName={activePackName} />
+            <DetailTab activePack={activePack} />
           </Tabs.Content>
           <Tabs.Content h="full" p="0" value="add">
             <AddNodesView />
@@ -60,10 +61,8 @@ export const DetailPane = () => {
   );
 };
 
-const DetailTab = ({ packName }: { packName: string | null }) => {
+const DetailTab = ({ activePack }: { activePack: NodePackInfo | null }) => {
   const { t } = useTranslation();
-  const nodePacks = useCustomNodesSelector((snapshot) => snapshot.nodePacks);
-  const activePack = nodePacks.find((pack) => pack.name === packName) ?? null;
 
   if (!activePack) {
     return (
@@ -85,4 +84,3 @@ const DetailTab = ({ packName }: { packName: string | null }) => {
     </Scrollable>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

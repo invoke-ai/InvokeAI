@@ -57,6 +57,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_Krea2_Config,
+    LoRA_LyCORIS_MiniMaxH3_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -73,6 +74,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_Krea2_Config,
+    Main_Checkpoint_MiniMaxH3_Config,
     Main_Checkpoint_QwenImage_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -85,6 +87,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
     Main_Diffusers_Krea2_Config,
+    Main_Diffusers_MiniMaxH3_Config,
     Main_Diffusers_QwenImage_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
@@ -101,6 +104,11 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.mistral_encoder import (
+    MistralEncoder_Checkpoint_Config,
+    MistralEncoder_Diffusers_Config,
+    MistralEncoder_GGUF_Config,
+)
 from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_Flux2_Config,
     PiDDecoder_Checkpoint_FLUX_Config,
@@ -115,6 +123,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
 )
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
+    Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
@@ -183,6 +192,7 @@ _MODEL_EXTENSIONS = {
 # Known config file names for diffusers/transformers models
 _CONFIG_FILES = {
     "model_index.json",
+    "modular_model_index.json",
     "config.json",
 }
 
@@ -195,7 +205,15 @@ _MAX_SEARCH_DEPTH = 2
 # Classes introduced by the versions pinned by this checkout may not exist in the interpreter used by
 # lightweight config tests. Keep explicit markers only for those newly supported classes; established
 # classes are resolved from the installed Diffusers/Transformers exports below.
-_PINNED_MODEL_CLASS_MARKERS = {"Krea2Pipeline"}
+_PINNED_MODEL_CLASS_MARKERS = {
+    "Krea2Pipeline",
+    # MiniMax H3 classes exist only in an unreleased diffusers branch (vendored under
+    # invokeai/backend/minimax_h3); the installed diffusers cannot resolve them.
+    "MiniMaxH3ModularPipeline",
+    "MiniMaxH3Transformer3DModel",
+    "AutoencoderKLMiniMaxH3",
+    "AutoencoderKLMiniMaxH3Audio",
+}
 
 
 def _is_known_model_marker(config_name: str, config: Any) -> bool:
@@ -221,15 +239,16 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
         except Exception:
             return False
 
-    if config_name == "model_index.json":
+    if config_name in ("model_index.json", "modular_model_index.json"):
         class_name = config.get("_class_name")
-        return class_name in _PINNED_MODEL_CLASS_MARKERS or has_model_export(
+        # Non-str _class_name (e.g. a list) must read as "not a marker", not TypeError on the set lookup.
+        return (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS) or has_model_export(
             diffusers, class_name, (DiffusionPipeline,)
         )
 
     class_name = config.get("_class_name")
     if (
-        class_name in _PINNED_MODEL_CLASS_MARKERS
+        (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS)
         or has_model_export(diffusers, class_name, (ModelMixin, DiffusionPipeline))
         or has_model_export(transformers, class_name, (PreTrainedModel, PretrainedConfig))
     ):
@@ -262,6 +281,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
+        Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -275,6 +295,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
+        Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -332,6 +353,11 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        # MiniMax H3 keys on H3-exclusive submodules (fused ``attn.qkv_proj``,
+        # ``adaln_proj.linear``) and rejects other architectures' signatures, so it
+        # is mutually exclusive with Wan/Anima regardless of order (locked in by
+        # ``test_minimax_h3_lora_probe_independence.py``).
+        Annotated[LoRA_LyCORIS_MiniMaxH3_Config, LoRA_LyCORIS_MiniMaxH3_Config.get_tag()],
         # Wan and Anima both target ``blocks.X`` shapes; their LoRA probes are
         # mutually exclusive — Wan rejects Anima's ``_proj``/``mlp``/
         # ``adaln_modulation`` markers, Anima requires at least one of those
@@ -361,12 +387,20 @@ AnyModelConfig = Annotated[
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
         # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
+        # MiniMax H3's truncated 32B conditioning encoder goes first: it matches on explicit
+        # safetensors metadata without reading tensors, and the Krea-2 config below is locked to
+        # the 4B shape so neither can claim the other's files.
+        Annotated[Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config, Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Checkpoint_Config, Qwen3VLEncoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        # Mistral Encoder (used by FLUX.2 [dev])
+        Annotated[MistralEncoder_Diffusers_Config, MistralEncoder_Diffusers_Config.get_tag()],
+        Annotated[MistralEncoder_Checkpoint_Config, MistralEncoder_Checkpoint_Config.get_tag()],
+        Annotated[MistralEncoder_GGUF_Config, MistralEncoder_GGUF_Config.get_tag()],
         # Gemma 2 Encoder (used by PiD)
         Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
         Annotated[Gemma2Encoder_GGUF_Config, Gemma2Encoder_GGUF_Config.get_tag()],

@@ -78,8 +78,19 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     )
 
 
+BOARD_NAME_MAX_LENGTH = 300
+"""The longest board name the API accepts.
+
+Lives here because `BoardChanges` is what enforces it. A project's board takes the project's name,
+and project names are unbounded, so both the claim path and the migration truncate to this — they
+must agree with the generic route or they would write names it then refuses to touch.
+"""
+
+
 class BoardChanges(BaseModel, extra="forbid"):
-    board_name: Optional[str] = Field(default=None, description="The board's new name.", max_length=300)
+    board_name: Optional[str] = Field(
+        default=None, description="The board's new name.", max_length=BOARD_NAME_MAX_LENGTH
+    )
     cover_image_name: Optional[str] = Field(default=None, description="The name of the board's new cover image.")
     archived: Optional[bool] = Field(default=None, description="Whether or not the board is archived")
     board_visibility: Optional[BoardVisibility] = Field(default=None, description="The visibility of the board.")
@@ -103,6 +114,13 @@ class BoardRecordSaveException(Exception):
     """Raised when an board record cannot be saved."""
 
     def __init__(self, message="Board record not saved"):
+        super().__init__(message)
+
+
+class BoardRecordProjectOwnedException(BoardRecordSaveException):
+    """Raised when a generic board update would change project-owned state."""
+
+    def __init__(self, message="Board belongs to a project"):
         super().__init__(message)
 
 

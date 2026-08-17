@@ -87,6 +87,18 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class MistralEncoderField(BaseModel):
+    """Field for the Mistral text encoder used by FLUX.2 [dev].
+
+    The "tokenizer" submodel actually points to the multimodal processor (AutoProcessor /
+    Mistral3Processor), which wraps the tokenizer plus the chat template needed by FLUX.2.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer / processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class Mistral3EncoderField(BaseModel):
     """Field for Mistral3 text encoder used by ERNIE-Image models."""
 
@@ -114,6 +126,26 @@ class WanT5EncoderField(BaseModel):
 
     tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
+class MiniMaxH3TextEncoderField(BaseModel):
+    """Field for the Qwen3-VL-32B conditioner used by MiniMax H3 models.
+
+    Unlike :class:`Qwen3VLEncoderField`, H3 also needs the Qwen3VLProcessor — even for
+    text-only prompts (its multimodal token-type ids drive Qwen3-VL's 3D rotary layout), and
+    for feeding first/last keyframes to the conditioner as vision context.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    processor: ModelIdentifierField = Field(description="Info to load processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class MiniMaxH3TransformerField(BaseModel):
+    """Transformer field for MiniMax H3 models (FL2VA)."""
+
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 

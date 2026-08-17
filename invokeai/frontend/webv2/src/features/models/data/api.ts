@@ -1,5 +1,6 @@
 import type {
   BulkDeleteModelsResponse,
+  BulkReidentifyModelsResponse,
   DeleteOrphanedModelsResponse,
   FoundModel,
   HFTokenStatus,
@@ -35,9 +36,6 @@ export const listMissingModels = async (signal?: AbortSignal): Promise<ModelConf
 export const getModelsDir = (signal?: AbortSignal): Promise<string> =>
   requestJson<string>(`${MODELS_BASE}/models_dir`, { signal });
 
-export const getModel = (key: string): Promise<ModelConfig> =>
-  requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}`);
-
 export const updateModel = (key: string, changes: ModelRecordChanges, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}`, {
     body: JSON.stringify(changes),
@@ -60,6 +58,15 @@ export const bulkDeleteModels = (keys: string[], signal?: AbortSignal): Promise<
 /** Re-probe the model files to refresh auto-detected base/type/format. */
 export const reidentifyModel = (key: string, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}/reidentify`, { method: 'POST', signal });
+
+/** Re-probe many models; returns keys only, so callers must refresh the library for the new configs. */
+export const bulkReidentifyModels = (keys: string[], signal?: AbortSignal): Promise<BulkReidentifyModelsResponse> =>
+  requestJson<BulkReidentifyModelsResponse>(`${MODELS_BASE}/i/bulk_reidentify`, {
+    body: JSON.stringify({ keys }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    signal,
+  });
 
 export const convertModelToDiffusers = (key: string, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/convert/${encodeURIComponent(key)}`, { method: 'PUT', signal });
@@ -180,39 +187,6 @@ export const deleteOrphanedModels = (paths: string[], signal?: AbortSignal): Pro
 
 export const emptyModelCache = async (signal?: AbortSignal): Promise<void> => {
   await request(`${MODELS_BASE}/empty_model_cache`, { method: 'POST', signal });
-};
-
-/** Model relationships: bidirectional "related model" links between configs. */
-
-const RELATIONSHIPS_BASE = '/api/v1/model_relationships';
-
-export const getRelatedModelKeys = (key: string, signal?: AbortSignal): Promise<string[]> =>
-  requestJson<string[]>(`${RELATIONSHIPS_BASE}/i/${encodeURIComponent(key)}`, { signal });
-
-export const addModelRelationship = async (
-  modelKey1: string,
-  modelKey2: string,
-  signal?: AbortSignal
-): Promise<void> => {
-  await request(`${RELATIONSHIPS_BASE}/`, {
-    body: JSON.stringify({ model_key_1: modelKey1, model_key_2: modelKey2 }),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'POST',
-    signal,
-  });
-};
-
-export const removeModelRelationship = async (
-  modelKey1: string,
-  modelKey2: string,
-  signal?: AbortSignal
-): Promise<void> => {
-  await request(`${RELATIONSHIPS_BASE}/`, {
-    body: JSON.stringify({ model_key_1: modelKey1, model_key_2: modelKey2 }),
-    headers: { 'Content-Type': 'application/json' },
-    method: 'DELETE',
-    signal,
-  });
 };
 
 /** External image-provider credentials (OpenAI, Gemini, ...). */

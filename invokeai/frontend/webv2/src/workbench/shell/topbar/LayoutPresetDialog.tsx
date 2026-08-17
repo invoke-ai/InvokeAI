@@ -1,15 +1,46 @@
+import type { GraphWidgetSource } from '@workbench/graphWidgets';
+import type { InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
+import type { LayoutPresetRoute } from '@workbench/layoutContracts';
 import type { FormEvent, KeyboardEvent } from 'react';
 
-import { chakra, Dialog, Icon, Input, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
+import {
+  chakra,
+  createListCollection,
+  Dialog,
+  HStack,
+  Icon,
+  Input,
+  Portal,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
 import { Field } from '@platform/ui/Field';
+import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { useCallback, useRef, useState } from 'react';
+import { getNaturalDestination } from '@workbench/graphWidgets';
+import { WidgetIcon } from '@workbench/iconResolver';
+import { getWidgetById } from '@workbench/widgetRegistry';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { DEFAULT_LAYOUT_PRESET_ICON_ID, layoutPresetIconGroups } from './layoutPresetIcons';
+import type { LayoutPresetDialogValue } from './layoutPresetDialogModel';
+
+import { getInitialLayoutPresetIconId, getInitialLayoutPresetRoute } from './layoutPresetDialogModel';
+import { layoutPresetIconGroups } from './layoutPresetIcons';
+import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
 const layoutPresetIconIds = layoutPresetIconGroups.flatMap((group) => group.options.map((option) => option.id));
+
+type SourceSelectItem = GraphWidgetSource & { value: InvocationSourceId };
+
+const renderSourceOption = (source: SourceSelectItem) => (
+  <HStack gap="1.5">
+    <WidgetIcon boxSize="3.5" icon={getWidgetById(source.typeId)?.manifest.icon} />
+    <Text as="span">{source.label}</Text>
+  </HStack>
+);
 
 const getNextIconId = (currentIconId: string, key: string): string | null => {
   if (key === 'Home') {
@@ -30,35 +61,51 @@ const getNextIconId = (currentIconId: string, key: string): string | null => {
 };
 
 /**
- * Name and icon for a custom layout preset.
+ * Identity and default routing for a layout preset.
  *
- * Custom presets sit in the same strip as the built-ins and collapse to
- * icon-only below 1280px, so an icon is not decoration — without one every
- * custom preset would be an identical anonymous square at that width. The
- * picker offers a curated set for exactly that reason: the job is to tell your
- * own layouts apart at a glance, not to browse an icon library.
+ * Presets collapse to icon-only below 1280px, so the icon is not decoration.
+ * The curated picker keeps the task focused on telling layouts apart at a
+ * glance instead of turning it into an icon-library search.
  */
 export const LayoutPresetDialog = ({
+  defaultRoute: initialDefaultRoute,
   iconId: initialIconId,
   isOpen,
   name: initialName,
   onClose,
   onSubmit,
+  sourceOptions,
   submitLabel,
   title,
 }: {
+  defaultRoute?: LayoutPresetRoute;
   iconId?: string;
   isOpen: boolean;
   name: string;
   onClose: () => void;
-  onSubmit: (value: { iconId: string; name: string }) => void;
+  onSubmit: (value: LayoutPresetDialogValue) => void;
+  sourceOptions: readonly GraphWidgetSource[];
   submitLabel: string;
   title: string;
 }) => {
   const { t } = useTranslation();
   const [name, setName] = useState(initialName);
-  const [iconId, setIconId] = useState(initialIconId ?? DEFAULT_LAYOUT_PRESET_ICON_ID);
+  const [iconId, setIconId] = useState(() => getInitialLayoutPresetIconId(initialIconId));
+  const [defaultRoute, setDefaultRoute] = useState(() =>
+    getInitialLayoutPresetRoute(initialDefaultRoute, sourceOptions)
+  );
   const nameRef = useRef<HTMLInputElement>(null);
+  const sourceCollection = useMemo(
+    () =>
+      createListCollection<SourceSelectItem>({
+        items: sourceOptions.map((source) => ({ ...source, value: source.sourceId })),
+      }),
+    [sourceOptions]
+  );
+  const sourceTriggerProps = useMemo(() => ({ 'aria-label': t('topbar.presets.defaultSource') }), [t]);
+  const selectedSource = sourceOptions.find((source) => source.sourceId === defaultRoute?.sourceId);
+  const sourceValue = useMemo(() => (defaultRoute ? [defaultRoute.sourceId] : []), [defaultRoute]);
+  const canSubmit = name.trim().length > 0 && (sourceOptions.length === 0 || defaultRoute !== undefined);
 
   // Without this the focus trap lands on the header's close button, so opening
   // the dialog and typing does nothing. `initialFocusEl` rather than `autoFocus`
@@ -88,10 +135,10 @@ export const LayoutPresetDialog = ({
         return;
       }
 
-      onSubmit({ iconId, name: trimmed });
+      onSubmit({ defaultRoute: defaultRoute ?? null, iconId, name: trimmed });
       onClose();
     },
-    [iconId, name, onClose, onSubmit]
+    [defaultRoute, iconId, name, onClose, onSubmit]
   );
   const handleIconKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
@@ -110,6 +157,21 @@ export const LayoutPresetDialog = ({
     },
     [iconId]
   );
+  const handleSourceChange = useCallback((event: { value: string[] }) => {
+    const sourceId = event.value[0] as InvocationSourceId | undefined;
+
+    if (!sourceId) {
+      return;
+    }
+
+    setDefaultRoute((route) => ({
+      destination: route?.destination ?? getNaturalDestination(sourceId),
+      sourceId,
+    }));
+  }, []);
+  const handleDestinationChange = useCallback((destination: ResultDestination) => {
+    setDefaultRoute((route) => (route ? { ...route, destination } : route));
+  }, []);
 
   return (
     <Dialog.Root initialFocusEl={initialFocusEl} open={isOpen} lazyMount unmountOnExit onOpenChange={handleOpenChange}>
@@ -166,13 +228,40 @@ export const LayoutPresetDialog = ({
                       </Stack>
                     ))}
                   </Stack>
+                  <Field
+                    helpText={sourceOptions.length === 0 ? t('topbar.presets.noInvocationSource') : undefined}
+                    label={t('topbar.presets.defaultSource')}
+                  >
+                    <Select
+                      collection={sourceCollection}
+                      disabled={sourceOptions.length === 0}
+                      renderItem={renderSourceOption}
+                      size="xs"
+                      triggerProps={sourceTriggerProps}
+                      value={sourceValue}
+                      valueText={
+                        selectedSource
+                          ? renderSourceOption({ ...selectedSource, value: selectedSource.sourceId })
+                          : undefined
+                      }
+                      onValueChange={handleSourceChange}
+                    />
+                  </Field>
+                  <Field disabled={!defaultRoute} label={t('topbar.presets.defaultDestination')}>
+                    <RoutingDestinationSegments
+                      ariaLabel={t('topbar.presets.defaultDestination')}
+                      disabled={!defaultRoute}
+                      value={defaultRoute?.destination ?? null}
+                      onChange={handleDestinationChange}
+                    />
+                  </Field>
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="sm" type="button" variant="outline" onClick={onClose}>
+                <Button size="xs" type="button" variant="outline" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={name.trim().length === 0} size="sm" type="submit">
+                <Button disabled={!canSubmit} size="xs" type="submit">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>

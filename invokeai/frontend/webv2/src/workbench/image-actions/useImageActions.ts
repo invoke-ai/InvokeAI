@@ -12,11 +12,17 @@ import {
   type GalleryImage,
   type GalleryImageMetadata,
   type GalleryItem,
+  type GalleryItemKey,
   type GalleryItemMutationResult,
   type GalleryItemRef,
 } from '@features/gallery';
 import { getGalleryBoardLabel } from '@features/gallery/contracts';
-import { invalidateGallery, patchGalleryItemCaches } from '@features/gallery/queries';
+import {
+  getGalleryItemBoardIdsFromCaches,
+  getGalleryItemStarredFromCaches,
+  invalidateGallery,
+  patchGalleryItemCaches,
+} from '@features/gallery/queries';
 import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -46,6 +52,14 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+import {
+  captureGalleryWidgetKeyValues,
+  collectGalleryStoreKnownItemFields,
+  diffGalleryWidgetKeyValues,
+  selectItemKeysUnchangedSince,
+  selectRestorableGalleryWidgetPatches,
+  type GalleryWidgetKeySnapshotEntry,
+} from './galleryOptimisticRollback';
 import {
   getMetadataPrompts,
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -157,6 +171,30 @@ export const useImageActions = ({
 
       return project ? getProjectWidgetValues(project, 'generate') : {};
     };
+    // A deleted item can be visible only through widget values — the
+    // `recentImages` overlay, or upscale's locked input — which the cache patch
+    // cannot restore. Snapshot those fields across every open project (images
+    // aren't project-scoped), diffed before/after so the restore applies the
+    // shared compare-and-swap rule rather than clobbering concurrent writes.
+    const applyGalleryItemRemoval = (itemKeys: GalleryItemKey[]): GalleryWidgetKeySnapshotEntry[] => {
+      const before = captureGalleryWidgetKeyValues(queries.getSnapshot().projects);
+
+      gallery.removeItems(itemKeys);
+
+      return diffGalleryWidgetKeyValues(before, queries.getSnapshot().projects);
+    };
+    const restoreGalleryItemRemoval = (entries: GalleryWidgetKeySnapshotEntry[]) => {
+      const patches = selectRestorableGalleryWidgetPatches(entries, queries.getSnapshot().projects);
+
+      for (const patch of patches) {
+        // `patchWidgetValues` is documented "not undoable" (workbenchState.ts);
+        // this restore works around that by re-applying the exact prior values
+        // as a forward patch, guarded by the CAS check above. `origin: 'system'`
+        // keeps it from tripping the auto-route side effects a user-driven
+        // widget patch would trigger.
+        commands.widgets.patchValues(patch.widgetId, patch.values, patch.projectId, 'system');
+      }
+    };
     const reportMutationOutcome = (
       action: 'delete' | 'move' | 'star' | 'unstar',
       requestedCount: number,
@@ -190,12 +228,16 @@ export const useImageActions = ({
       boardId,
       mutate,
       requested,
+      rollback,
     }: {
       action: 'delete' | 'move' | 'star' | 'unstar';
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
       requested: GalleryItemRef[];
+      /** Undo the optimistic apply. Runs once, only when the account scope that requested
+       *  it is still current, before the (likely also-failing) trailing invalidation. */
+      rollback?: () => void;
     }): Promise<void> => {
       const owner = captureAccountScope();
       let error: unknown = null;
@@ -208,6 +250,12 @@ export const useImageActions = ({
         await applyConfirmed(result, owner.signal);
       } catch (caught: unknown) {
         error = caught;
+        // The whole mutation failed — nothing was confirmed, so the optimistic
+        // apply must not stand. The trailing invalidation cannot be relied on
+        // here: whatever killed the mutation (offline) usually kills it too.
+        if (isAccountScopeCurrent(owner)) {
+          rollback?.();
+        }
       }
 
       if (!isAccountScopeCurrent(owner)) {
@@ -232,7 +280,12 @@ export const useImageActions = ({
       reportMutationOutcome(action, requested.length, result, boardId);
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
-      let deletionContext: GalleryItemActionContext | null = null;
+      // Optimistic: items vanish immediately. Capture the action context first
+      // (successor selection reasons about the pre-removal list) and keep a
+      // snapshot rollback. A partial failure leans on the trailing invalidation
+      // to restore overlay entries; a total failure cannot, so the widget
+      // snapshot restores them directly.
+      const deletionContext = getItemActionContext?.() ?? null;
       let orderedRefs: GalleryItemRef[] | null = null;
       const isDeletionContextCurrent = (): boolean => {
         if (!deletionContext || !getItemActionContext) {
@@ -247,10 +300,38 @@ export const useImageActions = ({
           current.selectedItemKey === deletionContext.selectedItemKey
         );
       };
+      const rollbackCaches = patchGalleryItemCaches(queryClient, {
+        kind: 'delete',
+        result: { failed: [], succeeded: items },
+      });
+      // `rollbackCaches` is invoked from two independent places below (the
+      // partial-failure branch inside `applyConfirmed`, and the total-failure
+      // `rollback`): guard so an `applyConfirmed` that throws after already
+      // rolling back a partial failure can't undo the cache patch twice.
+      let cachesRolledBack = false;
+      const rollbackCachesOnce = () => {
+        if (cachesRolledBack) {
+          return;
+        }
+
+        cachesRolledBack = true;
+        rollbackCaches();
+      };
+      // Once `applyConfirmed` starts applying a backend-confirmed result (some
+      // items really were deleted), nothing after that point may trigger a
+      // full rollback even if it throws — `onImagesDeleted` is a caller-
+      // supplied callback invoked after confirmation and can throw for
+      // reasons that have nothing to do with the mutation itself.
+      let confirmedApplied = false;
+      const galleryWidgetSnapshot = applyGalleryItemRemoval(items.map(toGalleryItemKey));
 
       return runItemMutation({
         action: 'delete',
         applyConfirmed: async (result, signal) => {
+          if (result.failed.length > 0) {
+            rollbackCachesOnce();
+          }
+
           if (result.succeeded.length === 0) {
             return;
           }
@@ -310,6 +391,7 @@ export const useImageActions = ({
             }
           }
 
+          confirmedApplied = true;
           patchGalleryItemCaches(queryClient, { kind: 'delete', result });
           gallery.removeItems(result.succeeded.map(toGalleryItemKey));
           if (successor) {
@@ -327,8 +409,6 @@ export const useImageActions = ({
           onImagesDeleted?.(result.succeeded.filter((item) => item.kind === 'image').map((item) => item.name));
         },
         mutate: async (signal) => {
-          deletionContext = getItemActionContext?.() ?? null;
-
           if (
             deletionContext?.selectedItemKey &&
             items.some((item) => toGalleryItemKey(item) === deletionContext?.selectedItemKey)
@@ -344,41 +424,208 @@ export const useImageActions = ({
           return galleryItemOrganization.delete(items, signal);
         },
         requested: items,
+        rollback: () => {
+          if (confirmedApplied) {
+            return;
+          }
+
+          rollbackCachesOnce();
+          restoreGalleryItemRemoval(galleryWidgetSnapshot);
+        },
       });
     };
     const deleteItems = (items: GalleryItemRef[]): Promise<void> =>
       confirmImageDeletion
         ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
         : deleteItemsConfirmed(items);
-    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> =>
-      runItemMutation({
+    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
+      // Optimistic: items leave the board view immediately, so the failure path
+      // rolls back wholesale and re-applies the confirmed subset, with the
+      // trailing invalidation reconciling whatever the rollback skipped as
+      // conflicted. The cache only knows items a list query fetched, so prior
+      // boards also come from the store, cache winning where both know.
+      const previousBoardIds = new Map<GalleryItemKey, string>(
+        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
+          key,
+          fields.boardId,
+        ])
+      );
+
+      for (const [key, cachedBoardId] of getGalleryItemBoardIdsFromCaches(queryClient, items)) {
+        previousBoardIds.set(key, cachedBoardId);
+      }
+
+      const rollbackCaches = patchGalleryItemCaches(queryClient, {
+        boardId,
+        kind: 'move',
+        result: { failed: [], succeeded: items },
+      });
+      // See the delete path's `cachesRolledBack` note: `rollbackCaches` is
+      // reachable both from the partial-failure branch below and from the
+      // total-failure `rollback`, so guard against undoing it twice.
+      let cachesRolledBack = false;
+      const rollbackCachesOnce = () => {
+        if (cachesRolledBack) {
+          return;
+        }
+
+        cachesRolledBack = true;
+        rollbackCaches();
+      };
+      // The cache rollback is CAS-guarded per query, but this store patch is a
+      // separate write: a second move that painted the item onto another board
+      // while the first request hung must not be clobbered back. Restore only
+      // items still on the board *this* move painted, grouped by prior board so
+      // each group is one patch.
+      const restorePreviousBoardIds = () => {
+        const currentStoreBoardIds = collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items);
+        const safeKeys = new Set(
+          selectItemKeysUnchangedSince(
+            [...previousBoardIds.keys()],
+            boardId,
+            (key) => currentStoreBoardIds.get(key)?.boardId
+          )
+        );
+        const restoreByPreviousBoardId = new Map<string, GalleryItemKey[]>();
+
+        for (const [key, previousBoardId] of previousBoardIds) {
+          if (!safeKeys.has(key)) {
+            continue;
+          }
+
+          const group = restoreByPreviousBoardId.get(previousBoardId) ?? [];
+
+          group.push(key);
+          restoreByPreviousBoardId.set(previousBoardId, group);
+        }
+
+        for (const [previousBoardId, keys] of restoreByPreviousBoardId) {
+          gallery.patchItems(keys, { boardId: previousBoardId });
+        }
+      };
+
+      gallery.patchItems(items.map(toGalleryItemKey), { boardId });
+
+      return runItemMutation({
         action: 'move',
         applyConfirmed: (result) => {
-          if (result.succeeded.length === 0) {
+          if (result.failed.length === 0) {
             return;
           }
 
+          rollbackCachesOnce();
           patchGalleryItemCaches(queryClient, { boardId, kind: 'move', result });
-          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { boardId });
+
+          for (const ref of result.failed) {
+            const key = toGalleryItemKey(ref);
+            const previousBoardId = previousBoardIds.get(key);
+
+            if (previousBoardId !== undefined) {
+              gallery.patchItems([key], { boardId: previousBoardId });
+            }
+          }
         },
         boardId,
         mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
         requested: items,
-      });
-    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> =>
-      runItemMutation({
-        action: starred ? 'star' : 'unstar',
-        applyConfirmed: (result) => {
-          if (result.succeeded.length === 0) {
-            return;
-          }
-
-          patchGalleryItemCaches(queryClient, { kind: 'star', result, starred });
-          gallery.patchItems(result.succeeded.map(toGalleryItemKey), { starred });
+        rollback: () => {
+          rollbackCachesOnce();
+          restorePreviousBoardIds();
         },
+      });
+    };
+    const patchItemsStarred = (refs: GalleryItemRef[], starred: boolean): void => {
+      if (refs.length === 0) {
+        return;
+      }
+
+      patchGalleryItemCaches(queryClient, { kind: 'star', result: { failed: [], succeeded: refs }, starred });
+      gallery.patchItems(refs.map(toGalleryItemKey), { starred });
+    };
+    // Split cache/store writers used only by the CAS-guarded rollback below,
+    // where the two sides can pass or fail the "still current" check
+    // independently (e.g. a trailing invalidation already reconciled the
+    // cache but the store overlay wasn't touched).
+    const patchStarredCacheOnly = (refs: GalleryItemRef[], starred: boolean): void => {
+      if (refs.length === 0) {
+        return;
+      }
+
+      patchGalleryItemCaches(queryClient, { kind: 'star', result: { failed: [], succeeded: refs }, starred });
+    };
+    const patchStarredStoreOnly = (keys: GalleryItemKey[], starred: boolean): void => {
+      if (keys.length === 0) {
+        return;
+      }
+
+      gallery.patchItems(keys, { starred });
+    };
+    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> => {
+      // Optimistic: paint the whole selection and flip back only what the
+      // backend refuses. A total failure cannot lean on the trailing
+      // invalidation, so capture each item's actual prior flag up front — a
+      // blanket invert would wrongly flip items that already matched.
+      const previousStarred = new Map<GalleryItemKey, boolean>(
+        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
+          key,
+          fields.starred,
+        ])
+      );
+
+      for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, items)) {
+        previousStarred.set(key, cachedStarred);
+      }
+
+      patchItemsStarred(items, starred);
+
+      return runItemMutation({
+        action: starred ? 'star' : 'unstar',
+        applyConfirmed: (result) => patchItemsStarred(result.failed, !starred),
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
+        // Total failure: restore each item's actual prior flag, leaving items
+        // with no known prior as painted. Star's optimistic apply is a value
+        // flip rather than a snapshot/restore pair, so unlike delete/move the
+        // patch carries no CAS of its own — both the cache and store writes
+        // need their own "still painted" check.
+        rollback: () => {
+          const requestedKeys = items.map(toGalleryItemKey);
+          const currentCacheStarred = getGalleryItemStarredFromCaches(queryClient, items);
+          const currentStoreFields = collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items);
+          const safeCacheKeys = new Set(
+            selectItemKeysUnchangedSince(requestedKeys, starred, (key) => currentCacheStarred.get(key))
+          );
+          const safeStoreKeys = new Set(
+            selectItemKeysUnchangedSince(requestedKeys, starred, (key) => currentStoreFields.get(key)?.starred)
+          );
+          const restoreGroups = new Map<boolean, GalleryItemRef[]>();
+
+          for (const item of items) {
+            const priorStarred = previousStarred.get(toGalleryItemKey(item));
+
+            if (priorStarred === undefined) {
+              continue;
+            }
+
+            const group = restoreGroups.get(priorStarred) ?? [];
+
+            group.push(item);
+            restoreGroups.set(priorStarred, group);
+          }
+
+          for (const [priorStarred, refs] of restoreGroups) {
+            patchStarredCacheOnly(
+              refs.filter((ref) => safeCacheKeys.has(toGalleryItemKey(ref))),
+              priorStarred
+            );
+            patchStarredStoreOnly(
+              refs.filter((ref) => safeStoreKeys.has(toGalleryItemKey(ref))).map(toGalleryItemKey),
+              priorStarred
+            );
+          }
+        },
       });
+    };
     const fetchItemBlob = async (item: GalleryItem, signal: AbortSignal): Promise<Blob> => {
       const response = await fetch(item.fullUrl, { signal });
 

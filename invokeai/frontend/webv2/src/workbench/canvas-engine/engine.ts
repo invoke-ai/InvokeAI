@@ -204,7 +204,7 @@ const createCleanupAccumulator = (): { run: (step: () => void) => void; throwIfF
 export interface CanvasEngineErrorReport {
   area: 'canvas-engine';
   context: { error: string; layerId: string };
-  message: 'Layer thumbnail rasterization failed' | 'Bitmap persistence failed';
+  message: 'Layer thumbnail rasterization failed' | 'Bitmap persistence failed' | 'Bitmap persistence suspended';
   namespace: 'canvas';
   projectId: string;
 }
@@ -546,7 +546,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         }
         return { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface };
       },
-      onError: (error, layerId) => reportError('Bitmap persistence failed', layerId, error),
+      onError: (error, layerId, info) =>
+        reportError(
+          info.willRetry ? 'Bitmap persistence failed' : 'Bitmap persistence suspended',
+          layerId,
+          // `willRetry === false` means the circuit just opened: strokes stop
+          // persisting from here until a fresh one closes it. That is more
+          // urgent than whatever error tripped it, so the toast leads with it
+          // instead of the (already-surfaced, on the streak's first report)
+          // underlying error text.
+          info.willRetry ? error : new Error('Canvas changes are no longer uploading. A new stroke will retry.')
+        ),
       uploadImage: (blob) => opts.uploadImage(blob),
     });
   const persistenceController = new PersistenceController(bitmapStore);
@@ -589,23 +599,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * The pixel-write bridge shared by undo and redo: put the patch's pixels back
    * into the layer's live cache surface, propagate the edit, and re-persist.
    *
-   * ## Undo ↔ bitmap-store convergence (P2.2 reviewer note)
-   *
-   * Undo writes the OLD pixels into the cache and marks the layer dirty while an
-   * upload of the NEW pixels may still be in flight. The sequence converges:
-   *
-   * 1. The in-flight upload finishes and dispatches `updateCanvasLayerSource`
-   *    with the NEW bitmap ref. Because the store recorded that name in
-   *    `lastApplied` before dispatching, the engine's mirror sees it as a
-   *    self-echo ({@link BitmapStore.isSelfEcho}) and does NOT re-rasterize — so
-   *    the cache keeps the OLD pixels this undo just wrote (never clobbered).
-   *    The contract now *transiently* points at the NEW ref.
-   * 2. This `markLayerDirty` schedules a follow-up flush. The bitmap store
-   *    serializes per layer, so it runs after the in-flight upload settles. It
-   *    encodes the cache (now the OLD pixels), hashes it, and the content-hash
-   *    dedupe reuses the OLD pixels' already-uploaded image name — no re-upload.
-   * 3. That flush dispatches the OLD ref, moving `lastApplied` back and pointing
-   *    the contract at the OLD pixels: cache and contract have re-converged.
+   * Undo writes the OLD pixels while an upload of the NEW ones may still be in
+   * flight, and the two converge: the in-flight dispatch reads as a self-echo
+   * ({@link BitmapStore.isSelfEcho}) so the cache keeps the OLD pixels, then
+   * this `markLayerDirty` schedules a flush that (serialized per layer, so it
+   * runs after) re-encodes them, hash-dedupes to their already-uploaded name,
+   * and dispatches the OLD ref back.
    */
   const applyImagePatch: ImagePatchApply = (layerId, rect, pixels) => {
     if (!layerCache.get(layerId)) {

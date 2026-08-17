@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
+from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.util.thumbnails import get_thumbnail_name
@@ -311,3 +312,66 @@ class TestSaveDeleteRoundTrip:
         restarted.start(invoker)
 
         assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestProvenanceRoundTrip:
+    """The property copying and exporting an image both rely on, and nothing else guarded.
+
+    `save()` writes generation metadata, the workflow and the graph into the PNG's text chunks, and
+    `extract_metadata_from_image()` reads them back out of a re-opened image. Nothing else carries
+    that provenance: `POST /images/copy` hands the reopened PIL image straight to the extractor, and
+    an `.invk` archive carries the file's bytes and nothing beside them. If these two ever stopped
+    agreeing, every copy and every restored project would silently lose its metadata while looking
+    entirely successful.
+    """
+
+    def test_saved_provenance_survives_being_read_back(self, disk_storage: DiskImageFileStorage):
+        metadata = '{"positive_prompt": "a cat"}'
+        workflow = '{"name": "Fixture workflow", "nodes": []}'
+        graph = '{"nodes": {}, "edges": []}'
+
+        disk_storage.save(
+            image=Image.new("RGB", (16, 16)),
+            image_name="provenance.png",
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+        )
+        disk_storage.evict_cache_paths([disk_storage.get_path("provenance.png")])
+
+        with Image.open(disk_storage.get_path("provenance.png")) as reopened:
+            reopened.load()
+            extracted = extract_metadata_from_image(
+                pil_image=reopened,
+                invokeai_metadata_override=None,
+                invokeai_workflow_override=None,
+                invokeai_graph_override=None,
+                logger=MagicMock(),
+            )
+
+            # The chunks themselves are what travels: an `.invk` carries the file's bytes and
+            # nothing beside them, and a copy hands the reopened image straight to the extractor.
+            assert reopened.info["invokeai_metadata"] == metadata
+            assert reopened.info["invokeai_workflow"] == workflow
+            assert reopened.info["invokeai_graph"] == graph
+
+        assert extracted.invokeai_metadata == metadata
+        assert extracted.invokeai_graph == graph
+
+    def test_an_image_saved_without_provenance_extracts_none(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (16, 16)), image_name="bare.png")
+        disk_storage.evict_cache_paths([disk_storage.get_path("bare.png")])
+
+        with Image.open(disk_storage.get_path("bare.png")) as reopened:
+            reopened.load()
+            extracted = extract_metadata_from_image(
+                pil_image=reopened,
+                invokeai_metadata_override=None,
+                invokeai_workflow_override=None,
+                invokeai_graph_override=None,
+                logger=MagicMock(),
+            )
+
+        assert extracted.invokeai_metadata is None
+        assert extracted.invokeai_workflow is None
+        assert extracted.invokeai_graph is None

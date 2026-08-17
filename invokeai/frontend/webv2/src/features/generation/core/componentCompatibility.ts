@@ -30,7 +30,7 @@ export const isDiffusersMainForBase =
 export const isVaeForBases =
   (bases: readonly string[]): GenerateComponentFilter =>
   (model) =>
-    model.type === 'vae' && (bases.length === 0 || bases.includes(model.base));
+    model.type === 'vae' && bases.length > 0 && bases.includes(model.base);
 
 export const isClipVariant =
   (variant: string): GenerateComponentFilter =>
@@ -43,7 +43,13 @@ export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
 export const isNonAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant !== 'qwen3_06b';
 
+export const isFlux2MistralEncoder: GenerateComponentFilter = (model) => model.type === 'mistral_encoder';
+
 export const isFlux2Qwen3EncoderForModel = (selectedModel: GenerateModelConfig): GenerateComponentFilter => {
+  if (selectedModel.variant === 'dev') {
+    return () => false;
+  }
+
   const requiredVariant =
     typeof selectedModel.variant === 'string' ? KLEIN_TO_QWEN3_VARIANT[selectedModel.variant] : null;
 
@@ -65,11 +71,15 @@ export const isFlux2DiffusersSourceForModel = (selectedModel: GenerateModelConfi
       return false;
     }
 
+    const sourceVariant = typeof model.variant === 'string' ? model.variant : null;
+
+    if (selectedVariant === 'dev') {
+      return sourceVariant === 'dev';
+    }
+
     if (!requiredVariant) {
       return true;
     }
-
-    const sourceVariant = typeof model.variant === 'string' ? model.variant : null;
 
     return sourceVariant ? KLEIN_TO_QWEN3_VARIANT[sourceVariant] === requiredVariant : false;
   };

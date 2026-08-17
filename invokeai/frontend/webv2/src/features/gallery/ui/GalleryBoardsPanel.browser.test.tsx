@@ -54,6 +54,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetCount: 3,
   imageCount: 50,
   kind: 'board',
+  projectId: null,
   videoCount: 0,
   ...overrides,
 });
@@ -78,6 +79,7 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     projectBoardId: null,
     searchTerm: '',
     selectedBoardId: 'dogs',
+    semanticImageQuery: null,
     selectedItemKey: null,
     selectedItemKeys: [],
     settings: { ...DEFAULT_GALLERY_SETTINGS, showArchivedBoards: true, showDateBoards: true, ...settings },
@@ -167,8 +169,15 @@ describe('GalleryBoardsPanel', () => {
     expect(text).toContain('GORL');
   });
 
-  it('marks the project board with a Project badge', async () => {
-    await renderPanel({ ...createGallery(), projectBoardId: 'cats' } as GalleryStateView);
+  /**
+   * The badge follows board ownership, not the open project: the server tells every board whose
+   * project it belongs to, and one that belongs to a project the user is not in is protected the
+   * same way. Only the *hoisting* is about the active project.
+   */
+  it('marks every project-owned board with a Project badge', async () => {
+    const ownedBoards = boards.map((board) => (board.id === 'cats' ? { ...board, projectId: 'p1' } : board));
+
+    await renderPanel({ ...createGallery(), boards: ownedBoards, projectBoardId: 'cats' } as GalleryStateView);
 
     const catsRow = getBoardRows().find((row) => row.textContent?.includes('Cats'));
 

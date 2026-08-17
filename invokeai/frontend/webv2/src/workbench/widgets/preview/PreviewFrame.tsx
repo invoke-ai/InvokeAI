@@ -2,7 +2,7 @@ import type { GalleryItemKey, GalleryItemRef } from '@features/gallery';
 /* eslint-disable react/react-compiler */
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
-import { Badge, Box, Flex, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Badge, Flex, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
@@ -22,42 +22,8 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
-import { PreviewLiveOverlay } from './PreviewLiveReadout';
+import { FittedFrame, PreviewStage } from './PreviewStage';
 import { usePreviewLoupe, type PreviewLoupeControls } from './usePreviewLoupe';
-
-export const previewGridCss = {
-  backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
-  backgroundPosition: 'center',
-  backgroundRepeat: 'repeat',
-  backgroundSize: '24px 24px',
-} as const;
-
-export const getFittedFrameCss = (width: number, height: number): SystemStyleObject => ({
-  aspectRatio: `${width} / ${height}`,
-  height: 'auto',
-  maxHeight: '100%',
-  maxWidth: '100%',
-  width: `min(100cqw, calc(100cqh * ${width / height}))`,
-});
-
-/**
- * Room for the centre region's floating chrome islands. `CenterArea` publishes
- * the variable and nothing else does, so the `0px` fallback keeps the right
- * panel — which reserves a real header row instead — unpadded.
- */
-const CENTER_CHROME_INSET = 'var(--wb-center-chrome-inset, 0px)';
-
-/**
- * Top padding for a media stage: its own padding plus room for the islands.
- *
- * It belongs on the stage rather than on the widget root so the dot grid still
- * runs to every edge and passes *behind* the chrome — the same arrangement that
- * lets `paddingBottom` pass it behind the filmstrip. Because the stage is a size
- * container, `getFittedFrameCss` reads the shrunken content box and refits the
- * media with no further change.
- */
-const getStagePaddingTop = (padding: string | undefined): string =>
-  padding === undefined ? CENTER_CHROME_INSET : `calc(var(--chakra-spacing-${padding}) + ${CENTER_CHROME_INSET})`;
 
 export type PreviewMediaSource =
   | { itemKey: GalleryItemKey; kind: 'image'; source: StreamingImageSource }
@@ -69,9 +35,13 @@ interface PreviewFrameProps {
   frameHeight: number;
   frameWidth: number;
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
+  /**
+   * No live frame carries a caption of any kind. The frame is styled exactly
+   * like a finished item so nothing about it moves when denoising ends, and
+   * every progress readout — including which device is rendering — belongs to
+   * the footer island or the top bar rail.
+   */
   isLive: boolean;
-  liveBadgeLabel: string;
-  liveQueueItemId?: string | null;
   loupeControlsRef?: Ref<PreviewLoupeControls>;
   onContextMenu?: (x: number, y: number) => void;
   onVideoCopyAvailabilityChange?: (itemKey: GalleryItemKey, isAvailable: boolean) => void;
@@ -110,8 +80,6 @@ const PreviewImageFrame = ({
   frameHeight,
   frameWidth,
   isLive,
-  liveBadgeLabel,
-  liveQueueItemId,
   loupeControlsRef,
   onContextMenu,
   padding,
@@ -174,108 +142,59 @@ const PreviewImageFrame = ({
     }),
     [isLive, shouldAntialiasLiveImage]
   );
-  const liveBadge = isLive ? (
-    typeof liveQueueItemId === 'string' ? (
-      <PreviewLiveOverlay queueItemId={liveQueueItemId} />
-    ) : (
-      <Badge left="2" pointerEvents="none" position="absolute" size="xs" top="2" variant="solid">
-        {liveBadgeLabel}
-      </Badge>
-    )
+  const media = source ? (
+    <img
+      alt={source.alt}
+      draggable={false}
+      height={frameHeight}
+      src={source.src}
+      style={imageStyle}
+      width={frameWidth}
+    />
   ) : null;
-
   if (variant === 'inset') {
     return (
-      <Flex
-        align="center"
-        backgroundColor="bg.inset"
-        color="fg.grid"
-        containerType="size"
-        css={previewGridCss}
-        h="full"
-        justify="center"
-        // Live tiles all reserve the inset, so in a multi-session grid the
-        // bottom row reserves room it does not need. Its own dot grid still
-        // fills the cell, so only the fitted frame sits a little lower.
-        pt={getStagePaddingTop(undefined)}
-        w="full"
-      >
+      // Live tiles all reserve the chrome inset, so in a multi-session grid the
+      // bottom row reserves room it does not need. Its own dot grid still fills
+      // the cell, so only the fitted frame sits a little lower.
+      <PreviewStage fill="parent">
         {source ? (
-          <Box
-            borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
-            borderWidth="1px"
-            boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-            css={getFittedFrameCss(frameWidth, frameHeight)}
-            overflow="hidden"
-            position="relative"
-            rounded="lg"
-          >
-            <img
-              alt={source.alt}
-              draggable={false}
-              height={frameHeight}
-              src={source.src}
-              style={imageStyle}
-              width={frameWidth}
-            />
-            {liveBadge}
-          </Box>
+          <FittedFrame frameHeight={frameHeight} frameWidth={frameWidth}>
+            {media}
+          </FittedFrame>
         ) : (
           children
         )}
-      </Flex>
+      </PreviewStage>
     );
   }
 
   return (
-    <Flex
+    <PreviewStage
       ref={loupe.stageRefCallback}
-      align="center"
-      backgroundColor="bg.inset"
-      color="fg.grid"
-      containerType="size"
-      css={previewGridCss}
       cursor={loupe.isZoomed ? 'grab' : undefined}
-      flex="1"
-      justify="center"
-      minH="0"
-      overflow="hidden"
-      p={padding}
-      pb={paddingBottom}
-      position="relative"
-      pt={getStagePaddingTop(padding)}
-      w="full"
+      fill="flex"
+      padding={padding}
+      paddingBottom={paddingBottom}
       {...loupe.stageProps}
     >
-      <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />
-      <Box
+      {/* Never armed over a live render: arming a comparison pauses live-follow
+          and would swap the in-progress image for a compare of the stale hidden
+          selection. The inset live frame never offered this either. */}
+      {isLive ? null : <PreviewCompareDropZone currentImageName={dragItem?.kind === 'image' ? dragItem.name : null} />}
+      <FittedFrame
         ref={setContentRef}
         {...listeners}
         bg="transparent"
-        borderWidth="1px"
-        borderColor={isLive ? 'accent.solid' : 'border.emphasized'}
-        boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-        css={getFittedFrameCss(frameWidth, frameHeight)}
         cursor={isDragDisabled ? undefined : isDragging ? 'grabbing' : 'grab'}
+        frameHeight={frameHeight}
+        frameWidth={frameWidth}
         opacity={isDragging ? 0.55 : undefined}
-        overflow="hidden"
-        position="relative"
-        rounded="lg"
         touchAction={isDragDisabled ? undefined : 'none'}
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
       >
-        {source ? (
-          <img
-            alt={source.alt}
-            draggable={false}
-            height={frameHeight}
-            src={source.src}
-            style={imageStyle}
-            width={frameWidth}
-          />
-        ) : null}
-        {liveBadge}
-      </Box>
+        {media}
+      </FittedFrame>
       {loupe.zoomPercent !== null ? (
         <Badge
           aria-label={t('widgets.preview.resetZoom')}
@@ -293,7 +212,7 @@ const PreviewImageFrame = ({
           {loupe.zoomPercent}%
         </Badge>
       ) : null}
-    </Flex>
+    </PreviewStage>
   );
 };
 
@@ -473,31 +392,11 @@ const PreviewVideo = ({
   );
 
   return (
-    <Flex
-      align="center"
-      backgroundColor="bg.inset"
-      color="fg.grid"
-      containerType="size"
-      css={previewGridCss}
-      flex="1"
-      justify="center"
-      minH="0"
-      overflow="hidden"
-      p={padding}
-      pb={paddingBottom}
-      position="relative"
-      pt={getStagePaddingTop(padding)}
-      w="full"
-    >
-      <Box
+    <PreviewStage fill="flex" padding={padding} paddingBottom={paddingBottom}>
+      <FittedFrame
         bg="black"
-        borderWidth="1px"
-        borderColor="border.emphasized"
-        boxShadow="0 24px 80px rgba(0,0,0,0.42)"
-        css={getFittedFrameCss(frameWidth, frameHeight)}
-        overflow="hidden"
-        position="relative"
-        rounded="lg"
+        frameHeight={frameHeight}
+        frameWidth={frameWidth}
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
       >
         {/* User-provided gallery videos do not include a caption-track contract. */}
@@ -550,8 +449,8 @@ const PreviewVideo = ({
             </Flex>
           </>
         ) : null}
-      </Box>
-    </Flex>
+      </FittedFrame>
+    </PreviewStage>
   );
 };
 

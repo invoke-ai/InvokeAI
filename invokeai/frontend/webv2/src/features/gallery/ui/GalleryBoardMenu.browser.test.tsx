@@ -42,6 +42,7 @@ const board = {
   imageCount: 2,
   kind: 'board',
   name: 'Board 1',
+  projectId: null,
   videoCount: 1,
 } as const;
 const target = { board, x: 20, y: 20 };

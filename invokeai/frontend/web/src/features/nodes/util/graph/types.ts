@@ -26,7 +26,8 @@ export type ImageOutputNodes =
   | 'ernie_image_vae_decode'
   | 'ideogram4_l2i'
   | 'anima_l2i'
-  | 'wan_l2i';
+  | 'wan_l2i'
+  | 'minimax_h3_latents_to_image';
 
 export type LatentToImageNodes =
   | 'l2i'
@@ -38,7 +39,8 @@ export type LatentToImageNodes =
   | 'z_image_l2i'
   | 'ernie_image_vae_decode'
   | 'anima_l2i'
-  | 'wan_l2i';
+  | 'wan_l2i'
+  | 'minimax_h3_latents_to_image';
 
 export type ImageToLatentsNodes =
   | 'i2l'
@@ -62,19 +64,22 @@ export type DenoiseLatentsNodes =
   | 'ernie_image_denoise'
   | 'krea2_denoise'
   | 'anima_denoise'
-  | 'wan_denoise';
+  | 'wan_denoise'
+  | 'minimax_h3_denoise';
 
 /**
  * Denoise nodes that support masked denoising (inpaint/outpaint). ERNIE-Image's denoise node
- * has no `denoise_mask` input (it is text-to-image only), so it is excluded here.
+ * has no `denoise_mask` input (it is text-to-image only), and MiniMax H3's denoise node has
+ * neither `denoise_mask` nor `denoising_start/end` (txt2img/t2v only), so they are excluded.
  */
-export type MaskableDenoiseNodes = Exclude<DenoiseLatentsNodes, 'ernie_image_denoise'>;
+export type MaskableDenoiseNodes = Exclude<DenoiseLatentsNodes, 'ernie_image_denoise' | 'minimax_h3_denoise'>;
 
 export type MainModelLoaderNodes =
   | 'main_model_loader'
   | 'sdxl_model_loader'
   | 'flux_model_loader'
   | 'flux2_klein_model_loader'
+  | 'flux2_dev_model_loader'
   | 'sd3_model_loader'
   | 'cogview4_model_loader'
   | 'qwen_image_model_loader'
@@ -82,7 +87,8 @@ export type MainModelLoaderNodes =
   | 'ernie_image_model_loader'
   | 'krea2_model_loader'
   | 'anima_model_loader'
-  | 'wan_model_loader';
+  | 'wan_model_loader'
+  | 'minimax_h3_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
 

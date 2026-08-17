@@ -92,6 +92,7 @@ const setModel = (project: Project, base: GenerateWidgetValues['model']['base'])
     positivePromptHeightPx: 96,
     promptTemplate: null,
     promptTemplateViewMode: false,
+    mistralEncoderModel: null,
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,

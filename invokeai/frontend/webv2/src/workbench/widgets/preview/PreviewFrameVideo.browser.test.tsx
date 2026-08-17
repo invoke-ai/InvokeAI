@@ -106,7 +106,6 @@ const VideoHarness = ({
           frameHeight={1080}
           frameWidth={1920}
           isLive={false}
-          liveBadgeLabel="Generating"
           shouldAntialiasLiveImage
           source={source}
           variant="framed"

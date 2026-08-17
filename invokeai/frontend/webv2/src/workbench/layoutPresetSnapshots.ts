@@ -1,4 +1,5 @@
 import type {
+  FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
   LayoutPresetSnapshot,
@@ -9,7 +10,25 @@ import type {
 import type { AccountState, Project } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { getLayoutPreset } from '@workbench/layoutPresets';
+import {
+  builtInLayoutPresetDescriptors,
+  getLayoutPreset,
+  isBuiltInLayoutPresetId,
+  resolveLayoutPresetId,
+} from '@workbench/layoutPresets';
+
+/** Palette labels follow account-owned preset names without making command registration reactive. */
+export const getLayoutPresetCommandTitleOverrides = (
+  account: AccountState,
+  formatTitle: (presetName: string) => string
+): Readonly<Record<string, string>> =>
+  Object.fromEntries(
+    builtInLayoutPresetDescriptors.flatMap(({ hotkeyId, preset }) => {
+      const savedLabel = resolveSavedLayoutPreset(account, preset.id).label;
+
+      return savedLabel === preset.label ? [] : [[`app.${hotkeyId}`, formatTitle(savedLabel)]];
+    })
+  );
 
 const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
 
@@ -21,17 +40,29 @@ const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
  * would appear to do nothing.
  */
 export const resolveSavedLayoutPreset = (account: AccountState, presetId: LayoutPresetId): LayoutPreset => {
-  const customPreset = account.customLayoutPresets?.find((preset) => preset.id === presetId);
+  const resolvedPresetId = resolveLayoutPresetId(presetId);
+  const customPreset = isBuiltInLayoutPresetId(resolvedPresetId)
+    ? undefined
+    : account.customLayoutPresets?.find((preset) => preset.id === presetId);
 
   if (customPreset) {
     return customPreset;
   }
 
-  const builtInPreset = getLayoutPreset(presetId);
+  const builtInPreset = getLayoutPreset(resolvedPresetId);
+  const metadata = account.layoutPresetMetadataOverrides?.[builtInPreset.id];
   const override = account.layoutPresetOverrides?.[builtInPreset.id];
+  const defaultRoute = account.layoutPresetRouteOverrides?.[builtInPreset.id] ?? builtInPreset.defaultRoute;
 
-  return override ? { ...builtInPreset, snapshot: override } : builtInPreset;
+  return metadata || override || defaultRoute !== builtInPreset.defaultRoute
+    ? { ...builtInPreset, ...metadata, defaultRoute, snapshot: override ?? builtInPreset.snapshot }
+    : builtInPreset;
 };
+
+export const cloneFloatingWidgets = (
+  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState>
+): Record<WidgetInstanceId, FloatingWidgetState> =>
+  Object.fromEntries(Object.entries(floatingWidgets).map(([instanceId, state]) => [instanceId, { ...state }]));
 
 export const cloneLayoutPresetWidgetRegions = (
   widgetRegionState: Record<WidgetRegion, WidgetRegionState>
@@ -53,6 +84,12 @@ export const createLayoutPresetSnapshot = (project: Project): LayoutPresetSnapsh
     }
   }
 
+  // A floated instance sits in no region, so it has to be named here too or
+  // applying the preset would recreate neither the window nor a docked copy.
+  for (const instanceId of Object.keys(project.floatingWidgets ?? {})) {
+    referencedInstanceIds.add(instanceId);
+  }
+
   const widgetInstances: Record<WidgetInstanceId, LayoutPresetWidgetInstanceSnapshot> = {};
 
   for (const instanceId of referencedInstanceIds) {
@@ -64,6 +101,7 @@ export const createLayoutPresetSnapshot = (project: Project): LayoutPresetSnapsh
   }
 
   return {
+    ...(project.floatingWidgets ? { floatingWidgets: cloneFloatingWidgets(project.floatingWidgets) } : {}),
     layout: { ...project.layout, panels: { ...project.layout.panels } },
     widgetInstances,
     widgetRegions: cloneLayoutPresetWidgetRegions(project.widgetRegions),
@@ -92,12 +130,45 @@ const areWidgetInstanceSnapshotsEqual = (
   );
 };
 
+/**
+ * Window geometry counts as drift for the same reason panel `sizePx` does: it
+ * is part of what `Save changes` would store, so the strip's dot has to offer
+ * to store it. `stackOrder` is excluded — it is a monotonically rising counter
+ * bumped by every click on a window, so comparing it would leave the dot lit
+ * for good the first time someone focuses one.
+ */
+const areFloatingWidgetsEqual = (
+  left: LayoutPresetSnapshot['floatingWidgets'],
+  right: LayoutPresetSnapshot['floatingWidgets']
+): boolean => {
+  const leftKeys = Object.keys(left ?? {}).sort();
+  const rightKeys = Object.keys(right ?? {}).sort();
+
+  return (
+    areArraysEqual(leftKeys, rightKeys) &&
+    leftKeys.every((key) => {
+      const leftState = left?.[key];
+      const rightState = right?.[key];
+
+      return (
+        leftState?.x === rightState?.x &&
+        leftState?.y === rightState?.y &&
+        leftState?.widthPx === rightState?.widthPx &&
+        leftState?.heightPx === rightState?.heightPx &&
+        leftState?.mode === rightState?.mode &&
+        leftState?.returnRegion === rightState?.returnRegion
+      );
+    })
+  );
+};
+
 export const areLayoutPresetSnapshotsEqual = (left: LayoutPresetSnapshot, right: LayoutPresetSnapshot): boolean =>
   left.layout.centerViewId === right.layout.centerViewId &&
   left.layout.panels.isBottomOpen === right.layout.panels.isBottomOpen &&
   left.layout.panels.isLeftOpen === right.layout.panels.isLeftOpen &&
   left.layout.panels.isRightOpen === right.layout.panels.isRightOpen &&
   widgetRegions.every((region) => areWidgetRegionsEqual(left.widgetRegions[region], right.widgetRegions[region])) &&
+  areFloatingWidgetsEqual(left.floatingWidgets, right.floatingWidgets) &&
   areWidgetInstanceSnapshotsEqual(left.widgetInstances, right.widgetInstances);
 
 export const doesProjectMatchLayoutPreset = (project: Project, preset: LayoutPreset): boolean =>

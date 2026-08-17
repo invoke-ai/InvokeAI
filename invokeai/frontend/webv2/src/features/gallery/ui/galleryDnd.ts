@@ -43,6 +43,27 @@ export const getGalleryItemDragId = (
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
 
+/** Droppable id for the search field: dropping a gallery image there searches by similarity. */
+export const GALLERY_SEMANTIC_SEARCH_DROP_ID = 'gallery-semantic-search-drop';
+
+/**
+ * Resolves an item drag released over the search field to an image-similarity
+ * reference. Semantic search is image-only, so a video-only drag resolves to
+ * nothing rather than to a broken query.
+ */
+export const resolveGallerySemanticSearchDrop = (
+  activeData: unknown,
+  overId: unknown
+): { imageName: string } | null => {
+  if (overId !== GALLERY_SEMANTIC_SEARCH_DROP_ID || !isGalleryItemDragData(activeData)) {
+    return null;
+  }
+
+  const image = activeData.items.find((item) => item.kind === 'image');
+
+  return image ? { imageName: image.name } : null;
+};
+
 export const getGalleryItemDragData = (items: readonly GalleryItemRef[]): GalleryItemDragData => ({
   items: [...items],
   kind: 'gallery-item',

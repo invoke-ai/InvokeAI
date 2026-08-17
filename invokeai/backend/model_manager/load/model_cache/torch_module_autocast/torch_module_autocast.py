@@ -4,6 +4,7 @@ import torch
 from diffusers.models.normalization import RMSNorm as DiffusersRMSNorm
 
 from invokeai.backend.flux.modules.layers import RMSNorm as FluxRMSNorm
+from invokeai.backend.minimax_h3.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_conv1d import (
     CustomConv1d,
 )
@@ -21,6 +22,9 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_group_norm import (
     CustomGroupNorm,
+)
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_int8_convrot_linear import (
+    CustomInt8ConvrotLinear,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_layer_norm import (
     CustomLayerNorm,
@@ -41,6 +45,7 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.LayerNorm: CustomLayerNorm,
     FluxRMSNorm: CustomFluxRMSNorm,
     DiffusersRMSNorm: CustomDiffusersRMSNorm,
+    Int8ConvrotLinear: CustomInt8ConvrotLinear,
 }
 
 try:

@@ -257,6 +257,40 @@ WAN22_LATENT_RGB_FACTORS = [
 
 WAN22_LATENT_RGB_BIAS = [0.0317, -0.0878, -0.1388]
 
+# MiniMax H3's video VAE: 24 latent channels, 16x spatial downscale. Least-squares fit of
+# NORMALIZED posterior-mean latents against 16x-downscaled RGB in [-1, 1], over real photos
+# plus synthetic gradients/patches, using the released H3 video VAE encoder (fit rms ~0.09).
+# This is the fallback path only — when the taeh3 preview decoder is available, the denoise
+# node decodes previews with it instead.
+MINIMAX_H3_LATENT_RGB_FACTORS = [
+    [-0.0127, -0.0944, -0.1146],
+    [-0.0083, 0.0638, -0.0942],
+    [0.3635, 0.4082, 0.1479],
+    [0.2079, 0.1357, -0.5101],
+    [0.0178, 0.3250, -0.3183],
+    [0.0567, 0.2060, -0.2453],
+    [0.0343, -0.0136, -0.0482],
+    [0.0079, 0.0299, -0.0814],
+    [0.0220, 0.0043, 0.0158],
+    [0.2984, 0.0988, 0.1576],
+    [-0.0066, 0.0184, 0.1134],
+    [-0.0794, -0.0416, 0.0628],
+    [0.0419, -0.0184, 0.0618],
+    [-0.0274, 0.0420, -0.0235],
+    [-0.0231, -0.0312, 0.0310],
+    [0.0089, 0.0368, -0.0387],
+    [0.0126, 0.0085, -0.0299],
+    [-0.0187, 0.0028, 0.0194],
+    [0.0264, -0.0304, 0.0089],
+    [0.0512, 0.0168, 0.0110],
+    [0.0168, -0.0357, -0.0001],
+    [0.0063, -0.0116, -0.0509],
+    [-0.0237, -0.0347, 0.0324],
+    [-0.0099, 0.0042, -0.0358],
+]
+
+MINIMAX_H3_LATENT_RGB_BIAS = [0.1189, 0.1415, -0.0034]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor,
@@ -366,6 +400,10 @@ def diffusion_step_callback(
         else:
             latent_rgb_factors = WAN_LATENT_RGB_FACTORS
             latent_rgb_bias = WAN_LATENT_RGB_BIAS
+    elif base_model == BaseModelType.MiniMaxH3:
+        # 24-ch H3 video VAE; factors fitted against the released encoder (see constants above).
+        latent_rgb_factors = MINIMAX_H3_LATENT_RGB_FACTORS
+        latent_rgb_bias = MINIMAX_H3_LATENT_RGB_BIAS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 
@@ -387,6 +425,8 @@ def diffusion_step_callback(
     # Wan TI2V-5B's Wan2.2-VAE uses 16x.
     spatial_scale = 8
     if base_model == BaseModelType.Wan and sample.shape[-3] == 48:
+        spatial_scale = 16
+    elif base_model == BaseModelType.MiniMaxH3:
         spatial_scale = 16
     width = image.width * spatial_scale
     height = image.height * spatial_scale
