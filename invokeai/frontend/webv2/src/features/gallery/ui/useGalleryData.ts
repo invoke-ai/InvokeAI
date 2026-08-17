@@ -1,4 +1,5 @@
 import type { GalleryItem } from '@features/gallery/core/items';
+import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@features/gallery/core/types';
 
@@ -32,6 +33,8 @@ export interface GalleryData {
   isWindowTruncated: boolean;
   items: GalleryItem[] | null;
   loadMore: () => void;
+  /** The current query's failure, or null while it is healthy. */
+  queryError: Error | null;
   total: number | null;
 }
 
@@ -53,6 +56,7 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
     filter.searchTerm !== '' ||
     filter.createdFrom !== undefined ||
     filter.createdTo !== undefined ||
+    Boolean(filter.semanticQuery) ||
     isDateBoardId(filter.boardId)
   ) {
     return false;
@@ -85,19 +89,25 @@ export const mergeGalleryItemWindow = ({
     .filter((item) => !backendItemKeys.has(toGalleryItemKey(item)) && isRecentItemVisible(item, filter));
   const seenItemKeys = new Set<string>();
 
-  return [...missingRecentItems, ...backendItems]
-    .filter((item) => {
-      const key = toGalleryItemKey(item);
+  const mergedItems = [...missingRecentItems, ...backendItems].filter((item) => {
+    const key = toGalleryItemKey(item);
 
-      if (seenItemKeys.has(key)) {
-        return false;
-      }
+    if (seenItemKeys.has(key)) {
+      return false;
+    }
 
-      seenItemKeys.add(key);
-      return true;
-    })
-    .sort((a, b) => compareGalleryItems(a, b, filter))
-    .slice(0, maxRows);
+    seenItemKeys.add(key);
+    return true;
+  });
+
+  // Semantic results arrive in relevance order, which a date re-sort would
+  // destroy; the backend order is the meaning of the list. (No recent items
+  // are overlaid in that mode, so the merge is the backend window itself.)
+  if (!filter.semanticQuery) {
+    mergedItems.sort((a, b) => compareGalleryItems(a, b, filter));
+  }
+
+  return mergedItems.slice(0, maxRows);
 };
 
 /**
@@ -129,6 +139,7 @@ export const useGalleryData = ({
   recentImages,
   searchTerm,
   selectedBoardId,
+  semanticQuery = null,
   settings,
 }: {
   galleryView: GalleryView;
@@ -136,6 +147,8 @@ export const useGalleryData = ({
   recentImages: readonly GeneratedImageContract[];
   searchTerm: string;
   selectedBoardId: string;
+  /** When set, items come from semantic search (similarity order) instead of the board listing. */
+  semanticQuery?: GallerySemanticReference | null;
   settings: GallerySettings;
 }): GalleryData => {
   const { boards } = useGalleryBoards({ settings });
@@ -151,6 +164,7 @@ export const useGalleryData = ({
       galleryView,
       orderDir: settings.imageOrderDir,
       searchTerm: dateParse.text,
+      ...(semanticQuery ? { semanticQuery } : {}),
       starredFirst: settings.starredFirst,
     }),
     [
@@ -159,12 +173,14 @@ export const useGalleryData = ({
       dateParse.range?.to,
       dateParse.text,
       galleryView,
+      semanticQuery,
       settings.imageOrderDir,
       settings.starredFirst,
     ]
   );
   const {
     data: queryData,
+    error: queryError,
     fetchNextPage,
     hasNextPage,
     isFetching,
@@ -216,5 +232,5 @@ export const useGalleryData = ({
     void fetchNextPage();
   }, [fetchNextPage, hasMore, isFetchingNextPage]);
 
-  return { boards, filter, hasMore, isLoadingItems: isFetching, isWindowTruncated, items, loadMore, total };
+  return { boards, filter, hasMore, isLoadingItems: isFetching, isWindowTruncated, items, loadMore, queryError, total };
 };

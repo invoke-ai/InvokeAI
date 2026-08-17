@@ -289,6 +289,7 @@ version = { attr = "invokeai.version.__version__" }
 "invokeai.backend.anima" = ["tokenizer/*.json"]
 "invokeai.backend.qwen3" = ["tokenizer/*.json", "tokenizer/*.json.gz"]
 "invokeai.backend.t5" = ["tokenizer/*.json"]
+"invokeai.app.services.image_index" = ["*.txt"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
 "invokeai.backend.hidiffusion" = ["sd_module_key/*.txt"]
 "invokeai.app.services.style_preset_records" = ["*.json"]
@@ -361,12 +362,21 @@ select = ["B", "C", "E", "F", "W", "I", "TID"]
 "invokeai/backend/minimax_h3/scheduling_minimax_h3.py" = ["B905"]
 
 [tool.ruff.format]
-# Same vendored files as above. They are kept byte-identical to upstream diffusers (modulo the
-# absolute-import rewrite) so that re-syncing when a tagged diffusers ships the H3 classes is a
-# clean copy rather than a manual re-application of formatting. Upstream wraps at a narrower line
-# length than this project, so `ruff format` would rewrap a handful of lines for no semantic gain.
-# `ruff check` still runs on them, so the import sorting this project does enforce stays enforced.
-exclude = ["invokeai/backend/minimax_h3/*.py"]
+# The vendored MiniMax-H3 files are kept byte-identical to upstream diffusers (modulo the
+# absolute-import rewrite) so that re-syncing when a tagged diffusers ships them is a clean copy
+# rather than a manual re-application of formatting. Upstream wraps at a narrower line length, so
+# `ruff format` would rewrap lines for no semantic gain. `ruff check` still runs on them, so the
+# import sorting this project does enforce stays enforced.
+#
+# Listed file by file rather than as a directory glob: the package also holds first-party modules
+# (presets.py, sampling.py, denoise.py, int8_convrot.py, ...) which must stay formatted.
+exclude = [
+  "invokeai/backend/minimax_h3/packing.py",
+  "invokeai/backend/minimax_h3/transformer_minimax_h3.py",
+  "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py",
+  "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py",
+  "invokeai/backend/minimax_h3/scheduling_minimax_h3.py",
+]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.

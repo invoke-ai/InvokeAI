@@ -1057,6 +1057,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -1488,6 +1491,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -1917,6 +1923,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -2393,6 +2402,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -2893,6 +2905,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -4241,6 +4256,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -6243,7 +6261,7 @@
                 {
                   "type": "number",
                   "maximum": 2.0,
-                  "minimum": 0.01
+                  "minimum": 1e-6
                 },
                 {
                   "type": "null"
@@ -6276,6 +6294,258 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ImageMapPointsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/image_map/search": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Search Image Map",
+        "description": "Ranks the user's accessible images by semantic similarity.\n\nProvide exactly one of `q` (text search \u2014 requires the embedding model's\ntext encoder to be installed) or `image_name` (visual similarity \u2014 uses\nthe reference image's stored embedding when it exists, and otherwise\nembeds the image file on demand, so unindexed images such as assets can\nbe reference images too).",
+        "operationId": "search_image_map",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Text query to embed and search with",
+              "title": "Q"
+            },
+            "description": "Text query to embed and search with"
+          },
+          {
+            "name": "image_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reference image for similarity search",
+              "title": "Image Name"
+            },
+            "description": "Reference image for similarity search"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/image_map/search_by_image": {
+      "post": {
+        "tags": ["image_map"],
+        "summary": "Search Image Map By Image",
+        "description": "Ranks the user's accessible images by similarity to an arbitrary reference image.\n\nProvide exactly one of `image` (multipart upload) or `image_url` (the\nserver downloads it). The reference is embedded for this query only \u2014\nnothing is stored.",
+        "operationId": "search_image_map_by_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "URL of a reference image",
+              "title": "Image Url"
+            },
+            "description": "URL of a reference image"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of results"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_search_image_map_by_image"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/image_map/cluster_labels": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Cluster Labels",
+        "description": "Labels the user's visible clusters with the most similar vocabulary phrases.\n\nClustering mirrors `/points` (same eps semantics, computed over the\ncaller's currently-accessible points), so cluster ids line up with the\nserved map. Pass the `cluster_eps` reported by `/points` so both requests\ncluster with the same eps; cluster ids can still differ if the accessible\nset changes between the requests, so compare the two responses'\n`visible_hash` (and `updated_at`) and discard labels on mismatch.\nRequires the embedding model's text encoder; the first call per model\nembeds the whole vocabulary and is slow.",
+        "operationId": "get_image_map_cluster_labels",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eps",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 2.0,
+                  "minimum": 1e-6
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span.",
+              "title": "Eps"
+            },
+            "description": "DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's k-distance distribution. Clamped server-side relative to the projection's coordinate span."
+          },
+          {
+            "name": "min_samples",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 2,
+              "description": "DBSCAN min_samples for clustering",
+              "default": 10,
+              "title": "Min Samples"
+            },
+            "description": "DBSCAN min_samples for clustering"
+          },
+          {
+            "name": "top_k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "description": "Candidate labels per cluster",
+              "default": 3,
+              "title": "Top K"
+            },
+            "description": "Candidate labels per cluster"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapClusterLabelsResponse"
                 }
               }
             }
@@ -15317,6 +15587,9 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
           },
           {
@@ -16898,6 +17171,25 @@
         "type": "object",
         "required": ["video_name"],
         "title": "Body_remove_video_from_board"
+      },
+      "Body_search_image_map_by_image": {
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image",
+            "description": "Reference image file"
+          }
+        },
+        "type": "object",
+        "title": "Body_search_image_map_by_image"
       },
       "Body_set_workflow_thumbnail": {
         "properties": {
@@ -36148,6 +36440,12 @@
                   "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
                 },
                 {
@@ -36734,6 +37032,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
@@ -41349,6 +41650,72 @@
           "$ref": "#/components/schemas/ImageOutput"
         }
       },
+      "ImageMapClusterLabel": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Best-matching vocabulary phrase"
+          },
+          "alternates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alternates",
+            "description": "Runner-up phrases"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Cosine similarity of the best phrase to the cluster centroid"
+          }
+        },
+        "type": "object",
+        "required": ["label", "alternates", "score"],
+        "title": "ImageMapClusterLabel",
+        "description": "The best vocabulary label for one cluster."
+      },
+      "ImageMapClusterLabelsResponse": {
+        "properties": {
+          "labels": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ImageMapClusterLabel"
+            },
+            "type": "object",
+            "title": "Labels",
+            "description": "Cluster id -> label; noise (-1) is omitted"
+          },
+          "visible_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible Hash",
+            "description": "Fingerprint of the visible image set these labels were clustered over; clients must discard labels whose visible_hash does not match their points response"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "The projection these labels were computed against; clients must discard labels whose projection does not match their points"
+          }
+        },
+        "type": "object",
+        "required": ["labels"],
+        "title": "ImageMapClusterLabelsResponse",
+        "description": "Automatic labels for the current user's visible clusters, keyed by cluster id."
+      },
       "ImageMapPoint": {
         "properties": {
           "x": {
@@ -41426,6 +41793,18 @@
             ],
             "title": "Cluster Eps",
             "description": "The effective DBSCAN eps used for these points (adaptive default resolved, clamps applied). Pass it back explicitly to get an identical clustering from a later request."
+          },
+          "visible_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visible Hash",
+            "description": "Fingerprint of the visible image set these points were computed over; compare across image-map responses to detect accessible-set drift between requests."
           },
           "updated_at": {
             "anyOf": [
@@ -41516,6 +41895,40 @@
         "required": ["enqueued"],
         "title": "ImageMapRefreshResponse",
         "description": "Result of a projection refresh request."
+      },
+      "ImageMapSearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ImageMapSearchResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Ranked results, most similar first"
+          }
+        },
+        "type": "object",
+        "required": ["results"],
+        "title": "ImageMapSearchResponse",
+        "description": "Semantic search results over the user's embedded images."
+      },
+      "ImageMapSearchResult": {
+        "properties": {
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The matching image"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Cosine similarity to the query; higher is more similar"
+          }
+        },
+        "type": "object",
+        "required": ["image_name", "score"],
+        "title": "ImageMapSearchResult",
+        "description": "One semantic search hit."
       },
       "ImageMapStatusResponse": {
         "properties": {
@@ -45000,6 +45413,12 @@
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
               },
               {
@@ -45543,6 +45962,9 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
@@ -46379,6 +46801,12 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
@@ -47367,6 +47795,12 @@
           "minimax_h3_latents_to_video": {
             "$ref": "#/components/schemas/VideoOutput"
           },
+          "minimax_h3_lora_collection_loader": {
+            "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+          },
+          "minimax_h3_lora_loader": {
+            "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+          },
           "minimax_h3_model_loader": {
             "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
           },
@@ -47887,6 +48321,8 @@
           "minimax_h3_ideal_dimensions",
           "minimax_h3_latents_to_image",
           "minimax_h3_latents_to_video",
+          "minimax_h3_lora_collection_loader",
+          "minimax_h3_lora_loader",
           "minimax_h3_model_loader",
           "minimax_h3_text_encoder",
           "mlsd_detection",
@@ -48689,6 +49125,12 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
@@ -49767,6 +50209,12 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
@@ -56098,6 +56546,158 @@
         ],
         "title": "LoRA_LyCORIS_Krea2_Config",
         "description": "Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."
+      },
+      "LoRA_LyCORIS_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_MiniMaxH3_Config",
+        "description": "Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.\n\nH3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the\n``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.\nDetection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``\nunder a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict\ncarrying another architecture's signature \u2014 see\n``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``\nalone would not be safe."
       },
       "LoRA_LyCORIS_QwenImage_Config": {
         "properties": {
@@ -67866,15 +68466,52 @@
             "type": "integer"
           },
           "num_frames": {
-            "default": 124,
-            "description": "Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.",
+            "default": "124",
+            "description": "Number of output frames at the fixed 24 fps. Only the video VAE's 17n+5 grid points are offered: 90 (3.75 s) through 345 (14.38 s), plus the single 5-frame block used by the still-image path. The model was trained for 5-15 s, so counts below 124 are usable but off-distribution - handy for quick test renders.",
+            "enum": [
+              "5",
+              "90",
+              "107",
+              "124",
+              "141",
+              "158",
+              "175",
+              "192",
+              "209",
+              "226",
+              "243",
+              "260",
+              "277",
+              "294",
+              "311",
+              "328",
+              "345"
+            ],
             "field_kind": "input",
             "input": "any",
-            "minimum": 5,
-            "orig_default": 124,
+            "orig_default": "124",
             "orig_required": false,
             "title": "Number of Frames",
-            "type": "integer"
+            "type": "string",
+            "ui_choice_labels": {
+              "107": "107 frames - 4.46 s",
+              "124": "124 frames - 5.17 s",
+              "141": "141 frames - 5.88 s",
+              "158": "158 frames - 6.58 s",
+              "175": "175 frames - 7.29 s",
+              "192": "192 frames - 8.00 s",
+              "209": "209 frames - 8.71 s",
+              "226": "226 frames - 9.42 s",
+              "243": "243 frames - 10.12 s",
+              "260": "260 frames - 10.83 s",
+              "277": "277 frames - 11.54 s",
+              "294": "294 frames - 12.25 s",
+              "311": "311 frames - 12.96 s",
+              "328": "328 frames - 13.67 s",
+              "345": "345 frames - 14.38 s",
+              "5": "5 frames - still image only",
+              "90": "90 frames - 3.75 s"
+            }
           },
           "steps": {
             "default": 50,
@@ -67909,7 +68546,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
@@ -68140,7 +68777,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\nApplies the released pipeline's canvas policy: short edge 768, soft area cap of\n768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of\nthe inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image\nPrimitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax\nH3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three\nmust share the same canvas).",
+        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\n\"768 highres\" applies the released pipeline's canvas policy: short edge 768, soft\narea cap of 768x1344. \"768 lowres\" pins the LONG edge to 768 instead, giving a\ncanvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes\n512x768 instead of 768x1152) \u2014 faster and cheaper, at some cost in fidelity since it\nis below the model's training resolution. Both presets round each axis to the\nnearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios\nbeyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs\nand into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax\nH3`` and ``Denoise - MiniMax H3`` (all three must share the same canvas).",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -68189,6 +68826,21 @@
             "title": "Height",
             "type": "integer"
           },
+          "target_resolution": {
+            "default": "768 highres",
+            "description": "Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.",
+            "enum": ["768 highres", "768 lowres"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "768 highres",
+            "orig_required": false,
+            "title": "Target Resolution",
+            "type": "string",
+            "ui_choice_labels": {
+              "768 highres": "768 highres (native: short edge 768, cap 768x1344)",
+              "768 lowres": "768 lowres (long edge 768 \u2014 smaller, faster)"
+            }
+          },
           "type": {
             "const": "minimax_h3_ideal_dimensions",
             "default": "minimax_h3_ideal_dimensions",
@@ -68201,7 +68853,7 @@
         "tags": ["minimax", "video", "dimensions", "math"],
         "title": "MiniMax H3 Ideal Dimensions",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/IdealSizeOutput"
         }
@@ -68471,6 +69123,219 @@
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }
+      },
+      "MiniMaxH3LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to a MiniMax H3 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "minimax_h3_lora_collection_loader",
+            "default": "minimax_h3_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "minimax"],
+        "title": "Apply LoRA Collection - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+        }
+      },
+      "MiniMaxH3LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to a MiniMax H3 transformer (e.g. the Turbo step-distillation LoRA).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "Strength of the LoRA. The Turbo LoRA is trained for 1.0; adjust only to trade off motion artifacts (raise slightly) against over-sharpening (lower slightly).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "minimax_h3_lora_loader",
+            "default": "minimax_h3_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "minimax"],
+        "title": "Apply LoRA - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+        }
+      },
+      "MiniMaxH3LoRALoaderOutput": {
+        "class": "output",
+        "description": "MiniMax H3 LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "MiniMax H3 Transformer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_lora_loader_output",
+            "default": "minimax_h3_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "type", "type"],
+        "title": "MiniMaxH3LoRALoaderOutput",
+        "type": "object"
       },
       "MiniMaxH3ModelLoaderInvocation": {
         "category": "model",
@@ -68778,6 +69643,14 @@
           "transformer": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load Transformer submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
           }
         },
         "required": ["transformer"],
@@ -69765,6 +70638,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -70442,6 +71318,9 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                   },
                   {
@@ -71004,6 +71883,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -71420,6 +72302,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -72311,6 +73196,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"

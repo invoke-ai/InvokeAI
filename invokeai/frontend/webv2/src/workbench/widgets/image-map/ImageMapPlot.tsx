@@ -3,14 +3,22 @@ import type { AxisRanges } from '@workbench/image-map/imageMapViewport';
 import type { PlotlyHTMLElement } from 'plotly.js';
 
 import { Box } from '@chakra-ui/react';
-import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import {
+  getPersistedSelectedGalleryItemKeys,
+  getSelectedGalleryImageFromValues,
+  parseGalleryItemKey,
+} from '@features/gallery/contracts';
 import { attachWheelZoom } from '@workbench/image-map/attachWheelZoom';
+import { collectClusterSelection } from '@workbench/image-map/clusterSelection';
 import { imageMapStore } from '@workbench/image-map/imageMapStore';
 import {
   buildAllPointsTrace,
+  buildClusterAnnotations,
   buildCurrentImageTrace,
+  buildHighlightedPointsTrace,
   buildMapLayout,
   CURRENT_IMAGE_TRACE,
+  HIGHLIGHTED_POINTS_TRACE,
 } from '@workbench/image-map/imageMapTraces';
 import {
   computePercentileRanges,
@@ -19,11 +27,11 @@ import {
   rangesToKeepMarkerInView,
 } from '@workbench/image-map/imageMapViewport';
 import { getThumbnailUrl } from '@workbench/image-map/thumbnailCache';
-import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import { shallowEqual, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import Plotly from 'plotly.js-gl2d-dist-min';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useSelectMapImage } from './useSelectMapImage';
+import { useMapSelection } from './useSelectMapImage';
 
 /** Suppress the synthetic click plotly fires when a pinch gesture ends. */
 const PINCH_CLICK_SUPPRESS_MS = 500;
@@ -110,14 +118,36 @@ const findTraceIndex = (plot: PlotElement, name: string): number =>
  * module is lazy-loaded so the plotly bundle stays out of the app's critical
  * path.
  */
-const ImageMapPlot = () => {
+const ImageMapPlot = ({
+  clickSelectsCluster = false,
+  showClusterLabels = true,
+}: {
+  clickSelectsCluster?: boolean;
+  showClusterLabels?: boolean;
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const points = imageMapStore.useSelector((snapshot) => snapshot.data?.points ?? null);
+  const clusterLabels = imageMapStore.useSelector((snapshot) => snapshot.clusterLabels);
   const selectedImageName = useWidgetValuesSelector(
     'gallery',
     (values) => getSelectedGalleryImageFromValues(values)?.imageName ?? null
   );
-  const selectImage = useSelectMapImage();
+  // The persisted selection stores kind-tagged item keys; map points carry
+  // bare image names, so parse the keys back down (videos never plot).
+  const selectedImageNames = useWidgetValuesSelector(
+    'gallery',
+    (values) =>
+      getPersistedSelectedGalleryItemKeys(values)
+        .map(parseGalleryItemKey)
+        .filter((ref) => ref.kind === 'image')
+        .map((ref) => ref.name),
+    shallowEqual
+  );
+  const selectedNames = useMemo(() => new Set(selectedImageNames), [selectedImageNames]);
+  const { selectCluster, selectImage } = useMapSelection();
+  // Bumped after every scene rebuild so the overlay effects (marker,
+  // highlight) re-apply onto the fresh, empty overlay traces.
+  const [plotRevision, setPlotRevision] = useState(0);
   const lastPinchAtRef = useRef(0);
   const lastMapSelectionRef = useRef<{ name: string; at: number } | null>(null);
   // The initial whole-map fit must happen exactly once per mount, at the
@@ -126,12 +156,14 @@ const ImageMapPlot = () => {
   const initialFitDoneRef = useRef(false);
   const pointsRef = useRef(points);
   const selectedImageNameRef = useRef(selectedImageName);
+  const clusterModeRef = useRef(clickSelectsCluster);
 
   // Declared before the effects below so the refs are fresh when they run.
   useEffect(() => {
     pointsRef.current = points;
     selectedImageNameRef.current = selectedImageName;
-  }, [points, selectedImageName]);
+    clusterModeRef.current = clickSelectsCluster;
+  }, [clickSelectsCluster, points, selectedImageName]);
   const [pendingHoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic hover session: a resolution from a previous hover (even of the
@@ -154,7 +186,13 @@ const ImageMapPlot = () => {
       return;
     }
 
-    const traces = [buildAllPointsTrace(points), buildCurrentImageTrace()];
+    // Overlay traces (highlight, marker) start empty; the overlay effects
+    // below restyle them, so a selection change never rebuilds the scene.
+    const traces = [
+      buildAllPointsTrace(points),
+      buildHighlightedPointsTrace(points, new Set()),
+      buildCurrentImageTrace(),
+    ];
     let disposed = false;
 
     // Feed the CURRENT view back into react so data refreshes never reset the
@@ -178,7 +216,12 @@ const ImageMapPlot = () => {
       }
     }
 
-    void Plotly.react(container, traces as Plotly.Data[], buildMapLayout(initialRanges), {
+    // Annotations are deliberately absent here: they are a layout concern, and
+    // rebuilding the scene for them is what made labels arriving a second after
+    // the points re-materialize every trace. See the relayout effect below.
+    const layout = buildMapLayout(initialRanges);
+
+    void Plotly.react(container, traces as Plotly.Data[], layout, {
       displayModeBar: false,
       // Custom wheel/pinch zoom below; plotly's own scrollZoom has
       // long-standing Safari issues.
@@ -197,12 +240,22 @@ const ImageMapPlot = () => {
 
           const imageName = event.points?.[0]?.customdata;
 
-          if (typeof imageName === 'string') {
-            // A selection made by clicking the map must not recenter the map
-            // under the user's cursor; the marker effect checks this. The
-            // stamp expires so a stale entry (failed hydrate, re-click of the
-            // current point) cannot suppress a legitimate future recenter.
-            lastMapSelectionRef.current = { at: Date.now(), name: imageName };
+          if (typeof imageName !== 'string') {
+            return;
+          }
+
+          // A selection made by clicking the map must not recenter the map
+          // under the user's cursor; the marker effect checks this. The
+          // stamp expires so a stale entry (failed hydrate, re-click of the
+          // current point) cannot suppress a legitimate future recenter.
+          lastMapSelectionRef.current = { at: Date.now(), name: imageName };
+
+          const clusterNames = clusterModeRef.current ? collectClusterSelection(points, imageName) : null;
+
+          if (clusterNames) {
+            selectCluster(imageName, clusterNames);
+          } else {
+            // Also the cluster-mode fallback for noise points (cluster -1).
             selectImage(imageName);
           }
         });
@@ -235,6 +288,7 @@ const ImageMapPlot = () => {
         plot.on('plotly_unhover', () => {
           clearHover();
         });
+        setPlotRevision((revision) => revision + 1);
       })
       .catch(() => {
         if (disposed) {
@@ -255,7 +309,36 @@ const ImageMapPlot = () => {
     return () => {
       disposed = true;
     };
-  }, [points, selectImage]);
+  }, [points, selectCluster, selectImage]);
+
+  // Highlight overlay: the gallery's multi-selection, restyled in place.
+  useEffect(() => {
+    const container = containerRef.current as PlotElement | null;
+
+    if (!container || points === null) {
+      return;
+    }
+
+    const highlightIndex = findTraceIndex(container, HIGHLIGHTED_POINTS_TRACE);
+
+    if (highlightIndex < 0) {
+      return;
+    }
+
+    const trace = buildHighlightedPointsTrace(points, selectedNames);
+    swallow(
+      Plotly.restyle(
+        container,
+        {
+          customdata: [trace.customdata],
+          'marker.color': [trace.marker.color as string[]],
+          x: [trace.x],
+          y: [trace.y],
+        },
+        [highlightIndex]
+      )
+    );
+  }, [plotRevision, points, selectedNames]);
 
   // The timer must not outlive the component; the scene effect used to do
   // this, but it reruns on every `points` change.
@@ -314,7 +397,26 @@ const ImageMapPlot = () => {
     if (recentered) {
       swallow(Plotly.relayout(container, { 'xaxis.range': recentered.x, 'yaxis.range': recentered.y }));
     }
-  }, [points, selectedImageName]);
+  }, [plotRevision, points, selectedImageName]);
+
+  // Labels arrive about a second after the points they annotate. Applying them
+  // with `relayout` rather than through the scene effect keeps that from
+  // re-materializing every coordinate array — and, more visibly, from resetting
+  // the highlight and current-image traces to empty, which made the gold marker
+  // and the multi-select highlight blink off and back on with every refresh.
+  useEffect(() => {
+    const container = containerRef.current as PlotElement | null;
+
+    if (!container || points === null || !container.data) {
+      return;
+    }
+
+    swallow(
+      Plotly.relayout(container, {
+        annotations: buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null),
+      })
+    );
+  }, [clusterLabels, plotRevision, points, showClusterLabels]);
 
   // Custom zoom handlers + container size tracking, attached once for the
   // plot's lifetime; plotly does not observe its container.

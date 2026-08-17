@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 832083,
+        "brotliBytes": 832217,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 831935,
+        "gzipBytes": 832184,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1933605,
+        "initialRawBytes": 1934317,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66816,
+        "ownedRawBytes": 66817,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -280,15 +280,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840404,
+        "brotliBytes": 840540,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 840255,
+        "gzipBytes": 840506,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1952942,
+        "initialRawBytes": 1953661,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 66816,
+        "ownedRawBytes": 66817,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -298,12 +298,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1030404,
+        "brotliBytes": 1031650,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1027773,
+        "gzipBytes": 1029036,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2527024,
+        "initialRawBytes": 2530634,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 111432,
@@ -436,6 +436,7 @@
           "source:src/features/gallery/core/items.ts",
           "source:src/features/gallery/core/recentImages.ts",
           "source:src/features/gallery/core/selection.ts",
+          "source:src/features/gallery/core/semanticImageQuery.ts",
           "source:src/features/gallery/core/settings.ts",
           "source:src/features/gallery/core/videoPaths.ts",
           "source:src/features/gallery/data/backend.ts",
@@ -832,12 +833,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1040709,
+        "brotliBytes": 1041967,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1038051,
+        "gzipBytes": 1039327,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2552295,
+        "initialRawBytes": 2555941,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 111432,
@@ -849,7 +850,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-16",
+  "capturedAt": "2026-08-17",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
@@ -894,7 +895,9 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "editorForbiddenInitialChunkNames": [
+      "ag-psd"
+    ],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }

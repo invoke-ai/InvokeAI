@@ -13,6 +13,11 @@ import {
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/core/selection';
+import {
+  gallerySemanticReferenceKey,
+  parseGallerySemanticReference,
+  type GallerySemanticReference,
+} from '@features/gallery/core/semanticImageQuery';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -80,6 +85,8 @@ export interface GalleryStateView {
   selectedBoardId: string;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
+  /** Active image-similarity query, rendered as a chip in place of the search text. */
+  semanticImageQuery: GallerySemanticReference | null;
   settings: GallerySettings;
 }
 
@@ -223,6 +230,23 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
+
+// The parser builds a fresh object per call, but selectors and memo
+// dependencies need identity stability: reuse the previous object while its
+// key is unchanged. (The gallery widget is single-instance, so one slot is
+// enough; a second consumer with a different value would still be correct,
+// merely unmemoized.)
+let lastSemanticReference: GallerySemanticReference | null = null;
+
+export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null => {
+  const parsed = parseGallerySemanticReference(values.semanticImageQuery);
+
+  if (gallerySemanticReferenceKey(parsed) !== gallerySemanticReferenceKey(lastSemanticReference)) {
+    lastSemanticReference = parsed;
+  }
+
+  return lastSemanticReference;
+};
 
 /**
  * Where new results land, resolved against the boards this install actually has.
@@ -401,8 +425,12 @@ export const getGalleryStateView = (
     compareImageKey !== null &&
     compareImageKey !== visibleSelectedItemKey;
   const generationSequence = getGalleryGenerationSequence(queueItems, liveTarget);
+  // A ranked similarity result has no chronological insertion point, so
+  // pending placeholders (which stand in for images-to-come) are hidden while
+  // a semantic query is active — exactly as they are for a text search.
+  const semanticImageQuery = getGallerySemanticImageQuery(values);
   const visibleActivePlaceholder =
-    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === ''
+    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === '' && semanticImageQuery === null
       ? generationSequence.liveSlot?.boardId === selectedBoardId
         ? generationSequence.liveSlot
         : null
@@ -421,14 +449,15 @@ export const getGalleryStateView = (
     galleryView,
     items,
     isLoading,
-    pendingPlaceholders: settings.showPendingItems
-      ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
-          galleryView,
-          imageOrderDir: settings.imageOrderDir,
-          searchTerm,
-          selectedBoardId,
-        })
-      : [],
+    pendingPlaceholders:
+      settings.showPendingItems && semanticImageQuery === null
+        ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
+            galleryView,
+            imageOrderDir: settings.imageOrderDir,
+            searchTerm,
+            selectedBoardId,
+          })
+        : [],
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,
@@ -437,6 +466,7 @@ export const getGalleryStateView = (
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
         ? [visibleSelectedItemKey, ...selectedItemKeys]
         : selectedItemKeys,
+    semanticImageQuery,
     settings,
   };
 };

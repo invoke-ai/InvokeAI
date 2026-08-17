@@ -213,6 +213,37 @@ describe('Gallery item cache patches', () => {
     }
   });
 
+  it('keeps moved items in ranked similarity windows regardless of the selected board', () => {
+    // A semantic window inherits whatever board happens to be selected, but
+    // its membership is similarity, not board: moving an image must update
+    // its board in place, never evict it from the ranked list.
+    const client = createClient();
+    const target = createItem('ranked.png', 'board-1');
+    const untouched = createItem('also-ranked.png', 'board-1');
+    const semanticKey = galleryKeys.items(
+      captureAccountScope(),
+      canonicalizeGalleryItemsFilter({
+        boardId: 'board-1',
+        galleryView: 'images',
+        searchTerm: '',
+        semanticQuery: { imageName: 'ref.png', kind: 'image' },
+      })
+    );
+
+    client.setQueryData(semanticKey, createData([[target, untouched]]));
+
+    patchGalleryItemCaches(client, {
+      boardId: 'board-2',
+      kind: 'move',
+      result: getResult([{ kind: 'image', name: target.name }]),
+    });
+
+    const after = getData(client, semanticKey);
+
+    expect(after.pages.flatMap((page) => page.items)).toEqual([{ ...target, boardId: 'board-2' }, untouched]);
+    expect(after.pages.map((page) => page.total)).toEqual([2]);
+  });
+
   it('does not let rollback clobber a later concurrent cache update', () => {
     const client = createClient();
     const target = createItem('target.png');
