@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 832275,
+        "brotliBytes": 832861,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 832279,
+        "gzipBytes": 832758,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1934798,
+        "initialRawBytes": 1935956,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 67298,
+        "ownedRawBytes": 67300,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -281,15 +281,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840598,
+        "brotliBytes": 841190,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 840602,
+        "gzipBytes": 841086,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1954146,
+        "initialRawBytes": 1955316,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 67298,
+        "ownedRawBytes": 67300,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -299,15 +299,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1032129,
+        "brotliBytes": 1034065,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1029460,
+        "gzipBytes": 1031559,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2531682,
+        "initialRawBytes": 2538750,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112318,
+        "ownedRawBytes": 112650,
         "requestCount": 89,
         "scriptRequestCount": 73,
         "sourceOwners": [
@@ -576,6 +576,7 @@
           "source:src/features/queue/ui/queueUiStore.ts",
           "source:src/features/queue/ui/queueViewModel.ts",
           "source:src/features/queue/ui/useDeviceLabel.ts",
+          "source:src/features/queue/widget.ts",
           "source:src/features/upscale/core/graph.ts",
           "source:src/features/upscale/core/settings.ts",
           "source:src/features/upscale/index.ts",
@@ -687,6 +688,7 @@
           "source:src/workbench/components/WorkbenchSplashScreen.tsx",
           "source:src/workbench/controlAdapters.ts",
           "source:src/workbench/controlLayerChecks.ts",
+          "source:src/workbench/deferredResource.ts",
           "source:src/workbench/diagnostics/logger.ts",
           "source:src/workbench/extensions/contributionSource.ts",
           "source:src/workbench/extensions/extensionRegistry.ts",
@@ -715,6 +717,7 @@
           "source:src/workbench/layoutPresetRouting.ts",
           "source:src/workbench/layoutPresetSnapshots.ts",
           "source:src/workbench/layoutPresets.ts",
+          "source:src/workbench/layoutWidgetSet.ts",
           "source:src/workbench/palette/WorkbenchCommandPalette.tsx",
           "source:src/workbench/palette/paletteStore.ts",
           "source:src/workbench/palette/settingsEntryDeps.ts",
@@ -783,6 +786,7 @@
           "source:src/workbench/shell/topbar/useInvocationState.ts",
           "source:src/workbench/shell/topbar/useLayoutDrift.ts",
           "source:src/workbench/shell/topbar/useTopbarShortcut.ts",
+          "source:src/workbench/shell/useMountedInstanceIds.ts",
           "source:src/workbench/useNotify.ts",
           "source:src/workbench/useOpenWorkbenchWidget.ts",
           "source:src/workbench/widget-frame/FloatingWidgetLayer.tsx",
@@ -836,15 +840,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1042451,
+        "brotliBytes": 1044406,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1039755,
+        "gzipBytes": 1041875,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2556999,
+        "initialRawBytes": 2564138,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112318,
+        "ownedRawBytes": 112650,
         "requestCount": 89,
         "scriptRequestCount": 73
       },
@@ -898,7 +902,9 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": ["ag-psd"],
+    "editorForbiddenInitialChunkNames": [
+      "ag-psd"
+    ],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }
