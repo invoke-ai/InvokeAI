@@ -25537,6 +25537,12 @@ export type components = {
              */
             base: "minimax-h3";
             variant: components["schemas"]["MiniMaxH3VariantType"];
+            /**
+             * Components Only
+             * @description Whether the folder holds only the shared components (tokenizer, processor, VAEs) without transformer weights - a slim install whose transformer and text encoder must be supplied as single-file overrides at generation time.
+             * @default false
+             */
+            components_only: boolean;
         };
         /**
          * Main_Diffusers_QwenImage_Config

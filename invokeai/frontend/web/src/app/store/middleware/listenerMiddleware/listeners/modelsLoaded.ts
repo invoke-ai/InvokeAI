@@ -7,6 +7,8 @@ import {
   fluxVAESelected,
   krea2Qwen3VlEncoderModelSelected,
   krea2VaeModelSelected,
+  minimaxH3TextEncoderModelSelected,
+  minimaxH3TransformerModelSelected,
   modelChanged,
   refinerModelChanged,
   t5EncoderModelSelected,
@@ -84,6 +86,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
 
       handleMainModels(models, state, dispatch, log);
       handleKrea2Components(models, state, dispatch, log);
+      handleMiniMaxH3Overrides(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
@@ -122,6 +125,19 @@ export const handleKrea2Components: ModelHandler = (models, state, dispatch) => 
   }
   if ('encoder' in updates) {
     dispatch(krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null));
+  }
+};
+
+const handleMiniMaxH3Overrides: ModelHandler = (models, state, dispatch) => {
+  // The MiniMax H3 single-file transformer / text-encoder overrides are optional (null = use the
+  // main folder's submodels), so never auto-select - but a selection whose model was uninstalled
+  // must be cleared, or it passes the components-only readiness gate and fails at invoke time.
+  const { minimaxH3TransformerModel, minimaxH3TextEncoderModel } = state.params;
+  if (minimaxH3TransformerModel && !models.some((m) => m.key === minimaxH3TransformerModel.key)) {
+    dispatch(minimaxH3TransformerModelSelected(null));
+  }
+  if (minimaxH3TextEncoderModel && !models.some((m) => m.key === minimaxH3TextEncoderModel.key)) {
+    dispatch(minimaxH3TextEncoderModelSelected(null));
   }
 };
 

@@ -61413,6 +61413,12 @@
           },
           "variant": {
             "$ref": "#/components/schemas/MiniMaxH3VariantType"
+          },
+          "components_only": {
+            "type": "boolean",
+            "title": "Components Only",
+            "description": "Whether the folder holds only the shared components (tokenizer, processor, VAEs) without transformer weights - a slim install whose transformer and text encoder must be supplied as single-file overrides at generation time.",
+            "default": false
           }
         },
         "type": "object",
@@ -61434,7 +61440,8 @@
           "format",
           "repo_variant",
           "base",
-          "variant"
+          "variant",
+          "components_only"
         ],
         "title": "Main_Diffusers_MiniMaxH3_Config",
         "description": "Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."

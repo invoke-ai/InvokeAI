@@ -32,6 +32,10 @@ def filter_files(
     :param files: List of files relative to the repo root.
     :param subfolder: Filter by the indicated subfolder (deprecated, use subfolders instead).
     :param subfolders: Filter by multiple subfolders. Files from any of these subfolders will be included.
+        An entry that names a repo file exactly (e.g. "modular_model_index.json" or
+        "transformer/config.json") is an explicit file request: it is included verbatim, bypassing
+        the extension prefilter, variant scoring and config-only-folder pruning that apply to
+        subfolder contents.
     :param variant: Filter by files belonging to a particular variant, such as fp16.
 
     The file list can be obtained from the `files` field of HuggingFaceMetadata,
@@ -58,6 +62,17 @@ def filter_files(
         if sf.suffix in [".safetensors", ".bin", ".onnx", ".xml", ".pth", ".pt", ".ckpt", ".msgpack"]:
             return [root / sf]
 
+    # In a multi-entry list, entries that name a repo file exactly are explicit requests for that
+    # file. Split them out so they skip every filter below - a slim install can then combine
+    # component subfolders with the root pipeline index and a bare config.json (whose folder the
+    # config-only pruning at the end would otherwise drop).
+    subfolder_filter_requested = bool(filter_subfolders)
+    explicit_files: List[Path] = []
+    if len(filter_subfolders) > 1:
+        file_set = set(files)
+        explicit_files = [sf for sf in filter_subfolders if (root / sf) in file_set]
+        filter_subfolders = [sf for sf in filter_subfolders if sf not in explicit_files]
+
     # Start by filtering on model file extensions, discarding images, docs, etc
     for file in files:
         if file.name.endswith((".json", ".txt", ".jinja")):  # .jinja for chat templates
@@ -81,13 +96,14 @@ def filter_files(
         elif re.search(r"model.*\.(safetensors|bin|onnx|xml|pth|pt|ckpt|msgpack)$", file.name):
             paths.append(file)
 
-    # limit search to subfolder(s) if requested
-    if filter_subfolders:
+    # limit search to subfolder(s) if requested. When every entry was an explicit file, this
+    # correctly reduces the subfolder-derived selection to nothing rather than the whole repo.
+    if subfolder_filter_requested:
         absolute_subfolders = [root / sf for sf in filter_subfolders]
         paths = [x for x in paths if any(Path(sf) in x.parents for sf in absolute_subfolders)]
 
     # _filter_by_variant uniquifies the paths and returns a set
-    return sorted(_filter_by_variant(paths, variant))
+    return sorted(_filter_by_variant(paths, variant) | {root / sf for sf in explicit_files})
 
 
 @dataclass
