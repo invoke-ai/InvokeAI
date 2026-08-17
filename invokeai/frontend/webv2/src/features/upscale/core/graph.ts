@@ -42,7 +42,8 @@ const addUpscaleMetadata = (
   graph: BackendGraphContract,
   output: BackendInvocationContract,
   settings: UpscaleWidgetValues,
-  projectSettings: GenerationProjectSettings
+  projectSettings: GenerationProjectSettings,
+  randDevice: string
 ): void => {
   if (!settings.model || !settings.upscaleModel || !settings.inputImage) {
     return;
@@ -57,7 +58,7 @@ const addUpscaleMetadata = (
     id: 'core_metadata',
     loras: activeLoras.map((lora) => ({ model: toModelIdentifier(lora.model), weight: lora.weight })),
     model: toModelIdentifier(settings.model),
-    rand_device: projectSettings.useCpuNoise ? 'cpu' : 'cuda',
+    rand_device: randDevice,
     scheduler: coerceSchedulerForGraph(settings.model, settings.scheduler),
     steps: settings.steps,
     structure: settings.structure,
@@ -85,7 +86,8 @@ const addUpscaleMetadata = (
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,
-  projectSettings: GenerationProjectSettings
+  projectSettings: GenerationProjectSettings,
+  randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda'
 ): CompiledUpscaleGraph => {
   const reasons = getUpscaleValidationReasons(settings);
 
@@ -239,7 +241,7 @@ export const compileUpscaleGraph = (
   addEdge(graph, controlNet1, 'control', controlNetCollector, 'item');
   addEdge(graph, controlNet2, 'control', controlNetCollector, 'item');
   addEdge(graph, controlNetCollector, 'collection', denoise, 'control');
-  addUpscaleMetadata(graph, output, settings, projectSettings);
+  addUpscaleMetadata(graph, output, settings, projectSettings, randDevice);
 
   return {
     backendGraph: graph,

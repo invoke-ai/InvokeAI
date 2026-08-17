@@ -34,7 +34,7 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
     Gemma2Encoder_Gemma2Encoder_Config,
     Gemma2Encoder_GGUF_Config,
 )
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_FLUX_Config,
     IPAdapter_Checkpoint_SD1_Config,
@@ -80,6 +80,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD2_Config,
     Main_Checkpoint_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
+    Main_Checkpoint_Wan_Config,
     Main_Checkpoint_ZImage_Config,
     Main_Diffusers_CogView4_Config,
     Main_Diffusers_ErnieImage_Config,
@@ -102,6 +103,12 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
     Main_GGUF_ZImage_Config,
+    Main_SDNQ_Diffusers_Flux2_Config,
+    Main_SDNQ_Diffusers_FLUX_Config,
+    Main_SDNQ_Diffusers_ZImage_Config,
+    Main_SDNQ_Flux2_Config,
+    Main_SDNQ_FLUX_Config,
+    Main_SDNQ_ZImage_Config,
     MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.mistral_encoder import (
@@ -120,6 +127,8 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+    Qwen3Encoder_SDNQ_Config,
+    Qwen3Encoder_SDNQ_Folder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
@@ -139,6 +148,7 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
 from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_BnBLLMint8_Config,
     T5Encoder_GGUF_Config,
+    T5Encoder_SDNQ_Config,
     T5Encoder_T5Encoder_Config,
 )
 from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
@@ -292,6 +302,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_Flux2_Config, Main_Checkpoint_Flux2_Config.get_tag()],
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_QwenImage_Config, Main_Checkpoint_QwenImage_Config.get_tag()],
+        Annotated[Main_Checkpoint_Wan_Config, Main_Checkpoint_Wan_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
@@ -306,6 +317,16 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Wan_Config, Main_GGUF_Wan_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
+        # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
+        # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
+        # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
+        # two mutually exclusive regardless of iteration order.
+        Annotated[Main_SDNQ_Flux2_Config, Main_SDNQ_Flux2_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_Flux2_Config, Main_SDNQ_Diffusers_Flux2_Config.get_tag()],
+        Annotated[Main_SDNQ_FLUX_Config, Main_SDNQ_FLUX_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_FLUX_Config, Main_SDNQ_Diffusers_FLUX_Config.get_tag()],
+        Annotated[Main_SDNQ_ZImage_Config, Main_SDNQ_ZImage_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_ZImage_Config, Main_SDNQ_Diffusers_ZImage_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
@@ -383,6 +404,7 @@ AnyModelConfig = Annotated[
         # T5 Encoder - all formats
         Annotated[T5Encoder_T5Encoder_Config, T5Encoder_T5Encoder_Config.get_tag()],
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
+        Annotated[T5Encoder_SDNQ_Config, T5Encoder_SDNQ_Config.get_tag()],
         Annotated[T5Encoder_GGUF_Config, T5Encoder_GGUF_Config.get_tag()],
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
@@ -397,6 +419,8 @@ AnyModelConfig = Annotated[
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        Annotated[Qwen3Encoder_SDNQ_Config, Qwen3Encoder_SDNQ_Config.get_tag()],
+        Annotated[Qwen3Encoder_SDNQ_Folder_Config, Qwen3Encoder_SDNQ_Folder_Config.get_tag()],
         # Mistral Encoder (used by FLUX.2 [dev])
         Annotated[MistralEncoder_Diffusers_Config, MistralEncoder_Diffusers_Config.get_tag()],
         Annotated[MistralEncoder_Checkpoint_Config, MistralEncoder_Checkpoint_Config.get_tag()],
@@ -476,6 +500,15 @@ class ModelClassificationResult:
     def match_count(self) -> int:
         """Returns the number of matching model configs found."""
         return len(self.all_matches)
+
+    @property
+    def invalid_matches(self) -> list[InvalidMatchError]:
+        """Rejections from config classes that recognised the model but found it unusable.
+
+        Non-empty means `config` is None because the file is broken, not because it is unidentifiable
+        — callers can report the specific reason instead of a generic "could not identify".
+        """
+        return [r for r in self.details.values() if isinstance(r, InvalidMatchError)]
 
 
 class ModelConfigFactory:
@@ -690,6 +723,11 @@ class ModelConfigFactory:
             except NotAMatchError as e:
                 # This means the model didn't match this config class. It's not an error, just no match.
                 details[candidate_name] = e
+            except InvalidMatchError as e:
+                # This means the model *is* this config class' kind of model, but is unusable (e.g. a
+                # truncated checkpoint). Recorded like any other result here; the fallback below is
+                # what treats it differently from a plain no-match.
+                details[candidate_name] = e
             except ValidationError as e:
                 # This means the model matched, but we couldn't create the pydantic model instance for the config.
                 # Maybe invalid overrides were provided?
@@ -702,6 +740,11 @@ class ModelConfigFactory:
         matches = [r for r in details.values() if isinstance(r, Config_Base)]
 
         if not matches:
+            if any(isinstance(r, InvalidMatchError) for r in details.values()):
+                # A config class recognised the model and rejected it as unusable. That is not the same
+                # as "unidentifiable": falling back to Unknown_Config here would register a file we know
+                # to be broken as a normal model record, so the rejection wins over allow_unknown.
+                return ModelClassificationResult(config=None, details=details)
             if not allow_unknown:
                 # No matches and we are not allowed to fall back to Unknown_Config
                 return ModelClassificationResult(config=None, details=details)

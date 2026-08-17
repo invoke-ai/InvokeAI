@@ -19,7 +19,7 @@ export interface ItemProgress {
   /** 0..1, or null while indeterminate. */
   percentage: number | null;
   image?: QueueProgressImage | null;
-  /** The GPU running this session, e.g. `cuda:1`. Null on non-CUDA and single-device installs. */
+  /** The accelerator running this session, e.g. `cuda:1` or `xpu:1`. Null on unindexed and single-device installs. */
   device?: string | null;
 }
 

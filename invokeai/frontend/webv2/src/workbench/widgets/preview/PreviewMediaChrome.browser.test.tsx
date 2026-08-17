@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { GalleryImageItem, GalleryVideoItem } from '@features/gallery';
+import type * as queueDevicesModule from '@features/queue/devices';
 import type { ImageActions } from '@workbench/image-actions';
 
 import { Box, ChakraProvider, Text } from '@chakra-ui/react';
@@ -60,9 +61,14 @@ vi.mock('@features/queue/react', () => ({
   useProgressImage: () => null,
 }));
 
-vi.mock('@features/queue/devices', () => ({
-  useDeviceLabel: () => mocks.deviceLabel,
-}));
+vi.mock('@features/queue/devices', async (importOriginal) => {
+  const actual = await importOriginal<typeof queueDevicesModule>();
+
+  return {
+    ...actual,
+    useDeviceLabel: () => mocks.deviceLabel,
+  };
+});
 
 vi.mock('@platform/ui/streaming-image/useStreamingImageSource', () => ({
   useStreamingImageSource: () => ({

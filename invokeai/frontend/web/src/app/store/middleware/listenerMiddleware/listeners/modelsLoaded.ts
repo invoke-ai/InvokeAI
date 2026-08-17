@@ -55,6 +55,7 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -148,11 +149,12 @@ type ModelHandler = (
   log: Logger<JsonObject>
 ) => undefined;
 
-const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
+export const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedMainModel = state.params.model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
-  const firstModel = allMainModels[0];
+  const selectableModels = selectPrimaryMainModelOptions(allMainModels);
+  const firstModel = selectableModels[0];
 
   // If we have no models, we may need to clear the selected model
   if (!firstModel) {
@@ -164,8 +166,14 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     return;
   }
 
-  // If the current model is available, we don't need to do anything
-  if (allMainModels.some((m) => m.key === selectedMainModel?.key)) {
+  const availableSelectedModel = allMainModels.find((model) => model.key === selectedMainModel?.key);
+
+  // Preserve an available selection when it is intrinsically eligible as a primary.
+  // Passing the model alone distinguishes that from a contextually hidden Wan low-noise
+  // expert: it is eligible without its partner and must not be silently replaced merely
+  // because installing that partner hides it from new selections. MiniMax H3 checkpoint
+  // overrides remain ineligible even alone, so they are cleared or replaced here.
+  if (availableSelectedModel && selectPrimaryMainModelOptions([availableSelectedModel]).length === 1) {
     return;
   }
 

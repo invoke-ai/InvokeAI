@@ -57,6 +57,7 @@ import {
   resolveGenerateSeed,
 } from '@features/generation/graph';
 import { normalizeGenerateWidgetValues, syncGenerateWidgetValuesWithModels } from '@features/generation/settings';
+import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   captureAccountScope,
   isAccountScopeCurrent,
@@ -114,6 +115,8 @@ export interface RunCanvasInvocationDeps {
   models?: readonly ModelConfig[];
   /** Project settings (only `useCpuNoise` is consulted by the compiler). */
   projectSettings: Pick<ProjectSettings, 'useCpuNoise'>;
+  /** Runtime-derived accelerator family recorded in generation metadata. */
+  randDevice?: string;
   /** Persisted denoising strength (already defaulted + clamped). Used for every image mode. */
   strength: number;
   /** Persisted compositing settings (infill / coherence / mask blur), defaulted + clamped. */
@@ -387,6 +390,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       model,
       noiseMaskImageName: composites.noiseMaskImageName,
       projectSettings: deps.projectSettings,
+      randDevice: deps.randDevice,
       regionalGuidance: regions.toGraphInputs(composites.regionalMaskImages),
       settings,
       strength: deps.strength,
@@ -489,6 +493,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     models: args.models,
     projectId: args.projectId,
     projectSettings: args.projectSettings,
+    randDevice: resolveRandDeviceMetadata(args.projectSettings.useCpuNoise, getGenerationDevicesSnapshot().options),
     signal,
     strength: args.strength,
   });

@@ -626,10 +626,11 @@ class SocketIO:
             )
             return
 
-        # Model install events feed an admin-only UI and may expose details about privileged
-        # operations, so keep the fork's admin-only routing. Other download events retain their
-        # existing broadcast behavior.
-        if isinstance(event_data, MODEL_INSTALL_EVENTS):
+        # Model install and download events contain signed source URLs and server filesystem
+        # paths. They feed the admin-only model manager UI and must not be broadcast to users.
+        # Keep the explicit install tuple alongside the base classes: it documents the install
+        # family registered by this server while the bases cover every download/model subtype.
+        if isinstance(event_data, MODEL_INSTALL_EVENTS + (DownloadEventBase, ModelEventBase)):
             await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
             return
 

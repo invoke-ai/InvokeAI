@@ -12,7 +12,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { useCallback, useMemo, useState } from 'react';
 
 /**
- * Which GPUs the server uses for generation (`generation_devices`).
+ * Which accelerators the server uses for generation (`generation_devices`).
  *
  * Server-wide app config rather than a user preference, so it is admin-only and only
  * takes effect after a restart — both of which the copy states plainly instead of
@@ -48,7 +48,7 @@ export const GenerationDevicesSettings = () => {
   const toggleAuto = useCallback(
     (checked: boolean) => {
       // Leaving auto starts from the devices in effect right now, so turning the
-      // switch off is not itself a change in which GPUs are used.
+      // switch off is not itself a change in which accelerators are used.
       void save(checked ? 'auto' : selectedDevices);
     },
     [save, selectedDevices]
@@ -65,7 +65,7 @@ export const GenerationDevicesSettings = () => {
       // The backend rejects an empty list, and a config with no devices would fail on
       // the next startup — so refuse locally rather than surfacing a 422.
       if (next.length === 0) {
-        setSaveError('Select at least one GPU.');
+        setSaveError('Select at least one generation device.');
         return;
       }
 
@@ -90,8 +90,8 @@ export const GenerationDevicesSettings = () => {
     return (
       <Text color="fg.subtle" fontSize="xs">
         {options.length === 1
-          ? `Generation runs on ${labels[options[0].device] ?? options[0].device}. Parallel generation needs more than one GPU.`
-          : 'No CUDA GPUs were detected, so generation runs on a single device.'}
+          ? `Generation runs on ${labels[options[0].device] ?? options[0].device}. Parallel generation needs more than one accelerator.`
+          : 'No accelerators were detected, so generation runs on a single device.'}
       </Text>
     );
   }
@@ -101,11 +101,11 @@ export const GenerationDevicesSettings = () => {
       <Stack gap="1">
         <Text color="fg" fontSize="xs">
           {isAuto
-            ? 'Every available GPU is used for generation.'
+            ? 'Every available accelerator is used for generation.'
             : selectedDevices.map((device) => labels[device] ?? device).join(', ')}
         </Text>
         <Text color="fg.subtle" fontSize="xs">
-          Only an administrator can change which GPUs are used.
+          Only an administrator can change which accelerators are used.
         </Text>
       </Stack>
     );
@@ -115,8 +115,8 @@ export const GenerationDevicesSettings = () => {
     <Stack gap="3">
       <DeviceSwitch
         checked={isAuto}
-        description="New GPUs are picked up automatically."
-        label="Use every available GPU"
+        description="New accelerators are picked up automatically."
+        label="Use every available accelerator"
         onChange={toggleAuto}
       />
       {isAuto ? null : (

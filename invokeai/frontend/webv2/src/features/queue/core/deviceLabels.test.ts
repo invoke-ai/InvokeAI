@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { getCudaDeviceIndex, getDeviceLabel, getDeviceNameLabels } from './deviceLabels';
+import { getCudaDeviceIndex, getDeviceLabel, getDeviceNameLabels, resolveRandDeviceMetadata } from './deviceLabels';
 
 describe('getCudaDeviceIndex', () => {
   it('parses the index from a cuda device', () => {
     expect(getCudaDeviceIndex('cuda:0')).toBe(0);
     expect(getCudaDeviceIndex('cuda:7')).toBe(7);
     expect(getCudaDeviceIndex('cuda:12')).toBe(12);
+  });
+
+  it('parses the index from an xpu device', () => {
+    expect(getCudaDeviceIndex('xpu:0')).toBe(0);
+    expect(getCudaDeviceIndex('xpu:7')).toBe(7);
   });
 
   it('returns null for non-cuda and missing devices', () => {
@@ -21,6 +26,27 @@ describe('getCudaDeviceIndex', () => {
   it('does not accept a device with trailing content', () => {
     expect(getCudaDeviceIndex('cuda:0:1')).toBeNull();
     expect(getCudaDeviceIndex('xcuda:0')).toBeNull();
+  });
+});
+
+describe('resolveRandDeviceMetadata', () => {
+  it('always reports CPU when CPU noise is enabled', () => {
+    expect(resolveRandDeviceMetadata(true, [{ device: 'xpu:0', name: 'Arc' }])).toBe('cpu');
+  });
+
+  it('reports the single available accelerator family', () => {
+    expect(resolveRandDeviceMetadata(false, [{ device: 'cuda:0', name: 'RTX' }])).toBe('cuda');
+    expect(resolveRandDeviceMetadata(false, [{ device: 'xpu:0', name: 'Arc' }])).toBe('xpu');
+  });
+
+  it('keeps the legacy CUDA fallback when device data is missing or mixed', () => {
+    expect(resolveRandDeviceMetadata(false, [])).toBe('cuda');
+    expect(
+      resolveRandDeviceMetadata(false, [
+        { device: 'cuda:0', name: 'RTX' },
+        { device: 'xpu:0', name: 'Arc' },
+      ])
+    ).toBe('cuda');
   });
 });
 

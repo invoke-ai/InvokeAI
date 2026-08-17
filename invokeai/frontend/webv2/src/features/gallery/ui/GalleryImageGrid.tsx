@@ -69,6 +69,7 @@ const GalleryStarredSectionHeader = ({
       top="0"
       transform={`translateY(${offsetPx}px)`}
       w="full"
+      zIndex="1"
     >
       <chakra.button
         aria-expanded={isOpen}
@@ -104,7 +105,7 @@ const GalleryStarredSectionHeader = ({
           >
             {t('widgets.gallery.starredItems')}
           </Text>
-          <Text as="span" color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1">
+          <Text as="span" color="currentColor" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1">
             {itemCount}
           </Text>
         </HStack>
@@ -373,80 +374,90 @@ export const GalleryImageGrid = () => {
       ) : (
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
           <ScrollArea.Viewport ref={viewportRef} h="full" outline="none" w="full">
-            <ScrollArea.Content aria-label={t('widgets.gallery.itemsAriaLabel')} role="list">
+            <ScrollArea.Content>
               <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
                 {virtualRows.map((virtualRow) => {
                   const row = rows[virtualRow.index];
 
-                  if (!row || row.kind === 'starred-gap') {
-                    return null;
-                  }
-
-                  if (row.kind === 'starred-header') {
-                    return (
-                      <GalleryStarredSectionHeader
-                        key={virtualRow.key}
-                        isOpen={isStarredOpen}
-                        itemCount={row.itemCount}
-                        offsetPx={virtualRow.start}
-                        onToggle={handleToggleStarredSection}
-                      />
-                    );
-                  }
-
-                  return (
-                    <Box
+                  return row?.kind === 'starred-header' ? (
+                    <GalleryStarredSectionHeader
                       key={virtualRow.key}
-                      data-gallery-section={row.section}
-                      display="grid"
-                      gap={`${GALLERY_GRID_GAP_PX}px`}
-                      gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
-                      left="0"
-                      position="absolute"
-                      role="presentation"
-                      top="0"
-                      transform={`translateY(${virtualRow.start}px)`}
-                      w="full"
-                    >
-                      {row.cells.map((cell) =>
-                        cell.kind === 'placeholder' ? (
-                          <GalleryQueuePlaceholderCell
-                            key={cell.placeholder.id}
-                            antialiasProgressImages={antialiasProgressImages}
-                            fit={thumbnailFit}
-                            isSelected={
-                              gallery.currentItem?.kind === 'placeholder' &&
-                              gallery.currentItem.placeholder.id === cell.placeholder.id
-                            }
-                            placeholder={cell.placeholder}
-                            onClick={handleShowProgressImages}
-                          />
-                        ) : (
-                          <GalleryThumbnailCell
-                            key={toGalleryItemKey(cell.item)}
-                            alwaysShowDimensions={showImageDimensions}
-                            dragScope={region}
-                            compareRole={
-                              isComparisonActive && toGalleryItemKey(cell.item) === gallery.selectedItemKey
-                                ? t('widgets.preview.viewing')
-                                : isComparisonActive && toGalleryItemKey(cell.item) === gallery.compareImageKey
-                                  ? t('widgets.preview.compare')
-                                  : null
-                            }
-                            fit={thumbnailFit}
-                            getDragItems={getDragItems}
-                            isPrimary={!isFollowingLive && toGalleryItemKey(cell.item) === gallery.selectedItemKey}
-                            isSelected={!isFollowingLive && selectedItemKeys.has(toGalleryItemKey(cell.item))}
-                            item={cell.item}
-                            onClick={handleThumbnailClick}
-                            onContextMenu={handleThumbnailContextMenu}
-                            onToggleStarred={handleToggleStarred}
-                          />
-                        )
-                      )}
-                    </Box>
-                  );
+                      isOpen={isStarredOpen}
+                      itemCount={row.itemCount}
+                      offsetPx={virtualRow.start}
+                      onToggle={handleToggleStarredSection}
+                    />
+                  ) : null;
                 })}
+                <Box
+                  aria-label={t('widgets.gallery.itemsAriaLabel')}
+                  h="full"
+                  inset="0"
+                  position="absolute"
+                  role="list"
+                  w="full"
+                >
+                  {virtualRows.map((virtualRow) => {
+                    const row = rows[virtualRow.index];
+
+                    if (!row || row.kind === 'starred-gap' || row.kind === 'starred-header') {
+                      return null;
+                    }
+
+                    return (
+                      <Box
+                        key={virtualRow.key}
+                        data-gallery-section={row.section}
+                        display="grid"
+                        gap={`${GALLERY_GRID_GAP_PX}px`}
+                        gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
+                        left="0"
+                        position="absolute"
+                        role="presentation"
+                        top="0"
+                        transform={`translateY(${virtualRow.start}px)`}
+                        w="full"
+                      >
+                        {row.cells.map((cell) =>
+                          cell.kind === 'placeholder' ? (
+                            <GalleryQueuePlaceholderCell
+                              key={cell.placeholder.id}
+                              antialiasProgressImages={antialiasProgressImages}
+                              fit={thumbnailFit}
+                              isSelected={
+                                gallery.currentItem?.kind === 'placeholder' &&
+                                gallery.currentItem.placeholder.id === cell.placeholder.id
+                              }
+                              placeholder={cell.placeholder}
+                              onClick={handleShowProgressImages}
+                            />
+                          ) : (
+                            <GalleryThumbnailCell
+                              key={toGalleryItemKey(cell.item)}
+                              alwaysShowDimensions={showImageDimensions}
+                              dragScope={region}
+                              compareRole={
+                                isComparisonActive && toGalleryItemKey(cell.item) === gallery.selectedItemKey
+                                  ? t('widgets.preview.viewing')
+                                  : isComparisonActive && toGalleryItemKey(cell.item) === gallery.compareImageKey
+                                    ? t('widgets.preview.compare')
+                                    : null
+                              }
+                              fit={thumbnailFit}
+                              getDragItems={getDragItems}
+                              isPrimary={!isFollowingLive && toGalleryItemKey(cell.item) === gallery.selectedItemKey}
+                              isSelected={!isFollowingLive && selectedItemKeys.has(toGalleryItemKey(cell.item))}
+                              item={cell.item}
+                              onClick={handleThumbnailClick}
+                              onContextMenu={handleThumbnailContextMenu}
+                              onToggleStarred={handleToggleStarred}
+                            />
+                          )
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
               {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
                 <Flex align="center" justify="center" py="2">

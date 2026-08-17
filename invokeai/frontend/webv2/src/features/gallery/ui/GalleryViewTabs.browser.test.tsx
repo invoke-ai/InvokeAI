@@ -50,6 +50,19 @@ const renderViewTabs = async (): Promise<{
     );
   });
 
+  // Match the release accessibility journey: wait until Ark has measured the
+  // moving indicator and removed its initial checked-item fallback styling.
+  await act(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            setTimeout(resolve, 200);
+          })
+        );
+      })
+  );
+
   const items = [...host.querySelectorAll<HTMLElement>('[data-part="item"]')];
 
   return {
@@ -69,15 +82,19 @@ describe('GalleryViewTabs', () => {
     expect(counts.map((count) => count.textContent)).toEqual(['148', '7']);
   });
 
-  it('keeps the count readable on the selected segment', async () => {
-    const { counts, indicator, items } = await renderViewTabs();
+  it('keeps the count readable against the selected segment itself', async () => {
+    const { counts, items } = await renderViewTabs();
     const checkedIndex = items.findIndex((item) => item.dataset.state === 'checked');
     const count = counts[checkedIndex]!;
     const style = getComputedStyle(count);
 
-    // The selected segment is filled with `accent.solid`, so a count pinned to
-    // `fg.muted` (rather than dimmed from the item's own colour) is unreadable.
-    const ratio = getContrastRatio(style.color, getComputedStyle(indicator).backgroundColor, Number(style.opacity));
+    // Axe evaluates the selected item's own background rather than a moving
+    // indicator sibling behind it, so that local surface must carry the fill.
+    const ratio = getContrastRatio(
+      style.color,
+      getComputedStyle(items[checkedIndex]!).backgroundColor,
+      Number(style.opacity)
+    );
 
     expect(ratio).toBeGreaterThanOrEqual(4.5);
   });

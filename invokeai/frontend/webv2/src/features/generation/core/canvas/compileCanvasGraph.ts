@@ -523,7 +523,11 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   // Mirror compileGenerateGraph: only a `canvas` destination stages an
   // intermediate output; `gallery` produces a durable image.
   const outputIsIntermediate = destination === 'canvas';
-  const backendGraph = builder(settings, model, outputIsIntermediate, projectSettings);
+  const runtimeProjectSettings = {
+    ...projectSettings,
+    randDevice: input.randDevice ?? (projectSettings.useCpuNoise ? 'cpu' : 'cuda'),
+  };
+  const backendGraph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
   const compositing = input.compositing ?? DEFAULT_CANVAS_COMPOSITING;
 
   // Validation above guarantees the composite/mask images required per mode.

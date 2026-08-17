@@ -1,5 +1,6 @@
 import type { GalleryImageItem, GalleryVideoItem, GeneratedImageContract } from '@features/gallery';
 import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
 import type {
   CanvasControlLayerContract,
   CanvasInpaintMaskLayerContract,
@@ -12,7 +13,8 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { GALLERY_RECENT_IMAGE_LIMIT, legacyGeneratedImageToGalleryItem } from '@features/gallery/contracts';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
-import { describe, expect, it, vi } from 'vitest';
+import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
@@ -29,6 +31,28 @@ import {
   type WorkbenchAction,
   workbenchReducer as reduceWorkbench,
 } from './workbenchState.testing';
+
+const generationDeviceMock = vi.hoisted(() => ({
+  options: [] as { device: string; name: string }[],
+}));
+
+vi.mock('@features/queue/devices', async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+
+  return {
+    ...original,
+    getGenerationDevicesSnapshot: () => ({
+      error: null,
+      loadState: 'loaded' as const,
+      options: generationDeviceMock.options,
+      setting: 'auto' as const,
+    }),
+  };
+});
+
+afterEach(() => {
+  generationDeviceMock.options = [];
+});
 
 type LegacyCanvasMutation = CanvasProjectMutation & { projectId?: string };
 const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
@@ -355,6 +379,73 @@ const primeGenerate = (
 
 const submitGenerate = (state: WorkbenchState) =>
   workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
+
+const getQueuedRandDevice = (state: WorkbenchState): unknown => {
+  const nodes = getActiveProject(state).queue.items[0]?.snapshot.graph.backendGraph?.nodes ?? {};
+  const metadata = Object.values(nodes).find((node) => node.type === 'core_metadata');
+
+  return metadata?.rand_device;
+};
+
+const createUpscaleModel = (key: string, type: string, base: string, name = key): ModelConfig => ({
+  base,
+  file_size: 1,
+  format: 'checkpoint',
+  hash: `${key}-hash`,
+  key,
+  name,
+  path: key,
+  source: key,
+  source_type: 'path',
+  type,
+});
+
+describe('generation-device orchestration metadata', () => {
+  it('passes the XPU runtime snapshot through the generate submission boundary', () => {
+    generationDeviceMock.options = [{ device: 'xpu:0', name: 'Intel Arc' }];
+    const initial = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { useCpuNoise: false },
+      type: 'setActiveProjectSettings',
+    });
+
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedRandDevice(state)).toBe('xpu');
+  });
+
+  it('passes the XPU runtime snapshot through the upscale submission boundary', () => {
+    generationDeviceMock.options = [{ device: 'xpu:0', name: 'Intel Arc' }];
+    const models = [
+      createUpscaleModel('main', 'main', 'sd-1'),
+      createUpscaleModel('spandrel', 'spandrel_image_to_image', 'any'),
+      createUpscaleModel('tile', 'controlnet', 'sd-1', 'Tile ControlNet'),
+    ];
+    const values = {
+      ...createDefaultUpscaleWidgetValues(models),
+      inputImage: { height: 64, image_name: 'input.png', width: 64 },
+      seed: 1,
+      shouldRandomizeSeed: false,
+    };
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { useCpuNoise: false },
+      type: 'setActiveProjectSettings',
+    });
+
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values, widgetId: 'upscale' });
+    state = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      models,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedRandDevice(state)).toBe('xpu');
+  });
+});
 
 describe('workbench widget region defaults', () => {
   it('starts new projects from the curated Compose widget defaults', () => {

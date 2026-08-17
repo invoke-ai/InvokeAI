@@ -95,9 +95,9 @@ export interface InvocationProgressEvent extends InvocationEventBase {
   /** Intermittent denoising preview, when the invocation produces one. */
   image?: { width: number; height: number; dataURL: string } | null;
   /**
-   * The GPU running this session, e.g. `cuda:1` — null on CPU/MPS and in
+   * The accelerator running this session, e.g. `cuda:1` or `xpu:1` — null on CPU/MPS and in
    * single-device mode. With `generation_devices` set (default `auto`) several
-   * sessions run at once, one per GPU, so progress must be attributable.
+   * sessions run at once, one per accelerator, so progress must be attributable.
    */
   device?: string | null;
 }

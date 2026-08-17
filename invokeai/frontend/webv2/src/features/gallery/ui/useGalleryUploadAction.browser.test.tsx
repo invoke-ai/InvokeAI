@@ -2,6 +2,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 
 import { GalleryUiProvider } from '@features/gallery/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, type ReactNode, useCallback, useImperativeHandle, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -353,5 +354,20 @@ describe('focused gallery upload action', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledWith(
       expect.objectContaining({ message: '1 images and 0 videos uploaded to Uncategorized. 0 failed.' })
     );
+  });
+
+  it('surfaces the first actionable API detail when every upload fails', async () => {
+    mocks.uploadGalleryImage.mockRejectedValue(new ApiError('{"detail":"Image storage maintenance is active"}', 409));
+
+    await act(async () => {
+      await uploadFilesRef.current?.([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith({
+      area: 'gallery-upload',
+      message: 'Image storage maintenance is active',
+      namespace: 'gallery',
+    });
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
   });
 });
