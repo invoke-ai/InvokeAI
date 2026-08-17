@@ -851,8 +851,6 @@ def test_cluster_labels_skips_the_embedding_gather_when_nothing_clustered(
     # returns {} for that. Gathering the accessible rows first copies
     # len(visible) x D float32 for nothing — gigabytes on the large galleries
     # /points is written for, once per points refresh.
-    from invokeai.app.services.image_index import image_index_default
-
     _seed_embedded_image(mock_invoker, "a.png")
     _seed_projection(mock_invoker, SYSTEM_USER_ID, ["a.png"], np.zeros((1, 2), dtype=np.float32))
 
