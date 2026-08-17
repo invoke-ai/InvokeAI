@@ -3,33 +3,13 @@ from fastapi.routing import APIRouter
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult
 
 board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
-
-
-def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not mutate the given board.
-
-    Write access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the board.
-    - The board visibility is Public (public boards accept contributions from any user).
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-    if current_user.is_admin:
-        return
-    if board.user_id == current_user.user_id:
-        return
-    if board.board_visibility == BoardVisibility.Public:
-        return
-    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
 
 
 def _assert_image_direct_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:

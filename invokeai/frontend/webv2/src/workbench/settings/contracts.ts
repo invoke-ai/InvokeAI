@@ -7,13 +7,22 @@ export type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/project
 
 export type { WorkbenchLanguage } from '@platform/i18n/languages';
 
+/**
+ * Settings that belong to the *project* and therefore travel inside its `.invk`
+ * export. Anything describing how a person likes to work — as opposed to how
+ * this document generates — belongs in {@link WorkbenchPreferences} instead, so
+ * that opening someone else's project cannot rewrite your editor.
+ */
 export interface ProjectSettings {
   useCpuNoise: boolean;
   showProgressDetails: boolean;
   antialiasProgressImages: boolean;
+  /**
+   * Not surfaced in the Settings dialog: the Preview widget's header owns this
+   * as a live toggle, and following a generation flips it implicitly. It is
+   * persisted per project because that is the lifetime the toggle expects.
+   */
   showProgressImagesInViewer: boolean;
-  preferNumericAttentionStyle: boolean;
-  showPromptSyntaxHighlighting: boolean;
 }
 
 /**
@@ -44,6 +53,12 @@ export interface WorkbenchPreferences {
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;
+  /** Toast when an invocation is added to the queue. The notification center records it regardless. */
+  notifyOnEnqueue: boolean;
+  /** Write numeric attention weights (`(word)1.1`) when the attention hotkeys insert them. */
+  preferNumericAttentionStyle: boolean;
+  /** Experimental. Color prompt syntax in prompt fields; changes rendering only. */
+  showPromptSyntaxHighlighting: boolean;
   developerLogEnabled: boolean;
   developerLogLevel: DeveloperLogLevel;
   developerLogNamespaces: DeveloperLogNamespace[];

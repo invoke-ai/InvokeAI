@@ -7,9 +7,11 @@ import {
   isAnimaQwen3Encoder,
   isAnimaVae,
   isFlux2DiffusersSourceForModel,
+  isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
   isVaeCompatibleWithGenerateModel,
+  isVaeForBases,
   type GenerateComponentCandidate,
 } from './componentCompatibility';
 
@@ -57,6 +59,24 @@ describe('Generate component compatibility', () => {
     expect(filter(candidate({ base: 'flux2', format: 'diffusers', type: 'main' }))).toBe(false);
   });
 
+  it('uses Mistral components and dev Diffusers sources for FLUX.2 [dev]', () => {
+    const model = flux2Model('dev');
+
+    expect(isFlux2MistralEncoder(candidate({ type: 'mistral_encoder' }))).toBe(true);
+    expect(isFlux2MistralEncoder(candidate({ type: 'qwen3_encoder' }))).toBe(false);
+    expect(isFlux2Qwen3EncoderForModel(model)(candidate({ variant: 'qwen3_8b' }))).toBe(false);
+    expect(
+      isFlux2DiffusersSourceForModel(model)(
+        candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'dev' })
+      )
+    ).toBe(true);
+    expect(
+      isFlux2DiffusersSourceForModel(model)(
+        candidate({ base: 'flux2', format: 'diffusers', type: 'main', variant: 'klein_9b' })
+      )
+    ).toBe(false);
+  });
+
   it('allows only backend-supported Anima VAE families', () => {
     expect(isAnimaVae(candidate({ base: 'anima', type: 'vae' }))).toBe(true);
     expect(isAnimaVae(candidate({ base: 'qwen-image', type: 'vae' }))).toBe(true);
@@ -81,5 +101,22 @@ describe('Generate component compatibility', () => {
     const staleVae: ComponentModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 
     expect(getCompatibleSelectedComponentKey(staleVae, isAnimaVae)).toBeNull();
+  });
+});
+
+const vae = (base: string) => ({ base, type: 'vae' }) as Parameters<ReturnType<typeof isVaeForBases>>[0];
+
+describe('isVaeForBases', () => {
+  it('matches a VAE whose base is listed', () => {
+    expect(isVaeForBases(['flux'])(vae('flux'))).toBe(true);
+    expect(isVaeForBases(['flux'])(vae('sdxl'))).toBe(false);
+  });
+
+  it('an empty base list matches nothing (no all-pass escape hatch)', () => {
+    expect(isVaeForBases([])(vae('flux'))).toBe(false);
+  });
+
+  it('never matches a non-vae model', () => {
+    expect(isVaeForBases(['flux'])({ base: 'flux', type: 'main' } as never)).toBe(false);
   });
 });

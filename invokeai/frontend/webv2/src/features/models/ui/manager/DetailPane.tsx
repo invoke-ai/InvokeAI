@@ -7,6 +7,7 @@ import { ModelDetail } from '@features/models/ui/detail/ModelDetail';
 import { InstallQueueBar } from '@features/models/ui/install-queue/InstallQueueBar';
 import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@features/models/ui/uiStore';
 import { Scrollable, Tabs } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,7 +22,7 @@ export const DetailPane = () => {
     (left, right) => left.activeModelKey === right.activeModelKey && left.activeTab === right.activeTab
   );
   const detailLabel = useModelsSelector(
-    (snapshot) => snapshot.models.find((model) => model.key === activeModelKey)?.name ?? t('models.details')
+    (snapshot) => (activeModelKey ? snapshot.modelsByKey.get(activeModelKey)?.name : undefined) ?? t('models.details')
   );
 
   return (
@@ -40,9 +41,7 @@ export const DetailPane = () => {
           <Tabs.List mb="-1px">
             <Tabs.Trigger value="details">
               <Icon as={BoxIcon} boxSize="3" />
-              <Text maxW="14rem" truncate>
-                {detailLabel}
-              </Text>
+              <MiddleTruncate maxW="14rem" text={detailLabel} />
             </Tabs.Trigger>
             <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />
@@ -97,8 +96,7 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
 
   return (
     <Scrollable h="full" label={t('models.details')} minH="0" p="3">
-      <ModelDetail key={modelKey} density="full" modelKey={modelKey} onDeleted={handleDeleted} />
+      <ModelDetail key={modelKey} modelKey={modelKey} onDeleted={handleDeleted} />
     </Scrollable>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -21,6 +21,12 @@ export type LayerContextMenuRenderEntry =
   | { id: 'before-danger'; kind: 'slot' }
   | { kind: 'section'; section: LayerContextMenuSection };
 
+export interface LayerContextMenuGroupLayout {
+  hasCanvasGroup: boolean;
+  layerEntries: LayerContextMenuRenderEntry[];
+  trailingEntries: LayerContextMenuRenderEntry[];
+}
+
 type LayerContextMenuLayerLabelKey =
   | 'widgets.canvas.import.control'
   | 'widgets.canvas.import.inpaintMask'
@@ -97,6 +103,25 @@ export const getLayerContextMenuRenderEntries = (
         ]
       : [{ kind: 'section', section }]
   );
+
+/** Partitions the render stream into the labeled groups used by legacy menus. */
+export const getLayerContextMenuGroupLayout = (
+  sections: readonly LayerContextMenuSection[],
+  includeCanvasGroup: boolean
+): LayerContextMenuGroupLayout => {
+  const entries = getLayerContextMenuRenderEntries(sections, includeCanvasGroup);
+  const canvasSlotIndex = entries.findIndex((entry) => entry.kind === 'slot');
+
+  if (canvasSlotIndex < 0) {
+    return { hasCanvasGroup: false, layerEntries: entries, trailingEntries: [] };
+  }
+
+  return {
+    hasCanvasGroup: true,
+    layerEntries: entries.slice(0, canvasSlotIndex),
+    trailingEntries: entries.slice(canvasSlotIndex + 1),
+  };
+};
 
 /** Resolves the singular layer labels used by the legacy canvas context menu. */
 export const getLayerContextMenuLayerLabelKey = (type: LayerType): LayerContextMenuLayerLabelKey => {

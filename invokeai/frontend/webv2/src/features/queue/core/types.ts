@@ -221,6 +221,11 @@ export interface QueueResultImageOptions {
   resultNodeIds?: readonly string[];
 }
 
+export interface QueueResultVideoOptions extends QueueResultImageOptions {
+  /** Drop videos whose DTO reports is_intermediate — the video analogue of filterIntermediateResults. */
+  excludeIntermediate?: boolean;
+}
+
 /** User-facing Queue commands; transport and adapter details stay private. */
 export interface QueueFeatureCommands {
   cancelCurrentItem(): Promise<void>;
@@ -248,6 +253,8 @@ export interface QueueBackendPort extends QueueFeatureCommands {
     queuedAt: string,
     options?: QueueResultImageOptions
   ): Promise<QueueResultImage[]>;
+  /** Names of the videos a completed backend item produced (no DTO hydration needed). */
+  getResultVideoNames(itemId: number, options?: QueueResultVideoOptions): Promise<string[]>;
   listItems(): Promise<QueueBackendItem[]>;
   readCurrent(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;

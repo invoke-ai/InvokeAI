@@ -3,6 +3,7 @@ import type { MouseEvent } from 'react';
 
 import { Box, Flex, Icon, Menu, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Row } from '@platform/ui/Row';
 import { Link } from '@tanstack/react-router';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
@@ -55,7 +56,7 @@ export const ProjectRow = ({
   const handleTogglePin = useCallback(() => onTogglePin(summary.id), [onTogglePin, summary.id]);
 
   return (
-    <Row className="group" gap="3" position="relative" rounded="md" onContextMenu={handleContextMenu}>
+    <Row className="group" gap="3" h="full" position="relative" px="2.5" rounded="md" onContextMenu={handleContextMenu}>
       <Link
         aria-label={t('projects.openProjectLabel', { name: summary.name })}
         search={projectSearch}
@@ -66,9 +67,7 @@ export const ProjectRow = ({
         <ProjectCover coverUrl={summary.coverUrl} />
       </Box>
       <Flex flex="1" gap="3" minW="0" pointerEvents="none">
-        <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
-          {summary.name}
-        </Text>
+        <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={summary.name} />
         <Text color="fg.muted" flexShrink={0} fontSize="2xs">
           {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
         </Text>

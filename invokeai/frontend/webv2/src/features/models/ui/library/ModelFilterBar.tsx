@@ -3,18 +3,10 @@ import type { ModelLibraryFilters, ModelSortField } from '@features/models/core/
 import type { ModelTaxonomyType } from '@features/models/core/types';
 
 import { HStack, Icon, Input, InputGroup } from '@chakra-ui/react';
-import { FilterMenuItem, ModelFilterMenu } from '@features/models/ui/shared/ModelFilterMenu';
+import { FilterMenuItem, ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
 import { SearchIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-
-const SORT_FIELDS: { field: ModelSortField; labelKey: string }[] = [
-  { field: 'default', labelKey: 'models.sort.default' },
-  { field: 'name', labelKey: 'models.sort.name' },
-  { field: 'base', labelKey: 'models.sort.base' },
-  { field: 'size', labelKey: 'models.sort.size' },
-  { field: 'format', labelKey: 'models.sort.format' },
-];
 
 const isFiltering = (filters: ModelLibraryFilters): boolean =>
   filters.typeFilter !== null || filters.baseFilter !== null || filters.missingOnly;
@@ -89,7 +81,7 @@ export const ModelFilterBar = ({
         isActive={isFiltering(filters)}
         sortDirection={filters.sortDirection}
         sortField={filters.sortField}
-        sortFields={SORT_FIELDS}
+        sortFields={SORT_FIELD_OPTIONS}
         typeAllChecked={filters.typeFilter === null && !filters.missingOnly}
         typeFilter={filters.typeFilter}
         onBaseFilterChange={handleBaseFilterChange}
@@ -99,4 +91,3 @@ export const ModelFilterBar = ({
     </HStack>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -1,33 +1,14 @@
-import type { ModelSortField } from '@features/models/core/library';
+import type { StarterModelFilters, StarterSortField } from '@features/models/core/starters';
 import type { ModelTaxonomyType } from '@features/models/core/types';
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelFilterSortOption } from '@features/models/ui/shared/ModelFilterMenu';
 
-import { ModelFilterMenu } from '@features/models/ui/shared/ModelFilterMenu';
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import { ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
 import { useTranslation } from 'react-i18next';
 
-export interface StarterModelFilters {
-  /** null = all types. */
-  typeFilter: ModelTaxonomyType | null;
-  /** null = all bases. */
-  baseFilter: string | null;
-  sortField: ModelSortField;
-  sortDirection: 'asc' | 'desc';
-}
-
-export const DEFAULT_STARTER_MODEL_FILTERS: StarterModelFilters = {
-  baseFilter: null,
-  sortDirection: 'asc',
-  sortField: 'default',
-  typeFilter: null,
-};
-
-const STARTER_SORT_FIELDS: ModelFilterSortOption[] = [
-  { field: 'default', labelKey: 'models.sortDefault' },
-  { field: 'name', labelKey: 'models.sortName' },
-  { field: 'base', labelKey: 'models.sortBase' },
-  { field: 'format', labelKey: 'models.sortFormat' },
-];
+const STARTER_SORT_FIELDS = SORT_FIELD_OPTIONS.filter(
+  (option): option is ModelFilterSortOption<StarterSortField> => option.field !== 'size'
+);
 
 const isFiltering = (filters: StarterModelFilters): boolean =>
   filters.typeFilter !== null || filters.baseFilter !== null;
@@ -62,4 +43,3 @@ export const StarterFilterMenu = ({
     />
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

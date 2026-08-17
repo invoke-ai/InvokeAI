@@ -15,10 +15,12 @@ import { canvasWidgetManifest } from './widgets/canvas/manifest';
 import { diagnosticsWidgetManifest } from './widgets/diagnostics/manifest';
 import { galleryWidgetManifest } from './widgets/gallery/manifest';
 import { generateWidgetManifest } from './widgets/generate/manifest';
+import { imageMapWidgetManifest } from './widgets/image-map/manifest';
 import { layersWidgetManifest } from './widgets/layers/manifest';
 import { notificationsWidgetManifest } from './widgets/notifications/manifest';
 import { previewWidgetManifest } from './widgets/preview/manifest';
 import { projectWidgetManifest } from './widgets/project/manifest';
+import { queueStatusWidgetManifest } from './widgets/queue-status/manifest';
 import { queueWidgetManifest } from './widgets/queue/manifest';
 import { serverStatusWidgetManifest } from './widgets/server-status/manifest';
 import { upscaleWidgetManifest } from './widgets/upscale/manifest';
@@ -32,12 +34,14 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   canvasWidgetManifest,
   diagnosticsWidgetManifest,
   galleryWidgetManifest,
+  imageMapWidgetManifest,
   previewWidgetManifest,
   projectWidgetManifest,
   layersWidgetManifest,
   queueWidgetManifest,
   notificationsWidgetManifest,
   serverStatusWidgetManifest,
+  queueStatusWidgetManifest,
   autosaveStatusWidgetManifest,
   versionStatusWidgetManifest,
 ];

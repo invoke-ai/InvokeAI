@@ -22,9 +22,19 @@ const boards: GalleryBoard[] = [
     imageCount: 1,
     kind: 'uncategorized',
     name: '',
+    projectId: null,
     videoCount: 0,
   },
-  { archived: false, assetCount: 0, id: 'board-1', imageCount: 2, kind: 'board', name: 'Board 1', videoCount: 0 },
+  {
+    archived: false,
+    assetCount: 0,
+    id: 'board-1',
+    imageCount: 2,
+    kind: 'board',
+    name: 'Board 1',
+    projectId: null,
+    videoCount: 0,
+  },
 ];
 
 const createImage = (imageName: string): GeneratedImageContract => ({
@@ -116,6 +126,43 @@ describe('gallery state view', () => {
     expect(getGalleryStateView(values, boards, [], false).selectedBoardId).toBe('none');
   });
 
+  /**
+   * A project arriving from another install — or one whose pre-migration board was rejected as
+   * ambiguous — names a destination that does not exist here. Its own board is a better answer
+   * than Uncategorized, which would quietly scatter the project's output.
+   */
+  it('falls back to the project board before uncategorized', () => {
+    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const values = { projectBoardId: 'project-board', selectedBoardId: 'missing-board' };
+
+    expect(getGallerySelectedBoardId(values, projectBoards)).toBe('project-board');
+    expect(getGalleryStateView(values, projectBoards, [], false).selectedBoardId).toBe('project-board');
+  });
+
+  it('keeps a still-resolvable selection rather than reverting to the project board', () => {
+    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const values = { projectBoardId: 'project-board', selectedBoardId: 'board-1' };
+
+    expect(getGallerySelectedBoardId(values, projectBoards)).toBe('board-1');
+  });
+
+  it('falls back to uncategorized when the project board is gone too', () => {
+    const values = { projectBoardId: 'deleted-board', selectedBoardId: 'missing-board' };
+
+    expect(getGallerySelectedBoardId(values, boards)).toBe('none');
+  });
+
+  /**
+   * Never having chosen a destination is not a choice of Uncategorized. A project saved before it
+   * owned a board should still work on its own board, where everything else it has made lives.
+   */
+  it('uses the project board when nothing was ever selected', () => {
+    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+
+    expect(getGallerySelectedBoardId({ projectBoardId: 'project-board' }, projectBoards)).toBe('project-board');
+    expect(getGallerySelectedBoardId({}, projectBoards)).toBe('none');
+  });
+
   it('does not render local fallback images while backend images are loading', () => {
     const values = { recentImages: [createImage('local-fallback.png')], selectedBoardId: 'none' };
     const gallery = getGalleryStateView(values, boards, null, true);
@@ -132,7 +179,7 @@ describe('gallery state view', () => {
     });
   });
 
-  it('parses persisted gallery settings with safe defaults', () => {
+  it('parses persisted gallery settings with safe defaults and keeps the starred section complete', () => {
     const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredFirst: false }, boards, [], false);
 
     expect(gallery.settings).toEqual({
@@ -149,7 +196,7 @@ describe('gallery state view', () => {
       showDateBoards: false,
       showImageDimensions: false,
       showPendingItems: true,
-      starredFirst: false,
+      starredFirst: true,
       thumbnailFit: 'square',
     });
   });

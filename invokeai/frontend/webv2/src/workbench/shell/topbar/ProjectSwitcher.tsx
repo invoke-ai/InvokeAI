@@ -9,13 +9,14 @@ import { useQueueItemProgress } from '@features/queue/react';
 import { Button } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { RenameDialog } from '@platform/ui/RenameDialog';
 import { QueueCircularProgress } from '@workbench/components/QueueProgressIndicator';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { OpenProjectDialog } from '@workbench/projects/components';
 import { refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
-import { exportOpenProject } from '@workbench/projects/projectFile';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
+import { useExportOpenProject } from '@workbench/projects/useProjectFileActions';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   useActiveProjectSelector,
@@ -55,6 +56,7 @@ export const ProjectSwitcher = () => {
   const queries = useWorkbenchQueries();
   const { projects } = useWorkbenchCommands();
   const { closeProject, deleteProject, openProject } = useProjectActions();
+  const startExport = useExportOpenProject();
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const [renameTarget, setRenameTarget] = useState<{ id: string; name: string } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
@@ -104,12 +106,19 @@ export const ProjectSwitcher = () => {
   );
   const showActiveProjectDetails = useCallback(() => openWorkbenchWidget('project'), [openWorkbenchWidget]);
   const exportActiveProject = useCallback(() => {
+    flushGenerateDrafts();
+
     const project = getProject(activeProjectId);
 
-    if (project) {
-      void exportOpenProject(project);
+    if (!project) {
+      return;
     }
-  }, [activeProjectId, getProject]);
+
+    // Export bundles every image the project points at, so it runs for as long
+    // as the project is large and can fail on a dropped connection or a project
+    // past the archive ceiling. The reporter owns saying both.
+    startExport(project);
+  }, [activeProjectId, getProject, startExport]);
   const closeActiveProject = useCallback(() => {
     const project = getProject(activeProjectId);
 
@@ -143,12 +152,10 @@ export const ProjectSwitcher = () => {
         <Menu.Trigger asChild>
           <Button
             aria-label={t('topbar.projectSwitcher.trigger', { name: activeProjectName })}
-            size="sm"
+            size="xs"
             variant="ghost"
           >
-            <Text css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" truncate>
-              {activeProjectName}
-            </Text>
+            <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
             <Icon as={ChevronsUpDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>
@@ -159,10 +166,9 @@ export const ProjectSwitcher = () => {
                 <Text color="fg.subtle" fontSize="2xs" textTransform="uppercase">
                   {t('projects.projectDetails')}
                 </Text>
-                <Text fontSize="xs" fontWeight="700" truncate>
-                  {activeProjectName}
-                </Text>
+                <MiddleTruncate fontSize="xs" fontWeight="700" text={activeProjectName} />
               </Stack>
+              <Menu.Separator />
               <Menu.Item value="rename-project" onClick={renameActiveProject}>
                 <Icon as={PencilIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('projects.renameWithEllipsis')}</Menu.ItemText>
@@ -233,17 +239,28 @@ export const ProjectSwitcher = () => {
       </Menu.Root>
 
       {renameTarget ? (
-        <RenameDialog initialName={renameTarget.name} isOpen onClose={closeRenameDialog} onSubmit={renameProject} />
+        <RenameDialog
+          initialName={renameTarget.name}
+          isOpen
+          label={t('projects.renameProjectNameLabel')}
+          submitLabel={t('common.rename')}
+          title={t('projects.renameProject')}
+          onClose={closeRenameDialog}
+          onSubmit={renameProject}
+        />
       ) : null}
       <ConfirmDialog
-        body={t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })}
+        body={`${t('projects.deleteProjectTabBody', { name: deleteTarget?.name ?? '' })} ${t('projects.deleteProjectBoardNote')}`}
         confirmLabel={t('projects.deleteProject')}
         isOpen={deleteTarget !== null}
         title={t('projects.deleteProjectQuestion')}
         onClose={closeDeleteDialog}
         onConfirm={confirmDeleteProject}
       />
-      {isOpenDialogVisible ? <OpenProjectDialog isOpen onClose={hideOpenDialog} /> : null}
+      {/* Rendered unconditionally and driven by `open`: the dialog already declares `lazyMount`
+          and `unmountOnExit`, so it costs nothing while closed — and unmounting it here instead
+          skipped its exit transition, closing by cutting rather than fading. */}
+      <OpenProjectDialog isOpen={isOpenDialogVisible} onClose={hideOpenDialog} />
     </>
   );
 };
@@ -275,8 +292,8 @@ const OpenProjectRow = ({
       <Menu.ItemIndicator color="accent.fg">
         <Icon as={CheckIcon} boxSize="3.5" />
       </Menu.ItemIndicator>
-      <Menu.ItemText flex="1" minW="0" truncate>
-        {project.name}
+      <Menu.ItemText flex="1" minW="0">
+        <MiddleTruncate as="span" text={project.name} />
       </Menu.ItemText>
       <QueueCircularProgress state={progressState} />
     </Menu.RadioItem>
@@ -295,8 +312,8 @@ const RecentProjectRow = ({
 
   return (
     <Menu.Item value={summary.id} onClick={handleSelect}>
-      <Menu.ItemText flex="1" minW="0" truncate>
-        {summary.name}
+      <Menu.ItemText flex="1" minW="0">
+        <MiddleTruncate as="span" text={summary.name} />
       </Menu.ItemText>
       <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
         {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}

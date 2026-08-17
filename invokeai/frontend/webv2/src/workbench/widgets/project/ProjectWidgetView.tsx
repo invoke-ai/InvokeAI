@@ -3,6 +3,7 @@ import type { Project } from '@workbench/projectContracts';
 import { HStack, Icon, Input, Stack, Text } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { Button, IconButton, ConfirmDialog, Field, FieldLabel, Panel } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useProjectSyncSelector } from '@workbench/projects/syncStore';
 import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { useNotify } from '@workbench/useNotify';
@@ -190,9 +191,7 @@ const RecoveryRow = ({
   return (
     <Panel alignItems="center" flexDirection="row" gap="2" p="2">
       <Stack flex="1" gap="0" minW="0">
-        <Text fontSize="xs" fontWeight="600" truncate>
-          {recovery.name}
-        </Text>
+        <MiddleTruncate fontSize="xs" fontWeight="600" text={recovery.name} />
         <Text color="fg.muted" fontSize="2xs">
           {formatTimestamp(recovery.recoveredAt, t('common.unknownTime'))}
         </Text>
@@ -250,9 +249,7 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
       <Panel gap="1.5" p="2.5">
         <DetailRow label={t('common.id')}>
           <HStack gap="1" minW="0">
-            <Text fontFamily="mono" fontSize="2xs" truncate>
-              {project.id}
-            </Text>
+            <MiddleTruncate fontFamily="mono" fontSize="2xs" text={project.id} />
             <IconButton
               aria-label={t('widgets.project.copyId')}
               color="fg.muted"

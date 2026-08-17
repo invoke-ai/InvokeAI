@@ -2,7 +2,7 @@
 import type { GalleryImageItem, GalleryVideoItem } from '@features/gallery';
 import type { ImageActions } from '@workbench/image-actions';
 
-import { ChakraProvider, Text } from '@chakra-ui/react';
+import { Box, ChakraProvider, Text } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PreviewActionStrip } from './PreviewActionStrip';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
 import { PreviewFooter } from './PreviewFooter';
+import { LivePreviewTile } from './PreviewWidgetView';
 
 const sharedImage: GalleryImageItem = {
   boardId: 'none',
@@ -45,6 +46,34 @@ const sharedVideo: GalleryVideoItem = {
   width: 1920,
 };
 
+const mocks = vi.hoisted(() => ({
+  itemProgress: null as { device: string | null; percentage: number | null } | null,
+  progressImage: null,
+  deviceLabel: null as { index: number } | null,
+}));
+
+vi.mock('@features/queue/react', () => ({
+  useItemProgress: () => mocks.itemProgress,
+  useQueueItemProgressImage: () => mocks.progressImage,
+  useActiveProgressTargets: () => [],
+  useActiveProgressTarget: () => null,
+  useProgressImage: () => null,
+}));
+
+vi.mock('@features/queue/devices', () => ({
+  useDeviceLabel: () => mocks.deviceLabel,
+}));
+
+vi.mock('@platform/ui/streaming-image/useStreamingImageSource', () => ({
+  useStreamingImageSource: () => ({
+    alt: 'preview',
+    height: 512,
+    kind: 'fallback' as const,
+    src: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"/>',
+    width: 512,
+  }),
+}));
+
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -53,7 +82,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { countOfTotal: '{{count}} of {{total}}' },
+        common: { countOfTotal: '{{count}} of {{total}}', generating: 'Generating' },
         widgets: {
           preview: {
             copyCurrentFrame: 'Copy Current Frame',
@@ -64,6 +93,11 @@ void i18n.use(initReactI18next).init({
             previousItemInBoard: 'Previous item in board',
             videoDetails: 'Video Details',
             videoDuration: 'Duration {{duration}}',
+          },
+          queue: {
+            device: {
+              shortLabel: 'GPU {{index}}',
+            },
           },
         },
       },
@@ -140,6 +174,64 @@ afterEach(async () => {
 });
 
 describe('PreviewFilmstrip mixed media', () => {
+  it('uses the gallery-style full accent border for the selected item', async () => {
+    await render(
+      <>
+        <Box borderColor="accent.solid" borderWidth="2px" data-filmstrip-selected-border-reference="" />
+        <DndContext>
+          <PreviewFilmstrip
+            density="full"
+            items={[sharedImage, sharedVideo]}
+            selectedItemKey="image:shared"
+            onSelect={() => undefined}
+          />
+        </DndContext>
+      </>
+    );
+
+    const reference = host!.querySelector<HTMLElement>('[data-filmstrip-selected-border-reference]')!;
+    const selected = host!.querySelector<HTMLButtonElement>('[aria-current="true"]')!;
+    const selectedStyle = getComputedStyle(selected);
+    const accentColor = getComputedStyle(reference).borderTopColor;
+
+    expect(selectedStyle.borderTopWidth).toBe('2px');
+    expect(selectedStyle.borderTopColor).toBe(accentColor);
+    expect(selectedStyle.borderRightColor).toBe(accentColor);
+    expect(selectedStyle.borderBottomColor).toBe(accentColor);
+    expect(selectedStyle.borderLeftColor).toBe(accentColor);
+    expect(selected.querySelector(':scope > div')).toBeNull();
+  });
+
+  it('vertically centers the thumb row inside the fixed-height scroll viewport', async () => {
+    await render(
+      <DndContext>
+        <PreviewFilmstrip
+          density="full"
+          items={[sharedImage, sharedVideo]}
+          selectedItemKey="image:shared"
+          onSelect={() => undefined}
+        />
+      </DndContext>
+    );
+
+    const viewport = host!.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]');
+    const thumb = host!.querySelector<HTMLButtonElement>('[aria-current="true"]');
+
+    expect(viewport).not.toBeNull();
+    expect(thumb).not.toBeNull();
+
+    const viewportRect = viewport!.getBoundingClientRect();
+    const thumbRect = thumb!.getBoundingClientRect();
+    const viewportCenterY = viewportRect.top + viewportRect.height / 2;
+    const thumbCenterY = thumbRect.top + thumbRect.height / 2;
+
+    // Without the Scrollable `contentProps={{ h: 'full' }}` fix, the content
+    // wrapper shrinks to the thumb row's own height and the row sticks to
+    // the viewport's top edge instead of centering in it — a multi-pixel
+    // offset for the "full" density's 60px strip / 48px thumb combination.
+    expect(Math.abs(thumbCenterY - viewportCenterY)).toBeLessThan(1);
+  });
+
   it('keeps same-name media independent and selects the clicked video poster', async () => {
     const onSelect = vi.fn();
 
@@ -228,12 +320,10 @@ describe('Preview mixed media footer and actions', () => {
             Expected muted
           </Text>
           <PreviewFooter
-            actionImage={null}
-            actions={{} as ImageActions}
             boardItemCount={3}
             isLoadingBoard={false}
             isMetadataOpen={false}
-            item={item}
+            media={{ actionImage: null, actions: {} as ImageActions, item, kind: 'item' }}
             selectedIndex={1}
             onNext={() => undefined}
             onPrevious={() => undefined}
@@ -260,12 +350,10 @@ describe('Preview mixed media footer and actions', () => {
   it('shows mixed position, dimensions, duration, and localized fps with tabular numerals', async () => {
     await render(
       <PreviewFooter
-        actionImage={null}
-        actions={{} as ImageActions}
         boardItemCount={3}
         isLoadingBoard={false}
         isMetadataOpen={false}
-        item={sharedVideo}
+        media={{ actionImage: null, actions: {} as ImageActions, item: sharedVideo, kind: 'item' }}
         selectedIndex={1}
         onNext={() => undefined}
         onPrevious={() => undefined}
@@ -367,5 +455,76 @@ describe('Preview mixed media footer and actions', () => {
     expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
     await interact(() => copyImage?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     expect(actions.copyImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'shared' }));
+  });
+});
+
+describe('Multi-session live preview tiles', () => {
+  const placeholder = {
+    backendItemId: 1,
+    boardId: 'none',
+    height: 512,
+    id: 'queue-1:0',
+    itemIndex: 0,
+    queueItemId: 'queue-1',
+    width: 512,
+  };
+
+  const renderTile = async () => {
+    await render(
+      <DndContext>
+        <LivePreviewTile placeholder={placeholder} shouldAntialiasProgressImage={false} />
+      </DndContext>
+    );
+
+    return Array.from(host!.querySelectorAll<HTMLElement>('p')).map((element) => element.textContent ?? '');
+  };
+
+  it('reports percent from the footer when no device label is available', async () => {
+    mocks.itemProgress = { device: null, percentage: 0.4 };
+    mocks.deviceLabel = null;
+
+    const footerText = await renderTile();
+
+    expect(footerText).toContain('40%');
+  });
+
+  it('names the device alongside percent once the label resolves', async () => {
+    mocks.itemProgress = { device: 'cuda:1', percentage: 0.4 };
+    mocks.deviceLabel = { index: 1 };
+
+    const footerText = await renderTile();
+
+    expect(footerText).toContain('GPU 1');
+    expect(footerText).toContain('40%');
+  });
+
+  it('still declares itself live before progress is quantified', async () => {
+    // A silent tile reads as a stuck one when several sessions race, so the
+    // footer says "Generating" rather than going blank.
+    mocks.itemProgress = { device: null, percentage: null };
+    mocks.deviceLabel = null;
+
+    const footerText = await renderTile();
+
+    expect(footerText).toContain('Generating');
+  });
+
+  it('carries no caption over the image itself', async () => {
+    // The frame must be indistinguishable from a finished item's, so that
+    // nothing moves at the moment denoising ends.
+    mocks.itemProgress = { device: 'cuda:1', percentage: 0.4 };
+    mocks.deviceLabel = { index: 1 };
+
+    await render(
+      <DndContext>
+        <LivePreviewTile placeholder={placeholder} shouldAntialiasProgressImage={false} />
+      </DndContext>
+    );
+
+    const image = host!.querySelector('img');
+    const captionInsideFrame = image?.closest('div')?.querySelector('p, span');
+
+    expect(image).not.toBeNull();
+    expect(captionInsideFrame).toBeNull();
   });
 });

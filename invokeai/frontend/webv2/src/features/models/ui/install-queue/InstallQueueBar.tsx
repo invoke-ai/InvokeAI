@@ -16,14 +16,12 @@ import {
 import { setQueueExpanded, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { getErrorMessage, useScopedAction } from '@platform/react/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { InstallQueueList } from './InstallQueueList';
@@ -54,81 +52,80 @@ export const InstallQueueBar = () => {
   );
   const settledCount = jobs.filter((job) => !isActiveInstallStatus(job.status) && job.status !== 'paused').length;
 
-  const [busyAction, setBusyAction] = useState<'pause' | 'resume' | 'cancel' | 'prune' | 'refresh' | null>(null);
+  // One busy flag per queue-wide control so each button tracks its own action.
+  const { isBusy: isPausingAll, run: runPauseAll } = useScopedAction();
+  const { isBusy: isResumingAll, run: runResumeAll } = useScopedAction();
+  const { isBusy: isCancellingAll, run: runCancelAll } = useScopedAction();
+  const { isBusy: isPruning, run: runPrune } = useScopedAction();
+  const { isBusy: isRefreshing, run: runRefresh } = useScopedAction();
 
   const runBulk = useCallback(
-    async (action: 'pause' | 'resume' | 'cancel', targets: ModelInstallJob[]) => {
-      const call =
-        action === 'pause' ? pauseModelInstall : action === 'resume' ? resumeModelInstall : cancelModelInstall;
-      const owner = captureAccountScope();
+    (
+      run: ReturnType<typeof useScopedAction>['run'],
+      call: (id: ModelInstallJob['id'], signal: AbortSignal) => Promise<unknown>,
+      targets: ModelInstallJob[]
+    ) =>
+      run(
+        async (owner) => {
+          // allSettled: one failed job must not hide the others' outcomes,
+          // and the requests that succeeded still deserve a fresh list.
+          const results = await Promise.allSettled(targets.map((job) => call(job.id, owner.signal)));
+          assertAccountScopeCurrent(owner);
+          await refreshInstalls(owner);
+          assertAccountScopeCurrent(owner);
 
-      setBusyAction(action);
-
-      try {
-        await Promise.all(targets.map((job) => call(job.id, owner.signal)));
-        assertAccountScopeCurrent(owner);
-        await refreshInstalls(owner);
-        assertAccountScopeCurrent(owner);
-      } catch (bulkError) {
-        if (!isAccountScopeCurrent(owner)) {
-          return;
+          const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected');
+          if (failures.length > 0) {
+            notify.error(
+              t('models.queueActionFailed'),
+              t('models.queueActionPartialDescription', {
+                error: getErrorMessage(failures[0]!.reason),
+                failed: failures.length,
+                total: targets.length,
+              })
+            );
+          }
+        },
+        (message) => {
+          notify.error(t('models.queueActionFailed'), message);
+          void refreshInstalls();
         }
-
-        notify.error(t('models.queueActionFailed'), bulkError instanceof Error ? bulkError.message : String(bulkError));
-        void refreshInstalls(owner);
-      } finally {
-        if (isAccountScopeCurrent(owner)) {
-          setBusyAction(null);
-        }
-      }
-    },
+      ),
     [notify, t]
   );
 
-  const handlePrune = useCallback(async () => {
-    const owner = captureAccountScope();
+  const handlePrune = useCallback(
+    () =>
+      runPrune(
+        async (owner) => {
+          await pruneCompletedModelInstalls(owner.signal);
+          assertAccountScopeCurrent(owner);
+          await refreshInstalls(owner);
+          assertAccountScopeCurrent(owner);
+        },
+        (message) => notify.error(t('models.pruneFailed'), message)
+      ),
+    [notify, runPrune, t]
+  );
 
-    setBusyAction('prune');
-
-    try {
-      await pruneCompletedModelInstalls(owner.signal);
-      assertAccountScopeCurrent(owner);
-      await refreshInstalls(owner);
-      assertAccountScopeCurrent(owner);
-    } catch (pruneError) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.pruneFailed'), pruneError instanceof Error ? pruneError.message : String(pruneError));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setBusyAction(null);
-      }
-    }
-  }, [notify, t]);
-
-  const handleRefresh = useCallback(async () => {
-    const owner = captureAccountScope();
-
-    setBusyAction('refresh');
-
-    try {
-      await refreshInstalls(owner);
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setBusyAction(null);
-      }
-    }
-  }, []);
+  const handleRefresh = useCallback(() => runRefresh((owner) => refreshInstalls(owner)), [runRefresh]);
   const handleOpenChange = useCallback((event: { open: boolean }) => setQueueExpanded(event.open), []);
-  const handlePauseAll = useCallback(() => void runBulk('pause', pausableJobs), [pausableJobs, runBulk]);
-  const handleResumeAll = useCallback(() => void runBulk('resume', pausedJobs), [pausedJobs, runBulk]);
-  const handleCancelAll = useCallback(() => void runBulk('cancel', cancellableJobs), [cancellableJobs, runBulk]);
+  const handlePauseAll = useCallback(
+    () => void runBulk(runPauseAll, pauseModelInstall, pausableJobs),
+    [pausableJobs, runBulk, runPauseAll]
+  );
+  const handleResumeAll = useCallback(
+    () => void runBulk(runResumeAll, resumeModelInstall, pausedJobs),
+    [pausedJobs, runBulk, runResumeAll]
+  );
+  const handleCancelAll = useCallback(
+    () => void runBulk(runCancelAll, cancelModelInstall, cancellableJobs),
+    [cancellableJobs, runBulk, runCancelAll]
+  );
 
   const summary =
     activeJobs.length > 0
-      ? `${getInstallJobDisplayName(activeJobs[0]!)}${activeJobs.length > 1 ? t('models.plusMore', { count: activeJobs.length - 1 }) : ''}`
+      ? `${getInstallJobDisplayName(activeJobs[0]!)}${activeJobs.length > 1 ? t('common.plusMore', { count: activeJobs.length - 1 }) : ''}`
       : jobs.length > 0
         ? t('models.installJobSummary', { count: jobs.length })
         : t('models.noInstallsYet');
@@ -149,13 +146,13 @@ export const InstallQueueBar = () => {
               {t('models.installQueue')}
             </Text>
             <HStack gap="1">
-              <Button loading={busyAction === 'refresh'} size="2xs" variant="ghost" onClick={handleRefresh}>
+              <Button loading={isRefreshing} size="2xs" variant="ghost" onClick={handleRefresh}>
                 <Icon as={RefreshCcwIcon} boxSize="3" />
                 {t('common.refresh')}
               </Button>
               <Button
                 disabled={settledCount === 0}
-                loading={busyAction === 'prune'}
+                loading={isPruning}
                 size="2xs"
                 variant="ghost"
                 onClick={handlePrune}
@@ -188,9 +185,7 @@ export const InstallQueueBar = () => {
           ) : (
             <Icon as={ListOrderedIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
           )}
-          <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
-            {summary}
-          </Text>
+          <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={summary} />
 
           {activeJobs.length > 0 ? (
             <Badge colorPalette="accent" flexShrink={0} fontSize="2xs" size="sm" variant="solid">
@@ -207,7 +202,7 @@ export const InstallQueueBar = () => {
             <Tooltip content={t('models.pauseAllDownloads')}>
               <IconButton
                 aria-label={t('models.pauseAllInstalls')}
-                loading={busyAction === 'pause'}
+                loading={isPausingAll}
                 size="2xs"
                 variant="ghost"
                 onClick={handlePauseAll}
@@ -220,7 +215,7 @@ export const InstallQueueBar = () => {
             <Tooltip content={t('models.resumeAllPausedDownloads')}>
               <IconButton
                 aria-label={t('models.resumeAllInstalls')}
-                loading={busyAction === 'resume'}
+                loading={isResumingAll}
                 size="2xs"
                 variant="ghost"
                 onClick={handleResumeAll}
@@ -233,7 +228,7 @@ export const InstallQueueBar = () => {
             <Tooltip content={t('models.cancelAllInstalls')}>
               <IconButton
                 aria-label={t('models.cancelAllInstalls')}
-                loading={busyAction === 'cancel'}
+                loading={isCancellingAll}
                 size="2xs"
                 variant="ghost"
                 onClick={handleCancelAll}

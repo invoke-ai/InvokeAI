@@ -8,6 +8,7 @@ from diffusers import UNet2DConditionModel
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 
 if TYPE_CHECKING:
     from invokeai.app.invocations.model import ModelIdentifierField
@@ -47,7 +48,7 @@ class LoRAExt(ExtensionBase):
                 patch_weight=self._weight,
                 original_weights=original_weights,
                 original_modules={},
-                dtype=unet.dtype,
+                dtype=get_model_compute_dtype(unet),
                 force_direct_patching=True,
                 force_sidecar_patching=False,
             )

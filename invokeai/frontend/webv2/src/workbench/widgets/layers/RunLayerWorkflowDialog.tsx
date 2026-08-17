@@ -444,9 +444,7 @@ export const RunLayerWorkflowDialog = ({
           <Dialog.Content ref={contentRef} bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
             <chakra.form onSubmit={handleSubmit}>
               <Dialog.Header>
-                <Dialog.Title fontSize="sm" fontWeight="700">
-                  {t('widgets.layers.runWorkflow.title')}
-                </Dialog.Title>
+                <Dialog.Title>{t('widgets.layers.runWorkflow.title')}</Dialog.Title>
               </Dialog.Header>
               <Dialog.Body>
                 <Stack gap="4">

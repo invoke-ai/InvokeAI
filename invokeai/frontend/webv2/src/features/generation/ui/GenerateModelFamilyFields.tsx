@@ -8,11 +8,11 @@ import { IDEOGRAM4_SAMPLER_PRESETS, MAX_KREA2_SEED_VARIANCE_STRENGTH } from '@fe
 // actually used means this module only rebuilds when those change.
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
+import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
-import { SliderNumberField } from './shared/SliderNumberField';
 
 interface GenerateModelFamilyFieldsProps {
   settings: GenerateSettings;

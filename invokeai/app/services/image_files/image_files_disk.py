@@ -180,6 +180,41 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except Exception as e:
             raise ImageFileSaveException from e
 
+    def copy(
+        self,
+        source_image_name: str,
+        image_name: str,
+        source_subfolder: str = "",
+        image_subfolder: str = "",
+        thumbnail_size: int = 256,
+    ) -> None:
+        """Duplicate an image's files under a new name, without decoding them.
+
+        `shutil.copy2` is both cheapest and most faithful: every PNG chunk travels, including ones
+        this application does not parse and would drop on a re-encode. Nothing is cached — a copy
+        nobody has read yet has no business occupying a slot.
+        """
+        try:
+            self.__validate_storage_folders()
+            source_path = self.get_path(source_image_name, image_subfolder=source_subfolder)
+            image_path = self.get_path(image_name, image_subfolder=image_subfolder)
+            image_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, image_path)
+
+            source_thumbnail_path = self.get_path(source_image_name, thumbnail=True, image_subfolder=source_subfolder)
+            thumbnail_path = self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder)
+            thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if source_thumbnail_path.exists():
+                shutil.copy2(source_thumbnail_path, thumbnail_path)
+            else:
+                # A source predating thumbnails, or one whose thumbnail was lost. Rare enough to be
+                # worth a decode rather than leaving the copy with a broken gallery tile.
+                with Image.open(image_path) as copied:
+                    make_thumbnail(copied, thumbnail_size).save(thumbnail_path)
+        except Exception as e:
+            raise ImageFileSaveException from e
+
     def delete(self, image_name: str, image_subfolder: str = "") -> None:
         token = self.stage_delete(image_name, image_subfolder)
         self.commit_delete(token)

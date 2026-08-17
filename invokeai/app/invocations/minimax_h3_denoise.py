@@ -55,6 +55,7 @@ from invokeai.backend.minimax_h3.sampling import (
     MINIMAX_H3_STILL_NUM_FRAMES,
     MINIMAX_H3_VAE_LATENT_CHANNELS,
     build_denoise_state,
+    validate_canvas,
     validate_num_frames,
 )
 from invokeai.backend.minimax_h3.taehv_decoder import TAEH3_PREVIEW_MODEL_URL, TAEH3Decoder
@@ -228,6 +229,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
         # bypasses the dropdown still fails here rather than deep in the VAE.
         num_frames = int(self.num_frames)
         validate_num_frames(num_frames)
+        validate_canvas(self.height, self.width)
 
         device = TorchDevice.choose_torch_device()
 

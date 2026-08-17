@@ -7,9 +7,10 @@ import type {
 } from '@features/workflow/contracts';
 
 import { Box, Flex, Icon, Stack, Text } from '@chakra-ui/react';
-import { getWorkflowNodeChromeProps } from '@features/workflow/preview';
+import { getWorkflowNodeChromeProps, WORKFLOW_NODE_DENSITY } from '@features/workflow/preview';
 import { getFieldTypeColor, getFieldTypeLabel, isModelFieldType } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { InfoIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -71,15 +72,20 @@ const FieldTooltip = ({
 };
 
 const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
-  <Box position="relative" px="3" py="0.5">
+  <Box position="relative" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
     <Tooltip
       content={<FieldTooltip description={template.description} direction="output" template={template} />}
       positioning={{ placement: 'top-end' }}
     >
       <Flex justify="flex-end">
-        <Text color="fg.muted" fontSize="2xs" lineHeight="shorter" maxW="full" textAlign="end" truncate>
-          {template.title}
-        </Text>
+        <MiddleTruncate
+          color="fg.muted"
+          fontSize="2xs"
+          justifyContent="flex-end"
+          lineHeight="shorter"
+          maxW="full"
+          text={template.title}
+        />
       </Flex>
     </Tooltip>
     <HandleDot side="right" type={template.type} />
@@ -87,7 +93,7 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
 );
 
 const InputRow = ({ template }: { template: FieldInputTemplate }) => (
-  <Box position="relative" px="3" py="0.5">
+  <Box position="relative" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
     <Tooltip
       content={<FieldTooltip description={template.description} direction="input" template={template} />}
       positioning={{ placement: 'top-start' }}
@@ -120,6 +126,7 @@ const NodeInfoTooltip = ({ template }: { template: InvocationTemplate }) => {
 };
 
 export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) => {
+  const { t } = useTranslation();
   const inputTemplates = sortByUiOrder(Object.values(template.inputs).filter((input) => !input.uiHidden));
   const outputTemplates = Object.values(template.outputs);
   const hasFields = inputTemplates.length > 0 || outputTemplates.length > 0;
@@ -135,17 +142,20 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
         gap="2"
         pe="2"
         ps="2.5"
-        py="1.5"
+        py={WORKFLOW_NODE_DENSITY.headerPaddingY}
       >
-        <Text fontWeight="700" minW="0" title={template.title} truncate>
-          {template.title}
-        </Text>
+        <MiddleTruncate fontWeight="700" minW="0" text={template.title} />
         <Box flex="1" />
         <Tooltip content={<NodeInfoTooltip template={template} />} positioning={{ placement: 'top-end' }} showArrow>
-          <Icon aria-label={`Details for ${template.title}`} as={InfoIcon} boxSize="3.5" color="fg.subtle" />
+          <Icon
+            aria-label={t('nodes.nodeDetailsAria', { title: template.title })}
+            as={InfoIcon}
+            boxSize="3.5"
+            color="fg.subtle"
+          />
         </Tooltip>
       </Flex>
-      <Stack bg="bg.muted" borderBottomRadius="lg" gap="0" py="1">
+      <Stack bg="bg.muted" borderBottomRadius="lg" gap="0" py={WORKFLOW_NODE_DENSITY.bodyPaddingY}>
         {hasFields ? (
           <>
             {outputTemplates.map((output) => (
@@ -157,11 +167,10 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
           </>
         ) : (
           <Text color="fg.muted" fontSize="2xs" px="3" py="1">
-            No exposed fields.
+            {t('nodes.noExposedFields')}
           </Text>
         )}
       </Stack>
     </Box>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

@@ -51,6 +51,7 @@ class DiskVideoFileStorage(VideoFileStorageBase):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         first_frame: Optional[Image.Image] = None,
+        move_source: bool = True,
     ) -> None:
         logger = InvokeAILogger.get_logger()
         try:
@@ -58,15 +59,18 @@ class DiskVideoFileStorage(VideoFileStorageBase):
             video_path = self.get_path(video_name, video_subfolder=video_subfolder)
             video_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Move if the source is on the same filesystem; otherwise copy then unlink.
-            try:
-                shutil.move(str(source_path), str(video_path))
-            except Exception:
-                shutil.copy2(str(source_path), str(video_path))
+            if move_source:
+                # Move if the source is on the same filesystem; otherwise copy then unlink.
                 try:
-                    Path(source_path).unlink(missing_ok=True)
+                    shutil.move(str(source_path), str(video_path))
                 except Exception:
-                    pass
+                    shutil.copy2(str(source_path), str(video_path))
+                    try:
+                        Path(source_path).unlink(missing_ok=True)
+                    except Exception:
+                        pass
+            else:
+                shutil.copy2(str(source_path), str(video_path))
             logger.info(f"Video file written: {video_path}")
 
             thumbnail_name = get_video_thumbnail_name(video_name)

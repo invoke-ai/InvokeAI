@@ -1,77 +1,98 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelConfig } from '@features/models/core/types';
+import type { ReactNode } from 'react';
 
-import { DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import { chakra, DataList, HStack, Icon, Menu, Portal, Separator, Stack, Text } from '@chakra-ui/react';
 import { isConvertibleToDiffusers } from '@features/models/core/baseIdentity';
-import { formatBytes } from '@features/models/core/taxonomy';
-import { useModelsSelector } from '@features/models/data/modelsStore';
+import { isLinkableType } from '@features/models/core/relationships';
+import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
+import { formatBytes, getModelSourceHref } from '@features/models/core/taxonomy';
+import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
+import {
+  ModelActionConfirmDialog,
+  ModelActionMenuItems,
+  type PendingModelAction,
+} from '@features/models/ui/shared/ModelActionsMenu';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { areArraysEqual } from '@platform/state/selectors';
-import { Button, IconButton, ConfirmDialog, MenuContent } from '@platform/ui';
-import { ArrowLeftIcon, MoreHorizontalIcon, PencilIcon, RefreshCcwIcon, Trash2Icon } from 'lucide-react';
+import { Button, IconButton, MenuContent } from '@platform/ui';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
+import { ExternalLinkIcon, MoreHorizontalIcon, PencilIcon } from 'lucide-react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
 
-import { DefaultSettingsSection, supportsDefaultSettings, type DefaultSettingsModel } from './DefaultSettingsSection';
+import { CpuOnlySetting, supportsCpuOnlySetting } from './CpuOnlySetting';
+import { supportsDefaultSettings, type DefaultSettingsModel } from './defaultSettingsFields';
+import { DefaultSettingsSection } from './DefaultSettingsSection';
 import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from './ModelBadges';
 import { ModelEditForm } from './ModelEditForm';
 import { ModelImageUpload } from './ModelImageUpload';
+import { ModelSettingsMenuItems } from './ModelSettingsMenuItems';
 import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
-import { useModelActions } from './useModelActions';
-import { supportsVaeCpuOnlySetting, VaeCpuOnlySetting } from './VaeCpuOnlySetting';
+import { UpdatePathDialog } from './UpdatePathDialog';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
-const RELATED_MODEL_TYPES = new Set(['main', 'lora']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
 
 type ModelDetailShellModel = Pick<ModelConfig, 'key' | 'type'>;
 type TriggerPhrasesModel = Pick<ModelConfig, 'key' | 'trigger_phrases'>;
-type VaeCpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
+type CpuOnlyModel = Pick<ModelConfig, 'cpu_only' | 'key' | 'name' | 'type'>;
 type ModelIdentityModel = Pick<
   ModelConfig,
   | 'base'
+  | 'config_path'
   | 'cover_image'
   | 'description'
   | 'file_size'
   | 'format'
   | 'hash'
+  | 'image_encoder_model_id'
   | 'key'
   | 'name'
   | 'path'
   | 'prediction_type'
+  | 'provider_id'
+  | 'provider_model_id'
+  | 'repo_variant'
   | 'source'
+  | 'source_type'
   | 'source_url'
   | 'type'
   | 'variant'
 >;
 
-const findModel = (models: readonly ModelConfig[], modelKey: string): ModelConfig | undefined =>
-  models.find((candidate) => candidate.key === modelKey);
+const findModel = (snapshot: ModelsSnapshot, modelKey: string): ModelConfig | undefined =>
+  snapshot.modelsByKey.get(modelKey);
 
-const selectModelShell = (models: readonly ModelConfig[], modelKey: string): ModelDetailShellModel | null => {
-  const model = findModel(models, modelKey);
+const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDetailShellModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model ? { key: model.key, type: model.type } : null;
 };
 
-const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): ModelIdentityModel | null => {
-  const model = findModel(models, modelKey);
+const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelIdentityModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model
     ? {
         base: model.base,
+        config_path: model.config_path,
         cover_image: model.cover_image,
         description: model.description,
         file_size: model.file_size,
         format: model.format,
         hash: model.hash,
+        image_encoder_model_id: model.image_encoder_model_id,
         key: model.key,
         name: model.name,
         path: model.path,
         prediction_type: model.prediction_type,
+        provider_id: model.provider_id,
+        provider_model_id: model.provider_model_id,
+        repo_variant: model.repo_variant,
         source: model.source,
+        source_type: model.source_type,
         source_url: model.source_url,
         type: model.type,
         variant: model.variant,
@@ -79,8 +100,8 @@ const selectModelIdentity = (models: readonly ModelConfig[], modelKey: string): 
     : null;
 };
 
-const selectDefaultSettingsModel = (models: readonly ModelConfig[], modelKey: string): DefaultSettingsModel | null => {
-  const model = findModel(models, modelKey);
+const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string): DefaultSettingsModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   // `base` is projected too: the FP8 storage default is unavailable for Z-Image.
   return model
@@ -88,14 +109,14 @@ const selectDefaultSettingsModel = (models: readonly ModelConfig[], modelKey: st
     : null;
 };
 
-const selectTriggerPhrasesModel = (models: readonly ModelConfig[], modelKey: string): TriggerPhrasesModel | null => {
-  const model = findModel(models, modelKey);
+const selectTriggerPhrasesModel = (snapshot: ModelsSnapshot, modelKey: string): TriggerPhrasesModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model ? { key: model.key, trigger_phrases: model.trigger_phrases } : null;
 };
 
-const selectVaeCpuOnlyModel = (models: readonly ModelConfig[], modelKey: string): VaeCpuOnlyModel | null => {
-  const model = findModel(models, modelKey);
+const selectCpuOnlyModel = (snapshot: ModelsSnapshot, modelKey: string): CpuOnlyModel | null => {
+  const model = findModel(snapshot, modelKey);
 
   return model ? { cpu_only: model.cpu_only, key: model.key, name: model.name, type: model.type } : null;
 };
@@ -107,42 +128,30 @@ const areTriggerPhrasesModelsEqual = (left: TriggerPhrasesModel | null, right: T
  * Full detail pane for one model: identity (view/edit), per-model default
  * settings, related models, trigger phrases, and lifecycle actions (convert,
  * re-identify, delete). Mount keyed by model key so per-model form state never
- * leaks between models. `density="panel"` tightens the side-panel drill-in.
+ * leaks between models.
  */
-export const ModelDetail = ({
-  density = 'full',
-  modelKey,
-  onBack,
-  onDeleted,
-}: {
-  density?: 'panel' | 'full';
-  modelKey: string;
-  onBack?: () => void;
-  onDeleted: () => void;
-}) => {
-  const model = useModelsSelector((snapshot) => selectModelShell(snapshot.models, modelKey));
+export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDeleted: () => void }) => {
+  const { t } = useTranslation();
+  const model = useModelsSelector((snapshot) => selectModelShell(snapshot, modelKey));
 
   if (!model) {
     return (
       <Stack align="start" gap="2" p="1">
-        {onBack ? <BackButton onBack={onBack} /> : null}
         <Text color="fg.subtle" fontSize="xs">
-          This model is no longer in the library.
+          {t('models.modelNoLongerInLibrary')}
         </Text>
       </Stack>
     );
   }
 
   return (
-    <Stack gap={density === 'panel' ? '3' : '4'} pb="4">
-      {onBack ? <BackButton onBack={onBack} /> : null}
+    <Stack gap="4" pb="4">
+      <ModelIdentitySectionContainer modelKey={model.key} onDeleted={onDeleted} />
 
-      <ModelIdentitySectionContainer density={density} modelKey={model.key} onDeleted={onDeleted} />
-
-      {supportsVaeCpuOnlySetting(model) ? (
+      {supportsCpuOnlySetting(model) ? (
         <>
           <Separator borderColor="border.subtle" />
-          <VaeCpuOnlySettingContainer modelKey={model.key} />
+          <CpuOnlySettingContainer modelKey={model.key} />
         </>
       ) : null}
 
@@ -153,7 +162,7 @@ export const ModelDetail = ({
         </>
       ) : null}
 
-      {RELATED_MODEL_TYPES.has(model.type) ? (
+      {isLinkableType(model.type) ? (
         <>
           <Separator borderColor="border.subtle" />
           <RelatedModelsSectionContainer modelKey={model.key} />
@@ -171,33 +180,29 @@ export const ModelDetail = ({
 };
 
 interface ModelIdentitySectionProps {
-  density: 'panel' | 'full';
   isMissing: boolean;
   model: ModelIdentityModel;
   onDeleted: () => void;
 }
 
 const ModelIdentitySectionContainer = memo(function ModelIdentitySectionContainer({
-  density,
   modelKey,
   onDeleted,
 }: {
-  density: 'panel' | 'full';
   modelKey: string;
   onDeleted: () => void;
 }) {
-  const model = useModelsSelector((snapshot) => selectModelIdentity(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectModelIdentity(snapshot, modelKey));
   const isMissing = useModelsSelector((snapshot) => snapshot.missingModelKeys.has(modelKey));
 
   if (!model) {
     return null;
   }
 
-  return <ModelIdentitySection density={density} isMissing={isMissing} model={model} onDeleted={onDeleted} />;
+  return <ModelIdentitySection isMissing={isMissing} model={model} onDeleted={onDeleted} />;
 });
 
 const ModelIdentitySection = memo(function ModelIdentitySection({
-  density,
   isMissing,
   model,
   onDeleted,
@@ -256,7 +261,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           }}
         />
       ) : (
-        <ModelAttributes density={density} model={model} />
+        <ModelAttributes isMissing={isMissing} model={model} />
       )}
     </>
   );
@@ -274,25 +279,14 @@ const ModelDetailActions = ({
   onToggleEditing: () => void;
 }) => {
   const { t } = useTranslation();
-  const { convert, reidentify, remove } = useModelActions();
-  const [pendingAction, setPendingAction] = useState<'delete' | 'convert' | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingModelAction>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
-
-  const handleReidentify = async () => {
-    setIsActionBusy(true);
-
-    try {
-      await reidentify(model);
-    } finally {
-      setIsActionBusy(false);
-    }
-  };
 
   return (
     <HStack flexShrink={0} gap="1" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
-        <Button size="xs" variant="outline" onClick={() => setPendingAction('convert')}>
-          <Icon as={SiHuggingface} boxSize="3" />
+        <Button size="xs" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
+          <Icon as={HuggingFaceIcon} boxSize="3" />
           {t('models.convertToDiffusers')}
         </Button>
       ) : null}
@@ -309,39 +303,17 @@ const ModelDetailActions = ({
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="12rem">
-              <Menu.Item value="reidentify" onClick={() => void handleReidentify()}>
-                <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.reidentify')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Separator />
-              <Menu.Item color="fg.error" value="delete" onClick={() => setPendingAction('delete')}>
-                <Icon as={Trash2Icon} boxSize="3.5" />
-                <Menu.ItemText fontSize="xs">{t('models.deleteModel')}</Menu.ItemText>
-              </Menu.Item>
+              <ModelActionMenuItems
+                extraItems={<ModelSettingsMenuItems modelKey={model.key} />}
+                model={model}
+                onBusyChange={setIsActionBusy}
+                onRequestConfirm={setPendingAction}
+              />
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <ConfirmDialog
-        body={t('models.deleteBody', { name: model.name })}
-        confirmLabel={t('models.deleteModel')}
-        isOpen={pendingAction === 'delete'}
-        title={t('models.deleteModel')}
-        onClose={() => setPendingAction(null)}
-        onConfirm={async () => {
-          await remove(model);
-          onDeleted();
-        }}
-      />
-      {/* Destructive styling: the original checkpoint file is replaced. */}
-      <ConfirmDialog
-        body={t('models.convertBody', { name: model.name })}
-        confirmLabel={t('models.convert')}
-        isOpen={pendingAction === 'convert'}
-        title={t('models.convertToDiffusers')}
-        onClose={() => setPendingAction(null)}
-        onConfirm={() => convert(model)}
-      />
+      <ModelActionConfirmDialog pending={pendingAction} onClose={() => setPendingAction(null)} onDeleted={onDeleted} />
     </HStack>
   );
 };
@@ -353,7 +325,7 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
 }) {
   const notify = useNotify();
   const { t } = useTranslation();
-  const model = useModelsSelector((snapshot) => selectDefaultSettingsModel(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectDefaultSettingsModel(snapshot, modelKey));
 
   if (!model || !supportsDefaultSettings(model)) {
     return null;
@@ -368,20 +340,20 @@ const DefaultSettingsSectionContainer = memo(function DefaultSettingsSectionCont
   );
 });
 
-const VaeCpuOnlySettingContainer = memo(function VaeCpuOnlySettingContainer({ modelKey }: { modelKey: string }) {
+const CpuOnlySettingContainer = memo(function CpuOnlySettingContainer({ modelKey }: { modelKey: string }) {
   const notify = useNotify();
   const { t } = useTranslation();
-  const model = useModelsSelector((snapshot) => selectVaeCpuOnlyModel(snapshot.models, modelKey));
+  const model = useModelsSelector((snapshot) => selectCpuOnlyModel(snapshot, modelKey));
 
-  if (!model || !supportsVaeCpuOnlySetting(model)) {
+  if (!model || !supportsCpuOnlySetting(model)) {
     return null;
   }
 
   return (
-    <VaeCpuOnlySetting
+    <CpuOnlySetting
       model={model}
-      onError={(message) => notify.error(t('models.failedToSaveVaeCpuSetting'), message)}
-      onSaved={() => notify.success(t('models.vaeCpuSettingSaved'), model.name)}
+      onError={(message) => notify.error(t('models.failedToSaveCpuSetting'), message)}
+      onSaved={() => notify.success(t('models.cpuSettingSaved'), model.name)}
     />
   );
 });
@@ -391,7 +363,7 @@ const TriggerPhrasesEditorContainer = memo(function TriggerPhrasesEditorContaine
   const { t } = useTranslation();
   const handleError = useCallback((message: string) => notify.error(t('models.triggerPhrases'), message), [notify, t]);
   const model = useModelsSelector(
-    (snapshot) => selectTriggerPhrasesModel(snapshot.models, modelKey),
+    (snapshot) => selectTriggerPhrasesModel(snapshot, modelKey),
     areTriggerPhrasesModelsEqual
   );
 
@@ -413,11 +385,11 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   const { t } = useTranslation();
   const model = useModelsSelector(
     (snapshot) => {
-      const candidate = snapshot.models.find((model) => model.key === modelKey);
+      const candidate = snapshot.modelsByKey.get(modelKey);
 
-      return candidate ? { base: candidate.base, key: candidate.key } : null;
+      return candidate ? { base: candidate.base, key: candidate.key, type: candidate.type } : null;
     },
-    (left, right) => left?.key === right?.key && left?.base === right?.base
+    (left, right) => left?.key === right?.key && left?.base === right?.base && left?.type === right?.type
   );
   const handleSectionError = useCallback(
     (message: string) => notify.error(t('models.modelManager'), message),
@@ -431,49 +403,100 @@ const RelatedModelsSectionContainer = memo(function RelatedModelsSectionContaine
   return <RelatedModelsSection model={model} onError={handleSectionError} />;
 });
 
-const BackButton = ({ onBack }: { onBack: () => void }) => {
-  const { t } = useTranslation();
-
-  return (
-    <Button alignSelf="start" size="2xs" variant="ghost" onClick={onBack}>
-      <Icon as={ArrowLeftIcon} boxSize="3" />
-      {t('models.allModels')}
-    </Button>
-  );
-};
-
-const isAbsolutePath = (path: string): boolean => path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
-
-const ModelAttributes = ({ density, model }: { density: 'panel' | 'full'; model: ModelIdentityModel }) => {
+const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: ModelIdentityModel }) => {
   const { t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
+  const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
   // Managed models store paths relative to the models directory; show the
   // resolved absolute path so it can be found on disk.
-  const fullPath =
-    isAbsolutePath(model.path) || !modelsDir ? model.path : `${modelsDir.replace(/\/+$/, '')}/${model.path}`;
+  const fullPath = resolveModelAbsolutePath(model.path, modelsDir);
+  // In-place installs (absolute paths) may be repointed after the file moves;
+  // a missing model gets the affordance too — that is exactly when it helps.
+  const canUpdatePath = isAbsoluteModelPath(model.path) || isMissing;
 
-  const attributes: { label: string; value: string }[] = [
+  const attributes: { action?: ReactNode; href?: string; label: string; value: string }[] = [
     { label: t('models.fileSize'), value: formatBytes(model.file_size) },
     { label: t('models.variant'), value: model.variant ?? '—' },
     { label: t('models.predictionType'), value: model.prediction_type ?? '—' },
     { label: t('models.hash'), value: model.hash },
-    { label: t('models.path'), value: fullPath },
-    { label: t('models.source'), value: model.source },
+    {
+      action: canUpdatePath ? (
+        <IconButton
+          aria-label={t('models.updatePath')}
+          size="2xs"
+          variant="ghost"
+          onClick={() => setIsPathDialogOpen(true)}
+        >
+          <Icon as={PencilIcon} boxSize="3" />
+        </IconButton>
+      ) : undefined,
+      label: t('models.path'),
+      value: fullPath,
+    },
+    {
+      href: getModelSourceHref(model.source, model.source_type) ?? undefined,
+      label: t('models.source'),
+      value: model.source,
+    },
+    // The user-editable page link (e.g. a Civitai listing); only visible in
+    // the edit form until now. Old records may predate the http(s)
+    // validation, so unlinkable values still render as text.
+    ...(model.source_url
+      ? [
+          {
+            href: model.source_url.startsWith('http') ? model.source_url : undefined,
+            label: t('models.sourceUrl'),
+            value: model.source_url,
+          },
+        ]
+      : []),
+    // Format-specific attrs; truthiness also skips repo_variant's '' default.
+    ...(model.format === 'diffusers' && model.repo_variant
+      ? [{ label: t('models.repoVariant'), value: model.repo_variant }]
+      : []),
+    ...(model.format === 'checkpoint' && model.config_path
+      ? [{ label: t('models.configPath'), value: model.config_path }]
+      : []),
+    ...(model.image_encoder_model_id
+      ? [{ label: t('models.imageEncoderModelId'), value: model.image_encoder_model_id }]
+      : []),
+    ...(model.provider_id ? [{ label: t('models.providerId'), value: model.provider_id }] : []),
+    ...(model.provider_model_id ? [{ label: t('models.providerModelId'), value: model.provider_model_id }] : []),
   ];
 
   return (
-    <DataList.Root gap="2.5" orientation={density === 'panel' ? 'vertical' : 'horizontal'} size="sm" variant="subtle">
-      {attributes.map((attribute) => (
-        <DataList.Item key={attribute.label}>
-          <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">
-            {attribute.label}
-          </DataList.ItemLabel>
-          <DataList.ItemValue fontSize="2xs" overflowWrap="anywhere">
-            {attribute.value}
-          </DataList.ItemValue>
-        </DataList.Item>
-      ))}
-    </DataList.Root>
+    <>
+      <DataList.Root gap="2.5" orientation="horizontal" size="sm" variant="subtle">
+        {attributes.map((attribute) => (
+          <DataList.Item key={attribute.label}>
+            <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">
+              {attribute.label}
+            </DataList.ItemLabel>
+            <DataList.ItemValue alignItems="center" display="flex" fontSize="2xs" gap="1" overflowWrap="anywhere">
+              {attribute.href ? (
+                <chakra.a
+                  alignItems="center"
+                  display="inline-flex"
+                  gap="1"
+                  href={attribute.href}
+                  minW="0"
+                  rel="noreferrer"
+                  target="_blank"
+                  wordBreak="break-all"
+                  _hover={{ textDecoration: 'underline' }}
+                >
+                  {attribute.value}
+                  <Icon as={ExternalLinkIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+                </chakra.a>
+              ) : (
+                attribute.value
+              )}
+              {attribute.action ?? null}
+            </DataList.ItemValue>
+          </DataList.Item>
+        ))}
+      </DataList.Root>
+      {isPathDialogOpen ? <UpdatePathDialog model={model} onClose={() => setIsPathDialogOpen(false)} /> : null}
+    </>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
