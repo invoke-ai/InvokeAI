@@ -1,15 +1,19 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { NodePackInfo } from '@features/nodes/core/catalog';
 
-import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack } from '@chakra-ui/react';
+import { filterNodePacks, isProblemPack, type NodePackFilters } from '@features/nodes/core/library';
 import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
-import { Button, Row, Scrollable } from '@platform/ui';
+import { openNodesManagerTab } from '@features/nodes/ui/nodesUiStore';
+import { Button, Row, Scrollable, Tooltip } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
-import { BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ArrowRightIcon, BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { NodePackContextMenu, type NodePackContextMenuTarget } from './NodePackContextMenu';
+import { NodePackFilterMenu } from './NodePackFilterMenu';
 
 /**
  * Master list for the nodes manager: a search box over a scrollable column of
@@ -20,34 +24,26 @@ import { NodePackContextMenu, type NodePackContextMenuTarget } from './NodePackC
 export const NodePackList = ({
   activePackName,
   error,
-  onSearchChange,
+  filters,
+  onFiltersChange,
   onSelect,
   onUninstalled,
   packs,
-  searchTerm,
   status,
 }: {
   activePackName: string | null;
   error: string | null;
-  onSearchChange: (value: string) => void;
+  filters: NodePackFilters;
+  onFiltersChange: (next: NodePackFilters) => void;
   onSelect: (packName: string) => void;
   onUninstalled: (packName: string) => void;
   packs: NodePackInfo[];
-  searchTerm: string;
   status: 'idle' | 'loading' | 'loaded' | 'error';
 }) => {
   const { t } = useTranslation();
   const [contextMenuTarget, setContextMenuTarget] = useState<NodePackContextMenuTarget | null>(null);
-  const deferredSearchTerm = useDeferredValue(searchTerm);
-  const filtered = useMemo(() => {
-    const query = deferredSearchTerm.trim().toLowerCase();
-
-    if (!query) {
-      return packs;
-    }
-
-    return packs.filter((pack) => pack.name.toLowerCase().includes(query) || pack.path.toLowerCase().includes(query));
-  }, [deferredSearchTerm, packs]);
+  const deferredFilters = useDeferredValue(filters);
+  const filtered = useMemo(() => filterNodePacks(packs, deferredFilters), [deferredFilters, packs]);
 
   if (status === 'error') {
     return (
@@ -68,15 +64,18 @@ export const NodePackList = ({
 
   return (
     <Stack flex="1" gap="2" minH="0" pt="3">
-      <InputGroup px="3" startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
-        <Input
-          aria-label={t('nodes.searchPacks')}
-          placeholder={t('nodes.searchPacksPlaceholder')}
-          size="xs"
-          value={searchTerm}
-          onChange={(event) => onSearchChange(event.currentTarget.value)}
-        />
-      </InputGroup>
+      <Flex gap="1.5" px="3">
+        <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
+          <Input
+            aria-label={t('nodes.searchPacks')}
+            placeholder={t('nodes.searchPacksPlaceholder')}
+            size="xs"
+            value={filters.searchTerm}
+            onChange={(event) => onFiltersChange({ ...filters, searchTerm: event.currentTarget.value })}
+          />
+        </InputGroup>
+        <NodePackFilterMenu filters={filters} onChange={onFiltersChange} />
+      </Flex>
       <Scrollable h="full" label={t('nodes.installedPacks')} minH="0">
         {status === 'idle' || status === 'loading' ? (
           <Flex align="center" justify="center" py="10">
@@ -87,13 +86,23 @@ export const NodePackList = ({
             description={t('nodes.noPacksDescription')}
             icon={<Icon as={PackageOpenIcon} />}
             title={t('nodes.noPacks')}
-          />
+          >
+            <Button size="sm" onClick={() => openNodesManagerTab('add')}>
+              {t('nodes.addNodes')}
+              <Icon as={ArrowRightIcon} />
+            </Button>
+          </EmptyState>
         ) : filtered.length === 0 ? (
           <EmptyState
             description={t('nodes.tryDifferentSearch')}
             icon={<Icon as={SearchIcon} />}
             title={t('nodes.noPacksMatch')}
-          />
+          >
+            <Button size="sm" variant="outline" onClick={() => openNodesManagerTab('add')}>
+              {t('nodes.addNodes')}
+              <Icon as={ArrowRightIcon} />
+            </Button>
+          </EmptyState>
         ) : (
           <Stack gap="1" minW="0" p="1" px="3" w="full">
             {filtered.map((pack) => (
@@ -101,6 +110,7 @@ export const NodePackList = ({
                 key={pack.name}
                 isActive={pack.name === activePackName}
                 pack={pack}
+                problemHint={t('nodes.noNodesRegisteredHint')}
                 onContextMenu={(targetPack, x, y) => setContextMenuTarget({ pack: targetPack, x, y })}
                 onSelect={() => onSelect(pack.name)}
               />
@@ -121,11 +131,14 @@ const PackRow = ({
   isActive,
   onContextMenu,
   onSelect,
+  problemHint,
   pack,
 }: {
   isActive: boolean;
   onContextMenu: (pack: NodePackInfo, x: number, y: number) => void;
   onSelect: () => void;
+  /** Tooltip for the zero-node warning badge. */
+  problemHint: string;
   pack: NodePackInfo;
 }) => (
   <Row
@@ -151,18 +164,25 @@ const PackRow = ({
     }}
   >
     <Icon as={BlocksIcon} boxSize="4" color={isActive ? 'accent.contrast' : 'fg.subtle'} flexShrink={0} />
-    <Text fontSize="xs" fontWeight="600" maxW="full" truncate>
-      {pack.name}
-    </Text>
-    <Badge
-      colorPalette={isActive ? undefined : 'gray'}
-      flexShrink={0}
-      fontSize="2xs"
-      variant={isActive ? 'solid' : 'surface'}
-      ms="auto"
-    >
-      {pack.nodeCount}
-    </Badge>
+    <MiddleTruncate fontSize="xs" fontWeight="600" maxW="full" text={pack.name} />
+    {isProblemPack(pack) ? (
+      // Zero nodes is the strongest health signal the catalog carries: the
+      // pack's import failed or a reload/restart is pending.
+      <Tooltip content={problemHint}>
+        <Badge colorPalette="orange" flexShrink={0} fontSize="2xs" ms="auto" variant="surface">
+          {pack.nodeCount}
+        </Badge>
+      </Tooltip>
+    ) : (
+      <Badge
+        colorPalette={isActive ? undefined : 'gray'}
+        flexShrink={0}
+        fontSize="2xs"
+        variant={isActive ? 'solid' : 'surface'}
+        ms="auto"
+      >
+        {pack.nodeCount}
+      </Badge>
+    )}
   </Row>
 );
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

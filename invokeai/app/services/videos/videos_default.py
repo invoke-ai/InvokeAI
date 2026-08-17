@@ -11,6 +11,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.bulk_media_delete import StagedMediaDeleteAdapter, delete_media_by_names
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_files.video_files_common import (
@@ -54,6 +55,7 @@ class VideoService(VideoServiceABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         first_frame: Optional[Image.Image] = None,
+        move_source: bool = True,
     ) -> VideoDTO:
         if video_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -112,6 +114,7 @@ class VideoService(VideoServiceABC):
                 workflow=workflow,
                 graph=graph,
                 first_frame=first_frame,
+                move_source=move_source,
             )
 
             video_dto = self.get_dto(video_name)
@@ -154,6 +157,58 @@ class VideoService(VideoServiceABC):
             else:
                 self.__invoker.services.logger.error(f"Problem saving video record and file: {str(e)}")
             raise
+
+    def copy(self, source_video_name: str, board_id: Optional[str] = None, user_id: Optional[str] = None) -> VideoDTO:
+        """Duplicate a video without moving the source or exposing partial attachment semantics.
+
+        A lost board attachment is fatal here as it is for images, but it is caught *after* the copy
+        rather than before: this path goes through ``create``, which deliberately swallows a failed
+        attachment so a freshly generated video is never lost to it. That leaves no way to refuse up
+        front, so the copy is made and then withdrawn — through ``delete``, which takes the files
+        with the record.
+        """
+        record = self.get_record(source_video_name)
+        metadata = self.get_metadata(source_video_name)
+        first_frame: Optional[Image.Image] = None
+
+        try:
+            thumbnail_path = Path(self.get_path(source_video_name, thumbnail=True))
+            if thumbnail_path.exists():
+                with Image.open(thumbnail_path) as thumbnail:
+                    first_frame = thumbnail.copy()
+        except Exception:
+            # A thumbnail is an optimization only. ``create`` extracts frame zero when absent.
+            first_frame = None
+
+        created = self.create(
+            source_path=Path(self.get_path(source_video_name)),
+            width=record.width,
+            height=record.height,
+            duration=record.duration,
+            fps=record.fps,
+            video_origin=record.video_origin,
+            video_category=record.video_category,
+            board_id=board_id,
+            is_intermediate=False,
+            metadata=metadata.model_dump_json() if metadata is not None else None,
+            workflow=self.get_workflow(source_video_name),
+            graph=self.get_graph(source_video_name),
+            user_id=user_id,
+            first_frame=first_frame,
+            # The source path belongs to this service; a copy may never consume it.
+            move_source=False,
+        )
+
+        if board_id is not None and created.board_id != board_id:
+            try:
+                self.delete(created.video_name)
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(
+                    f"Failed to remove video copy {created.video_name} after board attachment failed: {cleanup_error}"
+                )
+            raise RuntimeError(f"Copy of {source_video_name} did not reach board {board_id}")
+
+        return created
 
     def update(self, video_name: str, changes: VideoRecordChanges) -> VideoDTO:
         try:
@@ -320,53 +375,34 @@ class VideoService(VideoServiceABC):
             raise e
 
     def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        # When ``user_id`` is set the lookup filters to videos owned by that user so the
+        # cascade doesn't destroy other users' contributions to a public/shared board.
+        video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
+            board_id, categories=None, is_intermediate=None, user_id=user_id
+        )
+        return self.delete_videos_by_names(video_names)
+
+    def delete_videos_by_names(self, video_names: list[str]) -> tuple[list[str], list[str]]:
+        """Delete exactly these videos, returning ``(deleted, failed)``.
+
+        Split from ``delete_videos_on_board`` so a caller that must decide whether the board may go
+        *before* destroying anything can enumerate first and delete second.
+        """
         try:
-            # When ``user_id`` is set the lookup filters to videos owned by that user so the
-            # cascade doesn't destroy other users' contributions to a public/shared board.
-            video_names = self.__invoker.services.board_video_records.get_all_board_video_names_for_board(
-                board_id, categories=None, is_intermediate=None, user_id=user_id
+            records = self.__invoker.services.video_records
+            files = self.__invoker.services.video_files
+            return delete_media_by_names(
+                video_names,
+                StagedMediaDeleteAdapter(
+                    kind="video",
+                    stage=lambda name: files.stage_delete(name, video_subfolder=records.get(name).video_subfolder),
+                    delete_records=records.delete_many,
+                    rollback=files.rollback_delete,
+                    commit=files.commit_delete,
+                    notify_deleted=self._on_deleted,
+                    log_error=self.__invoker.services.logger.error,
+                ),
             )
-            # Only delete records for files we actually managed to remove. Otherwise a
-            # transient FS error would leave the file orphaned on disk with no record
-            # pointing at it — the API would report success and the user would have no
-            # way to clean up the leak. The board itself will still be deleted by the
-            # caller, so any preserved records cascade to "uncategorized" via the
-            # board_videos FK.
-            deleted_video_names: list[str] = []
-            failed_video_names: list[str] = []
-            staged_deletes: list[tuple[str, object]] = []
-            for video_name in video_names:
-                try:
-                    record = self.__invoker.services.video_records.get(video_name)
-                    token = self.__invoker.services.video_files.stage_delete(
-                        video_name, video_subfolder=record.video_subfolder
-                    )
-                    staged_deletes.append((video_name, token))
-                    deleted_video_names.append(video_name)
-                except Exception as e:
-                    failed_video_names.append(video_name)
-                    self.__invoker.services.logger.error(
-                        f"Failed to delete video file {video_name}; keeping record: {str(e)}"
-                    )
-            try:
-                self.__invoker.services.video_records.delete_many(deleted_video_names)
-            except Exception:
-                for video_name, token in staged_deletes:
-                    try:
-                        self.__invoker.services.video_files.rollback_delete(token)
-                    except Exception as rollback_error:
-                        self.__invoker.services.logger.error(
-                            f"Failed to restore staged video files for {video_name}: {rollback_error}"
-                        )
-                raise
-            for _, token in staged_deletes:
-                try:
-                    self.__invoker.services.video_files.commit_delete(token)
-                except Exception as cleanup_error:
-                    self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
-            for video_name in deleted_video_names:
-                self._on_deleted(video_name)
-            return deleted_video_names, failed_video_names
         except VideoRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete video records")
             raise

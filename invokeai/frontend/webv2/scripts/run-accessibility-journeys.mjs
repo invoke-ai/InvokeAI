@@ -395,6 +395,14 @@ const runTopbarMenuJourney = async (browser) => {
     assert.ok(activeLeftWidgetName);
 
     const routingTrigger = page.getByRole('button', { name: /^Invoke from/ });
+    const routingLockIndicator = routingTrigger.locator('[data-routing-lock-indicator]');
+    const routingTriggerBoundsBeforeHover = await routingTrigger.boundingBox();
+    assert.ok(routingTriggerBoundsBeforeHover);
+    assert.ok(
+      routingTriggerBoundsBeforeHover.width <= 36 && routingTriggerBoundsBeforeHover.height <= 38,
+      'The routing trigger should remain narrow and align with its attached controls.'
+    );
+    assert.equal(await routingLockIndicator.count(), 0);
     await routingTrigger.hover();
     const routingTooltip = page.getByRole('tooltip', { exact: true, name: 'Change routing' });
     await routingTooltip.waitFor({ timeout: 2_000 });
@@ -427,6 +435,7 @@ const runTopbarMenuJourney = async (browser) => {
       name: 'Invoke from workflow, output to gallery, source locked, destination locked',
     });
     await lockedRoutingTrigger.waitFor();
+    assert.equal(await lockedRoutingTrigger.locator('[data-routing-lock-indicator]').count(), 1);
     await lockedRoutingTrigger.click();
     const unlockRouting = page.getByRole('menu').getByRole('menuitem', { exact: true, name: 'Unlock routing' });
     await unlockRouting.click();
@@ -436,6 +445,7 @@ const runTopbarMenuJourney = async (browser) => {
         name: 'Invoke from workflow, output to gallery, following edits',
       })
       .waitFor();
+    assert.equal(await routingTrigger.locator('[data-routing-lock-indicator]').count(), 0);
 
     await routingTrigger.click();
 

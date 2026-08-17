@@ -104,6 +104,11 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.mistral_encoder import (
+    MistralEncoder_Checkpoint_Config,
+    MistralEncoder_Diffusers_Config,
+    MistralEncoder_GGUF_Config,
+)
 from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_Flux2_Config,
     PiDDecoder_Checkpoint_FLUX_Config,
@@ -392,6 +397,10 @@ AnyModelConfig = Annotated[
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        # Mistral Encoder (used by FLUX.2 [dev])
+        Annotated[MistralEncoder_Diffusers_Config, MistralEncoder_Diffusers_Config.get_tag()],
+        Annotated[MistralEncoder_Checkpoint_Config, MistralEncoder_Checkpoint_Config.get_tag()],
+        Annotated[MistralEncoder_GGUF_Config, MistralEncoder_GGUF_Config.get_tag()],
         # Gemma 2 Encoder (used by PiD)
         Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
         Annotated[Gemma2Encoder_GGUF_Config, Gemma2Encoder_GGUF_Config.get_tag()],

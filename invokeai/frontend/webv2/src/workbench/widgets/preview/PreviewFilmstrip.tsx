@@ -1,19 +1,22 @@
 import type { GalleryItem, GalleryItemKey } from '@features/gallery';
 
-import { Box, HStack, ScrollArea } from '@chakra-ui/react';
+import { Box, HStack } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { useCallback, useMemo } from 'react';
 
 import type { PreviewDensity } from './previewDensity';
 
 /**
- * A docked strip of the current board's thumbnails between frame and footer —
- * the same `boardImages` the "N of M" counter is derived from, made spatial.
- * Fixed height (`flexShrink=0`) so the fitted frame's `100cqh` math is never
- * stolen from. Thumbs are standard all-image gallery-item drag sources, so they work
- * with every existing drop target (canvas zones, boards, drop-to-compare).
+ * A floating strip of the current board's thumbnails above the footer — the
+ * same `boardImages` the "N of M" counter is derived from, made spatial. It
+ * overlays the fitted media rather than reserving height from it, so it
+ * carries the same opaque island fill as the footer to stay legible over any
+ * image. Thumbs are standard all-image gallery-item drag sources, so they
+ * work with every existing drop target (canvas zones, boards,
+ * drop-to-compare).
  */
 
 export const PreviewFilmstrip = ({
@@ -40,38 +43,37 @@ export const PreviewFilmstrip = ({
     // intrinsic width so a long board can never stretch the widget wider than
     // its panel (side panels host widgets in a grid ScrollArea.Content that
     // otherwise grows to max-content).
-    <ScrollArea.Root
+    <Scrollable
+      bg="bg.subtle"
+      borderColor="border.subtle"
+      borderWidth="1px"
+      contentProps={FILMSTRIP_CONTENT_PROPS}
       css={FILMSTRIP_CONTAIN_CSS}
       flexShrink={0}
       h={density === 'full' ? '3.75rem' : '2.75rem'}
       minW="0"
-      size="xs"
-      variant="hover"
+      orientation="horizontal"
+      px="1.5"
+      rounded="md"
+      shadow="sm"
       w="full"
     >
-      <ScrollArea.Viewport h="full" w="full">
-        <ScrollArea.Content asChild>
-          <HStack align="center" gap="1" h="full">
-            {items.map((item) => {
-              const itemKey = toGalleryItemKey(item);
+      <HStack align="center" gap="1" h="full">
+        {items.map((item) => {
+          const itemKey = toGalleryItemKey(item);
 
-              return (
-                <FilmstripThumb
-                  key={itemKey}
-                  item={item}
-                  isSelected={itemKey === selectedItemKey}
-                  size={thumbSize}
-                  onSelect={onSelect}
-                />
-              );
-            })}
-          </HStack>
-        </ScrollArea.Content>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar orientation="horizontal">
-        <ScrollArea.Thumb />
-      </ScrollArea.Scrollbar>
-    </ScrollArea.Root>
+          return (
+            <FilmstripThumb
+              key={itemKey}
+              item={item}
+              isSelected={itemKey === selectedItemKey}
+              size={thumbSize}
+              onSelect={onSelect}
+            />
+          );
+        })}
+      </HStack>
+    </Scrollable>
   );
 };
 
@@ -114,8 +116,8 @@ const FilmstripThumb = ({
       as="button"
       aria-current={isSelected || undefined}
       aria-label={item.kind === 'video' ? `Video ${item.name}` : item.name}
-      borderColor={isSelected ? 'border.emphasized' : 'border.subtle'}
-      borderWidth="1px"
+      borderColor={isSelected ? 'accent.solid' : 'border.subtle'}
+      borderWidth="2px"
       boxSize={size}
       cursor="pointer"
       flexShrink={0}
@@ -130,12 +132,15 @@ const FilmstripThumb = ({
       ) : (
         <Box aria-hidden bg="bg.muted" h="full" w="full" />
       )}
-      {isSelected ? <Box bg="accent.solid" bottom="0" h="2px" left="0" position="absolute" right="0" /> : null}
     </Box>
   );
 };
 
 const FILMSTRIP_CONTAIN_CSS = { contain: 'inline-size' } as const;
+
+// The thumb row centers itself with `h="full"`, which needs the content
+// wrapper to actually span the viewport height rather than shrink to it.
+const FILMSTRIP_CONTENT_PROPS = { h: 'full' } as const;
 
 const FILMSTRIP_IMG_STYLE = {
   display: 'block',

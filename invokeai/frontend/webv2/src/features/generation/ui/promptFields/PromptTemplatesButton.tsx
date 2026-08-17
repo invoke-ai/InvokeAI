@@ -2,13 +2,14 @@ import type { PromptTemplateSnapshot } from '@features/generation/core/promptTem
 import type { PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 import type { PendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
 
-import { Popover, Portal, Text } from '@chakra-ui/react';
+import { Popover, Portal } from '@chakra-ui/react';
 import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
 import { useOnPendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
 import { isPromptTemplateMissing, usePromptTemplates } from '@features/generation/ui/usePromptTemplates';
 import { IconButton } from '@platform/ui/Button';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { LayoutTemplateIcon } from 'lucide-react';
 import { useCallback, useId, useMemo, useState } from 'react';
@@ -130,9 +131,13 @@ export const PromptTemplatesButton = ({
             {activeTemplate ? (
               // Dimmed when it is gone, the same way the icon dims when nothing
               // is applied — one vocabulary for "not fully live", no new colour.
-              <Text as="span" fontSize="2xs" maxW="6rem" opacity={isMissing ? 0.5 : undefined} truncate>
-                {activeTemplate.name}
-              </Text>
+              <MiddleTruncate
+                as="span"
+                fontSize="2xs"
+                maxW="6rem"
+                opacity={isMissing ? 0.5 : undefined}
+                text={activeTemplate.name}
+              />
             ) : null}
           </IconButton>
         </Popover.Trigger>

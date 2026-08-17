@@ -27,7 +27,7 @@ const highlightStyles = {
     borderColor: 'transparent',
     borderRadius: 'md',
     content: '""',
-    inset: '2px',
+    inset: '0',
     opacity: 0,
     pointerEvents: 'none',
     position: 'absolute',

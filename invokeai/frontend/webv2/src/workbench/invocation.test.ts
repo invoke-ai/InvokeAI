@@ -184,6 +184,17 @@ describe('resolveInvocationRoute — upscale source', () => {
     return getInvocationRouteInput(project);
   };
 
+  it('still counts the widget as mounted once it is floated out of its rail', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { instanceId: 'upscale', type: 'floatWidget' });
+
+    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
+
+    expect(project.floatingWidgets?.upscale).toBeDefined();
+    expect(getInvocationRouteInput(project).mountedWidgetIds).toContain('upscale');
+  });
+
   it('is ready only with a mounted widget and installed compatible required models', () => {
     expect(resolveInvocationRouteInput(createInput(), 'global', route, upscaleModels)).toMatchObject({
       sourceValid: true,

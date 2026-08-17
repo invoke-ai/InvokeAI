@@ -6,6 +6,8 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
+import { createTrailingSingleFlight } from '@platform/state/singleFlight';
+import { getApiErrorMessage } from '@platform/transport/http';
 
 import { getStarterModels } from './api';
 
@@ -24,54 +26,46 @@ export interface StartersSnapshot {
 const EMPTY_STARTERS_SNAPSHOT: StartersSnapshot = { error: null, response: null, status: 'idle' };
 const store = createExternalStore<StartersSnapshot>(EMPTY_STARTERS_SNAPSHOT);
 
-let inflightRefresh: Promise<void> | null = null;
+const refreshFlight = createTrailingSingleFlight();
 
 registerAccountOwnedResource({
   clear: () => {
-    inflightRefresh = null;
+    refreshFlight.reset();
     store.setSnapshot(EMPTY_STARTERS_SNAPSHOT);
   },
   name: 'starter-models',
 });
 
-export const refreshStarters = (): Promise<void> => {
-  if (inflightRefresh) {
-    return inflightRefresh;
-  }
+export const refreshStarters = (): Promise<void> =>
+  refreshFlight.run(() => {
+    const owner = captureAccountScope();
+    store.patchSnapshot({ status: store.getSnapshot().response ? 'loaded' : 'loading' });
 
-  const owner = captureAccountScope();
-  store.patchSnapshot({ status: store.getSnapshot().response ? 'loaded' : 'loading' });
+    return getStarterModels(owner.signal)
+      .then((response) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-  const refresh = getStarterModels(owner.signal)
-    .then((response) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+        store.patchSnapshot({ error: null, response, status: 'loaded' });
+      })
+      .catch((error: unknown) => {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
 
-      store.patchSnapshot({ error: null, response, status: 'loaded' });
-    })
-    .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      store.patchSnapshot({
-        error: error instanceof Error ? error.message : 'Failed to load starter models.',
-        status: store.getSnapshot().response ? 'loaded' : 'error',
+        store.patchSnapshot({
+          error: getApiErrorMessage(error, 'Failed to load starter models.'),
+          status: store.getSnapshot().response ? 'loaded' : 'error',
+        });
       });
-    })
-    .finally(() => {
-      if (inflightRefresh === refresh) {
-        inflightRefresh = null;
-      }
-    });
+  });
 
-  inflightRefresh = refresh;
-  return inflightRefresh;
-};
-
+/** Fetch on first use or retry after an error, so one failed load never sticks. */
 export const ensureStartersLoaded = (): void => {
-  if (store.getSnapshot().status === 'idle') {
+  const { status } = store.getSnapshot();
+
+  if (status === 'idle' || status === 'error') {
     void refreshStarters();
   }
 };
@@ -83,6 +77,6 @@ export const refreshStartersIfLoaded = (): void => {
   }
 };
 
-export const useStartersSelector = store.useSelector;
+export const getStartersSnapshot = (): StartersSnapshot => store.getSnapshot();
 
-export const useStartersSnapshot = (): StartersSnapshot => store.useSnapshot();
+export const useStartersSelector = store.useSelector;

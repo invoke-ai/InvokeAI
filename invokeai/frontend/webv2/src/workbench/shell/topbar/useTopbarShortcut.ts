@@ -32,6 +32,9 @@ const OTHER_LABELS: Record<string, string> = {
 const formatPart = (part: string): string =>
   IS_MAC_OS ? (MAC_GLYPHS[part] ?? part.toUpperCase()) : (OTHER_LABELS[part] ?? part.toUpperCase());
 
+/** One key's text label, for render sites that draw icons for some keys and need the text for the rest. */
+export const formatTopbarShortcutPart = formatPart;
+
 export const formatTopbarShortcut = (hotkey: string): string =>
   formatHotkeyForPlatform(hotkey)
     .map(formatPart)
@@ -68,6 +71,8 @@ export const useTopbarShortcut = (commandId: string): string | null => {
 export interface TopbarShortcutBinding {
   aria: string;
   display: string;
+  /** Canonical per-key tokens (`cmd`, `enter`, `k`, …) for glyph rendering. */
+  parts: string[];
 }
 
 export const useTopbarShortcutBinding = (commandId: string): TopbarShortcutBinding | null => {
@@ -75,5 +80,11 @@ export const useTopbarShortcutBinding = (commandId: string): TopbarShortcutBindi
   const definition = findDefinition(commandId);
   const firstKey = definition ? applyCustomHotkeys(definition, customHotkeys).keys[0] : undefined;
 
-  return firstKey ? { aria: formatTopbarShortcutForAria(firstKey), display: formatTopbarShortcut(firstKey) } : null;
+  return firstKey
+    ? {
+        aria: formatTopbarShortcutForAria(firstKey),
+        display: formatTopbarShortcut(firstKey),
+        parts: formatHotkeyForPlatform(firstKey),
+      }
+    : null;
 };

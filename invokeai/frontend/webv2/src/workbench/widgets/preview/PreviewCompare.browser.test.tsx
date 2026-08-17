@@ -71,12 +71,48 @@ const interact = (action: () => void): Promise<void> =>
     });
   });
 
-const waitForMotion = (): Promise<void> =>
+/**
+ * Waits until a transition has actually settled on `expected`, rather than
+ * sleeping a fixed interval and asserting immediately after.
+ *
+ * A loaded CI runner can starve the compositor for longer than any constant
+ * worth waiting for, and the failure mode is silent: the transition has not
+ * advanced, so the assertion reads the value it started from and reports a
+ * plausible-looking mismatch. Polling makes the wait as long as the machine
+ * needs and no longer, and a timeout still fails loudly.
+ */
+const waitForOpacity = (element: HTMLElement, expected: string, label = '', timeoutMs = 5000): Promise<void> =>
   act(async () => {
-    await new Promise<void>((resolve) => {
-      globalThis.setTimeout(resolve, 350);
-    });
+    const deadline = Date.now() + timeoutMs;
+
+    while (getComputedStyle(element).opacity !== expected) {
+      if (Date.now() > deadline) {
+        throw new Error(
+          `Timed out after ${timeoutMs}ms waiting for opacity ${expected} at [${label}]; last value ${getComputedStyle(element).opacity}; activeElement=${document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName}`
+        );
+      }
+
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 16);
+      });
+    }
   });
+
+/**
+ * React derives `onPointerLeave` from `pointerout`, so this clears a hover the
+ * component may have picked up from the real cursor without moving it.
+ */
+const clearMouseHover = (element: HTMLElement): Promise<void> =>
+  interact(() =>
+    element.dispatchEvent(
+      new PointerEvent('pointerout', {
+        bubbles: true,
+        pointerId: 1,
+        pointerType: 'mouse',
+        relatedTarget: document.body,
+      })
+    )
+  );
 
 const renderComparison = async ({
   baseImage = createImage('base', 1200, 800),
@@ -141,13 +177,19 @@ describe('PreviewCompare', () => {
     const frame = host!.querySelector<HTMLElement>('[aria-label*="Reveal comparison"]')!;
     const compareOverlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')?.parentElement as HTMLElement;
 
-    expect(getComputedStyle(compareOverlay).opacity).toBe('0');
+    // The overlay reveals on focus OR hover OR touch press. The runner's
+    // cursor stays wherever the previous test left it, so a component that
+    // mounts underneath it gets a real `pointerenter` and stays revealed
+    // through blur. Clearing the hover synthetically keeps this test about
+    // focus, and keeps it independent of where the pointer happens to be.
+    // Waited for, not asserted outright: if the cursor had been resting on the
+    // frame, clearing it starts a fade that is still in flight right now.
+    await clearMouseHover(frame);
+    await waitForOpacity(compareOverlay, '0', 'initial');
     await interact(() => frame.focus());
-    await waitForMotion();
-    expect(getComputedStyle(compareOverlay).opacity).toBe('1');
+    await waitForOpacity(compareOverlay, '1', 'after-focus');
     await interact(() => frame.blur());
-    await waitForMotion();
-    expect(getComputedStyle(compareOverlay).opacity).toBe('0');
+    await waitForOpacity(compareOverlay, '0', 'after-blur');
 
     Object.defineProperties(frame, {
       hasPointerCapture: { value: () => true },
@@ -157,13 +199,11 @@ describe('PreviewCompare', () => {
     await interact(() =>
       frame.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 7, pointerType: 'touch' }))
     );
-    await waitForMotion();
-    expect(getComputedStyle(compareOverlay).opacity).toBe('1');
+    await waitForOpacity(compareOverlay, '1', 'after-pointerdown');
     await interact(() =>
       frame.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 7, pointerType: 'touch' }))
     );
-    await waitForMotion();
-    expect(getComputedStyle(compareOverlay).opacity).toBe('0');
+    await waitForOpacity(compareOverlay, '0', 'after-pointerup');
     expect(getComputedStyle(compareOverlay).transitionProperty).toContain('opacity');
   });
 

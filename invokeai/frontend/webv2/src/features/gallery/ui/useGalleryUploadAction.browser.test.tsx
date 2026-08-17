@@ -77,6 +77,7 @@ const adapter: GalleryUiAdapter = {
   ImageContextMenu: () => null,
   account: { enableLiveFollow: noop },
   antialiasProgressImages: false,
+  exportProject: vi.fn(),
   gallery: {
     reconcileDeletedBoardOutcome: noop,
     selectBoard: noop,
@@ -87,7 +88,6 @@ const adapter: GalleryUiAdapter = {
     setItemMultiSelection: noop,
     setPage: noop,
     setPageInfo: noop,
-    setProjectBoard: noop,
     setSearchTerm: noop,
     setView: noop,
     toggleItemSelection: noop,
@@ -130,6 +130,7 @@ const Probe = ({
         imageCount: 2,
         kind: 'board',
         name: 'Board 1',
+        projectId: null,
         videoCount: 1,
       },
       {
@@ -139,6 +140,7 @@ const Probe = ({
         imageCount: 0,
         kind: 'uncategorized',
         name: '',
+        projectId: null,
         videoCount: 0,
       },
     ],

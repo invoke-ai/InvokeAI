@@ -26,10 +26,10 @@ const workbenchMocks = vi.hoisted(() => ({
     widgetGraphs: {},
     widgetInstances: {},
     widgetRegions: {
-      bottom: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
-      center: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
-      left: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
-      right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 240 },
+      bottom: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 384 },
+      center: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 384 },
+      left: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 384 },
+      right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], isCollapsed: false, sizePx: 384 },
     },
   },
   runtime: {},
@@ -300,7 +300,7 @@ describe('WidgetRenderer failure containment', () => {
     const panel = host?.querySelector<HTMLElement>('aside');
     expect(panel).not.toBeNull();
     // Panel width survives the crash, so the region does not collapse or overflow.
-    expect(panel?.getBoundingClientRect().width).toBe(240);
+    expect(panel?.getBoundingClientRect().width).toBe(384);
     // And the drag handle is still there to resize with.
     expect(panel?.querySelector('[role="separator"]')).not.toBeNull();
   });

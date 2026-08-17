@@ -8,7 +8,11 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_board_read_access as _assert_board_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_common import (
+    BoardChanges,
+    BoardRecordOrderBy,
+    BoardRecordProjectOwnedException,
+)
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -102,9 +106,25 @@ async def update_board(
     if not current_user.is_admin and board.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this board")
 
+    # A project's board takes its name, archived state and visibility from the project, so the
+    # generic route must not set them — for admins either. The cover is still fair game: it is a
+    # display detail with no bearing on the project relationship.
+    if board.project_id is not None and (
+        changes.board_name is not None or changes.archived is not None or changes.board_visibility is not None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This board belongs to a project; rename or archive the project instead",
+        )
+
     try:
         result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
+    except BoardRecordProjectOwnedException:
+        raise HTTPException(
+            status_code=409,
+            detail="This board belongs to a project; rename or archive the project instead",
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to update board")
 
@@ -132,23 +152,58 @@ def delete_board(
     cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
     deleted_images: list[str] = []
     deleted_videos: list[str] = []
+    board_deleted = False
 
     try:
         if include_images is True:
             assert_image_move_maintenance_inactive()
+
+        # Enumerate first, delete the board second, delete its media third. The order matters:
+        # a project's board must be refused *before* anything is destroyed, and the conditional
+        # delete is the only check that cannot lose a race against a project claiming the board.
+        # Membership rows are gone by the time the media is deleted (the board FK cascades), which
+        # is why the names have to be captured up front.
+        #
+        # Without `include_images` every membership is dropped regardless of who contributed it,
+        # so that enumeration is deliberately unfiltered.
+        enumerate_user_id = cascade_user_id if include_images is True else None
+        board_image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
+            board_id=board_id,
+            categories=None,
+            is_intermediate=None,
+            user_id=enumerate_user_id,
+        )
+        board_video_names = ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
+            board_id=board_id,
+            categories=None,
+            is_intermediate=None,
+            user_id=enumerate_user_id,
+        )
+
+        if not ApiDependencies.invoker.services.boards.delete_if_unclaimed(board_id=board_id):
+            # `get_dto` above proved the board existed, so it is either claimed now or it vanished
+            # in between. Ask again rather than trusting the DTO, which predates any concurrent claim.
+            claimed = ApiDependencies.invoker.services.board_records.get_project_ids_for_boards([board_id])
+            if board_id in claimed:
+                raise HTTPException(
+                    status_code=409,
+                    detail="This board belongs to a project; delete the project instead",
+                )
+            raise HTTPException(status_code=404, detail="Board not found")
+        board_deleted = True
+
+        if include_images is True:
             # The services report both outcomes: records whose file delete failed are
-            # preserved (they cascade to "uncategorized" via the board FKs when the
-            # board is deleted below) and returned as failures. This is the ground
-            # truth — reconstructing failures by diffing a router-side board listing
-            # against the deleted names would double the DB work and misreport items
-            # moved or deleted concurrently between the two queries.
-            deleted_images, failed_images = ApiDependencies.invoker.services.images.delete_images_on_board(
-                board_id=board_id, user_id=cascade_user_id
+            # preserved (they are already uncategorized, the board having gone) and returned
+            # as failures. This is the ground truth — reconstructing failures by diffing a
+            # router-side board listing against the deleted names would double the DB work and
+            # misreport items moved or deleted concurrently between the two queries.
+            deleted_images, failed_images = ApiDependencies.invoker.services.images.delete_images_by_names(
+                board_image_names
             )
-            deleted_videos, failed_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
-                board_id=board_id, user_id=cascade_user_id
+            deleted_videos, failed_videos = ApiDependencies.invoker.services.videos.delete_videos_by_names(
+                board_video_names
             )
-            ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=[],
@@ -158,27 +213,14 @@ def delete_board(
                 failed_images=failed_images,
                 failed_videos=failed_videos,
             )
-        else:
-            deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
-                board_id=board_id,
-                categories=None,
-                is_intermediate=None,
-            )
-            deleted_board_videos = (
-                ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
-                    board_id=board_id,
-                    categories=None,
-                    is_intermediate=None,
-                )
-            )
-            ApiDependencies.invoker.services.boards.delete(board_id=board_id)
-            return DeleteBoardResult(
-                board_id=board_id,
-                deleted_board_images=deleted_board_images,
-                deleted_images=[],
-                deleted_board_videos=deleted_board_videos,
-                deleted_videos=[],
-            )
+
+        return DeleteBoardResult(
+            board_id=board_id,
+            deleted_board_images=board_image_names,
+            deleted_images=[],
+            deleted_board_videos=board_video_names,
+            deleted_videos=[],
+        )
     except HTTPException:
         raise
     except Exception:
@@ -186,10 +228,10 @@ def delete_board(
             raise HTTPException(
                 status_code=500,
                 detail={
-                    "message": "Failed to delete board after partially deleting media",
+                    "message": "Failed to delete board media",
                     "deleted_images": deleted_images,
                     "deleted_videos": deleted_videos,
-                    "board_deleted": False,
+                    "board_deleted": board_deleted,
                 },
             )
         raise HTTPException(status_code=500, detail="Failed to delete board")

@@ -130,8 +130,13 @@ export const createMockImageDTO = (overrides: Partial<ImageDTO> = {}): ImageDTO 
   ...overrides,
 });
 
+// `invocation` is the union of every registered invocation type — hundreds of members, and it
+// grows with each new node. Carrying it into this parameter type makes `merge` distribute the
+// union across the result and TypeScript gives up with TS2590 ("union type too complex"). It is
+// omitted here rather than made optional: an intersection that merely mentions the union is
+// enough to blow the limit, and no caller overrides `invocation`.
 export const createMockProgressEvent = (
-  overrides: PartialDeep<S['InvocationProgressEvent']> = {}
+  overrides: PartialDeep<Omit<S['InvocationProgressEvent'], 'invocation'>> = {}
 ): S['InvocationProgressEvent'] =>
   merge(
     {

@@ -1,7 +1,7 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import { Icon, Input, Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui';
-import { KeyRoundIcon } from 'lucide-react';
+import { ArrowRightIcon, KeyRoundIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /** Key icon -> popover with a one-off access token and a jump to the keys tab. */
@@ -48,7 +48,8 @@ export const AccessTokenPopover = ({
                   {t('models.accessTokenHelp')}
                 </Text>
                 <Button alignSelf="start" size="2xs" variant="ghost" onClick={onManageKeys}>
-                  {t('models.manageApiKeys')} {'->'}
+                  {t('models.manageApiKeys')}
+                  <Icon as={ArrowRightIcon} boxSize="3" />
                 </Button>
               </Stack>
             </Popover.Body>
@@ -58,4 +59,3 @@ export const AccessTokenPopover = ({
     </Popover.Root>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

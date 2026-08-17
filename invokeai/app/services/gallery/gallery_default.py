@@ -386,6 +386,24 @@ class SqliteGalleryService(GalleryServiceABC):
         else:
             raise ValueError(f"Unknown kind: {kind}")
 
+        if board_id == "none":
+            from_clause = f"FROM {base_table}"
+            board_id_expr = "NULL"
+        elif board_id is not None:
+            # CROSS JOIN keeps explicit-board work proportional to board membership.
+            from_clause = (
+                f"FROM {join_table} CROSS JOIN {base_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+            )
+            board_id_expr = f"{join_table}.board_id"
+        elif names_only:
+            from_clause = f"FROM {base_table}"
+            board_id_expr = "NULL"
+        else:
+            from_clause = (
+                f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+            )
+            board_id_expr = f"{join_table}.board_id"
+
         if names_only:
             select_cols = (
                 f"'{kind}' AS kind, "
@@ -402,13 +420,11 @@ class SqliteGalleryService(GalleryServiceABC):
                 f"{base_table}.{category_col} AS category, "
                 f"{base_table}.starred AS starred, "
                 f"{base_table}.is_intermediate AS is_intermediate, "
-                f"{join_table}.board_id AS board_id, "
+                f"{board_id_expr} AS board_id, "
                 f"{base_table}.created_at AS created_at, "
                 f"{duration_expr} AS duration, "
                 f"{fps_expr} AS fps"
             )
-
-        from_clause = f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
 
         conditions = ""
         params: list[Union[int, str, bool]] = []
@@ -441,7 +457,11 @@ class SqliteGalleryService(GalleryServiceABC):
             params.append(created_to)
 
         if board_id == "none":
-            conditions += f" AND {join_table}.board_id IS NULL "
+            conditions += f""" AND NOT EXISTS (
+                SELECT 1
+                FROM {join_table}
+                WHERE {join_table}.{name_col} = {base_table}.{name_col}
+            ) """
             if user_id is not None and not is_admin:
                 conditions += f" AND {base_table}.user_id = ? "
                 params.append(user_id)

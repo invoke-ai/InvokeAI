@@ -66,9 +66,7 @@ export const UserFormDialog = ({
               <>
                 <Dialog.Header borderBottomWidth="1px" borderColor="border.subtle">
                   <Stack gap="0.5">
-                    <Dialog.Title fontSize="md" fontWeight="700">
-                      {target.mode === 'create' ? t('users.addUser') : t('users.editUser')}
-                    </Dialog.Title>
+                    <Dialog.Title>{target.mode === 'create' ? t('users.addUser') : t('users.editUser')}</Dialog.Title>
                     {target.mode === 'edit' ? (
                       <Text color="fg.subtle" fontSize="xs">
                         {target.user.email}

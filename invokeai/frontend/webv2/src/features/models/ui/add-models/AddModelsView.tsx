@@ -1,28 +1,35 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { ModelSortField } from '@features/models/core/library';
 import type { StarterModel } from '@features/models/core/types';
+import type { ElementType } from 'react';
 
 import { Box, Checkbox, Flex, HStack, Icon, Input, InputGroup, Stack, Text } from '@chakra-ui/react';
-import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { collectBases, collectTypes } from '@features/models/core/library';
-import { getExternalProviderConfigs, getHuggingFaceModels, scanFolderForModels } from '@features/models/data/api';
+import {
+  DEFAULT_STARTER_MODEL_FILTERS,
+  filterStarterModels,
+  type StarterModelFilters,
+} from '@features/models/core/starters';
+import { getHuggingFaceModels, scanFolderForModels, type InstallModelRequest } from '@features/models/data/api';
+import {
+  ensureExternalProvidersLoaded,
+  useExternalProvidersSelector,
+} from '@features/models/data/externalProvidersStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
 import { updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useScopedAction } from '@platform/react/useScopedAction';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
-  type AccountScope,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Scrollable, Tooltip } from '@platform/ui';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
-
-import type { StarterInstallSource } from './starterModelInstallSources';
 
 import { AccessTokenPopover } from './AccessTokenPopover';
 import { BundleChips } from './BundleChips';
@@ -30,29 +37,17 @@ import { HuggingFaceFiles } from './HuggingFaceFiles';
 import { ScanResults } from './ScanResults';
 import { SelectedBundleBar } from './SelectedBundleBar';
 import { classifySource } from './sourceClassifier';
-import { DEFAULT_STARTER_MODEL_FILTERS, StarterFilterMenu, type StarterModelFilters } from './StarterFilterMenu';
+import { StarterFilterMenu } from './StarterFilterMenu';
 import { StarterList } from './StarterList';
 import { getStarterBundleInstallSources, getStarterModelInstallSources } from './starterModelInstallSources';
 import { useInstallActions } from './useInstallActions';
 
-interface IndexedStarterModel {
-  index: number;
-  model: StarterModel;
-}
-
-const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, field: ModelSortField): number => {
-  switch (field) {
-    case 'default':
-      return a.index - b.index;
-    case 'name':
-      return a.model.name.localeCompare(b.model.name, undefined, { sensitivity: 'base' });
-    case 'base':
-      return getModelBaseLabel(a.model.base).localeCompare(getModelBaseLabel(b.model.base));
-    case 'format':
-      return String(a.model.format ?? '').localeCompare(String(b.model.format ?? ''));
-    case 'size':
-      return 0;
-  }
+/** Keyed by the classifier's label so icon and label can never disagree. */
+const SOURCE_KIND_ICONS: Record<string, ElementType> = {
+  'models.sourceKind.filePath': FileIcon,
+  'models.sourceKind.folderPath': FolderIcon,
+  'models.sourceKind.hfRepo': HuggingFaceIcon,
+  'models.sourceKind.url': LinkIcon,
 };
 
 /**
@@ -64,54 +59,49 @@ const compareStarterModels = (a: IndexedStarterModel, b: IndexedStarterModel, fi
 export const AddModelsView = () => {
   const { t } = useTranslation();
   const notify = useNotify();
-  const { install, pendingSources } = useInstallActions();
+  const { install, installMany, pendingSources } = useInstallActions();
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
-  const { hfLookup, scan } = useModelsUiSelector(
-    (snapshot) => ({ hfLookup: snapshot.hfLookup, scan: snapshot.scan }),
-    (left, right) => left.hfLookup === right.hfLookup && left.scan === right.scan
+  const { hfLookup, scan, selectedBundleName } = useModelsUiSelector(
+    (snapshot) => ({
+      hfLookup: snapshot.hfLookup,
+      scan: snapshot.scan,
+      selectedBundleName: snapshot.selectedBundleName,
+    }),
+    (left, right) =>
+      left.hfLookup === right.hfLookup &&
+      left.scan === right.scan &&
+      left.selectedBundleName === right.selectedBundleName
   );
 
   const [query, setQuery] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
-  const [selectedBundleName, setSelectedBundleName] = useState<string | null>(null);
-  const [isPulling, setIsPulling] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
+  const { isBusy: isPulling, run: runPull } = useScopedAction();
+  const { isBusy: isScanning, run: runScan } = useScopedAction();
   const [installingBundle, setInstallingBundle] = useState<string | null>(null);
-  const [configuredExternalProviders, setConfiguredExternalProviders] = useState<ReadonlySet<string>>(() => new Set());
+  const providerConfigs = useExternalProvidersSelector((snapshot) => snapshot.configs);
+  const configuredExternalProviders = useMemo<ReadonlySet<string>>(
+    () =>
+      new Set(
+        (providerConfigs ?? []).filter((config) => config.api_key_configured).map((config) => config.provider_id)
+      ),
+    [providerConfigs]
+  );
   const [starterFilters, setStarterFilters] = useState<StarterModelFilters>(DEFAULT_STARTER_MODEL_FILTERS);
 
   useMountEffect(() => {
     ensureStartersLoaded();
-  });
 
-  useMountEffect(() => {
     const owner = captureAccountScope();
     let isMounted = true;
 
-    getExternalProviderConfigs(owner.signal)
-      .then((configs) => {
-        if (!isMounted || !isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        setConfiguredExternalProviders(
-          new Set(configs.filter((config) => config.api_key_configured).map((config) => config.provider_id))
-        );
-      })
-      .catch((error) => {
-        if (!isMounted || !isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        setConfiguredExternalProviders(new Set());
-        notify.error(
-          t('models.externalProviderKeysUnavailable'),
-          error instanceof Error ? error.message : String(error)
-        );
-      });
+    ensureExternalProvidersLoaded().catch((error: unknown) => {
+      if (isMounted && isAccountScopeCurrent(owner)) {
+        notify.error(t('models.externalProviderKeysUnavailable'), getApiErrorMessage(error, t('common.unknownError')));
+      }
+    });
 
     return () => {
       isMounted = false;
@@ -124,15 +114,7 @@ export const AddModelsView = () => {
   // browse-only chrome (bundles, filter menu, starter catalog).
   const hasResults = hfLookup !== null || scan !== null;
   const kind = useMemo(() => classifySource(trimmed), [trimmed]);
-  const searchIcon = kind.looksRepo
-    ? SiHuggingface
-    : kind.looksUrl
-      ? LinkIcon
-      : kind.localKind === 'file'
-        ? FileIcon
-        : kind.localKind === 'folder'
-          ? FolderIcon
-          : SearchIcon;
+  const searchIcon = (kind.labelKey ? SOURCE_KIND_ICONS[kind.labelKey] : undefined) ?? SearchIcon;
   const token = accessToken.trim() === '' ? undefined : accessToken.trim();
   // The primary action depends on the detected input: folders are scanned for
   // models; files, URLs, and HF repos are pulled. Access tokens only apply to URLs.
@@ -155,47 +137,15 @@ export const AddModelsView = () => {
   const availableStarterBases = useMemo(() => collectBases(sourceModels), [sourceModels]);
   const availableStarterTypes = useMemo(() => collectTypes(sourceModels), [sourceModels]);
 
-  const filteredModels = useMemo(() => {
-    const terms = deferredTrimmed.toLowerCase().split(/\s+/).filter(Boolean);
-    const directionFactor = starterFilters.sortDirection === 'desc' ? -1 : 1;
-
-    return sourceModels
-      .map((model, index) => ({ index, model }))
-      .filter(({ model }) => {
-        const haystack =
-          `${model.name} ${model.description} ${model.base} ${model.type} ${model.format ?? ''} ${model.variant ?? ''}`.toLowerCase();
-
-        return (
-          (starterFilters.typeFilter === null || model.type === starterFilters.typeFilter) &&
-          (starterFilters.baseFilter === null || model.base === starterFilters.baseFilter) &&
-          terms.every((term) => haystack.includes(term))
-        );
-      })
-      .sort((a, b) => compareStarterModels(a, b, starterFilters.sortField) * directionFactor)
-      .map(({ model }) => model);
-  }, [deferredTrimmed, sourceModels, starterFilters]);
-
-  const queueSources = async (entries: StarterInstallSource[], owner: AccountScope): Promise<number> => {
-    let queued = 0;
-
-    for (const { config, source } of entries) {
-      if (!isAccountScopeCurrent(owner)) {
-        break;
-      }
-
-      if (await install({ config, source }, { silent: true })) {
-        queued += 1;
-      }
-    }
-
-    return queued;
-  };
+  const filteredModels = useMemo(
+    () => filterStarterModels(sourceModels, starterFilters, deferredTrimmed),
+    [deferredTrimmed, sourceModels, starterFilters]
+  );
 
   const installStarter = async (model: StarterModel) => {
     const owner = captureAccountScope();
-    const queued = await queueSources(
-      getStarterModelInstallSources(model, { dependencySourcesToSkip: selectedBundleSources }),
-      owner
+    const queued = await installMany(
+      getStarterModelInstallSources(model, { dependencySourcesToSkip: selectedBundleSources })
     );
 
     if (queued > 0 && isAccountScopeCurrent(owner)) {
@@ -217,7 +167,7 @@ export const AddModelsView = () => {
     setInstallingBundle(bundle.name);
 
     try {
-      const queued = await queueSources(getStarterBundleInstallSources(bundle), owner);
+      const queued = await installMany(getStarterBundleInstallSources(bundle));
 
       if (queued > 0 && isAccountScopeCurrent(owner)) {
         notify.success(
@@ -232,95 +182,85 @@ export const AddModelsView = () => {
     }
   };
 
+  // Install-all from a results panel: silent per-model queueing with one
+  // summary toast, the same shape the bundle path uses — never a toast per
+  // file for a 40-file repo.
+  const installAllSources = async (requests: InstallModelRequest[]) => {
+    const owner = captureAccountScope();
+    const queued = await installMany(requests);
+
+    if (queued > 0 && isAccountScopeCurrent(owner)) {
+      notify.success(t('models.installAllQueued'), t('models.installAllQueuedDescription', { count: queued }));
+    }
+  };
+
   const handlePull = async () => {
     if (!kind.isInstallable) {
       return;
     }
 
-    const owner = captureAccountScope();
+    await runPull(
+      async (owner) => {
+        if (kind.looksRepo) {
+          const lookup = await getHuggingFaceModels(trimmed, owner.signal);
 
-    setIsPulling(true);
+          assertAccountScopeCurrent(owner);
+          if (lookup.is_diffusers) {
+            updateModelsUi({ hfLookup: null });
 
-    try {
-      if (kind.looksRepo) {
-        const lookup = await getHuggingFaceModels(trimmed, owner.signal);
+            if ((await install({ accessToken: token, source: trimmed })) && isAccountScopeCurrent(owner)) {
+              setQuery('');
+            }
 
-        assertAccountScopeCurrent(owner);
-        if (lookup.is_diffusers) {
-          updateModelsUi({ hfLookup: null });
-
-          if ((await install({ accessToken: token, source: trimmed })) && isAccountScopeCurrent(owner)) {
-            setQuery('');
+            return;
           }
 
-          return;
-        }
+          if (!lookup.urls || lookup.urls.length === 0) {
+            notify.error(t('models.noModelFilesFoundTitle'), t('models.noInstallableModelFiles'));
 
-        if (!lookup.urls || lookup.urls.length === 0) {
-          notify.error(t('models.noModelFilesFoundTitle'), t('models.noInstallableModelFiles'));
-
-          return;
-        }
-
-        // A single-file repo has nothing to choose from — install it directly,
-        // mirroring the diffusers path, instead of showing a one-row list.
-        const [onlyUrl] = lookup.urls;
-
-        if (lookup.urls.length === 1 && onlyUrl) {
-          updateModelsUi({ hfLookup: null });
-
-          if ((await install({ accessToken: token, source: onlyUrl })) && isAccountScopeCurrent(owner)) {
-            setQuery('');
+            return;
           }
 
+          // A single-file repo has nothing to choose from — install it directly,
+          // mirroring the diffusers path, instead of showing a one-row list.
+          const [onlyUrl] = lookup.urls;
+
+          if (lookup.urls.length === 1 && onlyUrl) {
+            updateModelsUi({ hfLookup: null });
+
+            if ((await install({ accessToken: token, source: onlyUrl })) && isAccountScopeCurrent(owner)) {
+              setQuery('');
+            }
+
+            return;
+          }
+
+          updateModelsUi({ hfLookup: { repo: trimmed, urls: lookup.urls } });
+
           return;
         }
 
-        updateModelsUi({ hfLookup: { repo: trimmed, urls: lookup.urls } });
-
-        return;
-      }
-
-      if (
-        (await install({ accessToken: token, inplace: kind.looksLocal ? inplace : undefined, source: trimmed })) &&
-        isAccountScopeCurrent(owner)
-      ) {
-        setQuery('');
-      }
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.installFailed'), error instanceof Error ? error.message : String(error));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsPulling(false);
-      }
-    }
+        if (
+          (await install({ accessToken: token, inplace: kind.looksLocal ? inplace : undefined, source: trimmed })) &&
+          isAccountScopeCurrent(owner)
+        ) {
+          setQuery('');
+        }
+      },
+      (message) => notify.error(t('models.installFailed'), message)
+    );
   };
 
   const handleScan = async () => {
-    const owner = captureAccountScope();
+    await runScan(
+      async (owner) => {
+        const results = await scanFolderForModels(trimmed, owner.signal);
 
-    setIsScanning(true);
-
-    try {
-      const results = await scanFolderForModels(trimmed, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      updateModelsUi({ scan: { path: trimmed, results } });
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('models.scanFailed'), error instanceof Error ? error.message : String(error));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsScanning(false);
-      }
-    }
+        assertAccountScopeCurrent(owner);
+        updateModelsUi({ scan: { path: trimmed, results } });
+      },
+      (message) => notify.error(t('models.scanFailed'), message)
+    );
   };
 
   return (
@@ -391,7 +331,7 @@ export const AddModelsView = () => {
                 <Text as="span" color="fg.muted" fontWeight="600">
                   {t('models.pull')}
                 </Text>{' '}
-                {t('models.toInstallFrom', { source: kind.label })}
+                {t('models.toInstallFrom', { source: t(kind.labelKey) })}
               </Text>
             )}
             {kind.localKind === 'file' ? (
@@ -425,7 +365,7 @@ export const AddModelsView = () => {
                   />
                 ) : undefined
               }
-              onSelect={setSelectedBundleName}
+              onSelect={(name) => updateModelsUi({ selectedBundleName: name })}
             />
 
             {selectedBundle ? (
@@ -448,6 +388,9 @@ export const AddModelsView = () => {
                 pendingSources={pendingSources}
                 onClear={() => updateModelsUi({ hfLookup: null })}
                 onInstall={(url) => void install({ accessToken: token, source: url })}
+                onInstallAll={(urls) =>
+                  void installAllSources(urls.map((url) => ({ accessToken: token, source: url })))
+                }
               />
             ) : null}
 
@@ -458,6 +401,7 @@ export const AddModelsView = () => {
                 scan={scan}
                 onClear={() => updateModelsUi({ scan: null })}
                 onInstall={(path) => void install({ inplace, source: path })}
+                onInstallAll={(paths) => void installAllSources(paths.map((path) => ({ inplace, source: path })))}
                 onSetInplace={setInplace}
               />
             ) : null}
@@ -482,4 +426,3 @@ export const AddModelsView = () => {
     </Flex>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

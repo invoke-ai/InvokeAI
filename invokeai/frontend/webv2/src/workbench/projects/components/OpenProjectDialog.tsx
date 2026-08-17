@@ -1,3 +1,5 @@
+import type { ProjectRecordDTO } from '@workbench/projects/api';
+
 import { Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -8,9 +10,10 @@ import {
 } from '@platform/state/accountLifecycle';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, Row, Scrollable } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { refreshProjectLibrary, useProjectLibrarySelector, type ProjectSummary } from '@workbench/projects/library';
-import { importProjectFile, pickProjectFile } from '@workbench/projects/projectFile';
+import { useImportProjectFile } from '@workbench/projects/useProjectFileActions';
 import { useNotify } from '@workbench/useNotify';
 import {
   useWorkbenchCommands,
@@ -89,18 +92,8 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
     [notify, onClose, persistence, projects, t]
   );
 
-  const handleImport = useCallback(async () => {
-    const owner = captureAccountScope();
-    const file = await pickProjectFile(owner);
-
-    if (!file || !isAccountScopeCurrent(owner)) {
-      return;
-    }
-
-    try {
-      const record = await importProjectFile(file, owner);
-
-      assertAccountScopeCurrent(owner);
+  const openImportedProject = useCallback(
+    (record: ProjectRecordDTO) => {
       const project = persistence.adoptProjectRecord(record);
 
       if (project) {
@@ -108,14 +101,10 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         projects.open(project);
         onClose();
       }
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error(t('projects.importFailed'), error instanceof Error ? error.message : undefined);
-    }
-  }, [notify, onClose, persistence, projects, t]);
+    },
+    [onClose, persistence, projects]
+  );
+  const handleImport = useImportProjectFile(openImportedProject);
 
   const handleOpenChange = useCallback(
     (event: { open: boolean }) => {
@@ -136,9 +125,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
         <Dialog.Positioner>
           <Dialog.Content>
             <Dialog.Header>
-              <Dialog.Title fontSize="sm" fontWeight="700">
-                {t('projects.openProject')}
-              </Dialog.Title>
+              <Dialog.Title>{t('projects.openProject')}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Scrollable maxH="72">
@@ -197,9 +184,7 @@ const OpenProjectRow = ({
     <Row asChild gap="2.5" px="2.5" py="2" rounded="md" _disabled={disabledRowStyles}>
       <button disabled={isDisabled} type="button" onClick={open}>
         <Stack flex="1" gap="0" minW="0">
-          <Text fontSize="xs" fontWeight="600" truncate>
-            {summary.name}
-          </Text>
+          <MiddleTruncate fontSize="xs" fontWeight="600" text={summary.name} />
           <Text color="fg.muted" fontSize="2xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>

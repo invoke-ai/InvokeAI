@@ -1,34 +1,26 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
+import type { ModelConfig } from '@features/models/core/types';
 
 import { Badge, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
+import { hasLinkableBase, isLinkablePair, LINKABLE_TYPES } from '@features/models/core/relationships';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
-import { addModelRelationship, getRelatedModelKeys, removeModelRelationship } from '@features/models/data/api';
 import { useModelsSelector } from '@features/models/data/modelsStore';
+import {
+  linkModels,
+  refreshRelatedModelKeys,
+  unlinkModels,
+  useRelatedModelKeys,
+} from '@features/models/data/relationshipsStore';
 import { ModelSelect } from '@features/models/ui/components';
 import { SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import {
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
+import { isAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { IconButton, FieldLabel, Tooltip } from '@platform/ui';
 import { Link2OffIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-/** Types offered when linking related models, grouped in one picker. */
-const LINKABLE_TYPES: ModelTaxonomyType[] = [
-  'main',
-  'lora',
-  'embedding',
-  'vae',
-  'controlnet',
-  't2i_adapter',
-  'ip_adapter',
-];
 
 /**
  * Bidirectional "related models" links — e.g. attach the LoRAs and VAE that
@@ -37,7 +29,7 @@ const LINKABLE_TYPES: ModelTaxonomyType[] = [
  * once; linked models render as rows with an unlink action.
  */
 interface RelatedModelsSectionProps {
-  model: Pick<ModelConfig, 'base' | 'key'>;
+  model: Pick<ModelConfig, 'base' | 'key' | 'type'>;
   onError: (message: string) => void;
 }
 
@@ -47,37 +39,29 @@ export const RelatedModelsSection = (props: RelatedModelsSectionProps) => (
 
 const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) => {
   const { t } = useTranslation();
-  const models = useModelsSelector((snapshot) => snapshot.models);
-  const [relatedKeys, setRelatedKeys] = useState<string[] | null>(null);
+  const modelsByKey = useModelsSelector((snapshot) => snapshot.modelsByKey);
+  const relatedKeys = useRelatedModelKeys(model.key);
   const [isMutating, setIsMutating] = useState(false);
 
   useMountEffect(() => {
     const owner = captureAccountScope();
     let isMounted = true;
 
-    getRelatedModelKeys(model.key, owner.signal)
-      .then((keys) => {
-        if (isMounted && isAccountScopeCurrent(owner)) {
-          setRelatedKeys(keys);
-        }
-      })
-      .catch((error: unknown) => {
-        if (isMounted && isAccountScopeCurrent(owner)) {
-          setRelatedKeys([]);
-          onError(error instanceof Error ? error.message : t('models.failedToLoadRelatedModels'));
-        }
-      });
+    refreshRelatedModelKeys(model.key).catch((error: unknown) => {
+      if (isMounted && isAccountScopeCurrent(owner)) {
+        onError(getApiErrorMessage(error, t('models.failedToLoadRelatedModels')));
+      }
+    });
 
     return () => {
       isMounted = false;
     };
   });
 
-  const relatedModels = useMemo(() => {
-    const byKey = new Map(models.map((candidate) => [candidate.key, candidate]));
-
-    return (relatedKeys ?? []).map((key) => ({ key, model: byKey.get(key) ?? null }));
-  }, [models, relatedKeys]);
+  const relatedModels = useMemo(
+    () => (relatedKeys ?? []).map((key) => ({ key, model: modelsByKey.get(key) ?? null })),
+    [modelsByKey, relatedKeys]
+  );
 
   const excludeKeys = useMemo(() => new Set([model.key, ...(relatedKeys ?? [])]), [model.key, relatedKeys]);
 
@@ -91,16 +75,13 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     setIsMutating(true);
 
     try {
-      await addModelRelationship(model.key, target.key, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      setRelatedKeys((current) => [...(current ?? []), target.key]);
+      await linkModels(model.key, target.key);
     } catch (error) {
       if (!isAccountScopeCurrent(owner)) {
         return;
       }
 
-      onError(error instanceof Error ? error.message : t('models.failedToLinkModels'));
+      onError(getApiErrorMessage(error, t('models.failedToLinkModels')));
     } finally {
       if (isAccountScopeCurrent(owner)) {
         setIsMutating(false);
@@ -114,16 +95,13 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     setIsMutating(true);
 
     try {
-      await removeModelRelationship(model.key, key, owner.signal);
-
-      assertAccountScopeCurrent(owner);
-      setRelatedKeys((current) => (current ?? []).filter((existing) => existing !== key));
+      await unlinkModels(model.key, key);
     } catch (error) {
       if (!isAccountScopeCurrent(owner)) {
         return;
       }
 
-      onError(error instanceof Error ? error.message : t('models.failedToUnlink'));
+      onError(getApiErrorMessage(error, t('models.failedToUnlink')));
     } finally {
       if (isAccountScopeCurrent(owner)) {
         setIsMutating(false);
@@ -131,26 +109,35 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     }
   };
 
+  // A subject whose base can never match a candidate (external/unknown, or an
+  // any-based type with no allowance) keeps its persisted links manageable but
+  // gets no add-picker — it would be a permanently empty combobox.
+  const canAddLinks = hasLinkableBase(model);
+
   return (
     <Stack gap="2">
       <Stack gap="0.5">
         <FieldLabel>{t('models.relatedModels')}</FieldLabel>
-        <Text color="fg.subtle" fontSize="2xs">
-          {t('models.relatedModelsHelp')}
-        </Text>
+        {canAddLinks ? (
+          <Text color="fg.subtle" fontSize="2xs">
+            {t('models.relatedModelsHelp')}
+          </Text>
+        ) : null}
       </Stack>
-      <ModelSelect
-        excludeKeys={excludeKeys}
-        filter={(candidate) => candidate.base === model.base || candidate.base === 'any' || model.base === 'any'}
-        modelTypes={LINKABLE_TYPES}
-        placeholder={t('models.searchCompatibleToLink')}
-        showManagerButton={false}
-        size="sm"
-        value={null}
-        onChange={(target) => {
-          void handleAdd(target);
-        }}
-      />
+      {canAddLinks ? (
+        <ModelSelect
+          excludeKeys={excludeKeys}
+          filter={(candidate) => isLinkablePair(model, candidate)}
+          modelTypes={LINKABLE_TYPES}
+          placeholder={t('models.searchCompatibleToLink')}
+          showManagerButton={false}
+          size="sm"
+          value={null}
+          onChange={(target) => {
+            void handleAdd(target);
+          }}
+        />
+      ) : null}
       {relatedKeys === null ? (
         <Spinner color="fg.subtle" size="xs" />
       ) : relatedModels.length === 0 ? (
@@ -174,7 +161,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
                     >
                       {getModelBaseLabel(relatedModel.base)}
                     </Badge>
-                    <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="outline">
+                    <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
                       {getModelTypeLabel(relatedModel.type)}
                     </Badge>
                   </>
@@ -203,4 +190,3 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
     </Stack>
   );
 };
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */

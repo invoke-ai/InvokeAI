@@ -181,6 +181,7 @@ vi.mock('@workbench/image-actions', () => ({
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
   getCurrentGenerateValues: () => ({}),
+  getImageRecallVerb: () => ({ icon: () => null, label: '' }),
   getGalleryCanvasImportMenuItems: () => [],
   getImageContextMenuImages: () => [],
   getImageContextMenuRecallRequestKey: () => null,
@@ -382,6 +383,57 @@ describe('preview keyboard navigation boundary', () => {
     }
   });
 
+  it('keeps a just-completed batch navigable before the backend refetch lands', async () => {
+    // The batch finished and its queue item is already gone; the backend list
+    // (staleTime + coalesced invalidation) still only has the older image.
+    // recentImages is the bridge: every batch image must stay in the sequence,
+    // or ArrowRight from the newest skips the whole batch onto old images.
+    mocks.project.queue.items = [];
+    mocks.project.widgetInstances.gallery.state.values.recentImages = [
+      {
+        height: 64,
+        imageName: 'batch-2',
+        imageUrl: '/images/batch-2/full',
+        queuedAt: '2026-07-22T00:00:02.000Z',
+        sourceQueueItemId: 'queue-item-done',
+        thumbnailUrl: '/images/batch-2/thumbnail',
+        width: 64,
+      },
+      {
+        height: 64,
+        imageName: 'batch-1',
+        imageUrl: '/images/batch-1/full',
+        queuedAt: '2026-07-22T00:00:01.000Z',
+        sourceQueueItemId: 'queue-item-done',
+        thumbnailUrl: '/images/batch-1/thumbnail',
+        width: 64,
+      },
+    ];
+    mocks.project.widgetInstances.gallery.state.values.selectedImage = {
+      boardId: 'none',
+      height: 64,
+      imageName: 'batch-2',
+      imageUrl: '/images/batch-2/full',
+      queuedAt: '2026-07-22T00:00:02.000Z',
+      sourceQueueItemId: 'queue-item-done',
+      thumbnailUrl: '/images/batch-2/thumbnail',
+      width: 64,
+    };
+    mocks.project.widgetInstances.gallery.state.values.selectedImageName = 'batch-2';
+    mocks.galleryItemPages = [{ items: [createImageItem('pre-batch', '2026-07-20T00:00:00.000Z')], total: 1 }];
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'batch-1' }),
+      undefined,
+      expect.any(Number),
+      true
+    );
+  });
+
   it('fetches the next infinite page before stepping past the loaded backend boundary', async () => {
     const newest: GalleryImage = {
       ...mocks.recentImages[0],
@@ -578,6 +630,29 @@ describe('preview keyboard navigation boundary', () => {
       expect.any(Number),
       true
     );
+  });
+
+  it('renders the live frame with the standard media chrome: footer up, no badge, item border', async () => {
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: 'queue-item-live' });
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'queue-item-live' },
+      width: 64,
+    });
+
+    await render();
+
+    // The footer island is up during the live render, fed by queue data: the
+    // slot's requested output size, and working prev/next.
+    expect(host?.textContent).toContain('64 × 64');
+    expect(host?.querySelector('button[aria-label="Next item in board"]')).not.toBeNull();
+    // No progress badge over the frame — the image is styled exactly like a
+    // finished item, so completion changes pixels, not chrome.
+    expect(host?.textContent).not.toContain('Generating');
+    expect(host?.querySelector<HTMLImageElement>('img[src^="data:image/png"]')).not.toBeNull();
   });
 
   it('uses the active placeholder board while following live, even before an image frame arrives', async () => {

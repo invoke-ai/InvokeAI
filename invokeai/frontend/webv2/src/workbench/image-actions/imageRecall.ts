@@ -394,6 +394,7 @@ const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undef
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
   getMetadataMainModel(metadata, 'qwen3_source', models) !== undefined ||
   getMetadataMainModel(metadata, 'qwen_image_component_source', models) !== undefined ||
+  getMetadataComponent(metadata, 'mistral_encoder', models) !== undefined ||
   getMetadataComponent(metadata, 'qwen3_encoder', models) !== undefined ||
   getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models) !== undefined;
 
@@ -545,16 +546,19 @@ export const buildImageRecallSettings = ({
     const qwen3SourceModel = getMetadataMainModel(metadata, 'qwen3_source', models);
     const qwenImageSourceModel = getMetadataMainModel(metadata, 'qwen_image_component_source', models);
     const componentSourceModel = qwen3SourceModel !== undefined ? qwen3SourceModel : qwenImageSourceModel;
+    const mistralEncoderModel = getMetadataComponent(metadata, 'mistral_encoder', models);
     const qwen3EncoderModel = getMetadataComponent(metadata, 'qwen3_encoder', models);
     const qwenVLEncoderModel = getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models);
     const componentPatch = {
       componentSourceModel: componentSourceModel !== undefined ? componentSourceModel : values.componentSourceModel,
+      mistralEncoderModel: mistralEncoderModel !== undefined ? mistralEncoderModel : values.mistralEncoderModel,
       qwen3EncoderModel: qwen3EncoderModel !== undefined ? qwen3EncoderModel : values.qwen3EncoderModel,
       qwenVLEncoderModel: qwenVLEncoderModel !== undefined ? qwenVLEncoderModel : values.qwenVLEncoderModel,
     };
 
     if (
       componentPatch.componentSourceModel !== values.componentSourceModel ||
+      componentPatch.mistralEncoderModel !== values.mistralEncoderModel ||
       componentPatch.qwen3EncoderModel !== values.qwen3EncoderModel ||
       componentPatch.qwenVLEncoderModel !== values.qwenVLEncoderModel
     ) {

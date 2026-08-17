@@ -63,7 +63,12 @@ class SqliteDatabase:
         if not self._db_path:
             return
         try:
-            with self._conn as conn:
+            # Serialize with transaction() users: services with their own
+            # threads (e.g. the image index worker) may have a statement in
+            # progress on this shared connection, and VACUUM refuses to run
+            # concurrently with one ("cannot VACUUM - SQL statements in
+            # progress").
+            with self._lock, self._conn as conn:
                 initial_db_size = Path(self._db_path).stat().st_size
                 conn.execute("VACUUM;")
                 conn.commit()

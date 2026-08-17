@@ -32,6 +32,16 @@ export interface GalleryBoard {
   /** ISO creation timestamp; absent for uncategorized and date virtual boards. */
   createdAt?: string | null;
   ownerName?: string | null;
+  /**
+   * The project that owns this board, or `null` for an ordinary one.
+   *
+   * A project's board is part of that project: it takes its name from it, is
+   * deleted with it, and the generic board routes refuse to rename, archive or
+   * delete it. The UI hides those actions for *any* project-owned board, not just
+   * the open project's — the server is authoritative either way, so a stale
+   * client is refused rather than obeyed.
+   */
+  projectId: string | null;
 }
 
 export interface GalleryImage extends GeneratedImageContract {

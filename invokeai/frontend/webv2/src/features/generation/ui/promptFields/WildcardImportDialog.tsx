@@ -6,6 +6,7 @@ import type {
 
 import { HStack, SegmentGroup, Stack, Text } from '@chakra-ui/react';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -127,9 +128,11 @@ export const WildcardImportDialog = ({
             <Stack gap="1" pr="1">
               {rejected.map((entry, index) => (
                 <HStack justify="space-between" key={`${entry.name}-${index}`}>
-                  <Text fontFamily="mono" fontSize="2xs" truncate>
-                    {entry.name || t('widgets.generate.dynamicPrompts.importUnnamed')}
-                  </Text>
+                  <MiddleTruncate
+                    fontFamily="mono"
+                    fontSize="2xs"
+                    text={entry.name || t('widgets.generate.dynamicPrompts.importUnnamed')}
+                  />
                   <Text color="fg.subtle" fontSize="2xs" flexShrink="0">
                     {t(REJECTION_KEY[entry.rejection])}
                   </Text>
@@ -202,9 +205,7 @@ const ConflictRow = ({
   return (
     <HStack gap="2" justify="space-between">
       <Stack gap="0" minW="0">
-        <Text fontFamily="mono" fontSize="2xs" truncate>
-          __{name}__
-        </Text>
+        <MiddleTruncate fontFamily="mono" fontSize="2xs" text={`__${name}__`} />
         <Text color="fg.subtle" fontSize="2xs">
           {t('widgets.generate.dynamicPrompts.importValueCount', { count: valueCount })}
         </Text>
