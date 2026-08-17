@@ -39,6 +39,9 @@ dependencies = [
   "diffusers[torch]==0.39.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
+  "mistral-common>=1.5.4,<2",             # canonical Tekken tokenizer for FLUX.2 [dev] Mistral encoder; the
+                                          # loader depends on private surface (Tekkenizer internals) that
+                                          # moves across majors, so cap below 2.x (validated against 1.11.6)
   "numpy<2.0.0",
   "onnx==1.16.1",
   "onnxruntime==1.19.2",
@@ -51,6 +54,12 @@ dependencies = [
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
   # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
   # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
+  # Deliberately NOT capped below 2.12 here. torch 2.12.x+rocm7.1 is reported to break generation (#9410), but
+  # this range is what every backend-agnostic install resolves against — manual installs use
+  # `--torch-backend=<x>` with no extra (see docs/start-here/manual), so a blanket cap would also
+  # reject torch>=2.12 on Windows/Linux CUDA, CPU and ARM64, where 2.12 has no known problem.
+  # The ROCm path is constrained where it can actually be targeted: the `rocm` extra below pins an
+  # exact version, and the manual docs carry the ROCm-specific caveat.
   "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
@@ -64,6 +73,7 @@ dependencies = [
   # the last known-good version.
   "fastapi== 0.118.3",
   "huggingface-hub",
+  "networkx",
   "pydantic-settings",
   "pydantic",
   "python-socketio",
@@ -129,6 +139,27 @@ dependencies = [
   "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
   "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
+# Intel XPU (Arc / Battlemage) wheels are published only for linux-x86_64 and
+# windows-amd64 on PyTorch's WHL index. Gate the +xpu pins to those platforms; the
+# Intel oneAPI runtime libs (intel-sycl-rt, etc.) come in automatically as deps of
+# torch+xpu.
+# Pinned ahead of the cpu/cuda extras (2.7.1), as the rocm extra already is. Intel's XPU
+# backend matured considerably after 2.7.1: torch.xpu.mem_get_info() works on driver/kernel
+# combinations where it previously raised, and the bundled oneAPI runtime ships with the wheel
+# (intel-sycl-rt), so upgrading torch upgrades the user-space runtime too.
+"xpu" = [
+  "torch==2.13.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  "torchvision==0.28.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # XPU triton (for torch.compile); the WHL index ships linux-x86_64 and win_amd64 wheels.
+  # Renamed from pytorch-triton-xpu to triton-xpu upstream.
+  "triton-xpu==3.7.2; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # macOS / linux_aarch64 have no +xpu wheels: fall back to base torch so the extra's
+  # conflict-universe always contains a torch. See note under "cpu". These stay on 2.7.1 to
+  # match the other extras and the project's `torch<2.8.0` constraint on darwin -- only the
+  # +xpu wheels above move.
+  "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+  "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+]
 
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
@@ -154,7 +185,7 @@ dependencies = [
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
 override-dependencies = ["opencv-python; sys_platform=='never'"]
-conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }, { extra = "xpu" }]]
 index-strategy = "unsafe-best-match"
 # Restrict resolution to the platforms we support: x86_64/aarch64 Linux, Windows,
 # and macOS. (ROCm and the PyTorch WHL-index pins are x86_64-only; on aarch64
@@ -170,16 +201,21 @@ torch = [
   { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 torchvision = [
   { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 triton-rocm = [
   { index = "torch-rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
+]
+triton-xpu = [
+  { index = "torch-xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
 ]
 
 [[tool.uv.index]]
@@ -199,6 +235,11 @@ explicit = true
 [[tool.uv.index]]
 name = "torch-rocm"
 url = "https://download.pytorch.org/whl/rocm7.1"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-xpu"
+url = "https://download.pytorch.org/whl/xpu"
 explicit = true
 
 [project.scripts]
@@ -239,6 +280,7 @@ version = { attr = "invokeai.version.__version__" }
 "invokeai.backend.qwen3" = ["tokenizer/*.json", "tokenizer/*.json.gz"]
 "invokeai.backend.t5" = ["tokenizer/*.json"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
+"invokeai.backend.hidiffusion" = ["sd_module_key/*.txt"]
 "invokeai.app.services.style_preset_records" = ["*.json"]
 "invokeai.app.services.style_preset_images.default_style_preset_images" = [
   "*.png",

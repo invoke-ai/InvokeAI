@@ -12,6 +12,10 @@ from invokeai.backend.model_manager.configs.base import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
+from invokeai.backend.model_manager.configs.flux2_variant import (
+    flux2_variant_from_context_dim,
+    flux2_variant_from_hidden_size,
+)
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     common_config_paths,
@@ -22,6 +26,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
     state_dict_has_any_keys_exact,
 )
+from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -29,6 +34,7 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxVariantType,
     Krea2VariantType,
     ModelFormat,
+    ModelRepoVariant,
     ModelType,
     ModelVariantType,
     QwenImageVariantType,
@@ -38,6 +44,8 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
@@ -114,7 +122,10 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(steps=48, cfg_scale=7.0, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
-                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                if variant == Flux2VariantType.Dev:
+                    # FLUX.2 [dev] is guidance-distilled (recommended guidance=3.5, 28 steps, CFG disabled)
+                    return cls(steps=28, cfg_scale=1.0, guidance=3.5, width=1024, height=1024)
+                elif variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
                     # Undistilled base models need more steps
                     return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
                 else:
@@ -163,6 +174,25 @@ def _has_bnb_nf4_keys(state_dict: dict[str | int, Any]) -> bool:
 
 def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
+
+
+def _has_sdnq_tensors(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains SDNQTensor instances."""
+    return any(isinstance(v, SDNQTensor) for v in state_dict.values())
+
+
+def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict has SDNQ-style keys (weight + scale pairs).
+
+    SDNQ quantized models store weights with associated scale tensors.
+    """
+    keys = {k for k in state_dict.keys() if isinstance(k, str)}
+    for key in keys:
+        if key.endswith(".weight"):
+            base = key[:-7]
+            if f"{base}.scale" in keys:
+                return True
+    return False
 
 
 def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -451,6 +481,20 @@ def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+def _has_flux2_diffusers_transformer_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check for the bare diffusers-style FLUX.2 transformer layout.
+
+    A FLUX.2 single-file SDNQ checkpoint can ship its keys in the bare diffusers layout
+    (``transformer_blocks.*``, ``context_embedder.*``) rather than the BFL / ComfyUI layout that
+    ``_has_main_keys`` recognizes. The FLUX.2 single-file loader looks for exactly these keys, so we
+    must treat their presence as "looks like a main model" for identification purposes.
+    """
+    for key in state_dict.keys():
+        if isinstance(key, str) and (key.startswith("transformer_blocks.") or key.startswith("context_embedder.")):
+            return True
+    return False
+
+
 def _filename_suggests_base(name: str) -> bool:
     """Check if a model name/filename suggests it is a Base (undistilled) variant.
 
@@ -464,9 +508,10 @@ def _filename_suggests_base(name: str) -> bool:
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
-    Distinguishes between Klein 4B and Klein 9B based on context embedding dimension:
+    Distinguishes between variants based on context embedding dimension:
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
     - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
+    - Dev:      context_in_dim = 15360 (3 × Mistral Small 3.1 hidden_size 5120)
 
     Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
     and cannot be distinguished from the state dict alone. This function defaults to Klein9B
@@ -476,10 +521,6 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     - BFL format: txt_in.weight (context embedder)
     - Diffusers format: context_embedder.weight
     """
-    # Context dimensions for each variant
-    KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-    KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-
     # Check context_embedder to determine variant
     # Support both BFL format (txt_in.weight) and diffusers format (context_embedder.weight)
     context_keys = {
@@ -502,14 +543,12 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                 continue
             if len(shape) >= 2:
                 context_in_dim = shape[1]
-                # Determine variant based on context dimension
-                if context_in_dim == KLEIN_9B_CONTEXT_DIM:
-                    # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
-                    return Flux2VariantType.Klein9B
-                elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
-                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
-                    return Flux2VariantType.Klein4B
-                elif context_in_dim > 4096:
+                # Determine variant based on context dimension. Callers use filename
+                # heuristics to upgrade Klein4B/Klein9B to their Base variants.
+                variant = flux2_variant_from_context_dim(context_in_dim)
+                if variant is not None:
+                    return variant
+                if context_in_dim > 4096:
                     # Unknown FLUX.2 variant, default to 4B
                     return Flux2VariantType.Klein4B
 
@@ -910,6 +949,10 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
             },
         )
 
+        # Reject SDNQ-quantized pipelines so Main_SDNQ_Diffusers_FLUX_Config matches instead.
+        if (mod.path / "transformer").is_dir() and _is_sdnq_folder(mod.path / "transformer"):
+            raise NotAMatchError("transformer is SDNQ-quantized; use Main_SDNQ_Diffusers_FLUX_Config")
+
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
@@ -945,7 +988,7 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
 
 
 class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."""
+    """Model config for FLUX.2 models in diffusers format (FLUX.2 Klein and FLUX.2 [dev])."""
 
     base: Literal[BaseModelType.Flux2] = Field(BaseModelType.Flux2)
     variant: Flux2VariantType = Field()
@@ -956,13 +999,37 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         raise_for_override_fields(cls, override_fields)
 
+        # A FLUX.2 *main* model is a full diffusers pipeline: a `model_index.json` at
+        # the root, or at least the transformer packaged as a `transformer/` subfolder.
+        # A loose transformer-only checkout — just the contents of `transformer/`, with
+        # a root `config.json` whose `_class_name` is `Flux2Transformer2DModel` — is NOT
+        # a usable main model: the loader unconditionally appends `vae/` / `text_encoder/`
+        # subfolders that don't exist and fails with an OSError mid-queue. Reject that
+        # layout here so it falls through to a non-main classification instead of
+        # registering as a broken pipeline. (The standalone `transformer/` still matches
+        # via the pipeline layout below when it ships inside a full folder.)
+        if not (mod.path / "model_index.json").exists() and not (mod.path / "transformer").exists():
+            raise NotAMatchError(
+                "directory is not a full FLUX.2 pipeline (no model_index.json and no transformer/ subfolder); "
+                "a loose transformer-only checkout cannot be used as a FLUX.2 main model"
+            )
+
         # Check for FLUX.2-specific pipeline class names
         raise_for_class_name(
             common_config_paths(mod.path),
             {
                 "Flux2KleinPipeline",
+                "Flux2Pipeline",
+                "Flux2Transformer2DModel",
             },
         )
+
+        # Reject SDNQ-quantized pipelines so the SDNQ-specific config matches them instead.
+        # Without this both configs accept the same folder and identification can latch onto
+        # the wrong one (the plain diffusers loader would then mis-read packed uint8 weights
+        # as bf16 and crash with size-mismatch errors at first inference).
+        if (mod.path / "transformer").is_dir() and _is_sdnq_folder(mod.path / "transformer"):
+            raise NotAMatchError("transformer is SDNQ-quantized; use Main_SDNQ_Diffusers_Flux2_Config")
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
@@ -978,34 +1045,37 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
         """Determine the FLUX.2 variant from the transformer config.
 
-        FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
-        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
-        - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        FLUX.2 variants are distinguished by joint_attention_dim (= 3 × text encoder hidden_size):
+        - Klein 4B/4B Base: 7680 (3 × Qwen3-4B 2560)
+        - Klein 9B/9B Base: 12288 (3 × Qwen3-8B 4096)
+        - Dev:              15360 (3 × Mistral Small 3.1 5120)
 
-        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
+        Klein distilled and Base variants share identical architectures; the Base variant
+        is detected by a filename heuristic.
         """
-        KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
-        KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
-
-        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        # Try transformer/config.json first (full pipeline), fall back to root config.json
+        # (loose transformer-only checkouts).
+        transformer_config_path = mod.path / "transformer" / "config.json"
+        root_config_path = mod.path / "config.json"
+        if transformer_config_path.exists():
+            transformer_config = get_config_dict_or_raise(transformer_config_path)
+        else:
+            transformer_config = get_config_dict_or_raise(root_config_path)
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
 
-        # Determine variant based on joint_attention_dim
-        if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein9BBase
-            return Flux2VariantType.Klein9B
-        elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
-            if _filename_suggests_base(mod.name):
-                return Flux2VariantType.Klein4BBase
+        # Determine variant based on joint_attention_dim (= context_in_dim).
+        variant = flux2_variant_from_context_dim(joint_attention_dim)
+        if variant is None:
+            # Unknown or FLUX.1-sized joint_attention_dim — default to Klein 4B.
             return Flux2VariantType.Klein4B
-        elif joint_attention_dim > 4096:
-            # Unknown FLUX.2 variant, default to 4B
-            return Flux2VariantType.Klein4B
-
-        # Default to 4B
-        return Flux2VariantType.Klein4B
+        # Klein 4B/9B share their architecture with the corresponding Base variant; use the
+        # filename heuristic to distinguish. Dev has no Base variant.
+        if variant is Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant is Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+        return variant
 
 
 class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
@@ -1299,6 +1369,14 @@ class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Conf
                 "ZImagePipeline",
             },
         )
+
+        # Reject SDNQ-quantized pipelines so Main_SDNQ_Diffusers_ZImage_Config matches them instead.
+        # Without this both configs accept the same ZImagePipeline folder and identification can
+        # latch onto the plain diffusers one (which would then mis-read packed uint8 weights as bf16
+        # and crash at inference). It also breaks the self-contained SDNQ path, since a pipeline
+        # mis-identified as plain diffusers would force the user to select separate VAE/Qwen3 sources.
+        if (mod.path / "transformer").is_dir() and _is_sdnq_folder(mod.path / "transformer"):
+            raise NotAMatchError("transformer is SDNQ-quantized; use Main_SDNQ_Diffusers_ZImage_Config")
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
@@ -1738,8 +1816,30 @@ def _is_native_wan_layout(state_dict: dict[str | int, Any]) -> bool:
     return any((p + "text_embedding.0.weight") in keys for p in prefixes)
 
 
-def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType | None:
-    """Determine A14B (T2V vs I2V) vs TI2V-5B from the GGUF state dict.
+_WAN_KEY_PREFIXES = ("", "model.diffusion_model.", "diffusion_model.")
+
+
+def _wan_patch_embedding_shape(state_dict: dict[str | int, Any]) -> tuple[int, ...] | None:
+    """Return the shape of ``patch_embedding.weight``, tolerating ComfyUI prefixes.
+
+    Works for both plain tensors and GGMLTensors (which carry the logical shape on
+    ``tensor_shape`` because their storage is the packed quantized blob).
+    """
+    for prefix in _WAN_KEY_PREFIXES:
+        tensor = state_dict.get(prefix + "patch_embedding.weight")
+        if tensor is None:
+            continue
+        shape = getattr(tensor, "tensor_shape", None)
+        if shape is None:
+            shape = getattr(tensor, "shape", None)
+        if shape is None:
+            return None
+        return tuple(int(dim) for dim in shape)
+    return None
+
+
+def _detect_wan_variant_from_state_dict(state_dict: dict[str | int, Any]) -> WanVariantType | None:
+    """Determine A14B (T2V vs I2V) vs TI2V-5B from the transformer state dict.
 
     ``patch_embedding.weight`` has shape ``[inner_dim, in_channels, T, H, W]``;
     ``in_channels`` uniquely identifies the Wan 2.2 variant:
@@ -1752,41 +1852,324 @@ def _detect_wan_gguf_variant(state_dict: dict[str | int, Any]) -> WanVariantType
 
     Returns None if the tensor is missing or the channel count is unrecognised.
     """
-    candidates = (
-        "patch_embedding.weight",
-        "model.diffusion_model.patch_embedding.weight",
-        "diffusion_model.patch_embedding.weight",
-    )
-    for key in candidates:
-        if key in state_dict:
-            tensor = state_dict[key]
-            shape = getattr(tensor, "tensor_shape", None) or getattr(tensor, "shape", None)
-            if shape is None or len(shape) < 2:
-                return None
-            in_channels = int(shape[1])
-            if in_channels == 16:
-                return WanVariantType.T2V_A14B
-            if in_channels == 36:
-                return WanVariantType.I2V_A14B
-            if in_channels == 48:
-                return WanVariantType.TI2V_5B
-            return None
+    shape = _wan_patch_embedding_shape(state_dict)
+    if shape is None or len(shape) < 2:
+        return None
+    inner_dim, in_channels = shape[0], shape[1]
+
+    # in_channels alone is ambiguous outside the three supported releases: the wider
+    # Wan family reuses these channel counts at other widths (Fun-Control-14B is
+    # 48-channel but 5120-wide, i.e. A14B-sized, not TI2V-5B). Require the width to
+    # agree, so a derivative we don't support falls through to None rather than being
+    # mislabelled — a wrong variant pins `expert`, picks the wrong default settings,
+    # and hides the low-noise partner picker.
+    #
+    # A14B is uniquely 5120-wide and TI2V-5B uniquely 3072-wide across Wan 2.2.
+    if in_channels == 16 and inner_dim == 5120:
+        return WanVariantType.T2V_A14B
+    if in_channels == 36 and inner_dim == 5120:
+        return WanVariantType.I2V_A14B
+    if in_channels == 48 and inner_dim == 3072:
+        return WanVariantType.TI2V_5B
     return None
 
 
-def _detect_wan_gguf_expert(filename: str) -> Literal["high", "low", "none"]:
+def _has_wan_transformer_block_weights(state_dict: dict[str | int, Any]) -> bool:
+    """True if the state dict carries a transformer block's *own* attention weight.
+
+    ``_has_wan_keys`` only looks at the input conv and the text projection, and a
+    Wan LoRA can legitimately ship both: I2V adapters bundle a full replacement
+    ``patch_embedding`` because they change ``in_channels`` from 16 to 36. Such a
+    file matches both the LoRA and the main-model probes, and ``matches_sort_key``
+    ranks Main above LoRA — so it would be pulled out of the LoRA pickers and into
+    the main-model dropdown, where it can only fail to load.
+
+    Requiring a bare ``blocks.0.<attn>.<q>.weight`` separates them positively: a
+    LoRA stores ``...q.lora_A.weight`` / ``...q.lora_down.weight`` and never the
+    undecorated weight. Keys are matched exactly, so a LoRA's decorated key cannot
+    satisfy this.
+
+    Deliberately a *positive* structural test rather than a "reject anything with
+    lora_A keys" exclusion: main models with merged-in LoRA weights sometimes retain
+    those keys (see ``LoRA_LyCORIS_*_Config._validate_looks_like_lora``), and
+    rejecting them would be the same over-restrictiveness this probe exists to fix.
+    """
+    attention_weights = (
+        "blocks.0.self_attn.q.weight",  # native upstream / ComfyUI layout
+        "blocks.0.attn1.to_q.weight",  # diffusers layout
+    )
+    keys = state_dict.keys()
+    return any((prefix + weight) in keys for prefix in _WAN_KEY_PREFIXES for weight in attention_weights)
+
+
+def _find_wan_2_1_marker(state_dict: dict[str | int, Any]) -> str | None:
+    """Return a human-readable reason if the state dict is architecturally Wan 2.1.
+
+    Wan 2.1 and Wan 2.2 share a key layout, so the two families can only be told
+    apart by architecture. Three markers are decisive, and all three describe
+    things Wan 2.2 never ships:
+
+    * **CLIP image embedder** (``img_emb.proj.*`` / ``condition_embedder.image_embedder.*``).
+      Wan 2.1 I2V conditioned on CLIP-vision features via ``image_dim``. Wan 2.2
+      I2V-A14B dropped that entirely and concatenates VAE latents instead, so any
+      36-channel model carrying an image embedder is Wan 2.1.
+    * **1536-dim inner width** — the Wan 2.1 T2V-1.3B model. The Wan 2.2 family is
+      5120 (A14B) or 3072 (TI2V-5B).
+    * **VACE blocks** (``vace_blocks.*``) — the Wan 2.1 VACE editing variant, which
+      needs a control branch InvokeAI's Wan pipeline doesn't drive.
+
+    Wan 2.1 T2V-14B is *not* detectable this way: it is shape-identical to a single
+    Wan 2.2 A14B expert. Callers that care fall back to the filename/metadata gate.
+    """
+    keys = state_dict.keys()
+    image_embedder_markers = ("img_emb.proj.0.weight", "condition_embedder.image_embedder.norm1.weight")
+    if any((prefix + marker) in keys for prefix in _WAN_KEY_PREFIXES for marker in image_embedder_markers):
+        return (
+            "state dict has a CLIP image embedder (img_emb), which is a Wan 2.1 I2V feature; "
+            "Wan 2.2 I2V conditions on VAE latents instead"
+        )
+
+    shape = _wan_patch_embedding_shape(state_dict)
+    if shape is not None and len(shape) >= 1 and shape[0] == 1536:
+        return "state dict has a 1536-dim transformer, which is the Wan 2.1 T2V-1.3B architecture"
+
+    return None
+
+
+def _find_unsupported_wan_variant_marker(state_dict: dict[str | int, Any]) -> str | None:
+    """Return a reason if this is a Wan variant the plain transformer can't represent.
+
+    These are Wan 2.2-era models built on extra conditioning branches that
+    ``WanTransformer3DModel`` simply doesn't have. Loading them would not error:
+    ``load_state_dict(strict=False)`` drops the extra modules as unexpected keys and
+    produces a model that silently ignores the conditioning it was built around
+    (real ``wan2.2_animate_14B_bf16.safetensors``: 127 of its 1441 keys are
+    ``face_adapter``/``motion_encoder``). Refusing is the honest outcome.
+
+    Checked before the Wan 2.1 markers because Animate also carries ``img_emb``, so
+    it would otherwise be reported as a Wan 2.1 I2V model.
+    """
+    keys = [key for key in state_dict.keys() if isinstance(key, str)]
+
+    def has(*markers: str) -> bool:
+        return any(marker in key for key in keys for marker in markers)
+
+    if has("face_adapter.", "motion_encoder."):
+        return (
+            "state dict has face-adapter / motion-encoder branches, which belong to Wan Animate; "
+            "character animation and replacement are not supported yet"
+        )
+
+    if has("audio_injector.", "casual_audio_encoder.", "cond_encoder.", "frame_packer."):
+        return (
+            "state dict has audio-conditioning branches, which belong to Wan S2V; "
+            "audio-driven video is not supported yet"
+        )
+
+    if has("control_adapter."):
+        # Fun-Control-Camera is the dangerous one: 36 in-channels and otherwise
+        # key-identical to plain I2V-A14B, and it ships as a properly tagged
+        # high/low pair, so the expert-pairing check passes too. Without this it
+        # would load and render as an ordinary I2V, ignoring every camera input.
+        return (
+            "state dict has a control-adapter branch, which belongs to the Wan Fun-Control family; "
+            "camera and control conditioning are not supported yet"
+        )
+
+    if has("vace_blocks."):
+        return "state dict has VACE control blocks, and VACE models are not supported yet"
+
+    return None
+
+
+# Tokens that turn an adjacent bare ``high``/``low`` into an adjective about
+# something other than the noise level, so it must not be read as an MoE expert.
+#
+# Deliberately short. Real releases sit expert markers next to plenty of unrelated
+# words — ``..._LOW_lightning_edition``, ``..._high_lighting_fp16`` — so anything
+# broader here starts costing true positives, which is the more damaging error for
+# a checkpoint whose expert can only be recovered from its name.
+_WAN_EXPERT_DISQUALIFIERS = frozenset(
+    {
+        "angle",
+        "cfg",
+        "guidance",
+        "vram",
+        "ram",
+        "mem",
+        "memory",
+        "step",
+        "steps",
+        "res",
+        "resolution",
+        "quality",
+        "speed",
+        "fps",
+        "bit",
+        "bits",
+    }
+)
+
+
+def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
     """Filename heuristic for the A14B dual-expert MoE.
 
-    Community releases tag each expert in the filename — typically
-    ``high_noise`` / ``low_noise`` (or hyphenated/concatenated variants).
-    Returns 'none' when neither marker is present (single-expert model or
-    ambiguous filename).
+    Two conventions dominate and both have to work, because the expert cannot be
+    read off the weights:
+
+    * ``high_noise`` / ``low_noise`` and its spellings — hyphenated, underscored,
+      spaced, fused (``highnoise``, ``LOWNOISEFP8``), camel-cased (``HighNoise``),
+      reversed (``noise_high``). This is what Comfy-Org's repackaged repos use.
+    * A **bare** ``HIGH`` / ``LOW`` token, e.g.
+      ``Wan2_2-T2V-A14B-HIGH_fp8_e4m3fn_scaled_KJ.safetensors``. This is what the
+      widely-mirrored Kijai fp8 catalogue and many CivitAI fine-tunes use, so
+      refusing to read it would leave most single-file A14B models unpairable.
+
+    Some releases also declare the expert in file metadata; ``_resolve_wan_expert``
+    consults that when the name yields nothing.
+
+    Precedence, in order:
+
+    1. Explicit ``..._noise`` markers outrank bare tokens found elsewhere in the
+       name, so ``..._4step_LOW_lightning_high_noise`` reads as the high-noise file.
+    2. Within a tier, one distinct marker wins. If **both** appear, the file serves
+       both experts (``... I2V HIGH+LOW ...``, ``..._low_high_noise_...`` — both are
+       real release patterns) or the name is simply ambiguous, so return 'none'
+       rather than guess. For a LoRA 'none' means "apply to both", which is the
+       right answer for those; for a main it surfaces as a pairing error the user
+       can act on, which beats silently running one expert for both phases.
+
+    Note the tiers are reconciled the same way. An earlier revision returned on the
+    first ``noise`` marker it saw, which meant the two spellings of the same
+    both-experts name disagreed: ``HIGH-LOW`` gave 'none' but ``low_high_noise``
+    gave 'high'.
+
+    A bare token is ignored when a neighbour marks it as an adjective about
+    something else (``lowVRAM``, ``low-cfg``, ``Low Angle``) — see
+    ``_WAN_EXPERT_DISQUALIFIERS``. TI2V-5B is handled structurally by the callers,
+    which force 'none' because the model is single-transformer.
+
+    Matching is per token, so a bare marker can't fire on a substring
+    (``highway``), and the fused form is anchored at a token boundary so
+    ``slow_noise`` and ``flownoise`` are left alone.
+
+    Returns 'none' for an untagged filename.
     """
-    name = filename.lower()
-    if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
-        return "high"
-    if any(s in name for s in ("low_noise", "low-noise", "lownoise")):
-        return "low"
+    name = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", filename).lower()
+    tokens = [token for token in re.split(r"[^a-z0-9]+", name) if token]
+
+    markers = ("high", "low")
+    explicit: list[str] = []
+    bare: list[str] = []
+
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+
+        # Fused with 'noise'. Anchored: startswith catches `lownoisefp8`, and only the
+        # reversed form may match at the end — `endswith("lownoise")` would wrongly
+        # claim `slownoise`.
+        fused = next((m for m in markers if token.startswith(f"{m}noise") or token.endswith(f"noise{m}")), None)
+        if fused is not None:
+            explicit.append(fused)
+            index += 1
+            continue
+
+        if token not in markers:
+            index += 1
+            continue
+
+        # Consume the whole *run* of adjacent marker tokens, so a single 'noise'
+        # qualifies all of them. `low_high_noise` names one file holding both experts
+        # (real: moriqqe/Mabrle_wan2.2_low_high_noise); scoring only the marker
+        # touching 'noise' would read it as the high-noise expert alone.
+        start = index
+        while index < len(tokens) and tokens[index] in markers:
+            index += 1
+        run = tokens[start:index]
+        previous = tokens[start - 1] if start > 0 else None
+        following = tokens[index] if index < len(tokens) else None
+
+        # Only the token *following* the run can disqualify: these are adjective-noun
+        # pairs, so the noun comes second. "low angle" is a camera angle, but
+        # "Angle HIGH" is the high-noise expert of a camera-angle LoRA.
+        #
+        # A disqualifier only consumes the marker it is actually attached to — the last
+        # one in the run — not the whole run. `HIGH_lowVRAM` is the high-noise expert of
+        # a low-VRAM build: dropping both markers there loses a correct tag, which for a
+        # main model disables the pair checks and for a LoRA silently applies a
+        # single-expert distill to both experts.
+        #
+        # Checked ahead of the 'noise' test below, and it clears `following` with it: a
+        # disqualifier sits after the run, so an adjacent 'noise' would have to precede
+        # it. ('low noise' can't trip this — 'noise' is not itself a disqualifier.)
+        if following in _WAN_EXPERT_DISQUALIFIERS:
+            run = run[:-1]
+            following = None
+        if not run:
+            continue
+        if previous == "noise" or following == "noise":
+            explicit.extend(run)
+        else:
+            bare.extend(run)
+
+    # An explicit `..._noise` marker outranks a bare token found elsewhere in the
+    # name. Within each tier, both experts named means the file serves both — real
+    # releases do ship that way — so return 'none' rather than pick one. For a LoRA
+    # 'none' means "apply to both", which is the right answer for those.
+    for candidates in (explicit, bare):
+        distinct = set(candidates)
+        if len(distinct) == 1:
+            return candidates[0]  # type: ignore[return-value]
+        if distinct:
+            return "none"
+    return "none"
+
+
+def _resolve_wan_expert(
+    mod: ModelOnDisk, override_fields: dict[str, Any], variant: WanVariantType
+) -> Literal["high", "low", "none"]:
+    """Settle the MoE expert field: explicit override, then filename, then metadata.
+
+    The override is consumed here so it can't reach the constructor twice. Note it is
+    not reachable through the install API today — ``ModelRecordChanges`` has no
+    ``expert`` field and ``ModelConfigFactory.build_common_fields`` forwards a fixed
+    whitelist that excludes it — so in practice a mis-detected expert can only be
+    corrected by renaming the file and re-importing.
+
+    TI2V-5B is a single-transformer model, so the expert is meaningless there and is
+    pinned to 'none'. That is not cosmetic: the frontend's low-noise expert picker
+    selects on ``expert == 'low'``, so a TI2V-5B file whose name happens to contain a
+    bare ``low`` (``...-5B-lowVRAM``, ``...-Turbo-lowSteps``) would otherwise be
+    offered as an A14B partner expert it can never be.
+
+    Metadata is consulted only as a fallback, not as the primary signal, even though
+    it is the more trustworthy of the two. Renaming a file is the one lever a user
+    has to correct a mis-detected expert — there is no UI for the field — and the
+    Wan model loader's error message tells them to use it. Letting an embedded
+    ``model_type`` override the name would take that lever away.
+
+    Coverage is uneven, which is why both signals are needed. Sampled 2026-08-13:
+    every Wan 2.2 safetensors in ``Kijai/WanVideo_comfy_fp8_scaled`` carries
+    ``__metadata__["model_type"]`` naming the expert (``Wan2_2-I2V-A14B-high``),
+    while none of the ``Comfy-Org/Wan_2.2_ComfyUI_Repackaged`` files carry any
+    ``__metadata__`` at all. GGUF releases use ``general.name`` instead.
+    """
+    explicit_expert = override_fields.pop("expert", None)
+    if explicit_expert is not None:
+        return explicit_expert  # type: ignore[no-any-return]
+
+    if variant == WanVariantType.TI2V_5B:
+        return "none"
+
+    expert = _detect_wan_expert(mod.path.stem)
+    if expert != "none":
+        return expert
+
+    metadata = mod.metadata()
+    declared = metadata.get("model_type") or metadata.get("general.name") or ""
+    if declared:
+        return _detect_wan_expert(declared)
     return "none"
 
 
@@ -1818,22 +2201,112 @@ class Main_GGUF_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base
             raise NotAMatchError("state dict does not look like GGUF quantized")
         if not _has_wan_keys(sd):
             raise NotAMatchError("state dict does not look like a Wan transformer")
+        if not _has_wan_transformer_block_weights(sd):
+            raise NotAMatchError(
+                "state dict has no undecorated transformer block weights — it looks like a Wan LoRA "
+                "or adapter rather than a full transformer"
+            )
+        unsupported_reason = _find_unsupported_wan_variant_marker(sd)
+        if unsupported_reason is not None:
+            raise NotAMatchError(unsupported_reason)
         gguf_name = mod.metadata().get("general.name", "")
         normalized_identity = "".join(
             character for character in f"{mod.path.stem} {gguf_name}".lower() if character.isalnum()
         )
         if "wan21" in normalized_identity:
             raise NotAMatchError("Wan 2.1 GGUF models are not supported by the Wan 2.2 loader")
+        # A misnamed Wan 2.1 GGUF slips past the name check above; the architectural
+        # markers don't care what the file is called.
+        wan_2_1_reason = _find_wan_2_1_marker(sd)
+        if wan_2_1_reason is not None:
+            raise NotAMatchError(f"Wan 2.1 GGUF models are not supported by the Wan 2.2 loader: {wan_2_1_reason}")
 
         explicit_variant = override_fields.pop("variant", None)
-        variant = explicit_variant or _detect_wan_gguf_variant(sd)
+        variant = explicit_variant or _detect_wan_variant_from_state_dict(sd)
         if variant is None:
             raise NotAMatchError("could not determine Wan variant from state dict")
         if variant in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B) and "wan22" not in normalized_identity:
             raise NotAMatchError("Wan A14B GGUF filename or metadata must identify the model as Wan 2.2")
 
-        explicit_expert = override_fields.pop("expert", None)
-        expert = explicit_expert or _detect_wan_gguf_expert(mod.path.stem)
+        expert = _resolve_wan_expert(mod, override_fields, variant)
+
+        return cls(**override_fields, variant=variant, expert=expert)
+
+
+class Main_Checkpoint_Wan_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for single-file Wan 2.2 transformer checkpoints (safetensors).
+
+    This is the format the community ships on CivitAI and in ComfyUI-oriented
+    Hugging Face repos: one ``.safetensors`` per transformer, in either the native
+    upstream key layout or the diffusers one, optionally under a
+    ``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``
+    quantized. The loader normalises all of those.
+
+    As with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``
+    records which one this is so the Wan model loader invocation can pair them.
+    TI2V-5B is single-transformer and stores ``expert='none'``.
+    """
+
+    base: Literal[BaseModelType.Wan] = Field(default=BaseModelType.Wan)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: WanVariantType = Field()
+    expert: Literal["high", "low", "none"] = Field(
+        default="none",
+        description="For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, "
+        "'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        # The loader reads this format with safetensors.torch.load_file, so claiming a
+        # pickle here would let the model install and then fail with an opaque
+        # "header too large" error at first generation. Wan isn't distributed as
+        # .ckpt/.pt/.bin, so refusing them costs nothing.
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"single-file Wan checkpoints must be .safetensors, not {mod.path.suffix or 'None'}")
+
+        sd = mod.load_state_dict()
+
+        if not _has_wan_keys(sd):
+            raise NotAMatchError("state dict does not look like a Wan transformer")
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+        if not _has_wan_transformer_block_weights(sd):
+            raise NotAMatchError(
+                "state dict has no undecorated transformer block weights — it looks like a Wan LoRA "
+                "or adapter rather than a full transformer"
+            )
+
+        # Checked before the Wan 2.1 markers: Animate carries img_emb too, so the
+        # order is what makes the rejection reason accurate.
+        unsupported_reason = _find_unsupported_wan_variant_marker(sd)
+        if unsupported_reason is not None:
+            raise NotAMatchError(unsupported_reason)
+
+        # Wan 2.1 shares Wan 2.2's key layout, so reject it on architecture rather
+        # than on the filename. Unlike the GGUF probe we deliberately do *not*
+        # require the name to say "wan2.2": community fine-tunes routinely drop the
+        # version from the filename, and rejecting them was the whole complaint in
+        # #9463. The residual ambiguity is Wan 2.1 T2V-14B, which is shape-identical
+        # to a Wan 2.2 A14B expert — that one is caught by the explicit "wan2.1" name
+        # check below, and otherwise imports as A14B.
+        wan_2_1_reason = _find_wan_2_1_marker(sd)
+        if wan_2_1_reason is not None:
+            raise NotAMatchError(f"Wan 2.1 models are not supported by the Wan 2.2 loader: {wan_2_1_reason}")
+
+        normalized_identity = "".join(character for character in mod.path.stem.lower() if character.isalnum())
+        if "wan21" in normalized_identity:
+            raise NotAMatchError("Wan 2.1 models are not supported by the Wan 2.2 loader")
+
+        explicit_variant = override_fields.pop("variant", None)
+        variant = explicit_variant or _detect_wan_variant_from_state_dict(sd)
+        if variant is None:
+            raise NotAMatchError("could not determine Wan variant from state dict")
+
+        expert = _resolve_wan_expert(mod, override_fields, variant)
 
         return cls(**override_fields, variant=variant, expert=expert)
 
@@ -1994,6 +2467,794 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
             raise NotAMatchError("state dict does not look like an Anima model")
 
 
+class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX transformer models."""
+
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_is_not_flux2(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_is_not_flux2(cls, mod: ModelOnDisk) -> None:
+        """Reject FLUX.2 SDNQ checkpoints so they route to Main_SDNQ_Flux2_Config instead.
+
+        This config only checks for generic main-model keys plus SDNQ keys, so without this guard a
+        prefixed FLUX.2 SDNQ state dict could be accepted as base=flux and later loaded by the
+        FLUX.1 loader.
+        """
+        state_dict = mod.load_state_dict()
+        if _is_flux2_model(state_dict):
+            raise NotAMatchError("model is a FLUX.2 model, not FLUX.1; use Main_SDNQ_Flux2_Config")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+
+class Main_SDNQ_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX.2 transformer models (e.g. Klein 4B / 9B)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_is_flux2(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        # Only the bare diffusers layout (transformer_blocks. / context_embedder.) is accepted: the
+        # single-file SDNQ FLUX.2 loader consumes those keys directly and neither strips the
+        # model.diffusion_model. prefix nor converts BFL double_blocks. keys. Accepting a BFL /
+        # ComfyUI checkpoint here (via _has_main_keys) would classify a checkpoint the loader then
+        # fails to load with missing/unexpected keys, so we reject it during identification instead.
+        if _has_flux2_diffusers_transformer_keys(state_dict):
+            return
+        raise NotAMatchError(
+            "state dict is not in the bare diffusers layout the single-file SDNQ FLUX.2 loader supports"
+        )
+
+    @classmethod
+    def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_model(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux2_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
+
+        if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
+
+        return variant
+
+
+class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized Z-Image transformer models."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    variant: ZImageVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = override_fields.pop("variant", None) or ZImageVariantType.Turbo
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+
+# Tokenizer class names a Qwen3-encoder pipeline can advertise in model_index.json. Qwen models
+# (incl. Qwen3) use the Qwen2 tokenizer classes, in slow and fast variants.
+_QWEN_TOKENIZER_CLASS_NAMES = {"Qwen2Tokenizer", "Qwen2TokenizerFast"}
+
+# Text-encoder class names the SDNQ pipeline loaders can actually instantiate. They build a text-only
+# Qwen3ForCausalLM for the discovered text_encoder/ folder, so they can only load a Qwen3 model — not
+# a Qwen2 causal LM (missing Qwen3 q/k-norm params) and not the multimodal Qwen2VLForConditionalGeneration
+# (visual tower). Recording any of those as a self-contained TextEncoder would mark the pipeline
+# complete even though the loader would fail, so discovery narrows to the loadable Qwen3 set.
+_SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES = _SDNQ_LOADABLE_QWEN_ARCHITECTURES
+
+
+# Files a pipeline component folder must actually ship to be loadable. Weight-bearing components
+# (transformer / text_encoder / vae) are loaded with a `from_pretrained`-style call that needs both a
+# config and at least one weight file; the tokenizer folder carries no weights, only its vocab/config.
+_COMPONENT_CONFIG_FILENAMES = ("config.json", "model_index.json")
+_COMPONENT_WEIGHT_SUFFIXES = (".safetensors", ".bin", ".pt", ".pth", ".ckpt", ".gguf")
+# ...but a *quantized* component is read by `sdnq_sd_loader`, which globs `*.safetensors` and raises
+# when it finds none. Anything else in an SDNQ folder is not a weight that component can be loaded
+# from, so accepting it would record a submodel the loader is guaranteed to choke on.
+_SDNQ_COMPONENT_WEIGHT_SUFFIXES = (".safetensors",)
+# Submodel slots that ship vocab/config only. They need no weight file, and nothing can be
+# mis-instantiated against them, so they are also exempt from the declared-class requirement.
+_WEIGHTLESS_SUBMODEL_TYPES = frozenset({SubModelType.Tokenizer, SubModelType.Tokenizer2})
+
+# FLUX.1 SDNQ pipeline components, keyed by the class name `model_index.json` advertises. The value
+# is the slot it fills, the model type recorded for it, and the class names the component's own config
+# may declare — the tokenizers list both spellings transformers writes.
+# Slots whose SDNQ loader calls `sdnq_sd_loader` unconditionally, so the component must ship
+# safetensors whatever its folder declares. FLUX.2 and Z-Image build their transformer and Qwen3
+# text encoder that way; FLUX.1 does so only for the transformer, because its CLIP / T5 / VAE
+# branch on `_is_sdnq_folder` and fall back to `from_pretrained`.
+# The transformer is read with `sdnq_sd_loader` in every SDNQ pipeline, which is why it is also the
+# slot identification validates before accepting the folder as one.
+_SDNQ_TRANSFORMER_ONLY = frozenset({SubModelType.Transformer})
+_SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED = _SDNQ_TRANSFORMER_ONLY | {SubModelType.TextEncoder}
+_SDNQ_FLUX1_ALWAYS_SDNQ_LOADED = _SDNQ_TRANSFORMER_ONLY
+
+_SDNQ_FLUX1_COMPONENT_BY_CLASS_NAME: dict[str, tuple[SubModelType, ModelType, set[str]]] = {
+    "FluxTransformer2DModel": (SubModelType.Transformer, ModelType.Main, {"FluxTransformer2DModel"}),
+    "CLIPTextModel": (SubModelType.TextEncoder, ModelType.CLIPEmbed, {"CLIPTextModel"}),
+    "T5EncoderModel": (SubModelType.TextEncoder2, ModelType.T5Encoder, {"T5EncoderModel"}),
+    "AutoencoderKL": (SubModelType.VAE, ModelType.VAE, {"AutoencoderKL"}),
+    "CLIPTokenizer": (SubModelType.Tokenizer, ModelType.CLIPEmbed, {"CLIPTokenizer", "CLIPTokenizerFast"}),
+    "T5TokenizerFast": (SubModelType.Tokenizer2, ModelType.T5Encoder, {"T5Tokenizer", "T5TokenizerFast"}),
+    "T5Tokenizer": (SubModelType.Tokenizer2, ModelType.T5Encoder, {"T5Tokenizer", "T5TokenizerFast"}),
+}
+_TOKENIZER_FILENAMES = (
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "tokenizer.model",
+    "vocab.json",
+    "merges.txt",
+    "spiece.model",
+)
+
+
+# Class names that legitimately identify each component of an SDNQ pipeline, used both to map a
+# `model_index.json` entry onto a submodel type and to check the component's own config agrees.
+# `AutoencoderKL` and `AutoencoderKLFlux2` are interchangeable spellings of the VAE slot.
+_SDNQ_FLUX2_TRANSFORMER_CLASS_NAMES = {"Flux2Transformer2DModel"}
+_SDNQ_ZIMAGE_TRANSFORMER_CLASS_NAMES = {"ZImageTransformer2DModel"}
+_SDNQ_VAE_CLASS_NAMES = {"AutoencoderKLFlux2", "AutoencoderKL"}
+
+# Keys a component config uses to name its own class. Transformers models use `architectures`,
+# diffusers models `_class_name`, and tokenizers `tokenizer_class`.
+_COMPONENT_CLASS_CONFIG_FILENAMES = ("config.json", "model_index.json", "tokenizer_config.json")
+
+
+def _sdnq_component_declared_classes(component_path: Path) -> set[str]:
+    """Class names the component's *own* config files declare, if any."""
+    import json
+
+    declared: set[str] = set()
+    for filename in _COMPONENT_CLASS_CONFIG_FILENAMES:
+        config_path = component_path / filename
+        if not config_path.is_file():
+            continue
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(config, dict):
+            continue
+        architectures = config.get("architectures")
+        if isinstance(architectures, list):
+            declared.update(name for name in architectures if isinstance(name, str))
+        for key in ("_class_name", "tokenizer_class"):
+            name = config.get(key)
+            if isinstance(name, str):
+                declared.add(name)
+    return declared
+
+
+def _sdnq_component_matches_advertised_class(
+    component_path: Path, accepted_class_names: set[str], *, require_declaration: bool
+) -> bool:
+    """True if the component's own config agrees with the class `model_index.json` advertises for it.
+
+    `model_index.json` records what a pipeline *claims* each component is, and that claim is what
+    selects the loader — but nothing forces it to be true. A folder can advertise `Qwen3ForCausalLM`
+    for `text_encoder/` and ship a Qwen2 or multimodal Qwen2-VL model there; the folder is populated,
+    so a file-presence check passes and the pipeline is recorded as self-contained. The mismatch then
+    only surfaces at generation time, when the loader builds a Qwen3ForCausalLM against a state dict
+    that cannot satisfy it.
+
+    With `require_declaration`, a component that declares *nothing* is rejected too, not just one that
+    contradicts. Silence is not evidence: "some config.json plus some weight file" is exactly the
+    shape an unrelated model has, so accepting it re-opens the hole for every component whose config
+    happens to omit the key. `save_pretrained` writes `_class_name` (diffusers) or `architectures`
+    (transformers) for anything it saves, so a weight-bearing component that names no class is not a
+    normally-produced one. Set it for those; the tokenizer stays lenient because it carries no weights
+    (nothing can be mis-instantiated against it) and `tokenizer_class` is less consistently written.
+
+    Rejecting here is not fatal to the install: the component is left unrecorded, the pipeline is
+    simply not self-contained, and the user wires that component up explicitly — which is the correct
+    outcome for a folder we cannot confirm.
+    """
+    declared = _sdnq_component_declared_classes(component_path)
+    if not declared:
+        return not require_declaration
+    return bool(declared & accepted_class_names)
+
+
+def _sdnq_component_dir_is_populated(
+    component_path: Path,
+    submodel_type: SubModelType,
+    always_sdnq_loaded: frozenset[SubModelType] = frozenset(),
+) -> bool:
+    """True if `component_path` holds the files the component's loader needs.
+
+    An existing-but-empty folder is not enough: an interrupted download leaves the component
+    directories created but empty (or holding only a partial file), and recording such a component as
+    a submodel makes is_self_contained_sdnq_pipeline() report the pipeline as complete. Readiness then
+    permits generation and the invocations select the main model as the component source, and the
+    failure only surfaces when the loader tries to read the empty vae/ text_encoder/ tokenizer/ folder.
+
+    "Files its loader needs" is per component, not one list for all of them. `sdnq_sd_loader` globs
+    `*.safetensors` and raises if it finds none, so a `.gguf` or `.bin` in a component it reads is
+    not a usable weight however well-formed the folder otherwise looks. A component loaded with
+    `from_pretrained` instead — typically the VAE, which SDNQ exports leave in bfloat16 — may
+    legitimately ship any of the formats diffusers reads.
+
+    Which of the two applies is a property of the *loader*, not of the folder. `always_sdnq_loaded`
+    names the slots whose loader calls `sdnq_sd_loader` unconditionally: FLUX.2 and Z-Image do that
+    for the transformer and text encoder, FLUX.1 only for the transformer (its CLIP / T5 / VAE
+    branch on the folder marker). Relying on `quantization_config.json` alone was not enough — a
+    component carrying SDNQ weight/scale keys but no marker file reads as unquantized, so a `.bin`
+    passed discovery and then failed in the loader that was always going to use `sdnq_sd_loader`.
+    """
+    if not component_path.is_dir():
+        return False
+
+    # Both tokenizer slots are weightless — FLUX.1 pipelines carry a CLIP tokenizer plus a T5
+    # `tokenizer_2`, and requiring weights of either would reject every real one.
+    if submodel_type in _WEIGHTLESS_SUBMODEL_TYPES:
+        return any((component_path / name).is_file() for name in _TOKENIZER_FILENAMES)
+
+    read_by_sdnq_loader = submodel_type in always_sdnq_loaded or _is_sdnq_folder(component_path)
+    accepted_suffixes = _SDNQ_COMPONENT_WEIGHT_SUFFIXES if read_by_sdnq_loader else _COMPONENT_WEIGHT_SUFFIXES
+    has_config = any((component_path / name).is_file() for name in _COMPONENT_CONFIG_FILENAMES)
+    has_weights = any(entry.is_file() and entry.suffix in accepted_suffixes for entry in component_path.iterdir())
+    return has_config and has_weights
+
+
+class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX.2 models in diffusers format
+    (Flux2KleinPipeline / Flux2Pipeline folder with transformer/, text_encoder/, vae/, ...)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: Flux2VariantType = Field()
+    repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_flux2_diffusers(mod)
+
+        cls._validate_has_sdnq_transformer(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
+        # Submodels are always rediscovered from disk, never replayed from a serialized config. A
+        # persisted map records what existed at install time, so a component deleted since would
+        # still be reported present and the pipeline still "self-contained" — and the failure would
+        # surface only when a loader opens a folder that is gone. The filesystem is the authority.
+        override_fields = {k: v for k, v in override_fields.items() if k != "submodels"}
+        submodels = cls._get_submodels(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _validate_looks_like_flux2_diffusers(cls, mod: ModelOnDisk) -> None:
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Flux2Pipeline",
+                "Flux2KleinPipeline",
+                "Flux2Transformer2DModel",
+            },
+        )
+
+    @classmethod
+    def _validate_has_sdnq_transformer(cls, mod: ModelOnDisk) -> None:
+        transformer_path = mod.path / "transformer"
+        if not transformer_path.is_dir():
+            raise NotAMatchError("no transformer subfolder found")
+
+        if not _is_sdnq_folder(transformer_path):
+            raise NotAMatchError("transformer is not SDNQ quantized")
+
+        # ...and it must actually be loadable. A marker (or SDNQ-shaped config) over a folder with no
+        # weight file the loader can read is not a pipeline: discovery would leave `Transformer` out
+        # of `submodels` while this check still said "yes, SDNQ pipeline", so the model installed and
+        # only failed when a loader opened the transformer path at generation time. Same predicate
+        # discovery uses, so identification and discovery cannot disagree about the transformer.
+        if not _sdnq_component_dir_is_populated(transformer_path, SubModelType.Transformer, _SDNQ_TRANSFORMER_ONLY):
+            raise NotAMatchError("transformer folder holds no weights its loader can read")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        """Determine the Flux2 variant from the transformer config + filename heuristic."""
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        # Read the geometry through `flux2_variant.py`, the single source of truth the checkpoint,
+        # diffusers and LoRA paths already use. Hand-rolling the comparison here is what made every
+        # SDNQ pipeline a Klein: [dev]'s 15360 / 6144 matched no branch and fell into the `else`,
+        # so a [dev] pipeline was silently identified as Klein4B rather than as itself.
+        joint_attention_dim = transformer_config.get("joint_attention_dim")
+        hidden_size = transformer_config.get("attention_head_dim", 128) * transformer_config.get(
+            "num_attention_heads", 24
+        )
+        variant = (
+            (flux2_variant_from_context_dim(joint_attention_dim) if joint_attention_dim is not None else None)
+            or flux2_variant_from_hidden_size(hidden_size)
+            or Flux2VariantType.Klein4B
+        )
+
+        # Base variants are architecturally identical to their distilled counterpart, so only the
+        # name separates them. [dev] has no base counterpart and is left alone.
+        if _filename_suggests_base(mod.name):
+            if variant == Flux2VariantType.Klein9B:
+                return Flux2VariantType.Klein9BBase
+            if variant == Flux2VariantType.Klein4B:
+                return Flux2VariantType.Klein4BBase
+        return variant
+
+    @classmethod
+    def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
+        weight_files = list(mod.path.glob("**/*.safetensors"))
+        weight_files.extend(list(mod.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
+    @classmethod
+    def _get_submodels(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+
+            _library_name, class_name = value
+
+            if class_name is None:
+                continue
+
+            match class_name:
+                case "Flux2Transformer2DModel":
+                    submodel_type, model_type = SubModelType.Transformer, ModelType.Main
+                    accepted_class_names = _SDNQ_FLUX2_TRANSFORMER_CLASS_NAMES
+                case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
+                    submodel_type, model_type = SubModelType.TextEncoder, ModelType.Qwen3Encoder
+                    accepted_class_names = _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES
+                case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
+                    submodel_type, model_type = SubModelType.Tokenizer, ModelType.Qwen3Encoder
+                    accepted_class_names = _QWEN_TOKENIZER_CLASS_NAMES
+                case "AutoencoderKLFlux2" | "AutoencoderKL":
+                    submodel_type, model_type = SubModelType.VAE, ModelType.VAE
+                    accepted_class_names = _SDNQ_VAE_CLASS_NAMES
+                case _:
+                    continue
+
+            # model_index.json only advertises which components a pipeline *should* have; a partial or
+            # interrupted download can retain the original index while its component folders are
+            # missing or still empty. Record a submodel only when the folder actually holds the files
+            # its loader needs, otherwise a partial pipeline is treated as self-contained
+            # (is_self_contained_sdnq_pipeline) and the loaders later request fixed vae/ text_encoder/
+            # tokenizer/ subfolders that have nothing to load.
+            component_path = mod.path / key
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
+                continue
+
+            # Populated is not the same as correct: the index's class name is a claim about the
+            # folder, not a fact. Require the component's own config to agree before recording it.
+            if not _sdnq_component_matches_advertised_class(
+                component_path,
+                accepted_class_names,
+                require_declaration=submodel_type not in _WEIGHTLESS_SUBMODEL_TYPES,
+            ):
+                continue
+
+            submodels[submodel_type] = SubmodelDefinition(
+                path_or_prefix=component_path.resolve().as_posix(),
+                model_type=model_type,
+                variant=None,
+            )
+
+        return submodels
+
+
+class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized Z-Image models in diffusers format (full ZImagePipeline folder)."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+    variant: ZImageVariantType = Field()
+
+    repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_diffusers(mod)
+
+        cls._validate_has_sdnq_transformer(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_default(mod)
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
+
+        # Submodels are always rediscovered from disk, never replayed from a serialized config. A
+        # persisted map records what existed at install time, so a component deleted since would
+        # still be reported present and the pipeline still "self-contained" — and the failure would
+        # surface only when a loader opens a folder that is gone. The filesystem is the authority.
+        override_fields = {k: v for k, v in override_fields.items() if k != "submodels"}
+        submodels = cls._get_submodels(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _get_variant_or_default(cls, mod: ModelOnDisk) -> ZImageVariantType:
+        """Determine Z-Image variant from the scheduler config (same heuristic as the unquantized diffusers config).
+
+        Turbo (distilled) uses shift = 3.0, ZBase (undistilled) uses shift = 6.0.
+        """
+        try:
+            scheduler_config = get_config_dict_or_raise(mod.path / "scheduler" / "scheduler_config.json")
+            shift = scheduler_config.get("shift", 3.0)
+        except NotAMatchError:
+            return ZImageVariantType.Turbo
+        return ZImageVariantType.ZBase if shift >= 5.0 else ZImageVariantType.Turbo
+
+    @classmethod
+    def _validate_looks_like_z_image_diffusers(cls, mod: ModelOnDisk) -> None:
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "ZImagePipeline",
+                "ZImageTransformer2DModel",
+            },
+        )
+
+    @classmethod
+    def _validate_has_sdnq_transformer(cls, mod: ModelOnDisk) -> None:
+        transformer_path = mod.path / "transformer"
+        if not transformer_path.is_dir():
+            raise NotAMatchError("no transformer subfolder found")
+
+        if not _is_sdnq_folder(transformer_path):
+            raise NotAMatchError("transformer is not SDNQ quantized")
+
+        # ...and it must actually be loadable. A marker (or SDNQ-shaped config) over a folder with no
+        # weight file the loader can read is not a pipeline: discovery would leave `Transformer` out
+        # of `submodels` while this check still said "yes, SDNQ pipeline", so the model installed and
+        # only failed when a loader opened the transformer path at generation time. Same predicate
+        # discovery uses, so identification and discovery cannot disagree about the transformer.
+        if not _sdnq_component_dir_is_populated(transformer_path, SubModelType.Transformer, _SDNQ_TRANSFORMER_ONLY):
+            raise NotAMatchError("transformer folder holds no weights its loader can read")
+
+    @classmethod
+    def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
+        weight_files = list(mod.path.glob("**/*.safetensors"))
+        weight_files.extend(list(mod.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
+    @classmethod
+    def _get_submodels(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+
+            _library_name, class_name = value
+
+            if class_name is None:
+                continue
+
+            match class_name:
+                case "ZImageTransformer2DModel":
+                    submodel_type, model_type = SubModelType.Transformer, ModelType.Main
+                    accepted_class_names = _SDNQ_ZIMAGE_TRANSFORMER_CLASS_NAMES
+                case name if name in _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES:
+                    submodel_type, model_type = SubModelType.TextEncoder, ModelType.Qwen3Encoder
+                    accepted_class_names = _SDNQ_PIPELINE_TEXT_ENCODER_CLASS_NAMES
+                case name if name in _QWEN_TOKENIZER_CLASS_NAMES:
+                    submodel_type, model_type = SubModelType.Tokenizer, ModelType.Qwen3Encoder
+                    accepted_class_names = _QWEN_TOKENIZER_CLASS_NAMES
+                case "AutoencoderKL":
+                    submodel_type, model_type = SubModelType.VAE, ModelType.VAE
+                    accepted_class_names = _SDNQ_VAE_CLASS_NAMES
+                case _:
+                    continue
+
+            # See the FLUX.2 _get_submodels note: only record a component whose folder actually holds
+            # the files its loader needs, so a partial download with a complete model_index.json isn't
+            # mis-classified as a self-contained SDNQ pipeline.
+            component_path = mod.path / key
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
+                continue
+
+            # ...and whose own config agrees with the class the index advertises for it.
+            if not _sdnq_component_matches_advertised_class(
+                component_path,
+                accepted_class_names,
+                require_declaration=submodel_type not in _WEIGHTLESS_SUBMODEL_TYPES,
+            ):
+                continue
+
+            submodels[submodel_type] = SubmodelDefinition(
+                path_or_prefix=component_path.resolve().as_posix(),
+                model_type=model_type,
+                variant=None,
+            )
+
+        return submodels
+
+
+def _is_sdnq_folder(folder_path: Path) -> bool:
+    """Check if a folder contains SDNQ-quantized model weights.
+
+    Delegates to the shared detector so identification and the loaders cannot disagree about a
+    markerless export — see `invokeai.backend.quantization.sdnq.detection`.
+    """
+    return is_sdnq_folder(folder_path)
+
+
+class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX models in diffusers format (folder with transformer, text_encoder, etc.)."""
+
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: FluxVariantType = Field()
+    repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_flux_diffusers(mod)
+
+        cls._validate_has_sdnq_transformer(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
+
+        # Submodels are always rediscovered from disk, never replayed from a serialized config. A
+        # persisted map records what existed at install time, so a component deleted since would
+        # still be reported present and the pipeline still "self-contained" — and the failure would
+        # surface only when a loader opens a folder that is gone. The filesystem is the authority.
+        override_fields = {k: v for k, v in override_fields.items() if k != "submodels"}
+        submodels = cls._get_submodels(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _validate_looks_like_flux_diffusers(cls, mod: ModelOnDisk) -> None:
+        """Check if this looks like a Flux diffusers model by checking for FluxPipeline or FluxTransformer2DModel."""
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "FluxPipeline",
+                "FluxTransformer2DModel",
+            },
+        )
+
+    @classmethod
+    def _validate_has_sdnq_transformer(cls, mod: ModelOnDisk) -> None:
+        """Check if the transformer subfolder contains SDNQ quantization."""
+        transformer_path = mod.path / "transformer"
+        if not transformer_path.is_dir():
+            raise NotAMatchError("no transformer subfolder found")
+
+        if not _is_sdnq_folder(transformer_path):
+            raise NotAMatchError("transformer is not SDNQ quantized")
+
+        # ...and it must actually be loadable. A marker (or SDNQ-shaped config) over a folder with no
+        # weight file the loader can read is not a pipeline: discovery would leave `Transformer` out
+        # of `submodels` while this check still said "yes, SDNQ pipeline", so the model installed and
+        # only failed when a loader opened the transformer path at generation time. Same predicate
+        # discovery uses, so identification and discovery cannot disagree about the transformer.
+        if not _sdnq_component_dir_is_populated(transformer_path, SubModelType.Transformer, _SDNQ_TRANSFORMER_ONLY):
+            raise NotAMatchError("transformer folder holds no weights its loader can read")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        """Determine the Flux variant from the transformer config."""
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        # Check for guidance_embeds to determine if it's Dev or Schnell
+        guidance_embeds = transformer_config.get("guidance_embeds", False)
+        in_channels = transformer_config.get("in_channels", 64)
+
+        if guidance_embeds and in_channels == 384:
+            return FluxVariantType.DevFill
+        elif guidance_embeds:
+            return FluxVariantType.Dev
+        else:
+            return FluxVariantType.Schnell
+
+    @classmethod
+    def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
+        """Determine the repo variant from the model files."""
+        weight_files = list(mod.path.glob("**/*.safetensors"))
+        weight_files.extend(list(mod.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
+    @classmethod
+    def _get_submodels(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        """Extract submodels from model_index.json for Flux SDNQ diffusers format."""
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            # Skip metadata fields and invalid entries
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+
+            _library_name, class_name = value
+
+            # Skip null entries
+            if class_name is None:
+                continue
+
+            resolved = _SDNQ_FLUX1_COMPONENT_BY_CLASS_NAME.get(class_name)
+            if resolved is None:
+                continue
+            submodel_type, model_type, accepted_class_names = resolved
+
+            # Same two guards as the FLUX.2 / Z-Image pipelines: the index advertises what a pipeline
+            # *should* have, so a partial download keeps a complete index over missing or empty
+            # folders, and the advertised class is a claim about the folder rather than a fact.
+            # Without these, a half-downloaded pipeline looks complete until generation time.
+            component_path = mod.path / key
+            if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_FLUX1_ALWAYS_SDNQ_LOADED):
+                continue
+            if not _sdnq_component_matches_advertised_class(
+                component_path,
+                accepted_class_names,
+                require_declaration=submodel_type not in _WEIGHTLESS_SUBMODEL_TYPES,
+            ):
+                continue
+
+            submodels[submodel_type] = SubmodelDefinition(
+                path_or_prefix=component_path.resolve().as_posix(),
+                model_type=model_type,
+                variant=None,
+            )
+
+        return submodels
+
+
 class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."""
 
@@ -2002,6 +3263,7 @@ class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
         raise_if_not_dir(mod)
+
         raise_for_override_fields(cls, override_fields)
 
         raise_for_class_name(

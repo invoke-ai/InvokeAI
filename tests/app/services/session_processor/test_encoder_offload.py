@@ -10,6 +10,7 @@ import threading
 import time
 from collections.abc import Iterator
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import torch
@@ -72,6 +73,27 @@ def test_encoder_node_repins_to_idle_gpu_and_restores():
     # Pin restored and the borrow released.
     assert TorchDevice.get_session_device() == torch.device("cuda:0")
     assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) == torch.device("cuda:1")
+
+
+def test_borrow_is_released_when_repinning_fails():
+    """A failure while re-pinning must not strand the borrow lock.
+
+    The lock is process-wide, so leaking it would make that GPU permanently unborrowable — a
+    silent, permanent loss of the idle-GPU offload with no error after the first one.
+    """
+    runner = _runner()
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    TorchDevice.set_session_device("cuda:0")
+
+    target = "invokeai.app.services.session_processor.session_processor_default._set_torch_current_device"
+    with patch(target, side_effect=RuntimeError("CUDA driver shutting down")):
+        with pytest.raises(RuntimeError, match="driver shutting down"):
+            with runner._maybe_offload_to_idle_gpu(_FakeInvocation(True, "flux_text_encoder")):
+                pass
+
+    # The idle GPU is borrowable again, and the session pin was restored.
+    assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) == torch.device("cuda:1")
+    assert TorchDevice.get_session_device() == torch.device("cuda:0")
 
 
 def test_non_encoder_node_is_not_offloaded():
@@ -239,3 +261,44 @@ def test_real_nodes_declare_the_marker_correctly():
     assert CompelInvocation.idle_gpu_offloadable is True
     # A non-encoder node defaults to False (never re-pinned to a borrowed GPU).
     assert IntegerInvocation.idle_gpu_offloadable is False
+
+
+def test_every_text_encoder_node_declares_the_marker():
+    """Every `*_text_encoder` node must carry the flag.
+
+    Four encoders (wan, krea2, ideogram4, ernie_image) were added after the flag landed and went
+    unmarked for several releases — on a multi-GPU box they silently ran on the session's own GPU,
+    holding VRAM the denoise model needed. Enumerating the registry rather than listing the known
+    encoders is deliberate: the next encoder to be added is the one this guards.
+
+    A text encoder that genuinely should not be offloaded (it does session-GPU work, or runs long
+    enough that holding the lent GPU's lock would stall a session dequeued onto it) belongs in
+    `_NOT_OFFLOADABLE` with a comment saying why.
+    """
+    import importlib
+
+    import invokeai.app.invocations as invocations_package
+    from invokeai.app.invocations.baseinvocation import InvocationRegistry
+
+    # Encoders that must NOT be offloadable. Empty today; add with a justification.
+    _NOT_OFFLOADABLE: set[str] = set()
+
+    for module_name in invocations_package.__all__:
+        importlib.import_module(f"invokeai.app.invocations.{module_name}")
+
+    encoders = {
+        cls.get_type(): cls.idle_gpu_offloadable
+        for cls in InvocationRegistry.get_invocation_classes()
+        if cls.get_type().endswith("_text_encoder")
+    }
+    # Sanity-check the enumeration itself: if this drops to nothing, the assertion below is vacuous.
+    assert len(encoders) >= 11, f"expected the known text encoders to be registered, got {sorted(encoders)}"
+
+    unmarked = sorted(t for t, flag in encoders.items() if not flag and t not in _NOT_OFFLOADABLE)
+    assert not unmarked, (
+        f"text-encoder nodes missing idle_gpu_offloadable=True: {unmarked}. "
+        "Add the flag to the @invocation decorator, or add the type to _NOT_OFFLOADABLE with a reason."
+    )
+    # The four that prompted this guard, named explicitly so a rename cannot silently drop them.
+    for node_type in ("wan_text_encoder", "krea2_text_encoder", "ideogram4_text_encoder", "ernie_image_text_encoder"):
+        assert encoders.get(node_type) is True, f"{node_type} is not registered as an offloadable text encoder"

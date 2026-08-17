@@ -212,6 +212,8 @@ A real failure mode of long chains: each iteration's reference image is itself a
 
 Video denoise is memory-intensive — attention scales roughly as `(T_lat × H/16 × W/16)²`, so resolution and frame count both quadratically affect peak VRAM.
 
+Add `wan_memory_optimization: true` to `invokeai.yaml` and restart Invoke to target about 2 GiB of resident transformer weights when `enable_partial_loading` is enabled, lower denoise activation memory, and stream untiled VAE decode directly to MP4. The explicit residency trim may be a no-op when cache admission already reaches that target. If partial loading is disabled, the activation, timestep, and VAE optimizations remain active but transformer weights are fully resident. This can make generation substantially slower and requires enough system RAM for offloaded weights. Optimized BF16 execution may produce small numerical differences from the baseline path.
+
 * **Drop resolution before frame count.** Going from 1280×720 to 832×480 is a ~2.4× memory drop and visually subtle in most content. Going from 81 frames to 65 only saves ~20%.
 * **TI2V-5B before A14B.** TI2V-5B Q4_K_M peaks around ~6–8 GB at 832×480, versus ~12–14 GB for A14B Q4_K_M. If you're at the OOM edge, switch model family.
 * **OOM at the *reference image encoder* step** is usually allocator fragmentation from a previous run rather than absolute memory pressure. Restart the dev server and try again; if it recurs reproducibly, file an issue.

@@ -118,6 +118,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
 export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
+export type MistralEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'mistral_encoder' }>;
 export type QwenVLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen_vl_encoder' }>;
 export type Qwen3VLEncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_vl_encoder' }>;
 export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'wan_t5_encoder' }>;
@@ -405,6 +406,10 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
   return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
 };
 
+export const isMistralEncoderModelConfig = (config: AnyModelConfig): config is MistralEncoderModelConfig => {
+  return config.type === 'mistral_encoder';
+};
+
 export const isQwenVLEncoderModelConfig = (config: AnyModelConfig): config is QwenVLEncoderModelConfig => {
   return config.type === 'qwen_vl_encoder';
 };
@@ -512,13 +517,24 @@ const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainMo
   return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
 };
 
+const isFlux2DevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.variant === 'dev';
+};
+
+export const isFlux2DevDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return isFlux2DevMainModelConfig(config) && config.format === 'diffusers';
+};
+
 const isIdeogram4MainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'ideogram-4';
 };
 
 export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return (
-    isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config) || isIdeogram4MainModelConfig(config)
+    isFluxDevMainModelConfig(config) ||
+    isFlux2Klein9BMainModelConfig(config) ||
+    isFlux2DevMainModelConfig(config) ||
+    isIdeogram4MainModelConfig(config)
   );
 };
 
@@ -526,12 +542,92 @@ export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config i
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev_fill';
 };
 
+/**
+ * The submodels an SDNQ pipeline install must expose before it can act as a component source.
+ * Mirrors `_REQUIRED_PIPELINE_SUBMODELS` / `is_self_contained_sdnq_pipeline()` in
+ * `invokeai/app/invocations/model.py` — the frontend and the backend must agree on what "complete"
+ * means, or the graph builders offer a source the invocation validation then rejects.
+ */
+const SDNQ_PIPELINE_REQUIRED_SUBMODELS = ['transformer', 'vae', 'text_encoder', 'tokenizer'] as const;
+
+/**
+ * True if an SDNQ pipeline config ships every component its loaders read from a fixed subfolder.
+ *
+ * A truthy `submodels` map is not enough: a partial pipeline can expose only the transformer, and a
+ * malformed model_index.json can expose the components while omitting the transformer. Either would
+ * otherwise be offered in the source pickers, auto-selected by the graph builders, and only rejected
+ * by the backend after graph construction.
+ */
+export const isSelfContainedSDNQPipeline = (config: AnyModelConfig): boolean => {
+  return hasSubmodels(config, SDNQ_PIPELINE_REQUIRED_SUBMODELS);
+};
+
+/**
+ * FLUX.1 drives two text encoders, so a pipeline install can only replace the standalone components
+ * if it also ships the T5 pair on top of the CLIP one. Mirrors
+ * `_REQUIRED_FLUX1_PIPELINE_SUBMODELS` / `is_self_contained_sdnq_flux1_pipeline()` in
+ * `invokeai/app/invocations/model.py`; if the two disagree, the UI either blocks a model the node
+ * would have accepted or builds a graph the node then rejects.
+ */
+const SDNQ_FLUX1_PIPELINE_REQUIRED_SUBMODELS = [
+  ...SDNQ_PIPELINE_REQUIRED_SUBMODELS,
+  'text_encoder_2',
+  'tokenizer_2',
+] as const;
+
+const hasSubmodels = (config: AnyModelConfig, required: readonly string[]): boolean => {
+  const submodels = (config as { submodels?: unknown }).submodels;
+  if (typeof submodels !== 'object' || submodels === null) {
+    return false;
+  }
+  return required.every((submodel) => Boolean((submodels as Record<string, unknown>)[submodel]));
+};
+
+/**
+ * True for a FLUX.1 SDNQ pipeline that ships every component the FLUX graph needs, so the
+ * standalone T5 / CLIP / VAE selections are not required.
+ */
+export const isSelfContainedSDNQFlux1Pipeline = (config: AnyModelConfig): boolean => {
+  if ((config as { format?: unknown }).format !== 'sdnq_quantized') {
+    return false;
+  }
+  return hasSubmodels(config, SDNQ_FLUX1_PIPELINE_REQUIRED_SUBMODELS);
+};
+
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'z-image') {
+    return false;
+  }
+  // Read `format` and `submodels` as plain strings/unknown so TS doesn't narrow away the
+  // `sdnq_quantized` branch. The OpenAPI schema is regenerated separately and currently
+  // doesn't list the `sdnq_quantized` Z-Image format variant.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  // SDNQ-quantized ZImagePipeline folders carry the same submodels layout (transformer, vae,
+  // text_encoder, ...) as a plain diffusers ZImagePipeline. Single-file SDNQ Z-Image
+  // checkpoints have no submodels and must not match here, and neither may a partial pipeline.
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  return isSelfContainedSDNQPipeline(config);
 };
 
 export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
+  if (config.type !== 'main' || config.base !== 'flux2') {
+    return false;
+  }
+  // Same reasoning as isZImageDiffusersMainModelConfig: an SDNQ FLUX.2 pipeline folder ships
+  // the same submodels (transformer/text_encoder/tokenizer/vae) and qualifies as a source model.
+  const format = (config as { format?: unknown }).format as string | undefined;
+  if (format === 'diffusers') {
+    return true;
+  }
+  if (format !== 'sdnq_quantized') {
+    return false;
+  }
+  return isSelfContainedSDNQPipeline(config);
 };
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -542,13 +638,111 @@ export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'wan' && config.format === 'diffusers';
 };
 
-/** Wan GGUF main models marked as the low-noise expert (the second half
- *  of the A14B MoE pair). Suitable for the Transformer (Low Noise) picker;
- *  also used to filter low-noise GGUFs out of the primary main dropdown. */
-export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+/** The single-file Wan main formats. Both are transformer-only: one file holds one
+ *  A14B expert, and the VAE + UMT5-XXL encoder have to come from somewhere else.
+ *  Anything gating on that property must use this, not a bare `=== 'gguf_quantized'`
+ *  — the two formats are interchangeable here and drifting apart has bitten us. */
+const WAN_SINGLE_FILE_FORMATS = ['gguf_quantized', 'checkpoint'] as const;
+
+export const isWanSingleFileMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  // Takes AnyModelConfig, not a structural `{base?; type?; format?}`. An all-optional
+  // parameter type is a *weak type*, which TypeScript satisfies with any object sharing
+  // one property name — so `ModelIdentifierField` (base + type, no format) would compile
+  // and silently return false, disabling every gate below it. The bare
+  // `format === 'gguf_quantized'` this replaced was at least a compile error there.
   return (
-    config.type === 'main' && config.base === 'wan' && config.format === 'gguf_quantized' && config.expert === 'low'
+    config.type === 'main' &&
+    config.base === 'wan' &&
+    (WAN_SINGLE_FILE_FORMATS as readonly string[]).includes(config.format)
   );
+};
+
+/** TI2V-5B is the single-transformer Wan variant: it has no expert pair, so no expert
+ *  tag on it means anything. Both predicates below have to agree about that, or a file
+ *  can fall through the gap between them. */
+const isWanTi2v5bConfig = (config: AnyModelConfigWithExternal): boolean =>
+  'variant' in config && config.variant === 'ti2v_5b';
+
+/** Wan single-file main models *tagged* as the low-noise expert. This is the narrow,
+ *  tag-based test, and its only job is deciding what to hide from the primary main
+ *  dropdown — see `selectPrimaryMainModelOptions`, its one caller. Deliberately not
+ *  exported: the Transformer (Low Noise) picker needs the wider test below, and reaching
+ *  for this one there is the mistake that left untagged pairs unwireable.
+ *
+ *  TI2V-5B is excluded for the same reason it is excluded from the partner picker. The
+ *  two exclusions have to match: hiding a 5B from the primary list steers it toward a
+ *  partner slot that will not offer it either, which is how a model ends up reachable
+ *  from nowhere. Such a record is not hypothetical — the pre-branch GGUF probe applied
+ *  the tag without consulting the variant, so a 5B named `...-low_noise.gguf` installed
+ *  before this branch still carries `expert='low'` today. */
+const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  return (
+    isWanSingleFileMainModelConfig(config) &&
+    !isWanTi2v5bConfig(config) &&
+    'expert' in config &&
+    config.expert === 'low'
+  );
+};
+
+/** What the Transformer (Low Noise) picker may offer.
+ *
+ *  Deliberately wider than the tag test above. Since #9505 the *wiring* decides which
+ *  expert a file is used as and the `expert` tag is only advisory, so requiring
+ *  `expert === 'low'` here strands every pair that probes to `none`/`none`: both halves
+ *  show up in the primary picker (which hides only models tagged `low`) and neither
+ *  shows up here, leaving the pair impossible to assemble outside the workflow editor.
+ *  That is the exact case this branch exists to support. It is also not something the
+ *  user can tag their way out of: `expert` is absent from `ModelRecordChanges`, so no
+ *  edit sets it. Re-probing via Reidentify recomputes it, but only from the filename,
+ *  which for an untagged file returns `none` again.
+ *
+ *  Two exclusions. Files tagged `high` belong in the primary slot — the loader would
+ *  only swap them back. TI2V-5B is single-transformer, so it has no partner at all and
+ *  offering one could only produce the variant mismatch the loader rejects. */
+export const isWanLowNoisePartnerOption = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  if (!isWanSingleFileMainModelConfig(config)) {
+    return false;
+  }
+  if ('expert' in config && config.expert === 'high') {
+    return false;
+  }
+  return !isWanTi2v5bConfig(config);
+};
+
+/** Narrows a main-model list to what may be offered as the *primary* main. Every list
+ *  the user can pick a primary main from must go through this — there are three
+ *  (MainModelPicker, InitialStateMainModelPicker, and the auto-select in the
+ *  modelsLoaded listener), and filtering in only some of them means the excluded models
+ *  are still reachable.
+ *
+ *  It only hides Wan A14B low-noise experts, and only when the user has a partner to
+ *  pick instead. The steer is worth making — a low-noise expert belongs in the
+ *  Transformer (Low Noise) slot, and running it alone gives visibly worse output — but
+ *  since #9505 the loader accepts an unpaired low expert with a warning rather than
+ *  refusing it. Hiding unconditionally would leave someone whose only Wan file is a low
+ *  expert staring at a list that doesn't contain their model, with nothing to do about
+ *  it. Partner-aware, the list degrades instead of dead-ending.
+ *
+ *  A partner is another single-file Wan main of the same variant that isn't itself
+ *  tagged low — i.e. the high-noise or untagged half of the same pair. */
+export const selectPrimaryMainModelOptions = <T extends AnyModelConfigWithExternal>(configs: T[]): T[] => {
+  // Annotated `: boolean` rather than left as an inferred type predicate. Two predicates
+  // narrowing to the same type would make the negated one resolve `candidate` to `never`
+  // below, and the `variant` read would stop compiling.
+  const isLowExpert = (config: T): boolean => isWanSingleFileLowNoiseMainModelConfig(config);
+  const variantOf = (config: T): string | null =>
+    'variant' in config && typeof config.variant === 'string' ? config.variant : null;
+
+  const hasPartner = (low: T): boolean =>
+    configs.some(
+      (candidate) =>
+        candidate.key !== low.key &&
+        isWanSingleFileMainModelConfig(candidate) &&
+        !isLowExpert(candidate) &&
+        variantOf(candidate) === variantOf(low)
+    );
+
+  return configs.filter((config) => !isLowExpert(config) || !hasPartner(config));
 };
 
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
