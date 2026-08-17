@@ -29,9 +29,11 @@ import {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen3Encoder,
   isAnimaVae,
+  isBundledMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isNonAnimaQwen3Encoder,
+  isSelfContainedSDNQFlux1Pipeline,
   isKrea2Vae,
   isVaeForBases,
 } from './componentCompatibility';
@@ -221,7 +223,7 @@ const addFluxKontextReferenceImages = (
 };
 
 const getDiffusersSource = (settings: GenerateSettings, model: MainModelConfig): MainModelConfig | undefined =>
-  getCompatibleComponentSource(settings, model) ?? (model.format === 'diffusers' ? model : undefined);
+  getCompatibleComponentSource(settings, model) ?? (isBundledMainForBase(model.base)(model) ? model : undefined);
 
 const requireComponent = <T extends ComponentModelConfig | null>(value: T, label: string): NonNullable<T> => {
   if (!value) {
@@ -608,18 +610,19 @@ const buildFluxGraph = (
 
   const graph: BackendGraphContract = { edges: [], id: createId('flux_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
-  const t5EncoderModel = requireComponent(settings.t5EncoderModel, 'T5 Encoder');
-  const clipEmbedModel = requireComponent(settings.clipEmbedModel, 'CLIP Embed');
-  const vaeModel = requireComponent(getCompatibleVae(settings, ['flux']), 'FLUX VAE');
+  const hasBundledComponents = isSelfContainedSDNQFlux1Pipeline(model);
+  const t5EncoderModel = hasBundledComponents ? null : requireComponent(settings.t5EncoderModel, 'T5 Encoder');
+  const clipEmbedModel = hasBundledComponents ? null : requireComponent(settings.clipEmbedModel, 'CLIP Embed');
+  const vaeModel = hasBundledComponents ? null : requireComponent(getCompatibleVae(settings, ['flux']), 'FLUX VAE');
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const activeLoras = getActiveCompatibleLoras(settings, model);
   const modelLoader = addNode(graph, {
-    clip_embed_model: clipEmbedModel,
+    clip_embed_model: clipEmbedModel ?? undefined,
     id: 'model_loader',
     model,
-    t5_encoder_model: t5EncoderModel,
+    t5_encoder_model: t5EncoderModel ?? undefined,
     type: 'flux_model_loader',
-    vae_model: vaeModel,
+    vae_model: vaeModel ?? undefined,
   });
   const loraSource = activeLoras.length
     ? addTransformerLoraCollectionLoader(graph, activeLoras, 'flux_lora_collection_loader', modelLoader, [
@@ -669,11 +672,11 @@ const buildFluxGraph = (
   addIPAdapterReferenceImages(graph, settings, model, denoise);
   addFluxReduxReferenceImages(graph, settings, model, denoise);
   addMetadata(graph, output, settings, model, 'flux_txt2img', projectSettings, {
-    clip_embed_model: clipEmbedModel,
+    clip_embed_model: clipEmbedModel ?? undefined,
     guidance: settings.cfgScale,
     scheduler,
-    t5_encoder: t5EncoderModel,
-    vae: vaeModel,
+    t5_encoder: t5EncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -689,7 +692,7 @@ const buildFlux2Graph = (
 ): BackendGraphContract => {
   const isDev = model.variant === 'dev';
   const sourceModel = getFlux2DiffusersComponentSource(model, settings);
-  const hasBundledComponents = model.format === 'diffusers' || sourceModel;
+  const hasBundledComponents = isBundledMainForBase('flux2')(model) || sourceModel;
   const mistralEncoderModel =
     settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
       ? settings.mistralEncoderModel
@@ -1417,7 +1420,8 @@ export const compileGenerateGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   destination: ResultDestination,
-  projectSettings: GenerationProjectSettings
+  projectSettings: GenerationProjectSettings,
+  randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda'
 ): CompiledGenerateGraph => {
   const validationReasons = getGenerationValidationReasons(model, settings);
 
@@ -1426,9 +1430,10 @@ export const compileGenerateGraph = (
   }
 
   const outputIsIntermediate = destination === 'canvas';
+  const runtimeProjectSettings = { ...projectSettings, randDevice };
   const backendGraph = (() => {
     if (model.type === 'external_image_generator') {
-      return buildExternalGraph(settings, model, outputIsIntermediate, projectSettings);
+      return buildExternalGraph(settings, model, outputIsIntermediate, runtimeProjectSettings);
     }
 
     const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
@@ -1439,7 +1444,7 @@ export const compileGenerateGraph = (
       throw new Error(`${model.name} dimensions must be multiples of ${dimensionGrid}.`);
     }
 
-    return builder(settings, model, outputIsIntermediate, projectSettings);
+    return builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
   })();
 
   return {

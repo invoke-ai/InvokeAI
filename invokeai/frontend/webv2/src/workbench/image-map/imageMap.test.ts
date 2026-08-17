@@ -21,6 +21,7 @@ import {
 } from './imageMapTraces';
 
 const BACKEND_RESPONSE = {
+  cluster_eps: 0.42,
   point_count: 2,
   points: [
     { cluster: 0, image_name: 'a.png', x: 1.5, y: -2 },
@@ -29,6 +30,7 @@ const BACKEND_RESPONSE = {
   stale: false,
   state: 'ready',
   updated_at: '2026-08-02 12:00:00',
+  visible_hash: 'hash-1',
 };
 
 describe('image map api', () => {
@@ -44,6 +46,8 @@ describe('image map api', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/points');
     expect(result.state).toBe('ready');
     expect(result.pointCount).toBe(2);
+    expect(result.clusterEps).toBe(0.42);
+    expect(result.visibleHash).toBe('hash-1');
     expect(result.points[0]).toEqual({ cluster: 0, imageName: 'a.png', x: 1.5, y: -2 });
   });
 
@@ -82,7 +86,14 @@ describe('image map api', () => {
 describe('image map store', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
-    imageMapStore.setSnapshot({ data: null, error: null, indexCounts: null, loadState: 'idle', renderError: null });
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      data: null,
+      error: null,
+      indexCounts: null,
+      loadState: 'idle',
+      renderError: null,
+    });
   });
 
   it('loads points into the snapshot', async () => {
@@ -94,6 +105,97 @@ describe('image map store', () => {
     expect(snapshot.loadState).toBe('loaded');
     expect(snapshot.data?.points).toHaveLength(2);
     expect(snapshot.error).toBeNull();
+  });
+
+  it('passes the points response eps through to the cluster labels fetch', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return Promise.resolve({
+          labels: { '0': { label: 'cats' } },
+          updated_at: BACKEND_RESPONSE.updated_at,
+          visible_hash: BACKEND_RESPONSE.visible_hash,
+        });
+      }
+
+      return Promise.resolve(BACKEND_RESPONSE);
+    });
+
+    await refreshImageMapPoints();
+
+    // The labels endpoint must receive the exact eps the map was clustered
+    // with; the adaptive default could resolve differently on a drifted set.
+    await vi.waitFor(() => {
+      expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/cluster_labels?eps=0.42');
+      expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': 'cats' });
+    });
+  });
+
+  it('discards label responses clustered over a drifted visible set', async () => {
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return Promise.resolve({
+          labels: { '0': { label: 'cats' } },
+          updated_at: BACKEND_RESPONSE.updated_at,
+          visible_hash: 'hash-2',
+        });
+      }
+
+      return Promise.resolve(BACKEND_RESPONSE);
+    });
+
+    await refreshImageMapPoints();
+
+    await vi.waitFor(() => {
+      expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/cluster_labels?eps=0.42');
+    });
+    // Flush the response handler: cluster ids from a different visible set
+    // must not be applied to the rendered map.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(imageMapStore.getSnapshot().clusterLabels).toBeNull();
+  });
+
+  it('ignores a stale labels failure after a newer request already set labels', async () => {
+    // L1: points land, but the labels request hangs and will fail late.
+    let rejectFirstLabels: (reason: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return new Promise((_resolve, reject) => {
+          rejectFirstLabels = reject;
+        });
+      }
+
+      return Promise.resolve(BACKEND_RESPONSE);
+    });
+    await refreshImageMapPoints();
+    await vi.waitFor(() => {
+      expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/cluster_labels?eps=0.42');
+    });
+
+    // L2: a newer refresh whose labels resolve first.
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return Promise.resolve({
+          labels: { '0': { label: 'cats' } },
+          updated_at: BACKEND_RESPONSE.updated_at,
+          visible_hash: BACKEND_RESPONSE.visible_hash,
+        });
+      }
+
+      return Promise.resolve(BACKEND_RESPONSE);
+    });
+    await refreshImageMapPoints();
+    await vi.waitFor(() => {
+      expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': 'cats' });
+    });
+
+    // L1's late failure is stale: it must not wipe the labels L2 set.
+    rejectFirstLabels(new Error('slow failure'));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': 'cats' });
   });
 
   it('records errors and keeps prior data', async () => {
@@ -183,6 +285,7 @@ describe('snapshot transitions', () => {
     // Asserting `error === null` after a success is vacuous when the fixture
     // starts at null; seed a real error first so the clearing is what is tested.
     imageMapStore.setSnapshot({
+      clusterLabels: null,
       data: null,
       error: 'boom',
       indexCounts: null,
@@ -209,6 +312,7 @@ describe('snapshot transitions', () => {
     // Without this the WebGL error is permanent for the session: the view stops
     // mounting the plot, and nothing else ever resets renderError.
     imageMapStore.setSnapshot({
+      clusterLabels: null,
       data: null,
       error: null,
       indexCounts: null,

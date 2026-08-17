@@ -18,6 +18,7 @@ describe('account-owned workbench UI stores', () => {
     requestLayerProperties('user-a-layer', 'filter');
     // Partial stand-in: the snapshot only needs to be observably non-empty.
     imageMapStore.patchSnapshot({
+      clusterLabels: { '0': 'cats' },
       data: { pointCount: 1, state: 'ready' } as unknown as ImageMapPoints,
       indexCounts: { embedded: 1, failed: 0, pending: 0, total: 1 },
       loadState: 'loaded',
@@ -34,6 +35,7 @@ describe('account-owned workbench UI stores', () => {
     expect(imageMapSnapshot.loadState).toBe('idle');
     expect(imageMapSnapshot.error).toBeNull();
     expect(imageMapSnapshot.indexCounts).toBeNull();
+    expect(imageMapSnapshot.clusterLabels).toBeNull();
     unregisterModal();
   });
 });

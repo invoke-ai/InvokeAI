@@ -15,6 +15,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -116,9 +117,12 @@ export const useGalleryUploadAction = ({
         const failedCount = files.length - uploadedItems.length;
 
         if (uploadedItems.length === 0) {
+          const fallback = t('widgets.gallery.uploadFailed', { failed: failedCount });
+          const firstFailure = [...imageResults, ...videoResults].find((result) => result.status === 'rejected');
+
           notifications.reportError({
             area: 'gallery-upload',
-            message: t('widgets.gallery.uploadFailed', { failed: failedCount }),
+            message: firstFailure ? getApiErrorMessage(firstFailure.reason, fallback) : fallback,
             namespace: 'gallery',
           });
           return;

@@ -4,6 +4,7 @@ export type GenerateComponentCandidate = {
   base: string;
   format?: string;
   key?: string;
+  submodels?: Record<string, unknown> | null;
   type: string;
   variant?: unknown;
 };
@@ -16,6 +17,38 @@ export const KLEIN_TO_QWEN3_VARIANT: Record<string, string> = {
   klein_9b: 'qwen3_8b',
   klein_9b_base: 'qwen3_8b',
 };
+
+const SDNQ_PIPELINE_COMPONENTS = ['transformer', 'vae', 'text_encoder', 'tokenizer'] as const;
+const SDNQ_FLUX1_COMPONENTS = [...SDNQ_PIPELINE_COMPONENTS, 'text_encoder_2', 'tokenizer_2'] as const;
+
+const hasSubmodels = (model: GenerateComponentCandidate, required: readonly string[]): boolean => {
+  if (model.format !== 'sdnq_quantized' || !model.submodels) {
+    return false;
+  }
+
+  return required.every((submodel) => Boolean(model.submodels?.[submodel]));
+};
+
+export const isSelfContainedSDNQPipeline = (model: GenerateComponentCandidate): boolean =>
+  hasSubmodels(model, SDNQ_PIPELINE_COMPONENTS);
+
+export const isSelfContainedSDNQFlux1Pipeline = (model: GenerateComponentCandidate): boolean =>
+  hasSubmodels(model, SDNQ_FLUX1_COMPONENTS);
+
+export const isBundledMainForBase =
+  (base: string): GenerateComponentFilter =>
+  (model) => {
+    if (model.type !== 'main' || model.base !== base) {
+      return false;
+    }
+    if (model.format === 'diffusers') {
+      return true;
+    }
+    if (base === 'flux') {
+      return isSelfContainedSDNQFlux1Pipeline(model);
+    }
+    return (base === 'flux2' || base === 'z-image') && isSelfContainedSDNQPipeline(model);
+  };
 
 export const getCompatibleSelectedComponentKey = (
   value: ComponentModelConfig | null,
@@ -67,7 +100,7 @@ export const isFlux2DiffusersSourceForModel = (selectedModel: GenerateModelConfi
   const requiredVariant = selectedVariant ? KLEIN_TO_QWEN3_VARIANT[selectedVariant] : null;
 
   return (model) => {
-    if (!isDiffusersMainForBase('flux2')(model)) {
+    if (!isBundledMainForBase('flux2')(model)) {
       return false;
     }
 
@@ -97,7 +130,7 @@ export const isCompatibleDiffusersComponentSourceForModel = (
     return isFlux2DiffusersSourceForModel(selectedModel)(source);
   }
 
-  return isDiffusersMainForBase(selectedModel.base)(source);
+  return isBundledMainForBase(selectedModel.base)(source);
 };
 
 export const getCompatibleDiffusersComponentSource = <T extends GenerateComponentCandidate>(

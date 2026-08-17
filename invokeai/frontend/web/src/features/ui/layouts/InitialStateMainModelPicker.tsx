@@ -1,10 +1,7 @@
 import { Flex, FormControl, FormLabel, Icon } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import {
-  isExternalModelUnsupportedForTab,
-  isSecondarySlotMainModelConfig,
-} from 'features/parameters/components/MainModel/mainModelPickerUtils';
+import { isExternalModelUnsupportedForTab } from 'features/parameters/components/MainModel/mainModelPickerUtils';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { modelSelected } from 'features/parameters/store/actions';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -13,17 +10,20 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfigWithExternal, isNonCommercialMainModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  isNonCommercialMainModelConfig,
+  selectPrimaryMainModelOptions,
+} from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
   const [allModelConfigs] = useMainModels();
-  const modelConfigs = useMemo(
-    () => allModelConfigs.filter((c) => !isSecondarySlotMainModelConfig(c)),
-    [allModelConfigs]
-  );
+  // Same filter as MainModelPicker — a Wan low-noise expert offered here is just as
+  // unusable as a primary main, and this picker is the launchpad's first impression.
+  const modelConfigs = useMemo(() => selectPrimaryMainModelOptions(allModelConfigs), [allModelConfigs]);
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

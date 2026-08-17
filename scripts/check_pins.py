@@ -17,11 +17,18 @@ index and resolves wheels for the wrong backend. This script therefore checks:
   2. Each of those URLs matches the corresponding ``torch-<backend>``
      ``[[tool.uv.index]]`` URL in pyproject.toml.
   3. pins.json's ``python`` — the version the launcher builds the venv with,
-     before it installs anything — satisfies ``project.requires-python`` and is
-     one of the versions pyproject.toml's classifiers claim support for.
+     before it installs anything — satisfies ``project.requires-python``.
      Otherwise the launcher creates an interpreter that the package metadata it
-     is about to install rejects (or that ``uv`` cannot resolve at all), and the
-     install fails at the last step.
+     is about to install rejects, and the install fails at the last step.
+
+It also prints a *warning* when the pin is a version pyproject.toml's classifiers
+do not mention. That is advisory only: classifiers are optional in PEP 621 and
+informational on PyPI, so they cannot decide whether a pin is installable —
+``requires-python`` does. One consequence is deliberate and worth stating: a
+version that satisfies an open-ended ``requires-python`` but that no interpreter
+has (``>=3.11`` with a ``3.99`` pin) is not caught here. Catching it would mean
+gating on non-normative metadata, and a checker that rejects a legal pin is worse
+than one that misses an implausible typo.
 
 The repo root is derived from this file's own location, so the working directory
 does not matter — only the path you hand to python does::
@@ -54,9 +61,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #   separate index, so the launcher installs the default PyPI wheels.
 # - win32 has no rocm entry: PyTorch publishes no ROCm wheels for Windows, and
 #   the `rocm` extra in pyproject.toml is marked `sys_platform == 'linux'`.
+# - xpu is on both win32 and linux: PyTorch's XPU index publishes win_amd64 and
+#   linux-x86_64 wheels, which is exactly what the `xpu` extra's markers allow.
 REQUIRED_BACKENDS: dict[str, set[str]] = {
-    "win32": {"cpu", "cuda"},
-    "linux": {"cpu", "cuda", "rocm"},
+    "win32": {"cpu", "cuda", "xpu"},
+    "linux": {"cpu", "cuda", "rocm", "xpu"},
     "darwin": set(),
 }
 
@@ -69,7 +78,7 @@ REQUIRED_BACKENDS: dict[str, set[str]] = {
 # patch component is inert there in any case. Forbidding the third component also
 # makes a bogus patch such as "3.12.9999" - which satisfies every specifier but which
 # `uv python find` cannot resolve - unrepresentable rather than merely unlikely. A
-# bogus major.minor is caught instead by requires-python and by the classifier list.
+# bogus major.minor is caught instead by requires-python, as far as its bounds reach.
 # Leading zeros are rejected too, so the pin has exactly one spelling: "03.12" would
 # otherwise compare equal to "3.12" here while reaching the launcher verbatim.
 _VERSION_RE = re.compile(r"(?:0|[1-9][0-9]?)\.(?:0|[1-9][0-9]?)\Z")
@@ -83,10 +92,12 @@ _CLAUSE_RE = re.compile(r"(==|!=|>=|<=|>|<)\s*([0-9]{1,4}(?:\.[0-9]{1,4}){0,2})\
 # "Programming Language :: Python :: 3.12" - a *whole* classifier naming exactly one
 # major.minor version. The required dot excludes "... :: 3" and "... :: 3 :: Only";
 # the anchor excludes "... :: 3.12 :: Only" and "... :: 3.1.4", neither of which
-# declares support for the version it appears to name. Digits are bounded like the two
-# patterns above so _parse_version's int() cannot hit CPython's str->int digit limit
-# and raise out of check_python, which promises never to raise.
-_CLASSIFIER_RE = re.compile(r"Programming Language :: Python :: ([0-9]{1,4}\.[0-9]{1,4})\Z")
+# declares support for the version it appears to name. Leading zeros are excluded for
+# the same reason as in _VERSION_RE: "... :: 3.012" is not a trove classifier, so
+# reading it as a declaration of 3.12 support would silence the advisory in exactly the
+# case it exists to name. Digits are bounded like the two patterns above, so a 4000-digit
+# "version" is not read as one and cannot end up quoted back in the advisory.
+_CLASSIFIER_RE = re.compile(r"Programming Language :: Python :: ((?:0|[1-9][0-9]{0,3})\.(?:0|[1-9][0-9]{0,3}))\Z")
 
 _SUPPORTED_OPERATORS = "==, !=, >=, <=, > and <"
 
@@ -149,7 +160,9 @@ def _classifier_versions(pyproject: dict) -> list[str]:
     """The major.minor versions project.classifiers claims support for, in declared order.
 
     Tolerates every malformed shape - a missing [project] table, a non-list value, non-string
-    entries - by returning nothing, so the caller reports it rather than raising.
+    entries - by returning nothing rather than raising. Nothing is a fine answer: classifiers
+    are optional, so their absence and their malformation mean the same thing here, which is
+    that there is no advisory to give.
     """
 
     project = pyproject.get("project")
@@ -158,16 +171,8 @@ def _classifier_versions(pyproject: dict) -> list[str]:
         return []
     matches = (_CLASSIFIER_RE.match(entry) for entry in classifiers if isinstance(entry, str))
     # dict.fromkeys de-duplicates without reordering; a repeated classifier is legal but would
-    # otherwise be listed twice in the error message.
+    # otherwise be listed twice in the warning.
     return list(dict.fromkeys(match.group(1) for match in matches if match is not None))
-
-
-def _is_dynamic(pyproject: dict, field: str) -> bool:
-    """Whether project.dynamic defers `field` to the build backend (PEP 621)."""
-
-    project = pyproject.get("project")
-    dynamic = project.get("dynamic") if isinstance(project, dict) else None
-    return isinstance(dynamic, list) and field in dynamic
 
 
 def check_python(pins: dict, pyproject: dict) -> list[str]:
@@ -197,28 +202,6 @@ def check_python(pins: dict, pyproject: dict) -> list[str]:
     version = _parse_version(pinned)
     requires_python = ", ".join(clauses)
 
-    # requires-python says which versions the metadata *allows*; the classifiers say which ones
-    # this project actually ships for. Without the second check a pin like '3.99' - inside an
-    # open-ended requires-python, but not an interpreter uv can find - would still pass.
-    supported = _classifier_versions(pyproject)
-    if not supported and _is_dynamic(pyproject, "classifiers"):
-        errors.append(
-            "pyproject.toml lists 'classifiers' in project.dynamic, so pins.json's python pin "
-            "cannot be checked against the versions this project ships for; teach "
-            "scripts/check_pins.py where the classifiers come from"
-        )
-    elif not supported:
-        errors.append(
-            "pyproject.toml declares no 'Programming Language :: Python :: X.Y' classifier, so "
-            "pins.json's python pin cannot be checked against the versions this project ships for"
-        )
-    elif version not in {_parse_version(entry) for entry in supported}:
-        errors.append(
-            f"pins.json python is '{pinned}' but pyproject.toml's classifiers declare support only "
-            f"for {', '.join(supported)}; add the classifier if that version is really supported, "
-            "otherwise the launcher builds the venv on an interpreter this project does not ship for"
-        )
-
     for clause in clauses:
         match = _CLAUSE_RE.match(clause)
         if match is None:
@@ -237,6 +220,37 @@ def check_python(pins: dict, pyproject: dict) -> list[str]:
             )
 
     return errors
+
+
+def check_python_classifiers(pins: dict, pyproject: dict) -> list[str]:
+    """Return advisory notes - never errors - about the python pin vs project.classifiers.
+
+    `requires-python` is what actually gates installation, and it is the only authority this
+    script fails on. Classifiers are optional in PEP 621 and purely informational on PyPI, so a
+    pin they don't mention is a documentation gap, not a broken install: `requires-python =
+    ">=3.11, <3.13"` genuinely permits a 3.11 pin whether or not a 3.11 classifier exists.
+    Saying so out loud is still useful - the classifiers are what we publish - but it must not
+    fail the build, and their *absence* must not be treated as a finding at all.
+
+    Never raises, for the same reason check_python doesn't.
+    """
+
+    pinned = pins.get("python") if isinstance(pins, dict) else None
+    if not isinstance(pinned, str) or _VERSION_RE.match(pinned) is None:
+        return []  # check_python already reports the shape
+
+    # A plain string comparison is enough: both patterns forbid leading zeros, so a version has
+    # exactly one spelling on either side and there is nothing left to normalize.
+    supported = _classifier_versions(pyproject)
+    if not supported or pinned in supported:
+        return []
+
+    return [
+        f"pins.json python is '{pinned}', which pyproject.toml's classifiers do not mention "
+        f"(they list {', '.join(supported)}). That is allowed - classifiers are informational, and "
+        "requires-python is what gates installation - but consider adding "
+        f"'Programming Language :: Python :: {pinned}' so the published metadata matches."
+    ]
 
 
 def _uv_indexes(pyproject: dict) -> dict[str, str]:
@@ -328,10 +342,18 @@ def main(repo_root: Path = REPO_ROOT) -> int:
         for error in errors:
             print(f"  - {error}", file=sys.stderr)
         print(
-            "\nUpdate pins.json to match the [[tool.uv.index]] URLs, requires-python and python "
-            "classifiers in pyproject.toml (or vice versa).",
+            "\nUpdate pins.json to match the [[tool.uv.index]] URLs and requires-python in "
+            "pyproject.toml (or vice versa).",
             file=sys.stderr,
         )
+
+    # Deliberately after the errors have already been printed: advice is worth less than a real
+    # problem, so computing it must not be able to come between one and its report. It is still
+    # printed on a failing run - a wrong pin and an unmentioned pin are usually the same edit.
+    for warning in check_python_classifiers(pins, pyproject):
+        print(f"warning: {warning}", file=sys.stderr)
+
+    if errors:
         return 1
 
     print("pins.json is consistent with pyproject.toml")

@@ -1,3 +1,4 @@
+import os
 import threading
 from pathlib import Path
 from queue import Empty, Queue
@@ -71,6 +72,26 @@ def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
         raise RuntimeError("The embedding model returned a degenerate vector for this query")
 
     return (vector / norm).astype(EMBEDDING_DTYPE)
+
+
+def _normalize_batch(matrix: np.ndarray) -> np.ndarray:
+    """L2-normalize each row, zeroing the ones that cannot be normalized.
+
+    Shares `_normalize_query_vector`'s float64 norm — a float32 sum of squares
+    under/overflows inside the range these encoders produce — but not its
+    refusal. A single query is worth failing loudly; a batch is not. The
+    vocabulary build sends ~11,700 phrases through here, and aborting all of
+    them over one degenerate row would discard minutes of encoder work, raise
+    past the caller's error handling as a 500, and (nothing having been cached)
+    do it all again on the next request.
+
+    A zeroed row scores 0 against everything, so the phrase simply never wins a
+    label — which is what a meaningless embedding should do.
+    """
+    norms = np.linalg.norm(matrix.astype(np.float64), axis=1, keepdims=True)
+    usable = np.isfinite(norms) & (norms > 0)
+
+    return np.where(usable, matrix / np.where(usable, norms, 1.0), 0.0).astype(EMBEDDING_DTYPE)
 
 
 def warm_up_attention(config: "InvokeAIAppConfig", logger: "Logger") -> None:
@@ -163,6 +184,14 @@ class ImageIndexService(ImageIndexServiceBase):
         # Lazily-loaded (tokenizer, text_model, is_siglip); None until first text search.
         self._text_encoder: Optional[tuple[Any, Any, bool]] = None
         self._text_encoder_lock = threading.Lock()
+        # A vocabulary build that already failed. Without this, the very common
+        # vision-only install retries AutoTokenizer.from_pretrained — inside
+        # MODEL_LOAD_LOCK, contending with generation's model loads — once per
+        # points refresh, forever.
+        self._vocab_failure: Optional[Exception] = None
+        # Set by a labels request, serviced on the worker: the build is minutes
+        # of encoder work and must never run on a request thread.
+        self._vocab_build_requested = threading.Event()
         # Guards the lazy _processor/_cpu_model init: embed_image runs on
         # request threads concurrently with the indexer worker.
         self._vision_init_lock = threading.Lock()
@@ -170,6 +199,9 @@ class ImageIndexService(ImageIndexServiceBase):
         # similarity search, so repeated queries skip re-reading BLOBs.
         self._search_cache: dict[str, tuple[list[str], np.ndarray]] = {}
         self._search_cache_lock = threading.Lock()
+        # (vocabulary, embeddings) for cluster labeling; RAM + disk cached.
+        self._vocab_cache: Optional[tuple[list[str], np.ndarray]] = None
+        self._vocab_lock = threading.Lock()
 
     @property
     def model_id(self) -> str | None:
@@ -203,6 +235,10 @@ class ImageIndexService(ImageIndexServiceBase):
         return _normalize_query_vector(matrix[0])
 
     def embed_text(self, text: str) -> np.ndarray:
+        return self._embed_texts([text])[0]
+
+    def _embed_texts(self, texts: list[str]) -> np.ndarray:
+        """Batched text embedding, (N, D) L2-normalized."""
         if self._model_id is None:
             raise TextSearchUnavailableError("The image index is not running")
 
@@ -210,13 +246,92 @@ class ImageIndexService(ImageIndexServiceBase):
         with torch.no_grad():
             # SigLIP was trained with pad-to-max-length; pad-to-longest degrades
             # its text embeddings. CLIP uses ordinary longest-padding.
-            inputs = tokenizer(
-                [text], padding="max_length" if is_siglip else True, return_tensors="pt", truncation=True
-            )
+            inputs = tokenizer(texts, padding="max_length" if is_siglip else True, return_tensors="pt", truncation=True)
             outputs = model(**inputs)
-            embedding = outputs.pooler_output[0] if is_siglip else outputs.text_embeds[0]
-            vector = embedding.float().cpu().numpy()
-        return _normalize_query_vector(vector)
+            embeddings = outputs.pooler_output if is_siglip else outputs.text_embeds
+            matrix = embeddings.float().cpu().numpy()
+        return _normalize_batch(matrix)
+
+    def get_vocab_embeddings(self) -> tuple[list[str], np.ndarray]:
+        """The phrase-embedding matrix for cluster labelling.
+
+        Never builds it: a first run embeds ~1700 phrases x 7 templates through
+        a CPU text tower, which takes minutes. Callers run on the event loop's
+        shared executor, so blocking there — worse, blocking there while holding
+        `_vocab_lock` — starves every other `asyncio.to_thread` in the app,
+        `/points` and image search included. The build is handed to the index
+        worker instead and this raises until it lands.
+        """
+        with self._vocab_lock:
+            if self._vocab_cache is not None:
+                return self._vocab_cache
+            if self._vocab_failure is not None:
+                raise self._vocab_failure
+            if self._invoker is None or self._model_id is None:
+                raise TextSearchUnavailableError("The image index is not running")
+
+            self._vocab_build_requested.set()
+
+        raise TextSearchUnavailableError("Cluster labels are still being prepared; try again shortly")
+
+    def _build_vocab_embeddings(self) -> None:
+        """Build and cache the phrase embeddings. Index-worker thread only."""
+        from invokeai.app.services.image_index.cluster_labels import (
+            ensemble_phrase_embeddings,
+            load_vocabulary,
+            vocab_fingerprint,
+        )
+
+        with self._vocab_lock:
+            if self._vocab_cache is not None or self._vocab_failure is not None:
+                return
+            if self._invoker is None or self._model_id is None:
+                return
+
+            vocabulary = load_vocabulary()
+            fingerprint = vocab_fingerprint(vocabulary)
+            # The model hash contains ':' (e.g. 'blake3:...'), illegal in
+            # Windows filenames.
+            model_tag = self._model_id.replace(":", "_")[:24]
+            cache_path = self._invoker.services.configuration.db_path.parent / f"cluster_vocab_{model_tag}.npz"
+
+            if cache_path.exists():
+                try:
+                    # Closed explicitly: np.load returns a lazily-read NpzFile
+                    # holding the zip handle open, and the rewrite below
+                    # truncates this very file on a fingerprint mismatch.
+                    with np.load(cache_path, allow_pickle=False) as cached:
+                        if str(cached["fingerprint"]) == fingerprint:
+                            self._vocab_cache = (vocabulary, cached["embeddings"].astype(EMBEDDING_DTYPE))
+
+                    if self._vocab_cache is not None:
+                        return
+                except Exception:
+                    self._invoker.services.logger.warning("Discarding unreadable cluster vocabulary cache")
+
+            # First run for this model: embedding ~1700 phrases x 7 templates
+            # takes minutes — hence the disk cache.
+            try:
+                embeddings = ensemble_phrase_embeddings(self._embed_texts, vocabulary)
+            except Exception as e:
+                # Remembered, so a vision-only install answers the next request
+                # from memory instead of reloading the absent text tower.
+                self._vocab_failure = e
+                self._invoker.services.logger.warning("Could not build the cluster vocabulary", exc_info=True)
+
+                return
+
+            try:
+                cache_path.parent.mkdir(parents=True, exist_ok=True)
+                # Written aside and renamed: two processes sharing a db_dir can
+                # first-run at once, and a kill mid-write would otherwise leave
+                # a truncated archive that costs another full re-embed.
+                staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp")
+                np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
+                os.replace(staging_path, cache_path)
+            except Exception:
+                self._invoker.services.logger.warning(f"Could not write cluster vocabulary cache to {cache_path}")
+            self._vocab_cache = (vocabulary, embeddings)
 
     def _get_text_encoder(self) -> tuple[Any, Any, bool]:
         with self._text_encoder_lock:
@@ -518,6 +633,13 @@ class ImageIndexService(ImageIndexServiceBase):
                     # abandoned thread writes the database and emits an event
                     # after the app believes the service is down.
                     break
+                if self._vocab_build_requested.is_set():
+                    # Cleared first: a request arriving mid-build wants the
+                    # result of a build that is already covering it, and
+                    # _build_vocab_embeddings is a no-op once one has landed.
+                    self._vocab_build_requested.clear()
+                    self._build_vocab_embeddings()
+                    continue
                 projection_job = self._next_projection_job()
                 if projection_job is not None:
                     self._process_projection(*projection_job)

@@ -3,7 +3,7 @@ import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { StreamingImageSource } from '@platform/ui/streaming-image/streamingImageSource';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { Box, ChakraProvider } from '@chakra-ui/react';
 import {
   DndContext,
   KeyboardSensor,
@@ -19,6 +19,7 @@ import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/reac
 import { isGalleryImageDragData } from '@features/gallery/utility';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { PreviewFilmstrip } from '@workbench/widgets/preview/PreviewFilmstrip';
@@ -347,9 +348,11 @@ const DragMonitor = () => {
 };
 
 const Harness = ({
+  background = 'bg',
   coMountPreviewSources = false,
   gallery,
 }: {
+  background?: 'bg' | 'bg.panel';
   coMountPreviewSources?: boolean;
   gallery: GalleryStateView;
 }) => {
@@ -376,7 +379,9 @@ const Harness = ({
             <GalleryWidgetContext value={contextValue}>
               <DndContext sensors={sensors}>
                 <DragMonitor />
-                <GalleryImageGrid />
+                <Box bg={background} data-testid="gallery-surface" h="full">
+                  <GalleryImageGrid />
+                </Box>
                 {coMountPreviewSources ? (
                   <>
                     <PreviewFrame
@@ -413,9 +418,15 @@ const interact = (action: () => void, delay = 0): Promise<void> =>
     });
   });
 
-const renderGallery = async (gallery = currentGallery, coMountPreviewSources = false) => {
+const renderGallery = async (
+  gallery = currentGallery,
+  coMountPreviewSources = false,
+  background: 'bg' | 'bg.panel' = 'bg'
+) => {
   currentGallery = gallery;
-  await interact(() => root?.render(<Harness coMountPreviewSources={coMountPreviewSources} gallery={gallery} />));
+  await interact(() =>
+    root?.render(<Harness background={background} coMountPreviewSources={coMountPreviewSources} gallery={gallery} />)
+  );
 };
 
 const getButton = (label: string): HTMLButtonElement => {
@@ -473,6 +484,7 @@ describe('GalleryImageGrid mixed item cells', () => {
 
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     expect(trigger.textContent).toContain('Starred');
+    expect(trigger.closest('[role="list"]')).toBeNull();
     expect(starredSection?.querySelector('button[aria-label="Select starred.png for preview"]')).not.toBeNull();
     expect(regularSection?.querySelector('button[aria-label="Select regular.png for preview"]')).not.toBeNull();
     expect(
@@ -480,6 +492,33 @@ describe('GalleryImageGrid mixed item cells', () => {
         row.getAttribute('data-gallery-section')
       )
     ).toEqual(['starred', 'regular']);
+  });
+
+  it.each(['bg', 'bg.panel'] as const)('keeps the starred count readable on the %s surface', async (background) => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'starred.png', { starred: true }), createItem('image', 'regular.png')],
+      }),
+      false,
+      background
+    );
+
+    const trigger = getButton('Collapse starred items');
+    const count = [...trigger.querySelectorAll<HTMLElement>('span')].find((span) => span.textContent === '1');
+    const surface = host?.querySelector<HTMLElement>('[data-testid="gallery-surface"]');
+
+    if (!count || !surface) {
+      throw new Error('Expected the starred count and gallery surface');
+    }
+
+    const countStyle = getComputedStyle(count);
+    const ratio = getContrastRatio(
+      countStyle.color,
+      getComputedStyle(surface).backgroundColor,
+      Number(countStyle.opacity)
+    );
+
+    expect(ratio).toBeGreaterThanOrEqual(4.5);
   });
 
   it('matches board disclosure chrome while retaining the star marker', async () => {
