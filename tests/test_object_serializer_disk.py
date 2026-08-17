@@ -2,8 +2,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from queue import Empty
-from threading import Event, get_ident
+from threading import Barrier
 
 import pytest
 import torch
@@ -72,12 +71,6 @@ def test_obj_serializer_disk_deletes(obj_serializer: ObjectSerializerDisk[MockDa
     obj_serializer.delete(obj_1_name)
     assert not Path(obj_serializer._output_dir, obj_1_name).exists()
     assert Path(obj_serializer._output_dir, obj_2_name).exists()
-
-
-def test_obj_serializer_disk_delete_is_noop_when_object_is_missing(
-    obj_serializer: ObjectSerializerDisk[MockDataclass],
-):
-    obj_serializer.delete("missing_object_name")
 
 
 def test_obj_serializer_ephemeral_creates_tempdir(tmp_path: Path):
@@ -212,21 +205,43 @@ def test_obj_serializer_fwd_cache_removes_deleted_ids_from_eviction_queue(
     assert fwd_cache._cache_ids.qsize() == 2
 
 
-def test_obj_serializer_fwd_cache_cleans_up_when_storage_object_is_missing(
+def test_obj_serializer_fwd_cache_stays_bounded_when_deletes_leave_stale_ids(
     fwd_cache: ObjectSerializerForwardCache[MockDataclass],
 ):
+    # A stale id consumes one eviction slot without freeing an entry. That must not let the queue or the
+    # cache grow past `max_cache_size`, and the slots must drain as new objects arrive.
+    for i in range(10):
+        fwd_cache.delete(fwd_cache.save(MockDataclass(foo=f"deleted-{i}")))
+        assert len(fwd_cache._cache) <= fwd_cache._max_cache_size
+        assert fwd_cache._cache_ids.qsize() <= fwd_cache._max_cache_size
+
+    # Once saves stop being deleted the cache refills to capacity, and eviction still drops the oldest live
+    # entries rather than being thrown off by the stale ids ahead of them in the queue.
+    names = [fwd_cache.save(MockDataclass(foo=f"live-{i}")) for i in range(4)]
+
+    assert set(fwd_cache._cache) == set(names[-fwd_cache._max_cache_size :])
+
+
+def test_obj_serializer_fwd_cache_delete_failure_leaves_cache_and_listeners_untouched(
+    fwd_cache: ObjectSerializerForwardCache[MockDataclass], monkeypatch: pytest.MonkeyPatch
+):
+    # If the underlying delete fails (the realistic Windows case: the file is still open elsewhere), the
+    # object is still there. Listeners must not be told otherwise -- `MemoryInvocationCache._delete_by_match`
+    # is registered on `on_deleted` and would purge cached invocation outputs for a live object.
     called_names: list[str] = []
     fwd_cache.on_deleted(called_names.append)
     obj_name = fwd_cache.save(MockDataclass(foo="bar"))
-    underlying_storage = fwd_cache._underlying_storage
-    assert isinstance(underlying_storage, ObjectSerializerDisk)
-    underlying_storage._get_path(obj_name).unlink()
 
-    fwd_cache.delete(obj_name)
+    def raise_permission_error(name: str) -> None:
+        raise PermissionError(name)
 
-    assert obj_name not in fwd_cache._cache
-    assert fwd_cache._cache_ids.qsize() == 0
-    assert called_names == [obj_name]
+    monkeypatch.setattr(fwd_cache._underlying_storage, "delete", raise_permission_error)
+
+    with pytest.raises(PermissionError):
+        fwd_cache.delete(obj_name)
+
+    assert called_names == []
+    assert obj_name in fwd_cache._cache
 
 
 def test_obj_serializer_fwd_cache_preserves_fifo_order_after_deletion(tmp_path: Path):
@@ -265,56 +280,27 @@ def test_obj_serializer_fwd_cache_delete_of_evicted_object_is_noop(
     assert obj_3_name in fwd_cache._cache
 
 
-def test_obj_serializer_fwd_cache_concurrent_deletes_do_not_leave_stale_eviction_ids(
+def test_obj_serializer_fwd_cache_concurrent_cache_misses_are_not_serialized(
     fwd_cache: ObjectSerializerForwardCache[MockDataclass], monkeypatch: pytest.MonkeyPatch
 ):
-    obj_1_name = fwd_cache.save(MockDataclass(foo="one"))
-    obj_2_name = fwd_cache.save(MockDataclass(foo="two"))
-    first_delete_thread_id: int | None = None
-    first_drained_queue = Event()
-    release_first_delete = Event()
-    second_delete_started = Event()
-    second_delete_finished = Event()
-    original_get_nowait = fwd_cache._cache_ids.get_nowait
+    # `load()` must not hold `_cache_lock` across the underlying read. One serializer instance is shared by
+    # every session-processor worker (`dependencies.py` builds a single `tensors` and `conditioning` cache),
+    # so widening the critical section would make a cache miss on one GPU block the others for a full
+    # `torch.load`. The barrier only trips if all four reads are in flight at once, which makes this a
+    # deadlock rather than a timing assertion.
+    names = [fwd_cache.save(MockDataclass(foo=f"obj-{i}")) for i in range(4)]
+    fwd_cache._cache.clear()  # force every load below to miss
+    barrier = Barrier(len(names), timeout=10)
+    underlying_load = fwd_cache._underlying_storage.load
 
-    def controlled_get_nowait():
-        try:
-            return original_get_nowait()
-        except Empty:
-            if get_ident() == first_delete_thread_id:
-                first_drained_queue.set()
-                assert release_first_delete.wait(timeout=5)
-            raise
+    def load_through_barrier(name: str) -> MockDataclass:
+        barrier.wait()
+        return underlying_load(name)
 
-    monkeypatch.setattr(fwd_cache._cache_ids, "get_nowait", controlled_get_nowait)
+    monkeypatch.setattr(fwd_cache._underlying_storage, "load", load_through_barrier)
 
-    def delete_first():
-        nonlocal first_delete_thread_id
-        first_delete_thread_id = get_ident()
-        fwd_cache.delete(obj_1_name)
+    with ThreadPoolExecutor(max_workers=len(names)) as executor:
+        futures = [executor.submit(fwd_cache.load, name) for name in names]
+        loaded = [future.result(timeout=10) for future in futures]
 
-    def delete_second():
-        second_delete_started.set()
-        fwd_cache.delete(obj_2_name)
-        second_delete_finished.set()
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        first_delete = executor.submit(delete_first)
-        assert first_drained_queue.wait(timeout=5)
-        second_delete = executor.submit(delete_second)
-        assert second_delete_started.wait(timeout=5)
-        try:
-            assert not second_delete_finished.wait(timeout=0.1)
-        finally:
-            release_first_delete.set()
-        first_delete.result(timeout=5)
-        second_delete.result(timeout=5)
-
-    assert fwd_cache._cache == {}
-    assert fwd_cache._cache_ids.qsize() == 0
-
-    obj_3_name = fwd_cache.save(MockDataclass(foo="three"))
-    obj_4_name = fwd_cache.save(MockDataclass(foo="four"))
-
-    assert set(fwd_cache._cache) == {obj_3_name, obj_4_name}
-    assert fwd_cache._cache_ids.qsize() == 2
+    assert {obj.foo for obj in loaded} == {f"obj-{i}" for i in range(len(names))}

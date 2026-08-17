@@ -1,5 +1,5 @@
-from queue import Empty, Queue
-from threading import RLock
+from queue import Queue
+from threading import Lock
 from typing import TYPE_CHECKING, Optional, TypeVar
 
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
@@ -22,9 +22,9 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         self._cache: dict[str, T] = {}
         self._cache_ids = Queue[str]()
         self._max_cache_size = max_cache_size
-        # Guards the in-memory cache and eviction queue so concurrent session-processor workers (multi-GPU)
-        # cannot interleave cache transitions. Reentrancy allows transition helpers to share this lock.
-        self._cache_lock = RLock()
+        # Guards the in-memory cache so concurrent session-processor workers (multi-GPU) can't race
+        # the check-then-evict in `_set_cache` (which could otherwise raise KeyError on eviction).
+        self._cache_lock = Lock()
 
     def start(self, invoker: "Invoker") -> None:
         self._invoker = invoker
@@ -39,14 +39,13 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
             stop_op(invoker)
 
     def load(self, name: str) -> T:
-        with self._cache_lock:
-            cache_item = self._get_cache(name)
-            if cache_item is not None:
-                return cache_item
+        cache_item = self._get_cache(name)
+        if cache_item is not None:
+            return cache_item
 
-            obj = self._underlying_storage.load(name)
-            self._set_cache(name, obj)
-            return obj
+        obj = self._underlying_storage.load(name)
+        self._set_cache(name, obj)
+        return obj
 
     def save(self, obj: T) -> str:
         name = self._underlying_storage.save(obj)
@@ -54,30 +53,11 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
         return name
 
     def delete(self, name: str) -> None:
-        try:
-            with self._cache_lock:
-                try:
-                    self._underlying_storage.delete(name)
-                finally:
-                    if name in self._cache:
-                        del self._cache[name]
-                        self._remove_cache_id(name)
-        finally:
-            self._on_deleted(name)
-
-    def _remove_cache_id(self, name: str) -> None:
+        self._underlying_storage.delete(name)
         with self._cache_lock:
-            remaining_ids: list[str] = []
-            while True:
-                try:
-                    cache_id = self._cache_ids.get_nowait()
-                except Empty:
-                    break
-                if cache_id != name:
-                    remaining_ids.append(cache_id)
-
-            for cache_id in remaining_ids:
-                self._cache_ids.put(cache_id)
+            if name in self._cache:
+                del self._cache[name]
+        self._on_deleted(name)
 
     def _get_cache(self, name: str) -> Optional[T]:
         with self._cache_lock:
@@ -89,4 +69,9 @@ class ObjectSerializerForwardCache(ObjectSerializerBase[T]):
                 self._cache[name] = data
                 self._cache_ids.put(name)
                 if self._cache_ids.qsize() > self._max_cache_size:
-                    self._cache.pop(self._cache_ids.get())
+                    # `delete()` drops the entry from `_cache` but leaves its id in `_cache_ids`, so the id
+                    # popped for eviction may name an object that is already gone. Tolerate that instead of
+                    # raising: the stale id has simply consumed its eviction slot, and the next `_set_cache`
+                    # refills it. Draining the queue on delete would keep the two exactly in step, but costs
+                    # an O(n) rebuild on a path that only ever needs the ids in FIFO order.
+                    self._cache.pop(self._cache_ids.get(), None)
