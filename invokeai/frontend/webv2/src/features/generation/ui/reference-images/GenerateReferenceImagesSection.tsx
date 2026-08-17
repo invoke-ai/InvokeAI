@@ -30,10 +30,18 @@ import {
 } from '@platform/state/accountLifecycle';
 import { Button, DropZone } from '@platform/ui';
 import { UploadIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ReferenceImageCard } from './ReferenceImageCard';
+/**
+ * Reference image controls are ~130 KB of per-adapter UI (FLUX Redux, IP-Adapter,
+ * CLIP vision selection) that only render once the user actually has a reference
+ * image. The section itself — drop zone, add button, empty state — stays eager so
+ * the form never reflows.
+ */
+const ReferenceImageCard = lazy(() =>
+  import('./ReferenceImageCard').then((module) => ({ default: module.ReferenceImageCard }))
+);
 
 const UPLOAD_ZONE_HOVER_STYLES = { bg: 'bg.muted', color: 'fg' };
 
@@ -288,19 +296,21 @@ export const GenerateReferenceImagesSection = ({
         </HStack>
 
         {referenceImageCount > 0 ? (
-          <Stack gap="2">
-            {referenceImages.map((referenceImage, index) => (
-              <ReferenceImageCard
-                key={referenceImage.id}
-                index={index}
-                referenceImage={referenceImage}
-                selectedModel={selectedModel}
-                onPatch={patchReferenceImage}
-                onRemove={removeReferenceImage}
-                onUseSize={applyReferenceImageSize}
-              />
-            ))}
-          </Stack>
+          <Suspense fallback={null}>
+            <Stack gap="2">
+              {referenceImages.map((referenceImage, index) => (
+                <ReferenceImageCard
+                  key={referenceImage.id}
+                  index={index}
+                  referenceImage={referenceImage}
+                  selectedModel={selectedModel}
+                  onPatch={patchReferenceImage}
+                  onRemove={removeReferenceImage}
+                  onUseSize={applyReferenceImageSize}
+                />
+              ))}
+            </Stack>
+          </Suspense>
         ) : null}
 
         <Input
