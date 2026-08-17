@@ -1,6 +1,13 @@
-import { galleryImages, legacyGeneratedImageToGalleryItem } from '@features/gallery';
+import { galleryImages, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+
+export interface MapSelectionActions {
+  /** Select one image (hydrates the item, then gallery.selectItem). */
+  selectImage: (imageName: string) => void;
+  /** Multi-select a cluster with the clicked image as primary. */
+  selectCluster: (primaryImageName: string, imageNames: string[]) => void;
+}
 
 /**
  * Module-scoped, deliberately: the thing being guarded — the gallery selection —
@@ -12,18 +19,18 @@ import { useCallback } from 'react';
 let selectionSequence = 0;
 
 /**
- * Turns a map point's image name into the current gallery selection. The map
- * only knows names; the selection contract wants a full gallery item, so names
- * are hydrated through the bulk by-names resolver — always fresh, since a
- * cached DTO's star/board state can drift. A monotonic sequence guards rapid
- * clicks: only the most recent click may dispatch, so a slow fetch can never
- * overwrite a newer selection. Preview follows the gallery selection on its
- * own.
+ * Turns map clicks into gallery selections. The map only knows names; the
+ * selection contract wants a full gallery item, so names are hydrated through
+ * the bulk by-names resolver — always fresh, since a cached DTO's star/board
+ * state can drift. ONE monotonic sequence spans both selection kinds, so
+ * rapid clicks always resolve to the latest click regardless of which mode
+ * each went through; a slow fetch can never overwrite a newer selection.
+ * Preview follows the gallery selection on its own.
  */
-export const useSelectMapImage = (): ((imageName: string) => void) => {
+export const useMapSelection = (): MapSelectionActions => {
   const commands = useWorkbenchCommands();
 
-  return useCallback(
+  const selectImage = useCallback(
     (imageName: string) => {
       const sequence = ++selectionSequence;
 
@@ -61,4 +68,35 @@ export const useSelectMapImage = (): ((imageName: string) => void) => {
     },
     [commands]
   );
+
+  const selectCluster = useCallback(
+    (primaryImageName: string, imageNames: string[]) => {
+      const sequence = ++selectionSequence;
+
+      galleryImages
+        .resolveMany([primaryImageName])
+        .then((images) => {
+          const image = images.at(0);
+
+          if (!image || sequence !== selectionSequence) {
+            return;
+          }
+
+          // Same reason as `selectImage` above: the multi-selection command
+          // stamps `selectedImageQuery` from the board the gallery is showing,
+          // so without landing on the primary image's board first the query
+          // describes a list none of these images are in.
+          commands.gallery.selectBoard(image.boardId);
+          // Map points are always images, so every key is kind-tagged 'image'.
+          const itemKeys = imageNames.map((name) => toGalleryItemKey({ kind: 'image', name }));
+          commands.gallery.setItemMultiSelection(itemKeys, legacyGeneratedImageToGalleryItem(image));
+        })
+        .catch(() => {
+          // Selection is simply left unchanged on hydrate failure.
+        });
+    },
+    [commands]
+  );
+
+  return useMemo(() => ({ selectCluster, selectImage }), [selectCluster, selectImage]);
 };
