@@ -93,7 +93,6 @@ export type WidgetHost = ComponentType;
 /** Deferred render implementation shared by every slot for one widget type. */
 export interface WidgetImplementation {
   view: WidgetView;
-  host?: WidgetHost;
   headerActions?: WidgetHeaderActions;
   headerLabel?: WidgetHeaderLabel;
   headerMenu?: WidgetHeaderMenu;
@@ -309,8 +308,16 @@ export interface WidgetManifest {
    * failure state, and retry; callers never invoke this directly.
    */
   load: () => Promise<WidgetImplementation>;
-  /** The deferred implementation contains a singleton host mounted at editor boot. */
-  hasHost?: boolean;
+  /**
+   * A singleton runtime the editor mounts once at boot, in its own chunk.
+   *
+   * Deliberately separate from `load`: hosts are data runtimes and dialog
+   * shells that must run whether or not the widget is on screen, so sharing a
+   * module with the view meant every boot paid for the view. Splitting the
+   * loader makes it impossible to declare an always-on part without giving it
+   * its own chunk.
+   */
+  loadHost?: () => Promise<WidgetHost>;
   /** When set, the frame header shows a gear that opens this settings dialog section. */
   settingsSection?: SettingsSectionId;
   state?: WidgetStateRegistration;
@@ -335,6 +342,7 @@ export interface RegisteredWidget {
   manifest: NormalizedWidgetManifest;
   status: 'enabled' | 'disabled' | 'hidden';
   failure?: WidgetFailure;
+  host?: DeferredResource<WidgetHost>;
 }
 
 export interface WidgetFailure {

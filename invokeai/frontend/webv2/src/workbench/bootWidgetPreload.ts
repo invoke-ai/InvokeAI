@@ -93,7 +93,7 @@ export const writeBootWidgetHint = (typeIds: readonly WidgetTypeId[]): void => {
  */
 export const preloadBootWidgets = (): void => {
   for (const widget of getWidgetHosts()) {
-    widget.implementation.preload();
+    widget.host?.preload();
   }
 
   for (const typeId of readBootWidgetHint() ?? getBootWidgetTypeIds(defaultLayoutPreset.snapshot)) {

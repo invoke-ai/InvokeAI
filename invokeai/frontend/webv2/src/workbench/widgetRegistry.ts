@@ -9,6 +9,7 @@ import type {
 
 import { getAuthSession } from '@features/identity';
 
+import { createDeferredResource } from './deferredResource';
 import { createWidgetImplementationResource } from './widgetImplementationResource';
 import { autosaveStatusWidgetManifest } from './widgets/autosave-status/manifest';
 import { canvasWidgetManifest } from './widgets/canvas/manifest';
@@ -96,10 +97,13 @@ export const registerWidgets = (manifests: WidgetManifest[]): RegisteredWidget[]
   manifests.map((rawManifest) => {
     const manifest = normalizeWidgetManifest(rawManifest);
 
+    const host = manifest.loadHost ? createDeferredResource(manifest.loadHost) : undefined;
+
     try {
       validateManifest(manifest);
 
       return {
+        host,
         implementation: createWidgetImplementationResource(manifest.id, manifest.load),
         manifest,
         status: 'enabled' as const,
@@ -110,6 +114,7 @@ export const registerWidgets = (manifests: WidgetManifest[]): RegisteredWidget[]
 
       return {
         failure,
+        host,
         implementation: createWidgetImplementationResource(manifest.id, manifest.load),
         manifest,
         status,
@@ -145,7 +150,7 @@ export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
 
 export const getWidgetHosts = (): RegisteredWidget[] =>
   registeredWidgets.filter(
-    (widget) => widget.status === 'enabled' && widget.manifest.hasHost && isWidgetAvailable(widget)
+    (widget) => widget.status === 'enabled' && widget.host !== undefined && isWidgetAvailable(widget)
   );
 
 export const getWidgetById = (widgetId: WidgetTypeId): RegisteredWidget | undefined =>
