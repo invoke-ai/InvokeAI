@@ -81,6 +81,15 @@ def test_path_resolution_root_not_set(patch_rootdir: None):
     assert config.root_path == expected_root
 
 
+def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    assert InvokeAIAppConfig().wan_memory_optimization is False
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\nwan_memory_optimization: true\n')
+
+    assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
+
+
 def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
