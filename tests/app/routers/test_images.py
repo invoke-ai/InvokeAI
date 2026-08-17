@@ -325,10 +325,13 @@ def test_star_unstar_dedupes_repeated_names(
         "/api/v1/images/unstar",
         "/api/v1/images/images_by_names",
         "/api/v1/images/download",
+        "/api/v1/board_images/batch",
+        "/api/v1/board_images/batch/delete",
     ],
 )
 def test_image_name_batches_are_bounded(monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str) -> None:
-    """An unbounded name list is a free amplification: each name costs a DB lookup."""
+    """An unbounded name list is a free amplification: each name costs at least one DB lookup,
+    and up to six when the caller is reading someone else's shared board."""
     images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
     # /download would otherwise authorize every name and schedule a background task; if the
     # bound ever regresses we want the assertion below to fail, not the service call to blow up.
@@ -336,18 +339,21 @@ def test_image_name_batches_are_bounded(monkeypatch: Any, mock_invoker: Invoker,
     bulk_download.generate_item_id.return_value = "test"
     monkeypatch.setattr(mock_invoker.services, "bulk_download", bulk_download)
 
-    response = client.post(
-        path, json={"image_names": [f"image-{index}.png" for index in range(MAX_IMAGE_BATCH_SIZE + 1)]}
-    )
+    body: dict[str, Any] = {"image_names": [f"image-{index}.png" for index in range(MAX_IMAGE_BATCH_SIZE + 1)]}
+    if path == "/api/v1/board_images/batch":
+        body["board_id"] = "board-1"
+    response = client.post(path, json=body)
     assert response.status_code == 422
 
-    response = client.post(path, json={"image_names": ["x" * 256]})
+    response = client.post(path, json={**body, "image_names": ["x" * 256]})
     assert response.status_code == 422
 
-    # Rejection is FastAPI request validation, so it happens before the route body runs:
-    # no per-name authorization lookups and no background task were scheduled.
-    assert images_service.get_dto.call_count == 0
-    assert bulk_download.generate_item_id.call_count == 0
+    # Rejection is FastAPI request validation, so it lands before the route body runs at all.
+    # These two only bite on the /v1/images routes -- the board_images router reads its own
+    # module-level ApiDependencies, which prepare_image_batch_test does not patch -- but they
+    # are what catches a bound that gets "enforced" inside the handler instead of on the body.
+    assert images_service.mock_calls == []
+    assert bulk_download.mock_calls == []
 
 
 def test_every_image_names_body_is_bounded(client: TestClient) -> None:
@@ -355,22 +361,15 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
 
     /download shipped unbounded because the limits were applied route-by-route rather
     than to the shape. Rather than restate the limit on every route, assert the published
-    contract: every images-router request body that takes an `image_names` array declares
-    both a list bound and a per-name length bound.
-
-    Scoped to /v1/images deliberately. The two /v1/board_images batch routes are unbounded
-    too, but bounding them would reject a >MAX_IMAGE_BATCH_SIZE change-board request that
-    the UI can produce today, so they are left for a follow-up that pairs the bound with
-    client-side chunking.
+    contract: every request body that takes an `image_names` array declares both a list
+    bound and a per-name length bound.
     """
     schema = client.get("/openapi.json").json()
     components = schema["components"]["schemas"]
 
     unbounded: list[str] = []
-    checked = 0
+    checked: list[str] = []
     for path, operations in schema["paths"].items():
-        if not path.startswith("/api/v1/images/"):
-            continue
         for method, operation in operations.items():
             ref = (
                 operation.get("requestBody", {})
@@ -390,12 +389,23 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
             array = next((variant for variant in variants if variant.get("type") == "array"), None)
             if array is None:
                 continue
-            checked += 1
+            checked.append(path)
             if array.get("maxItems") is None or array.get("items", {}).get("maxLength") is None:
                 unbounded.append(f"{method.upper()} {path}")
 
-    # Floor guards against the walk silently matching nothing if the schema shape changes.
-    assert checked >= 5
+    # Pin the exact route set rather than a floor. A floor cannot see the failure this test
+    # exists to catch: a route the walk *skips* (a body that nests image_names inside a model
+    # rather than declaring it flat with Body(embed=True)) leaves the count unchanged and the
+    # guard green. Adding a route here is deliberate — bound it, then add it to this list.
+    assert sorted(checked) == [
+        "/api/v1/board_images/batch",
+        "/api/v1/board_images/batch/delete",
+        "/api/v1/images/delete",
+        "/api/v1/images/download",
+        "/api/v1/images/images_by_names",
+        "/api/v1/images/star",
+        "/api/v1/images/unstar",
+    ]
     assert unbounded == [], f"unbounded image_names batch bodies: {unbounded}"
 
 

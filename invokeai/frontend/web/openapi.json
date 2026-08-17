@@ -15667,9 +15667,11 @@
           },
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The names of the images to add"
           }
@@ -15975,9 +15977,11 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The names of the images to remove"
           }

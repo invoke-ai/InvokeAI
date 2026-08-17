@@ -49,7 +49,14 @@ IMAGE_MAX_AGE = 31536000
 
 # Every name in a batch body costs at least one DB lookup, so an unbounded list lets an
 # authenticated client pin a worker with a single request. Mirrors MAX_VIDEO_BATCH_SIZE
-# in the videos router; comfortably above any selection the UI can produce.
+# in the videos router.
+#
+# "At least one" is doing real work in that sentence. The authorization helpers in _access.py
+# short-circuit on the first hit, so an admin or a direct owner costs 0-1 queries per name --
+# but a user reading someone else's Shared/Public board falls all the way through to
+# boards.get_dto(), which is six queries including three COUNT aggregates over the board's
+# contents. That is the case the bound has to hold, and it is why no route gets a laxer one:
+# the oversized selections this cap rejects are split client-side instead.
 MAX_IMAGE_BATCH_SIZE = 1000
 # Names are UUID-derived filenames; the bound only exists to keep a hostile body from
 # turning into megabytes of SQL parameters.

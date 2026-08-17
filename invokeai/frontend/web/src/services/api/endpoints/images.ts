@@ -1,5 +1,7 @@
+import type { FetchArgs, FetchBaseQueryError, QueryReturnValue } from '@reduxjs/toolkit/query';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { getStore } from 'app/store/nanostores/store';
+import { uniq } from 'es-toolkit';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { toast } from 'features/toast/toast';
@@ -45,6 +47,160 @@ const buildImagesUrl = (path: string = '', query?: Parameters<typeof buildV1Url>
  * // '/api/v1/board_images/some-path'
  */
 const buildBoardImagesUrl = (path: string = '') => buildV1Url(`board_images/${path}`);
+
+/**
+ * The batch routes cap `image_names` server-side (`MAX_IMAGE_BATCH_SIZE` in
+ * `invokeai/app/api/routers/images.py`) so one authenticated client cannot pin a worker with a
+ * single request. Nothing caps a gallery *selection*: select-all reads the whole board's name
+ * list, so one keystroke on a large board produces a selection an order of magnitude past the
+ * cap. Oversized bodies are therefore split client-side into conforming requests.
+ *
+ * Must stay <= the backend constant.
+ */
+const IMAGE_BATCH_CHUNK_SIZE = 1000;
+
+/** Every batch route answers with an object whose values are all name lists. */
+type ImageBatchResult = Record<string, string[]>;
+
+type InvalidateTagsArg = Parameters<typeof api.util.invalidateTags>[0];
+
+/** The `baseQuery` handed to a `queryFn`, matching what `fetchBaseQuery` produces. */
+type ImagesBaseQuery = (
+  args: string | FetchArgs
+) => QueryReturnValue<unknown, FetchBaseQueryError> | PromiseLike<QueryReturnValue<unknown, FetchBaseQueryError>>;
+
+export const chunkImageNames = (image_names: string[]): string[][] => {
+  if (image_names.length <= IMAGE_BATCH_CHUNK_SIZE) {
+    // Single-request path, byte-for-byte what it was before chunking existed. Note this also
+    // covers the empty list: the routes answer it with a well-formed empty result, which
+    // merging zero chunks could not reproduce.
+    return [image_names];
+  }
+  const chunks: string[][] = [];
+  for (let i = 0; i < image_names.length; i += IMAGE_BATCH_CHUNK_SIZE) {
+    chunks.push(image_names.slice(i, i + IMAGE_BATCH_CHUNK_SIZE));
+  }
+  return chunks;
+};
+
+/**
+ * Unions the per-chunk results key-by-key, so callers and `invalidatesTags` see one aggregate
+ * result with the same shape a single request would have returned. Keys are unioned rather
+ * than enumerated because the five batch routes name their outcome list differently
+ * (`deleted_images`, `starred_images`, `added_images`, ...) while sharing `affected_boards`.
+ */
+export const mergeImageBatchResults = <TResult extends ImageBatchResult>(results: TResult[]): TResult => {
+  const merged: ImageBatchResult = {};
+  for (const result of results) {
+    for (const [key, names] of Object.entries(result)) {
+      merged[key] = merged[key] ? uniq(merged[key].concat(names)) : names;
+    }
+  }
+  return merged as TResult;
+};
+
+/**
+ * Builds a `queryFn` that runs a batch mutation one conforming chunk at a time.
+ *
+ * Chunks go sequentially on purpose. Each is already up to `IMAGE_BATCH_CHUNK_SIZE` rows of DB
+ * work, and the server-side bound exists to stop a single client from pinning a worker — firing
+ * the chunks concurrently would hand straight back what the bound took away.
+ *
+ * The mid-run failure is the case that matters, and it resolves to a partial success rather than
+ * an error. Earlier chunks have already been committed by the server; returning a bare error
+ * would discard their payload, which is exactly the bug the partial-failure reporting on these
+ * routes exists to fix. It is not only the RTK cache at stake — `handleDeletions` drives the
+ * gallery selection and strips deleted images out of nodes, canvas layers and reference images
+ * off `result.deleted_images`, and none of that runs on a rejection. So the merged result is
+ * returned, the unreached names are toasted as failures, and only a run where *nothing* landed
+ * surfaces as an error.
+ */
+export const buildChunkedImageBatchQueryFn =
+  <TResult extends ImageBatchResult, TArg extends { image_names: string[] }>(
+    request: (body: TArg) => { url: string; method: string },
+    getTags: (result: TResult) => InvalidateTagsArg
+  ) =>
+  async (
+    arg: TArg,
+    { dispatch }: { dispatch: (action: ReturnType<typeof api.util.invalidateTags>) => unknown },
+    _extraOptions: unknown,
+    baseQuery: ImagesBaseQuery
+  ) => {
+    const results: TResult[] = [];
+    const chunks = chunkImageNames(arg.image_names);
+    for (const [index, image_names] of chunks.entries()) {
+      const response = await baseQuery({ ...request(arg), body: { ...arg, image_names } });
+      if (response.error) {
+        if (results.length === 0) {
+          // Nothing was applied, so this is an ordinary failed request — report it as one.
+          return { error: response.error };
+        }
+        // Everything from this chunk on is unreached, not merely un-reported.
+        const unreached = chunks.slice(index).flat();
+        toastFailedImages(unreached.length);
+        dispatch(api.util.invalidateTags(getTags(mergeImageBatchResults(results))));
+        return { data: mergeImageBatchResults(results) };
+      }
+      results.push(response.data as TResult);
+    }
+    return { data: mergeImageBatchResults(results) };
+  };
+
+/**
+ * Tag sets for the chunked batch mutations. Extracted from the endpoints so the chunked
+ * `queryFn` can invalidate for the chunks that landed before a mid-run failure using the exact
+ * tag set the endpoint publishes on success, rather than a hand-rolled approximation.
+ */
+const getDeleteImagesTags = (result: components['schemas']['DeleteImagesResult']): InvalidateTagsArg => [
+  // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
+  // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
+  // will force those queries to re-fetch, and the requests will of course 404.
+  ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+  'ImageCollectionCounts',
+  { type: 'ImageCollection', id: LIST_TAG },
+];
+
+const getStarImagesTags = (result: components['schemas']['StarredImagesResult']): InvalidateTagsArg => [
+  ...getTagsToInvalidateForImageMutation(result.starred_images),
+  ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+  'ImageCollectionCounts',
+  { type: 'ImageCollection', id: 'starred' },
+  { type: 'ImageCollection', id: 'unstarred' },
+];
+
+const getUnstarImagesTags = (result: components['schemas']['UnstarredImagesResult']): InvalidateTagsArg => [
+  ...getTagsToInvalidateForImageMutation(result.unstarred_images),
+  ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+  'ImageCollectionCounts',
+  { type: 'ImageCollection', id: 'starred' },
+  { type: 'ImageCollection', id: 'unstarred' },
+];
+
+const getAddImagesToBoardTags = (result: components['schemas']['AddImagesToBoardResult']): InvalidateTagsArg => [
+  ...getTagsToInvalidateForImageMutation(result.added_images),
+  ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+];
+
+const getRemoveImagesFromBoardTags = (
+  result: components['schemas']['RemoveImagesFromBoardResult']
+): InvalidateTagsArg => [
+  ...getTagsToInvalidateForImageMutation(result.removed_images),
+  ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
+];
+
+/**
+ * Surfaces the partial-failure warning. Used for both kinds of partial failure: the names the
+ * server reported it could not apply, and the names a chunked run never reached.
+ */
+const toastFailedImages = (count: number) => {
+  if (count > 0) {
+    toast({
+      id: 'IMAGES_FAILED_TO_UPDATE',
+      title: i18n.t('toast.imagesFailedToUpdate', { count }),
+      status: 'warning',
+    });
+  }
+};
 
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -133,24 +289,11 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/delete']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/images/delete']['post']['requestBody']['content']['application/json']
     >({
-      query: (body) => ({
-        url: buildImagesUrl('delete'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
-        // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
-        // will force those queries to re-fetch, and the requests will of course 404.
-        return [
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: LIST_TAG },
-        ];
-      },
+      queryFn: buildChunkedImageBatchQueryFn(
+        () => ({ url: buildImagesUrl('delete'), method: 'POST' }),
+        getDeleteImagesTags
+      ),
+      invalidatesTags: (result) => (result ? getDeleteImagesTags(result) : []),
     }),
     deleteUncategorizedImages: build.mutation<
       paths['/api/v1/images/uncategorized']['delete']['responses']['200']['content']['application/json'],
@@ -200,37 +343,19 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/star']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/images/star']['post']['requestBody']['content']['application/json']
     >({
-      query: (body) => ({
-        url: buildImagesUrl('star'),
-        method: 'POST',
-        body,
-      }),
+      queryFn: buildChunkedImageBatchQueryFn(
+        () => ({ url: buildImagesUrl('star'), method: 'POST' }),
+        getStarImagesTags
+      ),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
-          if (result.failed_images.length > 0) {
-            toast({
-              id: 'IMAGES_FAILED_TO_UPDATE',
-              title: i18n.t('toast.imagesFailedToUpdate', { count: result.failed_images.length }),
-              status: 'warning',
-            });
-          }
+          toastFailedImages(result.failed_images.length);
         } catch {
           // Global API error handling reports request-level failures.
         }
       },
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.starred_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: 'starred' },
-          { type: 'ImageCollection', id: 'unstarred' },
-        ];
-      },
+      invalidatesTags: (result) => (result ? getStarImagesTags(result) : []),
     }),
     /**
      * Unstar a list of images.
@@ -239,37 +364,19 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/unstar']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/images/unstar']['post']['requestBody']['content']['application/json']
     >({
-      query: (body) => ({
-        url: buildImagesUrl('unstar'),
-        method: 'POST',
-        body,
-      }),
+      queryFn: buildChunkedImageBatchQueryFn(
+        () => ({ url: buildImagesUrl('unstar'), method: 'POST' }),
+        getUnstarImagesTags
+      ),
       async onQueryStarted(_, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
-          if (result.failed_images.length > 0) {
-            toast({
-              id: 'IMAGES_FAILED_TO_UPDATE',
-              title: i18n.t('toast.imagesFailedToUpdate', { count: result.failed_images.length }),
-              status: 'warning',
-            });
-          }
+          toastFailedImages(result.failed_images.length);
         } catch {
           // Global API error handling reports request-level failures.
         }
       },
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.unstarred_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-          'ImageCollectionCounts',
-          { type: 'ImageCollection', id: 'starred' },
-          { type: 'ImageCollection', id: 'unstarred' },
-        ];
-      },
+      invalidatesTags: (result) => (result ? getUnstarImagesTags(result) : []),
     }),
     uploadImage: build.mutation<
       paths['/api/v1/images/upload']['post']['responses']['201']['content']['application/json'],
@@ -429,52 +536,54 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/board_images/batch']['post']['responses']['201']['content']['application/json'],
       paths['/api/v1/board_images/batch']['post']['requestBody']['content']['application/json']
     >({
-      query: (body) => ({
-        url: buildBoardImagesUrl('batch'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.added_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
+      queryFn: buildChunkedImageBatchQueryFn(
+        () => ({ url: buildBoardImagesUrl('batch'), method: 'POST' }),
+        getAddImagesToBoardTags
+      ),
+      invalidatesTags: (result) => (result ? getAddImagesToBoardTags(result) : []),
     }),
     removeImagesFromBoard: build.mutation<
       paths['/api/v1/board_images/batch/delete']['post']['responses']['201']['content']['application/json'],
       paths['/api/v1/board_images/batch/delete']['post']['requestBody']['content']['application/json']
     >({
-      query: (body) => ({
-        url: buildBoardImagesUrl('batch/delete'),
-        method: 'POST',
-        body,
-      }),
-      invalidatesTags: (result) => {
-        if (!result) {
-          return [];
-        }
-        return [
-          ...getTagsToInvalidateForImageMutation(result.removed_images),
-          ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
-        ];
-      },
+      queryFn: buildChunkedImageBatchQueryFn(
+        () => ({ url: buildBoardImagesUrl('batch/delete'), method: 'POST' }),
+        getRemoveImagesFromBoardTags
+      ),
+      invalidatesTags: (result) => (result ? getRemoveImagesFromBoardTags(result) : []),
     }),
     bulkDownloadImages: build.mutation<
       components['schemas']['ImagesDownloaded'],
       components['schemas']['Body_download_images_from_list']
     >({
-      query: ({ image_names, board_id }) => ({
-        url: buildImagesUrl('download'),
-        method: 'POST',
-        body: {
-          image_names,
-          board_id,
-        },
-      }),
+      /**
+       * Chunked like the mutating batch routes, but it cannot merge: each request produces its
+       * own bulk-download item, so an oversized selection becomes several zips rather than one.
+       * That is the cost of keeping the selection downloadable at all — the alternative is a 422
+       * the moment the user hits select-all on a board past the cap.
+       *
+       * Only the first item name is returned, and only to give `matchFulfilled` a name for the
+       * single "preparing" toast. The zips themselves arrive independently: each background task
+       * emits its own `bulk_download_complete`, and the socket handler fetches and saves per
+       * event, keyed on the item name in the event rather than on this payload.
+       */
+      queryFn: async ({ image_names, board_id }, _api, _extraOptions, baseQuery) => {
+        // A board download expands server-side from board_id alone, so there is nothing to split.
+        const chunks = image_names?.length ? chunkImageNames(image_names) : [image_names ?? []];
+        let first: components['schemas']['ImagesDownloaded'] | undefined;
+        for (const chunk of chunks) {
+          const response = await baseQuery({
+            url: buildImagesUrl('download'),
+            method: 'POST',
+            body: { image_names: chunk, board_id },
+          });
+          if (response.error) {
+            return { error: response.error };
+          }
+          first ??= response.data as components['schemas']['ImagesDownloaded'];
+        }
+        return { data: first as components['schemas']['ImagesDownloaded'] };
+      },
     }),
     /**
      * Get ordered list of image names for selection operations
@@ -497,11 +606,28 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/images_by_names']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/images/images_by_names']['post']['requestBody']['content']['application/json']
     >({
-      query: (body) => ({
-        url: buildImagesUrl('images_by_names'),
-        method: 'POST',
-        body,
-      }),
+      /**
+       * Chunked too, despite being a read: `useRangeBasedImageFetching` unions every virtuoso
+       * range seen inside its throttle window, and a dense grid with a 4096px overscan can carry
+       * that past the cap. The failure was silent — the hook swallows the rejection and nothing
+       * listens for it, so the affected thumbnails simply never loaded. Results concatenate
+       * because the route returns a plain ordered list, and the caller only upserts by name.
+       */
+      queryFn: async ({ image_names }, _api, _extraOptions, baseQuery) => {
+        const imageDTOs: ImageDTO[] = [];
+        for (const chunk of chunkImageNames(image_names)) {
+          const response = await baseQuery({
+            url: buildImagesUrl('images_by_names'),
+            method: 'POST',
+            body: { image_names: chunk },
+          });
+          if (response.error) {
+            return { error: response.error };
+          }
+          imageDTOs.push(...(response.data as ImageDTO[]));
+        }
+        return { data: imageDTOs };
+      },
       // Don't provide cache tags - we'll manually upsert into individual getImageDTO caches
       async onQueryStarted(_, { dispatch, queryFulfilled }) {
         try {

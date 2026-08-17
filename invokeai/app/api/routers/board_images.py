@@ -4,6 +4,7 @@ from fastapi.routing import APIRouter
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
+from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE, ImageName
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult
 
 board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
@@ -132,7 +133,9 @@ async def remove_image_from_board(
 async def add_images_to_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Body(description="The id of the board to add to"),
-    image_names: list[str] = Body(description="The names of the images to add", embed=True),
+    image_names: list[ImageName] = Body(
+        description="The names of the images to add", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
+    ),
 ) -> AddImagesToBoardResult:
     """Adds a list of images to a board"""
     _assert_board_write_access(board_id, current_user)
@@ -185,7 +188,9 @@ async def add_images_to_board(
 )
 async def remove_images_from_board(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(description="The names of the images to remove", embed=True),
+    image_names: list[ImageName] = Body(
+        description="The names of the images to remove", embed=True, max_length=MAX_IMAGE_BATCH_SIZE
+    ),
 ) -> RemoveImagesFromBoardResult:
     """Removes a list of images from their board, if they had one"""
     try:
