@@ -139,6 +139,27 @@ dependencies = [
   "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
   "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
 ]
+# Intel XPU (Arc / Battlemage) wheels are published only for linux-x86_64 and
+# windows-amd64 on PyTorch's WHL index. Gate the +xpu pins to those platforms; the
+# Intel oneAPI runtime libs (intel-sycl-rt, etc.) come in automatically as deps of
+# torch+xpu.
+# Pinned ahead of the cpu/cuda extras (2.7.1), as the rocm extra already is. Intel's XPU
+# backend matured considerably after 2.7.1: torch.xpu.mem_get_info() works on driver/kernel
+# combinations where it previously raised, and the bundled oneAPI runtime ships with the wheel
+# (intel-sycl-rt), so upgrading torch upgrades the user-space runtime too.
+"xpu" = [
+  "torch==2.13.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  "torchvision==0.28.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # XPU triton (for torch.compile); the WHL index ships linux-x86_64 and win_amd64 wheels.
+  # Renamed from pytorch-triton-xpu to triton-xpu upstream.
+  "triton-xpu==3.7.2; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # macOS / linux_aarch64 have no +xpu wheels: fall back to base torch so the extra's
+  # conflict-universe always contains a torch. See note under "cpu". These stay on 2.7.1 to
+  # match the other extras and the project's `torch<2.8.0` constraint on darwin -- only the
+  # +xpu wheels above move.
+  "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+  "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+]
 
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
@@ -164,7 +185,7 @@ dependencies = [
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
 override-dependencies = ["opencv-python; sys_platform=='never'"]
-conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
+conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }, { extra = "xpu" }]]
 index-strategy = "unsafe-best-match"
 # Restrict resolution to the platforms we support: x86_64/aarch64 Linux, Windows,
 # and macOS. (ROCm and the PyTorch WHL-index pins are x86_64-only; on aarch64
@@ -180,16 +201,21 @@ torch = [
   { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 torchvision = [
   { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 triton-rocm = [
   { index = "torch-rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
+]
+triton-xpu = [
+  { index = "torch-xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
 ]
 
 [[tool.uv.index]]
@@ -209,6 +235,11 @@ explicit = true
 [[tool.uv.index]]
 name = "torch-rocm"
 url = "https://download.pytorch.org/whl/rocm7.1"
+explicit = true
+
+[[tool.uv.index]]
+name = "torch-xpu"
+url = "https://download.pytorch.org/whl/xpu"
 explicit = true
 
 [project.scripts]

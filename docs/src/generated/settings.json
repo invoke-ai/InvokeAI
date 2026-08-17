@@ -504,7 +504,7 @@
     {
       "category": "DEVICE",
       "default": "auto",
-      "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
+      "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)",
       "env_var": "INVOKEAI_DEVICE",
       "literal_values": [],
       "name": "device",
@@ -515,7 +515,7 @@
     {
       "category": "DEVICE",
       "default": "auto",
-      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users. Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
+      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users \u2014 unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)",
       "env_var": "INVOKEAI_GENERATION_DEVICES",
       "literal_values": [],
       "name": "generation_devices",
@@ -557,6 +557,28 @@
       "env_var": "INVOKEAI_SEQUENTIAL_GUIDANCE",
       "literal_values": [],
       "name": "sequential_guidance",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": false,
+      "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
+      "env_var": "INVOKEAI_WAN_MEMORY_OPTIMIZATION",
+      "literal_values": [],
+      "name": "wan_memory_optimization",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": false,
+      "description": "Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.",
+      "env_var": "INVOKEAI_PID_MEMORY_OPTIMIZATION",
+      "literal_values": [],
+      "name": "pid_memory_optimization",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
@@ -752,6 +774,28 @@
       "name": "scan_models_on_startup",
       "required": false,
       "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": false,
+      "description": "Allow the download queue to fetch from loopback, link-local and private-network addresses. Disabled by default so that a download URL cannot be used to reach services that are only reachable from the server. Enable this only if you install models from a mirror on your own network.",
+      "env_var": "INVOKEAI_ALLOW_PRIVATE_DOWNLOAD_URLS",
+      "literal_values": [],
+      "name": "allow_private_download_urls",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": null,
+      "description": "Optional HTTP proxy for model downloads. The proxy must enforce the public-address policy because proxy-side DNS cannot be checked by InvokeAI.",
+      "env_var": "INVOKEAI_DOWNLOAD_PROXY",
+      "literal_values": [],
+      "name": "download_proxy",
+      "required": false,
+      "type": "typing.Optional[str]",
       "validation": {}
     },
     {
