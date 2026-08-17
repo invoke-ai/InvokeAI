@@ -18,6 +18,7 @@ from invokeai.app.services.image_index.image_index_common import ImageIndexStatu
 from invokeai.app.services.image_index.projection import (
     DEFAULT_CLUSTER_MIN_SAMPLES,
     MAX_CLUSTERED_POINTS,
+    MIN_BUDGETED_EPS,
     cluster_at_eps,
     compute_clusters,
     resolve_cluster_eps,
@@ -101,7 +102,13 @@ class ImageMapRefreshResponse(BaseModel):
 
 ClusterEpsQuery = Query(
     default=None,
-    ge=0.01,
+    # Floored at what the resolver itself can produce, not at a round number:
+    # `_shrink_eps_to_pair_budget` walks down to MIN_BUDGETED_EPS on a map with
+    # near-coincident coordinates (duplicate generations project to the same
+    # spot), and /points reports that value as `cluster_eps` for the client to
+    # pass back here. A higher bound rejects the server's own output, and the
+    # client treats the 422 as "no labels" with nothing logged anywhere.
+    ge=MIN_BUDGETED_EPS,
     le=2.0,
     description="DBSCAN eps for clustering. Defaults to an adaptive value derived from the projection's "
     "k-distance distribution. Clamped server-side relative to the projection's coordinate span.",
@@ -725,6 +732,14 @@ async def get_image_map_cluster_labels(
             # a label set whose visible_hash does not match its points.
             services.logger.exception(f"Image map: clustering failed for user '{user_id}'; serving no labels")
             return {}, visible_hash
+        # Nothing clustered, nothing to label. Worth checking before the gather
+        # below: above MAX_CLUSTERED_POINTS every id is -1 by design, and on a
+        # gallery that large the fancy-index would copy gigabytes purely to
+        # hand label_clusters a set of noise rows it discards.
+        clustered = cluster_ids >= 0
+        if not clustered.any():
+            return {}, visible_hash
+
         cluster_by_name = dict(zip(visible_names, cluster_ids, strict=True))
         # The accessible matrix comes from the same LRU the search endpoint
         # uses — this endpoint fires after every points refresh, and a full
@@ -733,7 +748,13 @@ async def get_image_map_cluster_labels(
             None if is_admin else user_id
         )
         row_by_name = {name: index for index, name in enumerate(accessible_names)}
-        found_names = [name for name in visible_names if name in row_by_name]
+        # Noise rows are excluded here rather than inside label_clusters: they
+        # contribute to no centroid, so gathering them only widens the copy.
+        found_names = [
+            name
+            for name, is_clustered in zip(visible_names, clustered, strict=True)
+            if is_clustered and name in row_by_name
+        ]
         if not found_names:
             return {}, visible_hash
         embeddings = accessible_matrix[[row_by_name[name] for name in found_names]]

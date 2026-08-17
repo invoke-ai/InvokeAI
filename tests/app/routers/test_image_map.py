@@ -844,6 +844,40 @@ def test_image_search_reports_an_encoder_fault_as_a_server_error(
     assert client.get("/api/v1/image_map/search", params={"image_name": "not-indexed.png"}).status_code == 500
 
 
+def test_cluster_labels_skips_the_embedding_gather_when_nothing_clustered(
+    monkeypatch, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # Above MAX_CLUSTERED_POINTS every id is -1 by design, and label_clusters
+    # returns {} for that. Gathering the accessible rows first copies
+    # len(visible) x D float32 for nothing — gigabytes on the large galleries
+    # /points is written for, once per points refresh.
+    from invokeai.app.services.image_index import image_index_default
+
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, ["a.png"], np.zeros((1, 2), dtype=np.float32))
+
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.image_map.compute_clusters",
+        lambda coords, eps=None, min_samples=None: np.full((coords.shape[0],), -1, dtype=np.int64),
+    )
+
+    gathered = []
+    original = image_index_service.get_accessible_embeddings
+
+    def _spy(scope_user):
+        gathered.append(scope_user)
+
+        return original(scope_user)
+
+    monkeypatch.setattr(image_index_service, "get_accessible_embeddings", _spy)
+
+    response = client.get("/api/v1/image_map/cluster_labels")
+
+    assert response.status_code == 200
+    assert response.json()["labels"] == {}
+    assert gathered == [], "the accessible matrix was gathered for a fully-unclustered map"
+
+
 def test_search_by_image_upload_returns_ranked_results(
     image_index_service: FakeImageIndexService, client: TestClient
 ) -> None:

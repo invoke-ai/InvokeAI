@@ -143,7 +143,42 @@ const areLabelMapsEqual = (left: Record<string, string> | null, right: Record<st
  * label response for a different projection — or one overtaken by a newer
  * request — is discarded rather than mislabeling clusters.
  */
+/**
+ * Whether the map is currently showing labels. Pushed down from the widget's
+ * toggle so the request can be skipped outright: labelling costs the server a
+ * DBSCAN pass over the visible set, an embedding gather and a 1675-way matmul
+ * per cluster, and it is precisely the people with galleries large enough to
+ * feel that who turn the labels off.
+ */
+let clusterLabelsEnabled = true;
+
+export const setClusterLabelsEnabled = (enabled: boolean): void => {
+  if (enabled === clusterLabelsEnabled) {
+    return;
+  }
+
+  clusterLabelsEnabled = enabled;
+
+  if (!enabled) {
+    // Bump the sequence so a request already in flight cannot land after this.
+    labelsSequence += 1;
+    imageMapStore.patchSnapshot({ clusterLabels: null });
+
+    return;
+  }
+
+  const { data } = imageMapStore.getSnapshot();
+
+  if (data) {
+    refreshClusterLabels(data);
+  }
+};
+
 const refreshClusterLabels = (data: ImageMapPoints): void => {
+  if (!clusterLabelsEnabled) {
+    return;
+  }
+
   if (data.state !== 'ready') {
     // Nothing to label; a disabled index would 409 on every refresh. Bump the
     // sequence so an in-flight labels response cannot repopulate the labels

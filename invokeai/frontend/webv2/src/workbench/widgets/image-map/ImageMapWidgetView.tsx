@@ -2,7 +2,12 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@workbench/image-map/imageMapSettings';
-import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import {
+  ensureImageMapLoaded,
+  imageMapStore,
+  refreshImageMapPoints,
+  setClusterLabelsEnabled,
+} from '@workbench/image-map/imageMapStore';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
 
@@ -36,6 +41,12 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   useEffect(() => {
     ensureImageMapLoaded();
   }, []);
+
+  // Pushed into the store so turning labels off stops the request, not just the
+  // drawing of what it returns.
+  useEffect(() => {
+    setClusterLabelsEnabled(showClusterLabels);
+  }, [showClusterLabels]);
 
   // Checked before the plot: this is the canvas failing, not a fetch, so
   // re-mounting the plot would just fail again and render an empty box with no

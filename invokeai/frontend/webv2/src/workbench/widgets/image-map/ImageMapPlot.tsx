@@ -216,10 +216,10 @@ const ImageMapPlot = ({
       }
     }
 
-    const layout = buildMapLayout(
-      initialRanges,
-      buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null)
-    );
+    // Annotations are deliberately absent here: they are a layout concern, and
+    // rebuilding the scene for them is what made labels arriving a second after
+    // the points re-materialize every trace. See the relayout effect below.
+    const layout = buildMapLayout(initialRanges);
 
     void Plotly.react(container, traces as Plotly.Data[], layout, {
       displayModeBar: false,
@@ -309,7 +309,7 @@ const ImageMapPlot = ({
     return () => {
       disposed = true;
     };
-  }, [clusterLabels, points, selectCluster, selectImage, showClusterLabels]);
+  }, [points, selectCluster, selectImage]);
 
   // Highlight overlay: the gallery's multi-selection, restyled in place.
   useEffect(() => {
@@ -398,6 +398,25 @@ const ImageMapPlot = ({
       swallow(Plotly.relayout(container, { 'xaxis.range': recentered.x, 'yaxis.range': recentered.y }));
     }
   }, [plotRevision, points, selectedImageName]);
+
+  // Labels arrive about a second after the points they annotate. Applying them
+  // with `relayout` rather than through the scene effect keeps that from
+  // re-materializing every coordinate array — and, more visibly, from resetting
+  // the highlight and current-image traces to empty, which made the gold marker
+  // and the multi-select highlight blink off and back on with every refresh.
+  useEffect(() => {
+    const container = containerRef.current as PlotElement | null;
+
+    if (!container || points === null || !container.data) {
+      return;
+    }
+
+    swallow(
+      Plotly.relayout(container, {
+        annotations: buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null),
+      })
+    );
+  }, [clusterLabels, plotRevision, points, showClusterLabels]);
 
   // Custom zoom handlers + container size tracking, attached once for the
   // plot's lifetime; plotly does not observe its container.
