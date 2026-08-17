@@ -210,7 +210,7 @@ class StableDiffusionGeneratorPipeline(StableDiffusionPipeline):
             return
 
         # The remainder if this code is called when attention_type=='auto'.
-        if self.unet.device.type == "cuda":
+        if self.unet.device.type in ("cuda", "xpu"):
             if is_xformers_available() and prefer_xformers:
                 self.enable_xformers_memory_efficient_attention()
                 return
