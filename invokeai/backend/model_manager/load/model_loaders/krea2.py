@@ -14,7 +14,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import ModelLoader, _device_supports_fp8_storage
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -605,11 +605,11 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         _reject_incomplete_load(model, what="Qwen3-VL encoder checkpoint")
 
         # Keep an fp8 encoder running in fp8 (storage=float8_e4m3fn, per-layer upcast to the compute
-        # dtype during forward) on CUDA. `_should_use_fp8` deliberately excludes text encoders (and the
-        # config has no fp8_storage toggle), so apply the hook-based casting directly here. This roughly
-        # halves the encoder's resident VRAM (~8.9GB bf16 -> ~4.4GB), which avoids partial-load thrashing
-        # when it shares the GPU with a large transformer.
-        if source_is_fp8 and self._torch_device.type == "cuda":
+        # dtype during forward) on devices that support fp8 storage. `_should_use_fp8` deliberately
+        # excludes text encoders (and the config has no fp8_storage toggle), so apply the hook-based
+        # casting directly here. This roughly halves the encoder's resident VRAM (~8.9GB bf16 ->
+        # ~4.4GB), which avoids partial-load thrashing when it shares the GPU with a large transformer.
+        if source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger):
             # `model.dtype` now reports the float8 storage dtype; `_apply_fp8_to_nn_module` records
             # the real compute dtype so callers can recover it via `get_model_compute_dtype`.
             self._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=model_dtype)
