@@ -146,6 +146,7 @@ class MiniMaxH3TransformerField(BaseModel):
     """Transformer field for MiniMax H3 models (FL2VA)."""
 
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class VAEField(BaseModel):

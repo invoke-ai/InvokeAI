@@ -474,7 +474,10 @@
             "label": "",
             "description": ""
           },
-          "end_image": { "name": "end_image", "label": "" },
+          "end_image": {
+            "name": "end_image",
+            "label": ""
+          },
           "vae": {
             "name": "vae",
             "label": "",

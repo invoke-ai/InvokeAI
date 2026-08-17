@@ -7,6 +7,7 @@ import { isMiniMaxH3ReferenceImageConfig } from 'features/controlLayers/store/ty
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { zImageField } from 'features/nodes/types/common';
+import { addMiniMaxH3LoRAs } from 'features/nodes/util/graph/generation/addMiniMaxH3LoRAs';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
@@ -128,6 +129,10 @@ export const buildMiniMaxH3Graph = async (arg: GraphBuilderArg): Promise<GraphBu
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
   g.addEdge(seed, 'value', denoise, 'seed');
+
+  // H3 LoRAs (e.g. the Turbo step-distillation LoRA) rewire the transformer edge through a
+  // collection loader. Works with both the folder transformer and the single-file overrides.
+  addMiniMaxH3LoRAs(state, g, denoise, modelLoader);
 
   g.upsertMetadata({
     model: Graph.getModelMetadataField(modelConfig),

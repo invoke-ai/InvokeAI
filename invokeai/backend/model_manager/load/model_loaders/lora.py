@@ -60,6 +60,9 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
     lora_model_from_krea2_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
+    lora_model_from_minimax_h3_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
@@ -187,6 +190,11 @@ class LoRALoader(ModelLoader):
             # Wan LoRAs use Kohya / diffusers PEFT / native PEFT formats targeting
             # WanTransformer3DModel attention (attn1/attn2) and FFN blocks.
             model = lora_model_from_wan_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.MiniMaxH3:
+            # MiniMax H3 LoRAs use PEFT lora_A/lora_B keys in the checkpoint's native
+            # single-file layout (fused qkv_proj / SwiGLU fc1, adaln_proj). alpha=None
+            # -> alpha=rank, matching the published Turbo LoRA's "no extra scaling".
+            model = lora_model_from_minimax_h3_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 
