@@ -39,7 +39,7 @@ const panelRegions = {
 const WidgetPanelSlot = ({ instanceId, panel }: { instanceId: WidgetInstanceId; panel: keyof typeof panelRegions }) => {
   const projectId = useActiveProjectId();
   const activeIdsElsewhere = useActiveProjectSelector(
-    (project) => getActiveInstanceIdsOutside(project.widgetRegions, panelRegions[panel]),
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, panelRegions[panel], project.floatingWidgets),
     areInstanceIdListsEqual
   );
   const mountedIds = withoutInstancesShownElsewhere(

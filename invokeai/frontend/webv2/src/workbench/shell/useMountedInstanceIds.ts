@@ -62,12 +62,18 @@ export const useMountedInstanceIds = (
  * One instance can be placed in more than one region — `preview` is Compose's
  * centre view and also sits in Edit's and Automate's right rails — so a kept
  * hidden copy can end up shadowing a live one: the same instance mounted twice,
- * one of them a ghost the user can neither see nor dismiss.
+ * one of them a ghost the user can neither see nor dismiss. A floated instance
+ * is the same hazard: `floatWidget` hands its region off to a fallback but
+ * does not touch this hook's remembered set, so the region's kept copy would
+ * otherwise stay mounted hidden while `FloatingWidgetWindow` mounts the same
+ * instance visible — and re-docking would make the stale hidden copy visible
+ * again, silently discarding whatever happened in the floating window.
  *
- * Only the regions' `activeInstanceId` values are consulted. Region membership
- * (`instanceIds`) is the thing a preset replaces wholesale, and deriving
- * anything here from it would reintroduce the very filtering bug this mechanism
- * exists to avoid. Actives are a small, stable signal that cannot.
+ * Only the regions' `activeInstanceId` values and the floating instance ids
+ * are consulted. Region membership (`instanceIds`) is the thing a preset
+ * replaces wholesale, and deriving anything here from it would reintroduce
+ * the very filtering bug this mechanism exists to avoid. Actives and floating
+ * ids are a small, stable signal that cannot.
  */
 export const withoutInstancesShownElsewhere = (
   mountedIds: string[],
@@ -79,14 +85,17 @@ export const withoutInstancesShownElsewhere = (
   return kept.length === mountedIds.length ? mountedIds : kept;
 };
 
-/** The `activeInstanceId` of every region except `region`. */
+/** The `activeInstanceId` of every region except `region`, plus every floating instance id. */
 export const getActiveInstanceIdsOutside = (
   widgetRegions: Record<string, { activeInstanceId: string }>,
-  region: string
-): string[] =>
-  Object.entries(widgetRegions)
+  region: string,
+  floatingWidgets?: Record<string, unknown>
+): string[] => [
+  ...Object.entries(widgetRegions)
     .filter(([name]) => name !== region)
-    .map(([, regionState]) => regionState.activeInstanceId);
+    .map(([, regionState]) => regionState.activeInstanceId),
+  ...Object.keys(floatingWidgets ?? {}),
+];
 
 export const areInstanceIdListsEqual = (left: readonly string[], right: readonly string[]): boolean =>
   left.length === right.length && left.every((id, index) => id === right[index]);

@@ -85,7 +85,7 @@ export const CenterArea = () => {
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
   const projectId = useActiveProjectId();
   const activeIdsElsewhere = useActiveProjectSelector(
-    (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center'),
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center', project.floatingWidgets),
     areInstanceIdListsEqual
   );
   const mountedCenterIds = withoutInstancesShownElsewhere(

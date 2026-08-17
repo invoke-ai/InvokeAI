@@ -147,4 +147,17 @@ describe('instances shown elsewhere', () => {
     // stays available for the centre to keep.
     expect(getActiveInstanceIdsOutside(widgetRegions, 'center')).toEqual(['gallery:bottom', 'generate', 'layers']);
   });
+
+  it('includes floating instance ids, since a float removes an instance from its region entirely', () => {
+    const widgetRegions = {
+      center: { activeInstanceId: 'canvas', instanceIds: ['canvas'] },
+      right: { activeInstanceId: 'layers', instanceIds: ['layers'] },
+    };
+
+    // `floatWidget` hands the region off to a fallback, so `image-map` no
+    // longer appears as any region's active — only the floating map catches
+    // it, which is what keeps the region's kept copy from shadowing the
+    // floating window.
+    expect(getActiveInstanceIdsOutside(widgetRegions, 'right', { 'image-map': {} })).toEqual(['canvas', 'image-map']);
+  });
 });
