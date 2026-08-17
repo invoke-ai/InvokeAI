@@ -1045,6 +1045,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -1458,6 +1461,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                     },
                     {
@@ -1869,6 +1875,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -2327,6 +2336,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -2809,6 +2821,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -4139,6 +4154,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -15423,6 +15441,9 @@
           },
           {
             "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
           },
           {
             "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -36267,6 +36288,12 @@
                   "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
                 },
                 {
@@ -36853,6 +36880,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
@@ -45119,6 +45149,12 @@
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
               },
               {
@@ -45662,6 +45698,9 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
@@ -46498,6 +46537,12 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
@@ -47486,6 +47531,12 @@
           "minimax_h3_latents_to_video": {
             "$ref": "#/components/schemas/VideoOutput"
           },
+          "minimax_h3_lora_collection_loader": {
+            "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+          },
+          "minimax_h3_lora_loader": {
+            "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+          },
           "minimax_h3_model_loader": {
             "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
           },
@@ -48006,6 +48057,8 @@
           "minimax_h3_ideal_dimensions",
           "minimax_h3_latents_to_image",
           "minimax_h3_latents_to_video",
+          "minimax_h3_lora_collection_loader",
+          "minimax_h3_lora_loader",
           "minimax_h3_model_loader",
           "minimax_h3_text_encoder",
           "mlsd_detection",
@@ -48808,6 +48861,12 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
@@ -49886,6 +49945,12 @@
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3LatentsToVideoInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/MiniMaxH3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/MiniMaxH3ModelLoaderInvocation"
@@ -56193,6 +56258,158 @@
         ],
         "title": "LoRA_LyCORIS_Krea2_Config",
         "description": "Model config for Krea-2 LoRA models in LyCORIS (single-file diffusers PEFT) format."
+      },
+      "LoRA_LyCORIS_MiniMaxH3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "minimax-h3",
+            "title": "Base",
+            "default": "minimax-h3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_MiniMaxH3_Config",
+        "description": "Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.\n\nH3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the\n``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.\nDetection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``\nunder a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict\ncarrying another architecture's signature \u2014 see\n``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``\nalone would not be safe."
       },
       "LoRA_LyCORIS_QwenImage_Config": {
         "properties": {
@@ -67287,7 +67504,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
@@ -67850,6 +68067,219 @@
           "$ref": "#/components/schemas/VideoOutput"
         }
       },
+      "MiniMaxH3LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a collection of LoRAs to a MiniMax H3 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs to apply. May be a single LoRA or a collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "minimax_h3_lora_collection_loader",
+            "default": "minimax_h3_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "minimax"],
+        "title": "Apply LoRA Collection - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+        }
+      },
+      "MiniMaxH3LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to a MiniMax H3 transformer (e.g. the Turbo step-distillation LoRA).",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["minimax-h3"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "Strength of the LoRA. The Turbo LoRA is trained for 1.0; adjust only to trade off motion artifacts (raise slightly) against over-sharpening (lower slightly).",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "minimax_h3_lora_loader",
+            "default": "minimax_h3_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "minimax"],
+        "title": "Apply LoRA - MiniMax H3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+        }
+      },
+      "MiniMaxH3LoRALoaderOutput": {
+        "class": "output",
+        "description": "MiniMax H3 LoRA loader output.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "MiniMax H3 Transformer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_lora_loader_output",
+            "default": "minimax_h3_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "type", "type"],
+        "title": "MiniMaxH3LoRALoaderOutput",
+        "type": "object"
+      },
       "MiniMaxH3ModelLoaderInvocation": {
         "category": "model",
         "class": "invocation",
@@ -68156,6 +68586,14 @@
           "transformer": {
             "$ref": "#/components/schemas/ModelIdentifierField",
             "description": "Info to load Transformer submodel"
+          },
+          "loras": {
+            "description": "LoRAs to apply on model loading",
+            "items": {
+              "$ref": "#/components/schemas/LoRAField"
+            },
+            "title": "Loras",
+            "type": "array"
           }
         },
         "required": ["transformer"],
@@ -69130,6 +69568,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -69789,6 +70230,9 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
                   },
                   {
@@ -70333,6 +70777,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
               },
               {
@@ -70731,6 +71178,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
@@ -71604,6 +72054,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_MiniMaxH3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_Wan_Config"
