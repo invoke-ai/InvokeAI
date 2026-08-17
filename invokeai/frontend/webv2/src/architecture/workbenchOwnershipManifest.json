@@ -96,6 +96,7 @@
     "canvasStagingView.ts": "workbench",
     "controlAdapters.ts": "workbench",
     "controlLayerChecks.ts": "workbench",
+    "deferredResource.ts": "workbench",
     "floatingWindows.ts": "workbench",
     "focusRegions.tsx": "workbench",
     "generationSettingsOrchestration.ts": "workbench",

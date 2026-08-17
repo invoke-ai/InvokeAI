@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } from 'react';
 
+import type { DeferredResource, DeferredResourceStatus } from './deferredResource';
 import type { DeveloperLogNamespace } from './diagnostics/contracts';
 import type { GraphId } from './graphContracts';
 import type { InvocationSourceId } from './invocationContracts';
@@ -99,15 +100,10 @@ export interface WidgetImplementation {
   footer?: WidgetFooter;
 }
 
-export type WidgetImplementationLoadStatus = 'idle' | 'loading' | 'loaded' | 'failed';
+export type WidgetImplementationLoadStatus = DeferredResourceStatus;
 
 /** Registry-owned, single-flight resource for a deferred widget implementation. */
-export interface WidgetImplementationResource {
-  getStatus: () => WidgetImplementationLoadStatus;
-  load: () => Promise<WidgetImplementation>;
-  preload: () => void;
-  retry: () => Promise<WidgetImplementation>;
-}
+export type WidgetImplementationResource = DeferredResource<WidgetImplementation>;
 
 export interface WidgetLabelProps {
   region: WorkbenchRegion;
