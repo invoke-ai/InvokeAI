@@ -67844,15 +67844,52 @@
             "type": "integer"
           },
           "num_frames": {
-            "default": 124,
-            "description": "Number of output frames at the fixed 24 fps. Must be of the form 17n+5 (5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames for a still image.",
+            "default": "124",
+            "description": "Number of output frames at the fixed 24 fps. Only the video VAE's 17n+5 grid points are offered: 90 (3.75 s) through 345 (14.38 s), plus the single 5-frame block used by the still-image path. The model was trained for 5-15 s, so counts below 124 are usable but off-distribution - handy for quick test renders.",
+            "enum": [
+              "5",
+              "90",
+              "107",
+              "124",
+              "141",
+              "158",
+              "175",
+              "192",
+              "209",
+              "226",
+              "243",
+              "260",
+              "277",
+              "294",
+              "311",
+              "328",
+              "345"
+            ],
             "field_kind": "input",
             "input": "any",
-            "minimum": 5,
-            "orig_default": 124,
+            "orig_default": "124",
             "orig_required": false,
             "title": "Number of Frames",
-            "type": "integer"
+            "type": "string",
+            "ui_choice_labels": {
+              "107": "107 frames - 4.46 s",
+              "124": "124 frames - 5.17 s",
+              "141": "141 frames - 5.88 s",
+              "158": "158 frames - 6.58 s",
+              "175": "175 frames - 7.29 s",
+              "192": "192 frames - 8.00 s",
+              "209": "209 frames - 8.71 s",
+              "226": "226 frames - 9.42 s",
+              "243": "243 frames - 10.12 s",
+              "260": "260 frames - 10.83 s",
+              "277": "277 frames - 11.54 s",
+              "294": "294 frames - 12.25 s",
+              "311": "311 frames - 12.96 s",
+              "328": "328 frames - 13.67 s",
+              "345": "345 frames - 14.38 s",
+              "5": "5 frames - still image only",
+              "90": "90 frames - 3.75 s"
+            }
           },
           "steps": {
             "default": 50,
@@ -67887,7 +67924,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
@@ -68118,7 +68155,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\nApplies the released pipeline's canvas policy: short edge 768, soft area cap of\n768x1344, both axes rounded to the nearest multiple of 32. Only the aspect ratio of\nthe inputs matters. Aspect ratios beyond 1:4 / 4:1 are rejected. Wire from ``Image\nPrimitive``'s width/height outputs and into the width/height of ``Prompt - MiniMax\nH3``, ``Frame Conditioning - MiniMax H3`` and ``Denoise - MiniMax H3`` (all three\nmust share the same canvas).",
+        "description": "Ideal dimensions for MiniMax H3 from a source image's aspect ratio.\n\n\"768 highres\" applies the released pipeline's canvas policy: short edge 768, soft\narea cap of 768x1344. \"768 lowres\" pins the LONG edge to 768 instead, giving a\ncanvas with roughly half the pixels for non-square ratios (e.g. a 2:3 source becomes\n512x768 instead of 768x1152) \u2014 faster and cheaper, at some cost in fidelity since it\nis below the model's training resolution. Both presets round each axis to the\nnearest multiple of 32. Only the aspect ratio of the inputs matters. Aspect ratios\nbeyond 1:4 / 4:1 are rejected. Wire from ``Image Primitive``'s width/height outputs\nand into the width/height of ``Prompt - MiniMax H3``, ``Frame Conditioning - MiniMax\nH3`` and ``Denoise - MiniMax H3`` (all three must share the same canvas).",
         "node_pack": "invokeai",
         "properties": {
           "id": {
@@ -68167,6 +68204,21 @@
             "title": "Height",
             "type": "integer"
           },
+          "target_resolution": {
+            "default": "768 highres",
+            "description": "Canvas preset. '768 highres' is H3's native policy (short edge 768, soft cap 768x1344). '768 lowres' pins the long edge to 768 for smaller, faster test renders (e.g. 512x768 from a 2:3 source) at some cost in fidelity.",
+            "enum": ["768 highres", "768 lowres"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "768 highres",
+            "orig_required": false,
+            "title": "Target Resolution",
+            "type": "string",
+            "ui_choice_labels": {
+              "768 highres": "768 highres (native: short edge 768, cap 768x1344)",
+              "768 lowres": "768 lowres (long edge 768 \u2014 smaller, faster)"
+            }
+          },
           "type": {
             "const": "minimax_h3_ideal_dimensions",
             "default": "minimax_h3_ideal_dimensions",
@@ -68179,7 +68231,7 @@
         "tags": ["minimax", "video", "dimensions", "math"],
         "title": "MiniMax H3 Ideal Dimensions",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/IdealSizeOutput"
         }

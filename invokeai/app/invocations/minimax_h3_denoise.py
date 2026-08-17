@@ -7,6 +7,7 @@ guidance-distilled: no negative prompt, no CFG, one forward per step.
 """
 
 from contextlib import ExitStack
+from typing import Literal, get_args
 
 import torch
 from PIL import Image
@@ -35,12 +36,14 @@ from invokeai.backend.minimax_h3.denoise import denoise
 from invokeai.backend.minimax_h3.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.minimax_h3.packing import (
     MINIMAX_H3_CANVAS_MULTIPLE,
+    MINIMAX_H3_FPS,
     MiniMaxH3PackedSequence,
     audio_latent_num_frames,
     unpack_audio_tokens,
     unpatchify_video_tokens,
     video_latent_num_frames,
 )
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES
 from invokeai.backend.minimax_h3.pruned_adaln_lora import (
     MINIMAX_H3_SILU_TEMB_GRID_URL,
     MiniMaxH3SiluTembGrid,
@@ -49,6 +52,7 @@ from invokeai.backend.minimax_h3.pruned_adaln_lora import (
 from invokeai.backend.minimax_h3.sampling import (
     MINIMAX_H3_PATCH_SIZE,
     MINIMAX_H3_SPATIAL_COMPRESSION,
+    MINIMAX_H3_STILL_NUM_FRAMES,
     MINIMAX_H3_VAE_LATENT_CHANNELS,
     build_denoise_state,
     validate_canvas,
@@ -72,6 +76,40 @@ from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineInterme
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import MiniMaxH3ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
+# The frame count is a choice list rather than a free integer: only `17n + 5` counts exist on the video VAE's
+# chunk grid, and a mistyped value used to surface as a validation error after the graph was already running.
+# The values are strings because that is the only enum shape both workflow editors render as a dropdown.
+MiniMaxH3NumFrames = Literal[
+    "5",
+    "90",
+    "107",
+    "124",
+    "141",
+    "158",
+    "175",
+    "192",
+    "209",
+    "226",
+    "243",
+    "260",
+    "277",
+    "294",
+    "311",
+    "328",
+    "345",
+]
+
+# Fail at import time if the grid constants and the Literal above ever drift apart.
+assert set(get_args(MiniMaxH3NumFrames)) == {
+    str(MINIMAX_H3_STILL_NUM_FRAMES),
+    *(str(n) for n in MINIMAX_H3_VIDEO_FRAME_CHOICES),
+}, "MiniMaxH3NumFrames is out of sync with the 17n+5 frame grid."
+
+MINIMAX_H3_NUM_FRAMES_LABELS: dict[str, str] = {
+    str(MINIMAX_H3_STILL_NUM_FRAMES): f"{MINIMAX_H3_STILL_NUM_FRAMES} frames - still image only",
+    **{str(n): f"{n} frames - {n / MINIMAX_H3_FPS:.2f} s" for n in MINIMAX_H3_VIDEO_FRAME_CHOICES},
+}
+
 
 @invocation_output("minimax_h3_denoise_output")
 class MiniMaxH3DenoiseOutput(BaseInvocationOutput):
@@ -91,7 +129,7 @@ class MiniMaxH3DenoiseOutput(BaseInvocationOutput):
     title="Denoise - MiniMax H3",
     tags=["latents", "video", "audio", "minimax"],
     category="latents",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3DenoiseInvocation(BaseInvocation):
@@ -121,13 +159,14 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
         multiple_of=MINIMAX_H3_CANVAS_MULTIPLE,
         description="Height of the generated video.",
     )
-    num_frames: int = InputField(
-        default=124,
-        ge=5,
-        description="Number of output frames at the fixed 24 fps. Must be of the form 17n+5 "
-        "(5, 22, ..., 124, ...); durations must stay within 5-15 s, except exactly 5 frames "
-        "for a still image.",
+    num_frames: MiniMaxH3NumFrames = InputField(
+        default="124",
+        description="Number of output frames at the fixed 24 fps. Only the video VAE's 17n+5 grid points are "
+        "offered: 90 (3.75 s) through 345 (14.38 s), plus the single 5-frame block used by the still-image "
+        "path. The model was trained for 5-15 s, so counts below 124 are usable but off-distribution - handy "
+        "for quick test renders.",
         title="Number of Frames",
+        ui_choice_labels=MINIMAX_H3_NUM_FRAMES_LABELS,
     )
     steps: int = InputField(
         default=50,
@@ -186,7 +225,10 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> MiniMaxH3DenoiseOutput:
-        validate_num_frames(self.num_frames)
+        # The field is a choice list of grid-aligned strings; validate anyway so a hand-authored graph that
+        # bypasses the dropdown still fails here rather than deep in the VAE.
+        num_frames = int(self.num_frames)
+        validate_num_frames(num_frames)
         validate_canvas(self.height, self.width)
 
         device = TorchDevice.choose_torch_device()
@@ -198,8 +240,8 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
 
         latent_height = self.height // MINIMAX_H3_SPATIAL_COMPRESSION
         latent_width = self.width // MINIMAX_H3_SPATIAL_COMPRESSION
-        num_latent_frames = video_latent_num_frames(self.num_frames)
-        num_audio_latents = audio_latent_num_frames(self.num_frames)
+        num_latent_frames = video_latent_num_frames(num_frames)
+        num_audio_latents = audio_latent_num_frames(num_frames)
 
         keyframe_anchors: tuple[str, ...] = ()
         clean_condition_rows: torch.Tensor | None = None
@@ -373,7 +415,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
                 )
             context.util.signal_progress("Denoising MiniMax H3 audio-video")
             # steps counts sigma grid points (terminal included) -> steps-1 model evaluations.
-            progress = tqdm(total=len(state.timesteps), desc=f"Denoising MiniMax H3 ({self.num_frames} frames)")
+            progress = tqdm(total=len(state.timesteps), desc=f"Denoising MiniMax H3 ({num_frames} frames)")
 
             def callback_with_progress(step: int, total_steps: int, pred_x0_video_rows: torch.Tensor) -> None:
                 progress.update(1)
@@ -410,7 +452,7 @@ class MiniMaxH3DenoiseInvocation(BaseInvocation):
             audio_latents=LatentsField(latents_name=audio_name, seed=self.seed),
             width=self.width,
             height=self.height,
-            num_frames=self.num_frames,
+            num_frames=num_frames,
         )
 
     def _materialize_lora_patches(self, context: InvocationContext) -> list[PatchSpec]:
