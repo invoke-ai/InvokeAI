@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 832550,
+        "brotliBytes": 832543,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 831283,
+        "gzipBytes": 831284,
         "imageRawBytes": 156376,
         "initialRawBytes": 1933972,
         "largestAssetRawBytes": 746305,
@@ -280,10 +280,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 840876,
+        "brotliBytes": 840869,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 839596,
+        "gzipBytes": 839597,
         "imageRawBytes": 157940,
         "initialRawBytes": 1953312,
         "largestAssetRawBytes": 753769,
@@ -298,12 +298,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1029803,
+        "brotliBytes": 1030872,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1025377,
+        "gzipBytes": 1026341,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2524890,
+        "initialRawBytes": 2527694,
         "largestAssetRawBytes": 746305,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 111374,
@@ -436,6 +436,7 @@
           "source:src/features/gallery/core/items.ts",
           "source:src/features/gallery/core/recentImages.ts",
           "source:src/features/gallery/core/selection.ts",
+          "source:src/features/gallery/core/semanticImageQuery.ts",
           "source:src/features/gallery/core/settings.ts",
           "source:src/features/gallery/core/videoPaths.ts",
           "source:src/features/gallery/data/backend.ts",
@@ -828,12 +829,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1040102,
+        "brotliBytes": 1041181,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1035631,
+        "gzipBytes": 1036605,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2550139,
+        "initialRawBytes": 2552971,
         "largestAssetRawBytes": 753769,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 111374,
