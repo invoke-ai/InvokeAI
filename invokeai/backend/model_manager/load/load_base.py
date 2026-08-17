@@ -56,14 +56,36 @@ class LoadedModelWithoutConfig:
     def __init__(self, cache_record: CacheRecord, cache: ModelCache):
         self._cache_record = cache_record
         self._cache = cache
-        release_first_use_grace = getattr(cache, "release_first_use_grace", None)
-        self._first_use_finalizer = (
-            finalize(self, release_first_use_grace, cache_record)
-            if cache_record.awaiting_first_use and release_first_use_grace is not None
-            else None
+        # Shield the record for the window between get() and this wrapper's first lock: without
+        # it, an eviction sweep racing that gap — a peer's budget reconcile, another model's
+        # make-room, or the cache's shutdown() — would evict the record out from under this
+        # wrapper, detaching it from the cache's RAM accounting and (for shared weights) from
+        # store ownership while its tensors live on. The hold is released exactly once: on the
+        # first lock (_end_first_use_window), or by the finalizer below if this wrapper is
+        # dropped without ever locking. The finalizer also covers the put()-set admission grace
+        # for a record whose hold could not be armed (no deferred worker running).
+        release_grace = getattr(cache, "release_first_use_grace", None)
+        register_hold = getattr(cache, "register_first_use_hold", None)
+        self._holds_first_use = (
+            bool(register_hold(cache_record)) if register_hold is not None and release_grace is not None else False
         )
-        if self._first_use_finalizer is not None:
+        self._first_use_finalizer = None
+        if release_grace is not None and (self._holds_first_use or cache_record.awaiting_first_use):
+            self._first_use_finalizer = finalize(self, release_grace, cache_record, self._holds_first_use)
             self._first_use_finalizer.atexit = False
+
+    def _end_first_use_window(self) -> None:
+        """This wrapper's first lock ended its get()->lock() window: the record is now pinned by
+        its lock count, so drop the abandonment finalizer and release the first-use hold. Runs at
+        most once — later re-entries of the context manager find nothing to release."""
+        if self._first_use_finalizer is not None:
+            self._first_use_finalizer.detach()
+            self._first_use_finalizer = None
+        if self._holds_first_use:
+            self._holds_first_use = False
+            release_hold = getattr(self._cache, "release_first_use_hold", None)
+            if release_hold is not None:
+                release_hold(self._cache_record)
 
     def __enter__(self) -> AnyModel:
         # Hold the MODEL_LOAD_LOCK read lock across the VRAM load (lock() runs
@@ -72,8 +94,7 @@ class LoadedModelWithoutConfig:
         # Acquired before the cache's own lock to keep a consistent lock order (see MODEL_LOAD_LOCK).
         with MODEL_LOAD_LOCK.read_lock():
             self._cache.lock(self._cache_record, None)
-        if self._first_use_finalizer is not None:
-            self._first_use_finalizer.detach()
+        self._end_first_use_window()
         try:
             self.repair_required_tensors_on_device()
             return self.model
@@ -96,8 +117,7 @@ class LoadedModelWithoutConfig:
         # See __enter__ for why the VRAM load is wrapped in the read lock.
         with MODEL_LOAD_LOCK.read_lock():
             self._cache.lock(self._cache_record, working_mem_bytes)
-        if self._first_use_finalizer is not None:
-            self._first_use_finalizer.detach()
+        self._end_first_use_window()
         try:
             self.repair_required_tensors_on_device()
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
@@ -113,8 +133,7 @@ class LoadedModelWithoutConfig:
     def model_in_ram(self) -> Generator[AnyModel, None, None]:
         """Pin the model's cache record in RAM without moving the model to its execution device."""
         self._cache.lock_in_ram(self._cache_record)
-        if self._first_use_finalizer is not None:
-            self._first_use_finalizer.detach()
+        self._end_first_use_window()
         try:
             yield self.model
         finally:

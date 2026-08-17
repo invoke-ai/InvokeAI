@@ -241,6 +241,219 @@ def test_no_duplicate_canonical_when_peer_reloads_after_shutdown(mock_logger):
         cache_b.shutdown()
 
 
+def test_shutdown_retains_record_inside_get_to_lock_window(mock_logger):
+    """shutdown() racing the gap between get() and the LoadedModel's first lock must retain the
+    record (JPPhoto review, 2026-08-13): a warm record is past its admission grace, so without
+    the wrapper's first-use hold the sweep would evict it, releasing shared-store ownership while
+    the holder proceeds to lock the detached record — and a peer's reload of the same key would
+    then mint a duplicate canonical copy that the budget counts only once."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("m", DummyModule())
+        _use_and_release(cache_a, "m")  # warm: past the admission grace, unlocked
+
+        # A generation retrieves the model; shutdown() lands before it enters the context.
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache_a.get("m"), cache=cache_a)
+        canonical_before = store.peek("m")
+        cache_a.shutdown()
+
+        record = cache_a._cached_models.get("m")
+        assert record is loaded_model._cache_record, "shutdown() evicted the record mid-window"
+        assert record.is_stale
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+
+        # A peer reloading the key while the holder is still using it adopts the SAME canonical.
+        with loaded_model as _model:
+            assert cache_a._cached_models.get("m") is loaded_model._cache_record, "locked a detached record"
+            cache_b.put("m", DummyModule())
+            _use_and_release(cache_b, "m")
+            assert store.peek("m") is canonical_before, "peer reload minted a duplicate canonical"
+            assert store.refcount("m") == 2
+            assert budget.total_in_use() == S
+
+        # Exiting the context is the record's last release: the stale mark set at shutdown()
+        # evicts it with its accounting.
+        assert "m" not in cache_a._cached_models
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+    finally:
+        cache_b.shutdown()
+
+
+def test_abandoned_holder_reaches_zero_after_shutdown(mock_logger):
+    """A record retained by the shutdown sweep for a wrapper that is then dropped un-entered must
+    still reach zero (JPPhoto review, 2026-08-13): no unlock() is ever coming, so the wrapper's
+    abandonment finalizer — carried by the deferred worker, which therefore must outlive
+    shutdown() — is the only event left that can evict the record and release its shared-store
+    reference and budget bytes."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+
+    cache.shutdown()
+    assert "m" in cache._cached_models, "shutdown() evicted the record out from under its holder"
+
+    del loaded_model
+    gc.collect()
+    assert _wait_until(lambda: "m" not in cache._cached_models), "the abandoned record was never evicted"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_cold_admission_sweep_does_not_clear_wrapper_holds(mock_logger):
+    """put()'s stale-grace sweep must not unshield a live wrapper: a node may retrieve several
+    models and only then enter their contexts, so another model's cold admission (and its
+    make-room) can land inside a warm wrapper's get()->lock() window. The hold — unlike the
+    put()-set grace — survives the sweep, so a shutdown() after that admission still retains the
+    record for its holder."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("first", DummyModule())
+    _use_and_release(cache, "first")
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("first"), cache=cache)
+    record = loaded_model._cache_record
+    assert record.first_use_holds == 1
+
+    cache.put("second", DummyModule())  # sweeps stale grace flags; must leave holds alone
+    assert record.first_use_holds == 1, "the cold admission cleared a live wrapper's hold"
+
+    cache.shutdown()
+    assert cache._cached_models.get("first") is record, "shutdown() evicted the held record"
+
+    with loaded_model as _model:
+        assert cache._cached_models.get("first") is record, "locked a detached record"
+    assert "first" not in cache._cached_models
+    assert store.refcount("first") == 0
+
+
+def test_post_shutdown_admission_is_evicted_after_its_use(mock_logger):
+    """put() after shutdown() (reachable: Invoker.stop() stops model_manager before
+    session_processor) missed the shutdown sweep, so the record is marked stale at admission —
+    its final release evicts it instead of leaving it resident until process exit."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("early", DummyModule())
+    _use_and_release(cache, "early")
+    cache.shutdown()
+
+    cache.put("late", DummyModule())
+    assert cache._cached_models["late"].is_stale, "a post-shutdown admission must be stale at birth"
+    _use_and_release(cache, "late")
+    assert "late" not in cache._cached_models
+    assert store.refcount("late") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_make_room_skips_held_records(mock_logger):
+    """make_room (another model's cold load, or the keep-alive timeout's clear) must treat a
+    record with a live first-use hold like a locked one: its wrapper is about to lock it, and
+    evicting it would detach the record mid-window. Once the hold is consumed by the first lock,
+    the record is ordinary evictable content again."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("held", DummyModule())
+        _use_and_release(cache, "held")
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("held"), cache=cache)
+
+        cache.make_room(10**12)
+        assert "held" in cache._cached_models, "make_room evicted a held record mid-window"
+
+        with loaded_model as _model:
+            pass
+        cache.make_room(10**12)
+        assert "held" not in cache._cached_models
+    finally:
+        cache.shutdown()
+
+
+def test_drop_model_defers_eviction_for_held_record(mock_logger):
+    """drop_model() must defer a held record exactly as it defers a locked one: mark it stale and
+    let the hold's release perform the eviction, instead of detaching the record from the holder
+    about to lock it."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("m", DummyModule())
+        _use_and_release(cache, "m")
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+        record = loaded_model._cache_record
+
+        dropped = cache.drop_model("m")
+        assert dropped == 0, "drop_model evicted a held record instead of deferring"
+        assert cache._cached_models.get("m") is record
+        assert record.is_stale
+
+        with loaded_model as _model:
+            assert cache._cached_models.get("m") is record, "locked a detached record"
+        assert "m" not in cache._cached_models
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_unlock_stale_eviction_defers_to_live_holder(mock_logger):
+    """The last unlock() of a stale record must not evict it while another wrapper still holds it
+    for its own upcoming lock — that wrapper's own release performs the eviction instead."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    record = cache.get("m")
+    cache.lock(record, None)  # generation A is using the model
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)  # holder B
+
+    cache.shutdown()  # marks the locked record stale
+    cache.unlock(record)  # A finishes; B's hold defers the stale eviction
+    assert cache._cached_models.get("m") is record, "unlock evicted a record another wrapper holds"
+
+    with loaded_model as _model:
+        assert cache._cached_models.get("m") is record, "locked a detached record"
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_worker_death_zeroes_stranded_first_use_holds(mock_logger):
+    """A hold whose abandonment release was dispatched into a dead worker is dropped for good —
+    finalizers fire once — so the next worker start must zero the surviving holds: the
+    alternative is a record shielded from every eviction path for the life of the process."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("m", DummyModule())
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+        record = loaded_model._cache_record
+        assert record.first_use_holds == 1
+
+        # The worker dies (the way a raising log handler would kill it) ...
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        assert cache._deferred_work_thread is not None
+        cache._deferred_work_thread.join(timeout=10)
+        # ... and the wrapper's abandonment release is dispatched into the void.
+        del loaded_model
+        gc.collect()
+        assert record.first_use_holds == 1, "the release was not dropped — dead-worker premise broken"
+
+        # The next admission starts a replacement worker, which clears the stranded hold.
+        cache.put("next", DummyModule())
+        assert record.first_use_holds == 0, "a stranded hold survived the worker restart"
+    finally:
+        cache.shutdown()
+
+
 def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
     """A cache dropped without shutdown() must not strand its shared-weights references:
     the store's refcount and bytes — and therefore the budget total — must return to zero once the
@@ -417,9 +630,11 @@ def test_model_in_ram_on_a_cold_record_ends_the_grace_and_detaches_the_finalizer
         with loaded_model.model_in_ram():
             assert record.is_locked
             assert not record.awaiting_first_use
-            # The grace has been consumed by the pin; the finalizer must be detached so a later GC
-            # of the handle does not queue a redundant grace release.
-            assert not loaded_model._first_use_finalizer.alive
+            # The grace has been consumed by the pin; the finalizer must be dropped (and the
+            # wrapper's first-use hold released) so a later GC of the handle does not queue a
+            # redundant release.
+            assert loaded_model._first_use_finalizer is None
+            assert record.first_use_holds == 0
 
         assert not record.is_locked
         # Post-pin, the record is ordinary evictable cache content.
@@ -1223,16 +1438,30 @@ def test_deferred_worker_start_failure_does_not_fail_the_admission(mock_logger, 
         cache.shutdown()
 
 
-def test_shutdown_stops_deferred_worker(mock_logger):
+def test_deferred_worker_survives_shutdown_and_exits_on_collection(mock_logger):
+    """shutdown() must NOT stop the deferred worker: a record the shutdown sweep retained because
+    a live LoadedModel wrapper had not locked it yet has no future unlock() if that wrapper is
+    simply dropped — the wrapper's abandonment release, carried by the worker, is the only event
+    left that can evict it. The worker exits when the cache itself is collected (via the
+    finalizer registered at worker start), not before."""
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
     cache = _make_cache(store, budget, mock_logger)
     cache.put("model", DummyModule())
 
     cache.shutdown()
-    cache._deferred_work_thread.join(timeout=10)
+    worker = cache._deferred_work_thread
+    assert worker is not None
+    # join() with a timeout rather than a bare is_alive() check: a worker that shutdown() told to
+    # stop may not have consumed the sentinel yet, and a racy alive-reading would pass anyway.
+    worker.join(timeout=2)
+    assert worker.is_alive(), "shutdown() stopped the deferred worker"
 
-    assert not cache._deferred_work_thread.is_alive()
+    cache_ref = weakref.ref(cache)
+    del cache
+    assert _wait_until(lambda: (gc.collect(), cache_ref() is None)[1]), "the cache was not collected"
+    worker.join(timeout=10)
+    assert not worker.is_alive(), "the worker outlived its collected cache"
 
 
 @pytest.mark.parametrize("finalizer_order", ["before_cache_release", "after_cache_release"])
@@ -1624,8 +1853,9 @@ def test_deferred_dispatch_is_dropped_when_no_worker_is_running(mock_logger):
             assert idle_cache.cached_model_keys() == set()
         assert idle_cache._deferred_work_queue.qsize() == 0
 
-        # After shutdown the same must hold for a cache that *does* have a (now stopped) worker.
-        busy_cache.shutdown()
+        # The same must hold for a cache whose worker has died (shutdown() no longer stops the
+        # worker, so simulate a death the way a raising log handler would cause one).
+        busy_cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
         assert busy_cache._deferred_work_thread is not None
         busy_cache._deferred_work_thread.join(timeout=10)
         assert not busy_cache._deferred_work_thread.is_alive()
@@ -1725,33 +1955,49 @@ def test_dropped_non_shared_cache_releases_only_its_budget_charge(mock_logger):
     assert budget.total_in_use() == S
 
 
-def test_admission_without_a_worker_gets_no_first_use_grace(mock_logger):
+def test_admission_without_a_worker_gets_no_first_use_grace_or_holds(mock_logger, monkeypatch):
     """A record must never be shielded from eviction with nothing left able to unshield it.
 
-    put() after shutdown() is reachable in production — Invoker.stop() stops model_manager before
-    session_processor, so an in-flight generation can admit a model after every cache has been shut
-    down — and _ensure_deferred_worker deliberately does not revive the worker there. Granting the
-    grace anyway would leave the record permanently invisible to both asynchronous eviction paths
-    while its bytes stayed charged to the shared budget.
+    put() (and register_first_use_hold) first try to revive a dead worker, so the no-worker state
+    only persists when the thread cannot be started at all (RLIMIT_NPROC, a container's pids.max).
+    Granting the grace — or arming a wrapper hold — there would leave the record permanently
+    invisible to the asynchronous eviction paths while its bytes stayed charged to the shared
+    budget, because the releases both travel through the worker.
     """
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 8), shared_store=store)
     cache = _make_cache(store, budget, mock_logger)
+    real_thread_start = threading.Thread.start
+
+    def fail_worker_start(thread: threading.Thread) -> None:
+        if thread.name == "model-cache-deferred-work":
+            raise RuntimeError("forced thread start failure")
+        real_thread_start(thread)
+
     try:
         cache.put("normal", DummyModule())
         assert cache._cached_models["normal"].awaiting_first_use, "a healthy admission keeps its grace"
+        _use_and_release(cache, "normal")
 
-        cache.shutdown()
+        # Kill the worker, then fail every restart so the cache truly has none.
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
         assert cache._deferred_work_thread is not None
         cache._deferred_work_thread.join(timeout=10)
+        monkeypatch.setattr(threading.Thread, "start", fail_worker_start)
 
         cache.put("late", DummyModule())
         record = cache._cached_models["late"]
-        assert cache._deferred_work_thread is not None and not cache._deferred_work_thread.is_alive()
         assert not record.awaiting_first_use, "admitted with a grace no worker can ever release"
 
-        # Being unshielded, it is reachable by the synchronous eviction path.
+        # A wrapper constructed now must not arm a hold (its finalizer's release would be
+        # dropped), and must therefore not register the finalizer either.
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("late"), cache=cache)
+        assert record.first_use_holds == 0, "armed a hold no worker can ever release"
+        assert loaded_model._first_use_finalizer is None
+
+        # Being unshielded, the record is reachable by the synchronous eviction path.
         cache._delete_cache_entry(record)
         assert "late" not in cache._cached_models
     finally:
+        monkeypatch.undo()
         cache.shutdown()
