@@ -1377,9 +1377,13 @@ class ModelInstallService(ModelInstallServiceBase):
         # subdirectory within the model folder.
 
         if subfolders and len(subfolders) > 1:
-            # Multiple subfolders: create combined name and keep subfolder structure
+            # Multiple subfolders: create combined name and keep subfolder structure. Entries may
+            # also be explicit files (e.g. "modular_model_index.json" or "transformer/config.json");
+            # use their stems in the combined name so it stays a sane directory name.
             top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
-            subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
+            subfolder_names = [
+                (sf.stem if sf.suffix else sf.name).replace("/", "_").replace("\\", "_") for sf in subfolders
+            ]
             combined_name = "_".join(subfolder_names)
             path_to_add = Path(f"{top}_{combined_name}")
 
@@ -1390,6 +1394,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 file_path = model_file.path
                 new_path: Optional[Path] = None
                 for sf in subfolders:
+                    if file_path == top / sf:
+                        # An explicit file entry: keep its repo-relative path so e.g.
+                        # transformer/config.json stays inside transformer/. (relative_to() below
+                        # would return "." here and flatten the file to the model root.)
+                        new_path = path_to_add / sf
+                        break
                     try:
                         # Try to get relative path from this subfolder
                         relative = file_path.relative_to(top / sf)

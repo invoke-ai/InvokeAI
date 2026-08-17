@@ -1,7 +1,10 @@
 import { Flex, FormControl, FormLabel, Icon } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { isExternalModelUnsupportedForTab } from 'features/parameters/components/MainModel/mainModelPickerUtils';
+import {
+  isExternalModelUnsupportedForTab,
+  isSecondarySlotMainModelConfig,
+} from 'features/parameters/components/MainModel/mainModelPickerUtils';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { modelSelected } from 'features/parameters/store/actions';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -16,7 +19,11 @@ export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
-  const [modelConfigs] = useMainModels();
+  const [allModelConfigs] = useMainModels();
+  const modelConfigs = useMemo(
+    () => allModelConfigs.filter((c) => !isSecondarySlotMainModelConfig(c)),
+    [allModelConfigs]
+  );
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {
