@@ -666,18 +666,27 @@ const runKeepAliveStateJourney = async (browser) => {
   const id = 'workbench-keep-alive-state';
 
   /**
-   * Every scroll offset in the panel, in DOM order. Restricted to real scroll
-   * containers — an overflow-clipped label is technically taller than its box
-   * and would otherwise wander into the comparison as noise.
+   * Every scroll offset in the panel, in DOM order, on both axes. Restricted
+   * to real scroll containers — an overflow-clipped label is technically
+   * taller than its box and would otherwise wander into the comparison as
+   * noise. Both `overflowX` and `overflowY` are checked: `Scrollable`
+   * installs `usePreservedScrollOffset` regardless of its own `orientation`
+   * prop, and a horizontal-only strip like the preview filmstrip would
+   * otherwise never be exercised here.
    */
   const SCROLLER_QUERY = `(element) => [...element.querySelectorAll('*')].filter((node) => {
-    const overflowY = getComputedStyle(node).overflowY;
-    return (overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 40;
+    const style = getComputedStyle(node);
+    const scrollsY = (style.overflowY === 'auto' || style.overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 40;
+    const scrollsX = (style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 40;
+    return scrollsY || scrollsX;
   })`;
 
   const readScrollOffsets = (panel) =>
     panel.evaluate(
-      new Function('element', `return (${SCROLLER_QUERY})(element).map((node) => Math.round(node.scrollTop));`)
+      new Function(
+        'element',
+        `return (${SCROLLER_QUERY})(element).map((node) => ({ left: Math.round(node.scrollLeft), top: Math.round(node.scrollTop) }));`
+      )
     );
 
   const scrollAll = (panel, offset) =>
@@ -686,8 +695,11 @@ const runKeepAliveStateJourney = async (browser) => {
         'element',
         'target',
         `const scrollers = (${SCROLLER_QUERY})(element);
-         for (const scroller of scrollers) { scroller.scrollTop = target; }
-         return scrollers.map((scroller) => Math.round(scroller.scrollTop));`
+         for (const scroller of scrollers) {
+           scroller.scrollTop = target;
+           scroller.scrollLeft = target;
+         }
+         return scrollers.map((scroller) => ({ left: Math.round(scroller.scrollLeft), top: Math.round(scroller.scrollTop) }));`
       ),
       offset
     );
@@ -700,12 +712,54 @@ const runKeepAliveStateJourney = async (browser) => {
     const galleryItems = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
     await galleryItems.waitFor();
 
+    // The preview filmstrip only renders once an item is selected — with
+    // nothing selected the centre view is a "No gallery selection" empty
+    // state, filmstrip included.
+    await galleryItems
+      .getByRole('button', { name: /for preview$/ })
+      .first()
+      .click();
+
     const leftPanel = page.getByRole('complementary', { exact: true, name: 'left widget panel' });
     const scrolledLeftOffsets = await scrollAll(leftPanel, 400);
     const scrolledOffsets = await scrollAll(rightPanel, 600);
     assert.ok(
-      scrolledOffsets.length >= 2 && scrolledOffsets.every((offset) => offset > 0),
+      scrolledOffsets.length >= 2 && scrolledOffsets.every(({ left, top }) => top > 0 || left > 0),
       `The representative gallery must have scrollable boards and items; got ${JSON.stringify(scrolledOffsets)}.`
+    );
+
+    // The preview filmstrip is a horizontal-only `Scrollable` living in the
+    // centre region, not either side panel. `usePreservedScrollOffset` is
+    // installed unconditionally inside `Scrollable` regardless of its
+    // `orientation`, so this is the one axis the panel assertions above never
+    // exercise. The filmstrip's items come from the widget's own board-scoped
+    // fetch, a separate round trip from the gallery panel's list, so it is
+    // not necessarily painted yet the instant the panel assertions above are —
+    // waiting for the overflow condition itself, rather than a fixed delay,
+    // is what actually pins that race rather than papering over it.
+    const centerPanel = centerRegion(page);
+    await page.waitForFunction(
+      () => {
+        const region = [...document.querySelectorAll('[role="region"]')].find(
+          (node) => node.getAttribute('aria-label') === 'Center view'
+        );
+
+        return region
+          ? [...region.querySelectorAll('*')].some((node) => {
+              const style = getComputedStyle(node);
+              return (
+                (style.overflowX === 'auto' || style.overflowX === 'scroll') && node.scrollWidth > node.clientWidth + 40
+              );
+            })
+          : false;
+      },
+      undefined,
+      { timeout: 10_000 }
+    );
+    const scrolledCenterOffsets = await scrollAll(centerPanel, 300);
+    assert.ok(
+      scrolledCenterOffsets.some(({ left }) => left > 0),
+      `The representative preview filmstrip must scroll horizontally; got ${JSON.stringify(scrolledCenterOffsets)}.`
     );
     await waitForSettledDocument(page);
 
@@ -742,6 +796,11 @@ const runKeepAliveStateJourney = async (browser) => {
       await readScrollOffsets(leftPanel),
       scrolledLeftOffsets,
       'Returning to a layout must keep a panel body scrolled where the user left it.'
+    );
+    assert.deepEqual(
+      await readScrollOffsets(centerPanel),
+      scrolledCenterOffsets,
+      'Returning to a layout must keep the preview filmstrip scrolled where the user left it.'
     );
 
     if (pageErrors.length > 0) {

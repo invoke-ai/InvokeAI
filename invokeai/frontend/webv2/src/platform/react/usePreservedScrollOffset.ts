@@ -7,9 +7,12 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
  * `display: none`, which takes the element out of layout entirely: it has no
  * scrollable overflow, its `scrollTop` reads 0, and the browser's own scroll
  * restoration only survives if the scrollable content happens to be unchanged
- * when it comes back. A virtualized list sizes its content from a measured
- * viewport, so its content is not unchanged, and the offset is simply lost —
- * the list returns pinned to the top with no scroll event ever having fired.
+ * when it comes back. A plain, non-virtualized list — the gallery's board
+ * list is the real reproduction case — has its content sized from actual DOM
+ * layout, which is not guaranteed to come back identical, and the offset is
+ * simply lost. A virtualized list is not the problem: its content height is a
+ * pure function of row count and estimated sizes rather than of being laid
+ * out at all, so it survives the round trip unaided and needs no help here.
  *
  * The offset is tracked as the user scrolls rather than read back at teardown,
  * because by the time a hidden subtree's effects are cleaned up the element is
@@ -23,7 +26,7 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
  * remembered offset with it, exactly as before.
  */
 export const usePreservedScrollOffset = (ref: RefObject<HTMLElement | null>): void => {
-  const offsetRef = useRef(0);
+  const offsetRef = useRef({ left: 0, top: 0 });
 
   useLayoutEffect(() => {
     const element = ref.current;
@@ -32,12 +35,16 @@ export const usePreservedScrollOffset = (ref: RefObject<HTMLElement | null>): vo
       return;
     }
 
-    if (offsetRef.current > 0) {
-      element.scrollTop = offsetRef.current;
+    if (offsetRef.current.top > 0) {
+      element.scrollTop = offsetRef.current.top;
+    }
+
+    if (offsetRef.current.left > 0) {
+      element.scrollLeft = offsetRef.current.left;
     }
 
     const recordOffset = () => {
-      offsetRef.current = element.scrollTop;
+      offsetRef.current = { left: element.scrollLeft, top: element.scrollTop };
     };
 
     element.addEventListener('scroll', recordOffset, { passive: true });

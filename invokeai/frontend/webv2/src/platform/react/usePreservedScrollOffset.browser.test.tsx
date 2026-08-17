@@ -9,12 +9,24 @@ import { usePreservedScrollOffset } from './usePreservedScrollOffset';
 const VIEWPORT_STYLE = { height: '100px', overflow: 'auto', width: '100px' } as const;
 
 /**
- * Stands in for a virtualized list: the scrollable content is sized from a
- * measurement, so it does not survive the container being taken out of layout.
- * That is what defeats the browser's own scroll restoration, and a container
- * with fixed content would not reproduce the bug at all.
+ * Stands in for a plain, non-virtualized list — the gallery's board list is
+ * the real reproduction case — whose content is sized from actual DOM layout
+ * rather than from a row count, so it does not survive the container being
+ * taken out of layout unchanged. That is what defeats the browser's own
+ * scroll restoration, and a container with fixed content would not reproduce
+ * the bug at all. A virtualized list does not have this problem: its content
+ * height is a pure function of row count and estimated sizes, so it survives
+ * unaided and needs no help from this hook.
  */
-const Scroller = ({ contentHeight, isPreserved }: { contentHeight: number; isPreserved: boolean }) => {
+const Scroller = ({
+  contentHeight,
+  contentWidth = 0,
+  isPreserved,
+}: {
+  contentHeight: number;
+  contentWidth?: number;
+  isPreserved: boolean;
+}) => {
   const preservedRef = useRef<HTMLDivElement>(null);
   const plainRef = useRef<HTMLDivElement>(null);
 
@@ -22,7 +34,7 @@ const Scroller = ({ contentHeight, isPreserved }: { contentHeight: number; isPre
 
   return (
     <div ref={isPreserved ? preservedRef : undefined} data-testid="scroller" style={VIEWPORT_STYLE}>
-      <div style={{ height: `${String(contentHeight)}px` }} />
+      <div style={{ height: `${String(contentHeight)}px`, width: `${String(contentWidth)}px` }} />
     </div>
   );
 };
@@ -30,11 +42,11 @@ const Scroller = ({ contentHeight, isPreserved }: { contentHeight: number; isPre
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const render = async (mode: 'hidden' | 'visible', contentHeight: number, isPreserved: boolean) => {
+const render = async (mode: 'hidden' | 'visible', contentHeight: number, isPreserved: boolean, contentWidth = 0) => {
   await act(async () => {
     root?.render(
       <Activity mode={mode}>
-        <Scroller contentHeight={contentHeight} isPreserved={isPreserved} />
+        <Scroller contentHeight={contentHeight} contentWidth={contentWidth} isPreserved={isPreserved} />
       </Activity>
     );
     await new Promise((resolve) => {
@@ -65,10 +77,23 @@ const scrollTo = async (offset: number) => {
   });
 };
 
+/** Scrolls both axes and lets the real scroll event land. */
+const scrollToBothAxes = async (top: number, left: number) => {
+  const element = scroller();
+
+  await act(async () => {
+    element.scrollTop = top;
+    element.scrollLeft = left;
+    await new Promise((resolve) => {
+      requestAnimationFrame(resolve);
+    });
+  });
+};
+
 /** Hides the container, collapses its measured content, then shows it again. */
-const hideAndShow = async (isPreserved: boolean) => {
-  await render('hidden', 0, isPreserved);
-  await render('visible', 2000, isPreserved);
+const hideAndShow = async (isPreserved: boolean, contentWidth = 0) => {
+  await render('hidden', 0, isPreserved, 0);
+  await render('visible', 2000, isPreserved, contentWidth);
 };
 
 const mount = () => {
@@ -103,9 +128,24 @@ describe('preserved scroll offset', () => {
     // Chrome restores this much on its own when the scrollable content happens
     // to survive, so this pins the contract rather than reproducing the bug —
     // the real reproduction is the `workbench-keep-alive-state` journey, which
-    // runs the actual virtualized gallery.
+    // runs the gallery's actual non-virtualized board list.
     expect(scroller()).toBe(element);
     expect(element.scrollTop).toBe(500);
+  });
+
+  it('keeps both axes across a keep-alive hide and show', async () => {
+    // `Scrollable` installs this hook unconditionally regardless of its own
+    // `orientation` prop, and `PreviewFilmstrip` is a horizontal `Scrollable`
+    // inside the keep-alive-able Preview widget — a vertical-only fix would
+    // leave that filmstrip snapping back to its start on every preset switch.
+    mount();
+    await render('visible', 2000, true, 2000);
+    await scrollToBothAxes(500, 300);
+
+    await hideAndShow(true, 2000);
+
+    expect(scroller().scrollTop).toBe(500);
+    expect(scroller().scrollLeft).toBe(300);
   });
 
   it('does not carry an offset into a genuinely new instance', async () => {
