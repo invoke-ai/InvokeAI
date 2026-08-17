@@ -26,6 +26,27 @@ describe('deferred resource', () => {
     expect(resource.getStatus()).toBe('loaded');
   });
 
+  it('marks the promise rejected with the reason so use() does not suspend on failure either', async () => {
+    const error = new Error('cold');
+    const resource = createDeferredResource(() => Promise.reject(error));
+    const promise = resource.load() as Promise<string> & { reason?: unknown; status?: string };
+
+    await expect(promise).rejects.toThrow('cold');
+
+    expect(promise.status).toBe('rejected');
+    expect(promise.reason).toBe(error);
+  });
+
+  it('keeps the settled fields on the promise handed to later callers', async () => {
+    const resource = createDeferredResource(() => Promise.resolve('value'));
+
+    await resource.load();
+    const again = resource.load() as Promise<string> & { status?: string; value?: string };
+
+    expect(again.status).toBe('fulfilled');
+    expect(again.value).toBe('value');
+  });
+
   it('reports failure and lets retry start a fresh attempt', async () => {
     let attempt = 0;
     const resource = createDeferredResource(() => {
