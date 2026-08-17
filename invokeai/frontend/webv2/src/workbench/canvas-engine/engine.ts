@@ -1812,6 +1812,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     render({ all: true, damage: null, layers: new Set<string>(), overlay: true, view: true });
   };
 
+  let hasEverFitToView = false;
+
   const fitToView = (): void => {
     const doc = mirror.getDocument();
     if (!doc) {
@@ -1827,6 +1829,26 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       }
     }
     viewport.fitToView(bounds, viewport.getViewportSize());
+    hasEverFitToView = true;
+  };
+
+  /**
+   * Fits the document into view only if this engine has never fitted it.
+   *
+   * A surface attaches every time the canvas widget is put on screen, and the
+   * shell keeps widgets mounted across layout switches — so returning to a
+   * layout re-attaches the surface and an unconditional fit would throw away
+   * whatever zoom and pan the user had set. The engine outlives the hide (it is
+   * leased per project and released with a grace period), so it is the thing
+   * that knows whether this is genuinely the canvas's first showing. A fresh
+   * engine has no viewport worth preserving and fits as before.
+   */
+  const fitToViewOnFirstShow = (): void => {
+    if (hasEverFitToView) {
+      return;
+    }
+
+    fitToView();
   };
 
   const isLayerCacheReadyForOp = (layer: CanvasLayerContract, doc: CanvasDocumentContractV2): boolean => {
@@ -2364,7 +2386,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       },
     });
   const surface: CanvasSurfaceCapability = { attach, detach, resize };
-  const viewportCapability: CanvasViewportCapability = { fitToView, getViewport, setBboxGrid };
+  const viewportCapability: CanvasViewportCapability = { fitToView, fitToViewOnFirstShow, getViewport, setBboxGrid };
   const historyCapability: CanvasHistoryCapability = { clearHistory, redo, undo };
   const lifecycle: CanvasLifecycleCapability = {
     activate,

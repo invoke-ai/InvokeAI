@@ -120,11 +120,15 @@ const selectLayoutPreset = async (page, preset, centerView) => {
   // Anchored at both ends, because custom presets share the strip: a loose
   // `^Edit` also matches a user's "Edit copy". The optional suffix is the drift
   // marker the tab folds into its own accessible name.
+  //
+  // Scoped to the strip: the Automate layout's workflow panel has its own "Edit"
+  // tab, so an unscoped tab lookup is ambiguous the moment a journey visits it.
   const name = new RegExp(`^${preset}(, unsaved changes)?$`);
-  const selected = page.getByRole('tab', { name, selected: true });
+  const strip = presetStrip(page);
+  const selected = strip.getByRole('tab', { name, selected: true });
 
   if ((await selected.count()) === 0) {
-    await page.getByRole('tab', { name }).click();
+    await strip.getByRole('tab', { name }).click();
   }
 
   await selected.waitFor();
@@ -644,6 +648,112 @@ const runVideoPreviewJourney = async (browser) => {
   }
 };
 
+/**
+ * State, not nodes.
+ *
+ * The shell keeps widgets mounted across layout switches so returning to a
+ * preset is cheap *and* lands where you left it. Node identity is the easy half
+ * and the automated suites already cover it; the half that actually regressed is
+ * the state those nodes carry. An unconditional `fitToView()` on surface attach
+ * and a scroll container that stops being rendered both throw it away, and
+ * neither is visible to a test that asserts the element is still there.
+ *
+ * Runs the real virtualized gallery and the real canvas engine, because that is
+ * where the loss happens.
+ */
+const runKeepAliveStateJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
+  const id = 'workbench-keep-alive-state';
+
+  /**
+   * Every scroll offset in the panel, in DOM order. Restricted to real scroll
+   * containers — an overflow-clipped label is technically taller than its box
+   * and would otherwise wander into the comparison as noise.
+   */
+  const SCROLLER_QUERY = `(element) => [...element.querySelectorAll('*')].filter((node) => {
+    const overflowY = getComputedStyle(node).overflowY;
+    return (overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight + 40;
+  })`;
+
+  const readScrollOffsets = (panel) =>
+    panel.evaluate(
+      new Function('element', `return (${SCROLLER_QUERY})(element).map((node) => Math.round(node.scrollTop));`)
+    );
+
+  const scrollAll = (panel, offset) =>
+    panel.evaluate(
+      new Function(
+        'element',
+        'target',
+        `const scrollers = (${SCROLLER_QUERY})(element);
+         for (const scroller of scrollers) { scroller.scrollTop = target; }
+         return scrollers.map((scroller) => Math.round(scroller.scrollTop));`
+      ),
+      offset
+    );
+
+  try {
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Compose', 'Preview');
+
+    const rightPanel = page.getByRole('complementary', { exact: true, name: 'right widget panel' });
+    const galleryItems = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
+    await galleryItems.waitFor();
+
+    const leftPanel = page.getByRole('complementary', { exact: true, name: 'left widget panel' });
+    const scrolledLeftOffsets = await scrollAll(leftPanel, 400);
+    const scrolledOffsets = await scrollAll(rightPanel, 600);
+    assert.ok(
+      scrolledOffsets.length >= 2 && scrolledOffsets.every((offset) => offset > 0),
+      `The representative gallery must have scrollable boards and items; got ${JSON.stringify(scrolledOffsets)}.`
+    );
+    await waitForSettledDocument(page);
+
+    await selectLayoutPreset(page, 'Edit', 'Canvas');
+
+    const zoomTrigger = page.getByRole('button', { exact: true, name: 'Zoom level' });
+    await zoomTrigger.click();
+    await page.getByRole('menuitem', { exact: true, name: '200%' }).click();
+    await waitForSettledDocument(page);
+    assert.equal((await zoomTrigger.textContent())?.trim(), '200%', 'The zoom control must report the chosen zoom.');
+
+    // Away and back, which is the whole point of keeping the widgets mounted.
+    await selectLayoutPreset(page, 'Automate', 'Workflow');
+    await waitForSettledDocument(page);
+    await selectLayoutPreset(page, 'Edit', 'Canvas');
+    await waitForSettledDocument(page);
+
+    assert.equal(
+      (await zoomTrigger.textContent())?.trim(),
+      '200%',
+      'Returning to a layout must keep the canvas viewport, not refit it.'
+    );
+
+    await selectLayoutPreset(page, 'Compose', 'Preview');
+    await galleryItems.waitFor();
+    await waitForSettledDocument(page);
+
+    assert.deepEqual(
+      await readScrollOffsets(rightPanel),
+      scrolledOffsets,
+      'Returning to a layout must keep the gallery scrolled where the user left it.'
+    );
+    assert.deepEqual(
+      await readScrollOffsets(leftPanel),
+      scrolledLeftOffsets,
+      'Returning to a layout must keep a panel body scrolled where the user left it.'
+    );
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
 const mockBackend = await startMockBackend(backendPort, { profile: 'representative' });
 const preview = spawn(
   'pnpm',
@@ -682,6 +792,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-video-preview-representative') {
     reports.push(await runVideoPreviewJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-keep-alive-state') {
+    reports.push(await runKeepAliveStateJourney(browser));
   }
   if (reports.length === 0) {
     throw new Error(`Unknown accessibility journey ${JSON.stringify(requestedJourney)}.`);
