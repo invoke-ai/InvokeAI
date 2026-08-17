@@ -111,6 +111,7 @@ const createBrowserBaseline = () => ({
       domContentLoadedMedianMs: 100,
       id: 'launchpad',
       layoutAckMedianMs: 0,
+      layoutReturnSwitchMedianMs: 0,
       layoutSwitchMedianMs: 0,
       loadMedianMs: 110,
       longestTaskMaxMs: 40,
@@ -363,6 +364,7 @@ describe('browser performance sampling and policy', () => {
       domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
       id: expected.id,
       layoutAckMedianMs: 200,
+      layoutReturnSwitchMedianMs: expected.layoutReturnSwitchMedianMs,
       layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
       loadMedianMs: expected.loadMedianMs,
       longestTaskMaxMs: expected.longestTaskMaxMs,
@@ -398,6 +400,76 @@ describe('browser performance sampling and policy', () => {
       domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
       id: expected.id,
       layoutAckMedianMs: 100,
+      layoutReturnSwitchMedianMs: expected.layoutReturnSwitchMedianMs,
+      layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
+      loadMedianMs: expected.loadMedianMs,
+      longestTaskMaxMs: expected.longestTaskMaxMs,
+      owner: expected.owner,
+      projectSwitchMedianMs: expected.projectSwitchMedianMs,
+      remediationTicket: expected.remediationTicket,
+      resources: expected.resourceBaseline,
+      routeReadyMedianMs: expected.routeReadyMedianMs,
+      scriptSourceOwners,
+      stateProfile: expected.stateProfile,
+    };
+
+    const failures = checkBrowserRouteBudget(route, expected, baseline.timingPolicy, scriptSourceOwners);
+
+    assert.deepEqual(failures, []);
+  });
+
+  it('fails a route whose layout-return-switch median exceeds its timing tolerance', () => {
+    const baseline = createBrowserBaseline();
+    baseline.timingPolicy = {
+      ...baseline.timingPolicy,
+      enforce: true,
+      runner: { id: 'ci-linux-x64', minimumStableRuns: 20, observedStableRuns: 20, stable: true },
+    };
+    const expected = baseline.routes[0];
+    expected.layoutReturnSwitchMedianMs = 100;
+    const scriptSourceOwners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
+    const route = {
+      activatedResources: expected.activatedResourceBaseline,
+      domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
+      id: expected.id,
+      layoutAckMedianMs: expected.layoutAckMedianMs,
+      layoutReturnSwitchMedianMs: 200,
+      layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
+      loadMedianMs: expected.loadMedianMs,
+      longestTaskMaxMs: expected.longestTaskMaxMs,
+      owner: expected.owner,
+      projectSwitchMedianMs: expected.projectSwitchMedianMs,
+      remediationTicket: expected.remediationTicket,
+      resources: expected.resourceBaseline,
+      routeReadyMedianMs: expected.routeReadyMedianMs,
+      scriptSourceOwners,
+      stateProfile: expected.stateProfile,
+    };
+
+    const failures = checkBrowserRouteBudget(route, expected, baseline.timingPolicy, scriptSourceOwners);
+
+    assert.ok(
+      failures.some((failure) => failure.includes('layout-return-switch median')),
+      failures.join('\n')
+    );
+  });
+
+  it('passes a route whose layout-return-switch median stays at or under its timing tolerance', () => {
+    const baseline = createBrowserBaseline();
+    baseline.timingPolicy = {
+      ...baseline.timingPolicy,
+      enforce: true,
+      runner: { id: 'ci-linux-x64', minimumStableRuns: 20, observedStableRuns: 20, stable: true },
+    };
+    const expected = baseline.routes[0];
+    expected.layoutReturnSwitchMedianMs = 100;
+    const scriptSourceOwners = baseline.scriptSourceOwnerSets[expected.scriptSourceOwnerSet];
+    const route = {
+      activatedResources: expected.activatedResourceBaseline,
+      domContentLoadedMedianMs: expected.domContentLoadedMedianMs,
+      id: expected.id,
+      layoutAckMedianMs: expected.layoutAckMedianMs,
+      layoutReturnSwitchMedianMs: 100,
       layoutSwitchMedianMs: expected.layoutSwitchMedianMs,
       loadMedianMs: expected.loadMedianMs,
       longestTaskMaxMs: expected.longestTaskMaxMs,

@@ -243,6 +243,92 @@ const getMaximumResourceSummary = (samples, key) =>
     BROWSER_RESOURCE_METRIC_KEYS.map((metric) => [metric, Math.max(...samples.map((sample) => sample[key][metric]))])
   );
 
+/**
+ * Waits for the main thread to go quiet. A semantic-ready mark says the widget
+ * mounted, not that the switch finished: the away switch leaves hundreds of
+ * milliseconds of work behind it, and pressing the next tab straight into that
+ * measures the tail of the previous switch as if it belonged to the next one.
+ * Idle callbacks are the browser's own answer to "is anything still running".
+ */
+const settleMainThread = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolveSettle) => {
+        const settle = (remaining) => {
+          if (remaining === 0) {
+            resolveSettle();
+            return;
+          }
+          requestAnimationFrame(() => {
+            requestIdleCallback(() => settle(remaining - 1), { timeout: 2000 });
+          });
+        };
+
+        settle(4);
+      })
+  );
+
+/**
+ * Measures a *repeat* layout switch: away to a second preset, then back to the
+ * fixture's own. Every other sample here gets a fresh context and page load and
+ * presses a preset tab exactly once, so `layoutSwitchMs` can only ever describe
+ * a cold, first switch. A return to a layout the session has already shown is
+ * the switch keeping widgets mounted is supposed to make near-free, and nothing
+ * else in this harness can see it.
+ *
+ * Runs after every resource, source-owner and timing figure has been captured,
+ * so the detour cannot perturb them.
+ */
+const measureLayoutReturnSwitch = async (page, fixture) => {
+  if (!fixture.layoutReturnPreset) {
+    return 0;
+  }
+
+  const homeTab = page.getByRole('tab', { exact: true, name: fixture.layoutPreset });
+  const awayTab = page.getByRole('tab', { exact: true, name: fixture.layoutReturnPreset });
+  await awayTab.waitFor({ timeout: 10_000 });
+
+  await page.evaluate((markName) => {
+    performance.clearMarks(markName);
+  }, fixture.layoutReturnReadyMark);
+  await awayTab.click();
+  await waitForSemanticMark(page, fixture.layoutReturnReadyMark);
+  await settleMainThread(page);
+
+  const interactionMark = `invokeai:interaction:${fixture.id}:${fixture.stateProfile}:layout-return-switch`;
+  await page.evaluate(
+    ({ interactionMarkName, readyMark }) => {
+      performance.clearMarks(interactionMarkName);
+      performance.clearMarks(readyMark);
+      document.addEventListener(
+        'pointerdown',
+        () => {
+          performance.mark(interactionMarkName);
+        },
+        { capture: true, once: true }
+      );
+    },
+    { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
+  );
+  await homeTab.click();
+  await waitForSemanticMark(page, fixture.readyMark);
+
+  const layoutReturnSwitchMs = await page.evaluate(
+    ({ interactionMarkName, readyMark }) => {
+      const start = performance.getEntriesByName(interactionMarkName, 'mark').at(-1);
+      const end = performance.getEntriesByName(readyMark, 'mark').at(-1);
+      return start && end ? Math.max(0, end.startTime - start.startTime) : null;
+    },
+    { interactionMarkName: interactionMark, readyMark: fixture.readyMark }
+  );
+
+  if (layoutReturnSwitchMs === null) {
+    throw new Error(`${fixture.id}/${fixture.stateProfile} did not record a layout-return-switch interaction.`);
+  }
+
+  return layoutReturnSwitchMs;
+};
+
 const getTiming = (page) =>
   page.evaluate(() => {
     const navigation = performance.getEntriesByType('navigation')[0];
@@ -508,15 +594,18 @@ const runSample = async (browser, fixture, sample) => {
     const resources = await resourceCollector.settle();
     const activatedResources = resources.filter((resource) => activatedResourcePaths.has(resource.path));
     const timing = await getTiming(page);
+    const scriptSourceOwners = getScriptSourceOwners(scripts);
+    const layoutReturnSwitchMs = await measureLayoutReturnSwitch(page, fixture);
 
     return {
       activatedResources: summarizeBrowserResources(activatedResources),
       profileCounts: profile.counts,
       resources: summarizeBrowserResources(resources),
-      scriptSourceOwners: getScriptSourceOwners(scripts),
+      scriptSourceOwners,
       timing: {
         ...timing,
         layoutAckMs,
+        layoutReturnSwitchMs,
         layoutSwitchMs,
         projectSwitchMs,
         routeReadyMs,
@@ -607,6 +696,7 @@ try {
     const timingKeys = [
       'domContentLoadedMs',
       'layoutAckMs',
+      'layoutReturnSwitchMs',
       'layoutSwitchMs',
       'loadMs',
       'longestTaskMs',
@@ -622,6 +712,7 @@ try {
       domContentLoadedMedianMs: median(timingValues('domContentLoadedMs')),
       id: fixture.id,
       layoutAckMedianMs: median(timingValues('layoutAckMs')),
+      layoutReturnSwitchMedianMs: median(timingValues('layoutReturnSwitchMs')),
       layoutSwitchMedianMs: median(timingValues('layoutSwitchMs')),
       loadMedianMs: median(timingValues('loadMs')),
       longestTaskMaxMs: Math.max(...timingValues('longestTaskMs')),
@@ -663,6 +754,7 @@ try {
         domContentLoadedMedianMs: route.domContentLoadedMedianMs,
         id: route.id,
         layoutAckMedianMs: route.layoutAckMedianMs,
+        layoutReturnSwitchMedianMs: route.layoutReturnSwitchMedianMs,
         layoutSwitchMedianMs: route.layoutSwitchMedianMs,
         loadMedianMs: route.loadMedianMs,
         longestTaskMaxMs: route.longestTaskMaxMs,
