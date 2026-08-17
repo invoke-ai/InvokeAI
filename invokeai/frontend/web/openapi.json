@@ -6381,7 +6381,7 @@
                 {
                   "type": "number",
                   "maximum": 2.0,
-                  "minimum": 0.01
+                  "minimum": 1e-6
                 },
                 {
                   "type": "null"
@@ -6619,7 +6619,7 @@
                 {
                   "type": "number",
                   "maximum": 2.0,
-                  "minimum": 0.01
+                  "minimum": 1e-6
                 },
                 {
                   "type": "null"
