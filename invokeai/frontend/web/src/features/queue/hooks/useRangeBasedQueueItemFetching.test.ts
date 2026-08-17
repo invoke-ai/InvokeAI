@@ -4,18 +4,17 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { ListRange } from 'react-virtuoso';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getVideoPrefetchOptions, hasCachedVideoDTO, useRangeBasedImageFetching } from './useRangeBasedImageFetching';
+import { useRangeBasedQueueItemFetching } from './useRangeBasedQueueItemFetching';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
-  // Args of every getImageDTOsByNames call, in order.
-  imageFetches: [] as string[][],
-  // Names with a getImageDTO cache entry, as reported by selectCachedArgsForQuery.
-  cachedImageNames: [] as string[],
-  // When true, a successful fetch upserts the requested names into the cache, like
-  // getImageDTOsByNames.onQueryStarted does. When false, requested names never land in the
-  // cache — the deleted-image / multiuser-filtered case that drove the pre-fix request stream.
+  // Args of every getQueueItemDTOsByItemIds call, in order.
+  queueFetches: [] as number[][],
+  // Item ids with a getQueueItem cache entry, as reported by selectCachedArgsForQuery.
+  cachedItemIds: [] as number[],
+  // When true, a successful fetch upserts the requested ids into the cache, like the mutation's
+  // onQueryStarted does. When false, requested ids never land in the cache.
   cacheLands: true,
   // When true, the mutation rejects, like a backend restart or a 502 from a reverse proxy.
   failFetches: false,
@@ -26,54 +25,43 @@ vi.mock('app/store/storeHooks', () => {
   return { useAppStore: () => store };
 });
 
-vi.mock('features/gallery/store/types', () => ({
-  isVideoName: (name: string) => name.endsWith('.mp4'),
-}));
-
-vi.mock('services/api/endpoints/images', () => {
-  const trigger = (arg: { image_names: string[] }) => {
-    mocks.imageFetches.push(arg.image_names);
+vi.mock('services/api/endpoints/queue', () => {
+  const trigger = (arg: { item_ids: number[] }) => {
+    mocks.queueFetches.push(arg.item_ids);
     // Like the real mutation: onQueryStarted upserts when the request fulfills, whether or not
     // the caller unwraps, and only the promise returned by unwrap() surfaces the rejection.
     const settled = mocks.failFetches
       ? Promise.reject(new Error('fetch failed'))
       : Promise.resolve().then(() => {
           if (mocks.cacheLands) {
-            mocks.cachedImageNames.push(...arg.image_names);
+            mocks.cachedItemIds.push(...arg.item_ids);
           }
           return [];
         });
     settled.catch(() => undefined);
     return { unwrap: () => settled.then((r) => r) };
   };
-  // RTK Query's mutation trigger is referentially stable across renders; the hook's fetchItems
-  // callback (and therefore its throttle and effect) depend on that.
+  // RTK Query's mutation trigger is referentially stable across renders; the hook's
+  // fetchQueueItems callback (and therefore its throttle and effect) depend on that.
   const result = [trigger];
   return {
-    imagesApi: { util: { selectCachedArgsForQuery: () => mocks.cachedImageNames } },
-    useGetImageDTOsByNamesMutation: () => result,
+    queueApi: { util: { selectCachedArgsForQuery: () => mocks.cachedItemIds } },
+    useGetQueueItemDTOsByItemIdsMutation: () => result,
   };
 });
 
-vi.mock('services/api/endpoints/videos', () => ({
-  videosApi: {
-    util: { selectCachedArgsForQuery: () => [] },
-    endpoints: { getVideoDTO: { select: () => () => ({ data: undefined }), initiate: () => ({ type: 'noop' }) } },
-  },
-}));
-
-const IMAGE_NAMES = ['a.png', 'b.png', 'c.png'];
+const ITEM_IDS = [1, 2, 3];
 const THROTTLE_MS = 500;
 
-describe('useRangeBasedImageFetching', () => {
+describe('useRangeBasedQueueItemFetching', () => {
   let root: Root | null = null;
   let renderCount = 0;
-  let hookReturn: ReturnType<typeof useRangeBasedImageFetching>;
+  let hookReturn: ReturnType<typeof useRangeBasedQueueItemFetching>;
 
-  const renderHook = (imageNames: string[], enabled: boolean) => {
+  const renderHook = (itemIds: number[], enabled: boolean) => {
     const Harness: FC = () => {
       renderCount++;
-      hookReturn = useRangeBasedImageFetching({ imageNames, enabled });
+      hookReturn = useRangeBasedQueueItemFetching({ itemIds, enabled });
       return null;
     };
     root = createRoot(document.createElement('div'));
@@ -104,8 +92,8 @@ describe('useRangeBasedImageFetching', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
-    mocks.imageFetches = [];
-    mocks.cachedImageNames = [];
+    mocks.queueFetches = [];
+    mocks.cachedItemIds = [];
     mocks.cacheLands = true;
     mocks.failFetches = false;
     renderCount = 0;
@@ -121,59 +109,48 @@ describe('useRangeBasedImageFetching', () => {
     vi.useRealTimers();
   });
 
-  it('fetches uncached names for a reported range, then goes quiet', async () => {
-    renderHook(IMAGE_NAMES, true);
+  it('fetches uncached items for a reported range, then goes quiet', async () => {
+    renderHook(ITEM_IDS, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 2);
 
-    expect(mocks.imageFetches).toEqual([IMAGE_NAMES]);
+    expect(mocks.queueFetches).toEqual([ITEM_IDS]);
 
     // Regression: clearing pendingRanges with a fresh `[]` (a new identity every time) re-ran the
-    // effect, re-armed the throttle, and cleared again — a self-sustaining render loop that
-    // re-rendered every ~500ms for as long as the grid was mounted, with no user input. Once the
+    // effect, re-armed the throttle, and cleared again — a self-sustaining render loop. Once the
     // range has been handled and the throttle has drained, both renders and fetches must stop.
     const settledRenders = renderCount;
     await advance(THROTTLE_MS * 10);
     expect(renderCount).toBe(settledRenders);
-    expect(mocks.imageFetches).toEqual([IMAGE_NAMES]);
+    expect(mocks.queueFetches).toEqual([ITEM_IDS]);
   });
 
-  it('does not loop even while the grid is mounted with nothing to fetch', async () => {
-    // Pre-fix, the loop ran from mount even with no ranges reported, because the clear was
-    // unconditional and every pass installed a new [] identity.
-    renderHook(IMAGE_NAMES, true);
-    const settledRenders = renderCount;
-    await advance(THROTTLE_MS * 10);
-    expect(renderCount).toBe(settledRenders);
-    expect(mocks.imageFetches).toEqual([]);
-  });
-
-  it('stops re-requesting names that never land in the cache', async () => {
-    // onQueryStarted upserts only the DTOs the server actually returned, so a requested name that
-    // comes back missing (deleted image, multiuser ownership filter) never gets a cache entry.
-    // Pre-fix, the render loop re-requested such names every ~500ms, forever.
+  it('stops re-requesting items that never land in the cache', async () => {
+    // A requested id the server does not return never gets a getQueueItem cache entry, so it is
+    // uncached on every pass. Pre-fix, that sustained the loop: the list re-requested such ids
+    // every ~500ms for as long as it was mounted.
     mocks.cacheLands = false;
-    renderHook(IMAGE_NAMES, true);
+    renderHook(ITEM_IDS, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 10);
 
     // The range-change pass fetches once, and clearing pendingRanges ([range] -> EMPTY_ARRAY) is a
     // real state change, so one follow-up pass may re-check the cache and re-request the
-    // still-missing names. After that the state is stable and the stream must stop — pre-fix it
+    // still-missing ids. After that the state is stable and the stream must stop — pre-fix it
     // continued at one request per throttle window, forever.
-    expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(1);
-    expect(mocks.imageFetches.length).toBeLessThanOrEqual(2);
-    const settledFetches = mocks.imageFetches.length;
+    expect(mocks.queueFetches.length).toBeGreaterThanOrEqual(1);
+    expect(mocks.queueFetches.length).toBeLessThanOrEqual(2);
+    const settledFetches = mocks.queueFetches.length;
     await advance(THROTTLE_MS * 10);
-    expect(mocks.imageFetches.length).toBe(settledFetches);
+    expect(mocks.queueFetches.length).toBe(settledFetches);
   });
 
   it('retries a failed fetch until it succeeds, then goes quiet', async () => {
-    // The pre-fix loop was also an accidental retry, and this bulk fetch is the only fetcher for
-    // these rows (ImageAtPosition subscribes with `skip: isUninitialized`). Without an explicit
-    // retry, a transient failure would leave grey placeholders until the user happens to scroll.
+    // This bulk fetch is the only fetcher for these rows (QueueItemAtPosition subscribes with
+    // `skip: isUninitialized`), so a transient failure must be retried or the placeholders stay
+    // empty until the user happens to scroll.
     mocks.failFetches = true;
-    renderHook(IMAGE_NAMES, true);
+    renderHook(ITEM_IDS, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 4);
 
@@ -181,17 +158,17 @@ describe('useRangeBasedImageFetching', () => {
     // window, and the first backoff retry (1s) restores the ranges for at least one more pass.
     // Without the retry, clearing pendingRanges after the failed fetch still re-runs the effect
     // once, so the count caps at two — three or more requires the retry restoring the ranges.
-    expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(3);
-    expect(mocks.cachedImageNames).toEqual([]);
+    expect(mocks.queueFetches.length).toBeGreaterThanOrEqual(3);
+    expect(mocks.cachedItemIds).toEqual([]);
 
     mocks.failFetches = false;
     await advance(THROTTLE_MS * 4);
-    expect(mocks.cachedImageNames).toEqual(IMAGE_NAMES);
+    expect(mocks.cachedItemIds).toEqual(ITEM_IDS);
 
-    const fetchesAfterRecovery = mocks.imageFetches.length;
+    const fetchesAfterRecovery = mocks.queueFetches.length;
     const settledRenders = renderCount;
     await advance(THROTTLE_MS * 10);
-    expect(mocks.imageFetches.length).toBe(fetchesAfterRecovery);
+    expect(mocks.queueFetches.length).toBe(fetchesAfterRecovery);
     expect(renderCount).toBe(settledRenders);
   });
 
@@ -203,45 +180,45 @@ describe('useRangeBasedImageFetching', () => {
     // stream must terminate. Each retry pass produces at most a leading and a trailing fetch,
     // bounding the total at 12; six requires every backoff retry to have actually fired.
     mocks.failFetches = true;
-    renderHook(IMAGE_NAMES, true);
+    renderHook(ITEM_IDS, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(35_000);
 
-    expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(6);
-    expect(mocks.imageFetches.length).toBeLessThanOrEqual(12);
+    expect(mocks.queueFetches.length).toBeGreaterThanOrEqual(6);
+    expect(mocks.queueFetches.length).toBeLessThanOrEqual(12);
 
-    const settledFetches = mocks.imageFetches.length;
+    const settledFetches = mocks.queueFetches.length;
     const settledRenders = renderCount;
     await advance(30_000);
-    expect(mocks.imageFetches.length).toBe(settledFetches);
+    expect(mocks.queueFetches.length).toBe(settledFetches);
     expect(renderCount).toBe(settledRenders);
   });
 
   it('resumes retrying after giving up when the user scrolls', async () => {
     mocks.failFetches = true;
-    renderHook(IMAGE_NAMES, true);
+    renderHook(ITEM_IDS, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(35_000);
-    const fetchesAfterGiveUp = mocks.imageFetches.length;
+    const fetchesAfterGiveUp = mocks.queueFetches.length;
 
-    // A new range report is fresh user input: it restarts the retry budget, so the grid does not
+    // A new range report is fresh user input: it restarts the retry budget, so the list does not
     // stay dead until reload. With the budget still exhausted, only the scroll-triggered fetch and
     // its trailing companion would fire — three or more new fetches requires the backoff schedule
     // to have restarted.
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(2_000);
-    expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(fetchesAfterGiveUp + 3);
+    expect(mocks.queueFetches.length).toBeGreaterThanOrEqual(fetchesAfterGiveUp + 3);
   });
 
   it('recovers a range that failed while the user was scrolling elsewhere', async () => {
     // Review finding on the original retry: the catch (`prev.length > 0 ? prev : ranges`) dropped
     // the failed range whenever another range had been reported in the meantime — rows the user
-    // had scrolled past stayed grey placeholders. The retry now merges the failed ranges with
+    // had scrolled past stayed blank placeholders. The retry now merges the failed ranges with
     // whatever is pending instead of choosing one side, so both ranges end up fetched with no
     // further user input.
-    const names = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png', 'g.png', 'h.png', 'i.png'];
+    const itemIds = [1, 2, 3, 4, 5, 6, 7, 8, 9];
     mocks.failFetches = true;
-    renderHook(names, true);
+    renderHook(itemIds, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     // The fetches for the failed range land at t=500 (throttle edges), scheduling the 1s backoff
     // retry for t=1500.
@@ -256,70 +233,58 @@ describe('useRangeBasedImageFetching', () => {
     scrollTo({ startIndex: 6, endIndex: 8 });
     await advance(3_000);
 
-    // Both the failed range (a-c) and the new one (g-i) land, with no user input beyond the one
+    // Both the failed range (1-3) and the new one (7-9) land, with no user input beyond the one
     // scroll — and nothing outside the reported ranges is fetched.
-    expect([...mocks.cachedImageNames].sort()).toEqual(['a.png', 'b.png', 'c.png', 'g.png', 'h.png', 'i.png']);
+    expect([...mocks.cachedItemIds].sort((a, b) => a - b)).toEqual([1, 2, 3, 7, 8, 9]);
   });
 
   it('still fetches for new ranges after settling', async () => {
-    const names = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png'];
-    renderHook(names, true);
+    const itemIds = [1, 2, 3, 4, 5, 6];
+    renderHook(itemIds, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 10);
-    expect(mocks.imageFetches).toEqual([['a.png', 'b.png', 'c.png']]);
+    expect(mocks.queueFetches).toEqual([[1, 2, 3]]);
 
     scrollTo({ startIndex: 3, endIndex: 5 });
     await advance(THROTTLE_MS * 2);
-    expect(mocks.imageFetches).toEqual([
-      ['a.png', 'b.png', 'c.png'],
-      ['d.png', 'e.png', 'f.png'],
+    expect(mocks.queueFetches).toEqual([
+      [1, 2, 3],
+      [4, 5, 6],
     ]);
   });
 
   it('fetches every range reported within a throttle window, not just the last', async () => {
     // onRangeChanged accumulates ranges into pendingRanges precisely so that ranges reported
     // mid-window are not dropped when the trailing invocation only sees the latest call's args.
-    const names = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png'];
-    renderHook(names, true);
+    const itemIds = [1, 2, 3, 4, 5, 6];
+    renderHook(itemIds, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     scrollTo({ startIndex: 3, endIndex: 5 });
     await advance(THROTTLE_MS * 2);
-    expect(mocks.imageFetches).toEqual([['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png']]);
+    expect(mocks.queueFetches).toEqual([[1, 2, 3, 4, 5, 6]]);
   });
 
   it('drops handled ranges instead of accumulating them', async () => {
-    // A handled range must not be re-scanned by later passes. Pre-fix, the queue variant of this
-    // hook returned early without clearing when everything was cached, so ranges accumulated for
-    // the lifetime of the list and a later pass would re-request an item evicted from a range
-    // handled long ago.
-    const names = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png'];
-    mocks.cachedImageNames = ['a.png', 'b.png', 'c.png'];
-    renderHook(names, true);
+    // A handled range must not be re-scanned by later passes. Pre-fix, this hook returned early
+    // without clearing when everything was cached, so ranges accumulated for the lifetime of the
+    // list and a later pass would re-request an item evicted from a range handled long ago.
+    const itemIds = [1, 2, 3, 4, 5, 6];
+    mocks.cachedItemIds = [1, 2, 3];
+    renderHook(itemIds, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 10);
-    expect(mocks.imageFetches).toEqual([]);
+    expect(mocks.queueFetches).toEqual([]);
 
-    mocks.cachedImageNames = ['a.png', 'c.png'];
+    mocks.cachedItemIds = [1, 3];
     scrollTo({ startIndex: 3, endIndex: 5 });
     await advance(THROTTLE_MS * 2);
-    expect(mocks.imageFetches).toEqual([['d.png', 'e.png', 'f.png']]);
+    expect(mocks.queueFetches).toEqual([[4, 5, 6]]);
   });
 
   it('does not fetch when disabled', async () => {
-    renderHook(IMAGE_NAMES, false);
+    renderHook(ITEM_IDS, false);
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 4);
-    expect(mocks.imageFetches).toEqual([]);
-  });
-});
-
-describe('video range prefetch', () => {
-  it('does not retain an RTK Query subscription', () => {
-    expect(getVideoPrefetchOptions()).toEqual({ subscribe: false, forceRefetch: true });
-  });
-
-  it('only treats fulfilled DTO queries as cached', () => {
-    expect(hasCachedVideoDTO({ data: { video_name: 'video.mp4' } })).toBe(true);
-    expect(hasCachedVideoDTO({ isError: true })).toBe(false);
+    expect(mocks.queueFetches).toEqual([]);
   });
 });
