@@ -303,19 +303,22 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
         context.util.signal_progress("Loading Qwen2.5-VL encoder (quantized)")
-        with warnings.catch_warnings():
+        # Torch module construction is not thread-safe process-wide (see
+        # _ModelLoadReadWriteLock); serialize with the model-load machinery. The lock is
+        # the OUTER context on purpose: warnings.catch_warnings() swaps the process-global
+        # filter list, so holding it across an unbounded wait for the lock would leave this
+        # thread's filter installed — and clobberable by any other thread's
+        # SilenceWarnings — for the whole duration of someone else's model load.
+        with MODEL_LOAD_LOCK.write_lock(), warnings.catch_warnings():
             # BnB int8 internally casts bfloat16→float16; the warning is harmless
             warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
-            # Torch module construction is not thread-safe process-wide (see
-            # _ModelLoadReadWriteLock); serialize with the model-load machinery.
-            with MODEL_LOAD_LOCK.write_lock():
-                text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                    str(encoder_path),
-                    quantization_config=bnb_config,
-                    device_map="auto",
-                    torch_dtype=torch.bfloat16,
-                    local_files_only=True,
-                )
+            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                str(encoder_path),
+                quantization_config=bnb_config,
+                device_map="auto",
+                torch_dtype=torch.bfloat16,
+                local_files_only=True,
+            )
 
         device = next(text_encoder.parameters()).device
 

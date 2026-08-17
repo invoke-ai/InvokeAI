@@ -44,6 +44,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
@@ -229,7 +230,20 @@ class _ExpertSwapper:
         # and now — the cached_model object still owns the tensors.
         if outgoing_cached_model is not None:
             try:
-                outgoing_cached_model.full_unload_from_vram()
+                # full_unload_from_vram() runs load_state_dict(assign=True) -> register_parameter,
+                # so it needs the MODEL_LOAD_LOCK read lock: without it, a construction on
+                # another worker holds the global register_parameter -> meta patch and strands
+                # this expert's weights on the meta device, poisoning the still-cached record.
+                # Safe to acquire here: _release() above dropped both the LoRA and device
+                # contexts, so this thread holds no MODEL_LOAD_LOCK (it is not reentrant).
+                # Note this is narrower than LoadedModelWithoutConfig.__enter__, which also
+                # holds ModelCache._lock: this call can still overlap the cache's own
+                # _offload_unlocked_models on the same record. That race predates this lock
+                # and is deliberately not addressed here. It also means the read lock is held
+                # across a multi-GB VRAM->RAM copy, and MODEL_LOAD_LOCK is write-preferring,
+                # so other workers' VRAM moves queue behind it for the duration.
+                with MODEL_LOAD_LOCK.read_lock():
+                    outgoing_cached_model.full_unload_from_vram()
             except Exception:
                 pass
 
