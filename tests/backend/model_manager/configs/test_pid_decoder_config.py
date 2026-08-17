@@ -421,6 +421,17 @@ class TestNameEvidence:
     """The name only ever breaks the 16-channel FLUX.1 / SD3 / Qwen-Image tie — the weights decide
     everything else. These pin how the name is read when it is consulted."""
 
+    def test_incidental_backbone_substring_in_parent_directory_is_ignored(self) -> None:
+        """An unrelated directory containing the letters ``sd3`` must not name the checkpoint's backbone."""
+        with TemporaryDirectory() as tmpdir:
+            checkpoint_dir = Path(tmpdir) / "modelsd3cache"
+            checkpoint_dir.mkdir()
+            path = _write_pid_checkpoint(checkpoint_dir, _real_pid_state_dict())
+            result = ModelConfigFactory.from_model_on_disk(path, allow_unknown=True)
+
+        assert result.config is not None
+        assert result.config.base is BaseModelType.Flux
+
     def test_the_filename_beats_the_parent_directory(self) -> None:
         """The reported case. Concatenating every name component into one string and substring-matching
         it let a fixed backbone precedence decide what the name had already answered: `/flux/model_sd3.pth`

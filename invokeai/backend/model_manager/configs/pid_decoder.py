@@ -205,11 +205,11 @@ def _name_components(mod: ModelOnDisk, override_fields: dict[str, Any]) -> tuple
 # `flux2` before `flux`. That is precedence between two spellings of one answer, not between two
 # answers — see `_backbone_named_in`.
 _BACKBONE_NAME_PATTERNS: tuple[tuple[BaseModelType, re.Pattern[str]], ...] = (
-    (BaseModelType.Flux2, re.compile(r"flux[_\-.]?2")),
-    (BaseModelType.StableDiffusionXL, re.compile(r"sdxl")),
-    (BaseModelType.QwenImage, re.compile(r"qwen[_\-.]?image")),
-    (BaseModelType.StableDiffusion3, re.compile(r"sd[_\-.]?3")),
-    (BaseModelType.Flux, re.compile(r"flux")),
+    (BaseModelType.Flux2, re.compile(r"(?<![a-z0-9])flux[_\-.]?2(?![a-z0-9])")),
+    (BaseModelType.StableDiffusionXL, re.compile(r"(?<![a-z0-9])sdxl(?![a-z0-9])")),
+    (BaseModelType.QwenImage, re.compile(r"(?<![a-z0-9])qwen[_\-.]?image(?![a-z0-9])")),
+    (BaseModelType.StableDiffusion3, re.compile(r"(?<![a-z0-9])sd[_\-.]?3(?![a-z0-9])")),
+    (BaseModelType.Flux, re.compile(r"(?<![a-z0-9])flux(?![a-z0-9])")),
 )
 
 
