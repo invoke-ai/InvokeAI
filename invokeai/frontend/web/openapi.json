@@ -6431,6 +6431,173 @@
         }
       }
     },
+    "/api/v1/image_map/search": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Search Image Map",
+        "description": "Ranks the user's accessible images by semantic similarity.\n\nProvide exactly one of `q` (text search \u2014 requires the embedding model's\ntext encoder to be installed) or `image_name` (visual similarity \u2014 uses\nthe reference image's stored embedding when it exists, and otherwise\nembeds the image file on demand, so unindexed images such as assets can\nbe reference images too).",
+        "operationId": "search_image_map",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 500
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Text query to embed and search with",
+              "title": "Q"
+            },
+            "description": "Text query to embed and search with"
+          },
+          {
+            "name": "image_name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Reference image for similarity search",
+              "title": "Image Name"
+            },
+            "description": "Reference image for similarity search"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/image_map/search_by_image": {
+      "post": {
+        "tags": ["image_map"],
+        "summary": "Search Image Map By Image",
+        "description": "Ranks the user's accessible images by similarity to an arbitrary reference image.\n\nProvide exactly one of `image` (multipart upload) or `image_url` (the\nserver downloads it). The reference is embedded for this query only \u2014\nnothing is stored.",
+        "operationId": "search_image_map_by_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "URL of a reference image",
+              "title": "Image Url"
+            },
+            "description": "URL of a reference image"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of results",
+              "default": 100,
+              "title": "Limit"
+            },
+            "description": "Maximum number of results"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_search_image_map_by_image"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/image_map/refresh": {
       "post": {
         "tags": ["image_map"],
@@ -17058,6 +17225,25 @@
         "type": "object",
         "required": ["video_name"],
         "title": "Body_remove_video_from_board"
+      },
+      "Body_search_image_map_by_image": {
+        "properties": {
+          "image": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image",
+            "description": "Reference image file"
+          }
+        },
+        "type": "object",
+        "title": "Body_search_image_map_by_image"
       },
       "Body_set_workflow_thumbnail": {
         "properties": {
@@ -41665,6 +41851,40 @@
         "required": ["enqueued"],
         "title": "ImageMapRefreshResponse",
         "description": "Result of a projection refresh request."
+      },
+      "ImageMapSearchResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ImageMapSearchResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Ranked results, most similar first"
+          }
+        },
+        "type": "object",
+        "required": ["results"],
+        "title": "ImageMapSearchResponse",
+        "description": "Semantic search results over the user's embedded images."
+      },
+      "ImageMapSearchResult": {
+        "properties": {
+          "image_name": {
+            "type": "string",
+            "title": "Image Name",
+            "description": "The matching image"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Cosine similarity to the query; higher is more similar"
+          }
+        },
+        "type": "object",
+        "required": ["image_name", "score"],
+        "title": "ImageMapSearchResult",
+        "description": "One semantic search hit."
       },
       "ImageMapStatusResponse": {
         "properties": {

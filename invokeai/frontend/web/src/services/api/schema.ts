@@ -1541,6 +1541,56 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_map/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Image Map
+         * @description Ranks the user's accessible images by semantic similarity.
+         *
+         *     Provide exactly one of `q` (text search — requires the embedding model's
+         *     text encoder to be installed) or `image_name` (visual similarity — uses
+         *     the reference image's stored embedding when it exists, and otherwise
+         *     embeds the image file on demand, so unindexed images such as assets can
+         *     be reference images too).
+         */
+        get: operations["search_image_map"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/image_map/search_by_image": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search Image Map By Image
+         * @description Ranks the user's accessible images by similarity to an arbitrary reference image.
+         *
+         *     Provide exactly one of `image` (multipart upload) or `image_url` (the
+         *     server downloads it). The reference is embedded for this query only —
+         *     nothing is stored.
+         */
+        post: operations["search_image_map_by_image"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/image_map/refresh": {
         parameters: {
             query?: never;
@@ -5282,6 +5332,14 @@ export type components = {
              * @description The name of the video to remove from its board
              */
             video_name: string;
+        };
+        /** Body_search_image_map_by_image */
+        Body_search_image_map_by_image: {
+            /**
+             * Image
+             * @description Reference image file
+             */
+            image?: Blob | null;
         };
         /** Body_set_workflow_thumbnail */
         Body_set_workflow_thumbnail: {
@@ -17455,6 +17513,33 @@ export type components = {
              * @description True if the recompute was accepted (or already pending)
              */
             enqueued: boolean;
+        };
+        /**
+         * ImageMapSearchResponse
+         * @description Semantic search results over the user's embedded images.
+         */
+        ImageMapSearchResponse: {
+            /**
+             * Results
+             * @description Ranked results, most similar first
+             */
+            results: components["schemas"]["ImageMapSearchResult"][];
+        };
+        /**
+         * ImageMapSearchResult
+         * @description One semantic search hit.
+         */
+        ImageMapSearchResult: {
+            /**
+             * Image Name
+             * @description The matching image
+             */
+            image_name: string;
+            /**
+             * Score
+             * @description Cosine similarity to the query; higher is more similar
+             */
+            score: number;
         };
         /**
          * ImageMapStatusResponse
@@ -46247,6 +46332,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageMapPointsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_image_map: {
+        parameters: {
+            query?: {
+                /** @description Text query to embed and search with */
+                q?: string | null;
+                /** @description Reference image for similarity search */
+                image_name?: string | null;
+                /** @description Maximum number of results */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapSearchResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_image_map_by_image: {
+        parameters: {
+            query?: {
+                /** @description URL of a reference image */
+                image_url?: string | null;
+                /** @description Maximum number of results */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_search_image_map_by_image"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapSearchResponse"];
                 };
             };
             /** @description Validation Error */

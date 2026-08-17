@@ -1,7 +1,7 @@
 import { useDndMonitor, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { useCallback, useRef } from 'react';
 
-import { forwardGalleryBoardDrop, isGalleryItemDragData } from './galleryDnd';
+import { forwardGalleryBoardDrop, isGalleryItemDragData, resolveGallerySemanticSearchDrop } from './galleryDnd';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 /**
@@ -35,6 +35,16 @@ export const GalleryBoardDragMonitor = () => {
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      const semanticDrop = resolveGallerySemanticSearchDrop(event.active.data.current, event.over?.id);
+
+      if (semanticDrop) {
+        // Dropping a gallery image on the search field ranks the gallery by
+        // visual similarity to it.
+        actions.setSemanticImageQuery({ imageName: semanticDrop.imageName, kind: 'image' });
+        restoreDisclosure();
+        return;
+      }
+
       forwardGalleryBoardDrop({
         activeData: event.active.data.current,
         loadedItems: gallery.items,
@@ -43,7 +53,7 @@ export const GalleryBoardDragMonitor = () => {
       });
       restoreDisclosure();
     },
-    [gallery.items, itemActions, restoreDisclosure]
+    [actions, gallery.items, itemActions, restoreDisclosure]
   );
 
   useDndMonitor({

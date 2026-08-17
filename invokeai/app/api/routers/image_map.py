@@ -5,12 +5,15 @@ from collections import OrderedDict
 from typing import Literal, Optional
 
 import numpy as np
-from fastapi import Query, status
+from fastapi import File, HTTPException, Query, UploadFile, status
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import assert_image_read_access
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
 from invokeai.app.services.image_index.image_index_common import ImageIndexStatus
 from invokeai.app.services.image_index.projection import (
     DEFAULT_CLUSTER_MIN_SAMPLES,
@@ -20,6 +23,7 @@ from invokeai.app.services.image_index.projection import (
     resolve_cluster_eps,
     scope_hash,
 )
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 
 image_map_router = APIRouter(prefix="/v1/image_map", tags=["image_map"])
 
@@ -322,6 +326,296 @@ async def get_image_map_points(
         point_count=len(points),
         cluster_eps=resolved_eps,
         updated_at=record.updated_at,
+    )
+
+
+class ImageMapSearchResult(BaseModel):
+    """One semantic search hit."""
+
+    image_name: str = Field(description="The matching image")
+    score: float = Field(description="Cosine similarity to the query; higher is more similar")
+
+
+class ImageMapSearchResponse(BaseModel):
+    """Semantic search results over the user's embedded images."""
+
+    results: list[ImageMapSearchResult] = Field(description="Ranked results, most similar first")
+
+
+@image_map_router.get("/search", operation_id="search_image_map", response_model=ImageMapSearchResponse)
+async def search_image_map(
+    current_user: CurrentUserOrDefault,
+    q: Optional[str] = Query(default=None, max_length=500, description="Text query to embed and search with"),
+    image_name: Optional[str] = Query(default=None, description="Reference image for similarity search"),
+    limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results"),
+) -> ImageMapSearchResponse:
+    """Ranks the user's accessible images by semantic similarity.
+
+    Provide exactly one of `q` (text search — requires the embedding model's
+    text encoder to be installed) or `image_name` (visual similarity — uses
+    the reference image's stored embedding when it exists, and otherwise
+    embeds the image file on demand, so unindexed images such as assets can
+    be reference images too).
+    """
+    services = ApiDependencies.invoker.services
+    if (q is None) == (image_name is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Provide exactly one of q or image_name"
+        )
+
+    model_id = services.image_index.model_id
+    if model_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The image index is not enabled; semantic search is unavailable",
+        )
+
+    user_id, is_admin = _scope(current_user)
+    scope_user = None if is_admin else user_id
+
+    if q is not None:
+        try:
+            query_embedding = await asyncio.to_thread(services.image_index.embed_text, q)
+        except TextSearchUnavailableError as e:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+    else:
+        assert image_name is not None
+        assert_image_read_access(image_name, current_user)
+        found, matrix = services.image_index_records.get_embeddings([image_name], model_id)
+        if found:
+            query_embedding = matrix[0]
+        else:
+            # Not in the index (assets and intermediates are never indexed) —
+            # embed the stored file on demand for this one query.
+            def embed_from_file() -> np.ndarray:
+                pil = services.images.get_pil_image(image_name)
+                # Capped exactly as the uploaded/downloaded path is: the encoder
+                # downscales to ~224px either way, and convert("RGB") on a large
+                # stored image materializes hundreds of MB on a request thread.
+                # This branch is the *normal* one for such images, since assets
+                # and intermediates are never indexed.
+                if pil.width * pil.height > MAX_SEARCH_IMAGE_PIXELS:
+                    raise HTTPException(
+                        status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                        detail="The reference image has too many pixels",
+                    )
+                return services.image_index.embed_image(pil)
+
+            try:
+                query_embedding = await asyncio.to_thread(embed_from_file)
+            except HTTPException:
+                raise
+            except (ImageFileNotFoundException, ImageRecordNotFoundException, OSError):
+                # The stored file is missing or undecodable — the only failure
+                # here that is really about this image. Both record and file
+                # exceptions are plain Exceptions rather than OSError, so they
+                # have to be named; PIL's decode failures are OSError subclasses.
+                services.logger.warning(f"Image search: cannot read '{image_name}' for on-demand embed", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="This image could not be embedded for search (its file may be missing)",
+                )
+            except Exception:
+                # An encoder fault, a stopped index, an OOM. Reporting these as
+                # "file may be missing" sent anyone debugging to the wrong place.
+                services.logger.error(f"Image search: failed to embed '{image_name}' on demand", exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="This image could not be embedded for search",
+                )
+
+    results = await asyncio.to_thread(services.image_index.search_similar, scope_user, query_embedding, limit)
+    return ImageMapSearchResponse(
+        results=[ImageMapSearchResult(image_name=name, score=score) for name, score in results]
+    )
+
+
+# One-off reference images are small; cap what we will buffer from an upload
+# or a URL download before decoding, and how many pixels we will decode.
+MAX_SEARCH_IMAGE_BYTES = 32 * 1024 * 1024
+MAX_SEARCH_IMAGE_PIXELS = 64_000_000
+_URL_TIMEOUT_SECONDS = 10.0
+_URL_TOTAL_DEADLINE_SECONDS = 30.0
+_URL_MAX_REDIRECTS = 5
+
+# Downloads run on the loop's shared default executor; a handful of slow
+# remote servers must not be able to park every thread in it.
+_download_slots = asyncio.Semaphore(4)
+
+
+def _assert_url_host_allowed(url: str) -> None:
+    """Reject URLs whose scheme is not http(s) or whose host resolves to any
+    non-global address (loopback, RFC1918, link-local, reserved).
+
+    Resolving via getaddrinfo covers hostnames like 'localhost' and the
+    non-canonical IP notations (decimal, hex, octal, shortened) that a plain
+    ip_address() literal parse misses. DNS rebinding between this check and
+    the actual request is accepted residual risk: the endpoint is
+    authenticated, and nothing about the response is revealed beyond whether
+    it decoded as an image.
+    """
+    import ipaddress
+    import socket
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="image_url must be an http(s) URL")
+
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, port, proto=socket.IPPROTO_TCP)
+    except OSError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="image_url host could not be resolved"
+        )
+    for info in infos:
+        if not ipaddress.ip_address(info[4][0]).is_global:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="image_url must not target a private or loopback address",
+            )
+
+
+def _download_search_image(url: str) -> bytes:
+    """Fetch a reference image for a one-off similarity search.
+
+    Redirects are followed manually so every hop is re-validated by
+    _assert_url_host_allowed — requests' automatic redirect handling would
+    happily follow a public URL into a private address. The wall-clock
+    deadline bounds slow-trickle servers that never trip the per-read
+    timeout.
+    """
+    import time
+    from urllib.parse import urljoin
+
+    import requests
+
+    deadline = time.monotonic() + _URL_TOTAL_DEADLINE_SECONDS
+
+    def _remaining() -> float:
+        """Budget left, as a positive number; raises once it is gone.
+
+        Checked before each hop and used as the per-request timeout, so the deadline bounds the
+        whole exchange rather than only the body. Without it the connect and read timeouts apply
+        afresh to every redirect, and a server that stalls each of the allowed hops before sending
+        a byte holds a thread for minutes — uninterruptibly, since this runs under
+        `asyncio.to_thread` on the executor that also serves embedding and search.
+        """
+        left = deadline - time.monotonic()
+
+        if left <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="The image download took too long",
+            )
+
+        return left
+
+    try:
+        for _ in range(_URL_MAX_REDIRECTS + 1):
+            _assert_url_host_allowed(url)
+            hop_timeout = min(_URL_TIMEOUT_SECONDS, _remaining())
+            with requests.get(url, stream=True, timeout=hop_timeout, allow_redirects=False) as response:
+                if response.is_redirect:
+                    location = response.headers.get("location")
+                    if not location:
+                        break
+                    url = urljoin(url, location)
+                    continue
+                response.raise_for_status()
+                chunks: list[bytes] = []
+                received = 0
+                for chunk in response.iter_content(chunk_size=64 * 1024):
+                    received += len(chunk)
+                    if received > MAX_SEARCH_IMAGE_BYTES:
+                        raise HTTPException(
+                            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                            detail="The reference image is too large",
+                        )
+                    _remaining()
+                    chunks.append(chunk)
+                return b"".join(chunks)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The image could not be downloaded from image_url",
+        )
+    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Too many redirects for image_url")
+
+
+@image_map_router.post(
+    "/search_by_image", operation_id="search_image_map_by_image", response_model=ImageMapSearchResponse
+)
+async def search_image_map_by_image(
+    current_user: CurrentUserOrDefault,
+    image: Optional[UploadFile] = File(default=None, description="Reference image file"),
+    image_url: Optional[str] = Query(default=None, max_length=2000, description="URL of a reference image"),
+    limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results"),
+) -> ImageMapSearchResponse:
+    """Ranks the user's accessible images by similarity to an arbitrary reference image.
+
+    Provide exactly one of `image` (multipart upload) or `image_url` (the
+    server downloads it). The reference is embedded for this query only —
+    nothing is stored.
+    """
+    services = ApiDependencies.invoker.services
+    if (image is None) == (image_url is None):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Provide exactly one of image or image_url"
+        )
+
+    model_id = services.image_index.model_id
+    if model_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The image index is not enabled; semantic search is unavailable",
+        )
+
+    user_id, is_admin = _scope(current_user)
+    scope_user = None if is_admin else user_id
+
+    if image is not None:
+        data = await image.read(MAX_SEARCH_IMAGE_BYTES + 1)
+        if len(data) > MAX_SEARCH_IMAGE_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="The reference image is too large"
+            )
+    else:
+        assert image_url is not None
+        async with _download_slots:
+            data = await asyncio.to_thread(_download_search_image, image_url)
+
+    def embed_bytes() -> np.ndarray:
+        from io import BytesIO
+
+        from PIL import Image
+
+        pil = Image.open(BytesIO(data))
+        # The encoder downscales to ~224px anyway; refuse decompression bombs
+        # before convert() materializes hundreds of MB of RGB.
+        if pil.width * pil.height > MAX_SEARCH_IMAGE_PIXELS:
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="The reference image has too many pixels"
+            )
+        return services.image_index.embed_image(pil)
+
+    try:
+        query_embedding = await asyncio.to_thread(embed_bytes)
+    except HTTPException:
+        raise
+    except Exception:
+        services.logger.warning("Image search: failed to decode or embed an uploaded reference image", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="The reference could not be decoded as an image",
+        )
+
+    results = await asyncio.to_thread(services.image_index.search_similar, scope_user, query_embedding, limit)
+    return ImageMapSearchResponse(
+        results=[ImageMapSearchResult(image_name=name, score=score) for name, score in results]
     )
 
 
