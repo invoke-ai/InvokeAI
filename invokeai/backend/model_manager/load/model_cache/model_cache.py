@@ -1183,11 +1183,21 @@ class ModelCache:
             self._delete_cache_entry(cache_entry)
             raise
 
-    def _move_model_to_ram(self, cache_entry: CacheRecord, vram_bytes_to_free: int) -> int:
+    def _move_model_to_ram(
+        self,
+        cache_entry: CacheRecord,
+        vram_bytes_to_free: int,
+        keep_required_weights_in_vram: bool | None = None,
+    ) -> int:
         try:
             if isinstance(cache_entry.cached_model, CachedModelWithPartialLoad):
                 return cache_entry.cached_model.partial_unload_from_vram(
-                    vram_bytes_to_free, keep_required_weights_in_vram=cache_entry.is_locked
+                    vram_bytes_to_free,
+                    keep_required_weights_in_vram=(
+                        cache_entry.is_locked
+                        if keep_required_weights_in_vram is None
+                        else keep_required_weights_in_vram
+                    ),
                 )
             elif isinstance(cache_entry.cached_model, CachedModelOnlyFullLoad):  # type: ignore
                 return cache_entry.cached_model.full_unload_from_vram()
@@ -1198,17 +1208,37 @@ class ModelCache:
             self._delete_cache_entry(cache_entry)
             raise
 
+    @synchronized
+    def unload_model_from_vram(
+        self,
+        cache_entry: CacheRecord,
+        vram_bytes_to_free: int,
+        keep_required_weights_in_vram: bool = False,
+    ) -> int:
+        """Unload model weights through cache error handling.
+
+        Caller must hold the model's usage lock when unloading a model that is in use.
+        The cache entry may already have been evicted; the cached model remains safe to
+        operate on while its owning handle is still alive.
+        """
+        return self._move_model_to_ram(
+            cache_entry,
+            vram_bytes_to_free,
+            keep_required_weights_in_vram=keep_required_weights_in_vram,
+        )
+
     def _get_vram_available(self, working_mem_bytes: Optional[int]) -> int:
         """Calculate the amount of additional VRAM available for the cache to use (takes into account the working
         memory).
         """
-        # If self._max_vram_cache_size_gb is set, then it overrides the default logic.
-        if self._max_vram_cache_size_gb is not None:
-            vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB)
-            return vram_total_available_to_cache - self._get_vram_in_use()
-
         working_mem_bytes_default = int(self._execution_device_working_mem_gb * GB)
         working_mem_bytes = max(working_mem_bytes or working_mem_bytes_default, working_mem_bytes_default)
+
+        # An explicit cache cap limits model residency, but operation-specific working
+        # memory still must remain free for activations and temporary tensors.
+        if self._max_vram_cache_size_gb is not None:
+            vram_total_available_to_cache = int(self._max_vram_cache_size_gb * GB) - working_mem_bytes
+            return vram_total_available_to_cache - self._get_vram_in_use()
 
         if self._execution_device.type == "cuda":
             # TODO(ryand): It is debatable whether we should use memory_reserved() or memory_allocated() here.
