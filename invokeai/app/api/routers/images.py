@@ -695,8 +695,11 @@ class ImagesDownloaded(BaseModel):
 async def download_images_from_list(
     current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
-    image_names: Optional[list[str]] = Body(
-        default=None, description="The list of names of images to download", embed=True
+    image_names: Optional[list[ImageName]] = Body(
+        default=None,
+        description="The list of names of images to download",
+        embed=True,
+        max_length=MAX_IMAGE_BATCH_SIZE,
     ),
     board_id: Optional[str] = Body(
         default=None, description="The board from which image should be downloaded", embed=True

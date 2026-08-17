@@ -317,10 +317,25 @@ def test_star_unstar_dedupes_repeated_names(
     assert images_service.update.call_count == 1
 
 
-@pytest.mark.parametrize("path", ["/api/v1/images/delete", "/api/v1/images/star", "/api/v1/images/unstar"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/images/delete",
+        "/api/v1/images/star",
+        "/api/v1/images/unstar",
+        "/api/v1/images/images_by_names",
+        "/api/v1/images/download",
+    ],
+)
 def test_image_name_batches_are_bounded(monkeypatch: Any, mock_invoker: Invoker, client: TestClient, path: str) -> None:
     """An unbounded name list is a free amplification: each name costs a DB lookup."""
-    prepare_image_batch_test(monkeypatch, mock_invoker)
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+    # /download would otherwise authorize every name and schedule a background task; if the
+    # bound ever regresses we want the assertion below to fail, not the service call to blow up.
+    bulk_download = MagicMock()
+    bulk_download.generate_item_id.return_value = "test"
+    monkeypatch.setattr(mock_invoker.services, "bulk_download", bulk_download)
+
     response = client.post(
         path, json={"image_names": [f"image-{index}.png" for index in range(MAX_IMAGE_BATCH_SIZE + 1)]}
     )
@@ -328,6 +343,60 @@ def test_image_name_batches_are_bounded(monkeypatch: Any, mock_invoker: Invoker,
 
     response = client.post(path, json={"image_names": ["x" * 256]})
     assert response.status_code == 422
+
+    # Rejection is FastAPI request validation, so it happens before the route body runs:
+    # no per-name authorization lookups and no background task were scheduled.
+    assert images_service.get_dto.call_count == 0
+    assert bulk_download.generate_item_id.call_count == 0
+
+
+def test_every_image_names_body_is_bounded(client: TestClient) -> None:
+    """Drift guard: a new explicit-name batch route must not ship without a bound.
+
+    /download shipped unbounded because the limits were applied route-by-route rather
+    than to the shape. Rather than restate the limit on every route, assert the published
+    contract: every images-router request body that takes an `image_names` array declares
+    both a list bound and a per-name length bound.
+
+    Scoped to /v1/images deliberately. The two /v1/board_images batch routes are unbounded
+    too, but bounding them would reject a >MAX_IMAGE_BATCH_SIZE change-board request that
+    the UI can produce today, so they are left for a follow-up that pairs the bound with
+    client-side chunking.
+    """
+    schema = client.get("/openapi.json").json()
+    components = schema["components"]["schemas"]
+
+    unbounded: list[str] = []
+    checked = 0
+    for path, operations in schema["paths"].items():
+        if not path.startswith("/api/v1/images/"):
+            continue
+        for method, operation in operations.items():
+            ref = (
+                operation.get("requestBody", {})
+                .get("content", {})
+                .get("application/json", {})
+                .get("schema", {})
+                .get("$ref")
+            )
+            if ref is None:
+                continue
+            body = components[ref.rsplit("/", 1)[-1]]
+            image_names = body.get("properties", {}).get("image_names")
+            if image_names is None:
+                continue
+            # Optional fields are wrapped in anyOf: [{array}, {null}].
+            variants = image_names.get("anyOf", [image_names])
+            array = next((variant for variant in variants if variant.get("type") == "array"), None)
+            if array is None:
+                continue
+            checked += 1
+            if array.get("maxItems") is None or array.get("items", {}).get("maxLength") is None:
+                unbounded.append(f"{method.upper()} {path}")
+
+    # Floor guards against the walk silently matching nothing if the schema shape changes.
+    assert checked >= 5
+    assert unbounded == [], f"unbounded image_names batch bodies: {unbounded}"
 
 
 @pytest.mark.parametrize(
