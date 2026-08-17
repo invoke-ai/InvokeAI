@@ -31,6 +31,13 @@ const ROUTE_SHARED_MODULES = [
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
+  // Both routes confirm destructive actions (deleting a project, discarding
+  // an import) with the same dialog. Splitting the widget hosts out of their
+  // view chunks gave it a second, editor-only consumer alongside the
+  // Launchpad's — without grouping it crosses the automatic chunking
+  // algorithm's single-consumer threshold and gets extracted into its own
+  // file on both routes, in place of the free inline copies each had before.
+  '/platform/ui/ConfirmDialog.tsx',
   // Name/identifier truncation used eagerly by Launchpad project cards and
   // editor widget chrome alike.
   '/platform/ui/MiddleTruncate.tsx',
@@ -69,6 +76,48 @@ const WORKBENCH_TOPBAR_MODULES = [
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
+] as const;
+
+// Modules the always-static editor shell and the boot-time `widget-hosts`
+// chunk both reach for. Editor-only — folding them into `route-shared`
+// would cost the Launchpad code it never loads, the trade the
+// `route-shared` comments above warn against. Splitting the widget hosts
+// out of their view chunks (see `WIDGET_HOST_MODULES`) gave each of these a
+// second, independent consumer; without grouping, that crosses the
+// automatic chunking algorithm's single-consumer threshold and each gets
+// extracted into its own file — several extra editor-only requests for code
+// that was previously duplicated inline for free. Riding the existing
+// `workbench-topbar` chunk rather than a new one costs it bytes, not a
+// request: `workbench-topbar` is already fetched by every editor boot.
+const EDITOR_SHARED_RUNTIME_MODULES = [
+  '/features/queue/core/graphInputMedia.ts',
+  '/features/queue/core/progressImage.ts',
+  '/features/queue/data/activeProgressTargetStore.ts',
+  '/features/queue/data/generationDevicesStore.ts',
+  '/features/queue/data/itemProgressStore.ts',
+  '/features/queue/data/progressImageStore.ts',
+  '/features/queue/data/progressStore.ts',
+  '/features/queue/data/realtimeRuntime.ts',
+  '/features/queue/publicApi.ts',
+  '/features/queue/runtime.ts',
+  '/features/queue/runtime/coordinator.ts',
+  '/features/queue/ui/queueConfirmationStore.ts',
+  '/features/workflow/core/validation.ts',
+] as const;
+
+// The singleton widget hosts the editor mounts once at boot: workflow's
+// dialog shell, queue's data runtime, image-map's data runtime. Each is
+// fetched together with the other two on every editor boot, all three are
+// always needed, and none is ever needed without the others — splitting
+// them into three separate chunks (one per widget's `loadHost`) traded a
+// shared-chunk request for a per-widget one three times over. Grouping them
+// back into a single chunk keeps the per-host code-splitting boundary (so a
+// host still never drags its widget's view chunk along) while paying for
+// that boundary once instead of three times.
+const WIDGET_HOST_MODULES = [
+  '/features/queue/ui/QueueDataRuntime.tsx',
+  '/features/workflow/ui/WorkflowWidgetChrome.tsx',
+  '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
 const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
@@ -156,7 +205,14 @@ export default defineConfig({
               includeDependenciesRecursively: false,
               name: 'workbench-topbar',
               priority: 30,
-              test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
+              test: (id) =>
+                matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES) || matchesAnySuffix(id, EDITOR_SHARED_RUNTIME_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'widget-hosts',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WIDGET_HOST_MODULES),
             },
             {
               // Plotly is large (~1MB min) and only used by the lazy-loaded
