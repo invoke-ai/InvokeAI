@@ -206,21 +206,73 @@ def test_bulk_cancel_tolerates_rows_deleted_mid_cancel(
     _insert(session_queue, batch_id=batch_id)
     _dequeue_two_on_separate_devices(session_queue)
 
-    original_set_status = session_queue._set_queue_item_status
+    original_transition = session_queue._transition_queue_item_status
 
-    def delete_then_set_status(item_id: int, status: str, **kwargs):
+    def delete_then_transition(item_id: int, status: str, **kwargs):
         # Simulate the concurrent deletion landing just before the per-item cancel.
         with session_queue._db.transaction() as cursor:
             cursor.execute("DELETE FROM session_queue WHERE item_id = ?", (item_id,))
-        return original_set_status(item_id, status, **kwargs)
+        return original_transition(item_id, status, **kwargs)
 
-    monkeypatch.setattr(session_queue, "_set_queue_item_status", delete_then_set_status)
+    monkeypatch.setattr(session_queue, "_transition_queue_item_status", delete_then_transition)
 
     result = session_queue.cancel_by_batch_ids("default", [batch_id])
 
     # Both rows vanished before they could be canceled, so nothing was actually canceled — the
     # point is that the request completed.
     assert result.canceled == 0
+
+
+def test_concurrent_bulk_cancels_count_each_item_once(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker, monkeypatch: pytest.MonkeyPatch
+):
+    """Two bulk cancellations that select the same in-progress rows before either updates them must
+    not both report those rows as newly canceled. The terminal guard is part of the cancel UPDATE
+    itself, so for each row exactly one request observes itself as the canceller and the combined
+    count equals the number of items (JPPhoto follow-up on PR #9263)."""
+    import threading
+
+    batch_id = str(uuid.uuid4())
+    _insert(session_queue, batch_id=batch_id)
+    _insert(session_queue, batch_id=batch_id)
+    id_a, id_b = _dequeue_two_on_separate_devices(session_queue)
+
+    # Rendezvous both requests after their item-id SELECTs but before either per-item update, so
+    # both have selected the same still-in-progress rows.
+    barrier = threading.Barrier(2)
+    arrived = threading.local()
+    original_transition = session_queue._transition_queue_item_status
+
+    def rendezvous_then_transition(item_id: int, status: str, **kwargs):
+        if not getattr(arrived, "done", False):
+            arrived.done = True
+            barrier.wait(timeout=10)
+        return original_transition(item_id, status, **kwargs)
+
+    monkeypatch.setattr(session_queue, "_transition_queue_item_status", rendezvous_then_transition)
+
+    results = []
+    errors = []
+
+    def run() -> None:
+        try:
+            results.append(session_queue.cancel_by_batch_ids("default", [batch_id]))
+        except Exception as e:  # noqa: BLE001 - surface any thread failure in the assertion below
+            errors.append(e)
+
+    threads = [threading.Thread(target=run) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=10)
+
+    assert not errors
+    assert len(results) == 2
+    # Each of the two items is counted by exactly one request (previously both requests could
+    # report the same item, summing to 4).
+    assert sum(r.canceled for r in results) == 2
+    assert session_queue.get_queue_item(id_a).status == "canceled"
+    assert session_queue.get_queue_item(id_b).status == "canceled"
 
 
 def test_cancel_by_batch_ids_respects_user_scope(session_queue: SqliteSessionQueue, mock_invoker: Invoker):

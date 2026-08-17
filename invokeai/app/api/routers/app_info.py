@@ -120,7 +120,7 @@ def _remove_nullable_default_from_schema(schema: dict[str, Any]) -> None:
             schema.update(non_null_schemas[0])
 
 
-_GENERATION_DEVICE_PATTERN = re.compile(r"^(cpu|mps|cuda(:\d+)?)$")
+_GENERATION_DEVICE_PATTERN = re.compile(r"^(cpu|mps|xpu(:\d+)?|cuda(:\d+)?)$")
 
 
 class GenerationDeviceOption(BaseModel):
@@ -163,7 +163,8 @@ class UpdateAppGenerationSettingsRequest(BaseModel):
         for device in v:
             if not _GENERATION_DEVICE_PATTERN.match(device):
                 raise ValueError(
-                    f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', or 'cuda:N'."
+                    f"Invalid generation device '{device}'. Valid values are 'auto', 'cpu', 'mps', 'cuda', 'cuda:N', "
+                    "'xpu', or 'xpu:N'."
                 )
         return v
 
@@ -187,8 +188,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
     configured.
 
     NOTE: coverage is by convention, not automatic. Only `*_api_key` fields listed in
-    EXTERNAL_PROVIDER_CONFIG_FIELDS plus `remote_api_tokens` are masked. If you add a credential to
-    InvokeAIAppConfig under any other name, you must extend this function or it will be served verbatim.
+    EXTERNAL_PROVIDER_CONFIG_FIELDS plus `remote_api_tokens` and credentials embedded in
+    `download_proxy` are masked. If you add a credential to InvokeAIAppConfig under any other
+    name, you must extend this function or it will be served verbatim.
     """
     updates: dict[str, Any] = {}
 
@@ -202,6 +204,9 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
         updates["remote_api_tokens"] = [
             pair.model_copy(update={"token": REDACTED_SECRET}) for pair in config.remote_api_tokens
         ]
+
+    if config.download_proxy and "@" in config.download_proxy:
+        updates["download_proxy"] = REDACTED_SECRET
 
     return config.model_copy(update=updates) if updates else config
 
@@ -220,6 +225,14 @@ async def get_generation_device_options(current_user: CurrentUserOrDefault) -> l
             device = f"cuda:{index}"
             try:
                 name = torch.cuda.get_device_name(index)
+            except Exception:
+                name = device
+            options.append(GenerationDeviceOption(device=device, name=name))
+    elif hasattr(torch, "xpu") and torch.xpu.is_available():
+        for index in range(torch.xpu.device_count()):
+            device = f"xpu:{index}"
+            try:
+                name = torch.xpu.get_device_name(index)
             except Exception:
                 name = device
             options.append(GenerationDeviceOption(device=device, name=name))

@@ -1,3 +1,4 @@
+import weakref
 from typing import Any
 
 import torch
@@ -41,6 +42,7 @@ class CachedModelOnlyFullLoad:
         # under `cache_key`; `release_shared_weights()` must be called exactly once on eviction.
         self._shared_store: SharedCpuWeightsStore | None = None
         self._shared_key: str | None = None
+        self._shared_release_finalizer: weakref.finalize | None = None
 
         # A CPU read-only copy of the model's state dict.
         self._cpu_state_dict: dict[str, torch.Tensor] | None = None
@@ -57,9 +59,24 @@ class CachedModelOnlyFullLoad:
                     if canonical is not cpu_state_dict:
                         model.load_state_dict(canonical, assign=True)
                     cpu_state_dict = canonical
+                    # A cache dropped without a shutdown() never routes its records through
+                    # _delete_cache_entry, so nothing would call release_shared_weights() and the
+                    # canonical tensors would stay resident (and counted by the RAM budget)
+                    # forever. The finalizer must not reference `self` (its args are held strongly
+                    # — that would make the wrapper immortal) and must not take the store's
+                    # non-reentrant lock (it runs in GC context): release_deferred only enqueues;
+                    # the store applies it on its next operation. release_shared_weights() detaches
+                    # this on the normal eviction path, so the release happens exactly once either
+                    # way. Registered inside this try so a failure here (e.g. MemoryError)
+                    # releases the just-acquired reference too.
+                    self._shared_release_finalizer = weakref.finalize(
+                        self, shared_store.release_deferred, cache_key, canonical
+                    )
+                    self._shared_release_finalizer.atexit = False
                 except Exception:
-                    # The re-point failed after acquiring a reference; release it so the shared
-                    # entry's refcount isn't leaked (this wrapper will never enter the cache).
+                    # The re-point or finalizer registration failed after acquiring a reference;
+                    # release it so the shared entry's refcount isn't leaked (this wrapper will
+                    # never enter the cache).
                     self.release_shared_weights()
                     raise
             self._cpu_state_dict = cpu_state_dict
@@ -92,6 +109,11 @@ class CachedModelOnlyFullLoad:
         no-op. After release, the shared store frees the canonical tensors once the last device that
         held this key releases it.
         """
+        if self._shared_release_finalizer is not None:
+            # The eviction path is releasing synchronously; the collection-time fallback must not
+            # release the same reference a second time.
+            self._shared_release_finalizer.detach()
+            self._shared_release_finalizer = None
         if self._shared_store is not None and self._shared_key is not None:
             self._shared_store.release(self._shared_key, self._cpu_state_dict)
             self._shared_store = None
