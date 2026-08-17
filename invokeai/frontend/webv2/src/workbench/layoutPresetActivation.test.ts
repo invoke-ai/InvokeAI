@@ -21,6 +21,7 @@ describe('layout preset activation', () => {
       apply: (presetId) => appliedPresetIds.push(presetId),
       getActiveProjectId: () => 'project-a',
       isCurrent: () => true,
+      isLoaded: () => false,
       load: (preset) => (preset.id === 'compose' ? composeLoad.promise : editLoad.promise),
     });
 
@@ -45,6 +46,7 @@ describe('layout preset activation', () => {
       applyDeadlineMs: 0,
       getActiveProjectId: () => activeProjectId,
       isCurrent: () => true,
+      isLoaded: () => false,
       load: () => new Promise(() => {}),
     });
 
@@ -62,6 +64,7 @@ describe('layout preset activation', () => {
       applyDeadlineMs: 0,
       getActiveProjectId: () => 'project-a',
       isCurrent: () => false,
+      isLoaded: () => false,
       load: () => new Promise(() => {}),
     });
 
@@ -76,6 +79,7 @@ describe('layout preset activation', () => {
       applyDeadlineMs: 0,
       getActiveProjectId: () => 'project-a',
       isCurrent: () => true,
+      isLoaded: () => false,
       load: () => new Promise(() => {}),
     });
 
@@ -91,6 +95,7 @@ describe('layout preset activation', () => {
       applyDeadlineMs: 0,
       getActiveProjectId: () => 'project-a',
       isCurrent: () => true,
+      isLoaded: () => false,
       load: () => new Promise(() => {}),
     });
 
@@ -100,5 +105,73 @@ describe('layout preset activation', () => {
     await expect(activation).resolves.toBeNull();
 
     expect(appliedPresetIds).toEqual([]);
+  });
+
+  it('applies synchronously when every widget is already loaded', () => {
+    const appliedPresetIds: string[] = [];
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => true,
+      isLoaded: () => true,
+      load: () => Promise.resolve(),
+    });
+
+    // No await: a warm switch must commit in the caller's own task, not a
+    // microtask later, so the click that triggered it paints with the layout.
+    void activator.activate(layoutPresets[1]);
+
+    expect(appliedPresetIds).toEqual(['edit']);
+  });
+
+  it('still honours the deadline when a widget is cold', async () => {
+    const appliedPresetIds: string[] = [];
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      applyDeadlineMs: 0,
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => true,
+      isLoaded: () => false,
+      load: () => new Promise(() => {}),
+    });
+
+    const activation = activator.activate(layoutPresets[0]);
+
+    expect(appliedPresetIds).toEqual([]);
+    await activation;
+    expect(appliedPresetIds).toEqual([layoutPresets[0].id]);
+  });
+
+  // Condition 2 of the fast-path contract: the fast path must bump
+  // latestRequestId itself, not rely on apply's downstream dispatch to do it.
+  // If it didn't, an earlier slow activation — still racing its deadline —
+  // would see requestId === latestRequestId when its timer fires and would
+  // overwrite the fast-path's result.
+  it('bumps the request id so an earlier pending slow activation cannot overwrite a later fast-path apply', async () => {
+    const appliedPresetIds: string[] = [];
+    let loaded = false;
+    const activator = createLayoutPresetActivator({
+      apply: (presetId) => appliedPresetIds.push(presetId),
+      applyDeadlineMs: 0,
+      getActiveProjectId: () => 'project-a',
+      isCurrent: () => true,
+      isLoaded: () => loaded,
+      load: () => new Promise(() => {}),
+    });
+
+    // Start a slow activation for a cold preset; it will sit waiting for its
+    // deadline timer.
+    const slowActivation = activator.activate(layoutPresets[0]);
+
+    // A later, fully-warm activation for a different preset takes the fast
+    // path and applies synchronously.
+    loaded = true;
+    void activator.activate(layoutPresets[1]);
+    expect(appliedPresetIds).toEqual(['edit']);
+
+    // When the slow activation's deadline fires, it must see it has been
+    // superseded and must not clobber the fast-path result.
+    await expect(slowActivation).resolves.toBeNull();
+    expect(appliedPresetIds).toEqual(['edit']);
   });
 });

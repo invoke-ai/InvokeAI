@@ -4,10 +4,12 @@ import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { loadWidgets, warmWidgets } from './widgetRegistry';
 
 /**
- * How long an activation waits for widget implementations before applying the
- * preset anyway. Warm widgets — the common case, given boot preloading and the
- * strip's hover preload — settle immediately and keep the atomic, no-fallback
- * reveal. A cold or failing chunk stops gating the entire layout at this
+ * How long a *cold* activation waits for widget implementations before
+ * applying the preset anyway. A fully warm switch (every widget already in
+ * memory) never consults this — it applies synchronously in the caller's own
+ * task. This deadline only bounds how long the tab waits before revealing a
+ * cold switch progressively; the tab has already acknowledged the press
+ * either way. A cold or failing chunk stops gating the entire layout at this
  * deadline: the switch commits and the stragglers reveal progressively behind
  * their own per-widget fallbacks.
  */
@@ -19,6 +21,8 @@ interface LayoutPresetActivatorDependencies {
   applyDeadlineMs?: number;
   getActiveProjectId: () => string;
   isCurrent: (preset: LayoutPreset) => boolean;
+  /** Whether every widget the preset renders is already in memory. */
+  isLoaded: (preset: LayoutPreset) => boolean;
   load: (preset: LayoutPreset) => Promise<unknown>;
 }
 
@@ -42,6 +46,7 @@ export const createLayoutPresetActivator = ({
   applyDeadlineMs = APPLY_DEADLINE_MS,
   getActiveProjectId,
   isCurrent,
+  isLoaded,
   load,
 }: LayoutPresetActivatorDependencies) => {
   let latestRequestId = 0;
@@ -60,6 +65,18 @@ export const createLayoutPresetActivator = ({
     activate: async (preset: LayoutPreset): Promise<LayoutPresetId | null> => {
       const projectId = getActiveProjectId();
       const requestId = ++latestRequestId;
+
+      // The common case — hover-preloaded, or a preset visited before. Awaiting
+      // here costs a microtask, which is enough to push the commit out of the
+      // click's own task and lose the frame on which the press was acknowledged.
+      // `requestId` is already bumped above, so a still-pending slow activation
+      // that lands after this one cannot overwrite it.
+      if (isLoaded(preset)) {
+        apply(preset.id);
+
+        return preset.id;
+      }
+
       await waitForLoadOrDeadline(load(preset), applyDeadlineMs);
 
       if (requestId !== latestRequestId || projectId !== getActiveProjectId() || !isCurrent(preset)) {
