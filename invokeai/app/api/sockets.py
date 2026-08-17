@@ -285,11 +285,10 @@ class SocketIO:
             # Forget the user's revalidation failures once their last socket is gone. The
             # count stands in for how long *these* sockets have gone unchecked, so a user
             # who reconnects must start over. The sweep drops orphaned counters too, but it
-            # cannot be relied on here: `_revalidation_loop` skips the sweep entirely while
-            # no sockets are open, which is precisely the state a departing last socket
-            # creates. Without this, a user whose only socket closed part-way through a
-            # database outage would come back one failed read away from losing the admin
-            # room.
+            # cannot be relied on here: `_revalidation_loop` still skips the sweep entirely
+            # when nothing is live, which a departing last socket can leave it. Without
+            # this, a user whose only socket closed part-way through a database outage
+            # would come back one failed read away from losing the admin room.
             if user_id is not None and not any(info.get("user_id") == user_id for info in self._socket_users.values()):
                 self._revalidation_failures.pop(user_id, None)
             logger.debug(f"Socket {sid} disconnected and cleaned up")
@@ -309,11 +308,35 @@ class SocketIO:
             self._revalidation_task.cancel()
             self._revalidation_task = None
 
+    @staticmethod
+    def _running_queue_item_owners() -> set[str]:
+        """The user ids that own queue items currently executing, or an empty set.
+
+        Errors are swallowed rather than logged: this runs on a timer, and the one way it
+        fails in practice is dependencies not being initialized (at startup, or in a test
+        that never builds them), which would otherwise produce a line every interval
+        forever. A miss costs nothing that the sweep does not already tolerate — the
+        owner is simply not revalidated this round, exactly as if their item had started
+        a moment later.
+        """
+        try:
+            from invokeai.app.api.dependencies import ApiDependencies
+
+            return ApiDependencies.invoker.services.session_processor.get_running_queue_item_owners()
+        except Exception:
+            return set()
+
     async def _revalidation_loop(self) -> None:
-        """Re-derive every open socket's authorization from the database, periodically."""
+        """Re-derive the authorization of every live user from the database, periodically."""
         while True:
             await asyncio.sleep(SOCKET_REVALIDATION_INTERVAL_SECONDS)
-            if not self._socket_users:
+            # Skip the work, not just its result, when there is nothing to revalidate:
+            # single-user mode has no records to check, and an idle server has nobody to
+            # check them for. Running queue items count as live even with no socket open —
+            # that is the whole point of including them.
+            if not self._is_multiuser_enabled():
+                continue
+            if not self._socket_users and not self._running_queue_item_owners():
                 continue
             try:
                 await self._revalidate_socket_users()
@@ -321,7 +344,7 @@ class SocketIO:
                 logger.exception("Error revalidating socket authorization")
 
     async def _revalidate_socket_users(self) -> None:
-        """Emit `user_access_changed` for any connected user whose cached state is stale.
+        """Emit `user_access_changed` for any live user the database no longer agrees with.
 
         The room membership and `is_admin` flag a socket carries are established at connect
         time and refreshed by `_handle_user_access_changed`, which fires on an in-process
@@ -365,12 +388,16 @@ class SocketIO:
         argument is weaker there — but it is a policy change beyond this one, not an
         oversight.
 
-        Scope: only users with an open socket are swept, which leaves one gap. An
-        out-of-process deletion of a user with no socket does not reach
-        `DefaultSessionProcessor._on_user_access_changed`, so a *single-node* graph of
-        theirs that is already running — the one case no other gate re-checks — runs to
-        completion. It cannot persist anything: the save gates in `invocation_context`
-        re-read the record and raise `PermissionError`. The cost is the wasted node.
+        Scope: every user holding an open socket, plus the owner of every queue item that
+        is currently executing. The second set is not about caches — a queue item holds no
+        cached authorization — but about reach. An out-of-process deletion of a user with
+        no socket open raises no event at all, and while
+        `DefaultSessionRunner._run_session_loop` re-reads the owner around every node, a
+        graph with a single long node spends that whole node inside one interval. Sweeping
+        running owners gives that case what a connected user's gets: the published event
+        reaches `DefaultSessionProcessor._on_user_access_changed`, which cancels the item,
+        and the cancellation sets the worker's cancel event so a node with step callbacks
+        stops part-way rather than finishing.
         """
         if not self._is_multiuser_enabled():
             return
@@ -384,6 +411,16 @@ class SocketIO:
         cached_by_user: dict[str, list[dict[str, Any]]] = {}
         for info in list(self._socket_users.values()):
             cached_by_user.setdefault(info["user_id"], []).append(info)
+
+        # Owners of running queue items are swept too, whether or not they hold a socket.
+        # They have no cached socket state, so they contribute no staleness of their own —
+        # an active owner matches the vacuous `all(...)` below and is skipped. What they
+        # add is the deleted or deactivated case: publishing the event is what reaches
+        # `DefaultSessionProcessor._on_user_access_changed` and cancels the item, which in
+        # turn sets the worker's cancel event and stops the node at its next step callback
+        # instead of at the next node boundary that a one-node graph never reaches.
+        for owner_id in self._running_queue_item_owners():
+            cached_by_user.setdefault(owner_id, [])
 
         # Forget the failure history of anyone who no longer has a socket. Without this the
         # dict would accumulate an entry per user across reconnect churn, and — worse — a
@@ -503,8 +540,64 @@ class SocketIO:
             info = self._socket_users.get(sid)
             if info is None or info.get("user_id") != user_id:
                 continue
-            info["is_admin"] = False
-            await self._sio.leave_room(sid, "admin")
+            await self._set_socket_admin(sid, info, False)
+
+    async def _disconnect_socket(self, sid: str) -> None:
+        """Close one socket, without letting its failure abandon the rest of the batch.
+
+        `disconnect` flushes a packet over a transport that may already be half-closed. An
+        exception here used to escape `_handle_user_access_changed`, which the dispatcher
+        runs as a bare task — so nothing observed it, the user's remaining sockets kept
+        their rooms, and (because every handler for an event shares one task, this one
+        first) `DefaultSessionProcessor._on_user_access_changed` never ran and the user's
+        queue item was never canceled. The revalidation sweep republishes, so a socket
+        missed here is retried rather than lost.
+        """
+        try:
+            await self._sio.disconnect(sid)
+        except Exception:
+            logger.warning(f"Could not disconnect socket {sid}; revalidation will retry", exc_info=True)
+
+    async def _set_socket_admin(self, sid: str, info: dict[str, Any], is_admin: bool) -> bool:
+        """Move a socket into or out of the admin room, keeping its cached role in step.
+
+        The cache is written before the room call and rolled back if that call raises, so
+        the cache never records a room change that did not happen. That matters beyond the
+        moment itself: the revalidation sweep decides there is nothing left to do by
+        comparing the record against this cache, and `_handle_sub_queue` re-derives room
+        membership from it on every subscription. A cache updated for a failed demotion
+        would report agreement with a record that says the user is not an administrator,
+        so nothing would ever retry — the socket would hold the admin room, reading other
+        users' events, with the one signal that could have caught it already overwritten.
+        Rolling back leaves the socket visibly more privileged than its record, which is
+        the state the sweep is built to find: it republishes, and this runs again. The
+        failed-lookup path retries too, since every sweep past the limit re-attempts the
+        drop.
+
+        On the connect-time and demotion paths this is atomic in practice — python-socketio's
+        in-memory manager implements both room calls without awaiting anything — but the
+        ordering is written to be correct without relying on that, since an external client
+        manager (Redis) does suspend and can fail.
+
+        Returns whether the change was applied.
+        """
+        previous = info.get("is_admin", False)
+        info["is_admin"] = is_admin
+        try:
+            if is_admin:
+                await self._sio.enter_room(sid, "admin")
+            else:
+                await self._sio.leave_room(sid, "admin")
+        except Exception:
+            info["is_admin"] = previous
+            action = "join" if is_admin else "leave"
+            logger.warning(
+                f"Socket {sid} could not {action} the admin room; leaving its cached role stale "
+                "so revalidation retries",
+                exc_info=True,
+            )
+            return False
+        return True
 
     async def _handle_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
         """Re-authorize a user's open sockets when their role or active status changes.
@@ -535,17 +628,22 @@ class SocketIO:
         replacement session a password change had just issued, and nothing would correct
         either until the next sweep.
 
-        A read that fails leaves the event standing, but only in the direction that takes
-        privileges away. The event is evidence of a committed change that the re-read could
-        not contradict, so its revocations are still applied — but a payload that *grants*
-        the admin room is exactly the superseded-promotion case above, and here there is no
-        record to check it against. So ``is_admin`` is forced to ``False`` on this path:
-        the handler can demote on an unreadable database, never promote. A genuine
-        promotion is not lost, only deferred — the sweep then sees a record saying
-        ``is_admin=True`` against a socket cached as ``False``, and publishes it again.
+        When the read fails there is no record to check the payload against, so the only
+        thing applied is the one revocation that cannot cost anything: ``is_admin`` is
+        forced to ``False`` and the socket leaves the admin room. Nothing is disconnected.
+        The payload cannot be trusted to disconnect on, for the same reason it cannot be
+        trusted to promote on — it may already be superseded, and a stale ``is_active`` or
+        ``token_epoch`` would then close the replacement session a password change had
+        just issued, or a reactivated account's socket, with no way back in while
+        ``_handle_connect`` is also failing closed. Neither decision is lost, only
+        deferred: once reads succeed the sweep compares the record against every socket of
+        the user and publishes any difference — a promotion, a deactivation, or an epoch
+        the socket no longer matches — and this handler applies it against a record it
+        could actually read.
         """
         _, event_data = event
         is_admin, is_active, token_epoch = event_data.is_admin, event_data.is_active, event_data.token_epoch
+        record_unreadable = False
         try:
             from invokeai.app.api.dependencies import ApiDependencies
 
@@ -553,9 +651,10 @@ class SocketIO:
         except Exception:
             logger.warning(
                 f"Could not re-read user {event_data.user_id} while re-authorizing its sockets; "
-                "honoring the access-changed event, less any privilege it would grant",
+                "dropping administrator privileges and deferring every other decision to revalidation",
                 exc_info=True,
             )
+            record_unreadable = True
             is_admin = False
         else:
             self._note_revalidation_success(event_data.user_id)
@@ -577,20 +676,23 @@ class SocketIO:
             info = self._socket_users.get(sid)
             if info is None:
                 continue
-            if not is_active:
-                logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} deactivated or deleted")
-                await self._sio.disconnect(sid)
+            # Both of these close the connection, so neither is taken on the payload
+            # alone — see the docstring. On an unreadable record only the admin-room
+            # change below is applied.
+            if not record_unreadable:
+                if not is_active:
+                    logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} deactivated or deleted")
+                    await self._disconnect_socket(sid)
+                    continue
+                if info.get("token_epoch", 0) != token_epoch:
+                    logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} revoked its earlier sessions")
+                    await self._disconnect_socket(sid)
+                    continue
+            if not await self._set_socket_admin(sid, info, is_admin):
                 continue
-            if info.get("token_epoch", 0) != token_epoch:
-                logger.info(f"Disconnecting socket {sid}: user {event_data.user_id} revoked its earlier sessions")
-                await self._sio.disconnect(sid)
-                continue
-            info["is_admin"] = is_admin
             if is_admin:
-                await self._sio.enter_room(sid, "admin")
                 logger.info(f"Socket {sid} joined admin room: user {event_data.user_id} promoted")
             else:
-                await self._sio.leave_room(sid, "admin")
                 logger.info(f"Socket {sid} left admin room: user {event_data.user_id} demoted")
 
     async def _handle_sub_queue(self, sid: str, data: Any) -> None:

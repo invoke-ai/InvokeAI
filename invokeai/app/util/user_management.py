@@ -24,9 +24,10 @@ _root_help = (
 # These commands write to the database from their own process, so they cannot raise the
 # in-process event that makes a running server re-authorize immediately. What the server
 # derives from the database per request — REST authorization, queue-item execution, media
-# reads and saves — changes the moment this commits. What it caches does not: an already
-# open socket keeps the rooms it joined at connect time until the server's periodic
-# revalidation sweep notices (see SOCKET_REVALIDATION_INTERVAL_SECONDS in api/sockets.py).
+# reads and saves — changes the moment this commits. What it caches or has already started
+# does not: an already open socket keeps the rooms it joined at connect time, and a queue
+# item already inside a node runs that node out, until the server's periodic revalidation
+# sweep notices (see SOCKET_REVALIDATION_INTERVAL_SECONDS in api/sockets.py).
 _LIVE_SERVER_NOTE = (
     "   ℹ️  A running server applies this to new requests immediately; already-open\n"
     "      connections are re-checked within about a minute."

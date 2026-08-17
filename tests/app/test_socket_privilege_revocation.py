@@ -357,15 +357,8 @@ class TestTokenEpochOnSockets:
         assert disconnected == {"sid-old"}
 
 
-class TestRevalidationSweep:
-    """`_revalidate_socket_users` catches user changes made by another process.
-
-    `invoke-usermod --no-admin` and `invoke-userdel` open the database directly, from
-    their own process. Nothing in the server process can raise `user_access_changed` for
-    them, so a socket would otherwise keep the rooms it joined at connect time until it
-    happened to reconnect. REST is unaffected either way — every request re-reads the
-    record — which is exactly why the socket cache is the thing that needs a sweep.
-    """
+class _SweepHarness:
+    """Stubs shared by the sweep test classes. Not collected — the name does not start with Test."""
 
     def _socketio(self, socket_users: dict[str, dict]) -> SocketIO:
         socketio = SocketIO(FastAPI())
@@ -380,6 +373,7 @@ class TestRevalidationSweep:
         *,
         multiuser: bool = True,
         lookups: list[str] | None = None,
+        running_owners: set[str] | None = None,
     ) -> list:
         """Bind ApiDependencies to a stub and return the list emitted events land in."""
         emitted: list = []
@@ -397,6 +391,9 @@ class TestRevalidationSweep:
                 configuration=SimpleNamespace(multiuser=multiuser),
                 users=SimpleNamespace(get=get),
                 events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: emitted.append(kwargs)),
+                session_processor=SimpleNamespace(
+                    get_running_queue_item_owners=lambda: set(running_owners or set()),
+                ),
             )
         )
         monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
@@ -404,6 +401,17 @@ class TestRevalidationSweep:
 
     def _user(self, user_id: str, *, is_admin: bool, is_active: bool = True, token_epoch: int = 0) -> SimpleNamespace:
         return SimpleNamespace(user_id=user_id, is_admin=is_admin, is_active=is_active, token_epoch=token_epoch)
+
+
+class TestRevalidationSweep(_SweepHarness):
+    """`_revalidate_socket_users` catches user changes made by another process.
+
+    `invoke-usermod --no-admin` and `invoke-userdel` open the database directly, from
+    their own process. Nothing in the server process can raise `user_access_changed` for
+    them, so a socket would otherwise keep the rooms it joined at connect time until it
+    happened to reconnect. REST is unaffected either way — every request re-reads the
+    record — which is exactly why the socket cache is the thing that needs a sweep.
+    """
 
     @pytest.mark.anyio
     async def test_cli_demotion_is_published(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -778,6 +786,282 @@ class TestRevalidationSweep:
         assert emitted == [{"user_id": "user-1", "is_admin": False, "is_active": True, "token_epoch": 1}]
 
 
+class TestRunningQueueOwnersAreSwept(_SweepHarness):
+    """The sweep also covers the owner of every queue item that is executing.
+
+    A queue item is not attached to a socket. An account deleted with `invoke-userdel`
+    while its owner has no browser open raises no event in this process, and the owner
+    check in `_run_session_loop` only runs between nodes — so a graph spending minutes
+    inside a single node had nothing that would stop it. Publishing the event for running
+    owners routes that case through `DefaultSessionProcessor._on_user_access_changed`,
+    which cancels the item and so sets the worker's cancel event.
+    """
+
+    @pytest.mark.anyio
+    async def test_a_deleted_socketless_owner_is_published(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        socketio = self._socketio({})
+        emitted = self._patch_services(monkeypatch, {"user-1": None}, running_owners={"user-1"})
+
+        await socketio._revalidate_socket_users()
+
+        assert emitted == [{"user_id": "user-1", "is_admin": False, "is_active": False, "token_epoch": 0}]
+
+    @pytest.mark.anyio
+    async def test_a_deactivated_socketless_owner_is_published(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        socketio = self._socketio({})
+        emitted = self._patch_services(
+            monkeypatch,
+            {"user-1": self._user("user-1", is_admin=False, is_active=False)},
+            running_owners={"user-1"},
+        )
+
+        await socketio._revalidate_socket_users()
+
+        assert emitted == [{"user_id": "user-1", "is_admin": False, "is_active": False, "token_epoch": 0}]
+
+    @pytest.mark.anyio
+    async def test_an_active_socketless_owner_publishes_nothing(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An owner with no socket has no cached authorization to be stale, so a healthy
+        record must not produce an event every interval for the length of every job."""
+        socketio = self._socketio({})
+        emitted = self._patch_services(
+            monkeypatch, {"user-1": self._user("user-1", is_admin=True)}, running_owners={"user-1"}
+        )
+
+        await socketio._revalidate_socket_users()
+
+        assert emitted == []
+
+    @pytest.mark.anyio
+    async def test_an_owner_who_also_holds_a_socket_is_looked_up_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0}})
+        lookups: list[str] = []
+        self._patch_services(
+            monkeypatch,
+            {"user-1": self._user("user-1", is_admin=False)},
+            lookups=lookups,
+            running_owners={"user-1"},
+        )
+
+        await socketio._revalidate_socket_users()
+
+        assert lookups == ["user-1"]
+
+    @pytest.mark.anyio
+    async def test_an_owners_socket_state_is_still_what_decides_staleness(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Being a running owner must not suppress the socket comparison: the empty list a
+        queue owner contributes would satisfy `all(...)` vacuously if it replaced the
+        socket's cached state instead of being merged with it."""
+        socketio = self._socketio({"sid-1": {"user_id": "admin-1", "is_admin": True, "token_epoch": 0}})
+        emitted = self._patch_services(
+            monkeypatch, {"admin-1": self._user("admin-1", is_admin=False)}, running_owners={"admin-1"}
+        )
+
+        await socketio._revalidate_socket_users()
+
+        assert emitted == [{"user_id": "admin-1", "is_admin": False, "is_active": True, "token_epoch": 0}]
+
+    async def _run_one_loop_tick(self, socketio: SocketIO, monkeypatch: pytest.MonkeyPatch) -> bool:
+        """Drive `_revalidation_loop` once and report whether it ran the sweep."""
+        monkeypatch.setattr("invokeai.app.api.sockets.SOCKET_REVALIDATION_INTERVAL_SECONDS", 0)
+        swept = asyncio.Event()
+
+        async def fake_sweep() -> None:
+            swept.set()
+
+        monkeypatch.setattr(socketio, "_revalidate_socket_users", fake_sweep)
+        task = asyncio.create_task(socketio._revalidation_loop())
+        try:
+            await asyncio.wait_for(swept.wait(), 0.25)
+        except TimeoutError:
+            return False
+        finally:
+            task.cancel()
+        return True
+
+    @pytest.mark.anyio
+    async def test_the_loop_does_not_skip_a_sweep_when_only_a_queue_item_is_live(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`_revalidation_loop` skips the sweep when nothing is live. A running item with no
+        socket open is exactly the case this fix exists for, so it must count as live."""
+        socketio = self._socketio({})
+        self._patch_services(monkeypatch, {}, running_owners={"user-1"})
+
+        assert await self._run_one_loop_tick(socketio, monkeypatch) is True
+
+    @pytest.mark.anyio
+    async def test_the_loop_still_skips_when_nothing_at_all_is_live(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        socketio = self._socketio({})
+        self._patch_services(monkeypatch, {}, running_owners=set())
+
+        assert await self._run_one_loop_tick(socketio, monkeypatch) is False
+
+    @pytest.mark.anyio
+    async def test_the_loop_does_not_look_for_running_items_in_single_user_mode(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The sweep has nothing to do without records to check, so it should not be
+        reaching into the session processor on every tick to find that out."""
+        socketio = self._socketio({})
+        self._patch_services(monkeypatch, {}, multiuser=False, running_owners={"user-1"})
+        looked = []
+        monkeypatch.setattr(socketio, "_running_queue_item_owners", lambda: looked.append(1) or set())
+
+        assert await self._run_one_loop_tick(socketio, monkeypatch) is False
+        assert looked == []
+
+    def test_running_owners_are_empty_when_dependencies_are_not_initialized(self) -> None:
+        """Called on a timer, so a missing `ApiDependencies.invoker` must not raise (or log
+        a line every interval) — an idle server and a test that never builds dependencies
+        both land here."""
+        socketio = self._socketio({})
+
+        assert socketio._running_queue_item_owners() == set()
+
+
+class TestRoomChangesAndCacheStayInStep:
+    """The cached `is_admin` must never claim more than the socket's actual room membership.
+
+    The sweep decides there is nothing to do by comparing the record against that cache, so
+    a cache written for a room change that then failed would report agreement and leave the
+    socket in the admin room with nothing left to notice it.
+    """
+
+    def _socketio(self, socket_users: dict[str, dict]) -> SocketIO:
+        socketio = SocketIO(FastAPI())
+        socketio._sio.enter_room = AsyncMock()
+        socketio._sio.leave_room = AsyncMock(side_effect=RuntimeError("room manager is unhappy"))
+        socketio._sio.disconnect = AsyncMock()
+        socketio._socket_users = socket_users
+        return socketio
+
+    def _patch_users(self, monkeypatch: pytest.MonkeyPatch, user) -> None:
+        invoker = SimpleNamespace(
+            services=SimpleNamespace(
+                configuration=SimpleNamespace(multiuser=True),
+                users=SimpleNamespace(get=lambda user_id: user),
+            )
+        )
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
+    @pytest.mark.anyio
+    async def test_a_failed_demotion_leaves_the_cache_stale(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
+        self._patch_users(monkeypatch, SimpleNamespace(user_id="user-1", is_admin=False, is_active=True, token_epoch=0))
+        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=True)
+
+        await socketio._handle_user_access_changed(("user_access_changed", event))
+
+        assert socketio._socket_users["sid-1"]["is_admin"] is True, (
+            "the room change failed, so the cache must not claim it succeeded"
+        )
+
+    @pytest.mark.anyio
+    async def test_the_sweep_republishes_after_a_failed_demotion(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The point of leaving it stale: the next sweep still sees a difference and tries
+        again, instead of finding cache and record in agreement."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
+        self._patch_users(monkeypatch, SimpleNamespace(user_id="user-1", is_admin=False, is_active=True, token_epoch=0))
+        await socketio._handle_user_access_changed(
+            ("user_access_changed", UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=True))
+        )
+
+        emitted: list[dict] = []
+        invoker = SimpleNamespace(
+            services=SimpleNamespace(
+                configuration=SimpleNamespace(multiuser=True),
+                users=SimpleNamespace(
+                    get=lambda user_id: SimpleNamespace(user_id="user-1", is_admin=False, is_active=True, token_epoch=0)
+                ),
+                events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: emitted.append(kwargs)),
+                session_processor=SimpleNamespace(get_running_queue_item_owners=lambda: set()),
+            )
+        )
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
+        await socketio._revalidate_socket_users()
+
+        assert emitted == [{"user_id": "user-1", "is_admin": False, "is_active": True, "token_epoch": 0}]
+
+    @pytest.mark.anyio
+    async def test_a_failed_drop_on_the_failure_path_leaves_the_cache_stale(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Same rule where there is no record at all to fall back on — and where a stale
+        cache is the only thing that gets the drop retried, since the next failed sweep
+        re-runs it."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
+        socketio._revalidation_failures["user-1"] = SOCKET_REVALIDATION_FAILURE_LIMIT - 1
+
+        await socketio._note_revalidation_failure("user-1")
+
+        socketio._sio.leave_room.assert_awaited_once_with("sid-1", "admin")
+        assert socketio._socket_users["sid-1"]["is_admin"] is True
+
+    @pytest.mark.anyio
+    async def test_a_failed_room_change_does_not_abandon_the_other_sockets(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """One socket's room manager error must not leave the user's remaining sockets
+        holding the admin room untouched."""
+        socketio = self._socketio(
+            {
+                "sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0},
+                "sid-2": {"user_id": "user-1", "is_admin": True, "token_epoch": 0},
+            }
+        )
+        socketio._sio.leave_room = AsyncMock(side_effect=[RuntimeError("room manager is unhappy"), None])
+        self._patch_users(monkeypatch, SimpleNamespace(user_id="user-1", is_admin=False, is_active=True, token_epoch=0))
+
+        await socketio._handle_user_access_changed(
+            ("user_access_changed", UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=True))
+        )
+
+        assert socketio._sio.leave_room.await_count == 2
+        assert socketio._socket_users["sid-1"]["is_admin"] is True
+        assert socketio._socket_users["sid-2"]["is_admin"] is False
+
+    @pytest.mark.anyio
+    async def test_a_failed_promotion_leaves_the_cache_unpromoted(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The reachable half of this: python-socketio's `enter_room` raises for a sid that
+        left between the snapshot and the call, where `leave_room` swallows the same
+        condition. The cache must not record a room the socket never joined."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0}})
+        socketio._sio.enter_room = AsyncMock(side_effect=ValueError("sid is not connected to requested namespace"))
+        self._patch_users(monkeypatch, SimpleNamespace(user_id="user-1", is_admin=True, is_active=True, token_epoch=0))
+
+        await socketio._handle_user_access_changed(
+            ("user_access_changed", UserAccessChangedEvent.build(user_id="user-1", is_admin=True, is_active=True))
+        )
+
+        assert socketio._socket_users["sid-1"]["is_admin"] is False
+
+    @pytest.mark.anyio
+    async def test_a_failed_disconnect_does_not_abandon_the_other_sockets(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`disconnect` flushes a packet and can raise on a half-closed transport. Letting
+        that escape would strand the user's other sockets — and skip the session
+        processor's handler for the same event, which is what cancels their queue item."""
+        socketio = self._socketio(
+            {
+                "sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0},
+                "sid-2": {"user_id": "user-1", "is_admin": False, "token_epoch": 0},
+            }
+        )
+        socketio._sio.disconnect = AsyncMock(side_effect=[RuntimeError("transport is gone"), None])
+        self._patch_users(monkeypatch, None)
+
+        await socketio._handle_user_access_changed(
+            ("user_access_changed", UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False))
+        )
+
+        assert socketio._sio.disconnect.await_count == 2
+
+
 class TestHandlerRereadsAtThePointOfDecision:
     """`_handle_user_access_changed` applies the *record*, using the event only as a trigger.
 
@@ -858,15 +1142,68 @@ class TestHandlerRereadsAtThePointOfDecision:
         monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
 
     @pytest.mark.anyio
-    async def test_an_unreadable_record_leaves_a_revoking_event_standing(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """The event is evidence of a committed change; a read that cannot contradict it
-        does not get to override it — in the direction that takes privileges away."""
+    async def test_an_unreadable_record_does_not_disconnect(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A payload that cannot be checked is not trusted to close a connection.
+
+        The same payload that might be superseded in the promotion direction might be
+        superseded here, and this direction is unrecoverable while the database is
+        unreadable: `_handle_connect` fails closed, so a socket dropped on a stale
+        `is_active` cannot get back in. The admin room still goes."""
         socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": True, "token_epoch": 0}})
         self._patch_unreadable_users(monkeypatch)
         event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
 
         await socketio._handle_user_access_changed(("user_access_changed", event))
 
+        socketio._sio.disconnect.assert_not_awaited()
+        socketio._sio.leave_room.assert_awaited_once_with("sid-1", "admin")
+        assert socketio._socket_users["sid-1"]["is_admin"] is False
+
+    @pytest.mark.anyio
+    async def test_an_unreadable_record_does_not_disconnect_on_a_stale_epoch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The replacement-session case, with the re-read that normally catches it failing.
+        The socket holds the epoch issued by the password change; the event still carries
+        the one from before it."""
+        socketio = self._socketio({"sid-new": {"user_id": "user-1", "is_admin": False, "token_epoch": 1}})
+        self._patch_unreadable_users(monkeypatch)
+        stale = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=True, token_epoch=0)
+
+        await socketio._handle_user_access_changed(("user_access_changed", stale))
+
+        socketio._sio.disconnect.assert_not_awaited()
+
+    @pytest.mark.anyio
+    async def test_a_deferred_disconnect_is_applied_once_the_record_reads_again(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Nothing is lost by deferring: the sweep republishes the difference it finds
+        between the record and the socket, and the handler then applies it against a record
+        it could read."""
+        socketio = self._socketio({"sid-1": {"user_id": "user-1", "is_admin": False, "token_epoch": 0}})
+        self._patch_unreadable_users(monkeypatch)
+        event = UserAccessChangedEvent.build(user_id="user-1", is_admin=False, is_active=False)
+        await socketio._handle_user_access_changed(("user_access_changed", event))
+        socketio._sio.disconnect.assert_not_awaited()
+
+        # The database comes back, and the account really was deactivated.
+        emitted: list[dict] = []
+        deactivated = SimpleNamespace(user_id="user-1", is_admin=False, is_active=False, token_epoch=0)
+        invoker = SimpleNamespace(
+            services=SimpleNamespace(
+                configuration=SimpleNamespace(multiuser=True),
+                users=SimpleNamespace(get=lambda user_id: deactivated),
+                events=SimpleNamespace(emit_user_access_changed=lambda **kwargs: emitted.append(kwargs)),
+                session_processor=SimpleNamespace(get_running_queue_item_owners=lambda: set()),
+            )
+        )
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
+        await socketio._revalidate_socket_users()
+        assert emitted == [{"user_id": "user-1", "is_admin": False, "is_active": False, "token_epoch": 0}]
+
+        await socketio._handle_user_access_changed(("user_access_changed", UserAccessChangedEvent.build(**emitted[0])))
         socketio._sio.disconnect.assert_awaited_once_with("sid-1")
 
     @pytest.mark.anyio

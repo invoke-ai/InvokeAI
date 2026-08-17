@@ -52,14 +52,18 @@ OWNER_LOOKUP_ATTEMPTS = 3
 OWNER_LOOKUP_RETRY_SECONDS = 0.25
 
 
-def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueueItem) -> bool:
+def queue_owner_is_active(
+    services: InvocationServices, queue_item: SessionQueueItem, *, unreadable_is_active: bool = False
+) -> bool:
     """Whether the queue item's owner is still permitted to execute work.
 
     Deactivating (or deleting) an account must also revoke its queued execution:
     a queued graph consumes GPU time, reads media, and writes outputs on behalf of
-    its owner. Pending items are rejected at dequeue; running items are stopped at
-    the next node boundary (and immediately mid-node for nodes with step callbacks,
-    via the cancel event set when the item is canceled).
+    its owner. Pending items are rejected at dequeue; running items are checked before
+    every node, so they stop at the next node boundary — and once more after the graph's
+    last node, so a one-node graph is not recorded as completed for an owner revoked while
+    it ran (and immediately mid-node for nodes with step callbacks, via the cancel event
+    set when the item is canceled).
 
     The check is skipped entirely when multiuser mode is disabled.
 
@@ -78,9 +82,19 @@ def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueue
     Failing closed costs a still-valid user a cancellation instead — recoverable, since
     canceled items can be retried, and only reachable when the database has been
     unreadable across every attempt, by which point the instance has larger problems.
-    The exception is swallowed rather than raised for the same reason as before: this
-    runs between nodes on a path with no exception handling of its own, and letting it
-    escape would abandon the session without its normal teardown.
+
+    ``unreadable_is_active`` inverts only that last decision, for the one caller that runs
+    *after* the work rather than before it. Ahead of a node, failing closed spends nothing
+    and may save a GPU; after the graph's last node there is no execution left to refuse,
+    so the same failure would cancel a completed generation — destroying a valid user's
+    result over a transient busy-timeout, and, for a workflow-call child, taking the whole
+    parent chain with it. A genuinely revoked owner loses nothing by the difference: the
+    save gates in ``invocation_context`` re-read the record independently and have already
+    refused every write.
+
+    The exception is swallowed rather than raised for the same reason as before: this runs
+    between nodes on a path with no exception handling of its own, and letting it escape
+    would abandon the session without its normal teardown.
     """
     if not services.configuration.multiuser:
         return True
@@ -97,6 +111,12 @@ def queue_owner_is_active(services: InvocationServices, queue_item: SessionQueue
                 time.sleep(OWNER_LOOKUP_RETRY_SECONDS)
             continue
         return user is not None and user.is_active
+    if unreadable_is_active:
+        services.logger.warning(
+            f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id} after it finished; "
+            "letting the completed work stand"
+        )
+        return True
     services.logger.error(
         f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id}; refusing execution"
     )
@@ -163,16 +183,9 @@ class DefaultSessionRunner(SessionRunnerBase):
             if invocation is None or self._is_canceled():
                 break
 
-            # Revalidate the owner between nodes: an account deactivated mid-session
-            # must not execute further nodes. Cancel the item so its status reflects
-            # why execution stopped.
-            if not queue_owner_is_active(self._services, queue_item):
-                self._services.logger.warning(
-                    f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
-                    "deleted, or could not be verified"
-                )
-                with suppress(SessionQueueItemNotFoundError):
-                    self._services.session_queue.cancel_queue_item(queue_item.item_id)
+            # Revalidate the owner before the node: an account deactivated mid-session
+            # must not execute further nodes.
+            if self._cancel_if_owner_revoked(queue_item):
                 break
 
             self.run_node(invocation, queue_item)
@@ -180,12 +193,37 @@ class DefaultSessionRunner(SessionRunnerBase):
             # The session is complete if all invocations have been run or there is an error on the session.
             # At this time, the queue item may be canceled, but the object itself here won't be updated yet. We must
             # use the cancel event to check if the session is canceled.
-            if (
-                queue_item.session.is_complete()
-                or self._is_canceled()
-                or queue_item.status in ["failed", "canceled", "completed"]
-            ):
+            session_finished = queue_item.session.is_complete()
+            already_terminal = self._is_canceled() or queue_item.status in ["failed", "canceled", "completed"]
+            if session_finished or already_terminal:
+                # Last pass, so the check at the top will not run again — which leaves the
+                # node that just ran, the only node of a one-node graph, as the one node
+                # nothing re-checks. A revocation committed while it executed would
+                # otherwise let the item be recorded as completed.
+                #
+                # Deliberately narrow, because after a node the balance is the reverse of
+                # what it is before one: there is no execution left to refuse, only a
+                # finished result to destroy. So it runs only when the session finished its
+                # own work — `has_error()` sessions are `is_complete()` too, and cancelling
+                # one would overwrite its error and drag a workflow call's waiting parent
+                # down with it — and it does not fail closed (see `queue_owner_is_active`).
+                # A suspended workflow call is not `is_complete()`, so it is untouched here
+                # and re-checked when the parent resumes.
+                if session_finished and not already_terminal and not queue_item.session.has_error():
+                    self._cancel_if_owner_revoked(queue_item, unreadable_is_active=True)
                 break
+
+    def _cancel_if_owner_revoked(self, queue_item: SessionQueueItem, *, unreadable_is_active: bool = False) -> bool:
+        """Cancel the item if its owner may no longer execute work. Returns True if canceled."""
+        if queue_owner_is_active(self._services, queue_item, unreadable_is_active=unreadable_is_active):
+            return False
+        self._services.logger.warning(
+            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
+            "deleted, or could not be verified"
+        )
+        with suppress(SessionQueueItemNotFoundError):
+            self._services.session_queue.cancel_queue_item(queue_item.item_id)
+        return True
 
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
@@ -628,10 +666,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
         payload = event[1]
         canceled = False
         for worker in self._workers:
+            # Bound to a local for the same reason as in `_on_queue_item_status_changed`:
+            # the worker thread can clear the field between two reads of it.
+            queue_item = worker.queue_item
             if (
-                worker.queue_item
-                and worker.queue_item.queue_id == payload.queue_id
-                and (payload.user_id is None or worker.queue_item.user_id == payload.user_id)
+                queue_item
+                and queue_item.queue_id == payload.queue_id
+                and (payload.user_id is None or queue_item.user_id == payload.user_id)
             ):
                 worker.cancel_event.set()
                 canceled = True
@@ -708,7 +749,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
         # Find the worker (if any) currently running the item whose status changed.
         for worker in self._workers:
-            if worker.queue_item and worker.queue_item.item_id == event[1].item_id:
+            # Bound to a local: the worker thread can clear the field between the two reads
+            # a `worker.queue_item and worker.queue_item.x` test would make, and the
+            # AttributeError would escape this handler — which the event dispatcher runs in
+            # the same task as every other handler for this event, so the ones registered
+            # after it would be skipped.
+            queue_item = worker.queue_item
+            if queue_item and queue_item.item_id == event[1].item_id:
                 if event[1].status in ["completed", "failed", "canceled"]:
                     # When the queue item is canceled via HTTP, the status is set to "canceled" and this event is
                     # emitted. We respond by setting that worker's cancel event, which its session runner checks
@@ -734,6 +781,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
             is_started=self._resume_event.is_set(),
             is_processing=any(worker.queue_item is not None for worker in self._workers),
         )
+
+    def get_running_queue_item_owners(self) -> set[str]:
+        # `worker.queue_item` is written by the worker thread and read here from the event
+        # loop, so it is bound to a local before being dereferenced — the field can go
+        # `None` between the two. `_workers` is rebound by `start()` rather than mutated
+        # after it, and iteration binds the list object, so it cannot change under this
+        # loop. The worst a race yields is the item that was running an instant ago, whose
+        # owner the caller re-reads from the database anyway.
+        owners: set[str] = set()
+        for worker in self._workers:
+            queue_item = worker.queue_item
+            if queue_item is not None:
+                owners.add(queue_item.user_id)
+        return owners
 
     def _is_queue_item_terminal(self, item_id: int) -> bool:
         """Return True if the queue item is already finished (canceled/failed/completed) or gone.
@@ -793,6 +854,16 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
             while not stop_event.is_set():
                 poll_now_event.clear()
+
+                # The previous item, if any, is finished with. Cleared here rather than
+                # after `run_queue_item` because the non-fatal error handler below needs it
+                # to fail the item, and it reaches this point by `continue`. Without this,
+                # a worker that finishes an item and then parks — paused, or waiting out
+                # image-move maintenance, both of which block before the dequeue below —
+                # goes on reporting that item as running for as long as it stays parked.
+                # `get_status` and `get_running_queue_item_owners` both read it.
+                worker.queue_item = None
+
                 try:
                     # Any unhandled exception in this block is a nonfatal processor error and will be handled.
                     # If we are paused, wait for resume event

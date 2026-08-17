@@ -3,6 +3,7 @@
 import sqlite3
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from invokeai.app.services.auth.password_utils import hash_password, validate_password_strength, verify_password
@@ -22,6 +23,31 @@ from invokeai.app.services.users.users_common import (
 # Bound-parameter chunk size for `get_many`. SQLite's SQLITE_MAX_VARIABLE_NUMBER is 32766
 # on modern builds but 999 on older ones; stay under the smaller limit.
 USER_LOOKUP_CHUNK_SIZE = 900
+
+# Every query that produces a `UserDTO` selects exactly these columns, in this order, and
+# maps them with `_user_dto_from_row`. The projection and its mapper are kept together
+# deliberately: they were previously copied out per query, and a field added to the DTO
+# afterwards had to be added to each copy by hand. `get_many` was missed, so it reported
+# `token_epoch` as the model default (0) for every user it returned, indistinguishable
+# from an account that had never rotated its password.
+_USER_DTO_COLUMNS = (
+    "user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch"
+)
+
+
+def _user_dto_from_row(row: Sequence[Any]) -> UserDTO:
+    """Build a `UserDTO` from a row selected with `_USER_DTO_COLUMNS`."""
+    return UserDTO(
+        user_id=row[0],
+        email=row[1],
+        display_name=row[2],
+        is_admin=bool(row[3]),
+        is_active=bool(row[4]),
+        created_at=datetime.fromisoformat(row[5]),
+        updated_at=datetime.fromisoformat(row[6]),
+        last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
+        token_epoch=int(row[8]),
+    )
 
 
 class UserService(UserServiceBase):
@@ -73,8 +99,8 @@ class UserService(UserServiceBase):
         """Get user by ID."""
         with self._db.transaction() as cursor:
             cursor.execute(
-                """
-                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
+                f"""
+                SELECT {_USER_DTO_COLUMNS}
                 FROM users
                 WHERE user_id = ?
                 """,
@@ -85,17 +111,7 @@ class UserService(UserServiceBase):
         if row is None:
             return None
 
-        return UserDTO(
-            user_id=row[0],
-            email=row[1],
-            display_name=row[2],
-            is_admin=bool(row[3]),
-            is_active=bool(row[4]),
-            created_at=datetime.fromisoformat(row[5]),
-            updated_at=datetime.fromisoformat(row[6]),
-            last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
-            token_epoch=int(row[8]),
-        )
+        return _user_dto_from_row(row)
 
     def get_many(self, user_ids: Sequence[str]) -> dict[str, UserDTO]:
         """Get users by ID, keyed by user_id. Unknown ids are absent from the result."""
@@ -112,7 +128,7 @@ class UserService(UserServiceBase):
             with self._db.transaction() as cursor:
                 cursor.execute(
                     f"""
-                    SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at
+                    SELECT {_USER_DTO_COLUMNS}
                     FROM users
                     WHERE user_id IN ({placeholders})
                     """,
@@ -120,24 +136,15 @@ class UserService(UserServiceBase):
                 )
                 rows = cursor.fetchall()
             for row in rows:
-                users[row[0]] = UserDTO(
-                    user_id=row[0],
-                    email=row[1],
-                    display_name=row[2],
-                    is_admin=bool(row[3]),
-                    is_active=bool(row[4]),
-                    created_at=datetime.fromisoformat(row[5]),
-                    updated_at=datetime.fromisoformat(row[6]),
-                    last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
-                )
+                users[row[0]] = _user_dto_from_row(row)
         return users
 
     def get_by_email(self, email: str) -> UserDTO | None:
         """Get user by email."""
         with self._db.transaction() as cursor:
             cursor.execute(
-                """
-                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
+                f"""
+                SELECT {_USER_DTO_COLUMNS}
                 FROM users
                 WHERE email = ?
                 """,
@@ -148,17 +155,7 @@ class UserService(UserServiceBase):
         if row is None:
             return None
 
-        return UserDTO(
-            user_id=row[0],
-            email=row[1],
-            display_name=row[2],
-            is_admin=bool(row[3]),
-            is_active=bool(row[4]),
-            created_at=datetime.fromisoformat(row[5]),
-            updated_at=datetime.fromisoformat(row[6]),
-            last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
-            token_epoch=int(row[8]),
-        )
+        return _user_dto_from_row(row)
 
     def update(self, user_id: str, changes: UserUpdateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Update user."""
@@ -244,9 +241,11 @@ class UserService(UserServiceBase):
     def authenticate(self, email: str, password: str) -> UserDTO | None:
         """Authenticate user credentials."""
         with self._db.transaction() as cursor:
+            # `password_hash` is appended rather than inserted, so the DTO columns keep the
+            # positions `_user_dto_from_row` expects.
             cursor.execute(
-                """
-                SELECT user_id, email, display_name, password_hash, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
+                f"""
+                SELECT {_USER_DTO_COLUMNS}, password_hash
                 FROM users
                 WHERE email = ?
                 """,
@@ -267,29 +266,20 @@ class UserService(UserServiceBase):
         if row[0] == SYSTEM_USER_ID:
             return None
 
-        password_hash = row[3]
+        password_hash = row[9]
         if not verify_password(password, password_hash):
             return None
 
         # Update last login time
+        last_login_at = datetime.now(timezone.utc)
         with self._db.transaction() as cursor:
             cursor.execute(
                 "UPDATE users SET last_login_at = ? WHERE user_id = ?",
-                (datetime.now(timezone.utc).isoformat(), row[0]),
+                (last_login_at.isoformat(), row[0]),
             )
 
-        return UserDTO(
-            user_id=row[0],
-            email=row[1],
-            display_name=row[2],
-            is_admin=bool(row[4]),
-            is_active=bool(row[5]),
-            created_at=datetime.fromisoformat(row[6]),
-            updated_at=datetime.fromisoformat(row[7]),
-            last_login_at=datetime.now(timezone.utc),
-            # password_hash occupies row[3] in this query, shifting the tail by one.
-            token_epoch=int(row[9]),
-        )
+        # Report the login just recorded rather than the one the row was read with.
+        return _user_dto_from_row(row).model_copy(update={"last_login_at": last_login_at})
 
     def has_admin(self) -> bool:
         """Check if any admin user exists."""
@@ -317,8 +307,8 @@ class UserService(UserServiceBase):
         """List all users."""
         with self._db.transaction() as cursor:
             cursor.execute(
-                """
-                SELECT user_id, email, display_name, is_admin, is_active, created_at, updated_at, last_login_at, token_epoch
+                f"""
+                SELECT {_USER_DTO_COLUMNS}
                 FROM users
                 ORDER BY created_at DESC
                 LIMIT ? OFFSET ?
@@ -327,20 +317,7 @@ class UserService(UserServiceBase):
             )
             rows = cursor.fetchall()
 
-        return [
-            UserDTO(
-                user_id=row[0],
-                email=row[1],
-                display_name=row[2],
-                is_admin=bool(row[3]),
-                is_active=bool(row[4]),
-                created_at=datetime.fromisoformat(row[5]),
-                updated_at=datetime.fromisoformat(row[6]),
-                last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
-                token_epoch=int(row[8]),
-            )
-            for row in rows
-        ]
+        return [_user_dto_from_row(row) for row in rows]
 
     def get_admin_email(self) -> str | None:
         """Get the email address of the first active admin user."""
