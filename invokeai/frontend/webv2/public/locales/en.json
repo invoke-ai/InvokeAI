@@ -543,10 +543,13 @@
     "you": "You"
   },
   "graphPreview": {
+    "cfgScale": "CFG scale",
     "graphJsonLabel": "{{title}} graph JSON",
     "inputCount_one": "{{count}} input",
     "inputCount_other": "{{count}} inputs",
     "invokeRoute": "Invoke {{route}}",
+    "loras": "LoRAs",
+    "model": "Model",
     "noCompiledGraph": "No compiled graph is available for \"{{graphId}}\" yet.",
     "nodes": "Nodes",
     "provenance": {
@@ -562,6 +565,13 @@
       "size": "Generate → Size",
       "steps": "Generate → Steps"
     },
+    "scheduler": "Scheduler",
+    "seed": "Seed",
+    "seedRandomValue": "random",
+    "seedRandomized": "Seed is randomized. This graph runs differently each time.",
+    "seedRegenerated": "regenerated each run",
+    "size": "Size",
+    "steps": "Steps",
     "title": "{{title}} Graph Preview"
   },
   "hotkeys": {
