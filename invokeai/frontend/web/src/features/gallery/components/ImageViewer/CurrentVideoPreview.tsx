@@ -215,17 +215,19 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     if (isMediaCookieSelfHealPending()) {
       return;
     }
-    // A genuinely errored element will never fire onLoadedMetadata, which is what normally clears
-    // a pending post-render progress overlay — clear it here or it strands over the viewer.
-    // (onLoadImage is a no-op unless a resolve is actually pending.)
-    onLoadImage();
+    // A genuinely errored element will never fire onLoadedMetadata, which is what normally ends
+    // this session's post-render "resolve" illusion — end it here instead of letting the overlay
+    // sit over the viewer for the whole resolve timeout. Attributed to this video's session, so
+    // the lifecycle ignores it if some other session's illusion is the one pending, and it is a
+    // no-op when none is.
+    onLoadImage(videoDTO?.session_id ?? null);
     toast({
       id: 'VIDEO_PLAYBACK_FAILED',
       status: 'error',
       title: t('toast.videoPlaybackFailed'),
       description: t('toast.videoPlaybackFailedDesc'),
     });
-  }, [onLoadImage, t]);
+  }, [onLoadImage, t, videoDTO?.session_id]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -396,7 +398,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // video frame until playback or a seek — the element just shows its black background.
   // Setting currentTime to 0.0001 nudges the decoder to paint without measurably advancing.
   const handleLoadedMetadata = useCallback(() => {
-    onLoadImage();
+    onLoadImage(videoDTO?.session_id ?? null);
     const el = videoRef.current;
     if (el && !isPlaying && el.currentTime === 0) {
       try {
@@ -405,7 +407,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         // Some browsers throw if metadata isn't fully ready yet; harmless.
       }
     }
-  }, [isPlaying, onLoadImage]);
+  }, [isPlaying, onLoadImage, videoDTO?.session_id]);
 
   if (!videoDTO) {
     return <NoContentForViewer />;
