@@ -8,8 +8,11 @@ import {
   refreshImageMapPoints,
   setClusterLabelsEnabled,
 } from '@workbench/image-map/imageMapStore';
+import { isIndexing } from '@workbench/image-map/indexProgress';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
+
+import { ImageIndexProgressPanel } from './ImageIndexProgress';
 
 // Lazy so the plotly bundle (its own vite chunk, ~1.5MB) loads only when the
 // widget is actually shown.
@@ -34,7 +37,7 @@ const plotLoadingFallback = (
  * selects that image in the gallery (and so in Preview).
  */
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
-  const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
+  const { data, error, indexCounts, indexRate, loadState, renderError } = imageMapStore.useSnapshot();
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
   const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
 
@@ -116,6 +119,18 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
         detail="Enable `image_index_enabled` in the server configuration and restart the server to build a semantic index of your gallery."
         title="Image indexing is off"
       />
+    );
+  }
+
+  // Ahead of both `computing` and the empty state: with nothing to draw yet,
+  // how far the backfill has got is the only thing that answers "when will
+  // there be a map?" - a spinner or "nothing to map yet" leaves a user with a
+  // large gallery unable to tell progress from a stall.
+  if (isIndexing(indexCounts)) {
+    return (
+      <Center h="full" p="6">
+        <ImageIndexProgressPanel counts={indexCounts} rate={indexRate} />
+      </Center>
     );
   }
 

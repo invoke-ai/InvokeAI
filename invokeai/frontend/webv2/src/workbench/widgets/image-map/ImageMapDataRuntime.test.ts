@@ -44,6 +44,7 @@ describe('attachImageMapDataRuntime', () => {
       data: null,
       error: null,
       indexCounts: null,
+      indexRate: null,
       loadState: 'idle',
       renderError: null,
     });

@@ -3,7 +3,7 @@ import type { ImageIndexStatusEvent, ImageMapProjectionReadyEvent } from '@workb
 import { getAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { socketHub } from '@platform/transport/socketHub';
-import { imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import { imageMapStore, recordImageIndexStatus, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
 
 /**
  * Socket-driven refresh for the image map, replacing polling: when the
@@ -63,13 +63,13 @@ export const attachImageMapDataRuntime = (): (() => void) => {
     socketHub.on('image_index_updated', refreshIfLoaded),
     socketHub.on('image_index_status', (payload: never) => {
       const event = payload as unknown as ImageIndexStatusEvent;
-      imageMapStore.patchSnapshot({
-        indexCounts: {
-          embedded: event.embedded,
-          failed: event.failed ?? 0,
-          pending: event.pending,
-          total: event.total,
-        },
+      // Through the store rather than a direct patch: it also folds the counts
+      // into the throughput estimate the progress UI turns into a time remaining.
+      recordImageIndexStatus({
+        embedded: event.embedded,
+        failed: event.failed ?? 0,
+        pending: event.pending,
+        total: event.total,
       });
       // Quiescence is the moment the point set may have changed: batch
       // completions, deletions, and the final sweep after failures all end

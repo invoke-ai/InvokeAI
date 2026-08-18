@@ -9,9 +9,9 @@ vi.mock('@platform/transport/http', () => ({
   getApiErrorMessage: (_error: unknown, fallback: string) => fallback,
 }));
 
-import { fetchImageMapPoints, requestImageMapRefresh } from './api';
+import { fetchImageMapPoints, fetchImageMapStatus, requestImageMapRefresh } from './api';
 import { CLUSTER_PALETTE, getClusterColor, NOISE_COLOR } from './clusterPalette';
-import { imageMapStore, refreshImageMapPoints } from './imageMapStore';
+import { ensureImageMapLoaded, imageMapStore, recordImageIndexStatus, refreshImageMapPoints } from './imageMapStore';
 import {
   ALL_POINTS_TRACE,
   buildAllPointsTrace,
@@ -91,6 +91,7 @@ describe('image map store', () => {
       data: null,
       error: null,
       indexCounts: null,
+      indexRate: null,
       loadState: 'idle',
       renderError: null,
     });
@@ -289,6 +290,7 @@ describe('snapshot transitions', () => {
       data: null,
       error: 'boom',
       indexCounts: null,
+      indexRate: null,
       loadState: 'error',
       renderError: null,
     });
@@ -316,10 +318,112 @@ describe('snapshot transitions', () => {
       data: null,
       error: null,
       indexCounts: null,
+      indexRate: null,
       loadState: 'loaded',
       renderError: 'The map failed to render (WebGL unavailable).',
     });
 
     expect(imageMapStore.getSnapshot().renderError).not.toBeNull();
+  });
+});
+
+const EMPTY_SNAPSHOT = {
+  clusterLabels: null,
+  data: null,
+  error: null,
+  indexCounts: null,
+  indexRate: null,
+  loadState: 'idle',
+  renderError: null,
+} as const;
+
+describe('image map status', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('derives the pending count the backend computes but does not serialize', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 30, failed: 2, total: 100 } });
+
+    const status = await fetchImageMapStatus();
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/status');
+    // Failures are excluded, exactly as `ImageIndexStatus.pending` does it, so
+    // the queue can still drain to zero with images given up on.
+    expect(status.index).toEqual({ embedded: 30, failed: 2, pending: 68, total: 100 });
+  });
+
+  it('has no counts for a non-admin, who is not told the aggregate totals', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: null });
+
+    expect((await fetchImageMapStatus()).index).toBeNull();
+  });
+});
+
+describe('image index progress', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    imageMapStore.setSnapshot({ ...EMPTY_SNAPSHOT });
+  });
+
+  it('measures throughput across successive status reports', () => {
+    recordImageIndexStatus({ embedded: 10, failed: 0, pending: 90, total: 100 }, 1_000);
+
+    // One report is a point, not a rate; the UI says "estimating" until there
+    // are two to measure between.
+    expect(imageMapStore.getSnapshot().indexRate).toBeNull();
+
+    recordImageIndexStatus({ embedded: 20, failed: 0, pending: 80, total: 100 }, 3_000);
+
+    expect(imageMapStore.getSnapshot().indexRate).toBe(5);
+  });
+
+  it('forgets the rate once the queue drains so the next run measures its own', () => {
+    recordImageIndexStatus({ embedded: 10, failed: 0, pending: 90, total: 100 }, 1_000);
+    recordImageIndexStatus({ embedded: 100, failed: 0, pending: 0, total: 100 }, 3_000);
+
+    expect(imageMapStore.getSnapshot().indexRate).toBeNull();
+
+    // A single new image arriving later must not inherit the backfill's rate.
+    recordImageIndexStatus({ embedded: 100, failed: 0, pending: 1, total: 101 }, 600_000);
+
+    expect(imageMapStore.getSnapshot().indexRate).toBeNull();
+  });
+
+  it('seeds the counts from the status endpoint when the map first loads', async () => {
+    // Status events only fire as batches complete, so a panel opened while the
+    // worker is parked behind a generation would otherwise show no progress.
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/status')
+        ? Promise.resolve({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } })
+        : Promise.resolve(BACKEND_RESPONSE)
+    );
+
+    ensureImageMapLoaded();
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts).not.toBeNull());
+    expect(imageMapStore.getSnapshot().indexCounts).toEqual({ embedded: 40, failed: 0, pending: 60, total: 100 });
+  });
+
+  it('does not let a slow seed rewind counts a status event already delivered', async () => {
+    let resolveStatus: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/status')
+        ? new Promise((resolve) => {
+            resolveStatus = resolve;
+          })
+        : Promise.resolve(BACKEND_RESPONSE)
+    );
+
+    ensureImageMapLoaded();
+    recordImageIndexStatus({ embedded: 90, failed: 0, pending: 10, total: 100 }, 1_000);
+    resolveStatus({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+
+    // A macrotask drains everything the resolved seed queued behind it.
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(imageMapStore.getSnapshot().indexCounts?.embedded).toBe(90);
   });
 });

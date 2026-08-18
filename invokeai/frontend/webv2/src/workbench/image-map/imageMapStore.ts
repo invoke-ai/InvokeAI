@@ -7,8 +7,10 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { getApiErrorMessage } from '@platform/transport/http';
 
 import type { ImageMapPoints } from './api';
+import type { ImageIndexCounts, IndexRateSample } from './indexProgress';
 
-import { fetchImageMapClusterLabels, fetchImageMapPoints } from './api';
+import { fetchImageMapClusterLabels, fetchImageMapPoints, fetchImageMapStatus } from './api';
+import { appendRateSample, estimateRate } from './indexProgress';
 
 /**
  * Read model for the semantic image map, shared by the widget body and any
@@ -16,20 +18,18 @@ import { fetchImageMapClusterLabels, fetchImageMapPoints } from './api';
  * driven by user action now and by socket events in a later runtime.
  */
 
-export interface ImageIndexCounts {
-  total: number;
-  embedded: number;
-  pending: number;
-  /** Given up on after repeated failures; excluded from `pending`. */
-  failed: number;
-}
-
 export interface ImageMapSnapshot {
   data: ImageMapPoints | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
   /** Embedding-index progress; only ever pushed to admins by the backend. */
   indexCounts: ImageIndexCounts | null;
+  /**
+   * Images embedded per second, measured from consecutive status events. Null
+   * until two of them have arrived far enough apart to measure, which is what
+   * the progress UI shows as "estimating" rather than a made-up time.
+   */
+  indexRate: number | null;
   /** Cluster id -> automatic label; null when unavailable (e.g. no text encoder). */
   clusterLabels: Record<string, string> | null;
   /**
@@ -46,6 +46,7 @@ const EMPTY_IMAGE_MAP_SNAPSHOT: ImageMapSnapshot = {
   data: null,
   error: null,
   indexCounts: null,
+  indexRate: null,
   loadState: 'idle',
   renderError: null,
 };
@@ -54,6 +55,7 @@ export const imageMapStore = createExternalStore<ImageMapSnapshot>(EMPTY_IMAGE_M
 
 let inflight: Promise<void> | null = null;
 let rerunRequested = false;
+let rateSamples: IndexRateSample[] = [];
 
 // The projection is per-user server state: a login/logout must drop it before
 // the next account's widgets can observe it.
@@ -64,6 +66,7 @@ registerAccountOwnedResource({
     // Orphan any in-flight labels request so its completion (or failure)
     // cannot touch the next account's labels.
     labelsSequence += 1;
+    rateSamples = [];
     imageMapStore.setSnapshot(EMPTY_IMAGE_MAP_SNAPSHOT);
   },
   name: 'image-map',
@@ -221,8 +224,59 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
     });
 };
 
+/**
+ * Fold one status report into the snapshot, keeping the throughput estimate
+ * that drives the ETA up to date. Both the socket event and the seeding fetch
+ * below land here, so the rate is measured over whatever mix of the two
+ * arrives.
+ */
+export const recordImageIndexStatus = (counts: ImageIndexCounts, at: number = Date.now()): void => {
+  if (counts.pending === 0) {
+    // The run is over. Dropping the history means the next one measures its
+    // own rate from scratch instead of inheriting the tail of this one, which
+    // for a backfill followed by a single new image is wildly optimistic.
+    rateSamples = [];
+    imageMapStore.patchSnapshot({ indexCounts: counts, indexRate: null });
+
+    return;
+  }
+
+  rateSamples = appendRateSample(rateSamples, { at, embedded: counts.embedded });
+  imageMapStore.patchSnapshot({ indexCounts: counts, indexRate: estimateRate(rateSamples) });
+};
+
+/**
+ * Seed the counts from the status endpoint. Status events only fire as batches
+ * complete, so without this a panel opened while the worker is parked (it
+ * waits out every generation) shows no progress at all until the queue moves
+ * again. Best-effort: a failure just leaves the socket to fill them in.
+ */
+const seedImageIndexStatus = (): void => {
+  const owner = captureAccountScope();
+
+  void fetchImageMapStatus()
+    .then((status) => {
+      // Non-admins get no counts at all — the totals aggregate every user's
+      // images — so `index` is null for them and there is nothing to seed.
+      if (status.index === null || !isAccountScopeCurrent(owner)) {
+        return;
+      }
+
+      // Never over an event: those are strictly newer, and a slow seed
+      // landing after one would rewind the counts the user is watching.
+      if (imageMapStore.getSnapshot().indexCounts === null) {
+        recordImageIndexStatus(status.index);
+      }
+    })
+    .catch(() => {
+      // Progress detail is optional chrome; the map itself reports its own
+      // load failures.
+    });
+};
+
 export const ensureImageMapLoaded = (): void => {
   if (imageMapStore.getSnapshot().loadState === 'idle') {
     void refreshImageMapPoints();
+    seedImageIndexStatus();
   }
 };
