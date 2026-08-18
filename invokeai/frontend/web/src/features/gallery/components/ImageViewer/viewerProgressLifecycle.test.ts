@@ -114,6 +114,19 @@ describe('viewerProgressLifecycle', () => {
       }
     );
 
+    it('leaves the promoted session up when no further event arrives', () => {
+      // The handoff must not be on borrowed time: after A finishes, B may go a long while before
+      // its next progress event (a video render's steps are seconds apart), and no timer armed by
+      // A's completion may take B's preview down in the meantime.
+      const { eventB } = startTwoSessions();
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      lifecycle.onFinalImageLoaded('session-1');
+      vi.advanceTimersByTime(RESOLVE_TIMEOUT_MS * 10);
+      expect(stores.$progressEvent.get()).toBe(eventB);
+      expect(stores.$progressImage.get()).toBe(eventB.image);
+      expect(stores.$progressData.get()[2]?.itemId).toBe(2);
+    });
+
     it('hands the shared preview to the remaining session even when auto-switch is off', () => {
       const { eventB } = startTwoSessions();
       lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'canceled' }), false);
