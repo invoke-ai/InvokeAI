@@ -1,6 +1,6 @@
 ---
 title: PiD Super-Resolution Decode
-lastUpdated: 2026-07-01
+lastUpdated: 2026-08-06
 sidebar:
   order: 5
 ---
@@ -12,7 +12,7 @@ import { Steps, Aside, Tabs, TabItem } from '@astrojs/starlight/components'
 Because it decodes in pixel space and is conditioned on your prompt, PiD often recovers finer texture and edge detail than a plain VAE decode followed by an upscaler.
 
 <Aside type="note">
-PiD replaces the VAE decode step of a single generation. It is not a separate "upscale" pass you run on an existing image — you enable it before generating.
+In the **Generate** tab and on the **Canvas**, PiD replaces the VAE decode step of a generation — you enable it *before* generating, it is not applied to a finished image. To run PiD over an image you already have, use the separate **PiD Upscale (4x)** node in the Workflow editor ([see below](#running-pid-on-an-existing-image)).
 </Aside>
 
 ## Supported models
@@ -44,8 +44,10 @@ PiD needs two extra models, both available in **Model Manager → Starter Models
 Each PiD decoder is roughly 5 GB and the shared Gemma-2 encoder is roughly 5 GB.
 
 <Aside type="note">
-The Starter Models install NVIDIA's **legacy** PiD checkpoints (the ones now under `checkpoints_deprecated/` on Hugging Face). NVIDIA's newer **v1.5** decoders use a different network and are not yet supported — installing one is rejected during model identification rather than failing at decode time.
+The Starter Models install NVIDIA's **legacy** PiD checkpoints, which are spread over both the `checkpoints/` and the `checkpoints_deprecated/` folder of the `nvidia/PiD` repository depending on the backbone and preset. NVIDIA's newer **v1.5** decoders use a different network and are not yet supported — installing one is rejected during model identification rather than failing at decode time.
 </Aside>
+
+The Gemma-2 caption encoder can also be a single-file **GGUF** (e.g. `gemma-2-2b-it-Q4_K_M.gguf`) that you install manually: InvokeAI loads it natively, keeping the large projection weights quantized instead of expanding them in memory, which cuts the encoder's footprint noticeably. Only Gemma-2-**2b** GGUFs are accepted — PiD's caption projection is fixed to their 2304-dim hidden state.
 
 ## Enabling PiD
 
@@ -67,7 +69,27 @@ When PiD mode is not *Off*, pick your **PiD Decoder** and **Gemma-2 Encoder** be
 
 PiD is available in both the **Generate** tab (text-to-image) and on the **Canvas** (image-to-image), in both Fit and Native modes.
 
+## Running PiD on an existing image
+
+Everything above describes PiD as a *decode* step: it needs the latent the model just produced, so it only exists inside a generation. If you want to push an image you already have through PiD, the Workflow editor has a separate **PiD Upscale (4x)** node.
+
+It encodes your image with the FLUX VAE and hands the resulting latent to the PiD decoder, giving a 4× result in one pass — the PiD analogue of an ESRGAN / SUPIR upscale. Connect a FLUX VAE, a **FLUX** PiD decoder and the Gemma-2 encoder, and optionally give it a caption describing the image (the decoder is caption-conditioned; an empty caption is the cheapest option but usually the weaker result).
+
+<Aside type="caution">
+This node is a **prototype** and FLUX-only in both directions: it requires InvokeAI's FLUX `AutoEncoder` VAE (a diffusers `AutoencoderKL`, e.g. Z-Image's, is rejected) and a FLUX PiD decoder. Since the input is a plain image rather than the generating model's own latent, results are less faithful than PiD used as a decode.
+</Aside>
+
 ## Tips & limitations
+
+On GPUs with limited VRAM, enable the experimental PiD memory optimizations in `invokeai.yaml`, then restart InvokeAI:
+
+```yaml
+pid_memory_optimization: true
+```
+
+This setting applies to every supported PiD decoder. It reduces peak activation and sampler memory by processing parts of the pixel pathway in chunks and by running the sampler's intermediates in float32 instead of float64 — measured on an RTX 4090, a 2048px decode peaks at ~1.5 GB of activations instead of ~3.7 GB. Decoding speed is roughly unchanged.
+
+It is disabled by default because it **changes the decoded image**. Neither the chunked pathway nor the float32 sampler math is bit-exact with the default path, and the few-step sampler amplifies that into a small but real difference (~43 dB PSNR — visually indistinguishable, numerically not identical). A seed that reproduced an image with the setting off will not reproduce it exactly with the setting on, and because this is a server-wide `invokeai.yaml` option it is not recorded in image metadata — each decode logs that it ran optimized instead.
 
 - **Turn off "Scale Before Processing"** on the Canvas when using PiD — PiD already decodes at 4×, so pre-scaling would inflate the work and is blocked.
 - **Inpaint / Outpaint** are not supported with PiD yet; use text-to-image or image-to-image.

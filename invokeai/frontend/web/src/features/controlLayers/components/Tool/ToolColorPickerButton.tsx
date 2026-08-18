@@ -14,8 +14,7 @@ export const ToolColorPickerButton = memo(() => {
     id: 'selectColorPickerTool',
     category: 'canvas',
     callback: selectColorPicker,
-    options: { enabled: !isSelected },
-    dependencies: [selectColorPicker, isSelected],
+    dependencies: [selectColorPicker],
   });
 
   return (
