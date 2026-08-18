@@ -16,8 +16,11 @@ import { getLibraryWorkflow, listLibraryWorkflows, type ListWorkflowsParams, typ
 const pageCache = new Map<string, WorkflowLibraryPage>();
 const workflowCache = new Map<string, Record<string, unknown>>();
 
+/** `JSON.stringify` on a sorted copy avoids delimiter collisions between tag values. */
+const getTagsKey = (tags: string[] | undefined): string => JSON.stringify([...(tags ?? [])].sort());
+
 const getPageKey = (params: ListWorkflowsParams): string =>
-  `${params.category}|${params.page}|${params.perPage ?? 20}|${params.query?.trim() ?? ''}`;
+  `${params.category}|${params.page}|${params.perPage ?? 20}|${params.query?.trim() ?? ''}|${getTagsKey(params.tags)}`;
 
 export const getCachedWorkflowPage = (params: ListWorkflowsParams): WorkflowLibraryPage | null =>
   pageCache.get(getPageKey(params)) ?? null;
