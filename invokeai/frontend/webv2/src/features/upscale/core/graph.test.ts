@@ -114,4 +114,10 @@ describe('compileUpscaleGraph', () => {
       compileUpscaleGraph(createValues('sd-1'), 'canvas', { useCpuNoise: false }).backendGraph.nodes.upscale_output
     ).toMatchObject({ is_intermediate: true, use_cache: false });
   });
+
+  it('records the accelerator supplied by the orchestration boundary in metadata', () => {
+    const graph = compileUpscaleGraph(createValues('sd-1'), 'gallery', { useCpuNoise: false }, 'xpu').backendGraph;
+
+    expect(graph.nodes.core_metadata?.rand_device).toBe('xpu');
+  });
 });

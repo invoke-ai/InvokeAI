@@ -73,10 +73,11 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
     };
 
     syncSize();
-    // Fit the document into view on first attach, once the viewport is sized.
-    if (engine.document.getDocument()) {
-      engine.viewport.fitToView();
-    }
+    // Fit the document into view the first time this canvas is shown, once the
+    // viewport is sized. The shell keeps widgets mounted across layout switches,
+    // so this callback re-runs on every re-show and an unconditional fit would
+    // reset the user's zoom and pan each time they came back.
+    engine.viewport.fitToViewOnFirstShow();
 
     const observer = new ResizeObserver(syncSize);
     observer.observe(container);

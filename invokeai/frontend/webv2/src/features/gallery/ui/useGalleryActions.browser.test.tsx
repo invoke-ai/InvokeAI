@@ -98,6 +98,7 @@ const reconcileDeletedBoardOutcome = vi.fn();
 const selectBoard = vi.fn();
 const selectItem = vi.fn();
 const setItemMultiSelection = vi.fn();
+const patchGalleryValues = vi.fn();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const Probe = ({
@@ -183,7 +184,7 @@ const adapter: GalleryUiAdapter = {
   projectId: 'project-1',
   projectName: 'Project',
   queueItems: [],
-  widgets: { patchGalleryValues: noop },
+  widgets: { patchGalleryValues },
 };
 
 let selectedBoardId = 'board-1';
@@ -619,7 +620,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
   });
 
-  it('reports unsupported and rejected files once without aborting supported uploads', async () => {
+  it('reports the first actionable rejection when every accepted upload fails alongside unsupported files', async () => {
     mocks.uploadGalleryVideo.mockRejectedValue(new Error('corrupt video'));
 
     await act(async () => {
@@ -633,7 +634,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
     expect(mocks.notificationsReportError).toHaveBeenCalledWith({
       area: 'gallery-upload',
-      message: 'No files uploaded. 2 failed.',
+      message: 'corrupt video',
       namespace: 'gallery',
     });
   });
@@ -667,5 +668,29 @@ describe('mixed gallery upload', () => {
     expect(mocks.uploadGalleryVideo).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
     expect(mocks.notificationsReportError).not.toHaveBeenCalled();
+  });
+});
+
+describe('setSemanticImageQuery', () => {
+  it('applies the reference while resetting pagination and clearing the text term', () => {
+    // Paginated mode with the user on a later page: applying a semantic query
+    // replaces the result set, so the page must snap back to the first one
+    // (mirroring setGallerySearchTerm) and the term the chip replaces must not
+    // keep filtering invisibly.
+    actionsRef.current?.setSemanticImageQuery({ imageName: 'ref.png', kind: 'image' });
+
+    expect(patchGalleryValues).toHaveBeenCalledOnce();
+    expect(patchGalleryValues).toHaveBeenCalledWith({
+      galleryPage: 0,
+      searchTerm: '',
+      semanticImageQuery: { imageName: 'ref.png', kind: 'image' },
+    });
+  });
+
+  it('resets pagination when the semantic query is cleared', () => {
+    actionsRef.current?.setSemanticImageQuery(null);
+
+    expect(patchGalleryValues).toHaveBeenCalledOnce();
+    expect(patchGalleryValues).toHaveBeenCalledWith({ galleryPage: 0, searchTerm: '', semanticImageQuery: null });
   });
 });

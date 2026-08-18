@@ -7,6 +7,8 @@ for attention mechanism.
 import psutil
 import torch
 
+from invokeai.backend.util.devices import TorchDevice
+
 
 def auto_detect_slice_size(latents: torch.Tensor) -> str:
     bytes_per_element_needed_for_baddbmm_duplication = latents.element_size() + 4
@@ -22,6 +24,8 @@ def auto_detect_slice_size(latents: torch.Tensor) -> str:
         mem_free = psutil.virtual_memory().free
     elif latents.device.type == "cuda":
         mem_free, _ = torch.cuda.mem_get_info(latents.device)
+    elif latents.device.type == "xpu":
+        mem_free, _ = TorchDevice.xpu_mem_get_info(latents.device)
     else:
         raise ValueError(f"unrecognized device {latents.device}")
 

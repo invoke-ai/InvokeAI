@@ -7,7 +7,11 @@ import { nodeAcceptsExtraInputs } from 'features/nodes/types/extraInputs';
 import type { FieldInputInstance, FieldInputTemplate } from 'features/nodes/types/field';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { getDefaultForm, isWorkflowInvocationNode } from 'features/nodes/types/workflow';
-import { getConnectedInputNames, migrateImageCollectionInputValues } from 'features/nodes/util/node/nodeUpdate';
+import {
+  getConnectedInputNames,
+  migrateImageCollectionInputValues,
+  migrateMiniMaxH3NumFramesValue,
+} from 'features/nodes/util/node/nodeUpdate';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import type { NonNullableGraph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
@@ -139,6 +143,14 @@ export const graphToWorkflow = (graph: NonNullableGraph, autoLayout = true): Wor
     migrateImageCollectionInputValues(node, {
       connectedInputNames: getConnectedInputNames(node.id, workflow.edges),
     });
+
+    // A graph recalled from an older session carries num_frames as a raw integer, and the node is
+    // built at the current template version, so nothing else would convert it. No source version
+    // is available here; the migration is a no-op unless the stored value really is a number.
+    const nodeTemplate = templates[node.data.type];
+    if (nodeTemplate) {
+      migrateMiniMaxH3NumFramesValue(node, nodeTemplate);
+    }
   });
 
   if (autoLayout) {

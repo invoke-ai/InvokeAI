@@ -15,7 +15,9 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 import { recordDiagnosticEntry } from './diagnostics/logger';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
+import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { getWorkbenchPreferences } from './settings/store';
+import { areWidgetsLoaded } from './widgetRegistry';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
@@ -526,6 +528,7 @@ export interface WorkbenchInternalStore {
 }
 
 export interface WorkbenchStoreOptions {
+  isLoaded?: (preset: LayoutPreset) => boolean;
   loadLayoutPresetWidgets?: (preset: LayoutPreset) => Promise<unknown>;
 }
 
@@ -666,6 +669,7 @@ export const createWorkbenchStore = (
 
       return current.id === preset.id && current.snapshot === preset.snapshot;
     },
+    isLoaded: options.isLoaded ?? ((preset) => areWidgetsLoaded(getLayoutWidgetTypeIds(preset.snapshot))),
     load: options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets,
   });
   invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;

@@ -468,7 +468,14 @@ class PiTBlock(nn.Module):
         return pos
 
     def forward(
-        self, x: torch.Tensor, s_cond: torch.Tensor, image_height: int, image_width: int, patch_size: int, mask=None
+        self,
+        x: torch.Tensor,
+        s_cond: torch.Tensor,
+        image_height: int,
+        image_width: int,
+        patch_size: int,
+        mask=None,
+        activation_chunk_size: Optional[int] = None,
     ) -> torch.Tensor:
         # x: [B*L_local, P2, C]; under CP, L_local = (Hs*Ws)/cp_size. Without CP,
         # L_local == L_full. The reshape uses L_local for the (B, L_local, ...)
@@ -489,24 +496,112 @@ class PiTBlock(nn.Module):
         assert s_cond.shape[0] == BL, "s_cond batch must match x batch"
         assert BL % L_local == 0, "Total sequences must be a multiple of local patch count"
         B = BL // L_local
+
+        # Chunking bounds full-resolution AdaLN and MLP intermediates during inference. Attention remains global:
+        # compressed tokens are assembled in original order before the unchanged attention call. Keep the original
+        # path while gradients are enabled because copy-based output assembly is inference-only.
+        if activation_chunk_size is not None and activation_chunk_size <= 0:
+            raise ValueError("activation_chunk_size must be positive when set")
+        chunk_size = activation_chunk_size
+        if chunk_size is not None and BL > chunk_size and not torch.is_grad_enabled():
+            return self._forward_chunked(x, s_cond, B, L_local, Hs, Ws, mask, chunk_size)
+
+        return self._forward_unchunked(x, s_cond, B, L_local, Hs, Ws, mask)
+
+    def _forward_unchunked(
+        self,
+        x: torch.Tensor,
+        s_cond: torch.Tensor,
+        batch_size: int,
+        local_patch_count: int,
+        patch_grid_height: int,
+        patch_grid_width: int,
+        mask: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        patch_batch, pixels_per_patch, _ = x.shape
         # adaLN per pixel (within patch): params
         cond_params = self.adaLN_modulation(s_cond)  # [BL, 6*pixel_dim*P2]
-        cond_params = cond_params.view(BL, P2, 6 * self.pixel_dim)
+        cond_params = cond_params.view(patch_batch, pixels_per_patch, 6 * self.pixel_dim)
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = torch.chunk(cond_params, 6, dim=-1)
         x_norm = apply_adaln(self.norm1(x), shift_msa, scale_msa)
-        x_flat = x_norm.view(BL, P2 * self.pixel_dim)
-        x_comp = self.compress_to_attn(x_flat).view(B, L_local, self.attn_dim)
+        x_flat = x_norm.view(patch_batch, pixels_per_patch * self.pixel_dim)
+        x_comp = self.compress_to_attn(x_flat).view(batch_size, local_patch_count, self.attn_dim)
         # attention across patch tokens (L) — pos is full-length; the CP-aware
         # RotaryAttention gathers k/v across CP ranks internally.
-        pos_comp = self._fetch_pos(Hs, Ws, x.device)
+        pos_comp = self._fetch_pos(patch_grid_height, patch_grid_width, x.device)
         attn_out = self.attn(x_comp, pos_comp, mask)  # [B, L_local, attn_dim]
-        attn_flat = self.expand_from_attn(attn_out.view(B * L_local, self.attn_dim))
-        attn_exp = attn_flat.view(BL, P2, self.pixel_dim)
+        attn_flat = self.expand_from_attn(attn_out.view(batch_size * local_patch_count, self.attn_dim))
+        attn_exp = attn_flat.view(patch_batch, pixels_per_patch, self.pixel_dim)
         # residual & MLP locally
         x = x + gate_msa * attn_exp
         mlp_out = self.mlp(apply_adaln(self.norm2(x), shift_mlp, scale_mlp))
         x = x + gate_mlp * mlp_out
         return x
+
+    def _compress_activation_chunk(self, x: torch.Tensor, s_cond: torch.Tensor) -> torch.Tensor:
+        """First half of a chunk: adaLN + norm1, compressed to one attention token per patch.
+
+        This recomputes ``adaLN_modulation`` that ``_finish_activation_chunk`` computes again, and that
+        is deliberate. Global attention sits between the two halves, so the four slices the second half
+        needs would have to be held for *every* chunk across the attention call - i.e. the full-resolution
+        ``[BL, P2, 4*pixel_dim]`` tensor this whole path exists to avoid (536 MiB in bf16 at 2048px).
+        Recomputing trades roughly 9.9 TFLOP per 2048px decode for that, measured at ~4% wall clock,
+        which is the honest source of the "slower decoding" the setting advertises.
+
+        Computing only the needed slices instead is not the way out either: the six slices are interleaved
+        per pixel position in the projection's output, so selecting two of them means gathering rows of a
+        1536x24576 weight - a ~50 MiB copy per call, spending memory to save the compute.
+        """
+        patch_batch, pixels_per_patch, _ = x.shape
+        cond_params = self.adaLN_modulation(s_cond).view(patch_batch, pixels_per_patch, 6 * self.pixel_dim)
+        shift_msa, scale_msa = torch.chunk(cond_params, 6, dim=-1)[:2]
+        x_norm = apply_adaln(self.norm1(x), shift_msa, scale_msa)
+        return self.compress_to_attn(x_norm.view(patch_batch, pixels_per_patch * self.pixel_dim))
+
+    def _finish_activation_chunk(
+        self, x: torch.Tensor, s_cond: torch.Tensor, attention_output: torch.Tensor
+    ) -> torch.Tensor:
+        patch_batch, pixels_per_patch, _ = x.shape
+        cond_params = self.adaLN_modulation(s_cond).view(patch_batch, pixels_per_patch, 6 * self.pixel_dim)
+        _, _, gate_msa, shift_mlp, scale_mlp, gate_mlp = torch.chunk(cond_params, 6, dim=-1)
+        attention_expanded = self.expand_from_attn(attention_output).view(patch_batch, pixels_per_patch, self.pixel_dim)
+        x = x + gate_msa * attention_expanded
+        return x + gate_mlp * self.mlp(apply_adaln(self.norm2(x), shift_mlp, scale_mlp))
+
+    def _forward_chunked(
+        self,
+        x: torch.Tensor,
+        s_cond: torch.Tensor,
+        batch_size: int,
+        local_patch_count: int,
+        patch_grid_height: int,
+        patch_grid_width: int,
+        mask: Optional[torch.Tensor],
+        chunk_size: int,
+    ) -> torch.Tensor:
+        patch_batch = x.shape[0]
+        compressed: Optional[torch.Tensor] = None
+        for start in range(0, patch_batch, chunk_size):
+            end = min(start + chunk_size, patch_batch)
+            compressed_chunk = self._compress_activation_chunk(x[start:end], s_cond[start:end])
+            if compressed is None:
+                compressed = compressed_chunk.new_empty((patch_batch, self.attn_dim))
+            compressed[start:end].copy_(compressed_chunk)
+        assert compressed is not None
+
+        compressed = compressed.view(batch_size, local_patch_count, self.attn_dim)
+        pos_comp = self._fetch_pos(patch_grid_height, patch_grid_width, x.device)
+        attention_output = self.attn(compressed, pos_comp, mask).view(patch_batch, self.attn_dim)
+
+        output: Optional[torch.Tensor] = None
+        for start in range(0, patch_batch, chunk_size):
+            end = min(start + chunk_size, patch_batch)
+            output_chunk = self._finish_activation_chunk(x[start:end], s_cond[start:end], attention_output[start:end])
+            if output is None:
+                output = output_chunk.new_empty(x.shape)
+            output[start:end].copy_(output_chunk)
+        assert output is not None
+        return output
 
 
 # =============================================================================

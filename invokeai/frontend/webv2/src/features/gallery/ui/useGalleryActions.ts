@@ -37,7 +37,7 @@ export const useGalleryActions = ({
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { exportProject, gallery, notifications } = useGalleryUi();
+  const { exportProject, gallery, notifications, widgets } = useGalleryUi();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -205,6 +205,16 @@ export const useGalleryActions = ({
       selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
       setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
+      // The similarity reference is widget state rather than a workbench
+      // command: it patches the gallery widget's persisted values, the same
+      // surface the parsed query is read back from. Changing the query resets
+      // pagination (mirroring setGallerySearchTerm) and clears the text term
+      // the chip visually replaces — left behind, a stale term would keep
+      // filtering invisibly and poison the preview widget's navigation query.
+      // Filmstrip/preview navigation under semantic ranking still follows
+      // board chronology, not similarity rank — an inherited limitation.
+      setSemanticImageQuery: (reference) =>
+        widgets.patchGalleryValues({ galleryPage: 0, searchTerm: '', semanticImageQuery: reference }),
       setView: gallery.setView,
       toggleItemInSelection: gallery.toggleItemSelection,
       updateSettings: gallery.updateSettings,
@@ -221,5 +231,6 @@ export const useGalleryActions = ({
     selectedBoardId,
     t,
     uploadFiles,
+    widgets,
   ]);
 };

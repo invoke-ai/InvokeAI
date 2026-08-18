@@ -1,8 +1,10 @@
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { toGallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import {
   hashKey,
@@ -22,6 +24,7 @@ import {
   listGalleryDateBoards,
   listGalleryItemNames,
   listGalleryItems,
+  listSemanticGalleryItemNames,
 } from './backend';
 
 export const GALLERY_PAGE_SIZE = 60;
@@ -51,6 +54,12 @@ export interface GalleryItemsFilter {
   galleryView: GalleryView;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
+  /**
+   * When set, items come from semantic image-similarity search (relevance
+   * order) instead of the board listing; board/order/starred controls do not
+   * apply to a ranked result set.
+   */
+  semanticQuery?: GallerySemanticReference | null;
   starredFirst?: boolean;
 }
 
@@ -61,6 +70,8 @@ export interface CanonicalGalleryItemsFilter {
   galleryView: GalleryView;
   orderDir: GalleryOrderDir;
   searchTerm: string;
+  /** Label-free semantic reference: a file query is keyed by its registry id. */
+  semantic?: GallerySemanticQuery;
   starredFirst: boolean;
 }
 
@@ -90,15 +101,40 @@ const canonicalizeBoardsQuery = (query: GalleryBoardsQuery): CanonicalGalleryBoa
   orderDir: query.orderDir ?? 'DESC',
 });
 
-export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): CanonicalGalleryItemsFilter => ({
-  boardId: filter.boardId,
-  ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
-  ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
-  galleryView: filter.galleryView,
-  orderDir: filter.orderDir ?? 'DESC',
-  searchTerm: filter.searchTerm.trim(),
-  starredFirst: filter.starredFirst ?? false,
-});
+export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): CanonicalGalleryItemsFilter => {
+  const semantic = filter.semanticQuery ? toGallerySemanticQuery(filter.semanticQuery) : undefined;
+
+  if (semantic) {
+    // A ranked result set answers to the reference alone: the semantic branch
+    // of `galleryItemNamesOptionsForOwner` sends only the query, so board,
+    // view, order, starred-first and the date range change nothing about the
+    // response. Keeping them in the key made clicking a board — or toggling
+    // starred-first, or switching the images/assets tab — mint a fresh key and
+    // re-run the search for byte-identical results, which for a dropped file
+    // means re-uploading the blob and for a URL reference means the server
+    // re-downloads the remote image. Pinned rather than omitted so the shape
+    // stays a `CanonicalGalleryItemsFilter`; the values are never read on this
+    // path, only compared.
+    return {
+      boardId: '',
+      galleryView: 'images',
+      orderDir: 'DESC',
+      searchTerm: '',
+      semantic,
+      starredFirst: false,
+    };
+  }
+
+  return {
+    boardId: filter.boardId,
+    ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
+    ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
+    galleryView: filter.galleryView,
+    orderDir: filter.orderDir ?? 'DESC',
+    searchTerm: filter.searchTerm.trim(),
+    starredFirst: filter.starredFirst ?? false,
+  };
+};
 
 const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
   accountId: owner.accountId,
@@ -136,9 +172,11 @@ const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalG
   queryOptions({
     queryFn: async ({ signal }) => {
       const requestSignal = AbortSignal.any([signal, owner.signal]);
-      const result = await (isDateBoardId(filter.boardId)
-        ? listGalleryDateBoardItemNames({ ...filter, signal: requestSignal })
-        : listGalleryItemNames({ ...filter, signal: requestSignal }));
+      const result = await (filter.semantic
+        ? listSemanticGalleryItemNames({ query: filter.semantic, signal: requestSignal })
+        : isDateBoardId(filter.boardId)
+          ? listGalleryDateBoardItemNames({ ...filter, signal: requestSignal })
+          : listGalleryItemNames({ ...filter, signal: requestSignal }));
 
       assertAccountScopeCurrent(owner);
       requestSignal.throwIfAborted();
@@ -162,9 +200,10 @@ export const galleryItemNamesOptions = (inputFilter: GalleryItemsFilter) => {
 const dateBoardNamesConsumers = new WeakMap<QueryClient, Map<string, number>>();
 
 /**
- * A date-name request is shared by infinite and paginated consumers. One
- * consumer may stop waiting immediately without cancelling work still needed
- * by another; the final departing consumer owns cancellation.
+ * A name-list request (date boards and semantic searches) is shared by
+ * infinite and paginated consumers. One consumer may stop waiting immediately
+ * without cancelling work still needed by another; the final departing
+ * consumer owns cancellation.
  */
 const fetchSharedDateBoardNames = (
   client: QueryClient,
@@ -300,7 +339,13 @@ export const galleryItemsInfiniteOptions = (
       const requestSignal = AbortSignal.any([signal, owner.signal]);
       let result: GalleryItemsPage;
 
-      if (isDateBoardId(filter.boardId)) {
+      // Semantic and date-board queries share one mechanism: the ordered name
+      // list is fetched once (shared across pages, both consumers, and the
+      // 60s stale window) and every page hydrates a slice of it. For semantic
+      // queries this is also what keeps ranks consistent across pages — and
+      // what keeps a dropped-file reference from re-uploading its blob on
+      // every page fetch.
+      if (filter.semantic || isDateBoardId(filter.boardId)) {
         const namesOptions = galleryItemNamesOptionsForOwner(owner, filter);
         const names = await fetchSharedDateBoardNames(client, namesOptions.queryKey, requestSignal, () =>
           client.fetchQuery(namesOptions)

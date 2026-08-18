@@ -1,8 +1,14 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
+import {
+  isWanComponentSourceCompatible,
+  isWanLowNoisePartnerCompatible,
+  isWanTi2v5b,
+  isWanVaeCompatible,
+} from 'app/store/middleware/listenerMiddleware/listeners/wanComponentSync';
 import { $false } from 'app/store/nanostores/util';
-import type { AppDispatch, AppStore } from 'app/store/store';
+import type { AppDispatch, AppStore, RootState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
@@ -44,9 +50,15 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
-import type { MainOrExternalModelConfig } from 'services/api/types';
-import { isExternalApiModelConfig } from 'services/api/types';
+import type { AnyModelConfig, MainOrExternalModelConfig } from 'services/api/types';
+import {
+  isExternalApiModelConfig,
+  isSelfContainedSDNQFlux1Pipeline,
+  isSelfContainedSDNQPipeline,
+  isWanSingleFileMainModelConfig,
+} from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 /**
@@ -93,6 +105,21 @@ type UpdateReasonsArg = {
   store: AppStore;
 };
 
+/** Resolve the wired Wan slot identifiers to their installed configs. Returns null for a
+ *  slot that is empty or points at a model that has since been deleted — the pre-flight
+ *  treats those the same way, since neither can be judged incompatible. */
+const selectWanWiredConfigs = (state: RootState) => {
+  const { wanVaeModel, wanComponentSource, wanTransformerLowNoise } = selectParamsSlice(state);
+  const query = selectModelConfigsQuery(state);
+  const configFor = (identifier: { key: string } | null) =>
+    identifier && query.data ? (modelConfigsAdapterSelectors.selectById(query.data, identifier.key) ?? null) : null;
+  return {
+    vae: configFor(wanVaeModel),
+    componentSource: configFor(wanComponentSource),
+    lowNoisePartner: configFor(wanTransformerLowNoise),
+  };
+};
+
 const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
   const {
     tab,
@@ -132,6 +159,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
       hasFlux2DevDiffusersSource,
+      wanWiredConfigs: selectWanWiredConfigs(store.getState()),
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -159,6 +187,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
       hasFlux2DevDiffusersSource,
+      wanWiredConfigs: selectWanWiredConfigs(store.getState()),
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -246,6 +275,71 @@ export const useReadinessWatcher = () => {
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
 
+/** Pre-flight for Wan mains, shared by the generate and canvas tabs so the two can't drift.
+ *  Mirrors what `WanModelLoaderInvocation` actually enforces.
+ *
+ *  Keep in step with the auto-fill in `modelSelected.ts`: if that doesn't offer to
+ *  populate the slots this demands, selecting the model just blocks Invoke with nothing
+ *  the user can act on.
+ *
+ *  Presence is not enough — the Advanced comboboxes offer every Wan VAE and every Wan
+ *  Diffusers main with no variant filtering, so a hand-picked slot can be present and
+ *  still rejected by the loader. The compatibility predicates are imported from
+ *  `wanComponentSync` rather than restated, so the auto-fill and the pre-flight cannot
+ *  disagree about what "compatible" means.
+ *
+ *  There is deliberately no check on the A14B expert *tag*. Since #9505 the loader takes
+ *  the pairing from the wiring, so an unpaired or untagged A14B runs with a warning
+ *  rather than raising. */
+const pushWanReasons = (
+  model: MainOrExternalModelConfig,
+  params: ParamsState,
+  wired: {
+    vae: AnyModelConfig | null;
+    componentSource: AnyModelConfig | null;
+    lowNoisePartner: AnyModelConfig | null;
+  },
+  reasons: Reason[]
+): void => {
+  if (isWanSingleFileMainModelConfig(model)) {
+    // Single-file Wan mains carry only the transformer; VAE + UMT5-XXL encoder must come
+    // from standalone models or the Component Source.
+    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
+    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
+    }
+  }
+
+  // A wired standalone VAE outranks the Diffusers main's own, so this applies to any Wan
+  // main. `wired.vae` is null when the slot is empty *or* dangling; only judge a resolved
+  // config, or a deleted model would read as a compatibility failure.
+  if (wired.vae && !isWanVaeCompatible(model, wired.vae)) {
+    reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanVae') });
+  }
+  if (isWanSingleFileMainModelConfig(model) && wired.componentSource) {
+    if (!isWanComponentSourceCompatible(model, wired.componentSource)) {
+      reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanComponentSource') });
+    }
+  }
+  // Only judge the low-noise slot when the loader actually reads it — a single-file
+  // A14B main. `wan_model_loader.py` logs "'Transformer (Low Noise)' is ignored for the
+  // single-expert TI2V-5B variant" and skips the whole pairing block, and the Diffusers
+  // branch never looks at the slot at all. Validating it regardless disables Invoke over
+  // a wire the backend would shrug off, and for a TI2V-5B main that is unavoidable rather
+  // than occasional: every model the partner picker can offer is an A14B, so every
+  // possible pick fails the variant check. The combobox is rendered for all Wan mains
+  // (see `ParamWanModelSelects`), so this is reachable by picking one, and the error text
+  // does not name the slot the user would have to clear to recover.
+  if (wired.lowNoisePartner && isWanSingleFileMainModelConfig(model) && !isWanTi2v5b(model)) {
+    if (params.wanTransformerLowNoise?.key === params.model?.key) {
+      reasons.push({ content: i18n.t('parameters.invoke.duplicateWanTransformer') });
+    } else if (!isWanLowNoisePartnerCompatible(model, wired.lowNoisePartner)) {
+      reasons.push({ content: i18n.t('parameters.invoke.incompatibleWanLowNoiseExpert') });
+    }
+  }
+};
+
 export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
   model: MainOrExternalModelConfig | null | undefined;
@@ -256,6 +350,14 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
   hasFlux2DevDiffusersSource: boolean;
+  /** Resolved configs of the wired Wan slots — null when empty or pointing at a model
+   *  that no longer exists. Resolved by the caller because readiness only receives
+   *  identifiers, and compatibility can only be judged from the config. */
+  wanWiredConfigs: {
+    vae: AnyModelConfig | null;
+    componentSource: AnyModelConfig | null;
+    lowNoisePartner: AnyModelConfig | null;
+  };
 }) => {
   const {
     isConnected,
@@ -267,6 +369,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
     hasFlux2DevDiffusersSource,
+    wanWiredConfigs,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -288,14 +391,20 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   } else if (isExternalApiModelConfig(model)) {
     // external models don't require local sub-models
   } else if (model.base === 'flux') {
-    if (!params.t5EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
-    }
-    if (!params.clipEmbedModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
-    }
-    if (!params.fluxVAE) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    // A complete SDNQ FLUX.1 pipeline install ships its own T5, CLIP and VAE, and the model loader
+    // node falls back to them, so requiring the standalone selections here would keep that path
+    // unreachable from the UI. Anything else (single-file, GGUF, BnB) still needs all three.
+    const mainSuppliesComponents = isSelfContainedSDNQFlux1Pipeline(model);
+    if (!mainSuppliesComponents) {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
     }
     if (params.pidMode !== 'off') {
       if (!params.pidDecoderModel) {
@@ -307,24 +416,33 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'flux2' && model.format !== 'diffusers') {
-    // Non-diffusers FLUX.2 models need standalone VAE + text encoder unless a Diffusers
-    // pipeline of the matching variant family is installed to extract from.
-    if ('variant' in model && model.variant === 'dev') {
-      // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
-      if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
-      }
-      if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
-      }
-    } else {
-      // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
-      if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-      }
-      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+  if (model?.base === 'flux2') {
+    // A FLUX.2 model is a self-sufficient source when its config exposes the diffusers-style
+    // submodels (transformer/vae/text_encoder/tokenizer). Plain Diffusers pipelines always do; an
+    // SDNQ pipeline qualifies only when it ships all of them — a truthy submodels dict is not enough,
+    // since a partial pipeline may expose only the transformer and the backend would then request
+    // missing fixed subfolders. Single-file / GGUF models have no submodels and need a standalone
+    // VAE + text encoder, or a Diffusers source of the matching variant family.
+    const mainIsPipeline =
+      model.format === 'diffusers' ||
+      ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
+    if (!mainIsPipeline) {
+      if ('variant' in model && model.variant === 'dev') {
+        // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
       }
     }
   }
@@ -382,29 +500,38 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
-    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
-    // come from either standalone models or the Component Source (Diffusers).
-    // The low-noise A14B partner expert is optional — if omitted, the loader
-    // will use the high-noise expert for the whole schedule (lower quality
-    // but still produces an image).
-    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
-    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
-    if (!hasVaeSource || !hasEncoderSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
-    }
+  if (model?.base === 'wan') {
+    pushWanReasons(model, params, wanWiredConfigs, reasons);
   }
 
   if (model?.base === 'z-image') {
-    // Check if VAE source is available (either separate VAE or Qwen3 Source)
-    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+    // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
+    // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+    // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models
+    // don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
+    const mainIsSelfContainedPipeline =
+      (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
+    if (!mainIsSelfContainedPipeline) {
+      // Check if VAE source is available (either separate VAE or Qwen3 Source)
+      const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+      const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
-    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
-    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
     }
     // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
     if (params.pidMode !== 'off') {
@@ -634,6 +761,14 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
   hasFlux2DevDiffusersSource: boolean;
+  /** Resolved configs of the wired Wan slots — null when empty or pointing at a model
+   *  that no longer exists. Resolved by the caller because readiness only receives
+   *  identifiers, and compatibility can only be judged from the config. */
+  wanWiredConfigs: {
+    vae: AnyModelConfig | null;
+    componentSource: AnyModelConfig | null;
+    lowNoisePartner: AnyModelConfig | null;
+  };
 }) => {
   const {
     isConnected,
@@ -651,6 +786,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
     hasFlux2DevDiffusersSource,
+    wanWiredConfigs,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -688,14 +824,20 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   } else if (isExternalApiModelConfig(model)) {
     // external models don't require local sub-models
   } else if (model.base === 'flux') {
-    if (!params.t5EncoderModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
-    }
-    if (!params.clipEmbedModel) {
-      reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
-    }
-    if (!params.fluxVAE) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+    // A complete SDNQ FLUX.1 pipeline install ships its own T5, CLIP and VAE, and the model loader
+    // node falls back to them, so requiring the standalone selections here would keep that path
+    // unreachable from the UI. Anything else (single-file, GGUF, BnB) still needs all three.
+    const mainSuppliesComponents = isSelfContainedSDNQFlux1Pipeline(model);
+    if (!mainSuppliesComponents) {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
     }
 
     const { bbox } = canvas;
@@ -759,9 +901,16 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // Non-diffusers FLUX.2 models need standalone VAE + text encoder unless a Diffusers
-    // pipeline of the matching variant family is installed to extract from.
-    if (model.format !== 'diffusers') {
+    // A FLUX.2 model is a self-sufficient source when its config exposes the diffusers-style
+    // submodels. Plain Diffusers pipelines always do; an SDNQ pipeline qualifies only when it ships
+    // all of them — a truthy submodels dict is not enough, since a partial pipeline may expose only
+    // the transformer and the backend would then request missing fixed subfolders. Mirrors the
+    // generate-tab check so both tabs behave identically.
+    const mainIsPipeline =
+      model.format === 'diffusers' ||
+      ((model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model));
+    // VAE is shared across variants, but the text encoder requires a variant-matching diffusers model.
+    if (!mainIsPipeline) {
       if ('variant' in model && model.variant === 'dev') {
         if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
           reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
@@ -1118,29 +1267,62 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  if (model?.base === 'wan' && model.format === 'gguf_quantized') {
-    // GGUF Wan mains carry only the transformer; VAE + UMT5-XXL encoder must
-    // come from either standalone models or the Component Source (Diffusers).
-    // The low-noise A14B partner expert is optional — if omitted, the loader
-    // will use the high-noise expert for the whole schedule (lower quality
-    // but still produces an image).
-    const hasVaeSource = params.wanVaeModel !== null || params.wanComponentSource !== null;
-    const hasEncoderSource = params.wanT5EncoderModel !== null || params.wanComponentSource !== null;
-    if (!hasVaeSource || !hasEncoderSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noWanComponentSourceSelected') });
-    }
+  if (model?.base === 'wan') {
+    pushWanReasons(model, params, wanWiredConfigs, reasons);
   }
 
   if (model?.base === 'z-image') {
-    // Check if VAE source is available (either separate VAE or Qwen3 Source)
-    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+    // encoder (text_encoder + tokenizer) as submodels of the main model, so no separate component
+    // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+    // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models
+    // don't have submodels and still need a standalone VAE + Qwen3 (or a Qwen3 Source model).
+    const mainIsSelfContainedPipeline =
+      (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
+    if (!mainIsSelfContainedPipeline) {
+      // Check if VAE source is available (either separate VAE or Qwen3 Source)
+      const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+      const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+      if (!hasQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
-    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
-    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
-    if (!hasQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (canvas.bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+      // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+      // bbox/4 to land on the grid; without this a 1040px bbox silently becomes a 256px generation.
+      const gridSize = getGridSize('z-image', getPidScale(params.pidMode));
+      if (canvas.bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Z-Image',
+            width: canvas.bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (canvas.bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Z-Image',
+            height: canvas.bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
     }
     // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
     if (params.pidMode !== 'off') {

@@ -15,6 +15,7 @@ import {
   useWidgetIntentPreloadProps,
   type WidgetEnableMenuItem,
 } from '@workbench/widget-frame';
+import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
@@ -24,10 +25,17 @@ import {
   isRequiredCenterView,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { Activity, Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import {
+  areInstanceIdListsEqual,
+  getActiveInstanceIdsOutside,
+  useMountedInstanceIds,
+  withoutInstancesShownElsewhere,
+} from './useMountedInstanceIds';
 
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
@@ -75,6 +83,16 @@ export const CenterArea = () => {
     ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
+  const projectId = useActiveProjectId();
+  const activeIdsElsewhere = useActiveProjectSelector(
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center', project.floatingWidgets),
+    areInstanceIdListsEqual
+  );
+  const mountedCenterIds = withoutInstancesShownElsewhere(
+    useMountedInstanceIds(activeCenterViewId, projectId),
+    activeCenterViewId,
+    activeIdsElsewhere
+  );
   const focusRegionProps = useFocusRegionProps('center');
 
   const openCenterWidget = useCallback(
@@ -136,7 +154,15 @@ export const CenterArea = () => {
     >
       <Box flex="1" minH="0" position="relative">
         <Box aria-label={t('widgets.centerRegion')} h="full" role="region">
-          {activeItem ? <CenterViewSlot item={activeItem} /> : <FallbackCenterView label="Center widget unavailable" />}
+          {activeCenterViewId !== undefined && mountedCenterIds.length > 0 ? (
+            mountedCenterIds.map((instanceId) => (
+              <Activity key={instanceId} mode={instanceId === activeCenterViewId ? 'visible' : 'hidden'}>
+                <KeptCenterViewSlot instanceId={instanceId} />
+              </Activity>
+            ))
+          ) : (
+            <FallbackCenterView label="Center widget unavailable" />
+          )}
         </Box>
 
         <Flex
@@ -347,14 +373,25 @@ const CenterViewMenuRow = ({
   );
 };
 
-const CenterViewSlot = ({ item }: { item: CenterWidgetItem }) => {
-  if (item.widget.status !== 'enabled') {
+/**
+ * One kept center view. It resolves its own instance and widget rather than
+ * taking a region view-model item: a kept instance is by definition no longer
+ * in the region's item list, because applying a preset replaces `instanceIds`
+ * wholesale. `applyLayoutPresetToProject` merges `widgetInstances`, so the
+ * instance itself survives and can still be resolved here.
+ */
+const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
+  const instance = useActiveProjectSelector(
+    (project) => project.widgetInstances[instanceId],
+    areWidgetRenderInstancesEqual
+  );
+  const widget = instance ? getWidgetById(instance.typeId) : undefined;
+
+  if (!instance || !widget || widget.status !== 'enabled') {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return (
-    <WidgetRendererById key={item.instance.id} instanceId={item.instance.id} widget={item.widget} region="center" />
-  );
+  return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

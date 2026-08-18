@@ -9,6 +9,7 @@ import type {
 
 import { getAuthSession } from '@features/identity';
 
+import { createDeferredResource } from './deferredResource';
 import { createWidgetImplementationResource } from './widgetImplementationResource';
 import { autosaveStatusWidgetManifest } from './widgets/autosave-status/manifest';
 import { canvasWidgetManifest } from './widgets/canvas/manifest';
@@ -96,10 +97,13 @@ export const registerWidgets = (manifests: WidgetManifest[]): RegisteredWidget[]
   manifests.map((rawManifest) => {
     const manifest = normalizeWidgetManifest(rawManifest);
 
+    const host = manifest.loadHost ? createDeferredResource(manifest.loadHost) : undefined;
+
     try {
       validateManifest(manifest);
 
       return {
+        host,
         implementation: createWidgetImplementationResource(manifest.id, manifest.load),
         manifest,
         status: 'enabled' as const,
@@ -110,6 +114,7 @@ export const registerWidgets = (manifests: WidgetManifest[]): RegisteredWidget[]
 
       return {
         failure,
+        host,
         implementation: createWidgetImplementationResource(manifest.id, manifest.load),
         manifest,
         status,
@@ -145,37 +150,48 @@ export const getWidgetsForRegion = (region: WidgetRegion): RegisteredWidget[] =>
 
 export const getWidgetHosts = (): RegisteredWidget[] =>
   registeredWidgets.filter(
-    (widget) => widget.status === 'enabled' && widget.manifest.hasHost && isWidgetAvailable(widget)
+    (widget) => widget.status === 'enabled' && widget.host !== undefined && isWidgetAvailable(widget)
   );
 
 export const getWidgetById = (widgetId: WidgetTypeId): RegisteredWidget | undefined =>
   registeredWidgets.find((widget) => widget.manifest.id === widgetId);
 
-/** Starts a cached implementation load for an explicit user intent. */
-export const preloadWidget = (widgetId: WidgetTypeId): void => {
-  const widget = getWidgetById(widgetId);
+/** Starts cached implementation loads. Unknown or disabled ids are skipped. */
+export const warmWidgets = (typeIds: readonly WidgetTypeId[]): void => {
+  for (const typeId of typeIds) {
+    const widget = getWidgetById(typeId);
 
-  if (widget?.status === 'enabled') {
-    widget.implementation.preload();
+    if (widget?.status === 'enabled') {
+      widget.implementation.preload();
+    }
   }
 };
 
 /**
- * Like {@link preloadWidget}, but resolves when the implementation is in hand.
+ * Like {@link warmWidgets}, but resolves when the implementations are in hand.
  *
- * Callers that are about to make a widget appear use this to get the module
+ * Callers that are about to make widgets appear use this to get the modules
  * BEFORE committing the state change, so the render never suspends. Suspending
  * is not free even when the chunk is already downloaded: showing a fallback
  * makes React withhold the resolved content for `FALLBACK_THROTTLE_MS` (300ms)
  * to avoid a flash, which measured as the entire cost of a layout switch.
- *
- * Returns `null` for an unknown or disabled widget, so callers can skip it.
  */
-export const loadWidget = (widgetId: WidgetTypeId): Promise<unknown> | null => {
-  const widget = getWidgetById(widgetId);
+export const loadWidgets = (typeIds: readonly WidgetTypeId[]): Promise<unknown> =>
+  Promise.allSettled(
+    typeIds.flatMap((typeId) => {
+      const widget = getWidgetById(typeId);
 
-  return widget?.status === 'enabled' ? widget.implementation.load() : null;
-};
+      return widget?.status === 'enabled' ? [widget.implementation.load()] : [];
+    })
+  );
+
+/** Whether every renderable widget in the set is already in memory. */
+export const areWidgetsLoaded = (typeIds: readonly WidgetTypeId[]): boolean =>
+  typeIds.every((typeId) => {
+    const widget = getWidgetById(typeId);
+
+    return widget?.status !== 'enabled' || widget.implementation.getStatus() === 'loaded';
+  });
 
 export const widgetRegistrationFailures = registeredWidgets.flatMap((widget) =>
   widget.failure ? [widget.failure] : []

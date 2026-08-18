@@ -1,8 +1,13 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
-import { getImageMapClickSelectsCluster } from '@workbench/image-map/imageMapSettings';
-import { ensureImageMapLoaded, imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@workbench/image-map/imageMapSettings';
+import {
+  ensureImageMapLoaded,
+  imageMapStore,
+  refreshImageMapPoints,
+  setClusterLabelsEnabled,
+} from '@workbench/image-map/imageMapStore';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
 
@@ -31,10 +36,17 @@ const plotLoadingFallback = (
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
+  const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
 
   useEffect(() => {
     ensureImageMapLoaded();
   }, []);
+
+  // Pushed into the store so turning labels off stops the request, not just the
+  // drawing of what it returns.
+  useEffect(() => {
+    setClusterLabelsEnabled(showClusterLabels);
+  }, [showClusterLabels]);
 
   // Checked before the plot: this is the canvas failing, not a fetch, so
   // re-mounting the plot would just fail again and render an empty box with no
@@ -57,13 +69,13 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     // the whole widget, so suspending on the plotly chunk replaced the entire
     // panel — header and actions menu included — with a skeleton frame, and
     // then held the resolved content for React's fallback throttle on top. It
-    // also sits above `loadWidget`, which preloads only the implementation
+    // also sits above `loadWidgets`, which preloads only the implementation
     // chunk and cannot reach this nested import, so a preset switch onto an
     // already-loaded map suspended anyway. Confining it here keeps the frame
     // mounted and the spinner where the plot will appear.
     return (
       <Suspense fallback={plotLoadingFallback}>
-        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} />
+        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} showClusterLabels={showClusterLabels} />
       </Suspense>
     );
   }

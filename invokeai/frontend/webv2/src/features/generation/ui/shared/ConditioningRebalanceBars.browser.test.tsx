@@ -4,6 +4,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { ConditioningRebalanceBars } from './ConditioningRebalanceBars';
 
@@ -65,6 +66,33 @@ const lastPreview = (): number[] => (onPreview.mock.calls.at(-1)?.[0] as number[
 
 const lastCommit = (): number[] => (onCommit.mock.calls.at(-1)?.[0] as number[] | undefined) ?? [];
 
+/**
+ * Puts the pointer somewhere harmless and undoes any scroll a previous test
+ * left behind.
+ *
+ * Every tap here is a synthetic PointerEvent at a computed coordinate, but the
+ * *real* cursor keeps whatever position the last test gave it. Left over the
+ * track, it emits its own pointer events at its own location, and the component
+ * dutifully reports that index — an instrumented failure showed the intended
+ * `7` arriving and then a spurious `6` after it, which is what breaks
+ * `toHaveBeenLastCalledWith`. The same run showed the track's `left` at -393
+ * rather than 0, i.e. the document had been scrolled sideways by another test,
+ * which moves which bar the stationary cursor is over.
+ */
+const resetPointerAndScroll = async (): Promise<void> => {
+  const parking = document.createElement('div');
+
+  parking.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;z-index:2147483647';
+  document.body.append(parking);
+
+  await act(async () => {
+    await userEvent.hover(parking);
+  });
+
+  parking.remove();
+  window.scrollTo(0, 0);
+};
+
 beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
@@ -79,6 +107,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  await resetPointerAndScroll();
 });
 
 describe('ConditioningRebalanceBars', () => {

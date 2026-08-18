@@ -7,10 +7,10 @@ export const imageMapWidgetManifest: WidgetManifest = {
   allowMultiple: false,
   allowedRegions: ['left', 'right', 'center'],
   failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
-  hasHost: true,
   icon: MapIcon,
   id: 'image-map',
   label: (t) => t('widgets.labels.imageMap'),
   load: () => import('./implementation').then((module) => module.widgetImplementation),
+  loadHost: () => import('./ImageMapDataRuntime').then((module) => module.ImageMapDataRuntime),
   version: 1,
 };

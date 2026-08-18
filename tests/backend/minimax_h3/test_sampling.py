@@ -9,6 +9,7 @@ from invokeai.backend.minimax_h3.packing import (
     resolve_canvas_size,
     video_latent_num_frames,
 )
+from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES, resolve_lowres_canvas_size
 from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_canvas, validate_num_frames
 
 
@@ -50,8 +51,9 @@ class TestCanvas:
 
 class TestFrameGrid:
     def test_legal_frame_counts_pass(self):
-        # 345 = 17*20+5 (14.375 s) is the longest legal clip: 362 rounds past the 15 s cap.
-        for n in (5, 124, 141, 345):
+        # 90 (3.75 s) is the accepted floor for video; 345 = 17*20+5 (14.375 s) is the longest legal
+        # clip, since 362 rounds past the 15 s cap.
+        for n in (5, 90, 107, 124, 141, 345):
             validate_num_frames(n)
 
     def test_misaligned_frame_counts_rejected(self):
@@ -60,17 +62,28 @@ class TestFrameGrid:
         with pytest.raises(ValueError, match="17"):
             validate_num_frames(121)
 
-    def test_durations_outside_window_rejected(self):
-        # 22/39/107 frames are grid-aligned but below the 5 s floor (and not the still path).
-        for n in (22, 39, 107):
-            with pytest.raises(ValueError, match="seconds"):
+    def test_frame_counts_outside_the_accepted_range_rejected(self):
+        # 22/39/56/73 are grid-aligned but below the 90-frame floor (and not the still path).
+        for n in (22, 39, 56, 73):
+            with pytest.raises(ValueError, match="frames on the 17n"):
                 validate_num_frames(n)
         # 362 = 17*21+5 is aligned but 15.083 s > 15 s.
-        with pytest.raises(ValueError, match="seconds"):
+        with pytest.raises(ValueError, match="frames on the 17n"):
             validate_num_frames(362)
 
     def test_still_image_minimum_allowed(self):
         validate_num_frames(5)
+
+    def test_every_offered_choice_validates(self):
+        # The node's dropdown is built from this tuple; nothing in it may be rejected at invoke time.
+        assert MINIMAX_H3_VIDEO_FRAME_CHOICES[0] == 90
+        assert MINIMAX_H3_VIDEO_FRAME_CHOICES[-1] == 345
+        for n in MINIMAX_H3_VIDEO_FRAME_CHOICES:
+            validate_num_frames(n)
+
+    def test_choices_are_exactly_the_grid_points_in_range(self):
+        expected = tuple(n for n in range(90, 361) if n % 17 == 5)
+        assert MINIMAX_H3_VIDEO_FRAME_CHOICES == expected
 
     def test_align_num_frames(self):
         assert align_num_frames(121) == 124
@@ -87,6 +100,39 @@ class TestFrameGrid:
         # 40 latents/s at 24 fps.
         assert audio_latent_num_frames(24) == 40
         assert audio_latent_num_frames(124) == round(124 / 24 * 40)
+
+
+class TestLowresCanvasResolution:
+    # The native short-edge-768 policy is covered by tests/app/invocations/test_minimax_h3_ideal_dimensions.py.
+
+    def test_lowres_pins_the_long_edge(self):
+        # Same aspect inputs, but the LONG edge is fixed at 768.
+        assert resolve_lowres_canvas_size(1, 1) == (768, 768)
+        # 2:3 portrait -> 512x768 (the user-facing "small test render" case).
+        assert resolve_lowres_canvas_size(800, 1200) == (768, 512)
+        assert resolve_lowres_canvas_size(1200, 800) == (512, 768)
+        # 16:9 -> short edge 432 rounds to the nearest multiple of 32 (448).
+        assert resolve_lowres_canvas_size(16, 9) == (448, 768)
+        assert resolve_lowres_canvas_size(9, 16) == (768, 448)
+
+    def test_lowres_never_exceeds_the_highres_area(self):
+        for w, h in ((1, 1), (16, 9), (9, 16), (2, 3), (4, 1), (1, 4), (1024, 1000)):
+            lo_h, lo_w = resolve_lowres_canvas_size(w, h)
+            hi_h, hi_w = resolve_canvas_size(w, h)
+            assert lo_h * lo_w <= hi_h * hi_w
+            assert lo_h % 32 == 0 and lo_w % 32 == 0
+
+    def test_extreme_aspect_ratios_stay_on_grid(self):
+        # 4:1 is the limit of the supported envelope; 768/4 = 192 divides the grid exactly (6 * 32).
+        assert resolve_lowres_canvas_size(4, 1) == (192, 768)
+        assert resolve_lowres_canvas_size(1, 4) == (768, 192)
+
+    def test_invalid_aspects_rejected_by_both_presets(self):
+        for fn in (resolve_canvas_size, resolve_lowres_canvas_size):
+            with pytest.raises(ValueError, match="positive"):
+                fn(0, 100)
+            with pytest.raises(ValueError, match="1:4"):
+                fn(9, 1)
 
 
 def _build_state(seed: int, with_keyframe: bool = False):

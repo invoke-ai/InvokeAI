@@ -13,6 +13,7 @@ import { collectClusterSelection } from '@workbench/image-map/clusterSelection';
 import { imageMapStore } from '@workbench/image-map/imageMapStore';
 import {
   buildAllPointsTrace,
+  buildClusterAnnotations,
   buildCurrentImageTrace,
   buildHighlightedPointsTrace,
   buildMapLayout,
@@ -117,9 +118,16 @@ const findTraceIndex = (plot: PlotElement, name: string): number =>
  * module is lazy-loaded so the plotly bundle stays out of the app's critical
  * path.
  */
-const ImageMapPlot = ({ clickSelectsCluster = false }: { clickSelectsCluster?: boolean }) => {
+const ImageMapPlot = ({
+  clickSelectsCluster = false,
+  showClusterLabels = true,
+}: {
+  clickSelectsCluster?: boolean;
+  showClusterLabels?: boolean;
+}) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const points = imageMapStore.useSelector((snapshot) => snapshot.data?.points ?? null);
+  const clusterLabels = imageMapStore.useSelector((snapshot) => snapshot.clusterLabels);
   const selectedImageName = useWidgetValuesSelector(
     'gallery',
     (values) => getSelectedGalleryImageFromValues(values)?.imageName ?? null
@@ -208,7 +216,12 @@ const ImageMapPlot = ({ clickSelectsCluster = false }: { clickSelectsCluster?: b
       }
     }
 
-    void Plotly.react(container, traces as Plotly.Data[], buildMapLayout(initialRanges), {
+    // Annotations are deliberately absent here: they are a layout concern, and
+    // rebuilding the scene for them is what made labels arriving a second after
+    // the points re-materialize every trace. See the relayout effect below.
+    const layout = buildMapLayout(initialRanges);
+
+    void Plotly.react(container, traces as Plotly.Data[], layout, {
       displayModeBar: false,
       // Custom wheel/pinch zoom below; plotly's own scrollZoom has
       // long-standing Safari issues.
@@ -385,6 +398,25 @@ const ImageMapPlot = ({ clickSelectsCluster = false }: { clickSelectsCluster?: b
       swallow(Plotly.relayout(container, { 'xaxis.range': recentered.x, 'yaxis.range': recentered.y }));
     }
   }, [plotRevision, points, selectedImageName]);
+
+  // Labels arrive about a second after the points they annotate. Applying them
+  // with `relayout` rather than through the scene effect keeps that from
+  // re-materializing every coordinate array — and, more visibly, from resetting
+  // the highlight and current-image traces to empty, which made the gold marker
+  // and the multi-select highlight blink off and back on with every refresh.
+  useEffect(() => {
+    const container = containerRef.current as PlotElement | null;
+
+    if (!container || points === null || !container.data) {
+      return;
+    }
+
+    swallow(
+      Plotly.relayout(container, {
+        annotations: buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null),
+      })
+    );
+  }, [clusterLabels, plotRevision, points, showClusterLabels]);
 
   // Custom zoom handlers + container size tracking, attached once for the
   // plot's lifetime; plotly does not observe its container.

@@ -12,7 +12,7 @@ export interface QueueServerItemDTO {
   completed_at?: string | null;
   created_at: string;
   destination?: string | null;
-  /** The GPU that processed this item, e.g. `cuda:1`. Null for pre-multi-GPU rows and non-CUDA. */
+  /** The accelerator that processed this item, e.g. `cuda:1` or `xpu:1`. Null for older or unindexed rows. */
   device?: string | null;
   error_message?: string | null;
   error_traceback?: string | null;
