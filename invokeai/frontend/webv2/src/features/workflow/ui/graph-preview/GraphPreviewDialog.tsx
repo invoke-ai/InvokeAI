@@ -5,12 +5,13 @@ import type { ReactNode } from 'react';
 import { Box, Dialog, Icon, Portal, SegmentGroup, Stack, Text } from '@chakra-ui/react';
 import { useWorkflowGraphPreview } from '@features/workflow/ui/WorkflowUiContext';
 import { Button, JsonPreview, toaster } from '@platform/ui';
-import { CheckIcon, CopyIcon, SquareDashedIcon } from 'lucide-react';
+import { CheckIcon, ChevronUpIcon, CopyIcon, SquareDashedIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
 import { GraphPreviewList } from './GraphPreviewList';
+import { GraphPreviewOpenAsMenu } from './GraphPreviewOpenAsMenu';
 import { GraphPreviewSidePanel } from './GraphPreviewSidePanel';
 
 interface GraphPreviewDialogProps {
@@ -229,14 +230,29 @@ export const GraphPreviewDialog = ({
               )}
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
-              <Button size="xs" variant="outline" onClick={copyJson}>
-                <Icon
-                  as={hasCopied ? CheckIcon : CopyIcon}
-                  boxSize="3.5"
-                  color={hasCopied ? 'green.solid' : undefined}
-                />
-                {hasCopied ? t('graphPreview.copied') : t('graphPreview.copyJson')}
-              </Button>
+              <Box display="flex" gap="2">
+                <Button size="xs" variant="outline" onClick={copyJson}>
+                  <Icon
+                    as={hasCopied ? CheckIcon : CopyIcon}
+                    boxSize="3.5"
+                    color={hasCopied ? 'green.solid' : undefined}
+                  />
+                  {hasCopied ? t('graphPreview.copied') : t('graphPreview.copyJson')}
+                </Button>
+                {graph ? (
+                  <GraphPreviewOpenAsMenu
+                    graph={graph}
+                    sourceId={sourceId}
+                    sourceLabel={sourceLabel}
+                    onClose={closeDialog}
+                  >
+                    <Button size="xs" variant="outline">
+                      {t('graphPreview.openAs')}
+                      <Icon as={ChevronUpIcon} boxSize="3.5" />
+                    </Button>
+                  </GraphPreviewOpenAsMenu>
+                ) : null}
+              </Box>
               <Box display="flex" gap="2">
                 {dialogRoute ? (
                   <Button

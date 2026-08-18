@@ -1,4 +1,8 @@
-import type { GraphPreviewSourceState, WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
+import type {
+  GraphPreviewSourceState,
+  WorkflowInvocationSourceId,
+  WorkflowPreviewGraph,
+} from '@features/workflow/ui/contracts';
 import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -19,6 +23,77 @@ vi.mock('./GraphPreviewFlow', () => ({
   },
 }));
 
+// `downloadText` and the invocation templates snapshot both need to exist
+// before `vi.mock` factories below run (they're hoisted above the imports
+// that would otherwise define them), so they're built through `vi.hoisted`.
+const { downloads, TEMPLATES_SNAPSHOT } = vi.hoisted(() => {
+  const fieldInput = (name: string, defaultValue: unknown) => ({
+    default: defaultValue,
+    description: '',
+    exclusiveMaximum: null,
+    exclusiveMinimum: null,
+    input: 'any' as const,
+    maximum: null,
+    minimum: null,
+    multipleOf: null,
+    name,
+    options: null,
+    required: false,
+    title: name,
+    type: { batch: false, cardinality: 'SINGLE' as const, name: 'IntegerField' },
+    uiChoiceLabels: null,
+    uiComponent: null,
+    uiHidden: false,
+    uiModelBase: null,
+    uiModelFormat: null,
+    uiModelType: null,
+    uiOrder: null,
+  });
+  const invocationTemplate = (type: string, inputs: Record<string, ReturnType<typeof fieldInput>>) => ({
+    category: 'test',
+    classification: 'stable',
+    description: '',
+    inputs,
+    nodePack: 'invokeai',
+    outputs: {},
+    outputType: `${type}_output`,
+    tags: [],
+    title: type,
+    type,
+    useCache: true,
+    version: '1.0.0',
+  });
+
+  return {
+    downloads: { downloadBlob: vi.fn(), downloadText: vi.fn() },
+    TEMPLATES_SNAPSHOT: {
+      error: null,
+      status: 'loaded' as const,
+      templates: {
+        denoise_latents: invocationTemplate('denoise_latents', {
+          cfg_scale: fieldInput('cfg_scale', 7),
+          steps: fieldInput('steps', 30),
+        }),
+        integer: invocationTemplate('integer', { value: fieldInput('value', 0) }),
+        l2i: invocationTemplate('l2i', {}),
+      },
+    },
+  };
+});
+
+vi.mock('@platform/browser/downloadBlob', () => downloads);
+
+// The "Open as" menu (`GraphPreviewOpenAsMenu`) reads the invocation
+// templates snapshot through the reactive hook, not the plain getter, so its
+// disabled state can update live if the menu opens while templates are still
+// loading — this stubs that hook (and the getter, for symmetry) with a
+// pre-loaded snapshot covering the fixture graph's node types.
+vi.mock('@features/workflow/react', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  getInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+  useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+}));
+
 // The real client fetches en.json over HTTP (`platform/i18n/client.ts`), which
 // this browser test never boots. Stub `t` with the subset of English strings
 // this dialog renders, so assertions check real copy instead of raw dotted
@@ -31,10 +106,15 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.copied': 'Copied',
   'graphPreview.copyJson': 'Copy JSON',
   'graphPreview.destination': 'Destination',
+  'graphPreview.downloadJson': 'Download JSON',
+  'graphPreview.downloadJsonHint': 'For bug reports and sharing',
   'graphPreview.edges': 'Edges',
   'graphPreview.edgesIn': 'in · {{count}} inputs from {{sources}}',
   'graphPreview.edgesInNone': 'in · none',
   'graphPreview.edgesOut': 'out · {{field}} → {{target}}',
+  'graphPreview.editInEditor': 'Edit in workflow editor',
+  'graphPreview.editInEditorFailed': 'No editable nodes in this graph.',
+  'graphPreview.editInEditorHint': 'Replaces the current workflow',
   'graphPreview.graph': 'Graph',
   'graphPreview.graphJsonLabel': '{{title}} graph JSON',
   'graphPreview.inputCount': '{{count}} inputs',
@@ -46,7 +126,12 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.nodeSummary.denoise': '{{steps}} steps · cfg {{cfg}}',
   'graphPreview.nodeSummary.noise': '{{width}} × {{height}}',
   'graphPreview.nodes': 'Nodes',
+  'graphPreview.openAs': 'Open as',
+  'graphPreview.openedFromPreview': 'Opened from graph preview',
   'graphPreview.resolvedInputs': 'Resolved inputs',
+  'graphPreview.savedToLibrary': 'Saved to workflow library',
+  'graphPreview.saveToLibrary': 'Save to workflow library',
+  'graphPreview.saveToLibraryHint': 'Reusable, leaves this project alone',
   'graphPreview.selectNode': 'Select a node for details.',
   'graphPreview.setBy': 'Set by',
   'graphPreview.showNode': 'show node',
@@ -129,10 +214,35 @@ const preferencesSnapshot = {
   workflowValidateConnections: true,
 };
 
-const createWorkflowUiAdapter = (): WorkflowUiAdapter =>
-  ({
+// A stable object per adapter instance — `useWorkflowProjectSelector`
+// (`useSaveWorkflowToLibrary`, called by `GraphPreviewOpenAsMenu`) runs this
+// through `useSyncExternalStoreWithSelector`'s shallow-equality check, which
+// would otherwise see a "changed" snapshot on every render (new object
+// identity, same content) and force an infinite re-render loop — the same
+// reason `preferencesSnapshot` above is hoisted rather than built inline.
+const createProjectSnapshot = () => ({
+  galleryValues: {},
+  graphHistory: [],
+  id: 'project-1',
+  isWorkflowRunning: false,
+  projectGraph: { edges: [], nodes: [], version: 1 as const },
+  workflowValues: {},
+});
+
+const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
+  const projectSnapshot = createProjectSnapshot();
+
+  return {
     capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe: () => () => {} },
-    commands: {},
+    commands: {
+      bindLibraryWorkflow: vi.fn(),
+      editGraph: vi.fn(),
+      redo: vi.fn(),
+      replace: vi.fn(),
+      restoreSnapshot: vi.fn(),
+      saveSnapshot: vi.fn(),
+      undo: vi.fn(),
+    },
     getProjectGraph: () => ({ edges: [], nodes: [], version: 1 as const }),
     nodeExecution: { get: () => null, subscribe: () => () => {} },
     notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -143,19 +253,13 @@ const createWorkflowUiAdapter = (): WorkflowUiAdapter =>
     },
     preferences: { getSnapshot: () => preferencesSnapshot, subscribe: () => () => {} },
     project: {
-      getSnapshot: () => ({
-        galleryValues: {},
-        graphHistory: [],
-        id: 'project-1',
-        isWorkflowRunning: false,
-        projectGraph: { edges: [], nodes: [], version: 1 as const },
-        workflowValues: {},
-      }),
+      getSnapshot: () => projectSnapshot,
       subscribe: () => () => {},
     },
     registerModalHotkeyLayer: vi.fn(() => vi.fn()),
     widgets: { open: vi.fn(), patchValues: vi.fn() },
-  }) as unknown as WorkflowUiAdapter;
+  } as unknown as WorkflowUiAdapter;
+};
 
 const createGraphPreviewPort = (): WorkflowGraphPreviewPort => ({
   focusSource: vi.fn(),
@@ -169,10 +273,13 @@ describe('GraphPreviewDialog', () => {
   let root: Root;
   let onOpenChange: (isOpen: boolean) => void;
   let graphPreviewPort: WorkflowGraphPreviewPort;
+  let workflowUiAdapter: WorkflowUiAdapter;
 
-  const renderDialog = async (source: GraphPreviewSourceState, isOpen = true) => {
-    const workflowUiAdapter = createWorkflowUiAdapter();
-
+  const renderDialog = async (
+    source: GraphPreviewSourceState,
+    isOpen = true,
+    sourceId: WorkflowInvocationSourceId = 'generate'
+  ) => {
     await act(() => {
       root.render(
         <StrictMode>
@@ -183,7 +290,7 @@ describe('GraphPreviewDialog', () => {
                   graphId="preview-graph-id"
                   isOpen={isOpen}
                   source={source}
-                  sourceId="generate"
+                  sourceId={sourceId}
                   sourceLabel="Generate"
                   onOpenChange={onOpenChange}
                 />
@@ -201,10 +308,17 @@ describe('GraphPreviewDialog', () => {
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
     graphPreviewPort = createGraphPreviewPort();
+    workflowUiAdapter = createWorkflowUiAdapter();
+    downloads.downloadBlob.mockReset();
+    downloads.downloadText.mockReset();
   });
 
   afterEach(async () => {
     await act(() => root.unmount());
+    // The "Open as" menu's content portals to `document.body`, outside the
+    // React root this suite unmounts above — sweep it so a leftover node
+    // from one test can't answer a `[role="menuitem"]` query in the next.
+    document.querySelectorAll('[data-scope="menu"]').forEach((element) => element.remove());
     host.remove();
   });
 
@@ -227,6 +341,32 @@ describe('GraphPreviewDialog', () => {
 
     await act(() => {
       button?.click();
+    });
+  };
+
+  // Opens the "Open as" menu. Chakra's `Menu.Content` is lazy-mounted and
+  // its open transition runs on a timer, so the click alone isn't enough —
+  // give the portal a beat to attach before querying for items.
+  const openAsMenu = async () => {
+    await clickButtonWithText('Open as');
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 40);
+      });
+    });
+  };
+
+  const findMenuItemWithText = (text: string) =>
+    [...document.querySelectorAll('[role="menuitem"]')].find((candidate) =>
+      (candidate.textContent ?? '').includes(text)
+    );
+
+  const clickMenuItemWithText = async (text: string) => {
+    const item = findMenuItemWithText(text);
+    expect(item).not.toBeUndefined();
+
+    await act(() => {
+      (item as HTMLElement | undefined)?.click();
     });
   };
 
@@ -341,5 +481,44 @@ describe('GraphPreviewDialog', () => {
     const text = document.body.textContent ?? '';
     expect(text).toContain('Select a node for details.');
     expect(text).not.toContain('Resolved inputs');
+  });
+
+  it('Open as → Edit in workflow editor replaces the document, opens the editor, closes the dialog', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Edit in workflow editor');
+
+    expect(workflowUiAdapter.commands.replace).toHaveBeenCalledTimes(1);
+    const [document_, label] = vi.mocked(workflowUiAdapter.commands.replace).mock.calls[0] ?? [];
+    expect(document_?.nodes).toHaveLength(3);
+    expect(label).toBe('Opened from graph preview');
+    expect(graphPreviewPort.openWorkflowEditor).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('Open as → Download JSON downloads the backend graph', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Download JSON');
+
+    expect(downloads.downloadText).toHaveBeenCalledTimes(1);
+    const [content, fileName, type] = vi.mocked(downloads.downloadText).mock.calls[0] ?? [];
+    // The fixture graph has no `backendGraph`, so this exercises the
+    // `graph.backendGraph ?? graph` fallback, not just the happy path.
+    expect(content).toContain('"denoise_latents"');
+    expect(fileName).toBe('graph.json');
+    expect(type).toBe('application/json');
+  });
+
+  it('hides Edit in workflow editor for the workflow source', async () => {
+    await renderDialog(FIXTURE_SOURCE, true, 'workflow');
+
+    await openAsMenu();
+
+    expect(findMenuItemWithText('Edit in workflow editor')).toBeUndefined();
+    expect(findMenuItemWithText('Save to workflow library')).not.toBeUndefined();
+    expect(findMenuItemWithText('Download JSON')).not.toBeUndefined();
   });
 });
