@@ -1755,6 +1755,10 @@ class TestWebSocketAuth:
         # at request time. Patch it to point at the mock invoker.
         mock_deps = MockApiDependencies(mock_invoker)
         monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", mock_deps)
+        # Connect resolves the user record through `resolve_authorized_user`, which binds
+        # ApiDependencies at import time in auth_dependencies — patching the defining
+        # module alone would not reach it.
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
         fastapi_app = FastAPI()
         return SocketIO(fastapi_app)
