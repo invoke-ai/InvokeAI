@@ -157,9 +157,16 @@ export type paths = {
          *     To change the password, both ``current_password`` and ``new_password`` must
          *     be provided. The current password is verified before the change is applied.
          *
+         *     A password change signs out the account's *other* sessions: it bumps the
+         *     revocation epoch, invalidating every previously issued token. This response
+         *     carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+         *     signed in.
+         *
          *     Args:
          *         request: Profile fields to update
          *         current_user: The authenticated user
+         *         http_request: The HTTP request, used to scope the replacement media cookie
+         *         response: The HTTP response, used to return the replacement token
          *
          *     Returns:
          *         The updated user
@@ -294,13 +301,13 @@ export type paths = {
          * @description Delete a user. Requires admin privileges.
          *
          *     Admins can delete any user including other admins, but cannot delete the last
-         *     remaining admin.
+         *     remaining admin, nor the internal system user.
          *
          *     Args:
          *         user_id: The user ID
          *
          *     Raises:
-         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 400 if attempting to delete the last admin or the system user
          *         HTTPException: 404 if user not found
          */
         delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
@@ -310,6 +317,10 @@ export type paths = {
          * Update User
          * @description Update a user. Requires admin privileges.
          *
+         *     Resetting a password revokes the target's existing sessions. An admin resetting
+         *     their own password receives a replacement token in ``X-Refreshed-Token`` so they
+         *     are not signed out by their own action.
+         *
          *     Args:
          *         user_id: The user ID
          *         request: Fields to update
@@ -318,7 +329,8 @@ export type paths = {
          *         The updated user
          *
          *     Raises:
-         *         HTTPException: 400 if password is weak
+         *         HTTPException: 400 if password is weak, if the change would remove the last
+         *             administrator, or if it targets the protected system account
          *         HTTPException: 404 if user not found
          */
         patch: operations["update_user_api_v1_auth_users__user_id__patch"];
@@ -1334,7 +1346,11 @@ export type paths = {
         };
         /**
          * Get Image Names
-         * @description Gets ordered list of image names with metadata for optimistic updates
+         * @deprecated
+         * @description Gets ordered list of image names with metadata for optimistic updates.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+         *     in one ordered list. This image-only endpoint predates the polymorphic gallery.
          */
         get: operations["get_image_names"];
         put?: never;
@@ -1575,7 +1591,11 @@ export type paths = {
         };
         /**
          * Get Video Names
+         * @deprecated
          * @description Gets ordered list of video names with metadata for optimistic updates.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+         *     in one ordered list. This video-only endpoint predates the polymorphic gallery.
          */
         get: operations["get_video_names"];
         put?: never;
@@ -1658,6 +1678,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/item_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Gallery Item Names
+         * @description Returns the ordered flat list of item names — used to drive virtualized gallery selection.
+         *
+         *     Names are polymorphic: image and video names are interleaved by `created_at`. A name ending
+         *     in `.mp4` is a video.
+         */
+        get: operations["list_gallery_item_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gallery/items/names": {
         parameters: {
             query?: never;
@@ -1667,7 +1710,12 @@ export type paths = {
         };
         /**
          * Get Gallery Item Names
+         * @deprecated
          * @description Returns an ordered (kind, name) list — used to drive virtualized gallery selection.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns the same order as a flat name
+         *     list. The `kind` discriminator here costs a model per row — ~800ms on a 200k-item library —
+         *     for a value callers already derive from the file extension.
          */
         get: operations["get_gallery_item_names"];
         put?: never;
@@ -1843,8 +1891,11 @@ export type paths = {
         };
         /**
          * List Virtual Board Image Names By Date
-         * @description Gets ordered image names for a specific date. Image-only; kept for API compatibility —
-         *     the UI uses the polymorphic `/by_date/{date}/item_names` endpoint.
+         * @deprecated
+         * @description Gets ordered image names for a specific date. Image-only.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and
+         *     videos in one ordered list.
          */
         get: operations["list_virtual_board_image_names_by_date"];
         put?: never;
@@ -1864,7 +1915,11 @@ export type paths = {
         };
         /**
          * List Virtual Board Item Names By Date
+         * @deprecated
          * @description Gets ordered polymorphic (image + video) item refs for a specific date.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same
+         *     order as a flat name list instead of one model per item.
          */
         get: operations["list_virtual_board_item_names_by_date"];
         put?: never;
@@ -2264,8 +2319,32 @@ export type paths = {
         /**
          * Get Queue Items By Item Ids
          * @description Gets queue items for the specified queue item ids. Maintains order of item ids.
+         *
+         *     Bound the legacy full-item endpoint as well as the summary endpoint: callers can otherwise
+         *     force one graph deserialization and response copy per supplied id, defeating the queue-list
+         *     optimization with an authenticated memory/CPU exhaustion request.
          */
         post: operations["get_queue_items_by_item_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Item Summaries By Ids
+         * @description Gets lightweight queue item summaries for specified IDs in requested order.
+         */
+        post: operations["get_queue_item_summaries_by_ids"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4112,7 +4191,7 @@ export type components = {
              */
             type: "anima_text_encoder";
         };
-        AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+        AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
         /**
          * AppVersion
          * @description App Version Response
@@ -4785,6 +4864,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_get_queue_item_summaries_by_ids */
+        Body_get_queue_item_summaries_by_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch summaries for
+             */
+            item_ids: number[];
+        };
         /** Body_get_queue_items_by_item_ids */
         Body_get_queue_items_by_item_ids: {
             /**
@@ -4797,7 +4884,6 @@ export type components = {
         Body_import_style_presets: {
             /**
              * File
-             * Format: binary
              * @description The file to import
              */
             file: Blob;
@@ -4855,7 +4941,6 @@ export type components = {
         Body_set_workflow_thumbnail: {
             /**
              * Image
-             * Format: binary
              * @description The image file to upload
              */
             image: Blob;
@@ -4878,10 +4963,7 @@ export type components = {
         };
         /** Body_update_model_image */
         Body_update_model_image: {
-            /**
-             * Image
-             * Format: binary
-             */
+            /** Image */
             image: Blob;
         };
         /** Body_update_style_preset */
@@ -4912,10 +4994,7 @@ export type components = {
         };
         /** Body_upload_image */
         Body_upload_image: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: Blob;
             /**
              * Resize To
@@ -4931,10 +5010,7 @@ export type components = {
         };
         /** Body_upload_video */
         Body_upload_video: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: Blob;
             /**
              * Metadata
@@ -13943,8 +14019,37 @@ export type components = {
          */
         GalleryItemKind: "image" | "video";
         /**
+         * GalleryItemNames
+         * @description Ordered flat list of gallery item names plus counts for optimistic UI.
+         *
+         *     Names are polymorphic — images and videos are interleaved by `created_at`. The kind of a
+         *     given name is its file extension (`.mp4` is a video), which is how every consumer already
+         *     discriminates. Mirrors the shape of the image-only `ImageNamesResult`.
+         */
+        GalleryItemNames: {
+            /**
+             * Item Names
+             * @description Ordered list of image and video names.
+             */
+            item_names: string[];
+            /**
+             * Starred Count
+             * @description Number of starred items (when starred_first=True).
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of items matching the query.
+             */
+            total_count: number;
+        };
+        /**
          * GalleryItemNamesResult
          * @description Ordered list of gallery item references plus counts for optimistic UI.
+         *
+         *     Deprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to
+         *     carry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,
+         *     for a field callers derive from the filename extension anyway.
          */
         GalleryItemNamesResult: {
             /**
@@ -18854,6 +18959,7 @@ export type components = {
          *         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)
          *         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
          *         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+         *         wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.
          *         pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
          *         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
          *         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
@@ -19198,6 +19304,12 @@ export type components = {
              * @default false
              */
             sequential_guidance?: boolean;
+            /**
+             * Wan Memory Optimization
+             * @description Enable experimental Wan memory optimizations at the cost of slower generation.
+             * @default false
+             */
+            wan_memory_optimization?: boolean;
             /**
              * Pid Memory Optimization
              * @description Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
@@ -23962,6 +24074,112 @@ export type components = {
             base: "sdxl";
         };
         /**
+         * Main_Checkpoint_Wan_Config
+         * @description Model config for single-file Wan 2.2 transformer checkpoints (safetensors).
+         *
+         *     This is the format the community ships on CivitAI and in ComfyUI-oriented
+         *     Hugging Face repos: one ``.safetensors`` per transformer, in either the native
+         *     upstream key layout or the diffusers one, optionally under a
+         *     ``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``
+         *     quantized. The loader normalises all of those.
+         *
+         *     As with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``
+         *     records which one this is so the Wan model loader invocation can pair them.
+         *     TI2V-5B is single-transformer and stores ``expert='none'``.
+         */
+        Main_Checkpoint_Wan_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default wan
+             * @constant
+             */
+            base: "wan";
+            /**
+             * Format
+             * @default checkpoint
+             * @constant
+             */
+            format: "checkpoint";
+            variant: components["schemas"]["WanVariantType"];
+            /**
+             * Expert
+             * @description For Wan 2.2 A14B's dual-expert MoE: 'high' for the high-noise expert, 'low' for the low-noise expert. 'none' for single-transformer models (TI2V-5B).
+             * @default none
+             * @enum {string}
+             */
+            expert: "high" | "low" | "none";
+        };
+        /**
          * Main_Checkpoint_ZImage_Config
          * @description Model config for Z-Image single-file checkpoint models (safetensors, etc).
          */
@@ -26087,6 +26305,273 @@ export type components = {
             submodels: {
                 [key: string]: components["schemas"]["SubmodelDefinition"];
             } | null;
+        };
+        /**
+         * Main_SDNQ_FLUX_Config
+         * @description Model config for SDNQ-quantized FLUX transformer models.
+         */
+        Main_SDNQ_FLUX_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default flux
+             * @constant
+             */
+            base: "flux";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            variant: components["schemas"]["FluxVariantType"];
+        };
+        /**
+         * Main_SDNQ_Flux2_Config
+         * @description Model config for SDNQ-quantized FLUX.2 transformer models (e.g. Klein 4B / 9B).
+         */
+        Main_SDNQ_Flux2_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default flux2
+             * @constant
+             */
+            base: "flux2";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            variant: components["schemas"]["Flux2VariantType"];
+        };
+        /**
+         * Main_SDNQ_ZImage_Config
+         * @description Model config for SDNQ-quantized Z-Image transformer models.
+         */
+        Main_SDNQ_ZImage_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default z-image
+             * @constant
+             */
+            base: "z-image";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /**
          * Combine Masks
@@ -28243,7 +28728,7 @@ export type components = {
              * Config
              * @description The installed model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
         };
         /**
          * ModelInstallDownloadProgressEvent
@@ -28409,7 +28894,7 @@ export type components = {
              * Config Out
              * @description After successful installation, this will hold the configuration object.
              */
-            config_out?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"]) | null;
+            config_out?: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"]) | null;
             /**
              * Inplace
              * @description Leave model in its current location; otherwise install under models directory
@@ -28495,7 +28980,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -28522,7 +29007,7 @@ export type components = {
              * Config
              * @description The model's config
              */
-            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+            config: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
             /**
              * @description The submodel type, if any
              * @default null
@@ -28749,7 +29234,7 @@ export type components = {
          */
         ModelsList: {
             /** Models */
-            models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"])[];
+            models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"])[];
         };
         /**
          * Multiply Integers
@@ -30845,6 +31330,94 @@ export type components = {
              * @constant
              */
             format: "qwen3_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /** @description Qwen3 model size variant (4B or 8B) */
+            variant: components["schemas"]["Qwen3VariantType"];
+        };
+        /**
+         * Qwen3Encoder_SDNQ_Config
+         * @description Configuration for SDNQ-quantized Qwen3 Encoder models (single file).
+         */
+        Qwen3Encoder_SDNQ_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
+             * Type
+             * @default qwen3_encoder
+             * @constant
+             */
+            type: "qwen3_encoder";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
             /**
              * Cpu Only
              * @description Whether this model should run on CPU only
@@ -34290,6 +34863,83 @@ export type components = {
             /** @description The workflow associated with this queue item */
             workflow?: components["schemas"]["WorkflowWithoutID"] | null;
         };
+        /**
+         * SessionQueueItemSummary
+         * @description Queue item fields needed to render the queue list.
+         */
+        SessionQueueItemSummary: {
+            /**
+             * Item Id
+             * @description The identifier of the session queue item
+             */
+            item_id: number;
+            /**
+             * Created At
+             * @description When this queue item was created
+             */
+            created_at: string;
+            /**
+             * Status
+             * @description The status of this queue item
+             * @enum {string}
+             */
+            status: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "canceled";
+            /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1'
+             */
+            device?: string | null;
+            /**
+             * Started At
+             * @description When this queue item was started
+             */
+            started_at: string | null;
+            /**
+             * Completed At
+             * @description When this queue item was completed
+             */
+            completed_at: string | null;
+            /**
+             * Origin
+             * @description The origin of this queue item
+             */
+            origin: string | null;
+            /**
+             * Destination
+             * @description The destination of this queue item
+             */
+            destination: string | null;
+            /**
+             * Batch Id
+             * @description The ID of the batch associated with this queue item
+             */
+            batch_id: string;
+            /**
+             * User Id
+             * @description The ID of the user who created this queue item
+             */
+            user_id: string;
+            /**
+             * User Display Name
+             * @description The display name of the user who created this queue item
+             */
+            user_display_name: string | null;
+            /**
+             * User Email
+             * @description The email of the user who created this queue item
+             */
+            user_email: string | null;
+            /**
+             * Field Values
+             * @description The batch field values used for this queue item
+             */
+            field_values: components["schemas"]["NodeFieldValue"][] | null;
+            /**
+             * Parent Item Id
+             * @description The ID of the parent queue item, if this is a child item
+             */
+            parent_item_id: number | null;
+        };
         /** SessionQueueStatus */
         SessionQueueStatus: {
             /**
@@ -37442,6 +38092,12 @@ export type components = {
              * @description When user last logged in
              */
             last_login_at?: string | null;
+            /**
+             * Token Epoch
+             * @description Revocation epoch; tokens minted before the current value are rejected
+             * @default 0
+             */
+            token_epoch?: number;
         };
         /**
          * UserProfileUpdateRequest
@@ -38552,6 +39208,10 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** VideoBoardArg */
         VideoBoardArg: {
@@ -39383,6 +40043,10 @@ export type components = {
          *     Each LoRA is routed to the primary and/or low-noise list based on its
          *     recorded ``expert`` tag (set by the probe from the filename). Untagged
          *     LoRAs go to both lists.
+         *
+         *     Against a TI2V-5B main, which is a single transformer with no low-noise
+         *     expert, a LoRA that would land only in the low-noise list is applied to
+         *     the transformer instead, with a warning.
          */
         WanLoRACollectionLoader: {
             /**
@@ -39431,8 +40095,9 @@ export type components = {
          *     field to override.
          *
          *     For TI2V-5B (single transformer) only the primary list is used at denoise
-         *     time; a LoRA routed only to the low-noise list would be inert, so that
-         *     routing logs a warning.
+         *     time, so a LoRA that would land only in the low-noise list is applied to
+         *     the transformer instead, with a warning. The alternative is to accept the
+         *     LoRA and silently have no effect.
          */
         WanLoRALoaderInvocation: {
             /**
@@ -39466,7 +40131,7 @@ export type components = {
             weight?: number;
             /**
              * Target
-             * @description Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it.
+             * @description Which expert(s) to apply this LoRA to. 'auto' uses the LoRA's recorded expert tag (or both if untagged); 'both'/'high'/'low' override it. On the single-transformer TI2V-5B, which has no low-noise expert, 'low' is applied to the transformer instead of being discarded.
              * @default auto
              * @enum {string}
              */
@@ -39522,15 +40187,16 @@ export type components = {
          *     - Transformer(s):
          *         * Diffusers main: emits ``transformer/`` and (for A14B) ``transformer_2/``
          *           from the same model record.
-         *         * GGUF main: emits the single GGUF as the primary transformer; for A14B
-         *           the second-expert GGUF must be wired to ``Transformer (Low Noise)``.
+         *         * Single-file main (GGUF or safetensors checkpoint): emits the file as the
+         *           primary transformer; for A14B the second-expert file must be wired to
+         *           ``Transformer (Low Noise)``.
          *     - VAE: standalone Wan VAE > main (if Diffusers) > Component Source (Diffusers).
          *     - UMT5-XXL encoder: standalone Wan T5 encoder > main (if Diffusers) >
          *       Component Source (Diffusers).
          *
          *     The Component Source slot lets users supply a Diffusers Wan main model purely
          *     for VAE / encoder extraction when the actual transformer is in a single-file
-         *     format. Together, the standalone VAE + standalone encoder let a GGUF
+         *     format. Together, the standalone VAE + standalone encoder let a single-file
          *     transformer run without a full ~30 GB Diffusers install.
          */
         WanModelLoaderInvocation: {
@@ -39558,7 +40224,7 @@ export type components = {
             model: components["schemas"]["ModelIdentifierField"];
             /**
              * Transformer (Low Noise)
-             * @description Optional second GGUF transformer for the A14B low-noise expert. Only relevant when the main model is a single-file GGUF and the variant is A14B; ignored when the main is a Diffusers A14B (both experts are pulled from transformer/ and transformer_2/ already) or when the variant is TI2V-5B.
+             * @description Optional second single-file transformer for the A14B low-noise expert. Only relevant when the main model is a single-file GGUF or safetensors checkpoint and the variant is A14B; ignored when the main is a Diffusers A14B (both experts are pulled from transformer/ and transformer_2/ already) or when the variant is TI2V-5B.
              * @default null
              */
             transformer_low_noise_model?: components["schemas"]["ModelIdentifierField"] | null;
@@ -42370,7 +43036,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Validation Error */
@@ -42402,7 +43068,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Validation Error */
@@ -42454,7 +43120,7 @@ export interface operations {
                      *       "upcast_attention": false
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -42503,6 +43169,13 @@ export interface operations {
             };
             /** @description Model not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -42561,7 +43234,7 @@ export interface operations {
                      *       "upcast_attention": false
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -42634,7 +43307,7 @@ export interface operations {
                      *       "upcast_attention": false
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -42646,6 +43319,13 @@ export interface operations {
             };
             /** @description The model could not be found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -42812,6 +43492,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Another operation on this model is already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -42850,6 +43537,13 @@ export interface operations {
             };
             /** @description Bad request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -43369,7 +44063,7 @@ export interface operations {
                      *       "upcast_attention": false
                      *     }
                      */
-                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_QwenImage_Config"] | components["schemas"]["Main_Diffusers_Wan_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Diffusers_ErnieImage_Config"] | components["schemas"]["Main_Diffusers_Ideogram4_Config"] | components["schemas"]["Main_Diffusers_Krea2_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_QwenImage_Config"] | components["schemas"]["Main_Checkpoint_Wan_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_Checkpoint_Krea2_Config"] | components["schemas"]["Main_Checkpoint_Anima_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_QwenImage_Config"] | components["schemas"]["Main_GGUF_Wan_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["Main_GGUF_Krea2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_Flux2_Config"] | components["schemas"]["Main_SDNQ_Diffusers_FLUX_Config"] | components["schemas"]["Main_SDNQ_Diffusers_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Checkpoint_Wan_Config"] | components["schemas"]["VAE_Checkpoint_QwenImage_Config"] | components["schemas"]["VAE_Checkpoint_Anima_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["VAE_Diffusers_Wan_Config"] | components["schemas"]["PiDDecoder_Checkpoint_FLUX_Config"] | components["schemas"]["PiDDecoder_Checkpoint_Flux2_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SD3_Config"] | components["schemas"]["PiDDecoder_Checkpoint_SDXL_Config"] | components["schemas"]["PiDDecoder_Checkpoint_QwenImage_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Checkpoint_Anima_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_LyCORIS_Krea2_Config"] | components["schemas"]["LoRA_LyCORIS_QwenImage_Config"] | components["schemas"]["LoRA_LyCORIS_Wan_Config"] | components["schemas"]["LoRA_LyCORIS_Anima_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["T5Encoder_SDNQ_Config"] | components["schemas"]["T5Encoder_GGUF_Config"] | components["schemas"]["Qwen3VLEncoder_Checkpoint_Config"] | components["schemas"]["Qwen3VLEncoder_Qwen3VLEncoder_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["Qwen3Encoder_SDNQ_Folder_Config"] | components["schemas"]["MistralEncoder_Diffusers_Config"] | components["schemas"]["MistralEncoder_Checkpoint_Config"] | components["schemas"]["MistralEncoder_GGUF_Config"] | components["schemas"]["Gemma2Encoder_Gemma2Encoder_Config"] | components["schemas"]["Gemma2Encoder_GGUF_Config"] | components["schemas"]["QwenVLEncoder_Diffusers_Config"] | components["schemas"]["QwenVLEncoder_Checkpoint_Config"] | components["schemas"]["WanT5Encoder_WanT5Encoder_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["TextLLM_Diffusers_Config"] | components["schemas"]["ExternalApiModelConfig"] | components["schemas"]["Unknown_Config"];
                 };
             };
             /** @description Bad request */
@@ -45141,6 +45835,52 @@ export interface operations {
             };
         };
     };
+    list_gallery_item_names: {
+        parameters: {
+            query?: {
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards. */
+                created_date?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred items first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemNames"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_gallery_item_names: {
         parameters: {
             query?: {
@@ -46342,6 +47082,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SessionQueueItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_item_summaries_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_item_summaries_by_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItemSummary"][];
                 };
             };
             /** @description Validation Error */

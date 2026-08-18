@@ -32,10 +32,10 @@ export type GetQueueItemIdsResult =
   paths['/api/v1/queue/{queue_id}/item_ids']['get']['responses']['200']['content']['application/json'];
 export type GetQueueItemIdsArgs = NonNullable<paths['/api/v1/queue/{queue_id}/item_ids']['get']['parameters']['query']>;
 
-export type GetQueueItemDTOsByItemIdsResult =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['responses']['200']['content']['application/json'];
-export type GetQueueItemDTOsByItemIdsArgs =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['requestBody']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsResult =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['responses']['200']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsArgs =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['requestBody']['content']['application/json'];
 
 export type InputFieldJSONSchemaExtra = S['InputFieldJSONSchemaExtra'];
 export type OutputFieldJSONSchemaExtra = S['OutputFieldJSONSchemaExtra'];
@@ -638,13 +638,111 @@ export const isWanDiffusersMainModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'wan' && config.format === 'diffusers';
 };
 
-/** Wan GGUF main models marked as the low-noise expert (the second half
- *  of the A14B MoE pair). Suitable for the Transformer (Low Noise) picker;
- *  also used to filter low-noise GGUFs out of the primary main dropdown. */
-export const isWanGGUFLowNoiseMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+/** The single-file Wan main formats. Both are transformer-only: one file holds one
+ *  A14B expert, and the VAE + UMT5-XXL encoder have to come from somewhere else.
+ *  Anything gating on that property must use this, not a bare `=== 'gguf_quantized'`
+ *  — the two formats are interchangeable here and drifting apart has bitten us. */
+const WAN_SINGLE_FILE_FORMATS = ['gguf_quantized', 'checkpoint'] as const;
+
+export const isWanSingleFileMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  // Takes AnyModelConfig, not a structural `{base?; type?; format?}`. An all-optional
+  // parameter type is a *weak type*, which TypeScript satisfies with any object sharing
+  // one property name — so `ModelIdentifierField` (base + type, no format) would compile
+  // and silently return false, disabling every gate below it. The bare
+  // `format === 'gguf_quantized'` this replaced was at least a compile error there.
   return (
-    config.type === 'main' && config.base === 'wan' && config.format === 'gguf_quantized' && config.expert === 'low'
+    config.type === 'main' &&
+    config.base === 'wan' &&
+    (WAN_SINGLE_FILE_FORMATS as readonly string[]).includes(config.format)
   );
+};
+
+/** TI2V-5B is the single-transformer Wan variant: it has no expert pair, so no expert
+ *  tag on it means anything. Both predicates below have to agree about that, or a file
+ *  can fall through the gap between them. */
+const isWanTi2v5bConfig = (config: AnyModelConfigWithExternal): boolean =>
+  'variant' in config && config.variant === 'ti2v_5b';
+
+/** Wan single-file main models *tagged* as the low-noise expert. This is the narrow,
+ *  tag-based test, and its only job is deciding what to hide from the primary main
+ *  dropdown — see `selectPrimaryMainModelOptions`, its one caller. Deliberately not
+ *  exported: the Transformer (Low Noise) picker needs the wider test below, and reaching
+ *  for this one there is the mistake that left untagged pairs unwireable.
+ *
+ *  TI2V-5B is excluded for the same reason it is excluded from the partner picker. The
+ *  two exclusions have to match: hiding a 5B from the primary list steers it toward a
+ *  partner slot that will not offer it either, which is how a model ends up reachable
+ *  from nowhere. Such a record is not hypothetical — the pre-branch GGUF probe applied
+ *  the tag without consulting the variant, so a 5B named `...-low_noise.gguf` installed
+ *  before this branch still carries `expert='low'` today. */
+const isWanSingleFileLowNoiseMainModelConfig = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  return (
+    isWanSingleFileMainModelConfig(config) &&
+    !isWanTi2v5bConfig(config) &&
+    'expert' in config &&
+    config.expert === 'low'
+  );
+};
+
+/** What the Transformer (Low Noise) picker may offer.
+ *
+ *  Deliberately wider than the tag test above. Since #9505 the *wiring* decides which
+ *  expert a file is used as and the `expert` tag is only advisory, so requiring
+ *  `expert === 'low'` here strands every pair that probes to `none`/`none`: both halves
+ *  show up in the primary picker (which hides only models tagged `low`) and neither
+ *  shows up here, leaving the pair impossible to assemble outside the workflow editor.
+ *  That is the exact case this branch exists to support. It is also not something the
+ *  user can tag their way out of: `expert` is absent from `ModelRecordChanges`, so no
+ *  edit sets it. Re-probing via Reidentify recomputes it, but only from the filename,
+ *  which for an untagged file returns `none` again.
+ *
+ *  Two exclusions. Files tagged `high` belong in the primary slot — the loader would
+ *  only swap them back. TI2V-5B is single-transformer, so it has no partner at all and
+ *  offering one could only produce the variant mismatch the loader rejects. */
+export const isWanLowNoisePartnerOption = (config: AnyModelConfigWithExternal): config is MainModelConfig => {
+  if (!isWanSingleFileMainModelConfig(config)) {
+    return false;
+  }
+  if ('expert' in config && config.expert === 'high') {
+    return false;
+  }
+  return !isWanTi2v5bConfig(config);
+};
+
+/** Narrows a main-model list to what may be offered as the *primary* main. Every list
+ *  the user can pick a primary main from must go through this — there are three
+ *  (MainModelPicker, InitialStateMainModelPicker, and the auto-select in the
+ *  modelsLoaded listener), and filtering in only some of them means the excluded models
+ *  are still reachable.
+ *
+ *  It only hides Wan A14B low-noise experts, and only when the user has a partner to
+ *  pick instead. The steer is worth making — a low-noise expert belongs in the
+ *  Transformer (Low Noise) slot, and running it alone gives visibly worse output — but
+ *  since #9505 the loader accepts an unpaired low expert with a warning rather than
+ *  refusing it. Hiding unconditionally would leave someone whose only Wan file is a low
+ *  expert staring at a list that doesn't contain their model, with nothing to do about
+ *  it. Partner-aware, the list degrades instead of dead-ending.
+ *
+ *  A partner is another single-file Wan main of the same variant that isn't itself
+ *  tagged low — i.e. the high-noise or untagged half of the same pair. */
+export const selectPrimaryMainModelOptions = <T extends AnyModelConfigWithExternal>(configs: T[]): T[] => {
+  // Annotated `: boolean` rather than left as an inferred type predicate. Two predicates
+  // narrowing to the same type would make the negated one resolve `candidate` to `never`
+  // below, and the `variant` read would stop compiling.
+  const isLowExpert = (config: T): boolean => isWanSingleFileLowNoiseMainModelConfig(config);
+  const variantOf = (config: T): string | null =>
+    'variant' in config && typeof config.variant === 'string' ? config.variant : null;
+
+  const hasPartner = (low: T): boolean =>
+    configs.some(
+      (candidate) =>
+        candidate.key !== low.key &&
+        isWanSingleFileMainModelConfig(candidate) &&
+        !isLowExpert(candidate) &&
+        variantOf(candidate) === variantOf(low)
+    );
+
+  return configs.filter((config) => !isLowExpert(config) || !hasPartner(config));
 };
 
 export const isWanLoRAModelConfig = (config: AnyModelConfig): config is WanLoRAModelConfig => {
@@ -822,6 +920,6 @@ export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_Gall
 export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
 export type ListGalleryItemsResponse =
   paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
-export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
-export type GetGalleryItemNamesResult =
-  paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];
+export type ListGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/item_names']['get']['parameters']['query']>;
+export type ListGalleryItemNamesResult =
+  paths['/api/v1/gallery/item_names']['get']['responses']['200']['content']['application/json'];
