@@ -150,6 +150,12 @@ export interface CanvasPsdExportCapability {
 export interface CanvasViewportCapability {
   getViewport(): Viewport;
   fitToView(): void;
+  /**
+   * Fits the document into view only the first time this engine is shown.
+   * Surfaces attach on every re-show of a kept-alive widget; an unconditional
+   * fit there would discard the user's zoom and pan.
+   */
+  fitToViewOnFirstShow(): void;
   setBboxGrid(size: number): void;
 }
 

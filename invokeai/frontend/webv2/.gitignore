@@ -6,3 +6,6 @@ artifacts/
 # vitest browser-mode failure artifacts
 .vitest-attachments
 __screenshots__/
+
+# planning scratch, never committed
+docs/superpowers/

@@ -103,6 +103,37 @@ describe('mergeGalleryItemWindow', () => {
     expect(items.slice(0, 60).map((item) => item.name)).toEqual(recentImages.map((image) => image.imageName).reverse());
   });
 
+  it('preserves backend relevance order and skips the recent overlay while a semantic query is active', () => {
+    const createRankedItem = (name: string, createdAt: string): GalleryItem => ({
+      boardId: 'none',
+      category: 'general',
+      createdAt,
+      fullUrl: `/images/${name}`,
+      height: 64,
+      isIntermediate: false,
+      kind: 'image',
+      name,
+      starred: false,
+      thumbnailUrl: `/thumbnails/${name}`,
+      width: 64,
+    });
+    // Deliberately out of chronological order: relevance is the order.
+    const rankedItems = [
+      createRankedItem('oldest.png', '2026-01-01T00:00:00.000Z'),
+      createRankedItem('newest.png', '2026-07-01T00:00:00.000Z'),
+      createRankedItem('middle.png', '2026-03-01T00:00:00.000Z'),
+    ];
+
+    expect(
+      mergeGalleryItemWindow({
+        backendItems: rankedItems,
+        filter: { ...filter, semanticQuery: { imageName: 'ref.png', kind: 'image' } },
+        maxRows: 60,
+        recentImages: [asGenerated(createImage(1))],
+      }).map((item) => item.name)
+    ).toEqual(['oldest.png', 'newest.png', 'middle.png']);
+  });
+
   it('uses SQLite binary ordering for mixed-case and punctuation name ties in both directions', () => {
     const createTiedItem = (name: string): GalleryItem => ({
       boardId: 'none',

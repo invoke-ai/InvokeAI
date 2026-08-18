@@ -1,10 +1,14 @@
+import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
+
 import { Box, Code, HStack, Icon, Popover, Portal, Stack, Text } from '@chakra-ui/react';
+import { semanticReferenceFromDataTransfer } from '@features/gallery/core/semanticImageQuery';
 import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
 import { CloseButton, IconButton } from '@platform/ui/Button';
-import { CircleHelpIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { CircleHelpIcon, ImageIcon, SparklesIcon } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { GALLERY_SEMANTIC_SEARCH_DROP_ID, useGalleryImageDroppable } from './galleryDnd';
 import { GallerySearchField } from './GallerySearchField';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -19,11 +23,108 @@ const DATE_TOKEN_EXAMPLES = [
   { descriptionKey: 'widgets.gallery.searchHelpRelative', key: 'from:7d' },
 ] as const;
 
+/** The full identity of the reference, surfaced as the chip's hover title. */
+const getSemanticReferenceTitle = (reference: GallerySemanticReference): string => {
+  switch (reference.kind) {
+    case 'text':
+      return reference.query;
+    case 'image':
+      return reference.imageName;
+    case 'url':
+      return reference.url;
+    case 'file':
+      return reference.label;
+  }
+};
+
+/** A short human-readable name for the chip; empty when nothing legible exists. */
+const getSemanticReferenceName = (reference: GallerySemanticReference): string => {
+  switch (reference.kind) {
+    case 'text':
+      return reference.query;
+    case 'image':
+      return reference.imageName;
+    case 'file':
+      return reference.label;
+    case 'url': {
+      try {
+        const parsed = new URL(reference.url);
+
+        return decodeURIComponent(parsed.pathname.split('/').pop() || parsed.hostname);
+      } catch {
+        return '';
+      }
+    }
+  }
+};
+
 export const GalleryItemSearch = () => {
   const { i18n, t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
 
   const handleClearSearch = useCallback(() => actions.setSearchTerm(''), [actions]);
+  const handleClearSemantic = useCallback(() => actions.setSemanticImageQuery(null), [actions]);
+
+  // Date tokens are metadata-search grammar; a semantic query is free text,
+  // so the whole field content is taken verbatim.
+  const semanticQueryText = gallery.searchTerm.trim();
+  const handleSemanticSearch = useCallback(() => {
+    const query = semanticQueryText;
+
+    if (query) {
+      actions.setSemanticImageQuery({ kind: 'text', query });
+    }
+  }, [actions, semanticQueryText]);
+
+  // In-app drags (dnd-kit) resolve through GalleryBoardDragMonitor; this hook
+  // only registers the drop target and reports hover for the highlight.
+  const { isOver: isItemDragOver, setNodeRef: setSemanticDropRef } = useGalleryImageDroppable({
+    id: GALLERY_SEMANTIC_SEARCH_DROP_ID,
+  });
+
+  // Native HTML5 drops reach here for anything dnd-kit does not manage: files
+  // from the OS and images dragged in from other pages (URL drags).
+  const [isNativeDropOver, setIsNativeDropOver] = useState(false);
+
+  const handleNativeDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    const types = event.dataTransfer.types;
+
+    if (types.includes('Files') || types.includes('text/uri-list')) {
+      event.preventDefault();
+      setIsNativeDropOver(true);
+    }
+  }, []);
+
+  const handleNativeDragLeave = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+      setIsNativeDropOver(false);
+    }
+  }, []);
+
+  const handleNativeDrop = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      const types = event.dataTransfer.types;
+
+      // Only claim drops this feature understands; a plain-text drop must
+      // fall through to the browser's default insertion into the input.
+      if (!types.includes('Files') && !types.includes('text/uri-list')) {
+        setIsNativeDropOver(false);
+        return;
+      }
+
+      event.preventDefault();
+      setIsNativeDropOver(false);
+
+      const reference = semanticReferenceFromDataTransfer(event.dataTransfer);
+
+      if (reference) {
+        actions.setSemanticImageQuery(reference);
+      }
+    },
+    [actions]
+  );
+
+  const isDropTargetActive = isItemDragOver || isNativeDropOver;
 
   // Valid tokens are legible as chips in the field itself, so only the failure
   // case still needs words — and it is positioned out of flow. As a sibling it
@@ -65,26 +166,53 @@ export const GalleryItemSearch = () => {
   const endElement = useMemo(
     () => (
       <HStack flexShrink={0} gap="0">
+        {semanticQueryText ? (
+          <IconButton
+            aria-label={t('widgets.gallery.searchSemantically')}
+            color="fg.muted"
+            size="2xs"
+            title={t('widgets.gallery.searchSemantically')}
+            variant="ghost"
+            onClick={handleSemanticSearch}
+          >
+            <Icon as={SparklesIcon} boxSize="3.5" />
+          </IconButton>
+        ) : null}
         {gallery.searchTerm ? (
           <CloseButton aria-label={t('common.clearSearch')} size="2xs" onClick={handleClearSearch} />
         ) : null}
         <GallerySearchHelp />
       </HStack>
     ),
-    [gallery.searchTerm, handleClearSearch, t]
+    [gallery.searchTerm, handleClearSearch, handleSemanticSearch, semanticQueryText, t]
   );
 
   return (
-    <Box minW="0" position="relative" w="full">
-      <GallerySearchField
-        ariaLabel={t('widgets.gallery.searchImagesAriaLabel')}
-        describedById={invalidHint ? SEARCH_DATE_HINT_ID : undefined}
-        endElement={endElement}
-        isInvalid={invalidHint !== null}
-        placeholder={t('widgets.gallery.searchImagesPlaceholder')}
-        value={gallery.searchTerm}
-        onChange={actions.setSearchTerm}
-      />
+    <Box
+      ref={setSemanticDropRef}
+      minW="0"
+      outline={isDropTargetActive ? '2px solid' : undefined}
+      outlineColor={isDropTargetActive ? 'accent.solid' : undefined}
+      position="relative"
+      rounded="md"
+      w="full"
+      onDragLeave={handleNativeDragLeave}
+      onDragOver={handleNativeDragOver}
+      onDrop={handleNativeDrop}
+    >
+      {gallery.semanticImageQuery ? (
+        <GallerySemanticChip reference={gallery.semanticImageQuery} onClear={handleClearSemantic} />
+      ) : (
+        <GallerySearchField
+          ariaLabel={t('widgets.gallery.searchImagesAriaLabel')}
+          describedById={invalidHint ? SEARCH_DATE_HINT_ID : undefined}
+          endElement={endElement}
+          isInvalid={invalidHint !== null}
+          placeholder={t('widgets.gallery.searchImagesPlaceholder')}
+          value={gallery.searchTerm}
+          onChange={actions.setSearchTerm}
+        />
+      )}
       {invalidHint ? (
         <Text
           color="fg.error"
@@ -107,6 +235,42 @@ export const GalleryItemSearch = () => {
         </Text>
       ) : null}
     </Box>
+  );
+};
+
+/**
+ * The active semantic query — a text prompt or an image-similarity
+ * reference — rendered in place of the search input. Clearing it restores
+ * metadata search.
+ */
+const GallerySemanticChip = ({ onClear, reference }: { onClear: () => void; reference: GallerySemanticReference }) => {
+  const { t } = useTranslation();
+  const isText = reference.kind === 'text';
+  const name = getSemanticReferenceName(reference) || t('widgets.gallery.semanticWebImage');
+
+  return (
+    <HStack
+      bg="bg"
+      borderColor="border.emphasized"
+      borderWidth="1px"
+      gap="1.5"
+      h="8"
+      minW="0"
+      px="2"
+      rounded="md"
+      title={getSemanticReferenceTitle(reference)}
+      w="full"
+    >
+      <Icon as={isText ? SparklesIcon : ImageIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+      <Text color="fg.muted" flex="1" fontSize="xs" minW="0" truncate>
+        {isText ? t('widgets.gallery.semanticTextSearch', { name }) : t('widgets.gallery.semanticSimilarTo', { name })}
+      </Text>
+      <CloseButton
+        aria-label={isText ? t('widgets.gallery.clearSemanticSearch') : t('widgets.gallery.clearImageSearch')}
+        size="2xs"
+        onClick={onClear}
+      />
+    </HStack>
   );
 };
 

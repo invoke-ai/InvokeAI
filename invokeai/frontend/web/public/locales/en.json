@@ -1458,7 +1458,7 @@
         "wanVae": "VAE",
         "wanVaePlaceholder": "From VAE/Encoder Source",
         "wanComponentSource": "VAE/Encoder Source (Diffusers)",
-        "wanComponentSourcePlaceholder": "GGUF Wan models require a Diffusers Wan source for VAE + UMT5-XXL",
+        "wanComponentSourcePlaceholder": "Single-file Wan models require a Diffusers Wan source for VAE + UMT5-XXL",
         "minimaxH3TransformerModel": "Transformer (single file)",
         "minimaxH3TransformerModelPlaceholder": "Folder transformer (default)",
         "wanTransformerLowNoise": "Transformer (Low Noise)",
@@ -1796,7 +1796,11 @@
             "noFlux2DevVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 [dev] models require a standalone FLUX.2 VAE",
             "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
-            "noWanComponentSourceSelected": "GGUF Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "noWanComponentSourceSelected": "Single-file Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "incompatibleWanVae": "The selected VAE does not match the Wan transformer. TI2V-5B needs the 48-channel Wan 2.2 VAE; A14B needs the 16-channel Wan 2.1 VAE.",
+            "incompatibleWanComponentSource": "The selected Component Source does not match the Wan transformer. Pick a Diffusers Wan model of the same family (TI2V-5B or A14B).",
+            "incompatibleWanLowNoiseExpert": "The Transformer (Low Noise) model is a different Wan variant from the main transformer. Both experts must be the same variant.",
+            "duplicateWanTransformer": "The same model is selected as both Transformer and Transformer (Low Noise). An A14B expert pair needs two different models.",
             "minimaxH3VideoOnGenerateTab": "MiniMax H3 video generation runs on the Generate tab (switch Output to Image to use MiniMax H3 on canvas)",
             "noMiniMaxH3TransformerModelSelected": "Components-only MiniMax H3 install: select a single-file Transformer in Advanced settings",
             "noMiniMaxH3TextEncoderModelSelected": "Components-only MiniMax H3 install: select a single-file Text Encoder in Advanced settings",
@@ -1973,8 +1977,8 @@
         "general": "General",
         "generation": "Generation",
         "generationDevices": "Generation Devices",
-        "generationDevicesAuto": "Auto (all GPUs)",
-        "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU.",
+        "generationDevicesAuto": "Auto",
+        "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU — unless the legacy 'device' setting in invokeai.yaml pins a specific device, in which case only that device is used. An explicit selection here overrides 'device'.",
         "generationDevicesRestart": "Restart InvokeAI for changes to take effect.",
         "generationDevicesSaveFailed": "Failed to save Generation Devices",
         "imageSubfolderStrategy": "Image Subfolder Strategy",
@@ -2060,6 +2064,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "imageStorageMaintenanceActive": "Image storage maintenance is active. Recover it before retrying the upload.",
         "videoUploaded": "Video Uploaded",
         "videoUploadFailed": "Video Upload Failed",
         "videoPlaybackFailed": "Unable to Play Video",
@@ -2705,7 +2710,7 @@
             "heading": "FP8 Storage",
             "paragraphs": [
                 "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
-                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs, and on Intel GPUs that support FP8 storage."
             ]
         }
     },

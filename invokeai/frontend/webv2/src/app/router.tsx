@@ -160,6 +160,12 @@ const usersHomeRoute = createRoute({
 
 const workbenchRoute = createRoute({
   beforeLoad: async ({ cause, search }) => {
+    // Warm the editor bundle while the guard's session peek is in flight. The
+    // module loader dedupes against `lazyRouteComponent`'s own import, so on a
+    // cold deep link the chunk downloads in parallel with the peek instead of
+    // after it.
+    void import('./WorkbenchApp');
+
     // Photoshop semantics: the editor without documents is Home. A definite
     // empty session redirects unless the URL explicitly asks for a project or
     // a fresh draft; an unknowable session (first run, legacy blob, backend

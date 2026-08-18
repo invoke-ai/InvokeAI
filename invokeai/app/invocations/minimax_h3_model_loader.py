@@ -84,6 +84,26 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
         if not context.models.exists(self.model.key):
             raise ValueError(f"Unknown model: {self.model.key}")
 
+        # Fail fast, and with a usable message, when a single-file main (e.g. the pruned int8
+        # transformer repack) lands in the Model field — a checkpoint main carries none of the
+        # folder submodels this node fans out, so letting it through would surface minutes
+        # later as an opaque loader stack trace. The picker filters on ui_model_format, but
+        # hand-authored workflows and clients that ignore the hint can still send one.
+        main_config = context.models.get_config(self.model.key)
+        if main_config.base is not BaseModelType.MiniMaxH3 or main_config.type is not ModelType.Main:
+            raise ValueError(
+                f"Model '{self.model.key}' is not a MiniMax H3 main model (resolved to "
+                f"type={getattr(main_config.type, 'value', main_config.type)}, "
+                f"base={getattr(main_config.base, 'value', main_config.base)})."
+            )
+        if main_config.format is not ModelFormat.Diffusers:
+            raise ValueError(
+                f"'{main_config.name}' is a single-file checkpoint and cannot be the Model input — that "
+                "field needs the diffusers-folder install (e.g. 'MiniMax H3 Components'), which supplies "
+                "the tokenizer, processor and VAEs. Single-file transformer/text-encoder repacks go in "
+                "this node's 'Transformer (single file)' / 'Text Encoder (single file)' fields instead."
+            )
+
         if self.transformer_model is not None:
             if not context.models.exists(self.transformer_model.key):
                 raise ValueError(f"Unknown transformer model: {self.transformer_model.key}")

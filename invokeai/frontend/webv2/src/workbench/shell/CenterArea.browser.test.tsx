@@ -53,6 +53,7 @@ vi.mock('@workbench/widgetRegionViewModel', () => ({
 }));
 vi.mock('@workbench/widgetRegistry', () => ({ getWidgetById: () => undefined, getWidgetsForRegion: () => [] }));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => centerAreaMocks.project.id,
   useActiveProjectSelector: (selector: (project: typeof centerAreaMocks.project) => unknown) =>
     selector(centerAreaMocks.project),
   useWorkbenchCommands: () => ({ widgets: {} }),

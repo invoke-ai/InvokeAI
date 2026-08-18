@@ -105,6 +105,12 @@ The following commands vary depending on the version of Invoke being installed a
               --torch-backend=cu128
               ```
             </TabItem>
+            <TabItem label="Intel Arc GPU">
+              Use:
+              ```sh
+              --torch-backend=xpu
+              ```
+            </TabItem>
             <TabItem label="Other / no GPU">
               Do not use a torch backend.
             </TabItem>
@@ -141,6 +147,12 @@ The following commands vary depending on the version of Invoke being installed a
                 ```
                 This workaround applies to the reported ROCm case only.
               :::
+            </TabItem>
+            <TabItem label="Linux + Intel Arc GPU">
+              Use:
+              ```sh
+              --torch-backend=xpu
+              ```
             </TabItem>
             <TabItem label="All other cases">
               Do not use a torch backend.

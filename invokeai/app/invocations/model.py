@@ -13,7 +13,48 @@ from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+
+# An SDNQ-quantized pipeline install (Z-Image / FLUX.2 Klein) is only self-contained when it ships
+# every component its loader reads from a fixed subfolder: the transformer, the VAE and the Qwen3
+# encoder (text_encoder + tokenizer). A truthy `submodels` dict is not sufficient — Main_SDNQ_Diffusers_*
+# configs record whichever submodels they recognize from model_index.json, so a partial (or
+# partially recognized) pipeline can expose only the transformer, and a malformed index can advertise
+# the components while omitting the transformer every loader requests. Treating either as
+# self-contained moves the failure from readiness/model-loader validation to runtime submodel loading.
+_REQUIRED_PIPELINE_SUBMODELS = frozenset(
+    {SubModelType.Transformer, SubModelType.VAE, SubModelType.TextEncoder, SubModelType.Tokenizer}
+)
+
+
+def is_self_contained_sdnq_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ pipeline that ships its own transformer, VAE and Qwen3
+    (text_encoder + tokenizer) submodels, so a single install can supply every component. Returns
+    False for single-file / GGUF models and for partial pipelines missing any required submodel."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_PIPELINE_SUBMODELS.issubset(submodels.keys())
+
+
+# FLUX.1 needs two text encoders, so its pipelines must additionally ship the T5 pair on top of the
+# CLIP one above. A FLUX.2 / Z-Image pipeline is complete without them.
+_REQUIRED_FLUX1_PIPELINE_SUBMODELS = _REQUIRED_PIPELINE_SUBMODELS | {
+    SubModelType.TextEncoder2,
+    SubModelType.Tokenizer2,
+}
+
+
+def is_self_contained_sdnq_flux1_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ FLUX.1 pipeline that ships every component the graph needs:
+    transformer, VAE, CLIP (text_encoder + tokenizer) and T5 (text_encoder_2 + tokenizer_2).
+
+    Stricter than `is_self_contained_sdnq_pipeline`, which describes the single-encoder pipelines.
+    A FLUX.1 folder missing the T5 pair still needs an external T5 selected."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_FLUX1_PIPELINE_SUBMODELS.issubset(submodels.keys())
 
 
 class ModelIdentifierField(BaseModel):
@@ -146,6 +187,7 @@ class MiniMaxH3TransformerField(BaseModel):
     """Transformer field for MiniMax H3 models (FL2VA)."""
 
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
 class VAEField(BaseModel):

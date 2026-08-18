@@ -21,7 +21,7 @@ export const WIDGET_SOURCES = new Map([
   ['src/workbench/widgets/version-status/implementation.ts', 'version-status'],
   ['src/features/gallery/widget.ts', 'gallery'],
   ['src/features/generation/widget.ts', 'generate'],
-  ['src/features/queue/widget.ts', 'queue'],
+  ['src/features/queue/ui/index.ts', 'queue'],
   ['src/features/upscale/widget.ts', 'upscale'],
   ['src/features/workflow/ui/implementation.ts', 'workflow'],
 ]);

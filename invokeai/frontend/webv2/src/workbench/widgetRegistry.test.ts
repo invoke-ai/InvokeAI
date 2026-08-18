@@ -3,7 +3,13 @@ import type { WidgetManifest } from '@workbench/widgetContracts';
 import { ImageUpscaleIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { getWidgetHosts, registerFirstPartyWidgets, registerWidgets } from './widgetRegistry';
+import {
+  getWidgetById,
+  getWidgetHosts,
+  registeredWidgets,
+  registerFirstPartyWidgets,
+  registerWidgets,
+} from './widgetRegistry';
 import { upscaleWidgetManifest } from './widgets/upscale/manifest';
 
 const TestIcon = () => null;
@@ -101,5 +107,36 @@ describe('widget registry', () => {
     expect(badId.failure?.message).toContain('stable non-empty string id');
     expect(badApiVersion.status).toBe('disabled');
     expect(badApiVersion.failure?.message).toContain('unsupported apiVersion');
+  });
+});
+
+describe('widget hosts', () => {
+  it('offers a host resource only for manifests that declare loadHost', () => {
+    const hosts = getWidgetHosts();
+
+    expect(hosts.length).toBeGreaterThan(0);
+
+    for (const widget of hosts) {
+      expect(widget.manifest.loadHost).toBeTypeOf('function');
+      expect(widget.host).toBeDefined();
+    }
+
+    for (const widget of registeredWidgets) {
+      if (!widget.manifest.loadHost) {
+        expect(widget.host).toBeUndefined();
+      }
+    }
+  });
+
+  it('loads a host without touching the widget implementation resource', async () => {
+    const workflow = getWidgetById('workflow');
+
+    expect(workflow?.host).toBeDefined();
+
+    const statusBeforeHostLoad = workflow?.implementation.getStatus();
+    await workflow?.host?.load();
+
+    // The whole point: mounting the singleton host must not drag the view chunk in.
+    expect(workflow?.implementation.getStatus()).toBe(statusBeforeHostLoad);
   });
 });

@@ -76,26 +76,26 @@ afterEach(async () => {
 });
 
 describe('GenerationDevicesSettings', () => {
-  it('explains that parallel generation needs more than one GPU on a single-GPU box', async () => {
+  it('explains that parallel generation needs more than one accelerator on a single-device box', async () => {
     await render({ options: [{ device: 'cuda:0', name: 'RTX 5090' }] });
 
     // This machine's real configuration: one GPU, `auto`. No switches should appear,
     // because there is nothing to choose between.
     expect(host?.textContent).toContain('RTX 5090');
-    expect(host?.textContent).toContain('needs more than one GPU');
+    expect(host?.textContent).toContain('needs more than one accelerator');
     expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
   });
 
-  it('says so when no CUDA GPU is present', async () => {
+  it('says so when no accelerator is present', async () => {
     await render({ options: [] });
 
-    expect(host?.textContent).toContain('No CUDA GPUs were detected');
+    expect(host?.textContent).toContain('No accelerators were detected');
   });
 
   it('offers the auto switch with two GPUs and hides per-device switches while auto is on', async () => {
     await render({ options: TWO_GPUS, setting: 'auto' });
 
-    expect(host?.textContent).toContain('Use every available GPU');
+    expect(host?.textContent).toContain('Use every available accelerator');
     // Auto only shows its own switch; the per-device list stays collapsed.
     expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
   });
@@ -137,7 +137,7 @@ describe('GenerationDevicesSettings', () => {
     await userEvent.click(switchControls()[2]!);
 
     expect(mocks.updateGenerationDevices).not.toHaveBeenCalled();
-    expect(host?.textContent).toContain('Select at least one GPU.');
+    expect(host?.textContent).toContain('Select at least one generation device.');
   });
 
   it('shows a read-only summary to a non-admin', async () => {
@@ -145,7 +145,7 @@ describe('GenerationDevicesSettings', () => {
     await render({ options: TWO_GPUS, setting: ['cuda:1'] });
 
     expect(host?.textContent).toContain('RTX 4090');
-    expect(host?.textContent).toContain('Only an administrator can change which GPUs are used.');
+    expect(host?.textContent).toContain('Only an administrator can change which accelerators are used.');
     expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
   });
 

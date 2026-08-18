@@ -79,11 +79,13 @@ class Int8ConvrotLinear(torch.nn.Module):
     consumes the quantized tensors directly and the model cache moves them between devices
     like any other weight. The Hadamard matrix is computed, not loaded (non-persistent).
 
-    Known limitations: this module is not covered by the model cache's autocast wrappers, so
-    under partial load its buffers fall into the mandatory always-on-device set — residency is
-    effectively all-or-nothing, and the pruned int8 transformer needs ~20 GiB of free VRAM.
-    There is deliberately no streaming path here; graceful degradation on smaller cards is the
-    diffusers-folder bf16 model's job (which partial-loads layer by layer).
+    The model cache wraps this module as ``CustomInt8ConvrotLinear`` (see
+    ``AUTOCAST_MODULE_TYPE_MAPPING``), which enables sidecar LoRA patches and lets a partial
+    load leave some int8 buffers on the CPU — ``forward``'s per-call ``.to(device)`` then
+    streams them (at half the bf16 byte count) instead of failing outright. Fully-resident
+    operation (~20 GiB free VRAM for the pruned transformer) remains the intended regime;
+    streamed layers pay a per-forward PCIe cost, and the diffusers-folder bf16 model is still
+    the better citizen on small cards.
     """
 
     def __init__(
@@ -114,9 +116,9 @@ class Int8ConvrotLinear(torch.nn.Module):
             self.bias = None
 
     def _dequantized_weight(self, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
-        # `.to(device)` is a no-op in the intended regime: these buffers sit in the model
-        # cache's mandatory always-on-device set (see the class docstring), so they are either
-        # fully resident or the load already failed - nothing streams here.
+        # `.to(device)` is a no-op in the intended fully-resident regime; under partial load
+        # the model cache may leave these buffers on the CPU, in which case this call streams
+        # the int8 weight to the compute device per forward (see the class docstring).
         #
         # Dequant + derotation run directly in the compute dtype: int8 values are exact in
         # bf16/fp16, the scale multiply adds ~0.2% relative rounding vs the ~0.4-0.8% int8

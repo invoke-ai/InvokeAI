@@ -156,7 +156,7 @@
       "type": "invocation",
       "data": {
         "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
-        "version": "1.1.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",
@@ -192,8 +192,8 @@
           "num_frames": {
             "name": "num_frames",
             "label": "Frames",
-            "description": "Frame count must be 5 more than a multiple of 17 (124, 141, ..., 345). 124 frames = ~5.2 s at the fixed 24 fps; the maximum is 345 (14.4 s).",
-            "value": 124
+            "description": "",
+            "value": "124"
           },
           "steps": {
             "name": "steps",
@@ -428,12 +428,7 @@
             "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
             "fieldName": "num_frames"
           },
-          "showDescription": true,
-          "settings": {
-            "type": "integer-field-config",
-            "showShuffle": false,
-            "component": "number-input"
-          }
+          "showDescription": true
         }
       },
       "node-field-h3-steps": {

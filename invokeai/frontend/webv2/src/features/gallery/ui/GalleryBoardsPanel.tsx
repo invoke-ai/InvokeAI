@@ -4,6 +4,7 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { HStack, Icon, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { usePreservedScrollOffset } from '@platform/react/usePreservedScrollOffset';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { PlusIcon } from 'lucide-react';
@@ -33,6 +34,11 @@ export const GalleryBoardsPanel = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const boardsViewportRef = useRef<HTMLDivElement>(null);
+
+  // The shell keeps the gallery mounted across layout switches, and a scroll
+  // container that stops being rendered loses its offset outright.
+  usePreservedScrollOffset(boardsViewportRef);
 
   const { collapsedBoardSections, showArchivedBoards, showDateBoards } = gallery.settings;
 
@@ -138,7 +144,7 @@ export const GalleryBoardsPanel = () => {
         onSubmitSearch={handleSubmitSearch}
       />
       <ScrollArea.Root flex="1" minH="0" size="xs" variant="hover" w="full">
-        <ScrollArea.Viewport h="full" w="full">
+        <ScrollArea.Viewport ref={boardsViewportRef} h="full" w="full">
           <ScrollArea.Content {...SCROLL_CONTENT_PROPS}>
             <GalleryBoardSection
               action={addBoardAction}

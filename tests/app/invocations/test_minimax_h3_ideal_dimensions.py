@@ -13,8 +13,8 @@ from invokeai.backend.minimax_h3.packing import (
 )
 
 
-def _resolve(w: int, h: int) -> tuple[int, int]:
-    out = MiniMaxH3IdealDimensionsInvocation(width=w, height=h).invoke(None)  # type: ignore[arg-type]
+def _resolve(w: int, h: int, **kwargs) -> tuple[int, int]:
+    out = MiniMaxH3IdealDimensionsInvocation(width=w, height=h, **kwargs).invoke(None)  # type: ignore[arg-type]
     return out.width, out.height
 
 
@@ -36,6 +36,32 @@ class TestCommonResolutions:
 
     def test_only_aspect_ratio_matters(self) -> None:
         assert _resolve(192, 108) == _resolve(1920, 1080) == _resolve(3840, 2160)
+
+
+class TestTargetResolutionPresets:
+    def test_default_is_native_highres(self) -> None:
+        # The pre-1.1.0 behavior: adding the dropdown must not change stored workflows.
+        assert _resolve(1024, 1536) == _resolve(1024, 1536, target_resolution="768 highres") == (768, 1152)
+
+    @pytest.mark.parametrize(
+        "w, h, expected",
+        [
+            (1024, 1536, (512, 768)),  # 2:3 — the "small test render" case
+            (1920, 1080, (768, 448)),  # 16:9 — true 432 short edge rounds up to the 32-grid
+            (1080, 1920, (448, 768)),  # 9:16
+            (1024, 1024, (768, 768)),  # square: both presets agree
+        ],
+    )
+    def test_lowres_pins_long_edge(self, w: int, h: int, expected: tuple[int, int]) -> None:
+        assert _resolve(w, h, target_resolution="768 lowres") == expected
+
+    @pytest.mark.parametrize("w, h", [(1920, 1080), (500, 500), (1000, 300), (300, 1000), (4032, 3024)])
+    def test_lowres_never_larger_than_highres(self, w: int, h: int) -> None:
+        lw, lh = _resolve(w, h, target_resolution="768 lowres")
+        hw, hh = _resolve(w, h, target_resolution="768 highres")
+        assert lw * lh <= hw * hh
+        assert lw % MINIMAX_H3_CANVAS_MULTIPLE == 0
+        assert lh % MINIMAX_H3_CANVAS_MULTIPLE == 0
 
 
 class TestPostconditions:

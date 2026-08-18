@@ -63,7 +63,7 @@ export const addMetadata = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   generationMode: string | null,
-  projectSettings: GenerationProjectSettings,
+  projectSettings: GenerationProjectSettings & { randDevice?: string },
   extras: Record<string, unknown> = {}
 ) => {
   const activeLoras = getActiveCompatibleLoras(settings, model);
@@ -75,7 +75,7 @@ export const addMetadata = (
     height: settings.height,
     id: createId('core_metadata'),
     model,
-    rand_device: projectSettings.useCpuNoise ? 'cpu' : 'cuda',
+    rand_device: projectSettings.randDevice ?? (projectSettings.useCpuNoise ? 'cpu' : 'cuda'),
     scheduler,
     seamless_x: settings.seamlessXAxis,
     seamless_y: settings.seamlessYAxis,

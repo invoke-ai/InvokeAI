@@ -587,7 +587,7 @@ const QueueSection = () => {
         />
       </SettingsSection>
       <SettingsSection
-        description="GPUs used for generation. With more than one selected, InvokeAI runs a session on each at the same time. This is a server-wide setting."
+        description="Accelerators used for generation. With more than one selected, InvokeAI runs a session on each at the same time. This is a server-wide setting."
         title="Generation Devices"
       >
         <GenerationDevicesSettings />
