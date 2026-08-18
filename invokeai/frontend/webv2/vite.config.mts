@@ -92,19 +92,6 @@ const ROUTE_SHARED_MODULES = [
 // both routes above, scoped here to the editor alone because none of this
 // is reachable from the Launchpad.
 const EDITOR_BOOT_SHARED_MODULES = [
-  '/features/queue/core/graphInputMedia.ts',
-  '/features/queue/core/progressImage.ts',
-  '/features/queue/data/activeProgressTargetStore.ts',
-  '/features/queue/data/generationDevicesStore.ts',
-  '/features/queue/data/itemProgressStore.ts',
-  '/features/queue/data/progressImageStore.ts',
-  '/features/queue/data/progressStore.ts',
-  '/features/queue/data/realtimeRuntime.ts',
-  '/features/queue/publicApi.ts',
-  '/features/queue/runtime.ts',
-  '/features/queue/runtime/coordinator.ts',
-  '/features/queue/ui/queueConfirmationStore.ts',
-  '/features/workflow/core/validation.ts',
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
