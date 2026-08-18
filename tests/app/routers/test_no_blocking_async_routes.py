@@ -36,7 +36,21 @@ def _is_route_handler(node: ast.AsyncFunctionDef | ast.FunctionDef) -> bool:
 
 
 def _awaits_something(node: ast.AsyncFunctionDef) -> bool:
-    return any(isinstance(child, (ast.Await, ast.AsyncWith, ast.AsyncFor)) for child in ast.walk(node))
+    """Whether the handler's *own* body awaits.
+
+    A nested closure's `await` says nothing about the handler: the closure is a separate
+    coroutine, and the handler that merely defines it still runs its own body to completion on
+    the event loop. Counting those awaits would let a handler pass by defining an inner async
+    helper it never awaits.
+    """
+    for child in ast.iter_child_nodes(node):
+        if isinstance(child, (ast.Await, ast.AsyncWith, ast.AsyncFor)):
+            return True
+        if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            continue  # a separate scope - its awaits are not this handler's
+        if _awaits_something(child):  # type: ignore[arg-type]
+            return True
+    return False
 
 
 def test_no_route_handler_is_async_without_awaiting() -> None:
@@ -45,7 +59,10 @@ def test_no_route_handler_is_async_without_awaiting() -> None:
 
     for path in sorted(ROUTERS_DIR.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        for node in tree.body:
+        # Walk the whole module, not just its top level: a handler registered from inside a
+        # factory function or an `if` block is still a handler, and "every handler including
+        # ones written later" has to mean every handler.
+        for node in ast.walk(tree):
             if not isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) or not _is_route_handler(node):
                 continue
             handlers += 1
@@ -66,3 +83,29 @@ def test_no_route_handler_is_async_without_awaiting() -> None:
         "needs to be async, it must await something; blocking calls inside it belong in "
         "`run_in_threadpool`. See docs/contributing/blocking-work-in-api-routes."
     )
+
+
+def _parse_handler(source: str) -> ast.AsyncFunctionDef:
+    node = ast.parse(source).body[0]
+    assert isinstance(node, ast.AsyncFunctionDef)
+    return node
+
+
+def test_awaits_something_ignores_awaits_in_nested_closures() -> None:
+    """A handler that only *defines* an async helper still runs its own body on the loop."""
+    handler = _parse_handler(
+        "async def handler():\n    async def helper():\n        await something()\n    return blocking_service_call()\n"
+    )
+
+    assert not _awaits_something(handler)
+
+
+def test_awaits_something_sees_awaits_below_the_top_level_of_the_body() -> None:
+    for body in (
+        "    await service.do()",
+        "    if cond:\n        await service.do()",
+        "    async with lock:\n        pass",
+        "    async for item in stream:\n        pass",
+        "    try:\n        await service.do()\n    finally:\n        pass",
+    ):
+        assert _awaits_something(_parse_handler(f"async def handler():\n{body}\n")), body

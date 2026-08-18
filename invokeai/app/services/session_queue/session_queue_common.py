@@ -265,7 +265,7 @@ class SessionQueueItem(BaseModel):
     )
     device: Optional[str] = Field(
         default=None,
-        description="The device that processed this queue item, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+        description="The device that processed this queue item, e.g. 'cuda:1' (set only when running on a GPU)",
     )
     workflow_call_id: Optional[str] = Field(
         default=None, description="The active workflow-call relationship id when this queue item is a child execution."
@@ -332,6 +332,9 @@ class SessionQueueItemSummary(BaseModel):
     user_display_name: Optional[str] = Field(description="The display name of the user who created this queue item")
     user_email: Optional[str] = Field(description="The email of the user who created this queue item")
     field_values: Optional[list[NodeFieldValue]] = Field(description="The batch field values used for this queue item")
+    # Carried because the list rows decide from it whether to offer a retry: a child item of a
+    # workflow call cannot be retried on its own.
+    parent_item_id: Optional[int] = Field(description="The ID of the parent queue item, if this is a child item")
 
     @classmethod
     def queue_item_summary_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemSummary":

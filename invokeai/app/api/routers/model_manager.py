@@ -5,11 +5,13 @@ import asyncio
 import contextlib
 import io
 import pathlib
+import threading
 import traceback
+from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
 from tempfile import TemporaryDirectory
-from typing import List, Optional, Type
+from typing import Any, List, Optional, Type
 
 import huggingface_hub
 from fastapi import Body, Path, Query, Response, UploadFile
@@ -30,7 +32,7 @@ from invokeai.app.services.model_records import (
     ModelRecordOrderBy,
     UnknownModelException,
 )
-from invokeai.app.services.orphaned_models import OrphanedModelInfo
+from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
@@ -57,6 +59,76 @@ from invokeai.backend.model_manager.starter_models import (
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
+
+# Conversion loads a model, writes a diffusers copy, then swaps the record. As an `async def`
+# body with no `await` it could not overlap with another request; running in the threadpool it
+# can, and two conversions in flight means two models resident at once with nothing bounding the
+# RAM/VRAM that takes. Held non-blocking: an admin gets a 409 telling them to wait rather than
+# an HTTP request that hangs for the minutes a conversion takes.
+_MODEL_CONVERSION_LOCK = threading.Lock()
+
+# Bounding conversions against each other is not enough: deletion runs in the threadpool too, and
+# conversion is a read-modify-replace spanning many service calls. Interleaved on one key, a
+# delete removes the source a conversion is still reading, the conversion's own final
+# `installer.delete` then fails, and the converted copy it already installed survives - so the
+# admin is told 204 and the model reappears under a new key. Claiming the key makes operations on
+# one model serialize while leaving different models free to run in parallel.
+_MODEL_KEY_CLAIM_LOCK = threading.Lock()
+_CLAIMED_MODEL_KEYS: set[str] = set()
+
+
+@contextlib.contextmanager
+def _claim_model_key(key: str) -> Generator[None, None, None]:
+    """Hold the exclusive claim on one model key, or raise 409 if another request holds it."""
+    # The lock also guards the short install-and-register transition used by conversion. Do not
+    # block a worker thread behind that transition: reject the request and let the caller retry.
+    if not _MODEL_KEY_CLAIM_LOCK.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409,
+            detail="Another model operation is already in progress. Wait for it to finish and try again.",
+        )
+    try:
+        if key in _CLAIMED_MODEL_KEYS:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another operation on model {key} is already in progress. Wait for it to finish and try again.",
+            )
+        _CLAIMED_MODEL_KEYS.add(key)
+    finally:
+        _MODEL_KEY_CLAIM_LOCK.release()
+    try:
+        yield
+    finally:
+        with _MODEL_KEY_CLAIM_LOCK:
+            _CLAIMED_MODEL_KEYS.discard(key)
+
+
+@contextlib.contextmanager
+def _install_and_claim_model(
+    installer: Any, model_path: pathlib.Path, config: ModelRecordChanges
+) -> Generator[str, None, None]:
+    """Install a model and claim its key before another request can observe it."""
+    # install_path computes and registers the key internally. Serialize that registration with
+    # request claims so a delete cannot observe the new record before its key is claimed.
+    with _MODEL_KEY_CLAIM_LOCK:
+        new_key = installer.install_path(model_path, config=config)
+        if new_key in _CLAIMED_MODEL_KEYS:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Another operation on model {new_key} is already in progress. Wait for it to finish and try again.",
+            )
+        _CLAIMED_MODEL_KEYS.add(new_key)
+    try:
+        yield new_key
+    finally:
+        with _MODEL_KEY_CLAIM_LOCK:
+            _CLAIMED_MODEL_KEYS.discard(new_key)
+
+
+# The HF token is process-global state backed by a file in the HF cache. Concurrent writers would
+# interleave set/reset with the status read that follows it, so the reported status need not
+# describe the token that was just written.
+_HF_TOKEN_LOCK = threading.Lock()
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
@@ -298,6 +370,7 @@ def get_model_record(
         },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
 )
 def reidentify_model(
@@ -306,32 +379,39 @@ def reidentify_model(
 ) -> AnyModelConfig:
     """Attempt to reidentify a model by re-probing its weights file."""
     try:
-        config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
-        models_path = ApiDependencies.invoker.services.configuration.models_path
-        if pathlib.Path(config.path).is_relative_to(models_path):
-            model_path = pathlib.Path(config.path)
-        else:
-            model_path = models_path / config.path
-        mod = ModelOnDisk(model_path)
-        result = ModelConfigFactory.from_model_on_disk(mod)
-        if result.config is None:
-            raise InvalidModelException("Unable to identify model format")
-
-        # Retain user-editable fields from the original config
-        result.config.path = config.path
-        result.config.key = config.key
-        result.config.name = config.name
-        result.config.description = config.description
-        result.config.cover_image = config.cover_image
-        if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
-            result.config.trigger_phrases = config.trigger_phrases
-        result.config.source = config.source
-        result.config.source_type = config.source_type
-
-        new_config = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
-        return new_config
+        with _claim_model_key(key):
+            return _reidentify_model(key)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except InvalidModelException as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+def _reidentify_model(key: str) -> AnyModelConfig:
+    """Re-probe one model and rewrite its record. Callers must hold the key claim."""
+    config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+    if pathlib.Path(config.path).is_relative_to(models_path):
+        model_path = pathlib.Path(config.path)
+    else:
+        model_path = models_path / config.path
+    mod = ModelOnDisk(model_path)
+    result = ModelConfigFactory.from_model_on_disk(mod)
+    if result.config is None:
+        raise InvalidModelException("Unable to identify model format")
+
+    # Retain user-editable fields from the original config
+    result.config.path = config.path
+    result.config.key = config.key
+    result.config.name = config.name
+    result.config.description = config.description
+    result.config.cover_image = config.cover_image
+    if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
+        result.config.trigger_phrases = config.trigger_phrases
+    result.config.source = config.source
+    result.config.source_type = config.source_type
+
+    return ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
 
 
 class FoundModel(BaseModel):
@@ -435,6 +515,51 @@ def get_hugging_face_models(
     )
 
 
+def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+    """Update a model record and invalidate any cache affected by the change.
+
+    Keep the complete claim and synchronous service work in one worker-thread operation. This
+    route needs to await cache invalidation, but that must not leave the database read/write and
+    response preparation on the event loop before and after that await.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    record_store = ApiDependencies.invoker.services.model_manager.store
+
+    # Claimed for the whole update: a conversion running on this key carries a snapshot of the
+    # record taken before it started and writes it into the replacement, so an edit accepted
+    # meanwhile would be reported as saved and then silently dropped.
+    with _claim_model_key(key):
+        try:
+            previous_config = record_store.get_model(key)
+            config = record_store.update_model(key, changes=changes, allow_class_change=True)
+            # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
+            # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
+            # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
+            if _load_settings_changed(previous_config, config):
+                # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
+                # Hold the model-load write lock so no worker is mid-construction while we invalidate:
+                # a concurrent load could otherwise peek the old shared CPU weights before the drop and
+                # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
+                # load/VRAM transfer, but this entire helper already runs off the event loop.
+                with MODEL_LOAD_LOCK.write_lock():
+                    dropped = sum(
+                        cache.drop_model(key)
+                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
+                    )
+                if dropped:
+                    logger.info(
+                        f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
+                    )
+            config = prepare_model_config_for_response(config, ApiDependencies)
+            logger.info(f"Updated model: {key}")
+        except UnknownModelException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        except ValueError as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=409, detail=str(e))
+    return config
+
+
 @model_manager_router.patch(
     "/i/{key}",
     operation_id="update_model_record",
@@ -455,40 +580,7 @@ async def update_model_record(
     current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Update a model's config."""
-    logger = ApiDependencies.invoker.services.logger
-    record_store = ApiDependencies.invoker.services.model_manager.store
-    try:
-        previous_config = record_store.get_model(key)
-        config = record_store.update_model(key, changes=changes, allow_class_change=True)
-        # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
-        # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
-        # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-        if _load_settings_changed(previous_config, config):
-            # Drop the model from every per-device cache so the next load on any GPU rebuilds it.
-            # Hold the model-load write lock so no worker is mid-construction while we invalidate:
-            # a concurrent load could otherwise peek the old shared CPU weights before the drop and
-            # re-register them as canonical after it. Acquiring the lock can wait on an in-flight
-            # load/VRAM transfer, so do it off the event loop.
-            def _drop_from_all_caches() -> int:
-                with MODEL_LOAD_LOCK.write_lock():
-                    return sum(
-                        cache.drop_model(key)
-                        for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values()
-                    )
-
-            dropped = await asyncio.to_thread(_drop_from_all_caches)
-            if dropped:
-                logger.info(
-                    f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
-                )
-        config = prepare_model_config_for_response(config, ApiDependencies)
-        logger.info(f"Updated model: {key}")
-    except UnknownModelException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
-    return config
+    return await asyncio.to_thread(_update_model_record, key, changes)
 
 
 _LOAD_AFFECTING_SETTINGS: tuple[str, ...] = ("fp8_storage", "cpu_only")
@@ -551,6 +643,7 @@ def get_model_image(
             "description": "The model image was updated successfully",
         },
         400: {"description": "Bad request"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=200,
 )
@@ -562,22 +655,25 @@ async def update_model_image(
     if not image.content_type or not image.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
-    contents = await image.read()
-    try:
-        pil_image = Image.open(io.BytesIO(contents))
-
-    except Exception:
-        ApiDependencies.invoker.services.logger.error(traceback.format_exc())
-        raise HTTPException(status_code=415, detail="Failed to read image")
-
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-    try:
-        model_images.save(pil_image, key)
-        logger.info(f"Updated image for model: {key}")
-    except ValueError as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=409, detail=str(e))
+    # A conversion moves this model's image to the replacement's key when it finishes, so claim
+    # the key before reading the upload and hold it until the image is saved.
+    with _claim_model_key(key):
+        contents = await image.read()
+        try:
+            pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
+
+        except Exception:
+            logger.error(traceback.format_exc())
+            raise HTTPException(status_code=415, detail="Failed to read image")
+
+        try:
+            await asyncio.to_thread(model_images.save, pil_image, key)
+            logger.info(f"Updated image for model: {key}")
+        except ValueError as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=409, detail=str(e))
     return
 
 
@@ -587,6 +683,7 @@ async def update_model_image(
     responses={
         204: {"description": "Model deleted successfully"},
         404: {"description": "Model not found"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=204,
 )
@@ -602,14 +699,15 @@ def delete_model(
     """
     logger = ApiDependencies.invoker.services.logger
 
-    try:
-        installer = ApiDependencies.invoker.services.model_manager.install
-        installer.delete(key)
-        logger.info(f"Deleted model: {key}")
-        return Response(status_code=204)
-    except UnknownModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+    with _claim_model_key(key):
+        try:
+            installer = ApiDependencies.invoker.services.model_manager.install
+            installer.delete(key)
+            logger.info(f"Deleted model: {key}")
+            return Response(status_code=204)
+        except UnknownModelException as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=404, detail=str(e))
 
 
 class BulkDeleteModelsRequest(BaseModel):
@@ -665,9 +763,15 @@ def bulk_delete_models(
 
     for key in request.keys:
         try:
-            installer.delete(key)
+            # Per key, so one model busy elsewhere is reported as a failure for that key rather
+            # than aborting the whole request or racing the operation that holds it.
+            with _claim_model_key(key):
+                installer.delete(key)
             deleted.append(key)
             logger.info(f"Deleted model: {key}")
+        except HTTPException as e:
+            logger.error(f"Failed to delete model {key}: {e.detail}")
+            failed.append({"key": key, "error": e.detail})
         except UnknownModelException as e:
             logger.error(f"Failed to delete model {key}: {str(e)}")
             failed.append({"key": key, "error": str(e)})
@@ -697,38 +801,22 @@ def bulk_reidentify_models(
     Returns a list of successfully reidentified keys and failed reidentifications with error messages.
     """
     logger = ApiDependencies.invoker.services.logger
-    store = ApiDependencies.invoker.services.model_manager.store
-    models_path = ApiDependencies.invoker.services.configuration.models_path
 
     succeeded = []
     failed = []
 
     for key in request.keys:
         try:
-            config = store.get_model(key)
-            if pathlib.Path(config.path).is_relative_to(models_path):
-                model_path = pathlib.Path(config.path)
-            else:
-                model_path = models_path / config.path
-            mod = ModelOnDisk(model_path)
-            result = ModelConfigFactory.from_model_on_disk(mod)
-            if result.config is None:
-                raise InvalidModelException("Unable to identify model format")
-
-            # Retain user-editable fields from the original config
-            result.config.path = config.path
-            result.config.key = config.key
-            result.config.name = config.name
-            result.config.description = config.description
-            result.config.cover_image = config.cover_image
-            if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
-                result.config.trigger_phrases = config.trigger_phrases
-            result.config.source = config.source
-            result.config.source_type = config.source_type
-
-            store.replace_model(config.key, result.config)
+            # Same claim and the same implementation as the single-model route: this loop used to
+            # carry its own copy of the retain-these-fields logic, which is one edit away from the
+            # two disagreeing about what a reidentification preserves.
+            with _claim_model_key(key):
+                _reidentify_model(key)
             succeeded.append(key)
             logger.info(f"Reidentified model: {key}")
+        except HTTPException as e:
+            logger.error(f"Failed to reidentify model {key}: {e.detail}")
+            failed.append({"key": key, "error": e.detail})
         except UnknownModelException as e:
             logger.error(f"Failed to reidentify model {key}: {str(e)}")
             failed.append({"key": key, "error": str(e)})
@@ -746,6 +834,7 @@ def bulk_reidentify_models(
     responses={
         204: {"description": "Model image deleted successfully"},
         404: {"description": "Model image not found"},
+        409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=204,
 )
@@ -755,13 +844,16 @@ def delete_model_image(
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-    try:
-        model_images.delete(key)
-        logger.info(f"Deleted model image: {key}")
-        return
-    except UnknownModelException as e:
-        logger.error(str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+    # Claimed for the same reason as the upload: a conversion carries this model's image over to
+    # the replacement's key, so a delete accepted meanwhile is undone by that copy.
+    with _claim_model_key(key):
+        try:
+            model_images.delete(key)
+            logger.info(f"Deleted model image: {key}")
+            return
+        except UnknownModelException as e:
+            logger.error(str(e))
+            raise HTTPException(status_code=404, detail=str(e))
 
 
 @model_manager_router.post(
@@ -1161,6 +1253,23 @@ def convert_model(
     Note that during the conversion process the key and model hash will change.
     The return value is the model configuration for the converted model.
     """
+    if not _MODEL_CONVERSION_LOCK.acquire(blocking=False):
+        raise HTTPException(
+            status_code=409,
+            detail="Another model conversion is already in progress. Wait for it to finish and try again.",
+        )
+    try:
+        # Claimed for the whole conversion, so a delete arriving mid-way is refused rather than
+        # pulling the source out from under it. Deletion never takes the conversion lock, so the
+        # two are ordered consistently and cannot deadlock.
+        with _claim_model_key(key):
+            return _convert_model(key, user_id=current_admin.user_id)
+    finally:
+        _MODEL_CONVERSION_LOCK.release()
+
+
+def _convert_model(key: str, user_id: str) -> AnyModelConfig:
+    """Converts one model. Callers must hold `_MODEL_CONVERSION_LOCK`."""
     model_manager = ApiDependencies.invoker.services.model_manager
     loader = model_manager.load
     logger = ApiDependencies.invoker.services.logger
@@ -1186,9 +1295,16 @@ def convert_model(
         logger.error(msg)
         raise HTTPException(400, msg)
 
-    with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
+    # Under the models root so `install_path` below moves the result rather than copying it across
+    # a filesystem boundary, but inside the scratch directory the orphan scan skips: a half-written
+    # diffusers copy is model files with no database record, which is exactly what that scan hunts
+    # for, and `DELETE /sync/orphaned` would rmtree it while it is still being written.
+    scratch_dir = ApiDependencies.invoker.services.configuration.models_path / CONVERSION_SCRATCH_DIRNAME
+    scratch_dir.mkdir(parents=True, exist_ok=True)
+
+    with TemporaryDirectory(dir=scratch_dir) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
-        converted_model = loader.load_model(model_config, user_id=current_admin.user_id)
+        converted_model = loader.load_model(model_config, user_id=user_id)
         # write the converted file to the convert path
         raw_model = converted_model.model
         assert hasattr(raw_model, "save_pretrained")
@@ -1201,40 +1317,41 @@ def convert_model(
         changes = ModelRecordChanges(name=model_config.name)
         store.update_model(key, changes=changes)
 
-        # install the diffusers
-        try:
-            new_key = installer.install_path(
-                convert_path,
-                config=ModelRecordChanges(
-                    name=original_name,
-                    description=model_config.description,
-                    hash=model_config.hash,
-                    source=model_config.source,
-                ),
-            )
-        except Exception as e:
-            logger.error(str(e))
-            store.update_model(key, changes=ModelRecordChanges(name=original_name))
-            raise HTTPException(status_code=409, detail=str(e))
+        # Install and claim the diffusers before allowing another request to observe its key.
+        with contextlib.ExitStack() as conversion_stack:
+            try:
+                new_key = conversion_stack.enter_context(
+                    _install_and_claim_model(
+                        installer,
+                        convert_path,
+                        config=ModelRecordChanges(
+                            name=original_name,
+                            description=model_config.description,
+                            hash=model_config.hash,
+                            source=model_config.source,
+                        ),
+                    )
+                )
+            except Exception as e:
+                logger.error(str(e))
+                store.update_model(key, changes=ModelRecordChanges(name=original_name))
+                raise HTTPException(status_code=409, detail=str(e))
 
-    # Update the model image if the model had one
-    try:
-        model_image = ApiDependencies.invoker.services.model_images.get(key)
-        ApiDependencies.invoker.services.model_images.save(model_image, new_key)
-        ApiDependencies.invoker.services.model_images.delete(key)
-    except ModelImageFileNotFoundException:
-        pass
+            # Update the model image if the model had one.
+            try:
+                model_image = ApiDependencies.invoker.services.model_images.get(key)
+                ApiDependencies.invoker.services.model_images.save(model_image, new_key)
+                ApiDependencies.invoker.services.model_images.delete(key)
+            except ModelImageFileNotFoundException:
+                pass
 
-    # delete the original safetensors file
-    installer.delete(key)
+            # Delete the original safetensors file.
+            installer.delete(key)
 
-    # delete the temporary directory
-    # shutil.rmtree(cache_path)
-
-    # return the config record for the new diffusers directory
-    new_config = store.get_model(new_key)
-    new_config = prepare_model_config_for_response(new_config, ApiDependencies)
-    return new_config
+            # Return the config record for the new diffusers directory.
+            new_config = store.get_model(new_key)
+            new_config = prepare_model_config_for_response(new_config, ApiDependencies)
+            return new_config
 
 
 class StarterModelResponse(BaseModel):
@@ -1418,8 +1535,10 @@ def do_hf_login(
     current_admin: AdminUserOrDefault,
     token: str = Body(description="Hugging Face token to use for login", embed=True),
 ) -> HFTokenStatus:
-    HFTokenHelper.set_token(token)
-    token_status = HFTokenHelper.get_status()
+    # Write and read-back as one step; see _HF_TOKEN_LOCK.
+    with _HF_TOKEN_LOCK:
+        HFTokenHelper.set_token(token)
+        token_status = HFTokenHelper.get_status()
 
     if token_status is HFTokenStatus.UNKNOWN:
         ApiDependencies.invoker.services.logger.warning("Unable to verify HF token")
@@ -1429,7 +1548,8 @@ def do_hf_login(
 
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
 def reset_hf_token(current_admin: AdminUserOrDefault) -> HFTokenStatus:
-    return HFTokenHelper.reset_token()
+    with _HF_TOKEN_LOCK:
+        return HFTokenHelper.reset_token()
 
 
 # Orphaned Models Management Routes

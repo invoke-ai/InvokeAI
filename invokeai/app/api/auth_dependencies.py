@@ -146,6 +146,11 @@ def require_admin(
 ) -> TokenData:
     """Require admin role for the current user.
 
+    Stays `async def`, unlike the dependencies it builds on: this only reads a field off the
+    already-resolved token data. Declaring it `def` would buy a threadpool round-trip per admin
+    request and nothing else. The `users.get` that can block lives in `get_current_user`, which
+    is synchronous for that reason.
+
     Args:
         current_user: The current authenticated user's token data
 
@@ -164,6 +169,8 @@ def require_admin_or_default(
     current_user: Annotated[TokenData, Depends(get_current_user_or_default)],
 ) -> TokenData:
     """Require admin role for the current user, or return default system admin in single-user mode.
+
+    `async def` for the same reason as `require_admin`: it does no blocking work of its own.
 
     This dependency is useful for admin-only endpoints that should work in both single-user and multiuser modes.
 

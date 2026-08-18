@@ -1,3 +1,4 @@
+import asyncio
 import io
 import json
 import traceback
@@ -105,7 +106,7 @@ async def upload_image(
         from invokeai.app.services.board_records.board_records_common import BoardVisibility
 
         try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+            board = await asyncio.to_thread(ApiDependencies.invoker.services.boards.get_dto, board_id=board_id)
         except Exception:
             raise HTTPException(status_code=404, detail="Board not found")
         if (
@@ -115,22 +116,25 @@ async def upload_image(
         ):
             raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
 
-    assert_image_move_maintenance_inactive()
+    await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
     contents = await file.read()
     try:
-        pil_image = Image.open(io.BytesIO(contents))
+        pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
 
     if crop_visible:
         try:
-            bbox = pil_image.getbbox()
-            pil_image = pil_image.crop(bbox)
+
+            def _crop() -> Image.Image:
+                return pil_image.crop(pil_image.getbbox())
+
+            pil_image = await asyncio.to_thread(_crop)
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to crop image")
 
@@ -143,14 +147,18 @@ async def upload_image(
 
         try:
             # heuristic_resize_fast expects an RGB or RGBA image
-            pil_rgba = pil_image.convert("RGBA")
-            np_image = pil_to_np(pil_rgba)
-            np_image = heuristic_resize_fast(np_image, (resize_dims.width, resize_dims.height))
-            pil_image = np_to_pil(np_image)
+            def _resize() -> Image.Image:
+                pil_rgba = pil_image.convert("RGBA")
+                np_image = pil_to_np(pil_rgba)
+                resized_np_image = heuristic_resize_fast(np_image, (resize_dims.width, resize_dims.height))
+                return np_to_pil(resized_np_image)
+
+            pil_image = await asyncio.to_thread(_resize)
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
-    extracted_metadata = extract_metadata_from_image(
+    extracted_metadata = await asyncio.to_thread(
+        extract_metadata_from_image,
         pil_image=pil_image,
         invokeai_metadata_override=metadata,
         invokeai_workflow_override=None,
@@ -159,7 +167,8 @@ async def upload_image(
     )
 
     try:
-        image_dto = ApiDependencies.invoker.services.images.create(
+        image_dto = await asyncio.to_thread(
+            ApiDependencies.invoker.services.images.create,
             image=pil_image,
             image_origin=ResourceOrigin.EXTERNAL,
             image_category=image_category,

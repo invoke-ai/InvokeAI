@@ -258,7 +258,7 @@ async def upload_video(
         from invokeai.app.services.board_records.board_records_common import BoardVisibility
 
         try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+            board = await run_in_threadpool(ApiDependencies.invoker.services.boards.get_dto, board_id=board_id)
         except Exception:
             raise HTTPException(status_code=404, detail="Board not found")
         if (

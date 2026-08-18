@@ -295,11 +295,11 @@ def _run_image_to_prompt(
 )
 async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromptRequest) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
-    assert_image_move_maintenance_inactive()
+    await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     # Reuse the image-read access check so non-owners can't probe stored images
     # via this endpoint (mirrors the policy in routers/images.py).
-    assert_image_read_access(body.image_name, current_user)
+    await asyncio.to_thread(assert_image_read_access, body.image_name, current_user)
 
     events = ApiDependencies.invoker.services.events
     try:

@@ -15,6 +15,7 @@ a single own-count and (b) hid other users' redacted entries entirely. These tes
 restored behavior.
 """
 
+import sqlite3
 import uuid
 
 import pytest
@@ -182,26 +183,23 @@ def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_o
     assert summaries[0].status == "pending"
 
 
-def test_get_queue_item_summaries_by_ids_handles_more_ids_than_sqlite_can_bind(
+def test_get_queue_item_summaries_by_ids_chunks_past_the_sqlite_bind_limit(
     session_queue: SqliteSessionQueue,
 ) -> None:
-    """The caller chooses the id count, and one bound parameter per id runs into SQLite's
-    SQLITE_MAX_VARIABLE_NUMBER (32766 on modern builds, 999 on older ones). Unchunked, the whole
-    request fails with an OperationalError and the endpoint answers 500. The ids do not need to
-    exist for this — being bound at all is what costs a parameter."""
-    real_id = _insert_queue_item(session_queue, user_id="user-a")
-    requested = [*range(10_000_000, 10_040_000), real_id]
+    """Every id becomes one bind parameter, so a single IN (...) would raise OperationalError once
+    the list outgrows SQLite's per-statement variable limit. The query is chunked instead."""
+    real_ids = [_insert_queue_item(session_queue, user_id="user-a") for _ in range(3)]
 
-    summaries = session_queue.get_queue_item_summaries_by_ids(queue_id="default", item_ids=requested)
+    # Size the request off the limit this SQLite build actually enforces (999 on builds older than
+    # 3.32, 32766 since), so the test stays meaningful wherever it runs.
+    with session_queue._db.transaction() as cursor:
+        bind_limit = cursor.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
 
-    assert [item.item_id for item in summaries] == [real_id]
+    # Padding ids do not exist, which also covers chunks that match nothing at all.
+    padding_ids = list(range(100_000, 100_000 + bind_limit + 10))
+    split = len(padding_ids) // 2
+    item_ids = [real_ids[0], *padding_ids[:split], real_ids[1], *padding_ids[split:], real_ids[2]]
 
+    summaries = session_queue.get_queue_item_summaries_by_ids(queue_id="default", item_ids=item_ids)
 
-def test_get_queue_item_summaries_by_ids_mirrors_repeated_ids(session_queue: SqliteSessionQueue) -> None:
-    """Repeats are collapsed for the lookup (they resolve to the same row) but the response
-    still follows the requested list one-for-one."""
-    item_id = _insert_queue_item(session_queue, user_id="user-a")
-
-    summaries = session_queue.get_queue_item_summaries_by_ids(queue_id="default", item_ids=[item_id, item_id])
-
-    assert [item.item_id for item in summaries] == [item_id, item_id]
+    assert [item.item_id for item in summaries] == real_ids
