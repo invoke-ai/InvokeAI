@@ -81,7 +81,7 @@ clip_vit_l_image_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
     source="InvokeAI/clip-vit-large-patch14",
-    description="CLIP VIT-L Image Encoder (used by the imagemap) ~1.7GB",
+    description="CLIP VIT-L Image Encoder (used by the imagemap index) ~1.7GB",
     type=ModelType.CLIPVision,
 )
 # endregion
