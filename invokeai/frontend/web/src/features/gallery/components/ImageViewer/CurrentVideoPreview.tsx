@@ -302,7 +302,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // video frame until playback or a seek — the element just shows its black background.
   // Setting currentTime to 0.0001 nudges the decoder to paint without measurably advancing.
   const handleLoadedMetadata = useCallback(() => {
-    onLoadImage();
+    onLoadImage(videoDTO?.session_id ?? null);
     const el = videoRef.current;
     if (el && !isPlaying && el.currentTime === 0) {
       try {
@@ -311,7 +311,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         // Some browsers throw if metadata isn't fully ready yet; harmless.
       }
     }
-  }, [isPlaying, onLoadImage]);
+  }, [isPlaying, onLoadImage, videoDTO?.session_id]);
 
   if (!videoDTO) {
     return <NoContentForViewer />;
