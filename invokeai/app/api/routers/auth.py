@@ -157,7 +157,7 @@ class SetupStatusResponse(BaseModel):
 
 
 @auth_router.get("/status", response_model=SetupStatusResponse)
-async def get_setup_status() -> SetupStatusResponse:
+def get_setup_status() -> SetupStatusResponse:
     """Check if initial administrator setup is required.
 
     Returns:
@@ -191,7 +191,7 @@ async def get_setup_status() -> SetupStatusResponse:
 
 
 @auth_router.post("/login", response_model=LoginResponse)
-async def login(
+def login(
     login_request: Annotated[LoginRequest, Body(description="Login credentials")],
     request: Request,
     response: Response,
@@ -252,7 +252,7 @@ async def login(
 
 
 @auth_router.post("/logout", response_model=LogoutResponse)
-async def logout(
+def logout(
     current_user: CurrentUser,
     request: Request,
     response: Response,
@@ -279,7 +279,7 @@ async def logout(
 
 
 @auth_router.post("/media-cookie", response_model=MediaCookieResponse)
-async def refresh_media_cookie(
+def refresh_media_cookie(
     request: Request,
     response: Response,
     _current_user: CurrentUserOrDefault,
@@ -326,7 +326,7 @@ async def refresh_media_cookie(
 
 
 @auth_router.get("/me", response_model=UserDTO)
-async def get_current_user_info(
+def get_current_user_info(
     current_user: CurrentUser,
 ) -> UserDTO:
     """Get current authenticated user's information.
@@ -350,7 +350,7 @@ async def get_current_user_info(
 
 
 @auth_router.post("/setup", response_model=SetupResponse)
-async def setup_admin(
+def setup_admin(
     request: Annotated[SetupRequest, Body(description="Admin account details")],
 ) -> SetupResponse:
     """Set up initial administrator account.
@@ -452,7 +452,7 @@ class GeneratePasswordResponse(BaseModel):
 
 
 @auth_router.get("/generate-password", response_model=GeneratePasswordResponse)
-async def generate_password(
+def generate_password(
     current_user: CurrentUser,
 ) -> GeneratePasswordResponse:
     """Generate a strong random password.
@@ -473,7 +473,7 @@ async def generate_password(
 
 
 @auth_router.get("/users", response_model=list[UserDTO])
-async def list_users(
+def list_users(
     current_user: AdminUser,
 ) -> list[UserDTO]:
     """List all users. Requires admin privileges.
@@ -489,7 +489,7 @@ async def list_users(
 
 
 @auth_router.post("/users", response_model=UserDTO, status_code=status.HTTP_201_CREATED)
-async def create_user(
+def create_user(
     request: Annotated[AdminUserCreateRequest, Body(description="New user details")],
     current_user: AdminUser,
 ) -> UserDTO:
@@ -519,7 +519,7 @@ async def create_user(
 
 
 @auth_router.get("/users/{user_id}", response_model=UserDTO)
-async def get_user(
+def get_user(
     user_id: Annotated[str, Path(description="User ID")],
     current_user: AdminUser,
 ) -> UserDTO:
@@ -542,7 +542,7 @@ async def get_user(
 
 
 @auth_router.patch("/users/{user_id}", response_model=UserDTO)
-async def update_user(
+def update_user(
     user_id: Annotated[str, Path(description="User ID")],
     request: Annotated[AdminUserUpdateRequest, Body(description="User fields to update")],
     current_user: AdminUser,
@@ -646,7 +646,7 @@ async def update_user(
 
 
 @auth_router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_user(
+def delete_user(
     user_id: Annotated[str, Path(description="User ID")],
     current_user: AdminUser,
 ) -> None:
@@ -696,7 +696,7 @@ async def delete_user(
 
 
 @auth_router.patch("/me", response_model=UserDTO)
-async def update_current_user(
+def update_current_user(
     request: Annotated[UserProfileUpdateRequest, Body(description="Profile fields to update")],
     current_user: CurrentUser,
     http_request: Request,

@@ -1099,6 +1099,10 @@ class TestSessionQueueAuth:
         r = client.get("/api/v1/queue/default/item_ids")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_get_queue_item_summaries_by_ids_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/queue/default/item_summaries_by_ids", json={"item_ids": [1]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
     def test_get_current_queue_item_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/queue/default/current")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED

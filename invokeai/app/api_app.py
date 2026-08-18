@@ -7,7 +7,6 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.security.utils import get_authorization_scheme_param
@@ -16,6 +15,7 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import invokeai.frontend.web as web_dir
@@ -187,6 +187,77 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                     pass  # Don't fail the request if token refresh fails
 
         return response
+
+
+# Response types worth compressing. Everything else is passed through untouched.
+#
+# This is an allowlist rather than a blocklist of media types on purpose: a type missing from
+# this list only loses compression it would barely have benefited from, whereas a binary type
+# missing from a blocklist costs real CPU on the event loop. The app serves a small, known set
+# of compressible things — the UI bundle, the API's JSON, SVG icons.
+COMPRESSIBLE_CONTENT_TYPES = (
+    "text/",
+    "application/json",
+    "application/javascript",
+    "application/xml",
+    "application/xhtml+xml",
+    "application/manifest+json",
+    "image/svg+xml",
+)
+
+# `text/` would otherwise match this, and compressing an event stream defeats its purpose by
+# withholding events until the compressor flushes. Starlette excludes it by default too.
+UNCOMPRESSIBLE_CONTENT_TYPES = ("text/event-stream",)
+
+
+def _is_compressible(content_type: str) -> bool:
+    if content_type.startswith(UNCOMPRESSIBLE_CONTENT_TYPES):
+        return False
+    return content_type.startswith(COMPRESSIBLE_CONTENT_TYPES)
+
+
+class _ContentTypeAwareGZipResponder(GZipResponder):
+    """Skips compression for response types that are already compressed.
+
+    `content_type_is_excluded` is computed when the response starts and only read once the
+    body arrives, so widening it right after the base class has set it is enough — no need to
+    reimplement Starlette's streaming/pathsend handling.
+    """
+
+    async def send_with_compression(self, message: Message) -> None:
+        await super().send_with_compression(message)
+        if message["type"] == "http.response.start" and not self.content_type_is_excluded:
+            self.content_type_is_excluded = not _is_compressible(
+                Headers(raw=message["headers"]).get("content-type", "")
+            )
+
+
+class ContentTypeAwareGZipMiddleware(GZipMiddleware):
+    """GZip, but only for content types that actually compress.
+
+    Starlette's GZipMiddleware compresses every response type except `text/event-stream`. The
+    gallery serves PNG, WebP and MP4 bytes, which are already compressed: a 3 MB PNG costs
+    ~52ms of event-loop time to gzip and comes back *larger* than it went in. With auto-switch
+    enabled the UI fetches the full image after every generated image, so that cost lands
+    repeatedly during a batch — exactly when the server can least afford to stall.
+
+    Lowering `compresslevel` does not help here: on incompressible input, level 1 costs
+    essentially the same as level 9 because deflate still has to scan the data.
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if "gzip" in Headers(scope=scope).get("Accept-Encoding", ""):
+            responder: ASGIApp = _ContentTypeAwareGZipResponder(
+                self.app, self.minimum_size, compresslevel=self.compresslevel
+            )
+        else:
+            responder = IdentityResponder(self.app, self.minimum_size)
+
+        await responder(scope, receive, send)
 
 
 class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
@@ -431,7 +502,7 @@ app.add_middleware(
     expose_headers=["X-Refreshed-Token"],
 )
 
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(ContentTypeAwareGZipMiddleware, minimum_size=1000)
 
 
 # Include all routers

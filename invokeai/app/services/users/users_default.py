@@ -63,6 +63,19 @@ class UserService(UserServiceBase):
 
     def create(self, user_data: UserCreateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Create a new user."""
+        return self._create(user_data, strict_password_checking=strict_password_checking, require_no_admin=False)
+
+    def _create(
+        self,
+        user_data: UserCreateRequest,
+        strict_password_checking: bool,
+        require_no_admin: bool,
+    ) -> UserDTO:
+        """Insert a user, optionally conditional on no administrator existing yet.
+
+        `require_no_admin` is evaluated on the cursor that performs the INSERT so that the check
+        and the write are one atomic step - see `create_admin` for why that matters.
+        """
         # Validate password strength
         if strict_password_checking:
             is_valid, error_msg = validate_password_strength(user_data.password)
@@ -76,9 +89,22 @@ class UserService(UserServiceBase):
             raise ValueError(f"User with email {user_data.email} already exists")
 
         user_id = str(uuid4())
+        # Hash before opening the transaction: hashing is deliberately slow, and the database is a
+        # single connection behind a process-wide lock.
         password_hash = hash_password(user_data.password)
 
         with self._db.transaction() as cursor:
+            if require_no_admin:
+                # BEGIN IMMEDIATE takes the write lock up front, so this count cannot change
+                # before the INSERT below commits. In-process callers are additionally
+                # serialized by the database's shared RLock; the explicit lock also covers a
+                # second process (invoke-useradd --admin) writing during the setup window.
+                cursor.execute("BEGIN IMMEDIATE")
+                # Same predicate as has_admin(), read on the cursor that performs the write.
+                cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE AND is_active = TRUE")
+                row = cursor.fetchone()
+                if row and row[0] > 0:
+                    raise ValueError("Admin user already exists")
             try:
                 cursor.execute(
                     """
@@ -290,10 +316,14 @@ class UserService(UserServiceBase):
         return bool(count > 0)
 
     def create_admin(self, user_data: UserCreateRequest, strict_password_checking: bool = True) -> UserDTO:
-        """Create an admin user (for initial setup)."""
-        if self.has_admin():
-            raise ValueError("Admin user already exists")
+        """Create the first admin user (for initial setup).
 
+        The "no admin exists yet" condition is enforced inside the INSERT's own transaction rather
+        than by a preceding has_admin() call. `POST /auth/setup` is necessarily unauthenticated
+        during the first-run window and runs in the threadpool, so two concurrent requests can both
+        pass a check made in a separate transaction and both create an administrator. Callers may
+        still check has_admin() first for a friendly error; this is the backstop that decides.
+        """
         # Force is_admin to True
         admin_data = UserCreateRequest(
             email=user_data.email,
@@ -301,7 +331,7 @@ class UserService(UserServiceBase):
             password=user_data.password,
             is_admin=True,
         )
-        return self.create(admin_data, strict_password_checking=strict_password_checking)
+        return self._create(admin_data, strict_password_checking=strict_password_checking, require_no_admin=True)
 
     def list_users(self, limit: int = 100, offset: int = 0) -> list[UserDTO]:
         """List all users."""
