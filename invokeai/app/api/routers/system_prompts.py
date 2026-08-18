@@ -19,7 +19,7 @@ system_prompts_router = APIRouter(prefix="/v1/system_prompts", tags=["system_pro
     operation_id="list_system_prompts",
     responses={200: {"model": list[SystemPromptRecordDTO]}},
 )
-async def list_system_prompts(current_user: CurrentUserOrDefault) -> list[SystemPromptRecordDTO]:
+def list_system_prompts(current_user: CurrentUserOrDefault) -> list[SystemPromptRecordDTO]:
     """Lists system prompts visible to the current user (own + public)."""
     config = ApiDependencies.invoker.services.configuration
     # Admins (and single-user installs) see everything; multiuser non-admins are scoped to own + public.
@@ -34,7 +34,7 @@ async def list_system_prompts(current_user: CurrentUserOrDefault) -> list[System
     operation_id="get_system_prompt",
     responses={200: {"model": SystemPromptRecordDTO}},
 )
-async def get_system_prompt(
+def get_system_prompt(
     current_user: CurrentUserOrDefault,
     system_prompt_id: str = Path(description="The id of the system prompt to get"),
 ) -> SystemPromptRecordDTO:
@@ -57,7 +57,7 @@ async def get_system_prompt(
     operation_id="create_system_prompt",
     responses={200: {"model": SystemPromptRecordDTO}},
 )
-async def create_system_prompt(
+def create_system_prompt(
     current_user: CurrentUserOrDefault,
     system_prompt: SystemPromptWithoutId = Body(description="The system prompt to create"),
 ) -> SystemPromptRecordDTO:
@@ -75,7 +75,7 @@ async def create_system_prompt(
     operation_id="update_system_prompt",
     responses={200: {"model": SystemPromptRecordDTO}},
 )
-async def update_system_prompt(
+def update_system_prompt(
     current_user: CurrentUserOrDefault,
     system_prompt_id: str = Path(description="The id of the system prompt to update"),
     changes: SystemPromptChanges = Body(description="The changes to apply"),
@@ -100,7 +100,7 @@ async def update_system_prompt(
     "/i/{system_prompt_id}",
     operation_id="delete_system_prompt",
 )
-async def delete_system_prompt(
+def delete_system_prompt(
     current_user: CurrentUserOrDefault,
     system_prompt_id: str = Path(description="The id of the system prompt to delete"),
 ) -> None:
