@@ -80,3 +80,17 @@ describe('workflow library account ownership', () => {
     await expect(cache.getLibraryWorkflowCached('shared-id')).resolves.toEqual({ owner: 'b' });
   });
 });
+
+describe('workflow library cache invalidation listeners', () => {
+  it('notifies registered listeners when the cache is invalidated', () => {
+    const listener = vi.fn();
+    const unsubscribe = cache.onWorkflowLibraryCacheInvalidated(listener);
+
+    cache.invalidateWorkflowLibraryCache();
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    cache.invalidateWorkflowLibraryCache();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
