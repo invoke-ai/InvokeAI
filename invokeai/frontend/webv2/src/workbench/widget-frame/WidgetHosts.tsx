@@ -4,9 +4,16 @@ import { Suspense, use } from 'react';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 
 const WidgetHost = ({ widget }: { widget: ReturnType<typeof getWidgetHosts>[number] }) => {
-  const Host = use(widget.implementation.load()).host;
+  const Host = use(widget.host!.load());
 
-  return Host ? <Host /> : null;
+  // react-compiler flags any JSX tag that is directly the value returned by
+  // `use()` as though it were freshly created each render. `Host` is the
+  // module's cached export, resolved once by the deferred resource and
+  // stable across renders; the false positive disappears the moment the
+  // value is read through a property access instead of being the call's
+  // direct result, which is what the sibling `WidgetRenderer` slots do.
+  // eslint-disable-next-line react/react-compiler
+  return <Host />;
 };
 
 const WidgetHostBoundary = ({ widget }: { widget: ReturnType<typeof getWidgetHosts>[number] }) => {
@@ -21,7 +28,7 @@ const WidgetHostBoundary = ({ widget }: { widget: ReturnType<typeof getWidgetHos
       resetKey={widget.manifest.id}
       widget={widget}
       widgetId={widget.manifest.id}
-      onRetry={widget.implementation.retry}
+      onRetry={widget.host!.retry}
     >
       {content}
     </WidgetFailureBoundary>

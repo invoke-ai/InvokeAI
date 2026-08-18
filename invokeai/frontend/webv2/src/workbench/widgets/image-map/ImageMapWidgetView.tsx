@@ -69,7 +69,7 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     // the whole widget, so suspending on the plotly chunk replaced the entire
     // panel — header and actions menu included — with a skeleton frame, and
     // then held the resolved content for React's fallback throttle on top. It
-    // also sits above `loadWidget`, which preloads only the implementation
+    // also sits above `loadWidgets`, which preloads only the implementation
     // chunk and cannot reach this nested import, so a preset switch onto an
     // already-loaded map suspended anyway. Confining it here keeps the frame
     // mounted and the spinner where the plot will appear.

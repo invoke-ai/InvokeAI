@@ -1,0 +1,20 @@
+{
+  "name": "Invoke Workbench",
+  "short_name": "Invoke",
+  "description": "Professional creative engine for generating and editing visual media.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#16181d",
+  "theme_color": "#16181d",
+  "icons": [
+    {
+      "src": "./invoke-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

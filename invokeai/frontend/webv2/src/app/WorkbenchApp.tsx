@@ -1,7 +1,9 @@
 import type { WorkbenchSearch } from '@workbench/projects/session';
 
 import { LLMTaskProgressRuntime } from '@features/generation/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { useSearch } from '@tanstack/react-router';
+import { preloadBootWidgets } from '@workbench/bootWidgetPreload';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 import { WorkbenchCommandPalette } from '@workbench/palette/WorkbenchCommandPalette';
 import { WorkbenchShell } from '@workbench/shell';
@@ -13,6 +15,7 @@ import { WorkbenchSessionController } from '@workbench/WorkbenchSessionControlle
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
 import { useMemo } from 'react';
 
+import { BootWidgetHintController } from './BootWidgetHintController';
 import { GenerateWidgetSyncRuntime } from './GenerateWidgetSyncRuntime';
 import { QueueRuntimeAdapter } from './QueueRuntimeAdapter';
 import { WorkbenchUiPorts } from './workbenchPorts';
@@ -34,9 +37,15 @@ export const WorkbenchApp = () => {
     [search.new, search.project]
   );
 
+  // Start widget chunk downloads now, while project hydration is still in
+  // flight — the provider below withholds the shell until hydration, and
+  // without this the first widget byte doesn't move until after it.
+  useMountEffect(preloadBootWidgets);
+
   return (
     <WorkbenchProvider loadOptions={loadOptions}>
       <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
+        <BootWidgetHintController />
         <GenerateWidgetSyncRuntime />
         <LLMTaskProgressRuntime />
         <WorkbenchUiPorts>

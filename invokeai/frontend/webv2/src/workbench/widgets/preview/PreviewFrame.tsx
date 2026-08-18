@@ -6,6 +6,7 @@ import { Badge, Flex, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import {
   useCallback,
@@ -317,6 +318,20 @@ const PreviewVideo = ({
     return isCurrent() ? { ok: true } : { ok: false, reason: 'stale' };
   }, [isItemCurrent, source.itemKey]);
   const isCopyAvailable = useCallback(() => isVideoFrameCopyAvailable(videoRef.current), []);
+  // Playback must not outlive this view being on screen. A widget the shell
+  // keeps mounted behind a layout switch is hidden with `display: none`, which
+  // does not stop media — the clip would keep running, with audio, behind a
+  // layout the user moved away from and with no reachable controls. Effects are
+  // torn down whenever the subtree stops being shown, whether that is a real
+  // unmount or a hidden keep-alive boundary, so pausing here covers both without
+  // this component needing to know which one happened.
+  useMountEffect(() => {
+    const video = videoRef.current;
+
+    return () => {
+      video?.pause();
+    };
+  });
   useImperativeHandle(
     videoControllerRef,
     () => ({
