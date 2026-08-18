@@ -544,10 +544,18 @@
   },
   "graphPreview": {
     "cfgScale": "CFG scale",
+    "compiledFrom": "Compiled from {{source}}.",
+    "copied": "Copied",
+    "copyJson": "Copy JSON",
+    "destination": "Destination",
+    "graph": "Graph",
     "graphJsonLabel": "{{title}} graph JSON",
     "inputCount_one": "{{count}} input",
     "inputCount_other": "{{count}} inputs",
+    "invalidTitle": "This graph can't compile yet.",
     "invokeRoute": "Invoke {{route}}",
+    "list": "List",
+    "liveHint": "Updates as you change settings.",
     "loras": "LoRAs",
     "model": "Model",
     "noCompiledGraph": "No compiled graph is available for \"{{graphId}}\" yet.",
@@ -570,9 +578,11 @@
     "seedRandomValue": "random",
     "seedRandomized": "Seed is randomized. This graph runs differently each time.",
     "seedRegenerated": "regenerated each run",
+    "selectNode": "Select a node for details.",
     "size": "Size",
     "steps": "Steps",
-    "title": "{{title}} Graph Preview"
+    "thisGraph": "This graph",
+    "title": "Graph preview"
   },
   "hotkeys": {
     "addHotkey": "Add hotkey",

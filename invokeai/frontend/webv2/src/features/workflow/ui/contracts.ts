@@ -116,6 +116,8 @@ export interface GraphPreviewProvenance {
  */
 export interface GraphPreviewSourceState {
   graph: WorkflowPreviewGraph | null;
+  /** Human-readable result destination (e.g. "Gallery"), set for every source by the builder. */
+  destinationLabel: string | null;
   invalidReasons: string[];
   isLive: boolean;
   notices: GraphPreviewNotice[];

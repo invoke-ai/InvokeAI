@@ -13,6 +13,7 @@ import type { TFunction } from 'i18next';
 
 import { compileGeneratePreviewGraph, getGenerateNodeProvenance } from '@features/generation/graph';
 import { compileProjectGraph } from '@features/workflow/graph';
+import { getDestinationLabel } from '@workbench/invocation';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 /**
@@ -54,7 +55,13 @@ const EMPTY_SOURCE_BASE: Pick<GraphPreviewSourceState, 'invalidReasons' | 'notic
   summaryRows: [],
 };
 
-const buildWorkflowSource = (project: Project, templates: InvocationTemplatesSnapshot): GraphPreviewSourceState => {
+/** `destinationLabel` is filled in once by `buildGraphPreviewSource` for every source, below. */
+type GraphPreviewSourceWithoutDestination = Omit<GraphPreviewSourceState, 'destinationLabel'>;
+
+const buildWorkflowSource = (
+  project: Project,
+  templates: InvocationTemplatesSnapshot
+): GraphPreviewSourceWithoutDestination => {
   if (templates.status !== 'loaded') {
     return { ...EMPTY_SOURCE_BASE, graph: null, isLive: true };
   }
@@ -74,7 +81,7 @@ const buildGenerateSource = (
   project: Project,
   models: readonly ModelConfig[] | undefined,
   t: TFunction
-): GraphPreviewSourceState => {
+): GraphPreviewSourceWithoutDestination => {
   const result = compileGeneratePreviewGraph({
     destination: project.invocation.destination,
     models: models ?? [],
@@ -117,7 +124,10 @@ const buildGenerateSource = (
   };
 };
 
-const buildWidgetGraphSource = (project: Project, surface: GraphBearingSurfaceContract): GraphPreviewSourceState => ({
+const buildWidgetGraphSource = (
+  project: Project,
+  surface: GraphBearingSurfaceContract
+): GraphPreviewSourceWithoutDestination => ({
   ...EMPTY_SOURCE_BASE,
   graph: project.widgetGraphs[surface.widgetId] ?? null,
   isLive: false,
@@ -130,13 +140,15 @@ export const buildGraphPreviewSource = ({
   t,
   templates,
 }: GraphPreviewSourceDeps): GraphPreviewSourceState => {
+  const destinationLabel = getDestinationLabel(project.invocation.destination);
+
   switch (surface.sourceId) {
     case 'workflow':
-      return buildWorkflowSource(project, templates);
+      return { ...buildWorkflowSource(project, templates), destinationLabel };
     case 'generate':
-      return buildGenerateSource(project, models, t);
+      return { ...buildGenerateSource(project, models, t), destinationLabel };
     case 'upscale':
     case 'canvas':
-      return buildWidgetGraphSource(project, surface);
+      return { ...buildWidgetGraphSource(project, surface), destinationLabel };
   }
 };

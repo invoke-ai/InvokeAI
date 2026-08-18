@@ -41,12 +41,11 @@ export const GraphPreviewHost = ({
 
   return (
     <GraphPreviewDialog
-      graph={source.graph}
       graphId={surface.graphId}
       isOpen={isOpen}
-      positionHints={source.positionHints}
+      source={source}
       sourceId={surface.sourceId}
-      title={surface.label}
+      sourceLabel={surface.label}
       onOpenChange={onOpenChange}
     />
   );

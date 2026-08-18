@@ -67,6 +67,7 @@ describe('buildGraphPreviewSource', () => {
     expect(source.getProvenance?.('seed', 'value')).toEqual({ label: 'graphPreview.provenance.seedRandom' });
     expect(source.resolvedInputOverrides).toEqual({ seed: { value: 'graphPreview.seedRegenerated' } });
     expect(source.summaryRows.some((row) => row.id === 'steps')).toBe(true);
+    expect(source.destinationLabel).toBe('Gallery');
   });
 
   it('returns invalid reasons instead of a graph when generate settings cannot compile', () => {
