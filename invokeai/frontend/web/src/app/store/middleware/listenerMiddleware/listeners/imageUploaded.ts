@@ -8,6 +8,9 @@ import { t } from 'i18next';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { imagesApi } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+
+import { getImageUploadFailedDescription } from './imageUploadFailedDescription';
+
 const log = logger('gallery');
 
 /**
@@ -104,7 +107,11 @@ export const addImageUploadedFulfilledListener = (startAppListening: AppStartLis
       log.error({ ...sanitizedData }, 'Image upload failed');
       toast({
         title: t('toast.imageUploadFailed'),
-        description: action.error.message,
+        description: getImageUploadFailedDescription(
+          action.error.message,
+          action.payload,
+          t('toast.imageStorageMaintenanceActive')
+        ),
         status: 'error',
       });
     },
