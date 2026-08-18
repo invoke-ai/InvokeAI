@@ -1141,7 +1141,15 @@ class ModelCache:
             device_label = f"{model_device.type} device #{model_device.index}"
         else:
             device_label = f"{model_device.type} device"
-        self._logger.info(
+        # A lock that found the model already fully resident and moved nothing is a no-op: it
+        # reports exactly the state the load that first put it there already reported. Callers
+        # that re-lock in a tight loop (e.g. the image index worker, which loads the model once
+        # per batch of images) would otherwise emit one of these lines per iteration and bury the
+        # log. Genuine loads - anything that moved bytes, or that left the model short of fully
+        # resident - stay at INFO.
+        is_no_op_relock = model_vram_needed <= 0 and model_bytes_loaded == 0
+        log_loaded = self._logger.debug if is_no_op_relock else self._logger.info
+        log_loaded(
             f"Loaded model '{cache_entry.key}' ({cache_entry.cached_model.model.__class__.__name__}) onto "
             f"{device_label} in {(time.time() - start_time):.2f}s. "
             f"Total model size: {model_total_bytes / MB:.2f}MB, "
