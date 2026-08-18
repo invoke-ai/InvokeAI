@@ -4,6 +4,8 @@
  * Curated, caller-driven export list — add a symbol only when a consumer needs it.
  */
 export { addLoraCollectionLoader, compileGenerateGraph, resolveGenerateSeed } from './core/graph';
+export { compileGeneratePreviewGraph, stabilizeBackendGraphIds } from './core/previewGraph';
+export type { GeneratePreviewInput, GeneratePreviewResult } from './core/previewGraph';
 export { addEdge, addNode, getActiveCompatibleLoras, toGraphContract, toModelIdentifier } from './core/graphBuilder';
 export { compileCanvasGraph } from './core/canvas/compileCanvasGraph';
 export { detectCanvasMode } from './core/canvas/canvasMode';
