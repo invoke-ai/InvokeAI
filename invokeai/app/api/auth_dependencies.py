@@ -214,7 +214,7 @@ def get_current_media_user_or_default(
     return _validate_token(token, "Invalid or expired token")
 
 
-async def require_admin(
+def require_admin(
     current_user: Annotated[TokenData, Depends(get_current_user)],
 ) -> TokenData:
     """Require admin role for the current user.
@@ -238,7 +238,7 @@ async def require_admin(
     return current_user
 
 
-async def require_admin_or_default(
+def require_admin_or_default(
     current_user: Annotated[TokenData, Depends(get_current_user_or_default)],
 ) -> TokenData:
     """Require admin role for the current user, or return default system admin in single-user mode.

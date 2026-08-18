@@ -235,6 +235,7 @@ class SocketIO:
                     "user_id": token_data.user_id,
                     "is_admin": is_admin,
                     "token_epoch": token_epoch,
+                    "authenticated": True,
                 }
                 logger.info(f"Socket {sid} connected with user_id: {token_data.user_id}, is_admin: {is_admin}")
                 await self._sio.enter_room(sid, f"user:{token_data.user_id}")
@@ -255,6 +256,7 @@ class SocketIO:
         self._socket_users[sid] = {
             "user_id": "system",
             "is_admin": True,
+            "authenticated": False,
         }
         logger.debug(f"Socket {sid} connected as system admin (single-user mode)")
         await self._sio.enter_room(sid, "user:system")
@@ -277,21 +279,48 @@ class SocketIO:
             # so we never accidentally admit an anonymous socket.
             return True
 
-    async def _handle_disconnect(self, sid: str) -> None:
-        """Handle socket disconnection and cleanup user info."""
-        if sid in self._socket_users:
-            user_id = self._socket_users[sid].get("user_id")
-            del self._socket_users[sid]
-            # Forget the user's revalidation failures once their last socket is gone. The
-            # count stands in for how long *these* sockets have gone unchecked, so a user
-            # who reconnects must start over. The sweep drops orphaned counters too, but it
-            # cannot be relied on here: `_revalidation_loop` still skips the sweep entirely
-            # when nothing is live, which a departing last socket can leave it. Without
-            # this, a user whose only socket closed part-way through a database outage
-            # would come back one failed read away from losing the admin room.
-            if user_id is not None and not any(info.get("user_id") == user_id for info in self._socket_users.values()):
-                self._revalidation_failures.pop(user_id, None)
-            logger.debug(f"Socket {sid} disconnected and cleaned up")
+    async def _handle_disconnect(self, sid: str, reason: str | None = None) -> None:
+        """Handle socket disconnection and cleanup user info.
+
+        Logged at the same level as the matching connect message. When only the connect
+        half is visible at INFO, a client that reconnects in a loop — a backgrounded tab
+        whose timers the browser has throttled, a flaky network — is indistinguishable
+        from an unbounded pile of accumulating sockets.
+
+        `reason` is python-socketio's disconnect reason — one of `ping timeout`,
+        `transport close`, `transport error`, `client disconnect`, `server disconnect` —
+        which is the first thing worth knowing when sockets are churning. Versions from
+        5.12 always pass one; `python-socketio` is unpinned, so an older install calls this
+        with `sid` alone and `reason` falls back to its default.
+
+        Two constraints on this body, both imposed by how python-socketio invokes it:
+
+        - It must not raise. `AsyncServer._handle_disconnect` does not guard the
+          `_trigger_event` call, so an exception here skips `manager.disconnect()` and
+          leaves the sid in its rooms and in `server.environ` for the life of the process.
+        - The `pop` must stay first. `_trigger_event` retries `disconnect` handlers on
+          `TypeError` with one fewer argument, and that retry wraps the *await of the
+          handler*, not just the argument binding — so a `TypeError` raised anywhere below
+          would silently re-enter this method.
+        """
+        user_info = self._socket_users.pop(sid, None)
+        if user_info is None:
+            return
+
+        user_id = user_info.get("user_id")
+        # Forget the user's revalidation failures once their last socket is gone. The
+        # count stands in for how long these sockets have gone unchecked, so a user who
+        # reconnects must start over.
+        if user_id is not None and not any(info.get("user_id") == user_id for info in self._socket_users.values()):
+            self._revalidation_failures.pop(user_id, None)
+
+        # `.get` throughout: entries are populated by convention, not by a schema, and a
+        # KeyError here would cost the caller its cleanup (see above).
+        message = f"Socket {sid} disconnected (user_id: {user_info.get('user_id')}, reason: {reason or 'unknown'})"
+        if user_info.get("authenticated"):
+            logger.info(message)
+        else:
+            logger.debug(message)
 
     def start(self) -> None:
         """Start background work. Called from the app's startup hook.
@@ -713,6 +742,7 @@ class SocketIO:
             self._socket_users[sid] = {
                 "user_id": "system",
                 "is_admin": True,
+                "authenticated": False,
             }
 
         user_id = self._socket_users[sid]["user_id"]
