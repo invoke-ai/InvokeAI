@@ -1,5 +1,8 @@
 import importlib
 import pkgutil
+import subprocess
+import sys
+import textwrap
 
 import invokeai
 
@@ -33,3 +36,34 @@ def test_invokeai_imports():
                 failed_to_import.add(mod)
 
     assert not failed_to_import, f"Modules failed to import: {failed_to_import}"
+
+
+def test_graph_module_import_does_not_require_networkx():
+    script = """
+    import builtins
+    import sys
+
+    real_import = builtins.__import__
+
+    def blocked_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name == "networkx" or name.startswith("networkx."):
+            raise ModuleNotFoundError("No module named 'networkx'")
+        return real_import(name, globals, locals, fromlist, level)
+
+    builtins.__import__ = blocked_import
+    import invokeai.app.services.shared.graph  # noqa: F401
+
+    assert "networkx" not in sys.modules
+    print("LAZY_OK")
+    """
+
+    result = subprocess.run(
+        [sys.executable, "-c", textwrap.dedent(script)],
+        capture_output=True,
+        text=True,
+        timeout=300,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "LAZY_OK" in result.stdout

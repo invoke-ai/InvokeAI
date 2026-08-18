@@ -11,7 +11,6 @@ same fixture pattern as test_boards_multiuser. The storage-level user_id
 filter is covered separately in tests/app/services/video_records.
 """
 
-import asyncio
 import inspect
 from pathlib import Path
 from typing import Any
@@ -28,10 +27,12 @@ from invokeai.app.api.routers.videos import (
     VideoNamesBatch,
     _is_mp4_file,
     delete_uncategorized_videos,
+    delete_video,
     delete_videos_from_list,
     get_video_thumbnail,
     star_videos_in_list,
     unstar_videos_in_list,
+    update_video,
 )
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
@@ -673,12 +674,13 @@ def test_get_video_thumbnail_closes_file_before_route_returns(
     mock_invoker.services.videos.get_path.return_value = str(thumbnail_path)
     current_user = MagicMock(is_admin=True)
 
-    async def get_thumbnail_after_delete() -> bytes:
-        response = await get_video_thumbnail(current_user=current_user, video_name="video.mp4")
-        thumbnail_path.unlink()
-        return bytes(response.body)
+    # The route is `def`, not `async def`, so that its synchronous file read runs in the
+    # threadpool instead of on the event loop. Deleting the file straight after it returns is
+    # what proves the handle was closed before the response was built.
+    response = get_video_thumbnail(current_user=current_user, video_name="video.mp4")
+    thumbnail_path.unlink()
 
-    assert asyncio.run(get_thumbnail_after_delete()) == b"thumbnail-data"
+    assert bytes(response.body) == b"thumbnail-data"
 
 
 @pytest.mark.parametrize(
@@ -931,4 +933,20 @@ def test_delete_uncategorized_videos_is_offloaded_by_fastapi() -> None:
     ],
 )
 def test_video_batch_mutations_are_offloaded_by_fastapi(handler: Any) -> None:
+    assert not inspect.iscoroutinefunction(handler)
+
+
+@pytest.mark.parametrize(
+    "handler",
+    [
+        delete_video,
+        update_video,
+    ],
+)
+def test_single_video_mutations_are_offloaded_by_fastapi(handler: Any) -> None:
+    """Single-item mutations do blocking SQLite/disk work, same as their batch siblings.
+
+    Declared ``async def``, they would run that work directly on the event loop and stall
+    every other request and socket event until the delete/update finished.
+    """
     assert not inspect.iscoroutinefunction(handler)
