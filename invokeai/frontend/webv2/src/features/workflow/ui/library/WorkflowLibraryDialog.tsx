@@ -12,7 +12,6 @@ import {
   type WorkflowLibraryCategory,
   type WorkflowLibraryListItem,
 } from '@features/workflow/queries';
-import { documentToPreviewGraph, GraphPreviewFlow } from '@features/workflow/ui/graph-preview';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson, serializeWorkflowJson } from '@features/workflow/utility';
@@ -25,7 +24,7 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, ConfirmDialog, JsonPreview, Scrollable } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { markLibraryGraphSynced } from './librarySyncBridge';
@@ -48,6 +47,12 @@ interface WorkflowPreviewState {
 
 type WorkflowLoadPhase = 'fetching' | 'applying';
 
+const GraphPreviewPane = lazy(() =>
+  import('@features/workflow/ui/graph-preview/GraphPreviewPane').then((module) => ({
+    default: module.GraphPreviewPane,
+  }))
+);
+
 const WorkflowPreviewPane = ({
   isLoadingWorkflow,
   preview,
@@ -60,8 +65,6 @@ const WorkflowPreviewPane = ({
   onLoad: () => void;
 }) => {
   const [mode, setMode] = useState<'nodes' | 'json'>('nodes');
-  const { t } = useTranslation();
-  const { graph, positionHints } = documentToPreviewGraph(preview.document, t('widgets.labels.workflow'));
 
   return (
     <Stack gap="2">
@@ -92,9 +95,9 @@ const WorkflowPreviewPane = ({
         </HStack>
       </HStack>
       {mode === 'nodes' ? (
-        <Box h="24rem">
-          <GraphPreviewFlow graph={graph} positionHints={positionHints} />
-        </Box>
+        <Suspense fallback={<Box h="24rem" />}>
+          <GraphPreviewPane document={preview.document} />
+        </Suspense>
       ) : (
         <JsonPreview label={`${preview.item.name} JSON`} maxH="24rem" value={preview.raw} />
       )}

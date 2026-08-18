@@ -88,6 +88,21 @@ const mouse = (type: string, target: EventTarget, clientX: number, clientY: numb
   );
 };
 
+// A real press emits `pointerdown` before `mousedown`. dnd-kit's `MouseSensor`
+// only listens to the latter, but the strip acknowledges on the former, so a
+// drag simulation that skips it does not exercise what a user actually does.
+const pressDown = (target: EventTarget, clientX: number, clientY: number): void => {
+  target.dispatchEvent(
+    new PointerEvent('pointerdown', { bubbles: true, button: 0, cancelable: true, clientX, clientY })
+  );
+  mouse('mousedown', target, clientX, clientY);
+};
+
+const nextFrame = (): Promise<void> =>
+  new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+
 const touch = (
   type: string,
   target: EventTarget,
@@ -137,10 +152,13 @@ describe('LayoutPresetStrip', () => {
     expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
   });
 
-  it('reorders a dragged tab without activating it', async () => {
+  // Desktop tab strips — Chrome, Firefox, VS Code — select a tab the moment it
+  // is pressed and reorder it from that same gesture. Reordering therefore
+  // activates the dragged tab, and does so on the press rather than the drop.
+  it('selects a dragged tab on the press and reorders it in the same gesture', async () => {
     await renderStrip();
     await act(() => userEvent.click(presetTab('edit')!));
-    const activeBeforeDrag = store.getSnapshot().activeProject.layout.presetId;
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
     const source = presetTab('compose');
     const target = presetTab('automate');
     expect(source).not.toBeNull();
@@ -151,13 +169,18 @@ describe('LayoutPresetStrip', () => {
     const startY = start.top + start.height / 2;
     const endX = end.left + end.width / 2;
 
-    await act(() => mouse('mousedown', source!, startX, startY));
+    await act(() => pressDown(source!, startX, startY));
+
+    expect(presetTab('compose')).toHaveAttribute('aria-selected', 'true');
+    expect(presetTab('edit')).toHaveAttribute('aria-selected', 'false');
+
     await act(() => mouse('mousemove', source!.ownerDocument, startX + 8, startY));
     await act(() => mouse('mousemove', source!.ownerDocument, endX, startY));
     await act(() => mouse('mouseup', source!.ownerDocument, endX, startY));
+    await act(() => nextFrame());
 
     expect(store.getSnapshot().account.layoutPresetOrder).toEqual(['custom-1', 'edit', 'automate', 'compose']);
-    expect(store.getSnapshot().activeProject.layout.presetId).toBe(activeBeforeDrag);
+    expect(store.getSnapshot().activeProject.layout.presetId).toBe('compose');
   });
 
   it('supports keyboard reordering with sortable drag semantics', async () => {

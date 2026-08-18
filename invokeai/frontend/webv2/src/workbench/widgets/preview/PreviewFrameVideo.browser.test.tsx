@@ -5,7 +5,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, createRef, type Ref } from 'react';
+import { act, Activity, createRef, type Ref } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -523,6 +523,48 @@ describe('PreviewFrame native video arm', () => {
     await expect(result).resolves.toEqual({ ok: false, reason: 'stale' });
   });
 });
+
+describe('PreviewFrame video keep-alive', () => {
+  it('stops playback when the shell hides the widget instead of unmounting it', async () => {
+    await renderKeptVideo('visible');
+    const video = getVideo();
+    const pause = vi.spyOn(video, 'pause');
+
+    await renderKeptVideo('hidden');
+
+    // The element survives — this is the keep-alive path, not an unmount — but
+    // `display: none` does not stop media, so the frame has to pause it itself.
+    expect(getVideo()).toBe(video);
+    expect(video.checkVisibility()).toBe(false);
+    expect(pause).toHaveBeenCalledOnce();
+    expect(video.paused).toBe(true);
+  });
+
+  it('leaves playback alone while the widget stays visible', async () => {
+    await renderKeptVideo('visible');
+    const video = getVideo();
+    const pause = vi.spyOn(video, 'pause');
+
+    await renderKeptVideo('visible');
+
+    expect(getVideo()).toBe(video);
+    expect(pause).not.toHaveBeenCalled();
+  });
+});
+
+const renderKeptVideo = async (mode: 'hidden' | 'visible'): Promise<void> => {
+  await interact(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <Activity mode={mode}>
+            <VideoHarness />
+          </Activity>
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+  });
+};
 
 const renderVideo = async (
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean,

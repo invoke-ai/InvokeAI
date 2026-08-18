@@ -231,6 +231,8 @@ const validateBrowserRoute = (route, path) => {
       'activatedResourceBaseline',
       'activatedResourceLimits',
       'id',
+      'layoutAckMedianMs',
+      'layoutReturnSwitchMedianMs',
       'layoutSwitchMedianMs',
       'loadMedianMs',
       'longestTaskMaxMs',
@@ -248,6 +250,8 @@ const validateBrowserRoute = (route, path) => {
   );
   for (const key of [
     'domContentLoadedMedianMs',
+    'layoutAckMedianMs',
+    'layoutReturnSwitchMedianMs',
     'layoutSwitchMedianMs',
     'loadMedianMs',
     'longestTaskMaxMs',
@@ -644,6 +648,8 @@ export const checkBrowserRouteBudget = (route, expected, timingPolicy, expectedS
   const timingLimit = (value) => value * (1 + timingPolicy.tolerancePercent);
   const timingChecks = [
     ['domContentLoadedMedianMs', 'DOMContentLoaded median'],
+    ['layoutAckMedianMs', 'layout-ack median'],
+    ['layoutReturnSwitchMedianMs', 'layout-return-switch median'],
     ['layoutSwitchMedianMs', 'layout-switch median'],
     ['loadMedianMs', 'load median'],
     ['projectSwitchMedianMs', 'project-switch median'],
