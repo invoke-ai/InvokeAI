@@ -88,6 +88,11 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
+    def update_last_run_at(self, workflow_id: str) -> None:
+        """Records that a workflow was just run by setting its last_run_at timestamp to now."""
+        pass
+
+    @abstractmethod
     def get_all_tags(
         self,
         categories: Optional[list[WorkflowCategory]] = None,

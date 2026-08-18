@@ -37,7 +37,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at, user_id, is_public
+                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at, last_run_at, user_id, is_public
                 FROM workflow_library
                 WHERE workflow_id = ?;
                 """,
@@ -186,6 +186,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                         created_at,
                         updated_at,
                         opened_at,
+                        last_run_at,
                         tags,
                         user_id,
                         is_public
@@ -441,6 +442,17 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     """,
                     (workflow_id,),
                 )
+
+    def update_last_run_at(self, workflow_id: str) -> None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                UPDATE workflow_library
+                SET last_run_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                WHERE workflow_id = ?;
+                """,
+                (workflow_id,),
+            )
 
     def get_all_tags(
         self,
