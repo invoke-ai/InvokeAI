@@ -1,8 +1,9 @@
 """Tests for the custom nodes router."""
 
-import asyncio
 import json
+import subprocess
 import sys
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -135,7 +136,9 @@ class TestUninstallPackNameValidation:
                 patch("invokeai.app.api.routers.custom_nodes.shutil") as mock_shutil,
                 patch("invokeai.app.api.routers.custom_nodes._remove_workflows_by_ids") as mock_remove_workflows,
             ):
-                response = asyncio.run(uninstall_custom_node_pack(MagicMock(), pack_name))
+                # The route is `def`, not `async def`, so that its synchronous filesystem work
+                # runs in the threadpool instead of on the event loop.
+                response = uninstall_custom_node_pack(MagicMock(), pack_name)
 
             assert response.name == pack_name
             assert response.success is False
@@ -565,3 +568,87 @@ class TestUninstallReinstallReloadsSubmodules:
             )
         finally:
             _purge_pack_modules(pack_name)
+
+
+class TestConcurrentPackMutation:
+    """Guards that two concurrent pack operations cannot corrupt each other.
+
+    Install, uninstall and reload were `async def` bodies containing no `await`, which made them
+    implicitly mutually exclusive — the event loop had no point at which to switch between two of
+    them. Dispatched to the threadpool they interleave for real, and install's failure path is
+    destructive: it `rmtree`s `target_dir` on a failed clone, without knowing whether that
+    directory is its own or one a concurrent install just finished writing.
+    """
+
+    # How long the losing install waits for the winner before giving up. Only reached when the
+    # two installs are correctly serialized — then nobody ever sets the event.
+    RACER_CLONE_WAIT = 1.0
+    SOURCE = "https://github.com/example/my-pack.git"
+
+    def test_failed_install_does_not_delete_a_concurrent_install(self, tmp_path: Path) -> None:
+        from types import SimpleNamespace
+
+        from invokeai.app.api.routers.custom_nodes import InstallNodePackRequest, install_custom_node_pack
+
+        racer_past_exists_check = threading.Event()
+        winner_installed = threading.Event()
+        clone_calls: list[list[str]] = []
+        calls_lock = threading.Lock()
+
+        def fake_clone(cmd, **kwargs):  # type: ignore[no-untyped-def]
+            target = Path(cmd[3])
+            with calls_lock:
+                is_racer = not clone_calls
+                clone_calls.append(cmd)
+
+            if is_racer:
+                # Reaching here means the exists-check has already passed. Fail only after the
+                # other install has written its files — that ordering is what turns this
+                # request's cleanup into a deletion of somebody else's pack.
+                racer_past_exists_check.set()
+                winner_installed.wait(timeout=TestConcurrentPackMutation.RACER_CLONE_WAIT)
+                return subprocess.CompletedProcess(cmd, 128, "", "fatal: clone failed")
+
+            target.mkdir(parents=True, exist_ok=True)
+            (target / "__init__.py").write_text("")
+            winner_installed.set()
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        responses: list[object] = []
+        responses_lock = threading.Lock()
+
+        def attempt() -> None:
+            response = install_custom_node_pack(MagicMock(), InstallNodePackRequest(source=self.SOURCE))
+            with responses_lock:
+                responses.append(response)
+
+        with (
+            patch("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", return_value=tmp_path),
+            # A stand-in module rather than patching `subprocess.run` itself: patching the real
+            # module would leak into the rest of the suite, and the router's `except
+            # subprocess.TimeoutExpired` needs a real exception class to catch.
+            patch(
+                "invokeai.app.api.routers.custom_nodes.subprocess",
+                SimpleNamespace(run=fake_clone, TimeoutExpired=subprocess.TimeoutExpired),
+            ),
+            patch("invokeai.app.api.routers.custom_nodes._load_node_pack"),
+            patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"),
+        ):
+            racer = threading.Thread(target=attempt)
+            racer.start()
+            # Start the second install only once the first is past the exists-check, so the
+            # interleaving under test is reached deterministically rather than by luck.
+            assert racer_past_exists_check.wait(timeout=10)
+
+            winner = threading.Thread(target=attempt)
+            winner.start()
+
+            for thread in (racer, winner):
+                thread.join(timeout=30)
+                assert not thread.is_alive()
+
+        pack_dir = tmp_path / "my-pack"
+        assert (pack_dir / "__init__.py").exists(), (
+            "The successful install's pack directory was deleted by the failed install's cleanup."
+        )
+        assert sum(1 for response in responses if response.success) == 1  # type: ignore[attr-defined]

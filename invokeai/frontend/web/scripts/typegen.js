@@ -24,7 +24,13 @@ async function generateTypes(schema) {
   const types = await openapiTS(schema, {
     exportType: true,
     transform: (schemaObject) => {
-      if ('format' in schemaObject && schemaObject.format === 'binary') {
+      // File upload fields. FastAPI emitted `format: binary` up to 0.129 and switched to the
+      // OpenAPI 3.1 form `contentMediaType: application/octet-stream` in 0.130 — both must map
+      // to `Blob`, or upload call sites silently start typing their `File` argument as `string`.
+      const isBinary =
+        ('format' in schemaObject && schemaObject.format === 'binary') ||
+        ('contentMediaType' in schemaObject && schemaObject.contentMediaType === 'application/octet-stream');
+      if (isBinary) {
         return schemaObject.nullable ? ts.factory.createUnionTypeNode([BLOB, NULL]) : BLOB;
       }
       if (schemaObject.title === 'MetadataField') {
