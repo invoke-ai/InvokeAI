@@ -59,3 +59,26 @@ def test_update_last_run_at_sets_timestamp(workflow_records_service: SqliteWorkf
     )
     row = next(item for item in listed.items if item.workflow_id == created.workflow_id)
     assert row.last_run_at is not None
+
+
+def test_update_last_run_at_scoped_to_owning_user(workflow_records_service: SqliteWorkflowRecordsStorage) -> None:
+    """Mirrors update_opened_at's ownership scoping: passing a mismatched user_id is a no-op,
+    and the row updates only once the correct owner's user_id is supplied."""
+    workflow = create_minimal_user_workflow()
+    created = workflow_records_service.create(workflow=workflow, user_id="user-a")
+
+    workflow_records_service.update_last_run_at(created.workflow_id, user_id="user-b")
+    assert workflow_records_service.get(created.workflow_id).last_run_at is None
+
+    workflow_records_service.update_last_run_at(created.workflow_id, user_id="user-a")
+    assert workflow_records_service.get(created.workflow_id).last_run_at is not None
+
+
+def test_update_last_run_at_missing_workflow_is_a_no_op(
+    workflow_records_service: SqliteWorkflowRecordsStorage,
+) -> None:
+    """The service method mirrors update_opened_at: it has no existence check and silently does
+    nothing for an unknown workflow_id. The router turns a missing workflow into a 404 by calling
+    `get()` first (see tests/app/routers/test_multiuser_authorization.py::TestWorkflowMutationAuth
+    ::test_update_last_run_at_missing_workflow_404s)."""
+    workflow_records_service.update_last_run_at("does-not-exist")

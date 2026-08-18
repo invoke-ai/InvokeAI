@@ -443,16 +443,26 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     (workflow_id,),
                 )
 
-    def update_last_run_at(self, workflow_id: str) -> None:
+    def update_last_run_at(self, workflow_id: str, user_id: Optional[str] = None) -> None:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""--sql
-                UPDATE workflow_library
-                SET last_run_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
-                WHERE workflow_id = ?;
-                """,
-                (workflow_id,),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    f"""--sql
+                    UPDATE workflow_library
+                    SET last_run_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                    WHERE workflow_id = ? AND user_id = ?;
+                    """,
+                    (workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    f"""--sql
+                    UPDATE workflow_library
+                    SET last_run_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                    WHERE workflow_id = ?;
+                    """,
+                    (workflow_id,),
+                )
 
     def get_all_tags(
         self,
