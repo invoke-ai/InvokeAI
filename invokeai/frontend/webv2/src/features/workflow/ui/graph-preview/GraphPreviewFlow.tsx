@@ -81,10 +81,15 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
   return (
     <Box
       bg="bg"
-      borderColor={data.isSelected ? 'accent.emphasized' : 'border.emphasized'}
+      borderColor={data.isSelected ? 'accent.solid' : 'border.emphasized'}
       borderWidth="1px"
       fontSize="xs"
       minW="14rem"
+      // Border + matching outline reads as a 2px solid accent ring — visible
+      // at any zoom, where the previous emphasized border was too subtle.
+      outlineColor="accent.solid"
+      outlineStyle={data.isSelected ? 'solid' : undefined}
+      outlineWidth="1px"
       rounded="lg"
       shadow="sm"
     >

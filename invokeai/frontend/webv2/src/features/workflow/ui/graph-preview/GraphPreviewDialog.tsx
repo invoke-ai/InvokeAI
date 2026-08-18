@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { Box, Dialog, Icon, Portal, SegmentGroup, Stack, Text } from '@chakra-ui/react';
 import { useWorkflowGraphPreview } from '@features/workflow/ui/WorkflowUiContext';
 import { Button, JsonPreview, toaster } from '@platform/ui';
-import { CheckIcon, ChevronUpIcon, CopyIcon, SquareDashedIcon } from 'lucide-react';
+import { CheckIcon, ChevronUpIcon, CopyIcon, TriangleAlertIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -44,26 +44,25 @@ const PreviewPane = ({ children }: { children: ReactNode }) => (
   </Box>
 );
 
-const NoticeBanner = ({ bg, color, children }: { bg: string; color: string; children: ReactNode }) => (
-  <Box alignItems="center" bg={bg} color={color} display="flex" fontSize="sm" gap="2" px="3" py="2" rounded="md">
-    <Icon as={SquareDashedIcon} boxSize="4" flexShrink={0} />
-    <Box alignItems="center" display="flex" flex="1" gap="2" justifyContent="space-between" minW="0">
+/** The strip above the graph when compilation is blocked — notices about a *valid* graph (e.g. randomized seed) live inline in the summary panel instead. */
+const InvalidBanner = ({ children }: { children: ReactNode }) => (
+  <Box
+    alignItems="center"
+    bg="bg.muted"
+    color="fg.muted"
+    display="flex"
+    fontSize="sm"
+    gap="2"
+    px="3"
+    py="2"
+    rounded="md"
+  >
+    <Icon as={TriangleAlertIcon} boxSize="4" flexShrink={0} />
+    <Box flex="1" minW="0">
       {children}
     </Box>
   </Box>
 );
-
-/** The banner's "show node" action — a notice may point at the node that caused it (e.g. a randomized seed). */
-const ShowNodeLink = ({ nodeId, onSelect }: { nodeId: string; onSelect: (nodeId: string) => void }) => {
-  const { t } = useTranslation();
-  const handleClick = useCallback(() => onSelect(nodeId), [nodeId, onSelect]);
-
-  return (
-    <Button flexShrink={0} fontWeight="normal" h="auto" px="0" size="2xs" variant="plain" onClick={handleClick}>
-      {t('graphPreview.showNode')}
-    </Button>
-  );
-};
 
 export const GraphPreviewDialog = ({
   graphId,
@@ -215,18 +214,12 @@ export const GraphPreviewDialog = ({
               </SegmentGroup.Root>
             </Dialog.Header>
             <Dialog.Body display="flex" flex="1" flexDirection="column" gap="3" minH="0">
-              {source.notices.map((notice) => (
-                <NoticeBanner key={notice.id} bg="orange.subtle" color="fg">
-                  <Text>{notice.message}</Text>
-                  {notice.nodeId ? <ShowNodeLink nodeId={notice.nodeId} onSelect={selectAndReveal} /> : null}
-                </NoticeBanner>
-              ))}
               {hasInvalidReasons ? (
-                <NoticeBanner bg="bg.muted" color="fg.muted">
+                <InvalidBanner>
                   <Text>
                     {t('graphPreview.invalidTitle')} {source.invalidReasons[0]}
                   </Text>
-                </NoticeBanner>
+                </InvalidBanner>
               ) : null}
               {hasInvalidReasons ? null : (
                 <Box display="flex" flex="1" gap="3" minH="0">
@@ -255,6 +248,7 @@ export const GraphPreviewDialog = ({
                       selectedNode={selectedNode}
                       onBack={handleBack}
                       onProvenanceClick={handleProvenanceClick}
+                      onShowNode={selectAndReveal}
                     />
                   ) : null}
                 </Box>

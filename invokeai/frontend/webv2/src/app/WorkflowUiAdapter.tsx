@@ -105,6 +105,14 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           throw error;
         }
       },
+      openDocumentInNewProject: (document, label) => {
+        // `create` activates the new project, so `replace` (which always
+        // targets the active project) lands the document there, not in the
+        // project the preview was opened from.
+        commands.projects.create();
+        commands.workflows.replace(document, label);
+        openWidget('workflow');
+      },
       openWorkflowEditor: () => {
         openWidget('workflow');
       },

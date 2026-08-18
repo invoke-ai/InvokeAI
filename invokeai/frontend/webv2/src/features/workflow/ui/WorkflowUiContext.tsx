@@ -47,6 +47,7 @@ export interface WorkflowGraphPreviewPort {
   invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
   focusSource(sourceId?: WorkflowInvocationSourceId): void; // reveal the source's widget (provenance links)
   openWorkflowEditor(): void; // reveal the workflow editor widget
+  openDocumentInNewProject(document: ProjectGraphState, label: string): void; // fork a preview into a fresh project
 }
 
 /**

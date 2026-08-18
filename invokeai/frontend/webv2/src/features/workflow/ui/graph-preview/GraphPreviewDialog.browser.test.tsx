@@ -149,6 +149,9 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.editInEditor': 'Edit in workflow editor',
   'graphPreview.editInEditorFailed': 'No editable nodes in this graph.',
   'graphPreview.editInEditorHint': 'Replaces the current workflow',
+  'graphPreview.forkIntoProject': 'Fork into new project',
+  'graphPreview.forkIntoProjectFailed': 'No nodes to fork into a project.',
+  'graphPreview.forkIntoProjectHint': 'Copies this graph into a fresh project',
   'graphPreview.graph': 'Graph',
   'graphPreview.graphJsonLabel': '{{title}} graph JSON',
   'graphPreview.inputCount': '{{count}} inputs',
@@ -340,6 +343,7 @@ const createGraphPreviewPort = (): WorkflowGraphPreviewPort => ({
   focusSource: vi.fn(),
   getRoute: () => ({ canInvoke: true, label: 'Generate → Gallery' }),
   invoke: vi.fn(() => Promise.resolve(true)),
+  openDocumentInNewProject: vi.fn(),
   openWorkflowEditor: vi.fn(),
 });
 
@@ -470,10 +474,11 @@ describe('GraphPreviewDialog', () => {
     expect(text).toContain('Updates as you change settings.');
   });
 
-  it('shows the seed notice banner', async () => {
+  it('shows the seed notice inline in the summary panel', async () => {
     await renderDialog(FIXTURE_SOURCE);
 
-    expect(document.body.textContent ?? '').toContain('Seed is randomized');
+    const panel = document.querySelector('[role="region"][aria-label="This graph"]');
+    expect(panel?.textContent ?? '').toContain('Seed is randomized');
   });
 
   it('switches to JSON mode', async () => {
@@ -629,6 +634,24 @@ describe('GraphPreviewDialog', () => {
     expect(document_?.nodes).toHaveLength(3);
     expect(label).toBe('Opened from graph preview');
     expect(graphPreviewPort.openWorkflowEditor).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('Open as → Fork into new project hands the named document to the port and closes the dialog', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Fork into new project');
+
+    expect(graphPreviewPort.openDocumentInNewProject).toHaveBeenCalledTimes(1);
+    const [document_, label] = vi.mocked(graphPreviewPort.openDocumentInNewProject).mock.calls[0] ?? [];
+    expect(document_?.nodes).toHaveLength(3);
+    // The fixture graph has no `label`, so this exercises the
+    // `graph.label ?? sourceLabel` fallback (`sourceLabel` is "Generate").
+    expect(document_?.name).toBe('Generate');
+    expect(label).toBe('Opened from graph preview');
+    // Forking must not touch the current project's workflow.
+    expect(workflowUiAdapter.commands.replace).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 

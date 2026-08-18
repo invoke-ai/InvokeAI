@@ -97,6 +97,7 @@ describe('Workflow UI read-port isolation', () => {
       focusSource: () => {},
       getRoute: () => null,
       invoke: () => Promise.resolve(false),
+      openDocumentInNewProject: () => {},
       openWorkflowEditor: () => {},
     };
     const GraphPreviewHarness = ({ children }: { children: ReactNode }) => {
@@ -168,6 +169,7 @@ describe('Workflow UI read-port isolation', () => {
         focusSource: () => {},
         getRoute: () => null,
         invoke: () => Promise.resolve(true),
+        openDocumentInNewProject: () => {},
         openWorkflowEditor: () => {},
       })
     );
@@ -176,6 +178,7 @@ describe('Workflow UI read-port isolation', () => {
         focusSource: () => {},
         getRoute: () => null,
         invoke: () => Promise.resolve(false),
+        openDocumentInNewProject: () => {},
         openWorkflowEditor: () => {},
       })
     );

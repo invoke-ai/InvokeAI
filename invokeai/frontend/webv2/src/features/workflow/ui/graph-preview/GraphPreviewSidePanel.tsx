@@ -1,9 +1,10 @@
 import type { GraphPreviewSourceState, WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 import type { TFunction } from 'i18next';
 
-import { Badge, Box, DataList, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, DataList, Icon, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton, Scrollable } from '@platform/ui';
-import { ArrowLeftIcon } from 'lucide-react';
+import { ArrowLeftIcon, SquareDashedIcon } from 'lucide-react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type PreviewGraphNode = WorkflowPreviewGraph['nodes'][number];
@@ -21,26 +22,81 @@ export const GraphPreviewSidePanel = ({
   selectedNode,
   onBack,
   onProvenanceClick,
+  onShowNode,
 }: {
   source: GraphPreviewSourceState;
   selectedNode: PreviewGraphNode | null;
   onBack: () => void;
   onProvenanceClick: () => void;
+  /** Selects a notice's node in the flow and brings it into view. */
+  onShowNode: (nodeId: string) => void;
 }) => {
   const { t } = useTranslation();
 
   return (
-    <Scrollable flexShrink={0} h="full" label={t('graphPreview.thisGraph')} w="19rem">
+    // `minH="0"` (not `h="full"`) — an explicit height opts the panel out of
+    // the flex row's stretch sizing, so the root grew to its content height
+    // and the viewport never actually overflowed (dead scrollbar thumb).
+    <Scrollable flexShrink={0} label={t('graphPreview.thisGraph')} minH="0" w="19rem">
       {selectedNode ? (
         <NodeInspector node={selectedNode} source={source} onBack={onBack} onProvenanceClick={onProvenanceClick} />
       ) : (
-        <GraphSummary source={source} />
+        <GraphSummary source={source} onShowNode={onShowNode} />
       )}
     </Scrollable>
   );
 };
 
-const GraphSummary = ({ source }: { source: GraphPreviewSourceState }) => {
+/** A notice row in the summary (e.g. randomized seed) — quiet, inline with the rows it annotates, with an optional jump to the node that caused it. */
+const SummaryNotice = ({
+  message,
+  nodeId,
+  onShowNode,
+}: {
+  message: string;
+  nodeId?: string;
+  onShowNode: (nodeId: string) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleShowNode = useCallback(() => {
+    if (nodeId) {
+      onShowNode(nodeId);
+    }
+  }, [nodeId, onShowNode]);
+
+  return (
+    <Box alignItems="flex-start" display="flex" gap="1.5">
+      <Icon as={SquareDashedIcon} boxSize="3" color="orange.fg" flexShrink={0} mt="0.5" />
+      <Stack gap="0.5" minW="0">
+        <Text color="fg.muted" fontSize="2xs">
+          {message}
+        </Text>
+        {nodeId ? (
+          <Button
+            alignSelf="flex-start"
+            fontSize="2xs"
+            fontWeight="normal"
+            h="auto"
+            px="0"
+            size="2xs"
+            variant="plain"
+            onClick={handleShowNode}
+          >
+            {t('graphPreview.showNode')}
+          </Button>
+        ) : null}
+      </Stack>
+    </Box>
+  );
+};
+
+const GraphSummary = ({
+  source,
+  onShowNode,
+}: {
+  source: GraphPreviewSourceState;
+  onShowNode: (nodeId: string) => void;
+}) => {
   const { t } = useTranslation();
   const nodeCount = source.graph?.nodes.length;
 
@@ -76,6 +132,9 @@ const GraphSummary = ({ source }: { source: GraphPreviewSourceState }) => {
           </DataList.Item>
         ))}
       </DataList.Root>
+      {source.notices.map((notice) => (
+        <SummaryNotice key={notice.id} message={notice.message} nodeId={notice.nodeId} onShowNode={onShowNode} />
+      ))}
     </Stack>
   );
 };
