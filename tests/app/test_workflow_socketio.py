@@ -194,7 +194,7 @@ async def test_authenticated_socket_logs_disconnect_at_same_level_as_connect(mon
     log = SimpleNamespace(info=Mock(), debug=Mock(), warning=Mock(), error=Mock())
     monkeypatch.setattr("invokeai.app.api.sockets.logger", log)
 
-    await socketio._handle_disconnect("sid-1", "ping timeout")
+    await socketio._sio._trigger_event("disconnect", "/", "sid-1", "ping timeout")
 
     log.info.assert_called_once()
     message = log.info.call_args.args[0]
