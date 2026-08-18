@@ -2854,6 +2854,7 @@
         }
     },
     "controlLayers": {
+        "krea2StyleStrength": "Style Strength",
         "regional": "Regional",
         "global": "Global",
         "canvas": "Canvas",

@@ -1,6 +1,6 @@
 import json
 import math
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 from pathlib import Path
 from typing import Any, Callable, Iterator, Optional
 
@@ -18,6 +18,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     Krea2ConditioningField,
+    Krea2StyleReferenceField,
     LatentsField,
     WithBoard,
     WithMetadata,
@@ -42,6 +43,7 @@ from invokeai.backend.krea2.sampling_utils import (
     prepare_position_ids,
     unpack_latents,
 )
+from invokeai.backend.krea2.style_reference_extension import Krea2StyleReferenceExtension
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
@@ -60,7 +62,7 @@ KREA2_LATENT_CHANNELS = 16
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -96,6 +98,22 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         default=None,
         description="Override the resolution-aware timestep shift (mu). Leave unset to use the model default "
         "(mu=1.15 for the distilled Turbo checkpoint).",
+    )
+    style_reference: Optional[Krea2StyleReferenceField] = InputField(
+        default=None,
+        description="Training-free style reference. Adds one reference forward per step, so generation "
+        "takes roughly twice as long, and retains the reference's attention keys/values for the whole "
+        "step (~0.5 GB at 1024x1024, ~1.7 GB at 2560x1440). At 1440p the combined footprint no longer "
+        "fits a 24 GB card alongside the model.",
+        input=Input.Connection,
+        title="Style Reference",
+    )
+    style_reference_conditioning: Optional[Krea2ConditioningField] = InputField(
+        default=None,
+        description="Prompt for the style-reference pass. Leave unconnected to reuse the positive prompt; "
+        "a short neutral prompt describing the reference can give a purer style transfer.",
+        input=Input.Connection,
+        title="Style Reference Prompt",
     )
 
     @field_validator("cfg_scale")
@@ -397,6 +415,40 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 init_latents=init_latents, inpaint_mask=inpaint_mask, noise=noise
             )
 
+        # Style reference: load + validate before the transformer is placed, so a size mismatch fails
+        # before we have spent anything on the model.
+        style_extension: Krea2StyleReferenceExtension | None = None
+        style_ref_prompt_embeds = None
+        style_ref_position_ids = None
+        if self.style_reference is not None:
+            style_extension = Krea2StyleReferenceExtension.from_field(
+                context,
+                self.style_reference,
+                denoise_width=self.width,
+                denoise_height=self.height,
+                dtype=inference_dtype,
+                device=device,
+            )
+            if self.style_reference_conditioning is not None:
+                style_ref_extension = self._load_text_conditioning(
+                    context,
+                    self.style_reference_conditioning,
+                    grid_height,
+                    grid_width,
+                    inference_dtype,
+                    device,
+                )
+                style_ref_prompt_embeds = style_ref_extension.regional_text_conditioning.prompt_embeds
+                style_ref_position_ids = prepare_position_ids(
+                    style_ref_prompt_embeds.shape[1], grid_height, grid_width, device
+                )
+            else:
+                # Reusing the positive conditioning costs nothing and needs no extra encode. A dedicated,
+                # neutral reference prompt is exposed as an override because it measurably changes how much
+                # of the reference's *subject* bleeds into the style.
+                style_ref_prompt_embeds = pos_prompt_embeds
+                style_ref_position_ids = position_ids
+
         step_callback = self._build_step_callback(context)
         step_callback(
             PipelineIntermediateState(
@@ -428,6 +480,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             regional_attention_mask_bytes=self._regional_attention_mask_bytes(
                 pos_extension, neg_extension, inference_dtype
             ),
+            style_reference_kv_bytes=(
+                style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0
+            ),
         )
 
         with ExitStack() as exit_stack:
@@ -435,7 +490,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
             )
 
-            attention_state = self._install_attention_processors(transformer, exit_stack)
+            attention_state = self._install_attention_processors(transformer, exit_stack, style_extension)
 
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
@@ -453,35 +508,62 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 self._build_attention_payload(neg_extension, inference_dtype) if neg_extension is not None else None
             )
 
+            if style_extension is not None:
+                # Built after the LoRA patcher so the reference trajectory is anchored to the same weights
+                # the sampler will use.
+                style_extension.prepare([sigma.item() for sigma in sigmas_sched[:total_steps]])
+
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / num_train_timesteps to the transformer.
                 timestep = (t / num_train_timesteps).expand(latents.shape[0]).to(inference_dtype)
 
-                self._install_attention_payload(attention_state, pos_attention_payload)
-                noise_pred_cond = transformer(
-                    hidden_states=latents,
-                    encoder_hidden_states=pos_prompt_embeds,
-                    encoder_attention_mask=None,
-                    timestep=timestep,
-                    position_ids=position_ids,
-                    return_dict=False,
-                )[0]
+                style_pass = nullcontext()
+                if style_extension is not None:
+                    # Pass A: run the reference alone and stash its image-token K/V. It never sees the
+                    # target, so this is equivalent to upstream's doubled batch — see style_reference.py.
+                    self._install_attention_payload(attention_state, None)
+                    with style_extension.capture():
+                        transformer(
+                            hidden_states=style_extension.reference_latents_for_step(step_idx),
+                            encoder_hidden_states=style_ref_prompt_embeds,
+                            encoder_attention_mask=None,
+                            timestep=timestep,
+                            position_ids=style_ref_position_ids,
+                            return_dict=False,
+                        )
+                    style_pass = style_extension.inject(
+                        Krea2StyleReferenceExtension.progress_for_step(step_idx, total_steps)
+                    )
 
-                if self._should_apply_cfg_for_step(
-                    cfg_scale[step_idx], has_negative_conditioning=neg_prompt_embeds is not None
-                ):
-                    self._install_attention_payload(attention_state, neg_attention_payload)
-                    noise_pred_uncond = transformer(
+                # Pass B: the target. CFG runs inside the same injection — styling only the conditional
+                # pass would make CFG amplify (styled_cond - plain_uncond), which overshoots badly above
+                # cfg ~4. The single reference pass above is shared by both.
+                with style_pass:
+                    self._install_attention_payload(attention_state, pos_attention_payload)
+                    noise_pred_cond = transformer(
                         hidden_states=latents,
-                        encoder_hidden_states=neg_prompt_embeds,
+                        encoder_hidden_states=pos_prompt_embeds,
                         encoder_attention_mask=None,
                         timestep=timestep,
-                        position_ids=neg_position_ids,
+                        position_ids=position_ids,
                         return_dict=False,
                     )[0]
-                    noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)
-                else:
-                    noise_pred = noise_pred_cond
+
+                    if self._should_apply_cfg_for_step(
+                        cfg_scale[step_idx], has_negative_conditioning=neg_prompt_embeds is not None
+                    ):
+                        self._install_attention_payload(attention_state, neg_attention_payload)
+                        noise_pred_uncond = transformer(
+                            hidden_states=latents,
+                            encoder_hidden_states=neg_prompt_embeds,
+                            encoder_attention_mask=None,
+                            timestep=timestep,
+                            position_ids=neg_position_ids,
+                            return_dict=False,
+                        )[0]
+                        noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
 
                 # Euler step using the (possibly clipped) sigma schedule.
                 sigma_curr = sigmas_sched[step_idx]
@@ -514,7 +596,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return latents
 
     def _install_attention_processors(
-        self, transformer: torch.nn.Module, exit_stack: ExitStack
+        self,
+        transformer: torch.nn.Module,
+        exit_stack: ExitStack,
+        style_extension: Krea2StyleReferenceExtension | None = None,
     ) -> Krea2RegionalPromptingState:
         """Swap in the memory-efficient attention processors and return the state they share.
 
@@ -527,10 +612,21 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         long as the state still carries the attention mask this node installs per pass.
         """
         state = Krea2RegionalPromptingState()
-        transformer.set_attn_processor(build_krea2_attention_processors(transformer, state))
+        style_state = style_extension.build_state(transformer) if style_extension is not None else None
+        transformer.set_attn_processor(
+            build_krea2_attention_processors(
+                transformer,
+                state,
+                style_reference_state=style_state,
+                style_reference_blocks=style_extension.block_indices if style_extension is not None else None,
+            )
+        )
         # The processors remain installed on the cached transformer after this invocation. Do not let them
         # retain a potentially multi-GB regional mask between generations, including when denoising raises.
         exit_stack.callback(self._clear_attention_state, state)
+        if style_state is not None:
+            # Same hazard, larger: the captured reference K/V run to ~1.7 GiB at 2560x1440.
+            exit_stack.callback(style_state.clear)
         return state
 
     @staticmethod
@@ -577,6 +673,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         do_cfg: bool,
         num_loras: int,
         regional_attention_mask_bytes: int = 0,
+        style_reference_kv_bytes: int = 0,
     ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
@@ -606,6 +703,15 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # transient buffers warrant a modest bump.
             estimated = int(estimated * 1.1)
         estimated += regional_attention_mask_bytes
+        if style_reference_kv_bytes > 0:
+            # The captured reference K/V stay resident for the whole target pass: two tensors per styled
+            # block, at the pre-expansion KV head count (12, not 48 — see style_reference.py). ~0.5 GiB at
+            # 1024x1024, ~1.7 GiB at 2560x1440. On top of that the styled attention runs with a key
+            # sequence of S + image_seq_len, and the reference forward briefly holds its own activations;
+            # 20% on the activation term covers both. The captured K/V are an exact, known size, so they
+            # are added after the multiplier rather than scaled by it.
+            estimated = int(estimated * 1.2)
+            estimated += style_reference_kv_bytes
         if num_loras > 0:
             estimated += int(0.5 * num_loras * GB)
         return estimated

@@ -194,11 +194,12 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    // FLUX.2, Qwen Image Edit and Wan reference images don't require a model - it's built-in
+    // FLUX.2, Qwen Image Edit, Wan and Krea-2 reference images don't require a model - it's built-in
     if (
       config.type !== 'flux2_reference_image' &&
       config.type !== 'qwen_image_reference_image' &&
-      config.type !== 'wan_reference_image'
+      config.type !== 'wan_reference_image' &&
+      config.type !== 'krea2_reference_image'
     ) {
       if (!('model' in config) || !config.model) {
         // No model selected

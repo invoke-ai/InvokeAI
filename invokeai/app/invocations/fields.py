@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Callable, Optional, Tuple
+from typing import Any, Callable, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, TypeAdapter
 from pydantic.fields import _Unset
@@ -396,6 +396,39 @@ class Krea2ConditioningField(BaseModel):
         description="The mask associated with this conditioning tensor for regional prompting. "
         "Excluded regions should be set to False, included regions should be set to True.",
     )
+
+
+class Krea2StyleReferenceField(BaseModel):
+    """Style-reference conditioning for Krea-2 shared-KV reference attention.
+
+    Carries the VAE-encoded reference latents plus the tuning parameters that shape how strongly, and in
+    which frequency bands, the reference influences the target. The reference must be encoded at exactly
+    the denoise node's resolution, so the dims travel with it for an early, legible mismatch error.
+
+    Only ``style_strength`` is meant for everyday use; it modulates several of the others. The remainder
+    are exposed for tuning and should be left at their defaults.
+    """
+
+    reference_latents_name: str = Field(description="Name of the saved [1, 16, 1, H/8, W/8] reference latents.")
+    width: int = Field(description="Image width the reference was encoded at (must match denoise width).")
+    height: int = Field(description="Image height the reference was encoded at (must match denoise height).")
+    style_strength: float = Field(default=1.0, description="Overall style strength. 0 disables the reference.")
+    blocks: str = Field(default="7-27", description="Transformer blocks the reference is injected into.")
+    ref_k_strength: float = Field(default=1.06, description="Multiplier on the reference key path.")
+    adain_strength: float = Field(default=0.85, description="Reference statistics applied to the target Q/K.")
+    value_mode: Literal["target", "raw_reference", "ref_mean", "target_adain", "target_adain_plus_ref"] = Field(
+        default="target_adain_plus_ref", description="How the reference value vectors are constructed."
+    )
+    value_adain_strength: float = Field(
+        default=0.65,
+        description="Reference statistics applied to the target value path. Has no effect while ref_value_mix is 1.0.",
+    )
+    ref_value_mix: float = Field(default=1.0, description="How much raw reference value signal is kept.")
+    high_scale_start: float = Field(default=1.04, description="High-frequency reference key scale at step 0.")
+    high_scale_end: float = Field(default=0.0, description="High-frequency reference key scale at the last step.")
+    low_scale_start: float = Field(default=1.0, description="Low-frequency reference key scale at step 0.")
+    low_scale_end: float = Field(default=1.10, description="Low-frequency reference key scale at the last step.")
+    beta: float = Field(default=2.5, description="Exponent of the high-to-low frequency falloff curve.")
 
 
 class AnimaConditioningField(BaseModel):

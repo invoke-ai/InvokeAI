@@ -43,6 +43,17 @@ vi.mock('features/controlLayers/store/paramsSlice', () => ({
   selectParamsSlice: vi.fn(() => params),
 }));
 
+let refImageEntities: unknown[] = [];
+vi.mock('features/controlLayers/store/refImagesSlice', async () => {
+  const actual = await vi.importActual('features/controlLayers/store/refImagesSlice');
+  return { ...actual, selectRefImagesSlice: vi.fn(() => ({ entities: refImageEntities })) };
+});
+
+vi.mock('features/controlLayers/store/validators', async () => {
+  const actual = await vi.importActual('features/controlLayers/store/validators');
+  return { ...actual, getGlobalReferenceImageWarnings: vi.fn(() => []) };
+});
+
 vi.mock('features/controlLayers/store/selectors', () => ({
   selectCanvasMetadata: vi.fn(() => ({})),
   selectCanvasSlice: vi.fn(() => ({
@@ -141,6 +152,7 @@ describe('buildKrea2Graph', () => {
   afterEach(() => {
     vi.clearAllMocks();
     nextId = 0;
+    refImageEntities = [];
     params = { ...defaultParams };
     model = { ...baseModel };
   });
@@ -384,6 +396,107 @@ describe('buildKrea2Graph', () => {
       const { g } = await buildTxt2Img();
       const metadata = g.getMetadataNode() as unknown as Record<string, unknown>;
       expect(metadata.negative_prompt).toBeUndefined();
+    });
+  });
+  describe('style reference', () => {
+    const styleRefEntity = (overrides: Record<string, unknown> = {}) => ({
+      id: 'ref-1',
+      isEnabled: true,
+      config: {
+        type: 'krea2_reference_image',
+        styleStrength: 1,
+        image: { original: { image: { image_name: 'style.png' }, width: 512, height: 512 } },
+        ...overrides,
+      },
+    });
+
+    const styleReferenceNode = (g: BuiltGraph) =>
+      Object.values(g.getGraph().nodes).find((n) => n.type === 'krea2_style_reference');
+
+    it('adds no style reference node when there is no reference image', async () => {
+      const { g } = await buildTxt2Img();
+      expect(styleReferenceNode(g)).toBeUndefined();
+    });
+
+    it('wires the style reference between the VAE and denoise', async () => {
+      refImageEntities = [styleRefEntity()];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference).toBeDefined();
+      expect(styleReference.image).toEqual({ image_name: 'style.png' });
+
+      const edges = g.getGraph().edges;
+      expect(edges.some((e) => e.destination.node_id === styleReference.id && e.destination.field === 'vae')).toBe(
+        true
+      );
+      expect(
+        edges.some((e) => e.source.node_id === styleReference.id && e.destination.field === 'style_reference')
+      ).toBe(true);
+    });
+
+    it('encodes the reference at the denoise resolution', async () => {
+      // The reference's image tokens are appended to the target's, so a size mismatch is a hard error
+      // in the denoise node.
+      refImageEntities = [styleRefEntity()];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      const denoise = Object.values(g.getGraph().nodes).find((n) => n.type === 'krea2_denoise') as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(styleReference.width).toBe(denoise.width);
+      expect(styleReference.height).toBe(denoise.height);
+    });
+
+    it('prefers the cropped image when one exists', async () => {
+      refImageEntities = [
+        styleRefEntity({
+          image: {
+            original: { image: { image_name: 'style.png' }, width: 512, height: 512 },
+            crop: { image: { image_name: 'style-cropped.png' }, width: 256, height: 256 },
+          },
+        }),
+      ];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference.image).toEqual({ image_name: 'style-cropped.png' });
+    });
+
+    it('carries the style strength onto the node and into metadata', async () => {
+      refImageEntities = [styleRefEntity({ styleStrength: 0.6 })];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference.style_strength).toBe(0.6);
+      expect((g.getMetadataNode() as unknown as Record<string, unknown>).krea2_style_strength).toBe(0.6);
+    });
+
+    it('ignores disabled reference images and ones without an image', async () => {
+      refImageEntities = [{ ...styleRefEntity(), isEnabled: false }, styleRefEntity({ image: null })];
+      const { g } = await buildTxt2Img();
+      expect(styleReferenceNode(g)).toBeUndefined();
+    });
+
+    it('uses only the first valid reference image', async () => {
+      // The technique supports exactly one reference; the panel allows several.
+      refImageEntities = [
+        styleRefEntity({ styleStrength: 0.25 }),
+        { ...styleRefEntity({ styleStrength: 0.75 }), id: 'ref-2' },
+      ];
+      const { g } = await buildTxt2Img();
+
+      const styleReferenceNodes = Object.values(g.getGraph().nodes).filter((n) => n.type === 'krea2_style_reference');
+      expect(styleReferenceNodes).toHaveLength(1);
+      expect((styleReferenceNodes[0] as unknown as Record<string, unknown>).style_strength).toBe(0.25);
+    });
+
+    it('ignores reference images belonging to another base', async () => {
+      refImageEntities = [{ id: 'ref-1', isEnabled: true, config: { type: 'wan_reference_image', image: {} } }];
+      const { g } = await buildTxt2Img();
+      expect(styleReferenceNode(g)).toBeUndefined();
     });
   });
 });

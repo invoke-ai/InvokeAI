@@ -1,8 +1,12 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { isKrea2ReferenceImageConfig } from 'features/controlLayers/store/types';
+import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { zImageField } from 'features/nodes/types/common';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addKrea2LoRAs } from 'features/nodes/util/graph/generation/addKrea2LoRAs';
@@ -184,8 +188,33 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       },
     });
   }
-  // Krea-2 does not support regional reference-image adapters.
+  // Krea-2 does not support *regional* reference-image adapters. Global style reference is handled below.
   g.deleteNode(ipAdapterCollect.id);
+
+  // Global style reference: training-free style transfer via shared-KV reference attention. There is no
+  // adapter model, and the technique supports exactly one reference, so consume the first valid entity.
+  const styleRefEntity = selectRefImagesSlice(state).entities.find(
+    (entity) =>
+      entity.isEnabled &&
+      isKrea2ReferenceImageConfig(entity.config) &&
+      entity.config.image !== null &&
+      getGlobalReferenceImageWarnings(entity, model).length === 0
+  );
+  if (styleRefEntity && isKrea2ReferenceImageConfig(styleRefEntity.config) && styleRefEntity.config.image) {
+    const { image, styleStrength } = styleRefEntity.config;
+    const styleReference = g.addNode({
+      type: 'krea2_style_reference',
+      id: getPrefixedId('krea2_style_reference'),
+      image: zImageField.parse(image.crop?.image ?? image.original.image),
+      // The reference's image tokens are appended to the target's, so both must be the same size.
+      width: denoise.width,
+      height: denoise.height,
+      style_strength: styleStrength,
+    });
+    g.addEdge(modelLoader, 'vae', styleReference, 'vae');
+    g.addEdge(styleReference, 'style_reference', denoise, 'style_reference');
+    g.upsertMetadata({ krea2_style_strength: styleStrength });
+  }
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'krea-2');
