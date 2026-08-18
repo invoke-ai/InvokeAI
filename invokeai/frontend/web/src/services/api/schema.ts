@@ -4786,7 +4786,7 @@ export type components = {
              * Image
              * @description The image file to upload
              */
-            image?: string | null;
+            image?: Blob | null;
             /**
              * Data
              * @description The data of the style preset to create
@@ -4868,7 +4868,7 @@ export type components = {
              * File
              * @description The file to import
              */
-            file: string;
+            file: Blob;
         };
         /** Body_parse_dynamicprompts */
         Body_parse_dynamicprompts: {
@@ -4925,7 +4925,7 @@ export type components = {
              * Image
              * @description The image file to upload
              */
-            image: string;
+            image: Blob;
         };
         /** Body_star_images_in_list */
         Body_star_images_in_list: {
@@ -4946,7 +4946,7 @@ export type components = {
         /** Body_update_model_image */
         Body_update_model_image: {
             /** Image */
-            image: string;
+            image: Blob;
         };
         /** Body_update_style_preset */
         Body_update_style_preset: {
@@ -4954,7 +4954,7 @@ export type components = {
              * Image
              * @description The image file to upload
              */
-            image?: string | null;
+            image?: Blob | null;
             /**
              * Data
              * @description The data of the style preset to update
@@ -4977,7 +4977,7 @@ export type components = {
         /** Body_upload_image */
         Body_upload_image: {
             /** File */
-            file: string;
+            file: Blob;
             /**
              * Resize To
              * @description Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: 16777216
@@ -4993,7 +4993,7 @@ export type components = {
         /** Body_upload_video */
         Body_upload_video: {
             /** File */
-            file: string;
+            file: Blob;
             /**
              * Metadata
              * @description The metadata to associate with the video, must be a stringified JSON dict
