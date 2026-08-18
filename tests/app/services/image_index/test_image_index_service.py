@@ -15,6 +15,7 @@ from PIL import Image
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import ImageIndexStatusEvent, ImageIndexUpdatedEvent
 from invokeai.app.services.image_index import image_index_default
+from invokeai.app.services.image_index.image_index_common import EMBEDDING_DTYPE
 from invokeai.app.services.image_index.image_index_default import (
     _MAX_ATTEMPTS,
     _MAX_BACKOFF_SECONDS,
@@ -1705,6 +1706,65 @@ def test_a_failed_vocabulary_build_is_not_retried_on_every_request(service: Imag
 
     # Not even queued: there is nothing for the worker to retry.
     assert not service._vocab_build_requested.is_set()
+
+
+def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.ndarray) -> ImageIndexService:
+    """A service wired for `_build_vocab_embeddings` over a three-phrase vocabulary."""
+    from invokeai.app.services.image_index import cluster_labels
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat", "a dog", "a car"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", lambda embed_fn, vocabulary: matrix)
+
+    svc = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    svc._invoker = SimpleNamespace(  # type: ignore[assignment]
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(db_path=tmp_path / "invokeai.db"),
+            logger=InvokeAILogger.get_logger(),
+        )
+    )
+    svc._model_id = MODEL_ID
+
+    return svc
+
+
+def test_the_vocabulary_cache_reaches_disk_under_its_final_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # np.savez appends `.npz` to a path that lacks it, so a staging name ending
+    # in `.tmp` produced `.tmp.npz` on disk and the rename that followed looked
+    # for a file that was never written. The handler swallowed the error, which
+    # left the in-memory cache working and hid the fact that nothing persisted:
+    # every restart re-embedded ~1700 phrases (minutes, with no cluster labels
+    # until it finished) and leaked one staging file per run.
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+
+    service._build_vocab_embeddings()
+
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    assert cache_path.exists()
+    # Nothing else: a leftover staging file means the rename did not happen.
+    assert [path.name for path in sorted(tmp_path.iterdir())] == [cache_path.name]
+
+
+def test_a_cached_vocabulary_is_reused_instead_of_re_embedded(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The point of persisting it: the next process reads the file rather than
+    # spending minutes in the text tower before it can serve a single label.
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    _vocab_build_service(tmp_path, monkeypatch, matrix)._build_vocab_embeddings()
+
+    from invokeai.app.services.image_index import cluster_labels
+
+    def _refuse(embed_fn: Callable[[list[str]], np.ndarray], vocabulary: list[str]) -> np.ndarray:
+        raise AssertionError("re-embedded a vocabulary that was already cached")
+
+    restarted = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _refuse)
+
+    restarted._build_vocab_embeddings()
+
+    assert restarted._vocab_cache is not None
+    vocabulary, cached = restarted._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(cached, matrix)
 
 
 def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:

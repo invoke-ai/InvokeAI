@@ -326,7 +326,16 @@ class ImageIndexService(ImageIndexServiceBase):
                 # Written aside and renamed: two processes sharing a db_dir can
                 # first-run at once, and a kill mid-write would otherwise leave
                 # a truncated archive that costs another full re-embed.
-                staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp")
+                #
+                # The staging name has to end in `.npz` because np.savez appends
+                # that extension to any path that lacks it: written as `.tmp`,
+                # the archive landed at `.tmp.npz` and the rename below then
+                # failed on the `.tmp` that was never created. The failure was
+                # swallowed by the handler, so the cache never reached disk and
+                # every restart re-embedded the whole vocabulary (minutes,
+                # during which cluster labels are unavailable) while leaking one
+                # orphaned staging file per run.
+                staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
                 np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
                 os.replace(staging_path, cache_path)
             except Exception:
