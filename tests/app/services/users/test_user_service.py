@@ -1,10 +1,12 @@
 """Tests for user service."""
 
+import threading
 from logging import Logger
 
 import pytest
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.users import users_default
 from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
 from invokeai.app.services.users.users_default import USER_LOOKUP_CHUNK_SIZE, UserService
 
@@ -243,16 +245,73 @@ def test_create_admin(user_service: UserService):
 
 def test_create_admin_when_exists(user_service: UserService):
     """Test creating admin when one already exists."""
-    user_data = UserCreateRequest(
-        email="admin@example.com",
-        display_name="Admin User",
-        password="AdminPassword123",
+    user_service.create_admin(
+        UserCreateRequest(
+            email="admin@example.com",
+            display_name="Admin User",
+            password="AdminPassword123",
+        )
     )
 
-    user_service.create_admin(user_data)
+    # A *different* email, so this exercises the admin guard rather than the unique-email one.
+    with pytest.raises(ValueError, match="Admin user already exists"):
+        user_service.create_admin(
+            UserCreateRequest(
+                email="second-admin@example.com",
+                display_name="Second Admin",
+                password="AdminPassword123",
+            )
+        )
 
-    with pytest.raises(ValueError, match="already exists"):
-        user_service.create_admin(user_data)
+
+def test_concurrent_create_admin_creates_exactly_one_admin(user_service: UserService, monkeypatch):
+    """Two concurrent `POST /auth/setup` requests must not both create an administrator.
+
+    The route is unauthenticated during the first-run window and runs in the threadpool, so the
+    two requests really do interleave. Checking has_admin() in its own transaction before the
+    INSERT leaves a window in which both callers see no admin and both create one; the loser then
+    holds a persistent admin account instead of getting the intended 400.
+
+    The barrier models that interleaving deterministically: it releases both threads only once
+    both have passed every step preceding the write.
+    """
+    barrier = threading.Barrier(2, timeout=30)
+    real_hash_password = users_default.hash_password
+
+    def synchronized_hash_password(password: str) -> str:
+        barrier.wait()
+        return real_hash_password(password)
+
+    monkeypatch.setattr(users_default, "hash_password", synchronized_hash_password)
+
+    results: dict[int, object] = {}
+
+    def attempt(index: int) -> None:
+        try:
+            results[index] = user_service.create_admin(
+                UserCreateRequest(
+                    email=f"admin{index}@example.com",
+                    display_name=f"Admin {index}",
+                    password="AdminPassword123",
+                )
+            )
+        except ValueError as exc:
+            results[index] = exc
+
+    threads = [threading.Thread(target=attempt, args=(index,)) for index in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+
+    created = [result for result in results.values() if not isinstance(result, ValueError)]
+    rejected = [result for result in results.values() if isinstance(result, ValueError)]
+
+    assert len(created) == 1, f"Both requests created an administrator: {results}"
+    assert len(rejected) == 1
+    assert "Admin user already exists" in str(rejected[0])
+    assert user_service.count_admins() == 1
 
 
 def test_list_users(user_service: UserService):

@@ -32,10 +32,10 @@ export type GetQueueItemIdsResult =
   paths['/api/v1/queue/{queue_id}/item_ids']['get']['responses']['200']['content']['application/json'];
 export type GetQueueItemIdsArgs = NonNullable<paths['/api/v1/queue/{queue_id}/item_ids']['get']['parameters']['query']>;
 
-export type GetQueueItemDTOsByItemIdsResult =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['responses']['200']['content']['application/json'];
-export type GetQueueItemDTOsByItemIdsArgs =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['requestBody']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsResult =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['responses']['200']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsArgs =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['requestBody']['content']['application/json'];
 
 export type InputFieldJSONSchemaExtra = S['InputFieldJSONSchemaExtra'];
 export type OutputFieldJSONSchemaExtra = S['OutputFieldJSONSchemaExtra'];
@@ -920,6 +920,6 @@ export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_Gall
 export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
 export type ListGalleryItemsResponse =
   paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
-export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
-export type GetGalleryItemNamesResult =
-  paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];
+export type ListGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/item_names']['get']['parameters']['query']>;
+export type ListGalleryItemNamesResult =
+  paths['/api/v1/gallery/item_names']['get']['responses']['200']['content']['application/json'];
