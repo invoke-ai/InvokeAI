@@ -74,6 +74,54 @@ def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
     return (vector / norm).astype(EMBEDDING_DTYPE)
 
 
+# Two phrases that share no content words. Any working text tower puts them well
+# apart (~0.6 cosine for CLIP); a broken one maps them to the same vector.
+_TEXT_PROBE_PAIR = ("a photograph of a cat", "an engineering diagram")
+# Not 1.0: the failure is exact degeneracy, but float paths and fp16 towers can
+# land a hair below it, and no usable encoder comes anywhere near this.
+_TEXT_PROBE_MAX_COSINE = 0.999
+
+
+def _text_encoder_defect(tokenizer: Any, model: Any, is_siglip: bool) -> Optional[str]:
+    """Why this text encoder is unusable, or None if it tells two phrases apart.
+
+    A model directory with no tokenizer files does not fail to load: transformers
+    resolves the tokenizer class from config.json and builds it with an empty
+    vocabulary, which maps every word to the same unknown token. The tower then
+    faithfully encodes that, so every phrase - every vocabulary label, every
+    search query - comes back as the same vector. Nothing downstream can detect
+    it: cluster labelling still returns a label for every cluster, chosen by
+    float noise among identical scores, and text search still returns a ranking.
+    One forward pass at load time is what separates that from a working encoder.
+    """
+    with torch.no_grad():
+        # Same padding rule as _embed_texts: SigLIP was trained pad-to-max-length.
+        inputs = tokenizer(
+            list(_TEXT_PROBE_PAIR),
+            padding="max_length" if is_siglip else True,
+            return_tensors="pt",
+            truncation=True,
+        )
+        outputs = model(**inputs)
+        embeddings = outputs.pooler_output if is_siglip else outputs.text_embeds
+        matrix = embeddings.float().cpu().numpy()
+
+    if not np.isfinite(matrix).all():
+        return "produced a non-finite embedding"
+
+    norms = np.linalg.norm(matrix, axis=1)
+    if float(norms.min()) == 0.0:
+        # Checked before the cosine, which would divide by zero here — and an
+        # all-zero pair would otherwise score 0.0 and pass as "discriminating".
+        return "produced an all-zero embedding"
+
+    cosine = float(matrix[0] @ matrix[1] / (norms[0] * norms[1]))
+    if cosine >= _TEXT_PROBE_MAX_COSINE:
+        return f"maps unrelated phrases to the same embedding (cosine {cosine:.3f})"
+
+    return None
+
+
 def _normalize_batch(matrix: np.ndarray) -> np.ndarray:
     """L2-normalize each row, zeroing the ones that cannot be normalized.
 
@@ -378,6 +426,16 @@ class ImageIndexService(ImageIndexServiceBase):
                         "tokenizer files, to enable semantic text search"
                     ) from e
                 model.eval()
+                defect = _text_encoder_defect(tokenizer, model, is_siglip)
+                if defect is not None:
+                    # Cached by the caller as _vocab_failure, so this costs one
+                    # probe per process rather than one per request.
+                    raise TextSearchUnavailableError(
+                        f"The configured embedding model's text encoder {defect}, so cluster labels and "
+                        "text search would be meaningless. The usual cause is a model directory with no "
+                        "tokenizer files (vocab.json, merges.txt): reinstall the embedding model to get "
+                        "them, or configure image_index_model to a model that has them"
+                    )
                 self._text_encoder = (tokenizer, model, is_siglip)
             return self._text_encoder
 

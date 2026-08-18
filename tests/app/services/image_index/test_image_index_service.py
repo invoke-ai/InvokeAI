@@ -1572,6 +1572,101 @@ def test_embed_text_unavailable_when_tokenizer_files_missing(tmp_path) -> None:
         service.embed_text("a query")
 
 
+class _FakeTokenizer:
+    """Stands in for a transformers tokenizer: only the call shape matters here."""
+
+    def __init__(self, distinct: bool) -> None:
+        self._distinct = distinct
+
+    def __call__(self, texts, padding=True, return_tensors="pt", truncation=True):
+        # A vocabulary-less tokenizer emits the same unknown token for every
+        # word, so two unrelated phrases differ in nothing but length.
+        rows = [[0, 2, 2, 2] if not self._distinct else [0, index + 3, index + 9, 1] for index in range(len(texts))]
+        return {"input_ids": torch.tensor(rows, dtype=torch.long)}
+
+
+class _FakeTextModel:
+    """Returns rows straight from a fixture matrix, keyed by batch size."""
+
+    def __init__(self, matrix: torch.Tensor) -> None:
+        self._matrix = matrix
+
+    def eval(self) -> "_FakeTextModel":
+        return self
+
+    def __call__(self, **inputs):
+        count = inputs["input_ids"].shape[0]
+        return SimpleNamespace(text_embeds=self._matrix[:count], pooler_output=self._matrix[:count])
+
+
+def test_a_text_encoder_that_discriminates_reports_no_defect() -> None:
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    matrix = torch.tensor([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+
+    assert _text_encoder_defect(_FakeTokenizer(distinct=True), _FakeTextModel(matrix), False) is None
+
+
+@pytest.mark.parametrize(
+    "matrix, expected",
+    [
+        (torch.tensor([[0.5, 0.25, 0.0, 0.0], [0.5, 0.25, 0.0, 0.0]]), "same embedding"),
+        (torch.zeros((2, 4)), "all-zero"),
+        (torch.tensor([[float("nan"), 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]]), "non-finite"),
+    ],
+)
+def test_a_degenerate_text_encoder_is_detected(matrix: torch.Tensor, expected: str) -> None:
+    # The failure this exists for: a model directory with no tokenizer files
+    # still loads, because transformers builds a tokenizer with an empty
+    # vocabulary that maps every word to the same unknown token. Every phrase
+    # then embeds identically, and both cluster labels and text search go on
+    # returning confident nonsense — labels chosen by float noise among equal
+    # scores — with nothing downstream able to tell.
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    defect = _text_encoder_defect(_FakeTokenizer(distinct=False), _FakeTextModel(matrix), False)
+
+    assert defect is not None
+    assert expected in defect
+
+
+def test_embed_text_refuses_a_text_encoder_that_cannot_tell_phrases_apart(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # End to end through the lazy loader: the typed error is what the router
+    # maps to a 409, so labels and search report unavailable rather than
+    # serving results computed from identical vectors.
+    import json
+
+    import transformers
+
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    (tmp_path / "config.json").write_text(json.dumps({"model_type": "clip", "architectures": ["CLIPModel"]}))
+    constant = torch.ones((2, DIM))
+    monkeypatch.setattr(
+        transformers.AutoTokenizer, "from_pretrained", classmethod(lambda cls, *a, **k: _FakeTokenizer(distinct=False))
+    )
+    monkeypatch.setattr(
+        transformers.CLIPTextModelWithProjection,
+        "from_pretrained",
+        classmethod(lambda cls, *a, **k: _FakeTextModel(constant)),
+    )
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(services=SimpleNamespace(configuration=SimpleNamespace(models_path=tmp_path)))  # type: ignore[assignment]
+    service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+
+    with pytest.raises(TextSearchUnavailableError, match="same embedding"):
+        service.embed_text("a query")
+
+    # Nothing was cached, so a later request re-probes rather than serving the
+    # encoder this one rejected.
+    assert service._text_encoder is None
+
+
 def test_search_similar_returns_empty_when_not_running(service: ImageIndexService) -> None:
     assert service.search_similar(None, np.ones(DIM, dtype=np.float32), limit=5) == []
 
