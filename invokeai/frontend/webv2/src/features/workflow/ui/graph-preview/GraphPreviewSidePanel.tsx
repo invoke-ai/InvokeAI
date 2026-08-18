@@ -80,8 +80,19 @@ const GraphSummary = ({ source }: { source: GraphPreviewSourceState }) => {
   );
 };
 
-/** string/number/boolean → `String`; object with a string `name` → the name; other object/array → truncated JSON; `undefined` → `null` (caller skips the row). */
-const formatResolvedValue = (value: unknown): string | null => {
+const TRUNCATE_LENGTH = 40;
+
+/** Truncates a display string past {@link TRUNCATE_LENGTH}, reporting whether it did — callers use that to decide whether the untruncated value needs a `title` tooltip. */
+const truncateForDisplay = (value: string): { display: string; isTruncated: boolean } => {
+  if (value.length <= TRUNCATE_LENGTH) {
+    return { display: value, isTruncated: false };
+  }
+
+  return { display: `${value.slice(0, TRUNCATE_LENGTH)}…`, isTruncated: true };
+};
+
+/** string/number/boolean → `String`; object with a string `name` → the name; other object/array → JSON; `undefined` → `null` (caller skips the row). Untruncated — pass through {@link truncateForDisplay} for display. */
+const stringifyResolvedValue = (value: unknown): string | null => {
   if (value === undefined) {
     return null;
   }
@@ -94,9 +105,7 @@ const formatResolvedValue = (value: unknown): string | null => {
     return (value as { name: string }).name;
   }
 
-  const json = JSON.stringify(value);
-
-  return json.length > 40 ? `${json.slice(0, 40)}…` : json;
+  return JSON.stringify(value);
 };
 
 const getDistinctProvenanceLabels = (node: PreviewGraphNode, source: GraphPreviewSourceState): string[] => {
@@ -146,7 +155,7 @@ const NodeInspector = ({
   const resolvedFields = Object.entries(node.inputs)
     .map(([field, value]) => ({
       field,
-      value: source.resolvedInputOverrides?.[node.id]?.[field] ?? formatResolvedValue(value),
+      value: source.resolvedInputOverrides?.[node.id]?.[field] ?? stringifyResolvedValue(value),
     }))
     .filter((entry): entry is { field: string; value: string } => entry.value !== null);
 
@@ -196,14 +205,18 @@ const NodeInspector = ({
           {t('graphPreview.resolvedInputs')}
         </Text>
         <DataList.Root gap="1.5" orientation="horizontal" size="sm">
-          {resolvedFields.map(({ field, value }) => (
-            <DataList.Item key={field}>
-              <DataList.ItemLabel fontSize="2xs">{field}</DataList.ItemLabel>
-              <DataList.ItemValue fontSize="2xs" minW="0">
-                {value}
-              </DataList.ItemValue>
-            </DataList.Item>
-          ))}
+          {resolvedFields.map(({ field, value }) => {
+            const { display, isTruncated } = truncateForDisplay(value);
+
+            return (
+              <DataList.Item key={field}>
+                <DataList.ItemLabel fontSize="2xs">{field}</DataList.ItemLabel>
+                <DataList.ItemValue fontSize="2xs" minW="0" title={isTruncated ? value : undefined}>
+                  {display}
+                </DataList.ItemValue>
+              </DataList.Item>
+            );
+          })}
         </DataList.Root>
       </Stack>
 

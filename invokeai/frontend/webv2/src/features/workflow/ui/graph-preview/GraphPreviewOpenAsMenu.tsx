@@ -85,7 +85,19 @@ export const GraphPreviewOpenAsMenu = ({
   }, [graph, templatesSnapshot, notifications, t, workflows, graphPreview, onClose]);
 
   const saveToLibrary = useCallback(async () => {
-    const { document } = previewGraphToDocument(graph, templatesSnapshot.templates);
+    const { document, skippedNodeTypes } = previewGraphToDocument(graph, templatesSnapshot.templates);
+
+    if (document.nodes.length === 0) {
+      notifications.error(t('graphPreview.saveToLibraryFailed'));
+      return;
+    }
+
+    if (skippedNodeTypes.length > 0) {
+      notifications.info(
+        t('graphPreview.nodesSkipped', { count: skippedNodeTypes.length, types: skippedNodeTypes.join(', ') })
+      );
+    }
+
     document.name = graph.label ?? sourceLabel;
 
     const id = await saveDocumentAsNew(document);
@@ -118,7 +130,12 @@ export const GraphPreviewOpenAsMenu = ({
                 <MenuItemBody hint={t('graphPreview.editInEditorHint')} label={t('graphPreview.editInEditor')} />
               </Menu.Item>
             ) : null}
-            <Menu.Item value="save-to-library" onClick={handleSaveToLibrary}>
+            <Menu.Item
+              _disabled={DISABLED_PROPS}
+              disabled={!isTemplatesLoaded}
+              value="save-to-library"
+              onClick={handleSaveToLibrary}
+            >
               <Icon as={BookmarkIcon} boxSize="3.5" />
               <MenuItemBody hint={t('graphPreview.saveToLibraryHint')} label={t('graphPreview.saveToLibrary')} />
             </Menu.Item>

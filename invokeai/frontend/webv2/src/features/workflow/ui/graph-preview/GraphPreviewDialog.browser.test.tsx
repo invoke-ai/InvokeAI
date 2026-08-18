@@ -1,3 +1,4 @@
+import type { InvocationTemplatesSnapshot } from '@features/workflow/core/types';
 import type {
   GraphPreviewSourceState,
   WorkflowInvocationSourceId,
@@ -14,19 +15,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GraphPreviewDialog } from './GraphPreviewDialog';
 
-// xyflow stays out of this shell test — the flow pane itself is covered
-// elsewhere (`GraphPreviewFlow`'s own tests).
-vi.mock('./GraphPreviewFlow', () => ({
-  GraphPreviewFlow: () => <div data-flow-stub />,
-  documentToPreviewGraph: () => {
-    throw new Error('not used');
-  },
-}));
-
-// `downloadText` and the invocation templates snapshot both need to exist
-// before `vi.mock` factories below run (they're hoisted above the imports
-// that would otherwise define them), so they're built through `vi.hoisted`.
-const { downloads, TEMPLATES_SNAPSHOT } = vi.hoisted(() => {
+// `downloadText`, the invocation templates snapshot, and the flow's `onInit`
+// instance stub all need to exist before `vi.mock` factories below run
+// (they're hoisted above the imports that would otherwise define them), so
+// they're built through `vi.hoisted`.
+const { downloads, fitViewMock, TEMPLATES_SNAPSHOT, templatesSnapshotRef } = vi.hoisted(() => {
   const fieldInput = (name: string, defaultValue: unknown) => ({
     default: defaultValue,
     description: '',
@@ -64,22 +57,49 @@ const { downloads, TEMPLATES_SNAPSHOT } = vi.hoisted(() => {
     version: '1.0.0',
   });
 
-  return {
-    downloads: { downloadBlob: vi.fn(), downloadText: vi.fn() },
-    TEMPLATES_SNAPSHOT: {
-      error: null,
-      status: 'loaded' as const,
-      templates: {
-        denoise_latents: invocationTemplate('denoise_latents', {
-          cfg_scale: fieldInput('cfg_scale', 7),
-          steps: fieldInput('steps', 30),
-        }),
-        integer: invocationTemplate('integer', { value: fieldInput('value', 0) }),
-        l2i: invocationTemplate('l2i', {}),
-      },
+  // Typed against the real snapshot shape (not inferred from this literal)
+  // so `templatesSnapshotRef.current` can be reassigned to other statuses
+  // (e.g. 'loading') from a test without a structural mismatch.
+  const templatesSnapshot: InvocationTemplatesSnapshot = {
+    error: null,
+    status: 'loaded',
+    templates: {
+      denoise_latents: invocationTemplate('denoise_latents', {
+        cfg_scale: fieldInput('cfg_scale', 7),
+        steps: fieldInput('steps', 30),
+      }),
+      integer: invocationTemplate('integer', { value: fieldInput('value', 0) }),
+      l2i: invocationTemplate('l2i', {}),
     },
   };
+
+  return {
+    downloads: { downloadBlob: vi.fn(), downloadText: vi.fn() },
+    // `GraphPreviewFlow`'s mock (below) calls `onInit` with this so
+    // `handleFlowInit`'s pending-reveal consumption has a real `fitView` spy
+    // to assert against — asserting the dialog's own reveal logic runs to
+    // completion, not just that it doesn't crash.
+    fitViewMock: vi.fn(() => Promise.resolve(true)),
+    TEMPLATES_SNAPSHOT: templatesSnapshot,
+    // Mutable so a single test can point `useInvocationTemplatesSnapshot` at
+    // a non-loaded status without a per-test `vi.mock` factory.
+    templatesSnapshotRef: { current: templatesSnapshot },
+  };
 });
+
+// xyflow stays out of this shell test — the flow pane's own rendering is
+// covered elsewhere (`GraphPreviewFlow`'s own tests). It still calls `onInit`
+// with a stub instance so `GraphPreviewDialog`'s pending-reveal handoff
+// (`selectAndReveal` → `handleFlowInit`) has something real to run against.
+vi.mock('./GraphPreviewFlow', () => ({
+  GraphPreviewFlow: ({ onInit }: { onInit?: (instance: { fitView: typeof fitViewMock }) => void }) => {
+    onInit?.({ fitView: fitViewMock });
+    return <div data-flow-stub />;
+  },
+  documentToPreviewGraph: () => {
+    throw new Error('not used');
+  },
+}));
 
 vi.mock('@platform/browser/downloadBlob', () => downloads);
 
@@ -90,8 +110,8 @@ vi.mock('@platform/browser/downloadBlob', () => downloads);
 // pre-loaded snapshot covering the fixture graph's node types.
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
-  useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+  getInvocationTemplatesSnapshot: () => templatesSnapshotRef.current,
+  useInvocationTemplatesSnapshot: () => templatesSnapshotRef.current,
 }));
 
 // "Save to workflow library" goes through `useSaveWorkflowToLibrary`
@@ -117,6 +137,7 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.back': 'Back',
   'graphPreview.compiledFrom': 'Compiled from {{source}}.',
   'graphPreview.copied': 'Copied',
+  'graphPreview.copyFailed': 'Failed to copy JSON',
   'graphPreview.copyJson': 'Copy JSON',
   'graphPreview.destination': 'Destination',
   'graphPreview.downloadJson': 'Download JSON',
@@ -144,6 +165,7 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.resolvedInputs': 'Resolved inputs',
   'graphPreview.savedToLibrary': 'Saved to workflow library',
   'graphPreview.saveToLibrary': 'Save to workflow library',
+  'graphPreview.saveToLibraryFailed': 'No saveable nodes in this graph.',
   'graphPreview.saveToLibraryHint': 'Reusable, leaves this project alone',
   'graphPreview.selectNode': 'Select a node for details.',
   'graphPreview.setBy': 'Set by',
@@ -214,6 +236,46 @@ const INVALID_SOURCE: GraphPreviewSourceState = {
   graph: null,
   invalidReasons: ['Height must be a multiple of 8.'],
   isLive: true,
+  notices: [],
+  summaryRows: [],
+};
+
+// A single node of a type absent from `TEMPLATES_SNAPSHOT.templates` —
+// `previewGraphToDocument` skips it, so the converted document has zero
+// nodes and both "Open as" actions that convert to a document should bail.
+const UNKNOWN_NODE_GRAPH: WorkflowPreviewGraph = {
+  id: 'unknown-node-graph',
+  nodes: [{ id: 'mystery', type: 'unknown_type', inputs: {} }],
+  edges: [],
+  version: 1,
+};
+
+const UNKNOWN_NODE_SOURCE: GraphPreviewSourceState = {
+  destinationLabel: 'Gallery',
+  graph: UNKNOWN_NODE_GRAPH,
+  invalidReasons: [],
+  isLive: false,
+  notices: [],
+  summaryRows: [],
+};
+
+// Long enough to exercise the side panel's ~40-char truncation policy for
+// resolved-input strings.
+const LONG_STRING_VALUE =
+  'a value long enough to need truncation in the resolved inputs list, well past forty characters';
+
+const LONG_VALUE_GRAPH: WorkflowPreviewGraph = {
+  id: 'long-value-graph',
+  nodes: [{ id: 'note', type: 'integer', inputs: { value: LONG_STRING_VALUE } }],
+  edges: [],
+  version: 1,
+};
+
+const LONG_VALUE_SOURCE: GraphPreviewSourceState = {
+  destinationLabel: 'Gallery',
+  graph: LONG_VALUE_GRAPH,
+  invalidReasons: [],
+  isLive: false,
   notices: [],
   summaryRows: [],
 };
@@ -325,6 +387,8 @@ describe('GraphPreviewDialog', () => {
     downloads.downloadBlob.mockReset();
     downloads.downloadText.mockReset();
     createLibraryWorkflowMock.mockReset();
+    fitViewMock.mockClear();
+    templatesSnapshotRef.current = TEMPLATES_SNAPSHOT;
   });
 
   afterEach(async () => {
@@ -437,6 +501,39 @@ describe('GraphPreviewDialog', () => {
     expect(document.querySelector('[data-flow-stub]')).toBeNull();
   });
 
+  it('renders the side panel only in graph mode', async () => {
+    // The fixture's own notice text ("...This graph runs differently each
+    // time.") contains the panel's heading as a substring, so this checks
+    // for the panel's `Scrollable` region (`aria-label="This graph"`)
+    // instead of a raw text match.
+    const findSidePanel = () => document.querySelector('[role="region"][aria-label="This graph"]');
+
+    await renderDialog(FIXTURE_SOURCE);
+
+    // Graph mode (the default): the panel is present.
+    expect(findSidePanel()).not.toBeNull();
+
+    await switchToMode('list');
+    expect(findSidePanel()).toBeNull();
+
+    await switchToMode('json');
+    expect(findSidePanel()).toBeNull();
+
+    await switchToMode('graph');
+    expect(findSidePanel()).not.toBeNull();
+  });
+
+  it('disables Copy JSON when there is no compiled graph to copy', async () => {
+    await renderDialog(INVALID_SOURCE);
+
+    const copyButton = [...document.querySelectorAll('button')].find((candidate) =>
+      (candidate.textContent ?? '').includes('Copy JSON')
+    );
+
+    expect(copyButton).toBeInstanceOf(HTMLButtonElement);
+    expect((copyButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('selecting a node from the list opens the inspector with resolved inputs and edges', async () => {
     await renderDialog(FIXTURE_SOURCE);
 
@@ -462,6 +559,14 @@ describe('GraphPreviewDialog', () => {
     expect(text).toContain('Edges');
     expect(text).toContain('in · 1 inputs from seed');
     expect(text).toContain('out · latents → l2i');
+
+    // The flow wasn't mounted when the row was clicked (mode was still
+    // 'list'), so the reveal had to go through the pending-reveal path:
+    // `selectAndReveal` stashes the id, and the flow's remount (its `onInit`
+    // firing again) is what actually calls `fitView`. This is the case the
+    // stale-ref bug broke — before the fix, `flowInstanceRef` still pointed
+    // at the unmounted flow's instance and this fit never happened.
+    expect(fitViewMock).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: 'denoise_latents' }] }));
   });
 
   it('show node selects the seed node and inspector shows the randomized override', async () => {
@@ -473,6 +578,11 @@ describe('GraphPreviewDialog', () => {
     expect(text).toContain('integer');
     expect(text).toContain('seed');
     expect(text).toContain('regenerated each run');
+
+    // Mode was already 'graph' with the flow mounted, so this reveal takes
+    // the immediate branch — `fitView` runs straight off `flowInstanceRef`
+    // instead of waiting on a remount.
+    expect(fitViewMock).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: 'seed' }] }));
   });
 
   it('clicking a provenance link focuses the source and closes the dialog', async () => {
@@ -577,5 +687,46 @@ describe('GraphPreviewDialog', () => {
     expect(workflowUiAdapter.notifications.success).not.toHaveBeenCalled();
     // `useSaveWorkflowToLibrary`'s own catch path (Task 8) reports the failure.
     expect(workflowUiAdapter.notifications.error).toHaveBeenCalledWith('Failed to save workflow', expect.any(String));
+  });
+
+  it('Open as → Save to workflow library bails with an error notification when the graph has no saveable nodes', async () => {
+    await renderDialog(UNKNOWN_NODE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    await flushAsync();
+
+    // The fixture's only node is a type with no matching template, so
+    // `previewGraphToDocument` skips it and the converted document is empty —
+    // this must bail before ever reaching the backend save call.
+    expect(createLibraryWorkflowMock).not.toHaveBeenCalled();
+    expect(workflowUiAdapter.notifications.error).toHaveBeenCalledWith('No saveable nodes in this graph.');
+    expect(workflowUiAdapter.notifications.success).not.toHaveBeenCalled();
+  });
+
+  it('disables "Save to workflow library" while invocation templates are still loading', async () => {
+    templatesSnapshotRef.current = { error: null, status: 'loading', templates: {} };
+
+    await renderDialog(FIXTURE_SOURCE);
+    await openAsMenu();
+
+    const item = findMenuItemWithText('Save to workflow library');
+    expect(item).not.toBeUndefined();
+    expect(item?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('truncates a long resolved-input string and exposes the full value via title', async () => {
+    await renderDialog(LONG_VALUE_SOURCE);
+
+    await switchToMode('list');
+    await clickButtonWithText('note');
+
+    const truncated = `${LONG_STRING_VALUE.slice(0, 40)}…`;
+    const valueElement = [...document.querySelectorAll('dd')].find((element) => element.textContent === truncated);
+
+    expect(valueElement).not.toBeUndefined();
+    expect(valueElement?.getAttribute('title')).toBe(LONG_STRING_VALUE);
+    // The untruncated value never appears verbatim in the rendered text.
+    expect(document.body.textContent ?? '').not.toContain(LONG_STRING_VALUE);
   });
 });

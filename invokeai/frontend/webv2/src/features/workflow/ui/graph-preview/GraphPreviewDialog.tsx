@@ -115,8 +115,22 @@ export const GraphPreviewDialog = ({
     });
   }, [graphPreview, closeAndReset, sourceId]);
 
+  // Consumed by `handleFlowInit` the next time the flow mounts. Set by
+  // `selectAndReveal` when it fires while the flow isn't the visible pane —
+  // `flowInstanceRef` still points at the *previous* mount's (destroyed)
+  // instance until then, so fitting it immediately would no-op on a dead
+  // instance instead of the one that's about to render.
+  const pendingRevealNodeIdRef = useRef<string | null>(null);
+
   const handleFlowInit = useCallback((instance: ReactFlowInstance) => {
     flowInstanceRef.current = instance;
+
+    const pendingNodeId = pendingRevealNodeIdRef.current;
+
+    if (pendingNodeId !== null) {
+      pendingRevealNodeIdRef.current = null;
+      void instance.fitView({ ...SELECT_AND_REVEAL_FIT_VIEW_OPTIONS, nodes: [{ id: pendingNodeId }] });
+    }
   }, []);
   const handleFlowNodeSelect = useCallback((nodeId: string | null) => setSelectedNodeId(nodeId), []);
   const handleBack = useCallback(() => setSelectedNodeId(null), []);
@@ -125,19 +139,30 @@ export const GraphPreviewDialog = ({
     closeAndReset(false);
   }, [graphPreview, sourceId, closeAndReset]);
 
-  // Selects a node and, if the flow is mounted and initialized, brings it into
-  // view. List rows and the notice banner's "show node" link both switch to
-  // graph mode so the selection is always visible after they fire.
-  const selectAndReveal = useCallback((nodeId: string) => {
-    setSelectedNodeId(nodeId);
-    setMode('graph');
+  // Selects a node and brings it into view. List rows and the notice banner's
+  // "show node" link both switch to graph mode so the selection is always
+  // visible after they fire — but if the flow isn't the mounted pane right
+  // now (`mode` is still 'list'/'json' at call time), setting `mode` below
+  // only *starts* the remount; the fresh instance doesn't exist until
+  // `handleFlowInit` runs next render. Stash the id for that instead of
+  // fitting a stale/dead instance.
+  const selectAndReveal = useCallback(
+    (nodeId: string) => {
+      setSelectedNodeId(nodeId);
 
-    const instance = flowInstanceRef.current;
+      const instance = flowInstanceRef.current;
+      const isFlowMounted = mode === 'graph' && instance !== null;
 
-    if (instance) {
-      void instance.fitView({ ...SELECT_AND_REVEAL_FIT_VIEW_OPTIONS, nodes: [{ id: nodeId }] });
-    }
-  }, []);
+      if (isFlowMounted) {
+        void instance.fitView({ ...SELECT_AND_REVEAL_FIT_VIEW_OPTIONS, nodes: [{ id: nodeId }] });
+      } else {
+        pendingRevealNodeIdRef.current = nodeId;
+      }
+
+      setMode('graph');
+    },
+    [mode]
+  );
 
   const copyJson = useCallback(() => {
     const json = JSON.stringify(graph?.backendGraph ?? graph, null, 2);
@@ -151,10 +176,14 @@ export const GraphPreviewDialog = ({
           clearTimeout(copyResetTimerRef.current);
         }
 
+        // Deliberately not a `useEffect` cleanup (unlike `JsonPreview`'s
+        // equivalent timer) — the no-useEffect rule keeps this in the
+        // handler, and a `setHasCopied` that fires after unmount is a no-op
+        // in React 18+, not a leak.
         copyResetTimerRef.current = setTimeout(() => setHasCopied(false), COPY_RESET_DELAY_MS);
       })
-      .catch(() => toaster.create({ title: 'Failed to copy JSON', type: 'error' }));
-  }, [graph]);
+      .catch(() => toaster.create({ title: t('graphPreview.copyFailed'), type: 'error' }));
+  }, [graph, t]);
 
   const jsonLabel = useMemo(() => t('graphPreview.graphJsonLabel', { title: sourceLabel }), [t, sourceLabel]);
   const subtitle = useMemo(() => {
@@ -220,18 +249,20 @@ export const GraphPreviewDialog = ({
                       />
                     )}
                   </PreviewPane>
-                  <GraphPreviewSidePanel
-                    source={source}
-                    selectedNode={selectedNode}
-                    onBack={handleBack}
-                    onProvenanceClick={handleProvenanceClick}
-                  />
+                  {mode === 'graph' ? (
+                    <GraphPreviewSidePanel
+                      source={source}
+                      selectedNode={selectedNode}
+                      onBack={handleBack}
+                      onProvenanceClick={handleProvenanceClick}
+                    />
+                  ) : null}
                 </Box>
               )}
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
               <Box display="flex" gap="2">
-                <Button size="xs" variant="outline" onClick={copyJson}>
+                <Button disabled={!graph} size="xs" variant="outline" onClick={copyJson}>
                   <Icon
                     as={hasCopied ? CheckIcon : CopyIcon}
                     boxSize="3.5"
