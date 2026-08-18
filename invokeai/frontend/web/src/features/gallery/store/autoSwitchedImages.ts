@@ -34,9 +34,8 @@ const MAX_PENDING = 8;
 // window is an orphan — its selection was superseded before rendering, the viewer was unmounted
 // (comparison mode), or a duplicate completion event re-recorded an already-rendered image — and
 // consuming an orphan later would swallow a genuine user click on that image, the very dead-click
-// the reveal exists to prevent. Generous enough for a slow thumbnail fetch (same reasoning as
-// PROGRESS_IMAGE_RESOLVE_TIMEOUT_MS); expiring early merely readmits the 2-second flash on a very
-// slow connection, which is the milder failure.
+// the reveal exists to prevent. Generous enough for a slow media fetch; expiring early merely
+// readmits the 2-second flash on a very slow connection, which is the milder failure.
 const TTL_MS = 30_000;
 
 export const createAutoSwitchedImageRegistry = (now: () => number = Date.now): AutoSwitchedImageRegistry => {
