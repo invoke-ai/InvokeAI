@@ -129,6 +129,15 @@ def estimate_vae_working_memory_anima(
     return int(working_memory)
 
 
+# Bytes of chunk working set per output pixel per element byte, measured at ~12 on a W7900 (a
+# 768x1344 28-frame chunk peaks at 1.31 GiB allocated in fp32) and rounded up for other canvases.
+MINIMAX_H3_CHUNK_BYTES_PER_PIXEL = 14
+
+# The caching allocator holds more than is live — measured 1.3-1.7x across tile-heavy decodes — and
+# the reservation has to cover what it holds.
+MINIMAX_H3_ALLOCATOR_HEADROOM = 1.6
+
+
 def estimate_vae_working_memory_minimax_h3(
     operation: Literal["encode", "decode"],
     vae: "torch.nn.Module",
@@ -138,25 +147,49 @@ def estimate_vae_working_memory_minimax_h3(
 ) -> int:
     """Estimate the working memory to encode/decode with the MiniMax H3 video VAE.
 
-    The H3 VAE always tiles spatially (``use_tiling`` defaults to True with 256px tiles / 64px
-    overlap, and the released frames are the blended-tile ones), so the conv working set is
-    per-tile, not per-frame: the tile geometry is read from the instance. The full RGB clip is
-    still assembled on the execution device (fp32 — the VAE's weights are pinned fp32), plus
-    one transient copy. The Wan per-pixel calibration constant is kept as a conservative
-    stand-in until an H3-specific calibration exists.
+    Two terms, both measured rather than borrowed from Wan (whose VAE is a pixel-resolution conv
+    stack decoded one frame at a time; H3's decoder is a ViT over the 16x16 latent grid, so Wan's
+    per-pixel constant is orders of magnitude too large here):
+
+    - **Chunk term.** The VAE processes one temporal chunk at a time, spatially tiled
+      (``use_tiling`` defaults to True with 256px tiles; the released frames are the blended-tile
+      ones). ``_decode_clip`` materializes ``tokens_chunk_size + token_overlap`` latent frames — 28
+      pixel frames with the released geometry — as tile activations, the accumulated tile rows and
+      the stitched chunk; ``_encode_clip`` does the same over ``clip_length`` frames. It therefore
+      scales with chunk frames x canvas, not with clip length.
+    - **Clip term.** ``_decode`` accumulates every chunk and then concatenates, so two copies of
+      the whole RGB clip are live at the peak. Encode keeps one.
+
+    The sum is scaled by :data:`MINIMAX_H3_ALLOCATOR_HEADROOM` because the reservation has to cover
+    what the caching allocator *holds*, not what is live: across the hundreds of tile calls in a
+    long clip, reserved runs ~1.3-1.7x allocated from block rounding and fragmentation. Ignoring
+    that gap is what made a 243-frame 768x1344 decode fail — it needed 7.92 GiB reserved against a
+    6.49 GiB reservation, and since partial loading packs VRAM up to exactly this number, the
+    shortfall was a hard failure rather than a near miss (on ROCm it surfaces from hipBLAS as
+    HIPBLAS_STATUS_INTERNAL_ERROR, so neither the caller nor the cache recognizes it as an OOM).
+
+    Calibrated 2026-08-09 on a W7900 (gfx1100, fp32, real released config), peak reserved:
+    one 256px tile at 28 frames 0.56 GiB; one 768x1344 chunk 1.81 GiB; a full 768x1344 decode
+    4.37 GiB at 90 frames and 7.92 GiB at 243 frames. This formula returns ~1.3-1.4x those.
     """
     element_size = next(vae.parameters()).element_size()
 
-    scaling_constant = 2900 if operation == "decode" else 1450
-    tile_height = min(int(getattr(vae, "tile_sample_min_height", 256)), pixel_height)
-    tile_width = min(int(getattr(vae, "tile_sample_min_width", 256)), pixel_width)
-    # 1.25 accounts for tile overlap.
-    tile_working = tile_height * tile_width * element_size * scaling_constant * 1.25
+    if operation == "decode":
+        tokens_chunk_size = int(getattr(vae, "tokens_chunk_size", 5))
+        token_overlap = int(getattr(vae, "token_overlap", 2))
+        temporal_ratio = int(getattr(vae, "temporal_compression_ratio", 4))
+        chunk_frames = (tokens_chunk_size + token_overlap) * temporal_ratio
+    else:
+        chunk_frames = int(getattr(getattr(vae, "config", None), "clip_length", 17))
+    # A clip with fewer frames than a chunk cannot fill one.
+    chunk_frames = max(1, min(chunk_frames, pixel_frames))
+
+    chunk_bytes = chunk_frames * pixel_height * pixel_width * element_size * MINIMAX_H3_CHUNK_BYTES_PER_PIXEL
 
     clip_copies = 2 if operation == "decode" else 1
     clip_bytes = clip_copies * 3 * pixel_frames * pixel_height * pixel_width * element_size
 
-    return int(tile_working + clip_bytes)
+    return int((chunk_bytes + clip_bytes) * MINIMAX_H3_ALLOCATOR_HEADROOM)
 
 
 def estimate_vae_working_memory_wan(

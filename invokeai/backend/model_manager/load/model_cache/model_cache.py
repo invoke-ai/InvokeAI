@@ -151,10 +151,24 @@ class _ModelLoadReadWriteLock:
     def write_lock(self) -> Generator[None, None, None]:
         with self._cond:
             self._writers_waiting += 1
-            while self._writer_active or self._readers > 0:
-                self._cond.wait()
-            self._writers_waiting -= 1
-            self._writer_active = True
+            acquired = False
+            try:
+                while self._writer_active or self._readers > 0:
+                    self._cond.wait()
+                self._writer_active = True
+                acquired = True
+            finally:
+                # Decrement even if wait() raises (e.g. an async exception delivered to
+                # this thread). Leaking the count would leave read_lock's
+                # `_writers_waiting > 0` guard permanently true, blocking every VRAM move
+                # in the process for the rest of its life. read_lock needs no equivalent
+                # guard: it increments only after its wait loop, so a raising wait() there
+                # leaves no state behind.
+                self._writers_waiting -= 1
+                if not acquired:
+                    # Giving up without becoming the writer — wake the readers that were
+                    # deferring to us, since nothing else will.
+                    self._cond.notify_all()
         try:
             yield
         finally:
