@@ -11,7 +11,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { GraphBearingSurfaceContract } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
-import { compileGeneratePreviewGraph, getGenerateNodeProvenance } from '@features/generation/graph';
+import { compileGeneratePreviewGraph, getGenerateNodeProvenance } from '@features/generation/preview';
 import { compileProjectGraph } from '@features/workflow/graph';
 import { getDestinationLabel } from '@workbench/invocation';
 import { getProjectWidgetValues } from '@workbench/widgetState';
