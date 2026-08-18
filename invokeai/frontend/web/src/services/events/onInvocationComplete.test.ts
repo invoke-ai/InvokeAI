@@ -288,6 +288,67 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect(galleryInvalidation?.payload).toContainEqual({ type: 'BoardVideosTotal', id: 'board-123' });
     expect(galleryInvalidation?.payload).toContain('VirtualBoards');
   });
+
+  it('processes each completion event exactly once — a duplicate delivery does no gallery work', async () => {
+    // Re-running the gallery handling on a duplicate double-counts the optimistic board totals and
+    // re-records the auto-switch marker after it was consumed, which suppresses a later genuine
+    // gallery click on that image.
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await handler(buildImageCompleteEvent());
+    const dispatchCountAfterFirst = dispatch.mock.calls.length;
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+
+    await handler(buildImageCompleteEvent());
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls.length).toBe(dispatchCountAfterFirst);
+  });
+
+  it('rejects a duplicate that arrives while the first delivery is still awaiting its DTO fetch', async () => {
+    // The gallery work awaits a DTO fetch, so a duplicate can land mid-flight. The handler must
+    // mark the event as processed before the first await, not after.
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await Promise.all([handler(buildImageCompleteEvent()), handler(buildImageCompleteEvent())]);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+  });
+
+  it('still processes distinct invocations of the same queue item', async () => {
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await handler(buildImageCompleteEvent());
+    const secondNode = buildImageCompleteEvent();
+    secondNode.invocation.id = 'prepared-node-2';
+    await handler(secondNode);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('buildOnForeignInvocationComplete', () => {

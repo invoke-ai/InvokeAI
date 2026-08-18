@@ -44,6 +44,21 @@ describe('ImageViewer progress image wiring', () => {
     expect(progressHandler).toContain('disarmDeferredClear()');
   });
 
+  it('promotes a still-active session at the resolve deadline instead of merely disarming', () => {
+    // Disarm-only leaves the shared atoms owned by the finished item, so the surviving sessions'
+    // terminal events 'ignore' them as foreign and the overlay strands on a stale preview after
+    // the last session ends. The promotion policy itself is tested in progressImageResolution.
+    const deadlineHandler = context.slice(
+      context.indexOf('const onResolveDeadline ='),
+      context.indexOf('useEffect(() => {')
+    );
+    expect(deadlineHandler).toContain('pickPromotionCandidate($activeProgressData.get())');
+    expect(deadlineHandler).toContain('$progressEvent.set(candidate.progressEvent)');
+    expect(deadlineHandler).toContain('$progressImage.set(candidate.progressImage)');
+    expect(deadlineHandler).toContain('disarmDeferredClear()');
+    expect(deadlineHandler).toContain('clearProgressImage()');
+  });
+
   it('gates the viewer reveal on the thumbnail rather than the full-resolution image', () => {
     // Gating on `/full` holds a stale latent preview on screen for the whole multi-megabyte
     // download on a slow connection.

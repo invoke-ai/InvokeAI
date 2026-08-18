@@ -77,6 +77,41 @@ export const getTerminalProgressAction = (
   return 'arm';
 };
 
+/** The fields of a per-session progress datum the promotion choice depends on. */
+type PromotionCandidate = {
+  itemId: number;
+  progressEvent: { timestamp: number };
+};
+
+/**
+ * Picks which still-active session should inherit the shared progress atoms when the resolve
+ * deadline fires while other sessions are running (multi-GPU).
+ *
+ * Merely disarming at the deadline leaves the atoms owned by the finished item. The surviving
+ * sessions' terminal events then see a foreign owner and 'ignore' (see getTerminalProgressAction),
+ * so nothing is left to clear the overlay once the last of them ends — it sticks with the finished
+ * item's stale preview until the page is reloaded. Promoting an active session transfers ownership
+ * to an item whose own terminal event will clear or re-arm normally, and replaces the stale preview
+ * with that session's latest known one.
+ *
+ * The candidate is the session with the newest progress event — what the shared atoms would hold
+ * had it emitted last — with ties broken toward the later-enqueued item. Returns null when no
+ * session is active, in which case the deadline should clear instead.
+ */
+export const pickPromotionCandidate = <T extends PromotionCandidate>(activeData: readonly T[]): T | null => {
+  let candidate: T | null = null;
+  for (const datum of activeData) {
+    if (
+      candidate === null ||
+      datum.progressEvent.timestamp > candidate.progressEvent.timestamp ||
+      (datum.progressEvent.timestamp === candidate.progressEvent.timestamp && datum.itemId > candidate.itemId)
+    ) {
+      candidate = datum;
+    }
+  }
+  return candidate;
+};
+
 type DeferredClear = {
   /**
    * Arms the deferred clear, replacing any deadline already pending. `onDeadline` runs only if

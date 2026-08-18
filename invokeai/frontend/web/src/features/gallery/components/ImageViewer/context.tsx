@@ -13,7 +13,7 @@ import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
-import { createDeferredClear, getTerminalProgressAction } from './progressImageResolution';
+import { createDeferredClear, getTerminalProgressAction, pickPromotionCandidate } from './progressImageResolution';
 
 /** Live progress for a single in-flight session (queue item). Used to tile the viewer when several
  * sessions run concurrently (multi-GPU). Only items that have produced a preview image are tracked. */
@@ -83,15 +83,22 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
 
   // Nulling $progressImage tears down the whole overlay, tiles included — $activeProgressData only
   // renders while it is set. So when other sessions are still producing previews (multi-GPU), the
-  // backstop must not clear: the overlay has already stopped being this item's to own. Disarming is
-  // enough; those sessions clear it via their own terminal events.
+  // backstop must not clear: the overlay has already stopped being this item's to own. Merely
+  // disarming is not enough either — that leaves the shared atoms owned by the finished item, and
+  // the surviving sessions' terminal events would then 'ignore' them as foreign (see
+  // getTerminalProgressAction), stranding the overlay on a stale preview after the last session
+  // ends. Hand the atoms to the most recently active session instead; its own terminal event then
+  // clears or re-arms them normally.
   const onResolveDeadline = useCallback(() => {
-    if ($activeProgressData.get().length > 0) {
+    const candidate = pickPromotionCandidate($activeProgressData.get());
+    if (candidate) {
       disarmDeferredClear();
+      $progressEvent.set(candidate.progressEvent);
+      $progressImage.set(candidate.progressImage);
       return;
     }
     clearProgressImage();
-  }, [$activeProgressData, clearProgressImage, disarmDeferredClear]);
+  }, [$activeProgressData, $progressEvent, $progressImage, clearProgressImage, disarmDeferredClear]);
 
   useEffect(() => {
     return () => {

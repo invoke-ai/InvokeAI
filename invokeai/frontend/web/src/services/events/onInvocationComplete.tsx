@@ -12,6 +12,7 @@ import {
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
+import { LRUCache } from 'lru-cache';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -54,6 +55,16 @@ export const buildOnInvocationComplete = (
   dispatch: AppDispatch,
   completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
+  // A duplicate delivery of a completion event must not repeat the work below: re-running the
+  // gallery handling double-counts the optimistic board totals, and re-recording the auto-switch
+  // after its entry was consumed would suppress a later genuine gallery click on that image (see
+  // autoSwitchedImages). The shared completedInvocationKeysByItemId map cannot detect this — the
+  // workflow coordinator pre-marks first-delivery events for non-active workflow items before this
+  // handler runs — so the handler tracks what it has processed itself. The invocation id half of
+  // the key is the prepared node's per-execution UUID, so keys cannot collide across distinct
+  // executions even where item ids restart (in-memory DB); the LRU bounds memory.
+  const processedInvocations = new LRUCache<string, boolean>({ max: 1000 });
+
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
@@ -359,6 +370,18 @@ export const buildOnInvocationComplete = (
 
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
+
+    const invocationKey = `${data.item_id}:${data.invocation.id}`;
+    if (processedInvocations.has(invocationKey)) {
+      log.trace(
+        { data } as JsonObject,
+        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+      );
+      return;
+    }
+    // Mark before the awaits below — a duplicate arriving while the DTO fetch is in flight must be
+    // rejected too.
+    processedInvocations.set(invocationKey, true);
 
     const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
     const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(

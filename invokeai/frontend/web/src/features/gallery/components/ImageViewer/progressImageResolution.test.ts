@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createDeferredClear,
   getTerminalProgressAction,
+  pickPromotionCandidate,
   PROGRESS_IMAGE_RESOLVE_TIMEOUT_MS,
 } from './progressImageResolution';
 
@@ -58,6 +59,36 @@ describe('getTerminalProgressAction', () => {
 
   it('uses a backstop long enough not to fire on the normal thumbnail-gated path', () => {
     expect(PROGRESS_IMAGE_RESOLVE_TIMEOUT_MS).toBeGreaterThanOrEqual(5_000);
+  });
+});
+
+describe('pickPromotionCandidate', () => {
+  const datum = (itemId: number, timestamp: number) => ({ itemId, progressEvent: { timestamp } });
+
+  it('returns null when no session is active, so the deadline clears', () => {
+    expect(pickPromotionCandidate([])).toBeNull();
+  });
+
+  it('picks the session with the newest progress event', () => {
+    expect(pickPromotionCandidate([datum(1, 300), datum(2, 100), datum(3, 200)])).toEqual(datum(1, 300));
+  });
+
+  it('breaks timestamp ties toward the later-enqueued item', () => {
+    expect(pickPromotionCandidate([datum(1, 100), datum(2, 100)])).toEqual(datum(2, 100));
+  });
+
+  it('transfers ownership so the promoted item is not ignored at its own terminal event', () => {
+    // Regression: progress B, progress A (A owns the shared atoms), complete A, deadline fires with
+    // B still active. Merely disarming left the owner as A, so B's terminal event returned 'ignore'
+    // and the overlay stuck with A's stale preview forever. Promoting B makes its terminal event
+    // actionable again.
+    const promoted = pickPromotionCandidate([datum(2, 100)]);
+    expect(promoted).not.toBeNull();
+    const action = getTerminalProgressAction(buildEvent({ item_id: 2 }), {
+      autoSwitch: true,
+      globalProgressItemId: promoted?.itemId ?? null,
+    });
+    expect(action).toBe('arm');
   });
 });
 

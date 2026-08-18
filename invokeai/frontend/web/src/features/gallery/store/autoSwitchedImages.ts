@@ -17,24 +17,33 @@ type AutoSwitchedImageRegistry = {
   /** Records that the gallery is auto-switching to this image. */
   record: (imageName: string) => void;
   /**
-   * Returns whether this image was recently auto-switched to, removing the entry. Call exactly
-   * once per rendered-image change — an entry left behind would suppress a genuine user selection
-   * of the same image later.
+   * Returns whether this image was recently auto-switched to. Call exactly once per rendered-image
+   * change: every call settles the registry, because each render proves what became of the pending
+   * selections. A match removes the entry and every entry recorded before it — those selections
+   * were superseded and will never first-render (e.g. two completions within one thumbnail-fetch
+   * window; only the last one renders). A miss means an image that was never recorded rendered,
+   * i.e. user activity superseded every pending selection, so the registry is cleared entirely.
+   * Either way, no entry survives past the next rendered-image change to swallow a genuine user
+   * click later — the very dead-click the reveal exists to prevent.
+   *
+   * The miss-clear is deliberately over-eager: a user click made *before* an entry was recorded
+   * can render *after* it (its preload was already in flight), wiping that live entry and
+   * readmitting one 2-second flash. That interleave is narrow, and trading it for stale entries
+   * that swallow clicks would be backwards — the flash is the milder failure.
    */
   consume: (imageName: string) => boolean;
 };
 
-// A selection can be superseded before it ever renders (rapid back-to-back completions), leaving
-// its entry unconsumed. The bound keeps those leftovers from accumulating; a dropped entry's worst
-// case is one spurious 2-second reveal.
+// consume settles the registry on every rendered-image change, so entries can only accumulate
+// while nothing renders at all — the viewer unmounted by comparison mode while generations keep
+// completing. The bound caps memory there; a dropped entry's worst case is one spurious 2-second
+// reveal.
 const MAX_PENDING = 8;
 
-// An entry is only meaningful for the handoff window between the auto-switch dispatch and the
-// image's first render (redux propagation plus the thumbnail preload). An entry that outlives that
-// window is an orphan — its selection was superseded before rendering, the viewer was unmounted
-// (comparison mode), or a duplicate completion event re-recorded an already-rendered image — and
-// consuming an orphan later would swallow a genuine user click on that image, the very dead-click
-// the reveal exists to prevent. Generous enough for a slow thumbnail fetch (same reasoning as
+// Same no-renders window as above: an entry is only meaningful between the auto-switch dispatch
+// and the image's first render, and with the viewer unmounted that render may never come. Without
+// the TTL, remounting the viewer within reach of such an orphan and clicking its image would
+// suppress the reveal. Generous enough for a slow thumbnail fetch (same reasoning as
 // PROGRESS_IMAGE_RESOLVE_TIMEOUT_MS); expiring early merely readmits the 2-second flash on a very
 // slow connection, which is the milder failure.
 const TTL_MS = 30_000;
@@ -59,9 +68,10 @@ export const createAutoSwitchedImageRegistry = (now: () => number = Date.now): A
       prune();
       const index = pending.findIndex((entry) => entry.imageName === imageName);
       if (index === -1) {
+        pending = [];
         return false;
       }
-      pending.splice(index, 1);
+      pending = pending.slice(index + 1);
       return true;
     },
   };
