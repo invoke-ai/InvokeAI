@@ -32,7 +32,8 @@ def db(logger: Logger) -> SqliteDatabase:
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
             updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            last_login_at DATETIME
+            last_login_at DATETIME,
+            token_epoch INTEGER NOT NULL DEFAULT 0
         );
     """)
     db._conn.commit()
@@ -350,6 +351,24 @@ def test_get_many_returns_users_keyed_by_id(user_service: UserService):
     assert set(users) == {created[0].user_id, created[1].user_id}
     assert users[created[0].user_id].email == "batch0@example.com"
     assert users[created[1].user_id].display_name == "Batch User 1"
+
+
+def test_get_many_agrees_with_get_after_a_password_rotation(user_service: UserService):
+    """Every projection that yields a `UserDTO` must select the same columns.
+
+    `get_many` selected all of them but `token_epoch`, so the DTO fell back to the model
+    default of 0 — the value a never-rotated account has, which makes a revoked epoch
+    indistinguishable from a fresh one in any caller that reads it from a bulk lookup.
+    """
+    user = user_service.create(
+        UserCreateRequest(email="rotated@example.com", display_name="Rotated", password="TestPassword123")
+    )
+    user_service.update(user.user_id, UserUpdateRequest(password="DifferentPassword456"))
+
+    single = user_service.get(user.user_id)
+    assert single is not None
+    assert single.token_epoch > 0, "precondition: rotating the password advances the epoch"
+    assert user_service.get_many([user.user_id])[user.user_id] == single
 
 
 def test_get_many_with_no_ids_returns_empty(user_service: UserService):

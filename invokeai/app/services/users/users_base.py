@@ -77,6 +77,8 @@ class UserServiceBase(ABC):
 
         Raises:
             ValueError: If user not found or (when strict) password is weak
+            LastAdministratorError: If demoting or deactivating this user would leave the
+                instance with no active administrator
         """
         pass
 
@@ -89,6 +91,8 @@ class UserServiceBase(ABC):
 
         Raises:
             ValueError: If user not found
+            LastAdministratorError: If deleting this user would leave the instance with no
+                active administrator
         """
         pass
 

@@ -157,9 +157,16 @@ export type paths = {
          *     To change the password, both ``current_password`` and ``new_password`` must
          *     be provided. The current password is verified before the change is applied.
          *
+         *     A password change signs out the account's *other* sessions: it bumps the
+         *     revocation epoch, invalidating every previously issued token. This response
+         *     carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+         *     signed in.
+         *
          *     Args:
          *         request: Profile fields to update
          *         current_user: The authenticated user
+         *         http_request: The HTTP request, used to scope the replacement media cookie
+         *         response: The HTTP response, used to return the replacement token
          *
          *     Returns:
          *         The updated user
@@ -294,13 +301,13 @@ export type paths = {
          * @description Delete a user. Requires admin privileges.
          *
          *     Admins can delete any user including other admins, but cannot delete the last
-         *     remaining admin.
+         *     remaining admin, nor the internal system user.
          *
          *     Args:
          *         user_id: The user ID
          *
          *     Raises:
-         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 400 if attempting to delete the last admin or the system user
          *         HTTPException: 404 if user not found
          */
         delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
@@ -310,6 +317,10 @@ export type paths = {
          * Update User
          * @description Update a user. Requires admin privileges.
          *
+         *     Resetting a password revokes the target's existing sessions. An admin resetting
+         *     their own password receives a replacement token in ``X-Refreshed-Token`` so they
+         *     are not signed out by their own action.
+         *
          *     Args:
          *         user_id: The user ID
          *         request: Fields to update
@@ -318,7 +329,8 @@ export type paths = {
          *         The updated user
          *
          *     Raises:
-         *         HTTPException: 400 if password is weak
+         *         HTTPException: 400 if password is weak, if the change would remove the last
+         *             administrator, or if it targets the protected system account
          *         HTTPException: 404 if user not found
          */
         patch: operations["update_user_api_v1_auth_users__user_id__patch"];
@@ -38040,6 +38052,12 @@ export type components = {
              * @description When user last logged in
              */
             last_login_at?: string | null;
+            /**
+             * Token Epoch
+             * @description Revocation epoch; tokens minted before the current value are rejected
+             * @default 0
+             */
+            token_epoch?: number;
         };
         /**
          * UserProfileUpdateRequest
