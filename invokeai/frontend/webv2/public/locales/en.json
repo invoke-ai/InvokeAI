@@ -549,6 +549,19 @@
     "invokeRoute": "Invoke {{route}}",
     "noCompiledGraph": "No compiled graph is available for \"{{graphId}}\" yet.",
     "nodes": "Nodes",
+    "provenance": {
+      "cfgScale": "Generate → CFG scale",
+      "clipSkip": "Generate → CLIP skip",
+      "loras": "Generate → LoRAs",
+      "model": "Generate → Model",
+      "negativePrompt": "Generate → Negative prompt",
+      "positivePrompt": "Generate → Prompt",
+      "scheduler": "Generate → Scheduler",
+      "seed": "Generate → Seed",
+      "seedRandom": "Generate → Seed (random)",
+      "size": "Generate → Size",
+      "steps": "Generate → Steps"
+    },
     "title": "{{title}} Graph Preview"
   },
   "hotkeys": {
