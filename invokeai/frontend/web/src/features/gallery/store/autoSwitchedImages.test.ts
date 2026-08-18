@@ -15,13 +15,24 @@ describe('createAutoSwitchedImageRegistry', () => {
     expect(registry.consume('a.png')).toBe(false);
   });
 
-  it('tracks multiple pending names independently', () => {
+  it('consumes a later name without disturbing entries recorded after it', () => {
+    const registry = createAutoSwitchedImageRegistry();
+    registry.record('a.png');
+    registry.record('b.png');
+    expect(registry.consume('a.png')).toBe(true);
+    expect(registry.consume('b.png')).toBe(true);
+    expect(registry.consume('a.png')).toBe(false);
+  });
+
+  it('drops entries superseded by the one that rendered', () => {
+    // Two sessions completing in the same React batch record two names, but only the last
+    // selection is ever rendered. The first entry has no render coming and never self-heals, so
+    // leaving it would make the user's next click on that item read as an auto-switch.
     const registry = createAutoSwitchedImageRegistry();
     registry.record('a.png');
     registry.record('b.png');
     expect(registry.consume('b.png')).toBe(true);
-    expect(registry.consume('a.png')).toBe(true);
-    expect(registry.consume('b.png')).toBe(false);
+    expect(registry.consume('a.png')).toBe(false);
   });
 
   it('evicts the oldest entry beyond the bound', () => {
@@ -34,6 +45,16 @@ describe('createAutoSwitchedImageRegistry', () => {
     for (let i = 1; i < 9; i++) {
       expect(registry.consume(`image-${i}.png`)).toBe(true);
     }
+  });
+
+  it('drops the superseded prefix when several were evicted and consumed out of order', () => {
+    const registry = createAutoSwitchedImageRegistry();
+    registry.record('a.png');
+    registry.record('b.png');
+    registry.record('c.png');
+    expect(registry.consume('c.png')).toBe(true);
+    expect(registry.consume('a.png')).toBe(false);
+    expect(registry.consume('b.png')).toBe(false);
   });
 
   it('expires entries after the TTL', () => {

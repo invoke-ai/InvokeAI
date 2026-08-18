@@ -93,7 +93,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // `!isPlaying`: a reveal exposes the play button, and an explicit play is a stronger signal than
   // the click that triggered the reveal — never re-cover an actively-playing video with the opaque
   // overlay (its audio would keep running underneath, with the controls unreachable). The overlay
-  // returns when the user closes the player.
+  // returns when playback ends — whether the user closes the player or the video runs out.
   const withProgress =
     shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying;
   // When more than one session is generating concurrently (multi-GPU), tile their previews instead
@@ -132,7 +132,12 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       return;
     }
 
+    // Same reasoning as the wasAutoSwitchedTo branch below: the clearTimeout above already killed
+    // any running reveal's timer, so every path out of here must leave the atom false or the reveal
+    // wedges on for the rest of the render. Reachable on a plain mount under StrictMode, whose
+    // double-invoked effect re-enters with the ref already holding this video's name.
     if (previousRenderedItemName === null || previousRenderedItemName === videoName) {
+      $isTemporarilyShowingSelectedImage.set(false);
       return;
     }
 
@@ -207,12 +212,29 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     );
   }, [videoDTO, store]);
 
-  const handleVideoError = useCallback(() => {
+  // Drop back to the idle still and tell the user, without touching the progress overlay. Used on
+  // its own for a rejected play(), where the media itself is fine.
+  const reportPlaybackFailure = useCallback(() => {
     setIsPlaying(false);
     // A restored session's <video> request can 401 before the media-cookie self-heal
     // completes; the URL version bumps and the element reloads once the cookie lands.
     // Surfacing an error toast for that transient window would be a false alarm.
     if (isMediaCookieSelfHealPending()) {
+      return false;
+    }
+    toast({
+      id: 'VIDEO_PLAYBACK_FAILED',
+      status: 'error',
+      title: t('toast.videoPlaybackFailed'),
+      description: t('toast.videoPlaybackFailedDesc'),
+    });
+    return true;
+  }, [t]);
+
+  const handleVideoError = useCallback(() => {
+    // The self-heal case reloads the element, which then fires onLoadedMetadata and ends any
+    // pending resolve on its own — so only a real element error takes the shortcut below.
+    if (!reportPlaybackFailure()) {
       return;
     }
     // A genuinely errored element will never fire onLoadedMetadata, which is what normally ends
@@ -221,13 +243,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     // the lifecycle ignores it if some other session's illusion is the one pending, and it is a
     // no-op when none is.
     onLoadImage(videoDTO?.session_id ?? null);
-    toast({
-      id: 'VIDEO_PLAYBACK_FAILED',
-      status: 'error',
-      title: t('toast.videoPlaybackFailed'),
-      description: t('toast.videoPlaybackFailedDesc'),
-    });
-  }, [onLoadImage, t, videoDTO?.session_id]);
+  }, [onLoadImage, reportPlaybackFailure, videoDTO?.session_id]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -242,9 +258,12 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         setIsPlaying(false);
         return;
       }
-      handleVideoError();
+      // Not a load failure: onLoadedMetadata has usually already fired, and the element is intact.
+      // Routing this through the error path would end whichever session's resolve illusion happens
+      // to be pending, for a user gesture unrelated to any render.
+      reportPlaybackFailure();
     });
-  }, [handleVideoError]);
+  }, [reportPlaybackFailure]);
 
   // Close: stop playback and drop back to the first-frame preview + play overlay. We
   // explicitly pause() because toggling React's `controls` prop hides the chrome but does
@@ -434,6 +453,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         playsInline
         controls={isPlaying}
         onLoadedMetadata={handleLoadedMetadata}
+        onEnded={handleClose}
         onError={handleVideoError}
         style={{
           maxWidth: '100%',

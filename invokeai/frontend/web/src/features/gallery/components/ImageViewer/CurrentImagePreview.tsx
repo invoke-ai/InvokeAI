@@ -117,7 +117,11 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       return;
     }
 
+    // Every path out of here must leave the atom false: the clearTimeout above already killed any
+    // running reveal's timer, so returning with it still true would wedge the reveal on for the
+    // rest of the render.
     if (previousRenderedItemName === null || previousRenderedItemName === renderedImageName) {
+      $isTemporarilyShowingSelectedImage.set(false);
       return;
     }
 

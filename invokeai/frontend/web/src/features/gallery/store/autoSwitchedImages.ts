@@ -17,9 +17,16 @@ type AutoSwitchedImageRegistry = {
   /** Records that the gallery is auto-switching to this image. */
   record: (imageName: string) => void;
   /**
-   * Returns whether this image was recently auto-switched to, removing the entry. Call exactly
-   * once per rendered-image change — an entry left behind would suppress a genuine user selection
-   * of the same image later.
+   * Returns whether this item was recently auto-switched to, removing the entry along with every
+   * entry recorded before it. Call exactly once per rendered-item change — an entry left behind
+   * would suppress a genuine user selection of the same item later.
+   *
+   * Dropping the older entries is what keeps that from happening after concurrent completions
+   * (multi-GPU): two sessions finishing in the same React batch record two names but only the last
+   * selection is ever rendered, so the first entry has no render coming to consume it. It is
+   * superseded, not pending — and unlike the orphans the TTL covers, it never self-heals, because
+   * that item is not the selection any more. The user's next click on it would otherwise read as
+   * an auto-switch and get no reveal: the exact dead click this registry exists to prevent.
    */
   consume: (imageName: string) => boolean;
 };
@@ -60,7 +67,9 @@ export const createAutoSwitchedImageRegistry = (now: () => number = Date.now): A
       if (index === -1) {
         return false;
       }
-      pending.splice(index, 1);
+      // Everything recorded before the entry that just rendered was superseded by it — the
+      // selection moved on without those ever rendering — so they go with it.
+      pending.splice(0, index + 1);
       return true;
     },
   };

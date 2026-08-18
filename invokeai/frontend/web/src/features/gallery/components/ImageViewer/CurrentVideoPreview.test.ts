@@ -56,6 +56,35 @@ describe('CurrentVideoPreview progress overlay', () => {
     );
   });
 
+  it('leaves no path out of the reveal effect with the atom still raised', () => {
+    // Every early return happens after the effect has already cleared the running reveal's timer,
+    // so a return that leaves the atom true wedges the reveal on for the rest of the render. Under
+    // StrictMode the plain mount case reaches the previous-name branch with the ref already
+    // holding this video's name.
+    const revealEffect = source.slice(
+      source.indexOf('const previousRenderedItemName = lastRenderedItemNameRef.current;'),
+      source.indexOf('$isTemporarilyShowingSelectedImage.set(true);')
+    );
+    const returns = revealEffect.match(/return;/g) ?? [];
+    const lowered = revealEffect.match(/\$isTemporarilyShowingSelectedImage\.set\(false\);\s+return;/g) ?? [];
+    expect(returns.length).toBeGreaterThan(0);
+    expect(lowered).toHaveLength(returns.length);
+  });
+
+  it('restores the overlay when playback ends on its own, not only when the player is closed', () => {
+    // isPlaying suppresses the overlay; without onEnded it never falls back, so the live preview
+    // stays hidden for the rest of the generation after a short video plays out.
+    expect(source).toContain('onEnded={handleClose}');
+  });
+
+  it('does not end a pending resolve when play() is rejected', () => {
+    // A rejected play() is not a load failure — the element is intact and its metadata has usually
+    // already loaded — so it must not clear an overlay belonging to some other session's render.
+    const playHandler = source.slice(source.indexOf('const handlePlay'), source.indexOf('const handleClose'));
+    expect(playHandler).toContain('reportPlaybackFailure()');
+    expect(playHandler).not.toContain('onLoadImage');
+  });
+
   it('ends a pending post-render resolve when the video element errors', () => {
     // onLoadedMetadata normally ends the resolve illusion; an errored element never fires it. The
     // call must carry this video's session id so the lifecycle can tell it apart from a late load
