@@ -4,6 +4,7 @@ import type { GenerateWidgetValues } from './types';
 import { getGenerationModelAvailabilityReasons, getGenerationValidationReasons } from './baseGenerationPolicies';
 import { compileGenerateGraph } from './graph';
 import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
+import { normalizeGenerateSettings } from './settings';
 
 /**
  * Preview-only compile: deterministic where the submit path is intentionally
@@ -14,6 +15,12 @@ import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
  */
 
 const NO_SUPPORTED_MODEL = 'Generate needs a supported model before it can be invoked.';
+// `getDefaultGenerateSettings` (the fallback `resolveGenerateWidgetValues` reaches for
+// when `storedValues` doesn't parse — first run, cleared storage, corrupted state) sets
+// `seed: Math.floor(Math.random() * SEED_MAX)`. A stored seed is always kept verbatim;
+// this placeholder only stands in for the synthesized-default case, so the preview is
+// deterministic even before Generate settings have ever been persisted.
+const UNINITIALIZED_SEED_PLACEHOLDER = 0;
 
 export interface GeneratePreviewInput {
   destination: ResultDestination;
@@ -89,7 +96,10 @@ export const compileGeneratePreviewGraph = (input: GeneratePreviewInput): Genera
     return { reasons: [NO_SUPPORTED_MODEL], status: 'invalid' };
   }
 
-  const settings = resolved.values;
+  const storedSettingsParsed = normalizeGenerateSettings(input.storedValues) !== null;
+  const settings = storedSettingsParsed
+    ? resolved.values
+    : { ...resolved.values, seed: UNINITIALIZED_SEED_PLACEHOLDER };
   const reasons = [
     ...getGenerationValidationReasons(settings.model, settings),
     ...getGenerationModelAvailabilityReasons(settings.model, settings, input.models),

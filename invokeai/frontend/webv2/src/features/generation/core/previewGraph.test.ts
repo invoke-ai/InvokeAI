@@ -111,6 +111,25 @@ describe('compileGeneratePreviewGraph', () => {
 
     expect(result.status).toBe('invalid');
   });
+
+  it('pins a deterministic seed across repeated compiles when generate settings are uninitialized', () => {
+    const input = { destination: 'gallery' as const, models, storedValues: undefined, useCpuNoise: false };
+    const first = compileGeneratePreviewGraph(input);
+    const second = compileGeneratePreviewGraph(input);
+
+    expect(first.status).toBe('ready');
+
+    if (first.status !== 'ready' || second.status !== 'ready') {
+      return;
+    }
+
+    expect(first.graph.nodes.map((node) => node.id)).toEqual(second.graph.nodes.map((node) => node.id));
+
+    const firstSeed = first.graph.nodes.find((node) => node.id === 'seed');
+    const secondSeed = second.graph.nodes.find((node) => node.id === 'seed');
+
+    expect(firstSeed?.inputs.value).toBe(secondSeed?.inputs.value);
+  });
 });
 
 describe('stabilizeBackendGraphIds', () => {
