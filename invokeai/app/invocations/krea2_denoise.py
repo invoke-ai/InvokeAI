@@ -490,7 +490,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
             )
 
-            attention_state = self._install_attention_processors(transformer, exit_stack, style_extension)
+            attention_state = self._install_attention_processors(transformer, exit_stack)
+            if style_extension is not None:
+                self._install_style_reference_processors(transformer, exit_stack, attention_state, style_extension)
 
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
@@ -596,10 +598,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return latents
 
     def _install_attention_processors(
-        self,
-        transformer: torch.nn.Module,
-        exit_stack: ExitStack,
-        style_extension: Krea2StyleReferenceExtension | None = None,
+        self, transformer: torch.nn.Module, exit_stack: ExitStack
     ) -> Krea2RegionalPromptingState:
         """Swap in the memory-efficient attention processors and return the state they share.
 
@@ -610,24 +609,52 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         Extension point: subclasses may install their own processors and a richer state object here, as
         long as the state still carries the attention mask this node installs per pass.
+
+        The signature is part of that contract — style reference deliberately does *not* extend it, and
+        installs itself in ``_install_style_reference_processors`` instead.
         """
         state = Krea2RegionalPromptingState()
-        style_state = style_extension.build_state(transformer) if style_extension is not None else None
-        transformer.set_attn_processor(
-            build_krea2_attention_processors(
-                transformer,
-                state,
-                style_reference_state=style_state,
-                style_reference_blocks=style_extension.block_indices if style_extension is not None else None,
-            )
-        )
+        transformer.set_attn_processor(build_krea2_attention_processors(transformer, state))
         # The processors remain installed on the cached transformer after this invocation. Do not let them
         # retain a potentially multi-GB regional mask between generations, including when denoising raises.
         exit_stack.callback(self._clear_attention_state, state)
-        if style_state is not None:
-            # Same hazard, larger: the captured reference K/V run to ~1.7 GiB at 2560x1440.
-            exit_stack.callback(style_state.clear)
         return state
+
+    def _install_style_reference_processors(
+        self,
+        transformer: torch.nn.Module,
+        exit_stack: ExitStack,
+        attention_state: Krea2RegionalPromptingState,
+        style_extension: Krea2StyleReferenceExtension,
+    ) -> None:
+        """Re-install the processors so the styled blocks also carry the style-reference state.
+
+        Kept out of ``_install_attention_processors`` on purpose. Subclasses (the prompt-weighting node
+        pack, for one) override that seam with their own state type and their own processors; widening
+        its signature would break every generation they run, style reference or not.
+
+        Because this replaces whatever that seam installed, it is only valid when the seam has *not* been
+        overridden — hence the explicit refusal below rather than silently discarding the subclass's
+        processors.
+        """
+        if type(self)._install_attention_processors is not Krea2DenoiseInvocation._install_attention_processors:
+            raise ValueError(
+                f"'{type(self).__name__}' installs its own Krea-2 attention processors, which style reference "
+                "would replace. Use the stock 'Denoise - Krea-2' node for style reference."
+            )
+
+        style_state = style_extension.build_state(transformer)
+        transformer.set_attn_processor(
+            build_krea2_attention_processors(
+                transformer,
+                attention_state,
+                style_reference_state=style_state,
+                style_reference_blocks=style_extension.block_indices,
+            )
+        )
+        # Same hazard as the regional mask, an order of magnitude larger: the captured reference K/V run
+        # to ~1.7 GiB at 2560x1440 and would otherwise stay on the cached transformer.
+        exit_stack.callback(style_state.clear)
 
     @staticmethod
     def _clear_attention_state(state: Krea2RegionalPromptingState) -> None:
@@ -707,10 +734,12 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # The captured reference K/V stay resident for the whole target pass: two tensors per styled
             # block, at the pre-expansion KV head count (12, not 48 — see style_reference.py). ~0.5 GiB at
             # 1024x1024, ~1.7 GiB at 2560x1440. On top of that the styled attention runs with a key
-            # sequence of S + image_seq_len, and the reference forward briefly holds its own activations;
-            # 20% on the activation term covers both. The captured K/V are an exact, known size, so they
-            # are added after the multiplier rather than scaled by it.
-            estimated = int(estimated * 1.2)
+            # sequence of S + image_seq_len, and the reference forward briefly holds its own activations.
+            # Measured at 1024x1024 (8 steps, cfg 1.0): peak VRAM rises ~1.6 GiB over the unstyled run, of
+            # which ~0.5 GiB is the cache itself — so the activation term needs ~35%, not the 20% the
+            # arithmetic alone suggested. The captured K/V are an exact, known size, so they are added
+            # after the multiplier rather than scaled by it.
+            estimated = int(estimated * 1.35)
             estimated += style_reference_kv_bytes
         if num_loras > 0:
             estimated += int(0.5 * num_loras * GB)

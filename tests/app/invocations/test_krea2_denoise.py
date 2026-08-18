@@ -1,6 +1,7 @@
 import math
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
 import torch
@@ -897,6 +898,40 @@ def test_run_diffusion_rejects_style_reference_latents_of_the_wrong_shape(monkey
         invocation._run_diffusion(_runtime_context(tmp_path, _Transformer()))
 
 
+class _SubclassWithOwnProcessors(Krea2DenoiseInvocation):
+    """Stands in for the prompt-weighting node pack, which overrides the attention-processor seam."""
+
+    installed: ClassVar[bool] = False
+
+    def _install_attention_processors(self, transformer, exit_stack):
+        type(self).installed = True
+        return super()._install_attention_processors(transformer, exit_stack)
+
+
+def test_a_subclass_overriding_the_attention_seam_still_runs_without_style_reference(monkeypatch, tmp_path) -> None:
+    # Regression: style reference must not widen _install_attention_processors' signature. Custom node
+    # packs override that seam with the documented two-argument form, and a third positional argument
+    # broke every generation they ran - style reference connected or not.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _SubclassWithOwnProcessors.model_construct(**_runtime_invocation(cfg_scale=1.0).__dict__)
+    _SubclassWithOwnProcessors.installed = False
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert _SubclassWithOwnProcessors.installed is True
+
+
+def test_style_reference_refuses_a_subclass_that_installs_its_own_processors(monkeypatch, tmp_path) -> None:
+    # Re-installing would silently discard the subclass's processors, so say so instead.
+    _patch_runtime(monkeypatch)
+    invocation = _SubclassWithOwnProcessors.model_construct(**_runtime_invocation(cfg_scale=1.0).__dict__)
+    invocation.style_reference = _style_reference_field()
+
+    with pytest.raises(ValueError, match="installs its own Krea-2 attention processors"):
+        invocation._run_diffusion(_runtime_context(tmp_path, _Transformer()))
+
+
 def test_run_diffusion_without_a_style_reference_runs_no_extra_passes(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
     transformer = _Transformer()
@@ -920,7 +955,27 @@ def test_estimate_working_memory_accounts_for_the_style_reference_kv_cache() -> 
     with_style = inv._estimate_working_memory(**kwargs, style_reference_kv_bytes=1_000_000)
 
     # The cache is an exact, known size, so it is added after the activation multiplier, not scaled by it.
-    assert with_style == int(baseline * 1.2) + 1_000_000
+    assert with_style == int(baseline * 1.35) + 1_000_000
+
+
+def test_estimate_working_memory_covers_the_measured_style_reference_overhead() -> None:
+    # Measured at 1024x1024 / 8 steps / cfg 1.0: peak VRAM rose ~1.6 GiB over the unstyled run. The
+    # estimate has to stay above that, or the model cache offloads the transformer to RAM and the forward
+    # crawls over PCIe instead of failing outright.
+    inv = Krea2DenoiseInvocation.model_construct()
+    kwargs = {
+        "image_seq_len": 4096,
+        "positive_text_seq_len": 512,
+        "negative_text_seq_len": None,
+        "do_cfg": False,
+        "num_loras": 0,
+    }
+    style_bytes = 21 * 2 * 12 * 4096 * 128 * 2
+    delta = inv._estimate_working_memory(**kwargs, style_reference_kv_bytes=style_bytes) - inv._estimate_working_memory(
+        **kwargs
+    )
+
+    assert delta > int(1.6 * 1024**3)
 
 
 def test_estimate_working_memory_with_style_reference_stays_within_a_24gb_card_at_1024() -> None:
