@@ -94,6 +94,19 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
 }));
 
+// "Save to workflow library" goes through `useSaveWorkflowToLibrary`
+// (Task 8), which calls the backend through this barrel — stub the one
+// function that path reaches, same mock shape as
+// `useSaveWorkflowToLibrary.browser.test.tsx`.
+const { createLibraryWorkflowMock } = vi.hoisted(() => ({
+  createLibraryWorkflowMock: vi.fn(),
+}));
+
+vi.mock('@features/workflow/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  createLibraryWorkflow: createLibraryWorkflowMock,
+}));
+
 // The real client fetches en.json over HTTP (`platform/i18n/client.ts`), which
 // this browser test never boots. Stub `t` with the subset of English strings
 // this dialog renders, so assertions check real copy instead of raw dotted
@@ -311,6 +324,7 @@ describe('GraphPreviewDialog', () => {
     workflowUiAdapter = createWorkflowUiAdapter();
     downloads.downloadBlob.mockReset();
     downloads.downloadText.mockReset();
+    createLibraryWorkflowMock.mockReset();
   });
 
   afterEach(async () => {
@@ -369,6 +383,17 @@ describe('GraphPreviewDialog', () => {
       (item as HTMLElement | undefined)?.click();
     });
   };
+
+  // "Save to workflow library" fires off an async handler (`void
+  // saveToLibrary()`) that the click itself doesn't wait for — a macrotask
+  // tick drains the `await saveDocumentAsNew(document)` chain (serialize →
+  // `createLibraryWorkflow` → notify) before assertions run.
+  const flushAsync = () =>
+    act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
 
   it('renders summary rows, node count, and the live subtitle', async () => {
     await renderDialog(FIXTURE_SOURCE);
@@ -520,5 +545,37 @@ describe('GraphPreviewDialog', () => {
     expect(findMenuItemWithText('Edit in workflow editor')).toBeUndefined();
     expect(findMenuItemWithText('Save to workflow library')).not.toBeUndefined();
     expect(findMenuItemWithText('Download JSON')).not.toBeUndefined();
+  });
+
+  it('Open as → Save to workflow library names the document from the source label and notifies success', async () => {
+    createLibraryWorkflowMock.mockResolvedValue('library-workflow-1');
+
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    await flushAsync();
+
+    expect(createLibraryWorkflowMock).toHaveBeenCalledTimes(1);
+    // The fixture graph has no `label`, so this exercises the
+    // `graph.label ?? sourceLabel` fallback (`sourceLabel` is "Generate").
+    const [serialized] = createLibraryWorkflowMock.mock.calls[0] ?? [];
+    expect(serialized).toMatchObject({ name: 'Generate' });
+    expect(workflowUiAdapter.notifications.success).toHaveBeenCalledWith('Saved to workflow library');
+  });
+
+  it('Open as → Save to workflow library does not notify success when the save fails', async () => {
+    createLibraryWorkflowMock.mockRejectedValue(new Error('network down'));
+
+    await renderDialog(FIXTURE_SOURCE);
+
+    await openAsMenu();
+    await clickMenuItemWithText('Save to workflow library');
+    await flushAsync();
+
+    expect(createLibraryWorkflowMock).toHaveBeenCalledTimes(1);
+    expect(workflowUiAdapter.notifications.success).not.toHaveBeenCalled();
+    // `useSaveWorkflowToLibrary`'s own catch path (Task 8) reports the failure.
+    expect(workflowUiAdapter.notifications.error).toHaveBeenCalledWith('Failed to save workflow', expect.any(String));
   });
 });
