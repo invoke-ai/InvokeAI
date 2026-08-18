@@ -275,7 +275,12 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
-    if (rawProperty.field_kind !== 'input') {
+    // `internal` covers exactly two properties across the whole schema: `metadata` and
+    // `board`. Both are real, connectable inputs — a workflow that wires a Core Metadata
+    // node into a save node needs the `metadata` handle to exist. The node-level
+    // attributes (`id`, `type`, `use_cache`, `is_intermediate`) are `node_attribute`, so
+    // they stay excluded here as well as by RESERVED_INPUT_FIELD_NAMES.
+    if (rawProperty.field_kind !== 'input' && rawProperty.field_kind !== 'internal') {
       continue;
     }
 

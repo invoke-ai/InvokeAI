@@ -8,6 +8,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation_output,
 )
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.metadata import LoRAMetadataField
 from invokeai.app.invocations.model import LoRAField, MiniMaxH3TransformerField, ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -20,6 +21,13 @@ class MiniMaxH3LoRALoaderOutput(BaseInvocationOutput):
     transformer: Optional[MiniMaxH3TransformerField] = OutputField(
         default=None, description=FieldDescriptions.transformer, title="MiniMax H3 Transformer"
     )
+    # The transformer field carries LoRAField entries, which metadata cannot consume (different
+    # shape, different key names). This echoes the same LoRA in the shape core_metadata.loras
+    # wants, so a workflow can record what it applied without retyping the model key.
+    lora_metadata: LoRAMetadataField = OutputField(
+        description="The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+        title="LoRA Metadata",
+    )
 
 
 @invocation(
@@ -27,7 +35,7 @@ class MiniMaxH3LoRALoaderOutput(BaseInvocationOutput):
     title="Apply LoRA - MiniMax H3",
     tags=["lora", "model", "minimax"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3LoRALoaderInvocation(BaseInvocation):
@@ -73,7 +81,10 @@ class MiniMaxH3LoRALoaderInvocation(BaseInvocation):
         transformer = self.transformer.model_copy(deep=True)
         transformer.loras.append(LoRAField(lora=self.lora, weight=self.weight))
 
-        return MiniMaxH3LoRALoaderOutput(transformer=transformer)
+        return MiniMaxH3LoRALoaderOutput(
+            transformer=transformer,
+            lora_metadata=LoRAMetadataField(model=self.lora, weight=self.weight),
+        )
 
 
 @invocation(

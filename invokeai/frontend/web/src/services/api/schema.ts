@@ -8732,7 +8732,7 @@ export type components = {
              * @description The generation mode that output this image
              * @default null
              */
-            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "ernie_image_txt2img" | "ideogram4_txt2img" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "krea2_txt2img" | "krea2_img2img" | "krea2_inpaint" | "krea2_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_i2v" | "minimax_h3_t2v" | "minimax_h3_i2v" | "minimax_h3_txt2img") | null;
+            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "ernie_image_txt2img" | "ideogram4_txt2img" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "krea2_txt2img" | "krea2_img2img" | "krea2_inpaint" | "krea2_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_i2v" | "minimax_h3_t2v" | "minimax_h3_i2v" | "minimax_h3_lf2v" | "minimax_h3_flf2v" | "minimax_h3_extend_video" | "minimax_h3_txt2img") | null;
             /**
              * Positive Prompt
              * @description The positive prompt parameter
@@ -8873,6 +8873,37 @@ export type components = {
              * @default null
              */
             ideogram4_caption?: string | null;
+            /**
+             * Num Frames
+             * @description The number of video frames generated
+             * @default null
+             */
+            num_frames?: number | null;
+            /**
+             * @description The image used as the video's first frame
+             * @default null
+             */
+            first_frame_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The image used as the video's last frame
+             * @default null
+             */
+            last_frame_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The video this generation was derived from, e.g. the clip an extend workflow continues
+             * @default null
+             */
+            source_video?: components["schemas"]["VideoField"] | null;
+            /**
+             * @description The single-file MiniMax H3 transformer used in place of the main model's transformer
+             * @default null
+             */
+            minimax_h3_transformer_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description The single-file MiniMax H3 Qwen3-VL text encoder used in place of the main model's
+             * @default null
+             */
+            minimax_h3_text_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Hrf Enabled
              * @description Whether or not high resolution fix was enabled.
@@ -29481,6 +29512,11 @@ export type components = {
              */
             transformer: components["schemas"]["MiniMaxH3TransformerField"] | null;
             /**
+             * LoRA Metadata
+             * @description The applied LoRA, in the shape Core Metadata's `loras` field takes.
+             */
+            lora_metadata: components["schemas"]["LoRAMetadataField"];
+            /**
              * type
              * @default minimax_h3_lora_loader_output
              * @constant
@@ -29564,6 +29600,23 @@ export type components = {
              * @description Audio VAE (stereo, 32 kHz) for MiniMax H3
              */
             audio_vae: components["schemas"]["VAEField"];
+            /**
+             * Model
+             * @description The MiniMax H3 model that was loaded.
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Transformer (single file)
+             * @description The single-file transformer override that was used, if any.
+             * @default null
+             */
+            transformer_model: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Text Encoder (single file)
+             * @description The single-file text encoder override that was used, if any.
+             * @default null
+             */
+            text_encoder_model: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * type
              * @default minimax_h3_model_loader_output

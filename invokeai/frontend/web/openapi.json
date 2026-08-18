@@ -23432,6 +23432,9 @@
                   "wan_i2v",
                   "minimax_h3_t2v",
                   "minimax_h3_i2v",
+                  "minimax_h3_lf2v",
+                  "minimax_h3_flf2v",
+                  "minimax_h3_extend_video",
                   "minimax_h3_txt2img"
                 ],
                 "type": "string"
@@ -23864,6 +23867,103 @@
             "orig_required": false,
             "title": "Ideogram4 Caption"
           },
+          "num_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The number of video frames generated",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Num Frames"
+          },
+          "first_frame_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image used as the video's first frame",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "last_frame_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image used as the video's last frame",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "source_video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The video this generation was derived from, e.g. the clip an extend workflow continues",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "minimax_h3_transformer_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file MiniMax H3 transformer used in place of the main model's transformer",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "minimax_h3_text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file MiniMax H3 Qwen3-VL text encoder used in place of the main model's",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
           "hrf_enabled": {
             "anyOf": [
               {
@@ -24079,7 +24179,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -69307,7 +69407,7 @@
         "tags": ["lora", "model", "minimax"],
         "title": "Apply LoRA - MiniMax H3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
         }
@@ -69331,6 +69431,13 @@
             "title": "MiniMax H3 Transformer",
             "ui_hidden": false
           },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
           "type": {
             "const": "minimax_h3_lora_loader_output",
             "default": "minimax_h3_lora_loader_output",
@@ -69339,7 +69446,7 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "type", "type"],
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
         "title": "MiniMaxH3LoRALoaderOutput",
         "type": "object"
       },
@@ -69437,7 +69544,7 @@
         "tags": ["model", "minimax", "video"],
         "title": "Main Model - MiniMax H3",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
         }
@@ -69474,6 +69581,43 @@
             "title": "Audio VAE",
             "ui_hidden": false
           },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The MiniMax H3 model that was loaded.",
+            "field_kind": "output",
+            "title": "Model",
+            "ui_hidden": false
+          },
+          "transformer_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file transformer override that was used, if any.",
+            "field_kind": "output",
+            "title": "Transformer (single file)",
+            "ui_hidden": false
+          },
+          "text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file text encoder override that was used, if any.",
+            "field_kind": "output",
+            "title": "Text Encoder (single file)",
+            "ui_hidden": false
+          },
           "type": {
             "const": "minimax_h3_model_loader_output",
             "default": "minimax_h3_model_loader_output",
@@ -69482,7 +69626,18 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "text_encoder", "vae", "audio_vae", "type", "type"],
+        "required": [
+          "output_meta",
+          "transformer",
+          "text_encoder",
+          "vae",
+          "audio_vae",
+          "model",
+          "transformer_model",
+          "text_encoder_model",
+          "type",
+          "type"
+        ],
         "title": "MiniMaxH3ModelLoaderOutput",
         "type": "object"
       },
