@@ -404,12 +404,13 @@ class TestCollectionLoaderUpstreamDuplicates:
 
 # --------------------------------------------------------------------------
 # TI2V-5B inert low routing — the single-transformer path never consumes the
-# low-noise list, so low-only routing must warn (JPPhoto review 2026-07-21).
+# low-noise list, so low-only routing is corrected to the primary list rather
+# than merely warned about (JPPhoto review 2026-07-21).
 # --------------------------------------------------------------------------
 
 
-class TestInertLowRoutingWarning:
-    def test_single_loader_warns_for_low_only_routing_on_ti2v(self):
+class TestInertLowRoutingCorrection:
+    def test_single_loader_reroutes_low_only_routing_on_ti2v(self):
         inv = WanLoRALoaderInvocation(
             id="inv-1", lora=_make_lora_field(), target="low", transformer=_make_transformer_field()
         )
@@ -421,9 +422,13 @@ class TestInertLowRoutingWarning:
         out = inv.invoke(ctx)
         assert out.transformer is not None
         ctx.logger.warning.assert_called_once()
-        assert "no effect" in ctx.logger.warning.call_args.args[0]
+        assert "Applying it to the transformer instead" in ctx.logger.warning.call_args.args[0]
+        # The correction is the point: the 5B denoise path reads only the primary list,
+        # so leaving it on `loras_low_noise` is indistinguishable from dropping the LoRA.
+        assert [item.lora.key for item in out.transformer.loras] == ["lora-1"]
+        assert out.transformer.loras_low_noise == []
 
-    def test_collection_loader_warns_for_low_tagged_lora_on_ti2v(self):
+    def test_collection_loader_reroutes_low_tagged_lora_on_ti2v(self):
         lora = LoRAField(lora=_make_lora_field(), weight=1.0)
         inv = WanLoRACollectionLoader(id="inv-1", loras=[lora], transformer=_make_transformer_field())
         ctx = _make_context(
@@ -434,6 +439,8 @@ class TestInertLowRoutingWarning:
         out = inv.invoke(ctx)
         assert out.transformer is not None
         ctx.logger.warning.assert_called_once()
+        assert [item.lora.key for item in out.transformer.loras] == ["lora-1"]
+        assert out.transformer.loras_low_noise == []
 
     @pytest.mark.parametrize("target", ["auto", "both", "high"])
     def test_no_warning_when_primary_list_is_reached(self, target):
@@ -448,6 +455,31 @@ class TestInertLowRoutingWarning:
         )
         inv.invoke(ctx)
         ctx.logger.warning.assert_not_called()
+
+    def test_reroutes_a_low_tagged_lora_whose_variant_could_not_be_detected(self):
+        """The probe-side pin can only fire when the variant was detected, and
+        `detect_wan_lora_variant` reads the inner dim off an `attn1.to_q` LoRA pair.
+
+        A LoKr/LoHa adapter, or one patching only `to_k`/`to_v`, yields `variant=None`,
+        so the filename's bare `low` token still lands on the record — and
+        `_assert_lora_variant_matches_main` returns early on an unknown variant, so
+        nothing downstream catches it either. Records written before the pin existed are
+        in the same position. The main model's variant is the one signal that is known
+        for certain, which is why the correction lives here as well as in the probe.
+        """
+        lora = LoRAField(lora=_make_lora_field(), weight=1.0)
+        inv = WanLoRACollectionLoader(id="inv-1", loras=[lora], transformer=_make_transformer_field())
+        ctx = _make_context(
+            lora_expert="low",
+            lora_config=_make_lora_config(expert="low", variant=None),
+            main_variant=WanVariantType.TI2V_5B,
+        )
+
+        out = inv.invoke(ctx)
+
+        assert out.transformer is not None
+        assert [item.lora.key for item in out.transformer.loras] == ["lora-1"]
+        assert out.transformer.loras_low_noise == []
 
     def test_no_warning_for_low_routing_on_a14b(self):
         inv = WanLoRALoaderInvocation(

@@ -36,6 +36,7 @@ from invokeai.app.util.video_encoding import make_mp4_writer
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
+from invokeai.backend.wan.vae_decode import iter_wan_vae_decode_chunks
 
 
 class _FrameWriter(Protocol):
@@ -117,6 +118,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         temporal_scale = getattr(vae_info.model.config, "scale_factor_temporal", None) or 4
         t_pixel = (t_lat - 1) * temporal_scale + 1
         h_pixel, w_pixel = h_lat * spatial_scale, w_lat * spatial_scale
+        optimize_memory = context.config.get().wan_memory_optimization
 
         estimated_working_memory = estimate_vae_working_memory_wan(
             operation="decode",
@@ -124,6 +126,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
             pixel_height=h_pixel,
             pixel_width=w_pixel,
             pixel_frames=t_pixel,
+            streaming=optimize_memory,
         )
         # Long/high-res clips can need a working set no card fits. When the full-frame
         # estimate exceeds the execution device's total VRAM, fall back to spatial tiling
@@ -147,72 +150,95 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                     pixel_width=w_pixel,
                     pixel_frames=t_pixel,
                     tile_size=tile_size,
+                    streaming=False,
                 )
 
-        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-            assert isinstance(vae, AutoencoderKLWan)
-            context.logger.info(
-                f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames at {w_pixel}x{h_pixel}"
-                + (" (tiled)" if use_tiling else "")
-            )
-            context.util.signal_progress("Running Wan VAE decode (video)")
-
-            vae_dtype = next(iter(vae.parameters())).dtype
-            latents = latents.to(device=get_effective_device(vae), dtype=vae_dtype)
-
-            TorchDevice.empty_cache()
-
-            if use_tiling:
-                vae.enable_tiling()
-            try:
-                with torch.inference_mode():
-                    # Denormalise from denoiser space back to VAE space.
-                    latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
-                    latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents)
-                    latents = latents * latents_std + latents_mean
-
-                    # [B, C=3, T_pixel, H, W] in [-1, 1] (roughly).
-                    decoded = vae.decode(latents, return_dict=False)[0]
-                    del latents, latents_mean, latents_std
-            finally:
-                if use_tiling:
-                    # The VAE instance is cached and shared; don't leak tiling into other nodes.
-                    vae.disable_tiling()
-
-            # Take batch 0 (we generate one video at a time) and move the clip off the
-            # accelerator now — MP4 encoding can take a while, and holding the full
-            # decoded clip in VRAM for its duration starves the next node's model load.
-            decoded = decoded[0].cpu()  # [C, T, H, W]
-
-        TorchDevice.empty_cache()
-
-        if context.util.is_canceled():
-            raise CanceledException
-
-        num_frames = decoded.shape[1]
-        if num_frames == 0:
-            raise ValueError("Wan VAE decode produced zero frames.")
-
-        height, width = decoded.shape[2:]
-        duration = num_frames / float(self.fps)
-
-        # Encode to a temporary MP4 (libx264 + yuv420p, exact frame dimensions —
-        # see make_mp4_writer for why macro_block_size matters).
         tmp = tempfile.NamedTemporaryFile(prefix="invokeai_wan_video_", suffix=".mp4", delete=False)
         tmp.close()
         tmp_path = Path(tmp.name)
         try:
-            context.logger.info(
-                f"Encoding MP4: {num_frames} frames @ {self.fps} fps ({duration:.2f}s) at {width}x{height} via libx264"
-            )
-            context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
-            writer = make_mp4_writer(tmp_path, self.fps)
-            try:
-                _write_video_frames(writer, _iter_decoded_frames(decoded), context.util.is_canceled)
-            finally:
-                writer.close()
-            del decoded
+            stream_decode = optimize_memory and not use_tiling
+            decoded: torch.Tensor | None = None
+            num_frames = 0
+
+            # Keep the VAE cache lock while the MP4 writer consumes chunks. The causal decoder's
+            # feature cache and weights must remain live for the whole sequence; releasing the
+            # lock would require a separate bounded decode/encode queue and would add buffering.
+            with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
+                assert isinstance(vae, AutoencoderKLWan)
+                context.logger.info(
+                    f"Running Wan VAE decode: {t_lat} latent frames -> {t_pixel} pixel frames at {w_pixel}x{h_pixel}"
+                    + (" (tiled)" if use_tiling else " (streaming to MP4)" if stream_decode else "")
+                )
+                context.util.signal_progress("Running Wan VAE decode (video)")
+
+                vae_dtype = next(iter(vae.parameters())).dtype
+                latents = latents.to(device=get_effective_device(vae), dtype=vae_dtype)
+                TorchDevice.empty_cache()
+
+                if use_tiling:
+                    vae.enable_tiling()
+                else:
+                    # AutoencoderKLWan is cached and shared with Anima. Clear any
+                    # tiling state left by a prior image decode before streaming.
+                    vae.disable_tiling()
+                try:
+                    with torch.inference_mode():
+                        # Denormalise from denoiser space back to VAE space.
+                        latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
+                        latents_std = torch.tensor(vae.config.latents_std).view(1, -1, 1, 1, 1).to(latents)
+                        latents = latents * latents_std + latents_mean
+
+                        if stream_decode:
+                            duration = t_pixel / float(self.fps)
+                            context.logger.info(
+                                f"Encoding MP4: {t_pixel} frames @ {self.fps} fps "
+                                f"({duration:.2f}s) at {w_pixel}x{h_pixel} via libx264"
+                            )
+                            context.util.signal_progress(f"Encoding MP4 ({t_pixel} frames @ {self.fps} fps)")
+                            writer = make_mp4_writer(tmp_path, self.fps)
+                            try:
+                                for chunk in iter_wan_vae_decode_chunks(vae, latents):
+                                    chunk = chunk[0].cpu()
+                                    num_frames += chunk.shape[1]
+                                    _write_video_frames(writer, _iter_decoded_frames(chunk), context.util.is_canceled)
+                            finally:
+                                writer.close()
+                        else:
+                            # [C=3, T_pixel, H, W] in [-1, 1] (roughly), on CPU.
+                            decoded = vae.decode(latents, return_dict=False)[0][0].cpu()
+                            num_frames = decoded.shape[1]
+                        del latents, latents_mean, latents_std
+                finally:
+                    # The VAE instance is cached and shared; don't leak tiling into other nodes.
+                    if use_tiling:
+                        vae.disable_tiling()
+
             TorchDevice.empty_cache()
+
+            if context.util.is_canceled():
+                raise CanceledException
+            if num_frames == 0:
+                raise ValueError("Wan VAE decode produced zero frames.")
+            if num_frames != t_pixel:
+                raise ValueError(f"Wan VAE decode produced {num_frames} frames; expected {t_pixel}.")
+
+            height, width = h_pixel, w_pixel
+            duration = num_frames / float(self.fps)
+            if decoded is not None:
+                context.logger.info(
+                    f"Encoding MP4: {num_frames} frames @ {self.fps} fps "
+                    f"({duration:.2f}s) at {width}x{height} via libx264"
+                )
+                context.util.signal_progress(f"Encoding MP4 ({num_frames} frames @ {self.fps} fps)")
+                writer = make_mp4_writer(tmp_path, self.fps)
+                try:
+                    _write_video_frames(writer, _iter_decoded_frames(decoded), context.util.is_canceled)
+                finally:
+                    writer.close()
+                del decoded
+                TorchDevice.empty_cache()
+
             encoded_bytes = tmp_path.stat().st_size
             context.logger.info(f"MP4 encode complete: {encoded_bytes / 1024:.1f} KB")
             video_dto = context.videos.save(
