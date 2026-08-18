@@ -13,6 +13,7 @@ import { dndInputFix } from 'features/dnd/util';
 import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -116,6 +117,14 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     const previousRenderedItemName = lastRenderedItemNameRef.current;
     lastRenderedItemNameRef.current = videoName;
 
+    // Consume on every change of the rendered video, not only when the reveal conditions below
+    // hold — in the common case the auto-switched video renders with no progress showing, and an
+    // entry left behind would suppress a genuine user selection of the same video later. The
+    // registry is keyed by gallery item name, which is polymorphic, so video names share it with
+    // the image path.
+    const wasAutoSwitchedTo =
+      videoName !== null && videoName !== previousRenderedItemName && autoSwitchedImages.consume(videoName);
+
     window.clearTimeout(selectedVideoRevealTimeoutId.current);
 
     if (!shouldShowProgressInViewer || !hasProgressImage || isProgressImageResolving || !videoName) {
@@ -124,6 +133,19 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     }
 
     if (previousRenderedItemName === null || previousRenderedItemName === videoName) {
+      return;
+    }
+
+    // The reveal exists to make a mid-render *user* selection visible. An auto-switch to a
+    // just-finished video lands asynchronously — the selection is dispatched only after
+    // onInvocationComplete's DTO fetch — so a quickly-started next render's first progress event
+    // can slot in ahead of it and reset $isProgressImageResolving. By the time the auto-switch
+    // reaches this effect it is indistinguishable by timing from a gallery click, and treating it
+    // as one hides the new render's live preview behind the finished video for 2 seconds. The
+    // set(false) is required: the clearTimeout above already cancelled any running reveal's timer,
+    // so returning with the atom still true would wedge the reveal on.
+    if (wasAutoSwitchedTo) {
+      $isTemporarilyShowingSelectedImage.set(false);
       return;
     }
 

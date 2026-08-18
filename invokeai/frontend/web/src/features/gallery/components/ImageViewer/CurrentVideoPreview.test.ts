@@ -34,6 +34,28 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('<ProgressImageTiles data={activeProgressData} />');
   });
 
+  it('does not treat an auto-switch to the finished video as a user reveal', () => {
+    // The auto-switch selection lands after onInvocationComplete's DTO fetch, so a quickly-started
+    // next render's first progress event can reset $isProgressImageResolving ahead of it. Without
+    // identity-based suppression the handoff reads as a gallery click and hides the new render's
+    // live preview for 2 seconds.
+    expect(source).toContain('autoSwitchedImages.consume(videoName)');
+    // Consumption must happen on every change of the rendered video — an entry left behind would
+    // swallow a genuine later click on the same video — so it cannot sit behind the reveal guards.
+    const revealEffect = source.slice(
+      source.indexOf('const previousRenderedItemName = lastRenderedItemNameRef.current;'),
+      source.indexOf('SELECTED_ITEM_REVEAL_DURATION_MS)')
+    );
+    expect(revealEffect.indexOf('autoSwitchedImages.consume')).toBeLessThan(
+      revealEffect.indexOf('if (!shouldShowProgressInViewer')
+    );
+    // The suppression branch must lower the atom: the effect has already cleared the running
+    // reveal's timer, so returning with it still true would wedge the reveal on.
+    expect(revealEffect).toMatch(
+      /if \(wasAutoSwitchedTo\) \{\s+\$isTemporarilyShowingSelectedImage\.set\(false\);\s+return;/
+    );
+  });
+
   it('clears a pending post-render overlay when the video element errors', () => {
     // onLoadedMetadata normally clears the resolve state; an errored element never fires it.
     const errorHandler = source.slice(source.indexOf('const handleVideoError'), source.indexOf('const handlePlay'));

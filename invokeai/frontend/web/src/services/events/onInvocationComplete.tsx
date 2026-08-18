@@ -1,6 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import {
   selectAutoSwitch,
   selectGalleryView,
@@ -307,6 +308,13 @@ export const buildOnInvocationComplete = (
 
     const { video_name } = lastVideoDTO;
     const board_id = lastVideoDTO.board_id ?? 'none';
+
+    // Both branches below auto-switch the selection to this video. Record that so the viewer's
+    // reveal effect can tell the handoff apart from a user's gallery click — this dispatch happens
+    // after an async DTO fetch, so it can land after the next render's first progress event has
+    // already reset $isProgressImageResolving, and timing alone cannot distinguish the two. The
+    // registry is keyed by gallery item name, which is polymorphic across images and videos.
+    autoSwitchedImages.record(video_name);
 
     // Selection is a polymorphic string[]; useGalleryItemDTO discriminates by filename extension.
     const selectedBoardId = selectSelectedBoardId(getState());
