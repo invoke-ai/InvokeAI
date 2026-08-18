@@ -26,19 +26,30 @@ vi.mock('./GraphPreviewFlow', () => ({
 const TRANSLATIONS: Record<string, string> = {
   'common.close': 'Close',
   'common.json': 'JSON',
+  'graphPreview.back': 'Back',
   'graphPreview.compiledFrom': 'Compiled from {{source}}.',
   'graphPreview.copied': 'Copied',
   'graphPreview.copyJson': 'Copy JSON',
   'graphPreview.destination': 'Destination',
+  'graphPreview.edges': 'Edges',
+  'graphPreview.edgesIn': 'in · {{count}} inputs from {{sources}}',
+  'graphPreview.edgesInNone': 'in · none',
+  'graphPreview.edgesOut': 'out · {{field}} → {{target}}',
   'graphPreview.graph': 'Graph',
   'graphPreview.graphJsonLabel': '{{title}} graph JSON',
+  'graphPreview.inputCount': '{{count}} inputs',
   'graphPreview.invalidTitle': "This graph can't compile yet.",
   'graphPreview.invokeRoute': 'Invoke {{route}}',
   'graphPreview.list': 'List',
   'graphPreview.liveHint': 'Updates as you change settings.',
   'graphPreview.noCompiledGraph': 'No compiled graph is available for "{{graphId}}" yet.',
+  'graphPreview.nodeSummary.denoise': '{{steps}} steps · cfg {{cfg}}',
+  'graphPreview.nodeSummary.noise': '{{width}} × {{height}}',
   'graphPreview.nodes': 'Nodes',
+  'graphPreview.resolvedInputs': 'Resolved inputs',
   'graphPreview.selectNode': 'Select a node for details.',
+  'graphPreview.setBy': 'Set by',
+  'graphPreview.showNode': 'show node',
   'graphPreview.thisGraph': 'This graph',
   'graphPreview.title': 'Graph preview',
 };
@@ -76,12 +87,24 @@ const FIXTURE_GRAPH: WorkflowPreviewGraph = {
 
 const FIXTURE_SOURCE: GraphPreviewSourceState = {
   destinationLabel: 'Gallery',
+  getProvenance: (nodeId, fieldName) => {
+    if (nodeId === 'denoise_latents' && fieldName === 'steps') {
+      return { label: 'Generate → Steps' };
+    }
+
+    if (nodeId === 'denoise_latents' && fieldName === 'cfg_scale') {
+      return { label: 'Generate → CFG scale' };
+    }
+
+    return null;
+  },
   graph: FIXTURE_GRAPH,
   invalidReasons: [],
   isLive: true,
   notices: [
     { id: 'seed-random', message: 'Seed is randomized. This graph runs differently each time.', nodeId: 'seed' },
   ],
+  resolvedInputOverrides: { seed: { value: 'regenerated each run' } },
   summaryRows: [
     { id: 'steps', label: 'Steps', value: '28' },
     { id: 'model', label: 'Model', value: 'SDXL' },
@@ -145,10 +168,10 @@ describe('GraphPreviewDialog', () => {
   let host: HTMLDivElement;
   let root: Root;
   let onOpenChange: (isOpen: boolean) => void;
+  let graphPreviewPort: WorkflowGraphPreviewPort;
 
   const renderDialog = async (source: GraphPreviewSourceState) => {
     const workflowUiAdapter = createWorkflowUiAdapter();
-    const graphPreviewPort = createGraphPreviewPort();
 
     await act(() => {
       root.render(
@@ -177,12 +200,35 @@ describe('GraphPreviewDialog', () => {
     document.body.append(host);
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
+    graphPreviewPort = createGraphPreviewPort();
   });
 
   afterEach(async () => {
     await act(() => root.unmount());
     host.remove();
   });
+
+  const switchToMode = async (mode: 'graph' | 'list' | 'json') => {
+    const input = document.querySelector<HTMLInputElement>(`input[value="${mode}"]`);
+    expect(input).not.toBeNull();
+    const label = input?.closest('label');
+    expect(label).not.toBeNull();
+
+    await act(() => {
+      label?.click();
+    });
+  };
+
+  const clickButtonWithText = async (text: string) => {
+    const button = [...document.querySelectorAll('button')].find((candidate) =>
+      (candidate.textContent ?? '').includes(text)
+    );
+    expect(button).not.toBeUndefined();
+
+    await act(() => {
+      button?.click();
+    });
+  };
 
   it('renders summary rows, node count, and the live subtitle', async () => {
     await renderDialog(FIXTURE_SOURCE);
@@ -224,5 +270,47 @@ describe('GraphPreviewDialog', () => {
 
     expect(document.body.textContent ?? '').toContain('Height must be a multiple of 8.');
     expect(document.querySelector('[data-flow-stub]')).toBeNull();
+  });
+
+  it('selecting a node from the list opens the inspector with resolved inputs and edges', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await switchToMode('list');
+    expect(document.querySelector('[data-flow-stub]')).toBeNull();
+
+    await clickButtonWithText('denoise_latents');
+
+    // List selection reveals the node in graph mode, not list mode.
+    expect(document.querySelector<HTMLInputElement>('input[value="graph"]')?.checked).toBe(true);
+    expect(document.querySelector('[data-flow-stub]')).not.toBeNull();
+
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('denoise_latents');
+    expect(text).toContain('Resolved inputs');
+    expect(text).toContain('28');
+    expect(text).toContain('Set by');
+    expect(text).toContain('Generate → Steps');
+  });
+
+  it('show node selects the seed node and inspector shows the randomized override', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await clickButtonWithText('show node');
+
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('integer');
+    expect(text).toContain('seed');
+    expect(text).toContain('regenerated each run');
+  });
+
+  it('clicking a provenance link focuses the source and closes the dialog', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await switchToMode('list');
+    await clickButtonWithText('denoise_latents');
+    await clickButtonWithText('Generate → Steps');
+
+    expect(graphPreviewPort.focusSource).toHaveBeenCalledWith('generate');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });

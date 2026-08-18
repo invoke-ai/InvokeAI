@@ -543,11 +543,17 @@
     "you": "You"
   },
   "graphPreview": {
+    "back": "Back",
     "cfgScale": "CFG scale",
     "compiledFrom": "Compiled from {{source}}.",
     "copied": "Copied",
     "copyJson": "Copy JSON",
     "destination": "Destination",
+    "edges": "Edges",
+    "edgesIn_one": "in · {{count}} input from {{sources}}",
+    "edgesIn_other": "in · {{count}} inputs from {{sources}}",
+    "edgesInNone": "in · none",
+    "edgesOut": "out · {{field}} → {{target}}",
     "graph": "Graph",
     "graphJsonLabel": "{{title}} graph JSON",
     "inputCount_one": "{{count}} input",
@@ -560,6 +566,10 @@
     "model": "Model",
     "noCompiledGraph": "No compiled graph is available for \"{{graphId}}\" yet.",
     "nodes": "Nodes",
+    "nodeSummary": {
+      "denoise": "{{steps}} steps · cfg {{cfg}}",
+      "noise": "{{width}} × {{height}}"
+    },
     "provenance": {
       "cfgScale": "Generate → CFG scale",
       "clipSkip": "Generate → CLIP skip",
@@ -573,12 +583,15 @@
       "size": "Generate → Size",
       "steps": "Generate → Steps"
     },
+    "resolvedInputs": "Resolved inputs",
     "scheduler": "Scheduler",
     "seed": "Seed",
     "seedRandomValue": "random",
     "seedRandomized": "Seed is randomized. This graph runs differently each time.",
     "seedRegenerated": "regenerated each run",
     "selectNode": "Select a node for details.",
+    "setBy": "Set by",
+    "showNode": "show node",
     "size": "Size",
     "steps": "Steps",
     "thisGraph": "This graph",
