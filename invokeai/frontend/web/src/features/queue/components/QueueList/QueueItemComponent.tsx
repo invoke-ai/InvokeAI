@@ -23,7 +23,7 @@ const selectedStyles = { bg: 'base.700' };
 
 type InnerItemProps = {
   index: number;
-  item: S['SessionQueueItem'];
+  item: S['SessionQueueItemSummary'];
 };
 
 const sx: ChakraProps['sx'] = {

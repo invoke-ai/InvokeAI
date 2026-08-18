@@ -144,7 +144,7 @@
       "patch": {
         "tags": ["authentication"],
         "summary": "Update Current User",
-        "description": "Update the current user's own profile.\n\nTo change the password, both ``current_password`` and ``new_password`` must\nbe provided. The current password is verified before the change is applied.\n\nArgs:\n    request: Profile fields to update\n    current_user: The authenticated user\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if current password is incorrect or new password is weak\n    HTTPException: 404 if user not found",
+        "description": "Update the current user's own profile.\n\nTo change the password, both ``current_password`` and ``new_password`` must\nbe provided. The current password is verified before the change is applied.\n\nA password change signs out the account's *other* sessions: it bumps the\nrevocation epoch, invalidating every previously issued token. This response\ncarries a replacement token in ``X-Refreshed-Token`` so the caller stays\nsigned in.\n\nArgs:\n    request: Profile fields to update\n    current_user: The authenticated user\n    http_request: The HTTP request, used to scope the replacement media cookie\n    response: The HTTP response, used to return the replacement token\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if current password is incorrect or new password is weak\n    HTTPException: 404 if user not found",
         "operationId": "update_current_user_api_v1_auth_me_patch",
         "requestBody": {
           "content": {
@@ -375,7 +375,7 @@
       "patch": {
         "tags": ["authentication"],
         "summary": "Update User",
-        "description": "Update a user. Requires admin privileges.\n\nArgs:\n    user_id: The user ID\n    request: Fields to update\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if password is weak\n    HTTPException: 404 if user not found",
+        "description": "Update a user. Requires admin privileges.\n\nResetting a password revokes the target's existing sessions. An admin resetting\ntheir own password receives a replacement token in ``X-Refreshed-Token`` so they\nare not signed out by their own action.\n\nArgs:\n    user_id: The user ID\n    request: Fields to update\n\nReturns:\n    The updated user\n\nRaises:\n    HTTPException: 400 if password is weak, if the change would remove the last\n        administrator, or if it targets the protected system account\n    HTTPException: 404 if user not found",
         "operationId": "update_user_api_v1_auth_users__user_id__patch",
         "security": [
           {
@@ -432,7 +432,7 @@
       "delete": {
         "tags": ["authentication"],
         "summary": "Delete User",
-        "description": "Delete a user. Requires admin privileges.\n\nAdmins can delete any user including other admins, but cannot delete the last\nremaining admin.\n\nArgs:\n    user_id: The user ID\n\nRaises:\n    HTTPException: 400 if attempting to delete the last admin\n    HTTPException: 404 if user not found",
+        "description": "Delete a user. Requires admin privileges.\n\nAdmins can delete any user including other admins, but cannot delete the last\nremaining admin, nor the internal system user.\n\nArgs:\n    user_id: The user ID\n\nRaises:\n    HTTPException: 400 if attempting to delete the last admin or the system user\n    HTTPException: 404 if user not found",
         "operationId": "delete_user_api_v1_auth_users__user_id__delete",
         "security": [
           {
@@ -2572,6 +2572,9 @@
           "404": {
             "description": "Model not found"
           },
+          "409": {
+            "description": "Another operation on this model is already in progress"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3018,6 +3021,9 @@
           "404": {
             "description": "The model could not be found"
           },
+          "409": {
+            "description": "Another operation on this model is already in progress"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3225,6 +3231,9 @@
           "400": {
             "description": "Bad request"
           },
+          "409": {
+            "description": "Another operation on this model is already in progress"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3265,6 +3274,9 @@
           },
           "404": {
             "description": "Model image not found"
+          },
+          "409": {
+            "description": "Another operation on this model is already in progress"
           },
           "422": {
             "description": "Validation Error",
@@ -5803,8 +5815,9 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Names",
-        "description": "Gets ordered list of image names with metadata for optimistic updates",
+        "description": "Gets ordered list of image names with metadata for optimistic updates.\n\nDeprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved\nin one ordered list. This image-only endpoint predates the polymorphic gallery.",
         "operationId": "get_image_names",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -6852,8 +6865,9 @@
       "get": {
         "tags": ["videos"],
         "summary": "Get Video Names",
-        "description": "Gets ordered list of video names with metadata for optimistic updates.",
+        "description": "Gets ordered list of video names with metadata for optimistic updates.\n\nDeprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved\nin one ordered list. This video-only endpoint predates the polymorphic gallery.",
         "operationId": "get_video_names",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -7355,12 +7369,184 @@
         }
       }
     },
+    "/api/v1/gallery/item_names": {
+      "get": {
+        "tags": ["gallery"],
+        "summary": "List Gallery Item Names",
+        "description": "Returns the ordered flat list of item names \u2014 used to drive virtualized gallery selection.\n\nNames are polymorphic: image and video names are interleaved by `created_at`. A name ending\nin `.mp4` is a video.",
+        "operationId": "list_gallery_item_names",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ResourceOrigin"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The origin of items to list.",
+              "title": "Origin"
+            },
+            "description": "The origin of items to list."
+          },
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImageCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The categories to include. Shared between images and videos.",
+              "title": "Categories"
+            },
+            "description": "The categories to include. Shared between images and videos."
+          },
+          {
+            "name": "is_intermediate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Whether to list intermediate items.",
+              "title": "Is Intermediate"
+            },
+            "description": "Whether to list intermediate items."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board id to filter by. Use 'none' to find items without a board.",
+              "title": "Board Id"
+            },
+            "description": "The board id to filter by. Use 'none' to find items without a board."
+          },
+          {
+            "name": "created_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards.",
+              "title": "Created Date"
+            },
+            "description": "Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards."
+          },
+          {
+            "name": "order_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SQLiteDirection",
+              "description": "The order of sort",
+              "default": "DESC"
+            },
+            "description": "The order of sort"
+          },
+          {
+            "name": "starred_first",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Whether to sort by starred items first",
+              "default": true,
+              "title": "Starred First"
+            },
+            "description": "Whether to sort by starred items first"
+          },
+          {
+            "name": "search_term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The term to search for",
+              "title": "Search Term"
+            },
+            "description": "The term to search for"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GalleryItemNames"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/gallery/items/names": {
       "get": {
         "tags": ["gallery"],
         "summary": "Get Gallery Item Names",
-        "description": "Returns an ordered (kind, name) list \u2014 used to drive virtualized gallery selection.",
+        "description": "Returns an ordered (kind, name) list \u2014 used to drive virtualized gallery selection.\n\nDeprecated: use `GET /v1/gallery/item_names`, which returns the same order as a flat name\nlist. The `kind` discriminator here costs a model per row \u2014 ~800ms on a 200k-item library \u2014\nfor a value callers already derive from the file extension.",
         "operationId": "get_gallery_item_names",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -8163,8 +8349,9 @@
       "get": {
         "tags": ["virtual_boards"],
         "summary": "List Virtual Board Image Names By Date",
-        "description": "Gets ordered image names for a specific date. Image-only; kept for API compatibility \u2014\nthe UI uses the polymorphic `/by_date/{date}/item_names` endpoint.",
+        "description": "Gets ordered image names for a specific date. Image-only.\n\nDeprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and\nvideos in one ordered list.",
         "operationId": "list_virtual_board_image_names_by_date",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -8273,8 +8460,9 @@
       "get": {
         "tags": ["virtual_boards"],
         "summary": "List Virtual Board Item Names By Date",
-        "description": "Gets ordered polymorphic (image + video) item refs for a specific date.",
+        "description": "Gets ordered polymorphic (image + video) item refs for a specific date.\n\nDeprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same\norder as a flat name list instead of one model per item.",
         "operationId": "list_virtual_board_item_names_by_date",
+        "deprecated": true,
         "security": [
           {
             "HTTPBearer": []
@@ -9258,7 +9446,7 @@
       "post": {
         "tags": ["queue"],
         "summary": "Get Queue Items By Item Ids",
-        "description": "Gets queue items for the specified queue item ids. Maintains order of item ids.",
+        "description": "Gets queue items for the specified queue item ids. Maintains order of item ids.\n\nBound the legacy full-item endpoint as well as the summary endpoint: callers can otherwise\nforce one graph deserialization and response copy per supplied id, defeating the queue-list\noptimization with an authenticated memory/CPU exhaustion request.",
         "operationId": "get_queue_items_by_item_ids",
         "security": [
           {
@@ -9299,6 +9487,68 @@
                     "$ref": "#/components/schemas/SessionQueueItem"
                   },
                   "title": "Response 200 Get Queue Items By Item Ids"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+      "post": {
+        "tags": ["queue"],
+        "summary": "Get Queue Item Summaries By Ids",
+        "description": "Gets lightweight queue item summaries for specified IDs in requested order.",
+        "operationId": "get_queue_item_summaries_by_ids",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_get_queue_item_summaries_by_ids"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SessionQueueItemSummary"
+                  },
+                  "title": "Response 200 Get Queue Item Summaries By Ids"
                 }
               }
             }
@@ -15623,7 +15873,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "binary"
+                "contentMediaType": "application/octet-stream"
               },
               {
                 "type": "null"
@@ -15745,6 +15995,22 @@
         "required": ["image_names"],
         "title": "Body_get_images_by_names"
       },
+      "Body_get_queue_item_summaries_by_ids": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Item Ids",
+            "description": "Object containing list of queue item ids to fetch summaries for"
+          }
+        },
+        "type": "object",
+        "required": ["item_ids"],
+        "title": "Body_get_queue_item_summaries_by_ids"
+      },
       "Body_get_queue_items_by_item_ids": {
         "properties": {
           "item_ids": {
@@ -15752,6 +16018,7 @@
               "type": "integer"
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Item Ids",
             "description": "Object containing list of queue item ids to fetch queue items for"
           }
@@ -15764,7 +16031,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File",
             "description": "The file to import"
           }
@@ -15854,7 +16121,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image",
             "description": "The image file to upload"
           }
@@ -15897,7 +16164,7 @@
         "properties": {
           "image": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "Image"
           }
         },
@@ -15911,7 +16178,7 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "binary"
+                "contentMediaType": "application/octet-stream"
               },
               {
                 "type": "null"
@@ -15957,7 +16224,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "resize_to": {
@@ -15994,7 +16261,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "format": "binary",
+            "contentMediaType": "application/octet-stream",
             "title": "File"
           },
           "metadata": {
@@ -33481,6 +33748,32 @@
         "title": "GalleryItemKind",
         "description": "Discriminator for polymorphic gallery items."
       },
+      "GalleryItemNames": {
+        "properties": {
+          "item_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Names",
+            "description": "Ordered list of image and video names."
+          },
+          "starred_count": {
+            "type": "integer",
+            "title": "Starred Count",
+            "description": "Number of starred items (when starred_first=True)."
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count",
+            "description": "Total number of items matching the query."
+          }
+        },
+        "type": "object",
+        "required": ["item_names", "starred_count", "total_count"],
+        "title": "GalleryItemNames",
+        "description": "Ordered flat list of gallery item names plus counts for optimistic UI.\n\nNames are polymorphic \u2014 images and videos are interleaved by `created_at`. The kind of a\ngiven name is its file extension (`.mp4` is a video), which is how every consumer already\ndiscriminates. Mirrors the shape of the image-only `ImageNamesResult`."
+      },
       "GalleryItemNamesResult": {
         "properties": {
           "items": {
@@ -33505,7 +33798,7 @@
         "type": "object",
         "required": ["items", "starred_count", "total_count"],
         "title": "GalleryItemNamesResult",
-        "description": "Ordered list of gallery item references plus counts for optimistic UI."
+        "description": "Ordered list of gallery item references plus counts for optimistic UI.\n\nDeprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to\ncarry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,\nfor a field callers derive from the filename extension anyway."
       },
       "GalleryItemRef": {
         "properties": {
@@ -62251,6 +62544,513 @@
         "title": "Main_SDNQ_Diffusers_ZImage_Config",
         "description": "Model config for SDNQ-quantized Z-Image models in diffusers format (full ZImagePipeline folder)."
       },
+      "Main_SDNQ_FLUX_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "flux",
+            "title": "Base",
+            "default": "flux"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/FluxVariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_SDNQ_FLUX_Config",
+        "description": "Model config for SDNQ-quantized FLUX transformer models."
+      },
+      "Main_SDNQ_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_SDNQ_Flux2_Config",
+        "description": "Model config for SDNQ-quantized FLUX.2 transformer models (e.g. Klein 4B / 9B)."
+      },
+      "Main_SDNQ_ZImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "z-image",
+            "title": "Base",
+            "default": "z-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/ZImageVariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_SDNQ_ZImage_Config",
+        "description": "Model config for SDNQ-quantized Z-Image transformer models."
+      },
       "MaskCombineInvocation": {
         "category": "mask",
         "class": "invocation",
@@ -73125,6 +73925,160 @@
         "title": "Qwen3Encoder_Qwen3Encoder_Config",
         "description": "Configuration for Qwen3 Encoder models in a diffusers-like format.\n\nThe model weights are expected to be in a folder called text_encoder inside the model directory,\ncompatible with Qwen2VLForConditionalGeneration or similar architectures used by Z-Image."
       },
+      "Qwen3Encoder_SDNQ_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_encoder",
+            "title": "Type",
+            "default": "qwen3_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "sdnq_quantized",
+            "title": "Format",
+            "default": "sdnq_quantized"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only",
+          "variant"
+        ],
+        "title": "Qwen3Encoder_SDNQ_Config",
+        "description": "Configuration for SDNQ-quantized Qwen3 Encoder models (single file)."
+      },
       "Qwen3Encoder_SDNQ_Folder_Config": {
         "properties": {
           "key": {
@@ -79876,6 +80830,181 @@
         "title": "SessionQueueItem",
         "description": "Session queue item without the full graph. Used for serialization."
       },
+      "SessionQueueItemSummary": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The identifier of the session queue item"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Created At",
+            "description": "When this queue item was created"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "waiting", "completed", "failed", "canceled"],
+            "title": "Status",
+            "description": "The status of this queue item"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device",
+            "description": "The device that processed this queue item, e.g. 'cuda:1'"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "When this queue item was started"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "When this queue item was completed"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin",
+            "description": "The origin of this queue item"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination",
+            "description": "The destination of this queue item"
+          },
+          "batch_id": {
+            "type": "string",
+            "title": "Batch Id",
+            "description": "The ID of the batch associated with this queue item"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The ID of the user who created this queue item"
+          },
+          "user_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Display Name",
+            "description": "The display name of the user who created this queue item"
+          },
+          "user_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Email",
+            "description": "The email of the user who created this queue item"
+          },
+          "field_values": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/NodeFieldValue"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field Values",
+            "description": "The batch field values used for this queue item"
+          },
+          "parent_item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Item Id",
+            "description": "The ID of the parent queue item, if this is a child item"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "created_at",
+          "status",
+          "started_at",
+          "completed_at",
+          "origin",
+          "destination",
+          "batch_id",
+          "user_id",
+          "user_display_name",
+          "user_email",
+          "field_values",
+          "parent_item_id"
+        ],
+        "title": "SessionQueueItemSummary",
+        "description": "Queue item fields needed to render the queue list."
+      },
       "SessionQueueStatus": {
         "properties": {
           "queue_id": {
@@ -85569,6 +86698,12 @@
             ],
             "title": "Last Login At",
             "description": "When user last logged in"
+          },
+          "token_epoch": {
+            "type": "integer",
+            "title": "Token Epoch",
+            "description": "Revocation epoch; tokens minted before the current value are rejected",
+            "default": 0
           }
         },
         "type": "object",
@@ -87515,6 +88650,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
