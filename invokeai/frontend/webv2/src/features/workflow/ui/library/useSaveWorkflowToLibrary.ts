@@ -1,3 +1,5 @@
+import type { ProjectGraphState } from '@features/workflow/core/types';
+
 import {
   createLibraryWorkflow,
   invalidateWorkflowLibraryCache,
@@ -30,6 +32,7 @@ import { setWorkflowLibrarySyncStatus } from './workflowLibrarySyncStore';
  */
 export const useSaveWorkflowToLibrary = (): {
   saveAsNew: () => Promise<string | null>;
+  saveDocumentAsNew: (document: ProjectGraphState) => Promise<string | null>;
   saveToLibrary: () => Promise<string | null>;
 } => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
@@ -89,5 +92,34 @@ export const useSaveWorkflowToLibrary = (): {
   const saveToLibrary = useCallback(() => save(false), [save]);
   const saveAsNew = useCallback(() => save(true), [save]);
 
-  return { saveAsNew, saveToLibrary };
+  // Saves an arbitrary document — not necessarily the active project graph —
+  // as a new library entry. Used by "Open as → Save to workflow library" for
+  // a preview payload that may never have become the active project. Unlike
+  // `saveAsNew`, this never binds the result to the project or marks the
+  // autosaver's synced baseline: the active project graph is left alone.
+  const saveDocumentAsNew = useCallback(
+    async (document: ProjectGraphState): Promise<string | null> => {
+      const owner = captureAccountScope();
+
+      try {
+        const serialized = serializeWorkflowJson(document);
+        const workflowId = await createLibraryWorkflow(serialized, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        invalidateWorkflowLibraryCache();
+
+        return workflowId;
+      } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return null;
+        }
+
+        notify.error('Failed to save workflow', getApiErrorMessage(error, 'The workflow could not be saved.'));
+        return null;
+      }
+    },
+    [notify]
+  );
+
+  return { saveAsNew, saveDocumentAsNew, saveToLibrary };
 };

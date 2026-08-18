@@ -153,3 +153,126 @@ describe('useSaveWorkflowToLibrary bind-then-sync', () => {
     }
   });
 });
+
+/**
+ * `saveDocumentAsNew` saves an arbitrary document (e.g. a preview payload
+ * that never became the active project graph) to the library. Unlike
+ * `saveAsNew`, it must not bind the result to the project or mark the
+ * autosaver's synced baseline — the active project graph is untouched.
+ */
+describe('useSaveWorkflowToLibrary saveDocumentAsNew', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+    createLibraryWorkflowMock.mockReset();
+    updateLibraryWorkflowMock.mockReset();
+    invalidateWorkflowLibraryCacheMock.mockReset();
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const renderHarness = () => {
+    const initialGraph = createProjectGraph('workflow-1');
+    const project = createMutablePort({
+      galleryValues: {},
+      graphHistory: [],
+      id: 'project-1',
+      isWorkflowRunning: false,
+      projectGraph: initialGraph,
+      workflowValues: {},
+    });
+
+    const bindLibraryWorkflow = vi.fn();
+
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
+    const adapter = {
+      commands: {
+        bindLibraryWorkflow,
+        editGraph: vi.fn(),
+        redo: vi.fn(),
+        replace: vi.fn(),
+        restoreSnapshot: vi.fn(),
+        saveSnapshot: vi.fn(),
+        undo: vi.fn(),
+      },
+      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+      project: project.port,
+    } as unknown as WorkflowUiAdapter;
+
+    let saveDocumentAsNew: ((document: ReturnType<typeof createProjectGraph>) => Promise<string | null>) | null = null;
+    const Harness = () => {
+      const hook = useSaveWorkflowToLibrary();
+
+      useEffect(() => {
+        saveDocumentAsNew = hook.saveDocumentAsNew;
+      });
+
+      return null;
+    };
+
+    return { adapter, bindLibraryWorkflow, getSaveDocumentAsNew: () => saveDocumentAsNew, Harness, project };
+  };
+
+  it('resolves the created id, sends the serialized document, and leaves the project alone', async () => {
+    createLibraryWorkflowMock.mockResolvedValue('library-workflow-42');
+
+    const { adapter, bindLibraryWorkflow, getSaveDocumentAsNew, Harness, project } = renderHarness();
+
+    await act(() => {
+      root.render(
+        <WorkflowUiProvider adapter={adapter}>
+          <Harness />
+        </WorkflowUiProvider>
+      );
+    });
+
+    const document = { ...createProjectGraph('preview-doc'), name: 'From preview' };
+
+    let result: string | null = null;
+    await act(async () => {
+      result = (await getSaveDocumentAsNew()?.(document)) ?? null;
+    });
+
+    expect(result).toBe('library-workflow-42');
+    expect(createLibraryWorkflowMock).toHaveBeenCalledTimes(1);
+    expect(createLibraryWorkflowMock.mock.calls[0]?.[0]).toMatchObject({ name: 'From preview' });
+    expect(createLibraryWorkflowMock.mock.calls[0]?.[0]).toStrictEqual(serializeWorkflowJson(document));
+    expect(bindLibraryWorkflow).not.toHaveBeenCalled();
+    expect(invalidateWorkflowLibraryCacheMock).toHaveBeenCalledTimes(1);
+    // The active project graph (a different document from the one saved)
+    // must be untouched: no libraryWorkflowId leaked onto it.
+    expect(project.port.getSnapshot().projectGraph.libraryWorkflowId).toBeUndefined();
+  });
+
+  it('returns null and notifies on rejection', async () => {
+    createLibraryWorkflowMock.mockRejectedValue(new Error('network down'));
+
+    const { adapter, getSaveDocumentAsNew, Harness } = renderHarness();
+
+    await act(() => {
+      root.render(
+        <WorkflowUiProvider adapter={adapter}>
+          <Harness />
+        </WorkflowUiProvider>
+      );
+    });
+
+    const document = { ...createProjectGraph('preview-doc'), name: 'From preview' };
+
+    let result: string | null = 'not-null';
+    await act(async () => {
+      result = (await getSaveDocumentAsNew()?.(document)) ?? null;
+    });
+
+    expect(result).toBeNull();
+    expect(adapter.notifications.error).toHaveBeenCalledWith('Failed to save workflow', expect.any(String));
+    expect(invalidateWorkflowLibraryCacheMock).not.toHaveBeenCalled();
+  });
+});
