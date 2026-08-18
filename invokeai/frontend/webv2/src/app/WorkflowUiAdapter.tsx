@@ -27,6 +27,7 @@ import {
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
@@ -54,9 +55,15 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
+  const openWidget = useOpenWorkbenchWidget();
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
+      focusSource: (sourceId) => {
+        if (sourceId) {
+          openWidget(sourceId);
+        }
+      },
       getRoute: (sourceId) => {
         if (!sourceId) {
           return null;
@@ -98,8 +105,11 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           throw error;
         }
       },
+      openWorkflowEditor: () => {
+        openWidget('workflow');
+      },
     }),
-    [availabilityModels, commands, queries, routeInput]
+    [availabilityModels, commands, openWidget, queries, routeInput]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;

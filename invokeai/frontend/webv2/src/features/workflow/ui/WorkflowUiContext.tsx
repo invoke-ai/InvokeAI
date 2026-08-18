@@ -45,6 +45,8 @@ export interface WorkflowGraphPreviewPort {
     sourceId?: WorkflowInvocationSourceId
   ): { canInvoke: boolean; label: string; validationMessage?: string } | null;
   invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
+  focusSource(sourceId?: WorkflowInvocationSourceId): void; // reveal the source's widget (provenance links)
+  openWorkflowEditor(): void; // reveal the workflow editor widget
 }
 
 /**
