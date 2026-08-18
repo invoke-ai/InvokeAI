@@ -290,18 +290,43 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete(self, image_name: str):
+        # Stage the file deletion first so a database failure can be rolled back by
+        # restoring the files, keeping the record and files consistent either way.
+        token: object | None = None
+        record_deleted = False
         try:
             record = self.__invoker.services.image_records.get(image_name)
-            self.__invoker.services.image_files.delete(image_name, image_subfolder=record.image_subfolder)
+            token = self.__invoker.services.image_files.stage_delete(image_name, image_subfolder=record.image_subfolder)
             self.__invoker.services.image_records.delete(image_name)
+            record_deleted = True
+            try:
+                self.__invoker.services.image_files.commit_delete(token)
+            except Exception as cleanup_error:
+                # The record is gone; a failed purge only leaves a staging directory
+                # behind, which startup recovery will clean up. Not a delete failure.
+                self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
             self._on_deleted(image_name)
         except ImageRecordDeleteException:
+            if token is not None:
+                try:
+                    self.__invoker.services.image_files.rollback_delete(token)
+                except Exception as rollback_error:
+                    self.__invoker.services.logger.error(
+                        f"Failed to restore staged image files for {image_name}: {rollback_error}"
+                    )
             self.__invoker.services.logger.error("Failed to delete image record")
             raise
         except ImageFileDeleteException:
             self.__invoker.services.logger.error("Failed to delete image file")
             raise
         except Exception as e:
+            if token is not None and not record_deleted:
+                try:
+                    self.__invoker.services.image_files.rollback_delete(token)
+                except Exception as rollback_error:
+                    self.__invoker.services.logger.error(
+                        f"Failed to restore staged image files for {image_name}: {rollback_error}"
+                    )
             self.__invoker.services.logger.error("Problem deleting image record and file")
             raise e
 
@@ -361,21 +386,48 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete_intermediates(self) -> int:
+        # Records first, files second. An earlier revision staged every file, then conditionally
+        # deleted the records, then restored the files of any image that had been promoted out of
+        # intermediate status mid-operation. That restore is unfixably racy: while a promoted
+        # image's files sit in our staging directory, a concurrent single-image or board delete can
+        # stage-empty (it finds no files to move) and then remove the record; our restore then puts
+        # the files back with no record referencing them and no staging dir to recover from —
+        # permanent orphans (JPPhoto, PR #9361).
+        #
+        # Deleting the records first removes that hazard entirely: the conditional DELETE is atomic
+        # and tells us exactly which rows it removed, and we only ever touch the files of rows that
+        # are already gone. A promoted image is never deleted and its files are never staged, so a
+        # concurrent delete of it operates on real files in the output folder and stays consistent.
         try:
-            image_name_subfolder_pairs = self.__invoker.services.image_records.delete_intermediates()
-            count = len(image_name_subfolder_pairs)
-            for image_name, image_subfolder in image_name_subfolder_pairs:
-                self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
+            image_name_subfolder_pairs = self.__invoker.services.image_records.get_intermediates()
+            subfolders = dict(image_name_subfolder_pairs)
+            # Conditional on the row still being an intermediate: an image promoted between the
+            # snapshot above and this call keeps both its record and its files. Returns exactly the
+            # names this call removed (already-absent and promoted rows are excluded).
+            deleted_image_names = self.__invoker.services.image_records.delete_intermediates_by_names(
+                list(subfolders.keys())
+            )
+            # The records are committed as gone; purge each file best-effort. A filesystem failure
+            # here orphans that file (nothing references it) but must neither abort the remaining
+            # purges nor undo the committed deletions, so failures are logged and skipped rather
+            # than raised.
+            for image_name in deleted_image_names:
+                try:
+                    self.__invoker.services.image_files.delete(
+                        image_name, image_subfolder=subfolders.get(image_name, "")
+                    )
+                except Exception as cleanup_error:
+                    self.__invoker.services.logger.error(
+                        f"Failed to purge intermediate image files for {image_name}: {cleanup_error}"
+                    )
+            for image_name in deleted_image_names:
                 self._on_deleted(image_name)
-            return count
+            return len(deleted_image_names)
         except ImageRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete image records")
             raise
-        except ImageFileDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image files")
-            raise
         except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting image records and files")
+            self.__invoker.services.logger.error("Problem deleting intermediate image records and files")
             raise e
 
     def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
