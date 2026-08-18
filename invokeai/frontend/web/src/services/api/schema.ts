@@ -4786,7 +4786,7 @@ export type components = {
              * Image
              * @description The image file to upload
              */
-            image?: Blob | null;
+            image?: string | null;
             /**
              * Data
              * @description The data of the style preset to create
@@ -4868,7 +4868,7 @@ export type components = {
              * File
              * @description The file to import
              */
-            file: Blob;
+            file: string;
         };
         /** Body_parse_dynamicprompts */
         Body_parse_dynamicprompts: {
@@ -4925,7 +4925,7 @@ export type components = {
              * Image
              * @description The image file to upload
              */
-            image: Blob;
+            image: string;
         };
         /** Body_star_images_in_list */
         Body_star_images_in_list: {
@@ -4946,7 +4946,7 @@ export type components = {
         /** Body_update_model_image */
         Body_update_model_image: {
             /** Image */
-            image: Blob;
+            image: string;
         };
         /** Body_update_style_preset */
         Body_update_style_preset: {
@@ -4954,7 +4954,7 @@ export type components = {
              * Image
              * @description The image file to upload
              */
-            image?: Blob | null;
+            image?: string | null;
             /**
              * Data
              * @description The data of the style preset to update
@@ -4977,7 +4977,7 @@ export type components = {
         /** Body_upload_image */
         Body_upload_image: {
             /** File */
-            file: Blob;
+            file: string;
             /**
              * Resize To
              * @description Dimensions to resize the image to, must be stringified tuple of 2 integers. Max total pixel count: 16777216
@@ -4993,7 +4993,7 @@ export type components = {
         /** Body_upload_video */
         Body_upload_video: {
             /** File */
-            file: Blob;
+            file: string;
             /**
              * Metadata
              * @description The metadata to associate with the video, must be a stringified JSON dict
@@ -18939,6 +18939,7 @@ export type components = {
          *         external_seedream_base_url: Base URL override for Seedream image generation.
          *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
          *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+         *         http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
          */
         InvokeAIAppConfig: {
             /**
@@ -19013,6 +19014,12 @@ export type components = {
              * @default 127.0.0.1
              */
             forwarded_allow_ips?: string;
+            /**
+             * Http Compression Level
+             * @description Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
+             * @default 9
+             */
+            http_compression_level?: number;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
