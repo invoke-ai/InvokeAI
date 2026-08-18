@@ -383,6 +383,42 @@ const PreviewVideo = ({
 
     void refresh.then(finishRefresh, () => finishRefresh(false));
   }, [isItemCurrent, publishCopyAvailability, source.itemKey]);
+  // The preview keeps `poster` — the 256px WebP gallery thumbnail — as its instant
+  // placeholder, but the browser goes on showing it well after the video's own first frame is
+  // decoded and ready: by `loadedmetadata` the element is already at readyState 4 with
+  // `resize` fired, and the poster survives only because the HTML spec's *show-poster flag* is
+  // still set. Upscaled across the whole stage, that 256px still is what reads as fuzzy.
+  // Seeking clears the show-poster flag, and that — not any new decoding — is what puts the
+  // native-resolution frame on screen. Measured on a 1280x720 clip, Laplacian variance of the
+  // painted stage goes from 254 to 576.
+  //
+  // Dropping the `poster` attribute instead does not work: the flag stays set with nothing
+  // left to draw, and the stage paints black until the user presses play.
+  //
+  // The nudge is not free. It pulls more of the clip than `preload="metadata"` alone would —
+  // measured on a 7MB/20s clip, one 1MB range request becomes three (~3.1MB), which then
+  // settles rather than running away. A full-resolution poster served by the backend would buy
+  // the same frame without the extra range traffic, if that ever becomes worth the endpoint.
+  //
+  // The guard skips the nudge when the user hit play before metadata arrived — measured, that
+  // is the one interleaving where `loadedmetadata` observes `paused === false`. It deliberately
+  // does not claim to protect a mid-playback viewer from a reload: `load()` is the only thing
+  // that refires `loadedmetadata` on this element, and it has already reset the position to 0
+  // and `paused` to true by the time the handler runs. The `currentTime` clause is
+  // belt-and-braces for an engine that does not reset it.
+  const handleFirstFrameSeek = useCallback(() => {
+    const video = videoRef.current;
+
+    if (!video || !video.paused || video.currentTime > 0) {
+      return;
+    }
+
+    try {
+      video.currentTime = FIRST_FRAME_SEEK_SECONDS;
+    } catch {
+      // Some browsers throw if the seekable range is not populated yet; the poster stays up.
+    }
+  }, []);
   const handleRetry = useCallback(() => {
     const video = videoRef.current;
 
@@ -429,6 +465,7 @@ const PreviewVideo = ({
           onEmptied={publishCopyAvailability}
           onError={handleVideoError}
           onLoadedData={publishCopyAvailability}
+          onLoadedMetadata={handleFirstFrameSeek}
           onPlaying={publishCopyAvailability}
           onResize={publishCopyAvailability}
           onSeeked={publishCopyAvailability}
@@ -506,6 +543,10 @@ const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
 
 const isCanvasSecurityError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'SecurityError';
+
+// Far enough from zero for browsers to treat it as a real seek, small enough that playback
+// still starts on frame 0 at any sane frame rate.
+const FIRST_FRAME_SEEK_SECONDS = 0.0001;
 
 const VIDEO_STYLE: CSSProperties = {
   display: 'block',
