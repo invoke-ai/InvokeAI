@@ -2,7 +2,7 @@ import type { WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 
 import { Badge, Button, Stack, Text } from '@chakra-ui/react';
 import { getTopologicalOrder } from '@features/workflow/core/graphLayout';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getNodeSubtitle } from './nodeSummaries';
@@ -55,19 +55,24 @@ export const GraphPreviewList = ({
   graph: WorkflowPreviewGraph;
   onSelect: (nodeId: string) => void;
 }) => {
-  const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
-  const order = getTopologicalOrder(
-    graph.nodes,
-    graph.edges.map((edge) => ({ sourceNodeId: edge.sourceNodeId, targetNodeId: edge.targetNodeId }))
-  );
+  // Live sources (e.g. Generate) recompile on every keystroke — re-sorting and
+  // re-mapping the node list on every one of those renders (not just when the
+  // graph itself changes) would make leaving List mode open needlessly costly.
+  const orderedNodes = useMemo(() => {
+    const nodesById = new Map(graph.nodes.map((node) => [node.id, node]));
+    const order = getTopologicalOrder(
+      graph.nodes,
+      graph.edges.map((edge) => ({ sourceNodeId: edge.sourceNodeId, targetNodeId: edge.targetNodeId }))
+    );
+
+    return order.map((nodeId) => nodesById.get(nodeId)).filter((node): node is PreviewListNode => node !== undefined);
+  }, [graph]);
 
   return (
     <Stack gap="1" h="full" overflowY="auto" p="2">
-      {order.map((nodeId) => {
-        const node = nodesById.get(nodeId);
-
-        return node ? <GraphPreviewListRow key={node.id} node={node} onSelect={onSelect} /> : null;
-      })}
+      {orderedNodes.map((node) => (
+        <GraphPreviewListRow key={node.id} node={node} onSelect={onSelect} />
+      ))}
     </Stack>
   );
 };

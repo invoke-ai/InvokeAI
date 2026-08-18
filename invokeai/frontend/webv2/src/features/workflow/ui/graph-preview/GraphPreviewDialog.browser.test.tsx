@@ -170,7 +170,7 @@ describe('GraphPreviewDialog', () => {
   let onOpenChange: (isOpen: boolean) => void;
   let graphPreviewPort: WorkflowGraphPreviewPort;
 
-  const renderDialog = async (source: GraphPreviewSourceState) => {
+  const renderDialog = async (source: GraphPreviewSourceState, isOpen = true) => {
     const workflowUiAdapter = createWorkflowUiAdapter();
 
     await act(() => {
@@ -181,7 +181,7 @@ describe('GraphPreviewDialog', () => {
               <WorkflowGraphPreviewProvider adapter={graphPreviewPort}>
                 <GraphPreviewDialog
                   graphId="preview-graph-id"
-                  isOpen
+                  isOpen={isOpen}
                   source={source}
                   sourceId="generate"
                   sourceLabel="Generate"
@@ -290,6 +290,13 @@ describe('GraphPreviewDialog', () => {
     expect(text).toContain('28');
     expect(text).toContain('Set by');
     expect(text).toContain('Generate → Steps');
+
+    // The fixture's `denoise_latents` node has one incoming edge (from `seed`)
+    // and one outgoing edge (to `l2i`) — exercise both `getEdgesInLine` and
+    // the per-edge `edgesOut` lines, not just that the "Edges" heading renders.
+    expect(text).toContain('Edges');
+    expect(text).toContain('in · 1 inputs from seed');
+    expect(text).toContain('out · latents → l2i');
   });
 
   it('show node selects the seed node and inspector shows the randomized override', async () => {
@@ -312,5 +319,27 @@ describe('GraphPreviewDialog', () => {
 
     expect(graphPreviewPort.focusSource).toHaveBeenCalledWith('generate');
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('clears the selected node when the dialog closes and reopens', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await switchToMode('list');
+    await clickButtonWithText('denoise_latents');
+    expect(document.body.textContent ?? '').toContain('Resolved inputs');
+
+    // The footer Close button is the path `closeAndReset` resets `selectedNodeId`
+    // through. Re-render with `isOpen` false then true to simulate the parent
+    // obeying the `onOpenChange(false)` this just triggered and reopening —
+    // the same controlled-`open` round trip a real host does.
+    await clickButtonWithText('Close');
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    await renderDialog(FIXTURE_SOURCE, false);
+    await renderDialog(FIXTURE_SOURCE, true);
+
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('Select a node for details.');
+    expect(text).not.toContain('Resolved inputs');
   });
 });
