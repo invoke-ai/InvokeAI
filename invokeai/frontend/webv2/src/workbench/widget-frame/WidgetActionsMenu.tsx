@@ -1,5 +1,3 @@
-import type { GraphContract } from '@workbench/graphContracts';
-import type { Project } from '@workbench/projectContracts';
 import type {
   GraphBearingSurfaceContract,
   WidgetInstanceRuntimeMeta,
@@ -16,7 +14,7 @@ import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getEnabledCenterViewCount } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { shallowEqual, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { GitBranchIcon, MoreHorizontalIcon, PictureInPicture2Icon, TargetIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
@@ -29,36 +27,7 @@ import { useTranslation } from 'react-i18next';
  * widgets extend the frame instead of stacking their own menus and toolbars.
  */
 
-const GraphPreviewDialog = lazy(() =>
-  import('@features/workflow/preview').then((module) => ({ default: module.GraphPreviewDialog }))
-);
-
-const getPreviewGraph = async (
-  project: Project,
-  surface: GraphBearingSurfaceContract
-): Promise<GraphContract | null> => {
-  // The project graph compiles fresh for preview so `View Graph` always shows
-  // what Invoke would run right now; widget graphs keep their last compile.
-  if (surface.sourceId === 'workflow') {
-    const [{ compileProjectGraph }, { getInvocationTemplatesSnapshot }] = await Promise.all([
-      import('@features/workflow/graph'),
-      import('@features/workflow/react'),
-    ]);
-    const templatesSnapshot = getInvocationTemplatesSnapshot();
-
-    if (templatesSnapshot.status !== 'loaded') {
-      return null;
-    }
-
-    try {
-      return compileProjectGraph(project.projectGraph, templatesSnapshot.templates);
-    } catch {
-      return null;
-    }
-  }
-
-  return project.widgetGraphs[surface.widgetId] ?? null;
-};
+const GraphPreviewHost = lazy(() => import('./GraphPreviewHost'));
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 const DISABLED_PROPS = { opacity: 0.4 };
@@ -117,15 +86,14 @@ export const WidgetActionsMenu = ({
   runtime: WidgetRuntimeApi;
 }) => {
   const { t } = useTranslation();
-  const activeProject = useActiveProjectSelector(
-    (project) => ({ projectGraph: project.projectGraph, widgetGraphs: project.widgetGraphs }),
-    shallowEqual
-  ) as Project;
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const { getWidgetById } = useWorkbenchWidgetRegistry();
   const { widgets } = useWorkbenchCommands();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewGraph, setPreviewGraph] = useState<GraphContract | null>(null);
+  // Mount outlives `isPreviewOpen`: dropping the host the moment the dialog
+  // closes cancels its exit transition, so the preview blinked out of
+  // existence. The host reports when the transition is done instead.
+  const [isPreviewMounted, setIsPreviewMounted] = useState(false);
   const label = resolveWidgetLabel(manifest, t);
   const surface = useMemo(
     () =>
@@ -146,25 +114,23 @@ export const WidgetActionsMenu = ({
     flushWorkbenchDrafts();
     widgets.float(instance.id);
   }, [instance.id, widgets]);
-  const surfaceSourceId = surface?.sourceId;
-  const handlePreview = useCallback(async () => {
+  const handlePreview = useCallback(() => {
     flushWorkbenchDrafts();
-    if (surface) {
-      setPreviewGraph(await getPreviewGraph(activeProject, surface));
-    }
+    setIsPreviewMounted(true);
     setIsPreviewOpen(true);
-  }, [activeProject, surface]);
-  const positionHints =
-    isPreviewOpen && surfaceSourceId === 'workflow'
-      ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
-      : undefined;
+  }, []);
+  // Guarded on `isPreviewOpen`: re-opening the preview while it is still
+  // animating out must not have the late exit report drop its mount.
+  const handlePreviewExitComplete = useCallback(() => {
+    if (!isPreviewOpen) {
+      setIsPreviewMounted(false);
+    }
+  }, [isPreviewOpen]);
 
   if (!surface && !HeaderMenu && !canFloat) {
     return null;
   }
 
-  // The project graph mirrors the editable document, so the preview can reuse
-  // the editor's node positions instead of auto-layouting.
   return (
     <>
       <Menu.Root positioning={MENU_POSITIONING}>
@@ -192,15 +158,12 @@ export const WidgetActionsMenu = ({
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      {surface && isPreviewOpen ? (
+      {surface && isPreviewMounted ? (
         <Suspense fallback={null}>
-          <GraphPreviewDialog
-            graph={previewGraph}
-            graphId={surface.graphId}
+          <GraphPreviewHost
             isOpen={isPreviewOpen}
-            positionHints={positionHints}
-            sourceId={surface.sourceId}
-            title={surface.label}
+            surface={surface}
+            onExitComplete={handlePreviewExitComplete}
             onOpenChange={setIsPreviewOpen}
           />
         </Suspense>

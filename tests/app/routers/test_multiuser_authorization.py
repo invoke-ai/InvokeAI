@@ -1124,6 +1124,33 @@ class TestWorkflowMutationAuth:
         )
         assert r.status_code == 200
 
+    def test_update_last_run_at_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.put("/api/v1/workflows/i/some-id/last_run_at")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_update_last_run_at_missing_workflow_404s(self, client: TestClient, user1_token: str):
+        r = client.put(
+            "/api/v1/workflows/i/some-id/last_run_at",
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_non_owner_cannot_update_last_run_at(self, client: TestClient, user1_token: str, user2_token: str):
+        workflow_id = _create_workflow(client, user1_token)
+        r = client.put(
+            f"/api/v1/workflows/i/{workflow_id}/last_run_at",
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_update_last_run_at(self, client: TestClient, user1_token: str):
+        workflow_id = _create_workflow(client, user1_token)
+        r = client.put(
+            f"/api/v1/workflows/i/{workflow_id}/last_run_at",
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == 204
+
 
 # ===========================================================================
 # 4. Workflow thumbnail authorization
