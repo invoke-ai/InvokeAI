@@ -9,16 +9,30 @@ import {
   setWorkflowLibraryBrowseFilter,
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
+import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton } from '@platform/ui';
-import { useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
 import { useLoadLibraryWorkflow } from './useLoadLibraryWorkflow';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryTagChips } from './WorkflowLibraryTagChips';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
+
+/**
+ * xyflow (~174 KB) stays out of this dialog's own chunk: the preview dialog
+ * is only ever needed once a card asks to preview it, so it is dynamic
+ * `import()`ed here rather than statically imported like every other panel
+ * in this file (mirrors `WidgetActionsMenu.tsx`'s `GraphPreviewHost`).
+ */
+const LazyGraphPreviewDialog = lazy(() =>
+  import('@features/workflow/ui/graph-preview/GraphPreviewDialog').then((module) => ({
+    default: module.GraphPreviewDialog,
+  }))
+);
 
 /**
  * Backend workflow library browser. Filtering and paging are server side and
@@ -74,14 +88,21 @@ export const WorkflowLibraryDialog = ({
 }) => {
   const { t } = useTranslation();
   const { category, entries, error, status, tag, tagCounts } = useWorkflowLibraryBrowseSelector(selectBrowseView);
+  const templatesSnapshot = useInvocationTemplatesSnapshot();
   const [searchInput, setSearchInput] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
-  // Task 8 mounts the real preview dialog from this; until then it is only the
-  // record of which workflow the rail asked to preview.
+  // The record of which workflow the rail asked to preview — mounts the lazy
+  // preview dialog below while set. This dialog shell is never unmounted while
+  // the app is up (only its `isOpen` toggles), so every path that can close
+  // *this* dialog has to clear it too, or a stale preview would resurrect
+  // itself the next time the library opens.
   const [previewEntry, setPreviewEntry] = useState<WorkflowLibraryEntry | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const closeDialog = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const closeDialog = useCallback(() => {
+    setPreviewEntry(null);
+    onOpenChange(false);
+  }, [onOpenChange]);
   const { load, loadPhase } = useLoadLibraryWorkflow(closeDialog);
   const isLoadPending = loadPhase !== 'idle';
   const missingCounts = useWorkflowLibraryMissingCounts(entries);
@@ -95,12 +116,36 @@ export const WorkflowLibraryDialog = ({
 
   const handleDialogOpenChange = useCallback(
     (event: { open: boolean }) => {
-      if (!isLoadPending) {
-        onOpenChange(event.open);
+      if (isLoadPending) {
+        return;
+      }
+
+      if (event.open) {
+        onOpenChange(true);
+      } else {
+        closeDialog();
       }
     },
-    [isLoadPending, onOpenChange]
+    [isLoadPending, onOpenChange, closeDialog]
   );
+
+  const handlePreviewOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setPreviewEntry(null);
+    }
+  }, []);
+
+  // Only a `'ready'` enrichment carries the compiled document; the rail's
+  // Preview action is disabled for anything else, so this is a defensive
+  // fallback (a stale `previewEntry` from before a revalidation), not a path
+  // the UI can normally reach.
+  const previewSource = useMemo(() => {
+    if (!previewEntry || previewEntry.enrichment.status !== 'ready' || templatesSnapshot.status !== 'loaded') {
+      return null;
+    }
+
+    return buildLibraryGraphPreviewSource(previewEntry.enrichment.document, templatesSnapshot.templates, t);
+  }, [previewEntry, templatesSnapshot, t]);
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.currentTarget;
@@ -146,87 +191,107 @@ export const WorkflowLibraryDialog = ({
   const handleDeleted = useCallback(() => setSelectedWorkflowId(null), []);
 
   return (
-    <Dialog.Root open={isOpen} placement="center" size="xl" onOpenChange={handleDialogOpenChange}>
-      <Portal>
-        <Dialog.Backdrop />
-        <Dialog.Positioner>
-          <Dialog.Content
-            aria-busy={isLoadPending}
-            h="80vh"
-            maxH="80vh"
-            maxW="min(72rem, calc(100vw - 4rem))"
-            position="relative"
-          >
-            {isLoadPending ? (
-              <Stack
-                alignItems="center"
-                aria-live="polite"
-                bg="bg/85"
-                inset="0"
-                justifyContent="center"
-                position="absolute"
-                role="status"
-                zIndex="modal"
+    <>
+      <Dialog.Root open={isOpen} placement="center" size="xl" onOpenChange={handleDialogOpenChange}>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content
+              aria-busy={isLoadPending}
+              h="80vh"
+              maxH="80vh"
+              maxW="min(72rem, calc(100vw - 4rem))"
+              position="relative"
+            >
+              {isLoadPending ? (
+                <Stack
+                  alignItems="center"
+                  aria-live="polite"
+                  bg="bg/85"
+                  inset="0"
+                  justifyContent="center"
+                  position="absolute"
+                  role="status"
+                  zIndex="modal"
+                >
+                  <Spinner color="accent.solid" size="lg" />
+                  <Text fontSize="xs" fontWeight="600">
+                    {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
+                  </Text>
+                </Stack>
+              ) : null}
+              <Dialog.Header>
+                <Stack gap="2" minW="0" w="full">
+                  <HStack gap="3" minW="0">
+                    <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
+                    <Input
+                      aria-label={t('workflowLibrary.searchPlaceholder')}
+                      flex="1"
+                      minW="0"
+                      placeholder={t('workflowLibrary.searchPlaceholder')}
+                      size="xs"
+                      type="search"
+                      value={searchInput}
+                      onChange={handleSearchChange}
+                    />
+                    <SegmentGroup.Root flexShrink={0} size="xs" value={category} onValueChange={handleCategoryChange}>
+                      <SegmentGroup.Indicator />
+                      {CATEGORY_ITEMS.map((item) => (
+                        <SegmentGroup.Item key={item.value} value={item.value}>
+                          <SegmentGroup.ItemHiddenInput />
+                          <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
+                        </SegmentGroup.Item>
+                      ))}
+                    </SegmentGroup.Root>
+                  </HStack>
+                  <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
+                </Stack>
+              </Dialog.Header>
+              <Dialog.Body
+                data-pending-preview={previewEntry?.item.workflow_id}
+                display="flex"
+                flex="1"
+                gap="3"
+                minH="0"
               >
-                <Spinner color="accent.solid" size="lg" />
-                <Text fontSize="xs" fontWeight="600">
-                  {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
-                </Text>
-              </Stack>
-            ) : null}
-            <Dialog.Header>
-              <Stack gap="2" minW="0" w="full">
-                <HStack gap="3" minW="0">
-                  <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
-                  <Input
-                    aria-label={t('workflowLibrary.searchPlaceholder')}
-                    flex="1"
-                    minW="0"
-                    placeholder={t('workflowLibrary.searchPlaceholder')}
-                    size="xs"
-                    type="search"
-                    value={searchInput}
-                    onChange={handleSearchChange}
-                  />
-                  <SegmentGroup.Root flexShrink={0} size="xs" value={category} onValueChange={handleCategoryChange}>
-                    <SegmentGroup.Indicator />
-                    {CATEGORY_ITEMS.map((item) => (
-                      <SegmentGroup.Item key={item.value} value={item.value}>
-                        <SegmentGroup.ItemHiddenInput />
-                        <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
-                      </SegmentGroup.Item>
-                    ))}
-                  </SegmentGroup.Root>
-                </HStack>
-                <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
-              </Stack>
-            </Dialog.Header>
-            <Dialog.Body data-pending-preview={previewEntry?.item.workflow_id} display="flex" flex="1" gap="3" minH="0">
-              <WorkflowLibraryGrid
-                entries={entries}
-                error={error}
-                missingCounts={missingCounts}
-                selectedWorkflowId={activeWorkflowId}
-                status={status}
-                onOpen={handleOpenWorkflow}
-                onSelect={setSelectedWorkflowId}
-              />
-              <WorkflowLibraryDetailPanel
-                entry={activeEntry}
-                onClose={closeDialog}
-                onDeleted={handleDeleted}
-                onDuplicated={setSelectedWorkflowId}
-                onOpen={handleOpenItem}
-                onPreview={setPreviewEntry}
-              />
-            </Dialog.Body>
-            {isOpen ? <WorkflowLibraryBrowseSession /> : null}
-            <Dialog.CloseTrigger asChild>
-              <CloseButton color="fg.muted" disabled={isLoadPending} size="sm" />
-            </Dialog.CloseTrigger>
-          </Dialog.Content>
-        </Dialog.Positioner>
-      </Portal>
-    </Dialog.Root>
+                <WorkflowLibraryGrid
+                  entries={entries}
+                  error={error}
+                  missingCounts={missingCounts}
+                  selectedWorkflowId={activeWorkflowId}
+                  status={status}
+                  onOpen={handleOpenWorkflow}
+                  onSelect={setSelectedWorkflowId}
+                />
+                <WorkflowLibraryDetailPanel
+                  entry={activeEntry}
+                  onClose={closeDialog}
+                  onDeleted={handleDeleted}
+                  onDuplicated={setSelectedWorkflowId}
+                  onOpen={handleOpenItem}
+                  onPreview={setPreviewEntry}
+                />
+              </Dialog.Body>
+              {isOpen ? <WorkflowLibraryBrowseSession /> : null}
+              <Dialog.CloseTrigger asChild>
+                <CloseButton color="fg.muted" disabled={isLoadPending} size="sm" />
+              </Dialog.CloseTrigger>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+      {previewEntry && previewSource ? (
+        <Suspense fallback={null}>
+          <LazyGraphPreviewDialog
+            graphId={previewEntry.item.workflow_id}
+            hideInvoke
+            isOpen={Boolean(previewEntry)}
+            source={previewSource}
+            sourceLabel={previewEntry.item.name || t('workflowLibrary.untitled')}
+            onOpenChange={handlePreviewOpenChange}
+          />
+        </Suspense>
+      ) : null}
+    </>
   );
 };

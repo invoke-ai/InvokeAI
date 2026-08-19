@@ -112,7 +112,7 @@ export const WorkflowLibraryDetailPanel = ({
   }, [entry, onOpen]);
 
   const handlePreview = useCallback(() => {
-    if (entry) {
+    if (entry && entry.enrichment.status === 'ready') {
       onPreview(entry);
     }
   }, [entry, onPreview]);
@@ -443,7 +443,7 @@ export const WorkflowLibraryDetailPanel = ({
             </Portal>
           </Menu.Root>
         </HStack>
-        <Button size="sm" variant="outline" w="full" onClick={handlePreview}>
+        <Button disabled={enrichment?.status !== 'ready'} size="sm" variant="outline" w="full" onClick={handlePreview}>
           <WorkflowIcon />
           {t('workflowLibrary.previewGraph')}
         </Button>

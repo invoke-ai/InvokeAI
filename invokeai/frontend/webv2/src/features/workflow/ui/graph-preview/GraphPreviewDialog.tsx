@@ -21,6 +21,8 @@ interface GraphPreviewDialogProps {
   sourceId?: WorkflowInvocationSourceId;
   /** e.g. "Generate" — used in the header subtitle and the JSON preview label. */
   sourceLabel: string;
+  /** Hides the footer Invoke button only — Copy JSON and the Open-as menu stay. For sources with no invocation route (e.g. a library entry, previewed before it's ever opened into a project). */
+  hideInvoke?: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
@@ -70,6 +72,7 @@ export const GraphPreviewDialog = ({
   source,
   sourceId,
   sourceLabel,
+  hideInvoke = false,
   onOpenChange,
 }: GraphPreviewDialogProps) => {
   const { t } = useTranslation();
@@ -279,7 +282,7 @@ export const GraphPreviewDialog = ({
                 ) : null}
               </Box>
               <Box display="flex" gap="2">
-                {dialogRoute ? (
+                {!hideInvoke && dialogRoute ? (
                   <Button
                     aria-disabled={!canInvoke}
                     cursor={canInvoke ? undefined : 'not-allowed'}

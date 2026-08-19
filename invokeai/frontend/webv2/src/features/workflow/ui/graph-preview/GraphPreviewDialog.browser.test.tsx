@@ -357,7 +357,8 @@ describe('GraphPreviewDialog', () => {
   const renderDialog = async (
     source: GraphPreviewSourceState,
     isOpen = true,
-    sourceId: WorkflowInvocationSourceId = 'generate'
+    sourceId: WorkflowInvocationSourceId = 'generate',
+    hideInvoke = false
   ) => {
     await act(() => {
       root.render(
@@ -367,6 +368,7 @@ describe('GraphPreviewDialog', () => {
               <WorkflowGraphPreviewProvider adapter={graphPreviewPort}>
                 <GraphPreviewDialog
                   graphId="preview-graph-id"
+                  hideInvoke={hideInvoke}
                   isOpen={isOpen}
                   source={source}
                   sourceId={sourceId}
@@ -678,6 +680,22 @@ describe('GraphPreviewDialog', () => {
     expect(findMenuItemWithText('Edit in workflow editor')).toBeUndefined();
     expect(findMenuItemWithText('Save to workflow library')).not.toBeUndefined();
     expect(findMenuItemWithText('Download JSON')).not.toBeUndefined();
+  });
+
+  it('renders the footer Invoke button by default', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    const buttonText = [...document.querySelectorAll('button')].map((button) => button.textContent ?? '');
+    expect(buttonText.some((text) => text.includes('Invoke Generate → Gallery'))).toBe(true);
+  });
+
+  it('hideInvoke hides only the footer Invoke button — Copy JSON and Open as stay', async () => {
+    await renderDialog(FIXTURE_SOURCE, true, 'generate', true);
+
+    const buttonText = [...document.querySelectorAll('button')].map((button) => button.textContent ?? '');
+    expect(buttonText.some((text) => text.includes('Invoke'))).toBe(false);
+    expect(buttonText.some((text) => text.includes('Copy JSON'))).toBe(true);
+    expect(buttonText.some((text) => text.includes('Open as'))).toBe(true);
   });
 
   it('Open as → Save to workflow library names the document from the source label and notifies success', async () => {

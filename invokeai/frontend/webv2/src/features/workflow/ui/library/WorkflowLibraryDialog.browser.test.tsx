@@ -1,5 +1,6 @@
 import type { StarterModel } from '@features/models';
 import type { WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
+import type { InvocationTemplate, InvocationTemplatesSnapshot, ProjectGraphState } from '@features/workflow/core/types';
 import type {
   WorkflowLibraryBrowseSnapshot,
   WorkflowLibraryEntry,
@@ -9,13 +10,79 @@ import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/work
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
-import { createProjectGraph } from '@features/workflow/utility';
+import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// A plain static import of the (mocked) module the dialog `lazy()`-loads, so
+// its dynamic `import()` resolves against an already-loaded module record
+// instead of paying a first-time compile cost mid-test — that cost is what
+// made a cold run of the graph-preview wiring tests below flaky.
+import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
+
+// Task 8's graph preview wiring needs invocation templates loaded to compile
+// a library entry's document (`buildLibraryGraphPreviewSource`); this suite
+// never boots the real templates fetch, so it stubs the reactive snapshot
+// hook with one template — matching the node type `PREVIEW_DOCUMENT` (below)
+// uses — the same way `GraphPreviewDialog.browser.test.tsx` does.
+const PREVIEW_NODE_TEMPLATE: InvocationTemplate = {
+  category: 'test',
+  classification: 'stable',
+  description: '',
+  inputs: {},
+  nodePack: 'invokeai',
+  outputs: {},
+  outputType: 'integer_output',
+  tags: [],
+  title: 'integer',
+  type: 'integer',
+  useCache: true,
+  version: '1.0.0',
+};
+
+const TEMPLATES_SNAPSHOT: InvocationTemplatesSnapshot = {
+  error: null,
+  status: 'loaded',
+  templates: { integer: PREVIEW_NODE_TEMPLATE },
+};
+
+vi.mock('@features/workflow/react', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useInvocationTemplatesSnapshot: () => TEMPLATES_SNAPSHOT,
+}));
+
+// xyflow stays out of this shell test — the lazy-mounted `GraphPreviewDialog`
+// (Task 8) is replaced with a stub that surfaces exactly what the wiring is
+// responsible for: which graph got compiled, `hideInvoke`, and the close path.
+vi.mock('@features/workflow/ui/graph-preview/GraphPreviewDialog', () => ({
+  GraphPreviewDialog: ({
+    graphId,
+    hideInvoke,
+    source,
+    sourceLabel,
+    onOpenChange,
+  }: {
+    graphId: string;
+    hideInvoke?: boolean;
+    isOpen: boolean;
+    source: { graph: { nodes: { id: string; type: string }[] } | null };
+    sourceLabel: string;
+    onOpenChange: (isOpen: boolean) => void;
+  }) => (
+    <div
+      data-graph-id={graphId}
+      data-hide-invoke={String(hideInvoke)}
+      data-preview-dialog
+      data-source-label={sourceLabel}
+    >
+      {(source.graph?.nodes ?? []).map((node) => node.type).join(',')}
+      <button onClick={() => onOpenChange(false)}>Close preview</button>
+    </div>
+  ),
+}));
 
 // The browse store is Task 5's; this suite owns the *dialog*, so the store is
 // replaced by a real external store the test drives directly plus spies for
@@ -141,14 +208,22 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
 
 const EMPTY_DOCUMENT = createProjectGraph('library-fixture');
 
+// One `integer` node — matches `PREVIEW_NODE_TEMPLATE` above, so this is the
+// document the graph-preview wiring tests compile.
+const PREVIEW_DOCUMENT: ProjectGraphState = projectGraphReducer(createProjectGraph('preview-fixture'), {
+  node: buildInvocationNode(PREVIEW_NODE_TEMPLATE, { x: 0, y: 0 }),
+  type: 'addNode',
+});
+
 const NO_REQUIREMENTS: readonly WorkflowModelRequirement[] = [];
 
 const readyEnrichment = (
   nodeCount: number,
   primaryBase: string | null,
-  requirements: readonly WorkflowModelRequirement[] = NO_REQUIREMENTS
+  requirements: readonly WorkflowModelRequirement[] = NO_REQUIREMENTS,
+  document: ProjectGraphState = EMPTY_DOCUMENT
 ): WorkflowLibraryEntryEnrichment => ({
-  document: EMPTY_DOCUMENT,
+  document,
   nodeCount,
   requirements: { primaryBase, requirements },
   status: 'ready',
@@ -191,6 +266,14 @@ const UPSCALE = entry(
   {
     tags: ['upscale'],
   }
+);
+// The graph-preview wiring's own fixture: a `'ready'` entry whose document
+// actually has a node, so the mocked preview dialog has a compiled graph to
+// show instead of an empty one.
+const PREVIEW_FIXTURE = entry(
+  'wf-preview-fixture',
+  'Preview Fixture',
+  readyEnrichment(1, null, NO_REQUIREMENTS, PREVIEW_DOCUMENT)
 );
 
 const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
@@ -266,6 +349,27 @@ describe('WorkflowLibraryDialog', () => {
       await new Promise<void>((resolve) => {
         setTimeout(resolve, ms);
       });
+    });
+
+  /**
+   * The lazy-loaded preview dialog (Task 8) resolves its `import()` on its
+   * own schedule — a fixed `wait` is either too short (flaky) or padded
+   * (slow), and letting it resolve outside `act` is what raises "a suspended
+   * resource finished loading" warnings. Polling inside `act` keeps every
+   * check, and the eventual resolution, in the same act scope.
+   */
+  const waitForPreviewDialog = () =>
+    act(async () => {
+      await vi.waitFor(
+        () => {
+          expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+        },
+        // Padded past `vi.waitFor`'s default 1000ms: the static side-effect
+        // import above keeps the module warm, but the dynamic `import()`
+        // still costs a real (if now small) round trip through Vite's module
+        // graph before `Suspense` re-renders.
+        { timeout: 2000 }
+      );
     });
 
   const cards = () => [...document.querySelectorAll<HTMLElement>('[data-workflow-card]')];
@@ -570,6 +674,77 @@ describe('WorkflowLibraryDialog', () => {
 
     // Task 8 mounts the preview dialog from this pending selection.
     expect(document.querySelector('[data-pending-preview="wf-portrait"]')).not.toBeNull();
+  });
+
+  it("mounts the lazy preview dialog with the entry's compiled graph and hides Invoke", async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+
+    await act(() => card('wf-preview-fixture')?.click());
+    await clickText('Preview graph');
+    await waitForPreviewDialog();
+
+    const preview = document.querySelector('[data-preview-dialog]');
+    expect(preview).not.toBeNull();
+    expect(preview?.getAttribute('data-graph-id')).toBe('wf-preview-fixture');
+    expect(preview?.getAttribute('data-hide-invoke')).toBe('true');
+    expect(preview?.getAttribute('data-source-label')).toBe('Preview Fixture');
+    // The document's one `integer` node made it through compilation.
+    expect(preview?.textContent).toContain('integer');
+  });
+
+  it('disables the Preview action for an entry whose enrichment is not ready', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    await act(() => card('wf-sketch')?.click());
+
+    const button = buttonWithText('Preview graph') as HTMLButtonElement | undefined;
+    expect(button?.disabled).toBe(true);
+  });
+
+  it('resets the pending preview when the preview dialog itself closes', async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+
+    await act(() => card('wf-preview-fixture')?.click());
+    await clickText('Preview graph');
+    await waitForPreviewDialog();
+
+    expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+
+    await clickText('Close preview');
+
+    expect(document.querySelector('[data-preview-dialog]')).toBeNull();
+    expect(document.querySelector('[data-pending-preview]')).toBeNull();
+  });
+
+  it('does not resurrect the preview after the library dialog closes and reopens', async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+
+    await act(() => card('wf-preview-fixture')?.click());
+    await clickText('Preview graph');
+    await waitForPreviewDialog();
+
+    expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+
+    // The dialog's own Close control is the only path that ever flips `isOpen`
+    // to `false` in the real app (`WorkflowWidgetChrome` only ever sets it
+    // back to `true`) — clicking it exercises the same reset the parent
+    // relies on. The isOpen round trip below then confirms the closed render
+    // drops the mount and the reopened one does not bring it back.
+    const closeButton = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
+    expect(closeButton).not.toBeNull();
+    // Chakra's `Dialog` commits its close transition a task after the click
+    // (the same class of gap `settleFrame` exists for, above) — settle inside
+    // this `act` scope rather than a bare click.
+    await act(async () => {
+      closeButton?.click();
+      await settleFrame();
+    });
+
+    await renderDialog(false);
+    expect(document.querySelector('[data-preview-dialog]')).toBeNull();
+
+    await renderDialog(true);
+    expect(document.querySelector('[data-preview-dialog]')).toBeNull();
   });
 
   it('shows the busy overlay while a workflow is being applied', async () => {
