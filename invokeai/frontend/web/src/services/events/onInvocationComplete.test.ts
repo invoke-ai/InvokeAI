@@ -734,6 +734,146 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
   });
 
+  it('counts an image named twice in one result once, and once again on retry', async () => {
+    // An image collection concatenates its inputs without deduping, so the same name can appear
+    // twice. It is one image: counting it twice inflates the board total, and on a retry a
+    // name-keyed missing set would re-admit the occurrence that already landed.
+    vi.mocked(selectAutoSwitch).mockReturnValue(true);
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+      return { unwrap: () => Promise.resolve(undefined) };
+    });
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const duplicated = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (duplicated as any).result = {
+      collection: [{ image_name: 'dup.png' }, { image_name: 'dup.png' }],
+    };
+
+    // Pass 1: one lookup for the repeated name, and it fails, so nothing lands.
+    await handler(duplicated);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+
+    // Pass 2: still one lookup, and the image is counted exactly once.
+    await handler(duplicated);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+
+    const boardTotalUpdates = dispatched.filter(
+      (action) => (action as { type?: string }).type === 'mock/boardsApi/upsertQueryEntries'
+    );
+    expect(boardTotalUpdates).toHaveLength(1);
+  });
+
+  it('keeps a non-intermediate sibling of an intermediate output', async () => {
+    // This used to bail out of the whole pass on the first intermediate, abandoning siblings that
+    // belong in the gallery — and with per-output retry such a sibling is in nobody's missing set,
+    // so no re-delivery could recover it.
+    // mockResolvedValueOnce, not mockImplementation: clearAllMocks resets calls but not
+    // implementations, so a persistent one would leak into every test after this.
+    const dto = (imageName: string, isIntermediate: boolean) =>
+      ({
+        image_name: imageName,
+        image_url: `mock://${imageName}`,
+        thumbnail_url: `mock://thumb/${imageName}`,
+        is_intermediate: isIntermediate,
+        is_starred: false,
+        image_category: 'general',
+        board_id: null,
+        created_at: '2026-01-01',
+        updated_at: '2026-01-01',
+        session_id: 'test-session',
+        node_id: 'test-node',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any;
+    vi.mocked(getImageDTOSafe)
+      .mockResolvedValueOnce(dto('intermediate.png', true))
+      .mockResolvedValueOnce(dto('keeper.png', false));
+
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+      return { unwrap: () => Promise.resolve(undefined) };
+    });
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const mixed = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mixed as any).result = {
+      collection: [{ image_name: 'intermediate.png' }, { image_name: 'keeper.png' }],
+    };
+
+    await handler(mixed);
+
+    const galleryInvalidation = dispatched.find((action) => {
+      const payload = (action as { payload?: unknown }).payload;
+      return Array.isArray(payload) && payload.includes('GalleryItemNameList');
+    });
+    expect(galleryInvalidation, 'the non-intermediate sibling must reach the gallery').toBeDefined();
+  });
+
+  it('does not move the selection again when a retry lands the lost output', async () => {
+    // The re-delivery can arrive long after the user has selected something else.
+    vi.mocked(selectAutoSwitch).mockReturnValue(true);
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await handler(buildImageCompleteEvent());
+    expect(imageSelected).not.toHaveBeenCalled();
+
+    await handler(buildImageCompleteEvent());
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+    expect(imageSelected, 'a retry lands the image without re-running the handoff').not.toHaveBeenCalled();
+  });
+
+  it('logs rather than rejecting when the gallery work throws', async () => {
+    // Both call sites discard this handler's promise, so a rejection would surface only as an
+    // unhandled rejection.
+    const dispatch = vi.fn(() => {
+      throw new Error('dispatch exploded');
+    });
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await expect(handler(buildImageCompleteEvent())).resolves.toBeUndefined();
+  });
+
   it('still processes distinct invocations of the same queue item', async () => {
     const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
     const getState = vi.fn(() => ({}));

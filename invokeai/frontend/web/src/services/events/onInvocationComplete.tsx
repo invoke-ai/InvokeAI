@@ -85,12 +85,21 @@ export const buildOnInvocationComplete = (
     onLookupFailure: (imageName: string) => void,
     retryNames: ReadonlySet<string> | null
   ) => {
+    // A retry exists to land an output the gallery lost, not to re-run the handoff around it. By
+    // the time a re-delivery arrives the user has had time to select something else, and pulling
+    // the selection back would be a worse failure than the one being repaired.
+    const isRetry = retryNames !== null;
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
       return;
     }
 
-    const imageDTOs = await getResultImageDTOs(data, onLookupFailure, retryNames);
+    const fetchedImageDTOs = await getResultImageDTOs(data, onLookupFailure, retryNames);
+    // Intermediates never reach the gallery. Dropping them here rather than bailing out of the
+    // whole pass on the first one (which is what this used to do) matters now that a delivery's
+    // outputs are tracked individually: a sibling abandoned that way is in nobody's missing set,
+    // so no re-delivery could ever recover it. Mirrors addVideosToGallery.
+    const imageDTOs = fetchedImageDTOs.filter((imageDTO) => !imageDTO.is_intermediate);
     if (imageDTOs.length === 0) {
       return;
     }
@@ -101,10 +110,6 @@ export const buildOnInvocationComplete = (
     const getImageNamesArg = selectGetImageNamesQueryArgs(getState());
 
     for (const imageDTO of imageDTOs) {
-      if (imageDTO.is_intermediate) {
-        return;
-      }
-
       const board_id = imageDTO.board_id ?? 'none';
       // update the total images for the board
       boardTotalAdditions[board_id] = (boardTotalAdditions[board_id] || 0) + 1;
@@ -213,7 +218,7 @@ export const buildOnInvocationComplete = (
 
     const autoSwitch = selectAutoSwitch(getState());
 
-    if (!autoSwitch) {
+    if (!autoSwitch || isRetry) {
       return;
     }
 
@@ -269,10 +274,19 @@ export const buildOnInvocationComplete = (
   ): Promise<ImageDTO[]> => {
     const { result } = data;
     const imageDTOs: ImageDTO[] = [];
+    const fetched = new Set<string>();
     const fetch = async (imageName: string) => {
       if (retryNames !== null && !retryNames.has(imageName)) {
         return;
       }
+      // A result can name the same image twice (an image collection concatenates its inputs
+      // without deduping). It is still one image: fetching it once keeps its board total counted
+      // once, and keeps the retry set — which is keyed by name — from re-admitting an occurrence
+      // that already landed.
+      if (fetched.has(imageName)) {
+        return;
+      }
+      fetched.add(imageName);
       const imageDTO = await getImageDTOSafe(imageName);
       if (imageDTO) {
         imageDTOs.push(imageDTO);
@@ -299,11 +313,16 @@ export const buildOnInvocationComplete = (
   ): Promise<VideoDTO[]> => {
     const { result } = data;
     const videoDTOs: VideoDTO[] = [];
+    const fetched = new Set<string>();
     for (const [_name, value] of objectEntries(result)) {
       if (isVideoField(value)) {
         if (retryNames !== null && !retryNames.has(value.video_name)) {
           continue;
         }
+        if (fetched.has(value.video_name)) {
+          continue;
+        }
+        fetched.add(value.video_name);
         const videoDTO = await getVideoDTOSafe(value.video_name);
         if (videoDTO) {
           videoDTOs.push(videoDTO);
@@ -329,6 +348,8 @@ export const buildOnInvocationComplete = (
     onLookupFailure: (videoName: string) => void,
     retryNames: ReadonlySet<string> | null
   ) => {
+    // See addImagesToGallery: a retry does not redo the auto-switch.
+    const isRetry = retryNames !== null;
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       return;
     }
@@ -358,7 +379,7 @@ export const buildOnInvocationComplete = (
     dispatch(galleryApi.util.invalidateTags(getTagsToInvalidateForBoardAffectingMutation(affectedBoards)));
 
     const autoSwitch = selectAutoSwitch(getState());
-    if (!autoSwitch) {
+    if (!autoSwitch || isRetry) {
       return;
     }
 
@@ -472,6 +493,11 @@ export const buildOnInvocationComplete = (
       if (!isRetry) {
         $lastProgressEvent.set(null);
       }
+    } catch (error) {
+      // Both call sites discard this handler's promise, so a throw here would surface as an
+      // unhandled rejection and nothing else. Log it and let the bookkeeping below run: the
+      // outputs whose lookups failed are still worth recording as retryable.
+      log.error({ data, error } as JsonObject, `Error handling invocation complete: ${String(error)}`);
     } finally {
       if (missingNames.size > 0) {
         processedInvocations.set(invocationKey, { status: 'retryable', missingNames });
