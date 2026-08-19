@@ -24,39 +24,44 @@ export const parseWorkflowTags = (tags: string | null | undefined): string[] => 
 };
 
 /**
- * Folds rows that differ only in casing into one chip. The backend counts tags
- * exactly as they were stored, so a library where some workflows say `sdxl` and
- * others `SDXL` reports two rows for what is, to the user, one tag — filtering
- * is a case-insensitive SQLite LIKE, so both chips return the same workflows.
- * Counts are summed and the label is the casing of the single biggest
- * contributing row (ties broken lexicographically, so the chip never depends on
- * the order the backend happened to return).
+ * Folds rows that differ only in casing into one chip. The backend reports one
+ * row per *stored* casing, so a library where some workflows say `sdxl` and
+ * others `SDXL` gets two rows for what is, to the user, one tag.
+ *
+ * The merged count is the **maximum** of the variants, never their sum: the
+ * backend counts each requested tag with `tags LIKE '%tag%'`, and SQLite's LIKE
+ * is case-insensitive, so every variant's count is *already* the full
+ * case-insensitive total — the same workflows, counted once per casing. Summing
+ * them showed "sdxl 4" over two workflows. Given those semantics the variants
+ * are equal anyway; taking the max just refuses to be wrong if they ever drift.
+ *
+ * The label is the casing of the biggest contributing row, ties broken
+ * lexicographically — and since equal counts are the normal case, that tiebreak
+ * is what actually decides, which keeps the chip stable whatever order the
+ * backend returned.
  */
 export const mergeTagCountsByCase = (counts: readonly WorkflowTagCount[]): WorkflowTagCount[] => {
-  const merged = new Map<string, { count: number; tag: string; tagCount: number }>();
+  const merged = new Map<string, WorkflowTagCount>();
 
   for (const entry of counts) {
     const key = entry.tag.toLowerCase();
     const existing = merged.get(key);
 
     if (!existing) {
-      merged.set(key, { count: entry.count, tag: entry.tag, tagCount: entry.count });
+      merged.set(key, { count: entry.count, tag: entry.tag });
       continue;
     }
 
-    existing.count += entry.count;
-
-    // Compared against the winning *row's* own count, not the running total.
-    if (
-      entry.count > existing.tagCount ||
-      (entry.count === existing.tagCount && entry.tag.localeCompare(existing.tag) < 0)
-    ) {
+    // Compared before the max is folded in, so `existing.count` is still the
+    // count of the row whose casing currently wins.
+    if (entry.count > existing.count || (entry.count === existing.count && entry.tag.localeCompare(existing.tag) < 0)) {
       existing.tag = entry.tag;
-      existing.tagCount = entry.count;
     }
+
+    existing.count = Math.max(existing.count, entry.count);
   }
 
-  return [...merged.values()].map(({ count, tag }) => ({ count, tag }));
+  return [...merged.values()];
 };
 
 /** Orders tag chips by how many workflows carry them, then alphabetically; case-duplicate and empty tags are merged away. */
