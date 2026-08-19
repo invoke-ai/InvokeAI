@@ -21,11 +21,15 @@ from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux2.sampling_utils import pack_flux2
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 
 # Maximum pixel counts for reference images (matches BFL FLUX.2 sampling.py)
 # Single reference image: 2024² pixels, Multiple: 1024² pixels
 MAX_PIXELS_SINGLE_REF = 2024**2  # ~4.1M pixels
 MAX_PIXELS_MULTI_REF = 1024**2  # ~1M pixels
+
+# Tile size (in pixels) forced on the VAE for reference-image encoding, see _prepare_ref_images().
+REF_ENCODE_TILE_SIZE = 512
 
 
 def resize_image_to_max_pixels(image: Image.Image, max_pixels: int) -> Image.Image:
@@ -203,8 +207,17 @@ class Flux2RefImageExtension:
             image_tensor = image_tensor * 2.0 - 1.0
             image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
 
-            # Encode using FLUX.2 VAE
-            with vae_info.model_on_device() as (_, vae):
+            # Encode using FLUX.2 VAE. The encode below forces REF_ENCODE_TILE_SIZE tiling, so the
+            # peak is bounded by one tile; tell the cache that up front so it frees the room instead
+            # of hitting the shortfall as an OOM.
+            estimated_working_memory = estimate_vae_working_memory_flux2(
+                operation="encode",
+                image_tensor=image_tensor,
+                vae=vae_info.model,
+                tile_size=REF_ENCODE_TILE_SIZE,
+            )
+
+            with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
                 vae_dtype = next(iter(vae.parameters())).dtype
                 image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
 
@@ -219,8 +232,8 @@ class Flux2RefImageExtension:
                 downsample = 2 ** (len(vae.config.block_out_channels) - 1)
                 prev_tiling = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
                 vae.use_tiling = True
-                vae.tile_sample_min_size = 512
-                vae.tile_latent_min_size = 512 // downsample
+                vae.tile_sample_min_size = REF_ENCODE_TILE_SIZE
+                vae.tile_latent_min_size = REF_ENCODE_TILE_SIZE // downsample
                 try:
                     # FLUX.2 VAE uses diffusers API
                     latent_dist = vae.encode(image_tensor, return_dict=False)[0]

@@ -2,6 +2,7 @@ from typing import Literal
 
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux2
 from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
@@ -94,6 +95,42 @@ def estimate_vae_working_memory_flux(
     working_memory = out_h * out_w * element_size * scaling_constant
 
     print(f"estimate_vae_working_memory_flux: {int(working_memory)}")
+
+    return int(working_memory)
+
+
+def estimate_vae_working_memory_flux2(
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKLFlux2,
+    tile_size: int | None = None,
+) -> int:
+    """Estimate the working memory required to encode or decode with the FLUX.2 (32-channel) VAE.
+
+    Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE --
+    ``AutoencoderKLFlux2``'s mid-block attention runs through SDPA, so no O(area^2) term appears.
+    Measured on CUDA/bf16 as peak *reserved* memory (the conservative quantity, including allocator
+    overhead), the implied constants are ~2170 (decode) and ~1070 (encode) bytes per pixel per
+    element byte, flat across 512-1536px; the constants below round those up and match the FLUX.1
+    ones. For reference, decoding 1024x1024 peaks at ~4.3GB and 1536x1536 at ~9.6GB -- far above the
+    default ``device_working_mem_gb``, which is why this estimate must be passed to the model cache.
+
+    When tiling is enabled the peak is bounded by a single tile instead of the full image (measured
+    ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap).
+    """
+    element_size = next(vae.parameters()).element_size()
+
+    # Encoding uses ~50% the working memory of decoding.
+    scaling_constant = 2200 if operation == "decode" else 1100
+
+    if tile_size is not None:
+        # Add 25% for tile overlap and the blending buffers, mirroring the SD1/SDXL estimate.
+        working_memory = tile_size * tile_size * element_size * scaling_constant * 1.25
+    else:
+        latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+        out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
+        out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
+        working_memory = out_h * out_w * element_size * scaling_constant
 
     return int(working_memory)
 
