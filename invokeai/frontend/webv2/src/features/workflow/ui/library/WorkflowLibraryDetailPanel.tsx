@@ -60,17 +60,6 @@ import {
 const DETAIL_RAIL_WIDTH = '18rem';
 const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 const INSTALL_HOVER = { opacity: 0.85 } as const;
-/**
- * zag sets `min-width: fit-content` inline on every scroll-area content box, so
- * the box grows to its *min-content* width — and a long workflow name
- * contributes its full unbroken width there, however hard the heading itself
- * truncates. The rail then scrolled sideways (with no horizontal scrollbar,
- * since this area is vertical) and clipped every row in it. An inline override
- * is what it takes to beat an inline style; zeroing it makes the content box
- * stretch to the viewport and nothing more, so the heading's truncation is what
- * actually gives.
- */
-const RAIL_CONTENT_PROPS = { style: { minWidth: 0 } } as const;
 
 export interface WorkflowLibraryDetailPanelProps {
   entry: WorkflowLibraryEntry | null;
@@ -331,7 +320,7 @@ export const WorkflowLibraryDetailPanel = ({
       rounded="md"
       w={DETAIL_RAIL_WIDTH}
     >
-      <Scrollable contentProps={RAIL_CONTENT_PROPS} flex="1" label={name} minH="0" minW="0">
+      <Scrollable flex="1" label={name} minH="0">
         <Stack gap="2" minW="0" p="2.5">
           <Stack gap="1" minW="0">
             <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">

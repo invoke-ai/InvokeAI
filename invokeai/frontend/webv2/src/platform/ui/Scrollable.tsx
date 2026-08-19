@@ -8,6 +8,18 @@ type ScrollAreaRootProps = ComponentProps<typeof ScrollArea.Root>;
 type ScrollAreaContentProps = ComponentProps<typeof ScrollArea.Content>;
 
 /**
+ * zag pins `min-width: fit-content` *inline* on every scroll-area content box,
+ * so the box grows to its content's min-content width. A horizontal strip wants
+ * exactly that. In a vertical area it is a trap: one unbreakable string (a long
+ * name, an unwrapped identifier) widens the content box past the viewport, the
+ * area scrolls sideways — and since a vertical area renders no horizontal
+ * scrollbar, the overflow is simply unreachable. Vertical areas override it back
+ * to zero, so their content stretches to the viewport and truncation inside is
+ * what gives. Only an inline style can beat an inline style.
+ */
+const VERTICAL_CONTENT_STYLE = { minWidth: 0 } as const;
+
+/**
  * The workbench's standard scroll container: ScrollArea with hover-revealed
  * scrollbars and the content wrapper zag needs for correct thumb sizing.
  * Layout props (h, maxH, flex, ...) go to the root.
@@ -48,7 +60,11 @@ export const Scrollable = ({
         role={label ? 'region' : undefined}
         w="full"
       >
-        <ScrollArea.Content w={orientation === 'horizontal' ? 'max-content' : 'full'} {...contentProps}>
+        <ScrollArea.Content
+          style={orientation === 'horizontal' ? undefined : VERTICAL_CONTENT_STYLE}
+          w={orientation === 'horizontal' ? 'max-content' : 'full'}
+          {...contentProps}
+        >
           {children}
         </ScrollArea.Content>
       </ScrollArea.Viewport>
