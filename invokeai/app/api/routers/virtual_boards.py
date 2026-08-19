@@ -16,7 +16,7 @@ virtual_boards_router = APIRouter(prefix="/v1/virtual_boards", tags=["virtual_bo
     operation_id="list_virtual_boards_by_date",
     response_model=list[VirtualSubBoardDTO],
 )
-async def list_virtual_boards_by_date(
+def list_virtual_boards_by_date(
     current_user: CurrentUserOrDefault,
 ) -> list[VirtualSubBoardDTO]:
     """Gets a list of virtual sub-boards grouped by date. Covers both images and videos."""
@@ -33,8 +33,9 @@ async def list_virtual_boards_by_date(
     "/by_date/{date}/image_names",
     operation_id="list_virtual_board_image_names_by_date",
     response_model=ImageNamesResult,
+    deprecated=True,
 )
-async def list_virtual_board_image_names_by_date(
+def list_virtual_board_image_names_by_date(
     current_user: CurrentUserOrDefault,
     date: str = Path(description="The ISO date string, e.g. '2026-03-18'"),
     starred_first: bool = Query(default=True, description="Whether to sort starred images first"),
@@ -42,8 +43,11 @@ async def list_virtual_board_image_names_by_date(
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of images to include"),
     search_term: str | None = Query(default=None, description="Search term to filter images"),
 ) -> ImageNamesResult:
-    """Gets ordered image names for a specific date. Image-only; kept for API compatibility —
-    the UI uses the polymorphic `/by_date/{date}/item_names` endpoint."""
+    """Gets ordered image names for a specific date. Image-only.
+
+    Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and
+    videos in one ordered list.
+    """
     try:
         return ApiDependencies.invoker.services.image_records.get_image_names_by_date(
             date=date,
@@ -62,8 +66,9 @@ async def list_virtual_board_image_names_by_date(
     "/by_date/{date}/item_names",
     operation_id="list_virtual_board_item_names_by_date",
     response_model=GalleryItemNamesResult,
+    deprecated=True,
 )
-async def list_virtual_board_item_names_by_date(
+def list_virtual_board_item_names_by_date(
     current_user: CurrentUserOrDefault,
     date: str = Path(description="The ISO date string, e.g. '2026-03-18'"),
     starred_first: bool = Query(default=True, description="Whether to sort starred items first"),
@@ -71,7 +76,11 @@ async def list_virtual_board_item_names_by_date(
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of items to include"),
     search_term: str | None = Query(default=None, description="Search term to filter items"),
 ) -> GalleryItemNamesResult:
-    """Gets ordered polymorphic (image + video) item refs for a specific date."""
+    """Gets ordered polymorphic (image + video) item refs for a specific date.
+
+    Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same
+    order as a flat name list instead of one model per item.
+    """
     try:
         return ApiDependencies.invoker.services.gallery.list_item_names(
             starred_first=starred_first,
