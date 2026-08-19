@@ -17,9 +17,10 @@ vi.mock('services/api/endpoints/images', () => ({
   imagesApi: {
     endpoints: {
       deleteImages: {
-        initiate: vi.fn((arg: { image_names: string[] }) => ({
+        initiate: vi.fn((arg: { image_names: string[]; delete_starred: boolean }) => ({
           type: 'imagesApi/deleteImages',
           image_names: arg.image_names,
+          delete_starred: arg.delete_starred,
         })),
       },
     },
@@ -36,7 +37,10 @@ vi.mock('features/gallery/store/gallerySlice', () => ({
 
 vi.mock('features/system/store/systemSlice', () => ({
   selectSystemShouldConfirmOnDelete: vi.fn(() => false),
+  selectSystemShouldProtectStarredMedia: vi.fn(() => false),
 }));
+
+vi.mock('features/toast/toast', () => ({ toast: vi.fn() }));
 
 // The canvas/ref-image usage sweeps aren't under test — give them empty state.
 vi.mock('features/controlLayers/store/selectors', () => ({
@@ -59,20 +63,33 @@ vi.mock('features/gallery/store/selectCachedGalleryItemNames', async (importOrig
 import type { AppStore } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
+import {
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldProtectStarredMedia,
+} from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
+import { imagesApi } from 'services/api/endpoints/images';
 
 import { handleDeletions } from './state';
 
-const buildStore = (selection: string[], failingNames: Set<string>) => {
+const buildStore = (selection: string[], failingNames: Set<string>, protectedNames: Set<string> = new Set()) => {
   const dispatched: unknown[] = [];
   const dispatch = vi.fn((action: unknown) => {
     dispatched.push(action);
-    const typed = action as { type?: string; image_names?: string[] };
+    const typed = action as { type?: string; image_names?: string[]; delete_starred?: boolean };
     if (typed?.type === 'imagesApi/deleteImages') {
       return {
         unwrap: () =>
           Promise.resolve({
-            deleted_images: (typed.image_names ?? []).filter((name) => !failingNames.has(name)),
+            deleted_images: (typed.image_names ?? []).filter(
+              (name) => !failingNames.has(name) && (typed.delete_starred !== false || !protectedNames.has(name))
+            ),
+            failed_images: (typed.image_names ?? []).filter((name) => failingNames.has(name)),
             affected_boards: [],
+            starred_skipped:
+              typed.delete_starred === false
+                ? (typed.image_names ?? []).filter((name) => protectedNames.has(name))
+                : [],
           }),
       };
     }
@@ -91,6 +108,8 @@ const getSelectionChange = (dispatched: unknown[]) =>
 describe('handleDeletions selection behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(selectSystemShouldConfirmOnDelete).mockReturnValue(false);
+    vi.mocked(selectSystemShouldProtectStarredMedia).mockReturnValue(false);
     vi.mocked(selectCachedGalleryItemNames).mockReturnValue(['a.png', 'b.png', 'c.mp4']);
   });
 
@@ -143,5 +162,21 @@ describe('handleDeletions selection behavior', () => {
     await handleDeletions(['b.png'], store);
 
     expect(getSelectionChange(dispatched)?.payload).toBe('a.png');
+  });
+
+  it('passes protection to the backend and keeps a protected image selected', async () => {
+    vi.mocked(selectSystemShouldConfirmOnDelete).mockReturnValue(true);
+    vi.mocked(selectSystemShouldProtectStarredMedia).mockReturnValue(true);
+    vi.mocked(selectLastSelectedItem).mockReturnValue('a.png');
+    const { store, dispatched } = buildStore(['a.png'], new Set(), new Set(['a.png']));
+
+    await handleDeletions(['a.png'], store);
+
+    expect(imagesApi.endpoints.deleteImages.initiate).toHaveBeenCalledWith(
+      { image_names: ['a.png'], delete_starred: false },
+      { track: false }
+    );
+    expect(getSelectionChange(dispatched)).toBeUndefined();
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ status: 'warning' }));
   });
 });

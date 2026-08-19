@@ -51,6 +51,10 @@ class DeleteImagesResult(ResultWithAffectedBoards):
         default_factory=list,
         description="The names of authorized images that could not be deleted",
     )
+    starred_skipped: list[str] = Field(
+        default_factory=list,
+        description="The names of starred images that were skipped because deletion protection was enabled",
+    )
 
 
 class StarredImagesResult(ResultWithAffectedBoards):
