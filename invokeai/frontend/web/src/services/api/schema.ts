@@ -11119,15 +11119,11 @@ export type components = {
          *     with the video when the output fps changes playback speed); silent
          *     sources stay silent.
          *
-         *     Setting ``width``/``height`` conforms the trimmed clip to that canvas (0 on an
-         *     axis keeps the source's). This is what lets a trimmed source be concatenated
-         *     with a generated clip: Concatenate Videos rejects mismatched dimensions, and
-         *     video models render onto their own fixed canvas family, so the source segment
-         *     has to be brought onto the same canvas first.
-         *
          *     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
          *     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
-         *     them into a downstream Frame from Video to extract the same boundary frame.
+         *     them into a downstream Frame from Video to extract the same boundary frame, and the
+         *     input video is echoed back on ``source_video`` so a graph can record the clip the user
+         *     chose rather than the freshly-encoded trim.
          */
         ExtractVideoRangeInvocation: {
             /**
@@ -11181,18 +11177,6 @@ export type components = {
              */
             fps?: number;
             /**
-             * Width
-             * @description Output width in pixels. 0 = keep the source width. Set both width and height to conform the trimmed clip to a specific canvas — e.g. to match a generated clip before concatenating, since Concatenate Videos rejects mismatched dimensions.
-             * @default 0
-             */
-            width?: number;
-            /**
-             * Height
-             * @description Output height in pixels. 0 = keep the source height. Aspect ratio is not preserved: the frame is resampled to exactly the requested canvas.
-             * @default 0
-             */
-            height?: number;
-            /**
              * type
              * @default extract_video_range
              * @constant
@@ -11211,6 +11195,11 @@ export type components = {
         ExtractVideoRangeOutput: {
             /** @description The trimmed video */
             video: components["schemas"]["VideoField"];
+            /**
+             * Source Video
+             * @description The video the range was taken from
+             */
+            source_video: components["schemas"]["VideoField"];
             /**
              * Width
              * @description The width of the video in pixels
@@ -40849,9 +40838,15 @@ export type components = {
          *       so the total emitted is exactly ``transition_frames`` per boundary — even for odd
          *       ``transition_frames`` — and the overall length equals the sum of inputs.
          *
-         *     All inputs must share the same pixel dimensions. Output frame rate defaults to the
-         *     first input's fps; override with ``fps`` to force a specific rate (the frames are not
-         *     resampled, only the container is encoded at the new rate).
+         *     Inputs must share the same pixel dimensions. ``size_mismatch`` decides what happens
+         *     when they do not: ``error`` (the default) refuses the join, and ``match_first``
+         *     resamples every later clip onto the first clip's canvas. ``match_first`` is what lets a
+         *     generated clip be appended to source footage — video models render onto their own fixed
+         *     canvas family, so a generated continuation rarely matches the clip it extends.
+         *
+         *     Output frame rate defaults to the first input's fps; override with ``fps`` to force a
+         *     specific rate (the frames are not resampled in time, only the container is encoded at
+         *     the new rate).
          */
         VideoConcatInvocation: {
             /**
@@ -40906,6 +40901,13 @@ export type components = {
              * @default null
              */
             fps?: number | null;
+            /**
+             * Size Mismatch
+             * @description What to do when the inputs do not all share the same pixel dimensions. 'error' refuses the join; 'match_first' resamples every later clip onto the first clip's canvas, so a generated clip can be appended to source footage it does not match.
+             * @default error
+             * @enum {string}
+             */
+            size_mismatch?: "error" | "match_first";
             /**
              * type
              * @default video_concat

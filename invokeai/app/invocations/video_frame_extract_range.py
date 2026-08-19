@@ -20,7 +20,6 @@ from pathlib import Path
 from typing import Callable, Iterator, Optional, Protocol
 
 import numpy as np
-from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -68,7 +67,6 @@ def _write_frame_range(
     start: int,
     end: int,
     is_canceled: Optional[Callable[[], bool]] = None,
-    resize_to: Optional[tuple[int, int]] = None,
 ) -> int:
     """Streams frames[start..end] (inclusive) from a lazy decoder into the writer.
 
@@ -77,9 +75,6 @@ def _write_frame_range(
     tens of gigabytes, so peak memory here must stay one-frame-sized regardless of the
     requested range. Decoding stops as soon as ``end`` has been written. Returns the
     number of frames written.
-
-    ``resize_to`` is a ``(width, height)`` pair; each frame is resampled to it on the way
-    past, one frame at a time, so the streaming memory profile is unchanged.
     """
     written = 0
     for idx, frame in enumerate(islice(frames, end + 1)):
@@ -87,8 +82,6 @@ def _write_frame_range(
             raise CanceledException
         if idx < start:
             continue
-        if resize_to is not None and (frame.shape[1], frame.shape[0]) != resize_to:
-            frame = np.asarray(Image.fromarray(frame).resize(resize_to, Image.LANCZOS))
         writer.append_data(np.ascontiguousarray(frame))
         written += 1
     return written
@@ -105,6 +98,10 @@ class ExtractVideoRangeOutput(BaseInvocationOutput):
     """
 
     video: VideoField = OutputField(description="The trimmed video")
+    # Echoed back so a graph can record what the user actually picked: the `video` output is a
+    # freshly-encoded intermediate, so naming it as a generation's provenance would point at a
+    # clip that never appears in the gallery.
+    source_video: VideoField = OutputField(description="The video the range was taken from", title="Source Video")
     width: int = OutputField(description="The width of the video in pixels")
     height: int = OutputField(description="The height of the video in pixels")
     num_frames: int = OutputField(description="The number of frames in the trimmed video")
@@ -134,15 +131,11 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
     with the video when the output fps changes playback speed); silent
     sources stay silent.
 
-    Setting ``width``/``height`` conforms the trimmed clip to that canvas (0 on an
-    axis keeps the source's). This is what lets a trimmed source be concatenated
-    with a generated clip: Concatenate Videos rejects mismatched dimensions, and
-    video models render onto their own fixed canvas family, so the source segment
-    has to be brought onto the same canvas first.
-
     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
-    them into a downstream Frame from Video to extract the same boundary frame.
+    them into a downstream Frame from Video to extract the same boundary frame, and the
+    input video is echoed back on ``source_video`` so a graph can record the clip the user
+    chose rather than the freshly-encoded trim.
     """
 
     video: VideoField = InputField(description="The video to extract a frame range from.")
@@ -162,19 +155,6 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         le=120,
         description="Output frame rate. 0 = match the source video's frame rate "
         "(falls back to 16 fps if the source rate can't be probed).",
-    )
-    width: int = InputField(
-        default=0,
-        ge=0,
-        description="Output width in pixels. 0 = keep the source width. Set both width and height "
-        "to conform the trimmed clip to a specific canvas — e.g. to match a generated clip before "
-        "concatenating, since Concatenate Videos rejects mismatched dimensions.",
-    )
-    height: int = InputField(
-        default=0,
-        ge=0,
-        description="Output height in pixels. 0 = keep the source height. Aspect ratio is not "
-        "preserved: the frame is resampled to exactly the requested canvas.",
     )
 
     def invoke(self, context: InvocationContext) -> ExtractVideoRangeOutput:
@@ -211,22 +191,9 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
         else:
             output_fps = 16.0
 
-        # Conform to the requested canvas when either axis is set; 0 on an axis keeps the
-        # source's. Everything downstream (the encoder, the even-dimension check, the saved
-        # video record) uses the output dimensions, not the source's.
-        out_width = self.width or width
-        out_height = self.height or height
-        resize_to = (out_width, out_height) if (out_width, out_height) != (width, height) else None
-
-        # libx264 + yuv420p needs even dimensions. Reject odd sizes up front with a clear
-        # message instead of surfacing an opaque ffmpeg error mid-encode.
-        if resize_to is None:
-            _validate_even_dimensions(out_width, out_height, self.video.video_name)
-        elif out_width % 2 or out_height % 2:
-            raise ValueError(
-                f"Requested output size is {out_width}x{out_height}; H.264 encoding requires even "
-                "dimensions. Choose an even width and height."
-            )
+        # libx264 + yuv420p needs even dimensions. Reject odd sources up front with a
+        # clear message instead of surfacing an opaque ffmpeg error mid-encode.
+        _validate_even_dimensions(width, height, self.video.video_name)
 
         context.util.signal_progress(f"Transcoding frames {start}-{end} of {n_frames} @ {output_fps:.2f} fps")
 
@@ -246,7 +213,6 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
                     start,
                     end,
                     is_canceled=context.util.is_canceled,
-                    resize_to=resize_to,
                 )
             finally:
                 writer.close()
@@ -289,13 +255,12 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             out_duration = num_frames / output_fps
             context.logger.info(
                 f"Encoded trimmed MP4: {num_frames} frames @ {output_fps:.2f} fps "
-                f"({out_duration:.2f}s) at {out_width}x{out_height}"
-                + (", with AAC audio" if audio is not None else ", silent")
+                f"({out_duration:.2f}s) at {width}x{height}" + (", with AAC audio" if audio is not None else ", silent")
             )
             video_dto = context.videos.save(
                 source_path=source_path,
-                width=out_width,
-                height=out_height,
+                width=width,
+                height=height,
                 duration=out_duration,
                 fps=output_fps,
             )
@@ -303,6 +268,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             base = VideoOutput.build(video_dto)
             return ExtractVideoRangeOutput(
                 video=base.video,
+                source_video=self.video,
                 width=base.width,
                 height=base.height,
                 num_frames=base.num_frames,

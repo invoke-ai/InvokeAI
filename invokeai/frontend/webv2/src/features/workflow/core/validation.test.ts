@@ -207,22 +207,46 @@ describe('getCompatibleInputTemplate', () => {
     expect(getCompatibleInputTemplate(template, null)?.name).toBe('early');
   });
 
-  it('never auto-connects to an internal-kind input', () => {
+  it('skips internal-kind inputs when the source type is unresolved', () => {
     // `metadata` has no `ui_order` and precedes the authored fields in the schema, so it
-    // sorts first on every WithMetadata node. Dragging onto the canvas must still land on
-    // the node's real input -- including when the source type could not be resolved, which
-    // skips the type check entirely.
+    // sorts first on every WithMetadata node. With an unresolved source the type check is
+    // skipped entirely, so without the guard it would bury the node's real input.
     const baseInput = templates.number.inputs.value;
+    const metadata = {
+      ...baseInput,
+      fieldKind: 'internal' as const,
+      input: 'connection' as const,
+      name: 'metadata',
+      type: { batch: false, cardinality: 'SINGLE' as const, name: 'MetadataField' },
+    };
+    const template = {
+      ...templates.number,
+      inputs: { metadata, value: { ...baseInput, name: 'value' } },
+    };
+
+    expect(getCompatibleInputTemplate(template, null)?.name).toBe('value');
+  });
+
+  it('still offers an internal-kind input to a source that genuinely matches it', () => {
+    // Dragging a real MetadataField output onto a save node must land on `metadata` -- and
+    // this function also decides which nodes the Add Node dialog offers for that drag, so
+    // excluding internal fields outright would make every WithMetadata node unreachable.
+    const baseInput = templates.number.inputs.value;
+    const metadataType = { batch: false, cardinality: 'SINGLE' as const, name: 'MetadataField' };
     const template = {
       ...templates.number,
       inputs: {
-        metadata: { ...baseInput, fieldKind: 'internal' as const, input: 'connection' as const, name: 'metadata' },
-        value: { ...baseInput, name: 'value' },
+        metadata: {
+          ...baseInput,
+          fieldKind: 'internal' as const,
+          input: 'connection' as const,
+          name: 'metadata',
+          type: metadataType,
+        },
       },
     };
 
-    expect(getCompatibleInputTemplate(template, single('IntegerField'))?.name).toBe('value');
-    expect(getCompatibleInputTemplate(template, null)?.name).toBe('value');
+    expect(getCompatibleInputTemplate(template, metadataType)?.name).toBe('metadata');
   });
 });
 

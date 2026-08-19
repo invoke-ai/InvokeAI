@@ -19,13 +19,20 @@ implementing the contract (the surrounding ``invoke()`` deals with imageio
 encode/decode plumbing that isn't germane to the math).
 """
 
+from pathlib import Path
 from typing import Iterator
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
 from invokeai.app.invocations.fields import VideoField
-from invokeai.app.invocations.video_concat import MAX_TRANSITION_MEMORY_BYTES, VideoConcatInvocation, _crossfade
+from invokeai.app.invocations.video_concat import (
+    MAX_TRANSITION_MEMORY_BYTES,
+    VideoConcatInvocation,
+    _crossfade,
+    _iter_frames_on_canvas,
+)
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
 
@@ -228,3 +235,66 @@ class TestFrameRateValidation:
             fps=20,
         )
         assert invocation._resolve_output_fps([16.0, 24.0]) == 20.0
+
+
+class TestSizeMismatch:
+    """Mismatched inputs: refuse by default, resample onto the first clip on request.
+
+    A generated continuation never matches the footage it extends -- video models render
+    onto their own fixed canvas family -- so the Extend workflows set `match_first` and let
+    the source clip, which is first in the collect order, decide the output canvas.
+    """
+
+    @staticmethod
+    def _invoke(size_mismatch: str, sizes: list[tuple[int, int]]) -> MagicMock:
+        invocation = VideoConcatInvocation(
+            videos=[VideoField(video_name=f"v{i}") for i in range(len(sizes))],
+            transition="cut",
+            size_mismatch=size_mismatch,  # type: ignore[arg-type]
+        )
+        context = MagicMock()
+        context.videos.get_path.side_effect = lambda name: Path(f"{name}.mp4")
+        context.util.is_canceled.return_value = False
+        probes = [(w, h, 1.0, 16.0) for (w, h) in sizes]
+        # Each clip decodes at its own size; the node is what brings them onto one canvas.
+        by_path = {f"v{i}.mp4": (w, h) for i, (w, h) in enumerate(sizes)}
+
+        def frames(path: Path, **_: object) -> Iterator[np.ndarray]:
+            w, h = by_path[path.name]
+            return iter([np.full((h, w, 3), 7, dtype=np.uint8) for _ in range(4)])
+
+        with (
+            patch("invokeai.app.invocations.video_concat.probe_video", side_effect=probes),
+            patch("invokeai.app.invocations.video_concat.make_mp4_writer", return_value=MagicMock()),
+            patch("invokeai.app.invocations.video_concat.iter_video_frames", side_effect=frames),
+            patch("invokeai.app.invocations.video_concat.extract_audio_pcm", return_value=None),
+            patch("invokeai.app.invocations.video_concat.VideoOutput.build", return_value=MagicMock()),
+        ):
+            invocation.invoke(context)
+
+        return context
+
+    def test_mismatched_inputs_are_refused_by_default(self) -> None:
+        with pytest.raises(ValueError, match="must share the same dimensions"):
+            self._invoke("error", [(1920, 1080), (848, 480)])
+
+    def test_match_first_saves_the_first_clips_canvas(self) -> None:
+        context = self._invoke("match_first", [(1920, 1080), (848, 480)])
+        saved = context.videos.save.call_args.kwargs
+        assert (saved["width"], saved["height"]) == (1920, 1080)
+
+    def test_matching_inputs_need_no_policy(self) -> None:
+        context = self._invoke("error", [(848, 480), (848, 480)])
+        saved = context.videos.save.call_args.kwargs
+        assert (saved["width"], saved["height"]) == (848, 480)
+
+
+class TestIterFramesOnCanvas:
+    def test_frames_are_resampled_to_the_target(self) -> None:
+        frames = _clip(120, 3)
+        assert [f.shape for f in _iter_frames_on_canvas(iter(frames), (8, 6))] == [(6, 8, 3)] * 3
+
+    def test_frames_already_on_target_are_untouched(self) -> None:
+        frames = _clip(120, 2)
+        out = list(_iter_frames_on_canvas(iter(frames), (4, 4)))
+        assert all(a is b for a, b in zip(out, frames, strict=True))

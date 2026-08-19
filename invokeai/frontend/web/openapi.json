@@ -28506,7 +28506,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nSetting ``width``/``height`` conforms the trimmed clip to that canvas (0 on an\naxis keeps the source's). This is what lets a trimmed source be concatenated\nwith a generated clip: Concatenate Videos rejects mismatched dimensions, and\nvideo models render onto their own fixed canvas family, so the source segment\nhas to be brought onto the same canvas first.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame, and the\ninput video is echoed back on ``source_video`` so a graph can record the clip the user\nchose rather than the freshly-encoded trim.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -28614,28 +28614,6 @@
             "title": "Fps",
             "type": "integer"
           },
-          "width": {
-            "default": 0,
-            "description": "Output width in pixels. 0 = keep the source width. Set both width and height to conform the trimmed clip to a specific canvas \u2014 e.g. to match a generated clip before concatenating, since Concatenate Videos rejects mismatched dimensions.",
-            "field_kind": "input",
-            "input": "any",
-            "minimum": 0,
-            "orig_default": 0,
-            "orig_required": false,
-            "title": "Width",
-            "type": "integer"
-          },
-          "height": {
-            "default": 0,
-            "description": "Output height in pixels. 0 = keep the source height. Aspect ratio is not preserved: the frame is resampled to exactly the requested canvas.",
-            "field_kind": "input",
-            "input": "any",
-            "minimum": 0,
-            "orig_default": 0,
-            "orig_required": false,
-            "title": "Height",
-            "type": "integer"
-          },
           "type": {
             "const": "extract_video_range",
             "default": "extract_video_range",
@@ -28661,6 +28639,13 @@
             "$ref": "#/components/schemas/VideoField",
             "description": "The trimmed video",
             "field_kind": "output",
+            "ui_hidden": false
+          },
+          "source_video": {
+            "$ref": "#/components/schemas/VideoField",
+            "description": "The video the range was taken from",
+            "field_kind": "output",
+            "title": "Source Video",
             "ui_hidden": false
           },
           "width": {
@@ -28723,6 +28708,7 @@
         "required": [
           "output_meta",
           "video",
+          "source_video",
           "width",
           "height",
           "num_frames",
@@ -92039,7 +92025,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Join two or more videos into a single MP4.\n\nAudio: if any input carries an audio track, the output gets an AAC track assembled on\nthe emitted timeline \u2014 silent inputs contribute silence, `cut` splices the tracks,\n`crossfade` blends them equal-power over the transition window, and\n`fade_through_black` fades the outgoing track to silence and the incoming one up from\nit, mirroring the video. An fps override retimes audio with the video (a deliberate\nspeed/pitch change). If no input has audio, the output has no audio stream.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nAll inputs must share the same pixel dimensions. Output frame rate defaults to the\nfirst input's fps; override with ``fps`` to force a specific rate (the frames are not\nresampled, only the container is encoded at the new rate).",
+        "description": "Join two or more videos into a single MP4.\n\nAudio: if any input carries an audio track, the output gets an AAC track assembled on\nthe emitted timeline \u2014 silent inputs contribute silence, `cut` splices the tracks,\n`crossfade` blends them equal-power over the transition window, and\n`fade_through_black` fades the outgoing track to silence and the incoming one up from\nit, mirroring the video. An fps override retimes audio with the video (a deliberate\nspeed/pitch change). If no input has audio, the output has no audio stream.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nInputs must share the same pixel dimensions. ``size_mismatch`` decides what happens\nwhen they do not: ``error`` (the default) refuses the join, and ``match_first``\nresamples every later clip onto the first clip's canvas. ``match_first`` is what lets a\ngenerated clip be appended to source footage \u2014 video models render onto their own fixed\ncanvas family, so a generated continuation rarely matches the clip it extends.\n\nOutput frame rate defaults to the first input's fps; override with ``fps`` to force a\nspecific rate (the frames are not resampled in time, only the container is encoded at\nthe new rate).",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -92160,6 +92146,17 @@
             "orig_required": false,
             "title": "Fps"
           },
+          "size_mismatch": {
+            "default": "error",
+            "description": "What to do when the inputs do not all share the same pixel dimensions. 'error' refuses the join; 'match_first' resamples every later clip onto the first clip's canvas, so a generated clip can be appended to source footage it does not match.",
+            "enum": ["error", "match_first"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "error",
+            "orig_required": false,
+            "title": "Size Mismatch",
+            "type": "string"
+          },
           "type": {
             "const": "video_concat",
             "default": "video_concat",
@@ -92172,7 +92169,7 @@
         "tags": ["video", "concat", "transition"],
         "title": "Concatenate Videos",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }

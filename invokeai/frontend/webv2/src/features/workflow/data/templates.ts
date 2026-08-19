@@ -42,8 +42,6 @@ const isJsonObject = (value: unknown): value is JsonObject => typeof value === '
 const INVOCATION_DENYLIST = new Set(['graph', 'linear_ui_output']);
 
 const RESERVED_INPUT_FIELD_NAMES = new Set(['id', 'type', 'use_cache', 'is_intermediate']);
-/** `field_kind: 'internal'` properties that are nonetheless real, connectable inputs here. */
-const CONNECTABLE_INTERNAL_FIELD_NAMES = new Set(['metadata']);
 const RESERVED_FIELD_TYPE_NAMES = new Set(['IsIntermediate']);
 
 const OPENAPI_TO_FIELD_TYPE_MAP: Record<string, string> = {
@@ -284,21 +282,25 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
     }
 
     // `internal` covers exactly two properties across the whole schema: `metadata` and
-    // `board`. `metadata` is admitted because it is a real, connectable input — a workflow
-    // that wires a Core Metadata node into a save node needs that handle to exist, and
-    // without it the edge is invisible in the editor and dropped on re-save.
+    // `board`. Both are real inputs and both must be here.
     //
-    // `board` stays out. It is a direct input whose value this app does not honour: the
-    // queue runtime re-homes every result onto the active gallery board after a run
-    // (see `addImagesToDestination`), and `toBoardGraphValue` reads `'auto'` as "no board"
-    // where the v6 editor reads it as "the auto-add board". Admitting it would render a
-    // control on ~104 node types that silently does nothing. Revisit if those two are fixed.
+    // `metadata`: a workflow that wires a Core Metadata node into a save node needs that
+    // handle to exist, or the edge is invisible in the editor and dropped on re-save.
+    //
+    // `board`: seven bundled workflows expose it as a linear-UI field. The
+    // exposedFields -> form migration does not check that a field has a template, and
+    // NodeFieldControl renders "This field no longer exists in the project graph." when it
+    // does not — so excluding `board` puts a red error in those workflows' Linear tab. It is
+    // also in v6's templates, which reports a missing-field error for any node instance that
+    // lacks it. Note the value is not fully honoured yet: the queue runtime re-homes results
+    // onto the active gallery board after a run, and `toBoardGraphValue` reads 'auto' as "no
+    // board" where v6 reads it as "the auto-add board".
     //
     // The node-level attributes (`id`, `type`, `use_cache`, `is_intermediate`) are
     // `node_attribute`, so they stay excluded here as well as by RESERVED_INPUT_FIELD_NAMES.
-    const isConnectableInternal = rawProperty.field_kind === 'internal' && CONNECTABLE_INTERNAL_FIELD_NAMES.has(name);
+    const isInternal = rawProperty.field_kind === 'internal';
 
-    if (rawProperty.field_kind !== 'input' && !isConnectableInternal) {
+    if (rawProperty.field_kind !== 'input' && !isInternal) {
       continue;
     }
 
@@ -308,7 +310,7 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
-    inputs[name] = buildInputTemplate(name, rawProperty, fieldType, isConnectableInternal ? 'internal' : 'input');
+    inputs[name] = buildInputTemplate(name, rawProperty, fieldType, isInternal ? 'internal' : 'input');
   }
 
   const outputRefName = isJsonObject(schema.output) ? getRef(schema.output) : null;

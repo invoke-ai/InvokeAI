@@ -176,10 +176,13 @@ export const getCompatibleInputTemplate = (
       (inputTemplate) =>
         !inputTemplate.uiHidden &&
         // `metadata` sorts first on every WithMetadata node (no `ui_order`, and it precedes
-        // the authored fields in the schema), so without this it would win the drag-to-canvas
-        // auto-connect for any source whose type it accepts — or for any source whose type
-        // could not be resolved, which skips the type check below entirely.
-        inputTemplate.fieldKind !== 'internal' &&
+        // the authored fields in the schema). When the source type could not be resolved we
+        // skip the type check below entirely and take the first candidate, so it would win
+        // every time and bury the node's real input. A resolved source type still reaches it
+        // — dragging an actual MetadataField output onto a save node should land on
+        // `metadata`, and this function also gates which nodes the Add Node dialog offers
+        // for a pending connection.
+        !(sourceType === null && inputTemplate.fieldKind === 'internal') &&
         inputTemplate.input !== 'direct' &&
         (sourceType === null || validateConnectionTypes(sourceType, inputTemplate.type))
     ) ?? null

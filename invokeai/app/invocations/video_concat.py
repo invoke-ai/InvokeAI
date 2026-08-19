@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator, Literal, Optional
 
 import numpy as np
+from PIL import Image
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -43,6 +44,23 @@ from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
 from invokeai.app.util.video_thumbnails import iter_video_frames, probe_video
 
 TransitionMode = Literal["cut", "crossfade", "fade_through_black"]
+SizeMismatchMode = Literal["error", "match_first"]
+
+
+def _iter_frames_on_canvas(frames: Iterator[np.ndarray], canvas: tuple[int, int]) -> Iterator[np.ndarray]:
+    """Yields each frame at ``canvas`` (a ``(width, height)`` pair) as it streams past.
+
+    A frame already on the canvas is passed through untouched, so this is free for the
+    common case where every clip matches. Resizing happens one frame at a time, so the
+    O(transition_frames) memory bound of the join is preserved.
+    """
+    for frame in frames:
+        if (frame.shape[1], frame.shape[0]) == canvas:
+            yield frame
+        else:
+            yield np.asarray(Image.fromarray(frame).resize(canvas, Image.LANCZOS))
+
+
 MAX_TRANSITION_MEMORY_BYTES = 512 * 1024 * 1024
 _BLEND_WORKING_FRAMES = 13
 
@@ -78,7 +96,7 @@ def _fade_through_black(a_tail: list[np.ndarray], b_head: list[np.ndarray]) -> I
     title="Concatenate Videos",
     tags=["video", "concat", "transition"],
     category="video",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -103,9 +121,15 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
       so the total emitted is exactly ``transition_frames`` per boundary — even for odd
       ``transition_frames`` — and the overall length equals the sum of inputs.
 
-    All inputs must share the same pixel dimensions. Output frame rate defaults to the
-    first input's fps; override with ``fps`` to force a specific rate (the frames are not
-    resampled, only the container is encoded at the new rate).
+    Inputs must share the same pixel dimensions. ``size_mismatch`` decides what happens
+    when they do not: ``error`` (the default) refuses the join, and ``match_first``
+    resamples every later clip onto the first clip's canvas. ``match_first`` is what lets a
+    generated clip be appended to source footage — video models render onto their own fixed
+    canvas family, so a generated continuation rarely matches the clip it extends.
+
+    Output frame rate defaults to the first input's fps; override with ``fps`` to force a
+    specific rate (the frames are not resampled in time, only the container is encoded at
+    the new rate).
     """
 
     videos: list[VideoField] = InputField(
@@ -128,6 +152,14 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
         le=120,
         description="Output frame rate. Defaults to the first input's fps.",
     )
+    size_mismatch: SizeMismatchMode = InputField(
+        default="error",
+        description=(
+            "What to do when the inputs do not all share the same pixel dimensions. 'error' "
+            "refuses the join; 'match_first' resamples every later clip onto the first clip's "
+            "canvas, so a generated clip can be appended to source footage it does not match."
+        ),
+    )
 
     def invoke(self, context: InvocationContext) -> VideoOutput:
         if len(self.videos) < 2:
@@ -135,24 +167,31 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         paths: list[Path] = [context.videos.get_path(v.video_name) for v in self.videos]
 
-        # Probe inputs up front: enforce matching dims and pick the default output fps.
+        # Probe inputs up front: settle the output canvas and pick the default output fps.
         probes = [probe_video(p) for p in paths]
-        widths = {(w, h) for (w, h, _, _) in probes}
-        if len(widths) > 1:
-            raise ValueError(
-                f"All inputs must share the same dimensions. Got: "
-                f"{sorted(widths)}. Re-render at a single resolution before concatenating."
-            )
         width, height, _, _first_fps = probes[0]
+        sizes = {(w, h) for (w, h, _, _) in probes}
+        if len(sizes) > 1 and self.size_mismatch == "error":
+            raise ValueError(
+                f"All inputs must share the same dimensions. Got: {sorted(sizes)}. Re-render at a "
+                "single resolution before concatenating, or set Size Mismatch to 'match_first' to "
+                "resample the later clips onto the first clip's canvas."
+            )
         # libx264 + yuv420p needs even dimensions; we encode with macro_block_size=1 to
         # preserve the source dimensions exactly, so reject odd sources with a clear error.
         if width % 2 or height % 2:
             raise ValueError(
-                f"Input videos are {width}x{height}; H.264 encoding requires even dimensions. "
-                "Re-encode or crop the sources to even width and height first."
+                f"The output canvas is {width}x{height}, taken from the first input; H.264 encoding "
+                "requires even dimensions. Re-encode or crop that clip to an even width and height "
+                "first."
             )
         self._validate_transition_memory(width, height)
         output_fps = self._resolve_output_fps([probe[3] for probe in probes])
+        mismatched = sum(1 for (w, h, _, _) in probes if (w, h) != (width, height))
+        if mismatched:
+            context.logger.info(
+                f"Resampling {mismatched} of {len(paths)} clip(s) onto the first clip's {width}x{height} canvas"
+            )
 
         context.util.signal_progress(f"Joining {len(self.videos)} clip(s) ({self.transition}) @ {output_fps:.2f} fps")
 
@@ -168,7 +207,13 @@ class VideoConcatInvocation(BaseInvocation, WithMetadata, WithBoard):
             num_frames = 0
             frame_counts: list[int] = []
             try:
-                clip_iters = [iter_video_frames(p, is_canceled=context.util.is_canceled) for p in paths]
+                # Every clip goes through the canvas guard, including the first: frames already
+                # on it pass straight through, so nothing can reach the writer at a size the
+                # file is not being encoded at.
+                clip_iters = [
+                    _iter_frames_on_canvas(iter_video_frames(p, is_canceled=context.util.is_canceled), (width, height))
+                    for p in paths
+                ]
                 for frame in self._iter_joined_frames(
                     clip_iters, is_canceled=context.util.is_canceled, frame_counts=frame_counts
                 ):

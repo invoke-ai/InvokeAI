@@ -184,16 +184,18 @@ describe('parseOpenApiToTemplates', () => {
     expect(denoise?.inputs.scheduler?.options).toEqual(['euler', 'ddim']);
   });
 
-  it('keeps the internal-kind metadata input, but drops board and node attributes', () => {
-    // `metadata` and `board` are the only two internal-kind properties in the schema.
-    // `metadata` has to be here or a bundled workflow's Core Metadata edge has no handle to
-    // land on and is dropped on re-save. `board` stays out: this app re-homes results onto
-    // the active gallery board after every run, so a per-node board control would do nothing.
+  it('keeps internal-kind metadata and board inputs, but drops node attributes', () => {
+    // `metadata` and `board` are the only two internal-kind properties in the schema, and
+    // both are real inputs. Without `metadata` a bundled workflow's Core Metadata edge has
+    // no handle to land on and is dropped on re-save; without `board` the seven bundled
+    // workflows that expose it get an error in place of a Linear-tab control.
     const saveVideo = templates.save_video;
 
-    expect(Object.keys(saveVideo?.inputs ?? {}).sort()).toEqual(['latents', 'metadata']);
+    expect(Object.keys(saveVideo?.inputs ?? {}).sort()).toEqual(['board', 'latents', 'metadata']);
     expect(saveVideo?.inputs.metadata?.type.name).toBe('MetadataField');
+    expect(saveVideo?.inputs.board?.type.name).toBe('BoardField');
     expect(saveVideo?.inputs.metadata?.fieldKind).toBe('internal');
+    expect(saveVideo?.inputs.board?.fieldKind).toBe('internal');
     expect(saveVideo?.inputs.latents?.fieldKind).toBe('input');
   });
 
