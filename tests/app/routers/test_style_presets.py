@@ -134,6 +134,26 @@ def test_import_forbidden_for_regular_user(client: TestClient, user1_token: str)
     assert r.status_code == status.HTTP_403_FORBIDDEN
 
 
+def test_import_malformed_json_returns_400(client: TestClient, admin_token: str):
+    r = client.post(
+        "/api/v1/style_presets/import",
+        files={"file": ("presets.json", b"{not-json", "application/json")},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_admin_can_import_csv_without_blocking_parser(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    r = client.post(
+        "/api/v1/style_presets/import",
+        files={"file": ("presets.csv", b"name,prompt,negative_prompt\nImported,p,n\n", "text/csv")},
+        headers=_auth(admin_token),
+    )
+    assert r.status_code == status.HTTP_200_OK
+    admin_id = _user_id(mock_invoker, "admin@test.com")
+    assert any(p.name == "Imported" for p in mock_invoker.services.style_preset_records.get_many(user_id=admin_id))
+
+
 # ----------------------------- Bug B regression: JSONDecodeError → 400 -----------------------------
 
 

@@ -37,6 +37,6 @@ describe('CurrentVideoPreview progress overlay', () => {
   it('clears a pending post-render overlay when the video element errors', () => {
     // onLoadedMetadata normally clears the resolve state; an errored element never fires it.
     const errorHandler = source.slice(source.indexOf('const handleVideoError'), source.indexOf('const handlePlay'));
-    expect(errorHandler).toContain('onLoadImage()');
+    expect(errorHandler).toContain('onLoadImage(videoDTO?.session_id ?? null)');
   });
 });
