@@ -3,7 +3,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { getVideoPrefetchOptions, useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
-import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import type { selectGalleryItemNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
   selectGalleryImageMinimumWidth,
   selectImageToCompare,
@@ -42,7 +42,7 @@ import { scrollIntoView } from './scrollIntoView';
 import { useGalleryImageNames } from './use-gallery-image-names';
 import { useScrollableGallery } from './useScrollableGallery';
 
-type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
+type ListImageNamesQueryArgs = ReturnType<typeof selectGalleryItemNamesQueryArgs>;
 
 type GridContext = {
   queryArgs: ListImageNamesQueryArgs;
