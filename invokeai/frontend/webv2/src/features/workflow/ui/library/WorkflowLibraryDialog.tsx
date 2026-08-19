@@ -97,10 +97,18 @@ export const WorkflowLibraryDialog = ({
   // *this* dialog has to clear it too, or a stale preview would resurrect
   // itself the next time the library opens.
   const [previewEntry, setPreviewEntry] = useState<WorkflowLibraryEntry | null>(null);
+  // Tracked separately from `previewEntry` so closing the preview can play its
+  // exit transition: `isPreviewOpen` goes false first, and the entry (which is
+  // what keeps the lazy dialog mounted) is only released once the transition
+  // has finished.
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closeDialog = useCallback(() => {
+    // The library itself is leaving, and it takes the preview with it — there
+    // is nothing left to animate against, so this drops the mount outright.
     setPreviewEntry(null);
+    setIsPreviewOpen(false);
     onOpenChange(false);
   }, [onOpenChange]);
   const { load, loadPhase } = useLoadLibraryWorkflow(closeDialog);
@@ -129,11 +137,25 @@ export const WorkflowLibraryDialog = ({
     [isLoadPending, onOpenChange, closeDialog]
   );
 
+  const handlePreviewRequest = useCallback((entry: WorkflowLibraryEntry) => {
+    setPreviewEntry(entry);
+    setIsPreviewOpen(true);
+  }, []);
+
   const handlePreviewOpenChange = useCallback((open: boolean) => {
     if (!open) {
-      setPreviewEntry(null);
+      setIsPreviewOpen(false);
     }
   }, []);
+
+  // Guarded on `isPreviewOpen`: previewing another card while the last one is
+  // still animating out re-opens the same dialog, and an exit report that
+  // arrives after that must not pull the mount out from under it.
+  const handlePreviewExitComplete = useCallback(() => {
+    if (!isPreviewOpen) {
+      setPreviewEntry(null);
+    }
+  }, [isPreviewOpen]);
 
   // Only a `'ready'` enrichment carries the compiled document; the rail's
   // Preview action is disabled for anything else, so this is a defensive
@@ -144,8 +166,8 @@ export const WorkflowLibraryDialog = ({
       return null;
     }
 
-    return buildLibraryGraphPreviewSource(previewEntry.enrichment.document, templatesSnapshot.templates, t);
-  }, [previewEntry, templatesSnapshot, t]);
+    return buildLibraryGraphPreviewSource(previewEntry.enrichment.document, templatesSnapshot.templates);
+  }, [previewEntry, templatesSnapshot]);
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.currentTarget;
@@ -243,6 +265,21 @@ export const WorkflowLibraryDialog = ({
                         </SegmentGroup.Item>
                       ))}
                     </SegmentGroup.Root>
+                    {/* In the header row rather than the dialog's absolutely
+                        positioned corner: with a second header row of tag chips
+                        underneath, the corner placement floated the control
+                        across both bands instead of reading as part of either. */}
+                    <Dialog.CloseTrigger asChild>
+                      <CloseButton
+                        color="fg.muted"
+                        disabled={isLoadPending}
+                        flexShrink={0}
+                        insetEnd="auto"
+                        position="static"
+                        size="sm"
+                        top="auto"
+                      />
+                    </Dialog.CloseTrigger>
                   </HStack>
                   <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
                 </Stack>
@@ -269,13 +306,10 @@ export const WorkflowLibraryDialog = ({
                   onDeleted={handleDeleted}
                   onDuplicated={setSelectedWorkflowId}
                   onOpen={handleOpenItem}
-                  onPreview={setPreviewEntry}
+                  onPreview={handlePreviewRequest}
                 />
               </Dialog.Body>
               {isOpen ? <WorkflowLibraryBrowseSession /> : null}
-              <Dialog.CloseTrigger asChild>
-                <CloseButton color="fg.muted" disabled={isLoadPending} size="sm" />
-              </Dialog.CloseTrigger>
             </Dialog.Content>
           </Dialog.Positioner>
         </Portal>
@@ -285,9 +319,10 @@ export const WorkflowLibraryDialog = ({
           <LazyGraphPreviewDialog
             graphId={previewEntry.item.workflow_id}
             hideInvoke
-            isOpen={Boolean(previewEntry)}
+            isOpen={isPreviewOpen}
             source={previewSource}
             sourceLabel={previewEntry.item.name || t('workflowLibrary.untitled')}
+            onExitComplete={handlePreviewExitComplete}
             onOpenChange={handlePreviewOpenChange}
           />
         </Suspense>

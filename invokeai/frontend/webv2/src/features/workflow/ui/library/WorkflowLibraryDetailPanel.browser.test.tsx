@@ -89,6 +89,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.duplicateFailed': 'Failed to duplicate workflow',
   'workflowLibrary.duplicateName': '{{name}} copy',
   'workflowLibrary.duplicated': 'Saved a copy under Yours',
+  'workflowLibrary.findModel': 'Find {{name}} in the model manager',
   'workflowLibrary.forkIntoProject': 'Fork into new project',
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
@@ -243,7 +244,11 @@ const RAW_WORKFLOW: Record<string, unknown> = {
 // #endregion
 
 const NOTIFICATIONS = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-const ADAPTER = { notifications: NOTIFICATIONS } as unknown as WorkflowUiAdapter;
+const OPEN_ADD_MODELS = vi.fn();
+const ADAPTER = {
+  notifications: NOTIFICATIONS,
+  openAddModels: OPEN_ADD_MODELS,
+} as unknown as WorkflowUiAdapter;
 const OPEN_DOCUMENT_IN_NEW_PROJECT = vi.fn();
 const GRAPH_PREVIEW = {
   openDocumentInNewProject: OPEN_DOCUMENT_IN_NEW_PROJECT,
@@ -355,6 +360,7 @@ describe('WorkflowLibraryDetailPanel', () => {
 
     downloadText.mockClear();
     OPEN_DOCUMENT_IN_NEW_PROJECT.mockClear();
+    OPEN_ADD_MODELS.mockClear();
     NOTIFICATIONS.error.mockClear();
     NOTIFICATIONS.info.mockClear();
     NOTIFICATIONS.success.mockClear();
@@ -656,6 +662,64 @@ describe('WorkflowLibraryDetailPanel', () => {
     await clickButton('Preview graph');
 
     expect(onPreview).toHaveBeenCalledWith(IMAGE_TO_VIDEO);
+  });
+
+  it('links only the rows the account is missing, and takes them to Add Models', async () => {
+    await renderPanel(IMAGE_TO_VIDEO);
+
+    // Two installable rows link; the installed VAE stays plain text — Add
+    // Models has nothing to offer for a model that is already here.
+    expect(requirementStatuses()).toEqual(['installable', 'installable', 'installed']);
+    expect(document.querySelectorAll('[data-requirement-link]')).toHaveLength(2);
+    expect(requirementRows()[2]?.querySelector('[data-requirement-link]')).toBeNull();
+
+    const link = document.querySelector<HTMLElement>('[data-requirement-link]');
+    expect(link?.textContent).toBe('Wan 2.2 I2V A14B');
+    // Quiet affordance: a bare label, with the destination in its tooltip.
+    expect(link?.getAttribute('title')).toBe('Find Wan 2.2 I2V A14B in the model manager');
+
+    await act(async () => {
+      link?.click();
+      await settleFrame();
+    });
+
+    // The catalog entry that can actually supply it, by its catalog name.
+    expect(OPEN_ADD_MODELS).toHaveBeenCalledWith('Wan 2.2 I2V A14B');
+    // Add Models is another page, so the library gets out of the way.
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a row that names nothing installable as plain text', async () => {
+    // Nothing installed and no catalog: the row is unresolvable, and a slot
+    // with neither base nor type has no query to offer either.
+    models.installedModels.current = [];
+    models.starterModels.current = [];
+
+    await renderPanel(
+      entry(
+        { name: 'Unsearchable', workflow_id: 'wf-unsearchable' },
+        readyEnrichment([{ base: null, kind: 'slot', label: 'Model', modelType: null }])
+      )
+    );
+
+    expect(requirementStatuses()).toEqual(['unresolvable']);
+    expect(document.querySelector('[data-requirement-link]')).toBeNull();
+  });
+
+  it('searches an unresolvable slot by its raw base, not its prose label', async () => {
+    models.starterModels.current = [];
+
+    await renderPanel(IMAGE_TO_VIDEO);
+
+    const link = document.querySelector<HTMLElement>('[data-requirement-link]');
+
+    await act(async () => {
+      link?.click();
+      await settleFrame();
+    });
+
+    // 'Wan 2.2' is a display label; the starter catalog indexes 'wan'.
+    expect(OPEN_ADD_MODELS).toHaveBeenCalledWith('wan');
   });
 
   it('renders nothing actionable without a selection', async () => {

@@ -63,19 +63,24 @@ export const AddModelsView = () => {
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
-  const { hfLookup, scan, selectedBundleName } = useModelsUiSelector(
+  const { hfLookup, query, scan, selectedBundleName } = useModelsUiSelector(
     (snapshot) => ({
       hfLookup: snapshot.hfLookup,
+      query: snapshot.addModelsQuery,
       scan: snapshot.scan,
       selectedBundleName: snapshot.selectedBundleName,
     }),
     (left, right) =>
       left.hfLookup === right.hfLookup &&
+      left.query === right.query &&
       left.scan === right.scan &&
       left.selectedBundleName === right.selectedBundleName
   );
 
-  const [query, setQuery] = useState('');
+  // In the store rather than local state so another surface can seed it before
+  // navigating here (`requestAddModelsSearch`) without this view needing an
+  // effect to notice.
+  const setQuery = (addModelsQuery: string) => updateModelsUi({ addModelsQuery });
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
   const { isBusy: isPulling, run: runPull } = useScopedAction();

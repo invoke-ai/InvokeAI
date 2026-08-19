@@ -184,6 +184,18 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       getProjectGraph: () => queries.getSnapshot().activeProject.projectGraph,
       nodeExecution: { get: nodeExecutionStore.get, subscribe: nodeExecutionStore.subscribe },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
+      // Hash navigation and a dynamic import, matching `GenerationUiAdapter`'s
+      // `openManager`: `useNavigate` would pull the router hooks and
+      // `@features/models/launchpad` would pull the manager's UI store into the
+      // editor's initial bundle, for a link most sessions never click. The seed
+      // lands before the navigation, so Add Models' first paint is already
+      // showing what was asked for.
+      openAddModels: (query) => {
+        void import('@features/models/launchpad').then(({ requestAddModelsSearch }) => {
+          requestAddModelsSearch(query);
+          window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`;
+        });
+      },
       performance: {
         mark: (name, source) => markWorkbenchPerf(name, source),
         measure: (name, start, source, end) => measureWorkbenchPerf(name, start, source, end),

@@ -15,10 +15,10 @@ import {
   useModelsSelector,
   useStartersSelector,
 } from '@features/models';
-import { resolveWorkflowModelRequirements } from '@features/workflow/core/modelRequirements';
+import { getAddModelsSearchTerm, resolveWorkflowModelRequirements } from '@features/workflow/core/modelRequirements';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CheckIcon, DownloadIcon, TriangleAlertIcon } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -152,10 +152,30 @@ export const useWorkflowLibraryMissingCounts = (
   }, [deps, entries]);
 };
 
-const RequirementRow = ({ resolved }: { resolved: ResolvedModelRequirement }) => {
+/** Quiet by design: an underline on hover and nothing else — the rows are facts, not a toolbar. */
+const REQUIREMENT_LINK_HOVER = { textDecoration: 'underline' } as const;
+
+const RequirementRow = ({
+  resolved,
+  onFindModel,
+}: {
+  resolved: ResolvedModelRequirement;
+  /** Absent when the panel has no way to reach Add Models. */
+  onFindModel?: (query: string) => void;
+}) => {
   const { t } = useTranslation();
   const presentation = STATUS_PRESENTATION[resolved.status];
   const statusLabel = t(presentation.labelKey);
+  const { label } = resolved.requirement;
+  // `null` for rows there is nothing to install (already installed, or nothing
+  // the query could name) — those stay plain text.
+  const searchTerm = getAddModelsSearchTerm(resolved);
+  const canFindModel = Boolean(onFindModel) && searchTerm !== null;
+  const handleFindModel = useCallback(() => {
+    if (searchTerm) {
+      onFindModel?.(searchTerm);
+    }
+  }, [onFindModel, searchTerm]);
 
   return (
     <DataList.Item alignItems="center" data-requirement-status={resolved.status} gap="1.5">
@@ -167,9 +187,22 @@ const RequirementRow = ({ resolved }: { resolved: ResolvedModelRequirement }) =>
         )}
       </DataList.ItemLabel>
       <DataList.ItemValue color={presentation.color} fontSize="2xs" minW="0">
-        <Text truncate title={resolved.requirement.label}>
-          {resolved.requirement.label}
-        </Text>
+        {canFindModel ? (
+          <Text asChild cursor="pointer" textAlign="start" truncate _hover={REQUIREMENT_LINK_HOVER}>
+            <button
+              data-requirement-link={searchTerm}
+              title={t('workflowLibrary.findModel', { name: label })}
+              type="button"
+              onClick={handleFindModel}
+            >
+              {label}
+            </button>
+          </Text>
+        ) : (
+          <Text truncate title={label}>
+            {label}
+          </Text>
+        )}
       </DataList.ItemValue>
     </DataList.Item>
   );
@@ -180,9 +213,11 @@ export interface WorkflowRequirementsListProps {
   errorMessage: string | null;
   /** `null` while the workflow is still being parsed in the background. */
   resolved: readonly ResolvedModelRequirement[] | null;
+  /** Turns rows for models the account is missing into links into Add Models. */
+  onFindModel?: (query: string) => void;
 }
 
-export const WorkflowRequirementsList = ({ errorMessage, resolved }: WorkflowRequirementsListProps) => {
+export const WorkflowRequirementsList = ({ errorMessage, resolved, onFindModel }: WorkflowRequirementsListProps) => {
   const { t } = useTranslation();
 
   // A readable workflow that needs no models says so by omission, not by an
@@ -209,7 +244,11 @@ export const WorkflowRequirementsList = ({ errorMessage, resolved }: WorkflowReq
       {!errorMessage && resolved !== null && resolved.length > 0 ? (
         <DataList.Root gap="1.5" orientation="horizontal" size="sm">
           {resolved.map((requirement) => (
-            <RequirementRow key={getRequirementKey(requirement.requirement)} resolved={requirement} />
+            <RequirementRow
+              key={getRequirementKey(requirement.requirement)}
+              resolved={requirement}
+              onFindModel={onFindModel}
+            />
           ))}
         </DataList.Root>
       ) : null}

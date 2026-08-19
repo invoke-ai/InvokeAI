@@ -17,7 +17,7 @@ import { WorkflowLibraryCard } from './WorkflowLibraryCard';
 
 /** How close to the bottom (in viewports) counts as "fetch the next page". */
 const NEAR_BOTTOM_VIEWPORTS = 1.5;
-const GRID_TEMPLATE_COLUMNS = 'repeat(2, minmax(0, 1fr))';
+const GRID_TEMPLATE_COLUMNS = 'repeat(3, minmax(0, 1fr))';
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
 
 export interface WorkflowLibraryGridProps {

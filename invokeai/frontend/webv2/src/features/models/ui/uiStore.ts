@@ -28,6 +28,12 @@ export interface HFLookupState {
 
 export interface ModelsUiSnapshot {
   activeTab: ModelManagerTab;
+  /**
+   * The Add Models box's contents. Session state like everything else here, so
+   * a half-typed source survives a tab switch — and so surfaces outside the
+   * manager can seed it before navigating (see {@link requestAddModelsSearch}).
+   */
+  addModelsQuery: string;
   /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
   selectedKeys: ReadonlySet<string>;
@@ -49,6 +55,7 @@ export interface ModelsUiSnapshot {
 const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   activeModelKey: null,
   activeTab: 'add',
+  addModelsQuery: '',
   filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
   libraryScrollOffsets: {},
@@ -111,6 +118,27 @@ export const openModelDetail = (modelKey: string): void => {
  */
 export const openAddModelsWithBundle = (bundleName: string): void => {
   updateModelsUi({ activeTab: 'add', hfLookup: null, scan: null, selectedBundleName: bundleName });
+};
+
+/**
+ * Open Add Models searching for one model. Called just before navigating to the
+ * manager from elsewhere in the app (e.g. a model a workflow needs but the
+ * account does not have), so the page the user lands on is already offering the
+ * thing they clicked — the installed-models list would only confirm its absence.
+ *
+ * Scan and HuggingFace results are cleared for the same reason
+ * {@link openAddModelsWithBundle} clears them: Add Models hides the starter
+ * catalog whenever either has results, and the catalog is what this search is
+ * for.
+ */
+export const requestAddModelsSearch = (query: string): void => {
+  updateModelsUi({
+    activeTab: 'add',
+    addModelsQuery: query,
+    hfLookup: null,
+    scan: null,
+    selectedBundleName: null,
+  });
 };
 
 /** Expand the always-visible install queue footer (e.g. from a "View queue" link). */

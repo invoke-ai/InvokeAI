@@ -2987,6 +2987,7 @@
     "duplicated": "Saved a copy under Yours",
     "empty": "No workflows match these filters.",
     "fetching": "Fetching workflow…",
+    "findModel": "Find {{name}} in the model manager",
     "forkIntoProject": "Fork into new project",
     "installModels_one": "Install 1 model",
     "installModels_other": "Install {{count}} models",

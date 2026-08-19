@@ -23,6 +23,30 @@ describe('models ui store', () => {
     expect(snapshot.scan).toBeNull();
   });
 
+  it('opens Add Models searching for one model, with nothing else in the way', async () => {
+    const store = await import('./uiStore');
+
+    store.updateModelsUi({
+      activeTab: 'details',
+      addModelsQuery: 'stale',
+      hfLookup: { repo: 'owner/repo', urls: ['a'] },
+      scan: { path: '/models', results: [] },
+      selectedBundleName: 'Essentials',
+    });
+
+    store.requestAddModelsSearch('Juggernaut XL');
+
+    const snapshot = store.getModelsUiSnapshotForTests();
+
+    // Add Models, showing the starter catalog filtered to the request — a
+    // leftover scan/HF panel or bundle would hide the catalog entirely.
+    expect(snapshot.activeTab).toBe('add');
+    expect(snapshot.addModelsQuery).toBe('Juggernaut XL');
+    expect(snapshot.hfLookup).toBeNull();
+    expect(snapshot.scan).toBeNull();
+    expect(snapshot.selectedBundleName).toBeNull();
+  });
+
   it('keeps the bundle selection until it is explicitly replaced', async () => {
     const store = await import('./uiStore');
 

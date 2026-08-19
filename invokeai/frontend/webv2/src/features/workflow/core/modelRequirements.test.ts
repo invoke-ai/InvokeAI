@@ -11,8 +11,10 @@ import type {
 
 import {
   extractWorkflowModelRequirements,
+  getAddModelsSearchTerm,
   resolveWorkflowModelRequirements,
   type InstalledModelSummary,
+  type ResolvedModelRequirement,
   type StarterCatalogEntry,
   type WorkflowModelRequirement,
 } from './modelRequirements';
@@ -392,5 +394,83 @@ describe('resolveWorkflowModelRequirements', () => {
     });
 
     expect(resolved).toMatchObject({ matchedModelName: null, starterMatch: null, status: 'unresolvable' });
+  });
+});
+
+describe('getAddModelsSearchTerm', () => {
+  const resolve = (
+    requirement: WorkflowModelRequirement,
+    status: ResolvedModelRequirement['status'],
+    starterMatch: StarterCatalogEntry | null = null
+  ): ResolvedModelRequirement => ({ matchedModelName: null, requirement, starterMatch, status });
+
+  const starter = (name: string): StarterCatalogEntry => ({
+    base: 'wan',
+    is_installed: false,
+    name,
+    source: 'https://models.test/starter',
+    type: 'main',
+  });
+
+  const fluxSlot: WorkflowModelRequirement = {
+    base: 'flux',
+    kind: 'slot',
+    label: 'FLUX checkpoint',
+    modelType: 'main',
+  };
+
+  it('sends an installable row to the catalog entry that can supply it, by name', () => {
+    expect(getAddModelsSearchTerm(resolve(fluxSlot, 'installable', starter('FLUX.1 dev')))).toBe('FLUX.1 dev');
+  });
+
+  it('has nothing to offer for a requirement that is already installed', () => {
+    // Add Models searches the starter catalog, which need not carry an
+    // installed model's name at all.
+    expect(getAddModelsSearchTerm(resolve(fluxSlot, 'installed', starter('FLUX.1 dev')))).toBeNull();
+  });
+
+  it("falls back to the exact requirement's model name when the catalog has no match", () => {
+    expect(
+      getAddModelsSearchTerm(
+        resolve(
+          {
+            identifier: { base: 'sdxl', key: 'model-key', name: 'Juggernaut XL' },
+            kind: 'exact',
+            label: 'Juggernaut XL',
+          },
+          'unresolvable'
+        )
+      )
+    ).toBe('Juggernaut XL');
+  });
+
+  it("falls back to an exact requirement's base when the graph recorded no name", () => {
+    expect(
+      getAddModelsSearchTerm(
+        resolve({ identifier: { base: 'sdxl', key: 'model-key' }, kind: 'exact', label: 'model-key' }, 'unresolvable')
+      )
+    ).toBe('sdxl');
+  });
+
+  it("falls back to a slot's raw base, not its prose label", () => {
+    // "FLUX checkpoint" is a label; the catalog's index carries 'flux'.
+    expect(getAddModelsSearchTerm(resolve(fluxSlot, 'unresolvable'))).toBe('flux');
+  });
+
+  it("falls back to a base-less slot's model type", () => {
+    expect(
+      getAddModelsSearchTerm(resolve({ base: null, kind: 'slot', label: 'VAE', modelType: 'vae' }, 'unresolvable'))
+    ).toBe('vae');
+  });
+
+  it('has nothing to search for a requirement that describes neither', () => {
+    expect(
+      getAddModelsSearchTerm(resolve({ base: null, kind: 'slot', label: 'Model', modelType: null }, 'unresolvable'))
+    ).toBeNull();
+    expect(
+      getAddModelsSearchTerm(
+        resolve({ identifier: { key: 'model-key' }, kind: 'exact', label: 'model-key' }, 'unresolvable')
+      )
+    ).toBeNull();
   });
 });

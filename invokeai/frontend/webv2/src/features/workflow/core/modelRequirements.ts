@@ -452,3 +452,41 @@ export const resolveWorkflowModelRequirements = (
   });
 
 // #endregion
+
+// #region Add Models handoff
+
+/**
+ * What to search for in Add Models to reach the model a requirement is missing
+ * — `null` when there is nothing to send anyone there for, and the row stays
+ * plain text.
+ *
+ * An already-installed requirement is `null` by design: Add Models searches the
+ * *starter catalog*, which need not carry a locally installed model's name at
+ * all, so the link would dead-end on an empty list.
+ *
+ * When the catalog can supply the model, its own catalog name is the surest
+ * query. Otherwise an exact requirement names one model, and a slot names a
+ * *kind* — whose display label ("FLUX checkpoint") is prose the catalog does
+ * not index; its raw base (or failing that, raw type) is what it does.
+ */
+export const getAddModelsSearchTerm = (resolved: ResolvedModelRequirement): string | null => {
+  if (resolved.status === 'installed') {
+    return null;
+  }
+
+  const starterName = resolved.starterMatch?.name.trim();
+
+  if (starterName) {
+    return starterName;
+  }
+
+  const { requirement } = resolved;
+
+  if (requirement.kind === 'exact') {
+    return requirement.identifier.name?.trim() || requirement.identifier.base?.trim() || null;
+  }
+
+  return requirement.base?.trim() || requirement.modelType?.trim() || null;
+};
+
+// #endregion

@@ -71,6 +71,8 @@ export interface WorkflowUiAdapter {
     measure(name: string, start: string, source: WorkflowPerfSource, end?: string): void;
     time<T>(name: string, source: WorkflowPerfSource, callback: () => T): T;
   };
+  /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
+  openAddModels(query: string): void;
   registerModalHotkeyLayer(id: string): () => void;
   nodeExecution: {
     get(nodeId: string): WorkflowNodeExecutionState | null;
@@ -141,6 +143,8 @@ export const useWorkflowGraphPreview = (): WorkflowGraphPreviewPort => {
 };
 
 export const useWorkflowNotifications = () => useWorkflowUi().notifications;
+
+export const useOpenAddModels = (): ((query: string) => void) => useWorkflowUi().openAddModels;
 
 export const useWorkflowNodeExecutionState = (nodeId: string): WorkflowNodeExecutionState | null => {
   const { nodeExecution } = useWorkflowUi();

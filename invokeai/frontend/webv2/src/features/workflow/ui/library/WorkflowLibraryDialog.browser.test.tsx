@@ -61,8 +61,10 @@ vi.mock('@features/workflow/ui/graph-preview/GraphPreviewDialog', () => ({
   GraphPreviewDialog: ({
     graphId,
     hideInvoke,
+    isOpen,
     source,
     sourceLabel,
+    onExitComplete,
     onOpenChange,
   }: {
     graphId: string;
@@ -70,16 +72,21 @@ vi.mock('@features/workflow/ui/graph-preview/GraphPreviewDialog', () => ({
     isOpen: boolean;
     source: { graph: { nodes: { id: string; type: string }[] } | null };
     sourceLabel: string;
+    onExitComplete?: () => void;
     onOpenChange: (isOpen: boolean) => void;
   }) => (
     <div
       data-graph-id={graphId}
       data-hide-invoke={String(hideInvoke)}
       data-preview-dialog
+      data-preview-open={String(isOpen)}
       data-source-label={sourceLabel}
     >
       {(source.graph?.nodes ?? []).map((node) => node.type).join(',')}
       <button onClick={() => onOpenChange(false)}>Close preview</button>
+      {/* Stands in for Ark's presence machine: the real dialog reports the end
+          of its close transition, which is what releases the mount. */}
+      <button onClick={() => onExitComplete?.()}>Finish preview exit</button>
     </div>
   ),
 }));
@@ -275,6 +282,10 @@ const PREVIEW_FIXTURE = entry(
   'Preview Fixture',
   readyEnrichment(1, null, NO_REQUIREMENTS, PREVIEW_DOCUMENT)
 );
+
+/** ~80 characters with no break opportunity the rail could exploit. */
+const LONG_NAME = 'Cinematic Portrait Restoration And Upscaling Pipeline With Refiner And Face Detail';
+const LONG_NAMED = entry('wf-long-name', LONG_NAME, readyEnrichment(3, 'sdxl'));
 
 const LOADED_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
   entries: [PORTRAIT, LANDSCAPE, SKETCH, UPSCALE],
@@ -701,19 +712,45 @@ describe('WorkflowLibraryDialog', () => {
     expect(button?.disabled).toBe(true);
   });
 
-  it('resets the pending preview when the preview dialog itself closes', async () => {
+  it('keeps the preview mounted through its exit transition, then resets the pending preview', async () => {
     await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
 
     await act(() => card('wf-preview-fixture')?.click());
     await clickText('Preview graph');
     await waitForPreviewDialog();
 
-    expect(document.querySelector('[data-preview-dialog]')).not.toBeNull();
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
 
     await clickText('Close preview');
 
+    // Still mounted, now closed: unmounting here is what skipped the exit
+    // animation and made the preview vanish.
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('false');
+    expect(document.querySelector('[data-pending-preview]')).not.toBeNull();
+
+    await clickText('Finish preview exit');
+
     expect(document.querySelector('[data-preview-dialog]')).toBeNull();
     expect(document.querySelector('[data-pending-preview]')).toBeNull();
+  });
+
+  it('keeps a re-opened preview mounted when the previous exit reports in late', async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+
+    await act(() => card('wf-preview-fixture')?.click());
+    await clickText('Preview graph');
+    await waitForPreviewDialog();
+
+    await clickText('Close preview');
+    // Previewing again mid-transition re-opens the same dialog…
+    await clickText('Preview graph');
+
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
+
+    // …and the exit report from the *previous* close must not unmount it.
+    await clickText('Finish preview exit');
+
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
   });
 
   it('does not resurrect the preview after the library dialog closes and reopens', async () => {
@@ -745,6 +782,50 @@ describe('WorkflowLibraryDialog', () => {
 
     await renderDialog(true);
     expect(document.querySelector('[data-preview-dialog]')).toBeNull();
+  });
+
+  it('sits the close control on the header row, not floating over the tag chips', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
+    const segments = document.querySelector<HTMLElement>('[data-scope="segment-group"][data-part="root"]');
+    expect(close).not.toBeNull();
+    expect(segments).not.toBeNull();
+
+    // Same row container as the title/search/segment cluster…
+    expect(segments?.parentElement?.contains(close as Node)).toBe(true);
+    // …and on its baseline rather than the dialog's absolute top corner.
+    const closeBox = close?.getBoundingClientRect();
+    const segmentBox = segments?.getBoundingClientRect();
+    const closeCenter = (closeBox?.top ?? 0) + (closeBox?.height ?? 0) / 2;
+
+    expect(closeCenter).toBeGreaterThanOrEqual(segmentBox?.top ?? 0);
+    expect(closeCenter).toBeLessThanOrEqual(segmentBox?.bottom ?? 0);
+    // And it comes after the segment control, at the end of the row.
+    expect(closeBox?.left ?? 0).toBeGreaterThanOrEqual(segmentBox?.right ?? 0);
+  });
+
+  it('truncates a long workflow name instead of scrolling the rail sideways', async () => {
+    await openWith(withSnapshot({ entries: [LONG_NAMED, PORTRAIT] }));
+
+    const detail = document.querySelector<HTMLElement>('[data-workflow-detail]');
+    const body = detail?.parentElement;
+    expect(detail?.dataset.workflowDetail).toBe('wf-long-name');
+    expect(body).not.toBeNull();
+
+    // 18rem rail plus its 1px borders. Anything wider is the rail growing to
+    // its content's min-content width.
+    expect(detail?.getBoundingClientRect().width).toBeLessThanOrEqual(18 * 16 + 2);
+    expect(body?.scrollWidth).toBeLessThanOrEqual((body?.clientWidth ?? 0) + 1);
+
+    // The rail's own (vertical) scroll area must not scroll horizontally: it
+    // renders no horizontal scrollbar, so overflow there just hides content.
+    const railViewport = detail?.querySelector<HTMLElement>(`[role="region"][aria-label="${LONG_NAME}"]`);
+    expect(railViewport).not.toBeNull();
+    expect(railViewport?.scrollWidth).toBeLessThanOrEqual((railViewport?.clientWidth ?? 0) + 1);
+
+    // The name is still readable — truncated, with the full string on hover.
+    expect(detail?.querySelector(`[title="${LONG_NAME}"]`)).not.toBeNull();
   });
 
   it('shows the busy overlay while a workflow is being applied', async () => {
