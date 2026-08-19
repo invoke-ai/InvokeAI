@@ -418,6 +418,7 @@
         "queueActionsMenu": "Queue Actions Menu",
         "queueEmpty": "Queue Empty",
         "queueItem": "Queue Item",
+        "queueItemLoadFailed": "This queue item could not be loaded.",
         "enqueueing": "Queueing Batch",
         "resume": "Resume",
         "resumeTooltip": "Resume Processor",
