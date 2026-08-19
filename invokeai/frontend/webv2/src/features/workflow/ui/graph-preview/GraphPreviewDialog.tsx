@@ -24,6 +24,12 @@ interface GraphPreviewDialogProps {
   /** Hides the footer Invoke button only — Copy JSON and the Open-as menu stay. For sources with no invocation route (e.g. a library entry, previewed before it's ever opened into a project). */
   hideInvoke?: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  /**
+   * Fires once the close transition has finished playing. Hosts that mount this
+   * dialog conditionally must drop the mount here rather than the moment
+   * `isOpen` goes false, or the exit animation never gets to run.
+   */
+  onExitComplete?: () => void;
 }
 
 type PreviewMode = 'graph' | 'list' | 'json';
@@ -74,6 +80,7 @@ export const GraphPreviewDialog = ({
   sourceLabel,
   hideInvoke = false,
   onOpenChange,
+  onExitComplete,
 }: GraphPreviewDialogProps) => {
   const { t } = useTranslation();
   const graphPreview = useWorkflowGraphPreview();
@@ -194,11 +201,21 @@ export const GraphPreviewDialog = ({
   }, [t, sourceLabel, source.isLive]);
 
   return (
-    <Dialog.Root open={isOpen} placement="center" size="xl" onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      open={isOpen}
+      placement="center"
+      size="xl"
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content h="80vh" maxH="80vh" maxW="min(72rem, calc(100vw - 4rem))">
+          {/* A graph reads left-to-right, so the dialog is landscape: it takes
+              the width it can get and only as much height as that shape wants,
+              instead of the near-full-height column an 80vh-first sizing gave
+              it on tall displays. */}
+          <Dialog.Content h="min(46rem, 85vh)" maxH="85vh" maxW="min(72rem, calc(100vw - 4rem))">
             <Dialog.Header alignItems="center" flexDirection="row" justifyContent="space-between">
               <Stack gap="0.5" minW="0">
                 <Dialog.Title>{t('graphPreview.title')}</Dialog.Title>

@@ -1,12 +1,9 @@
 import type { FieldInputTemplate, InvocationTemplate, ProjectGraphState } from '@features/workflow/contracts';
-import type { TFunction } from 'i18next';
 
 import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { describe, expect, it } from 'vitest';
 
 import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
-
-const translate = ((key: string) => (key === 'graphPreview.nodes' ? 'Nodes' : key)) as TFunction;
 
 const input = (name: string, overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate => ({
   default: undefined,
@@ -85,7 +82,7 @@ describe('buildLibraryGraphPreviewSource', () => {
   it('compiles the document into a graph with its nodes and edges', () => {
     const { doc, sinkId, sourceId } = buildDocument();
 
-    const result = buildLibraryGraphPreviewSource(doc, templates, translate);
+    const result = buildLibraryGraphPreviewSource(doc, templates);
 
     expect(result.invalidReasons).toEqual([]);
     expect(result.graph?.nodes.map((node) => node.id).sort()).toEqual([sinkId, sourceId].sort());
@@ -96,25 +93,26 @@ describe('buildLibraryGraphPreviewSource', () => {
   it('is never live and carries no destination or notices', () => {
     const { doc } = buildDocument();
 
-    const result = buildLibraryGraphPreviewSource(doc, templates, translate);
+    const result = buildLibraryGraphPreviewSource(doc, templates);
 
     expect(result.isLive).toBe(false);
     expect(result.destinationLabel).toBeNull();
     expect(result.notices).toEqual([]);
   });
 
-  it('summarizes the compiled node count', () => {
+  it('adds no summary rows of its own — the side panel already counts the nodes', () => {
     const { doc } = buildDocument();
 
-    const result = buildLibraryGraphPreviewSource(doc, templates, translate);
+    const result = buildLibraryGraphPreviewSource(doc, templates);
 
-    expect(result.summaryRows).toEqual([{ id: 'nodes', label: 'Nodes', value: '2' }]);
+    // A 'nodes' row here rendered a second "Nodes" line under the panel's own.
+    expect(result.summaryRows).toEqual([]);
   });
 
   it('maps position hints from the document node positions', () => {
     const { doc, sinkId, sourceId } = buildDocument();
 
-    const result = buildLibraryGraphPreviewSource(doc, templates, translate);
+    const result = buildLibraryGraphPreviewSource(doc, templates);
 
     expect(result.positionHints?.[sourceId]).toEqual({ x: 0, y: 0 });
     expect(result.positionHints?.[sinkId]).toEqual({ x: 240, y: 80 });
@@ -127,7 +125,7 @@ describe('buildLibraryGraphPreviewSource', () => {
     // silently producing an empty graph.
     const corrupt = { ...doc, nodes: null } as unknown as ProjectGraphState;
 
-    const result = buildLibraryGraphPreviewSource(corrupt, templates, translate);
+    const result = buildLibraryGraphPreviewSource(corrupt, templates);
 
     expect(result.graph).toBeNull();
     expect(result.invalidReasons).toHaveLength(1);

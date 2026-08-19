@@ -117,12 +117,18 @@ const GraphSummary = ({
             {nodeCount !== undefined ? String(nodeCount) : '—'}
           </DataList.ItemValue>
         </DataList.Item>
-        <DataList.Item>
-          <DataList.ItemLabel fontSize="2xs">{t('graphPreview.destination')}</DataList.ItemLabel>
-          <DataList.ItemValue fontSize="2xs" minW="0">
-            {source.destinationLabel ?? '—'}
-          </DataList.ItemValue>
-        </DataList.Item>
+        {/* A source with no destination has not been routed anywhere yet (a
+            library entry previewed before it is opened into a project). A row
+            reading "Destination —" states nothing; omitting it says the same
+            thing without the noise. */}
+        {source.destinationLabel === null ? null : (
+          <DataList.Item>
+            <DataList.ItemLabel fontSize="2xs">{t('graphPreview.destination')}</DataList.ItemLabel>
+            <DataList.ItemValue fontSize="2xs" minW="0">
+              {source.destinationLabel}
+            </DataList.ItemValue>
+          </DataList.Item>
+        )}
         {source.summaryRows.map((row) => (
           <DataList.Item key={row.id}>
             <DataList.ItemLabel fontSize="2xs">{row.label}</DataList.ItemLabel>

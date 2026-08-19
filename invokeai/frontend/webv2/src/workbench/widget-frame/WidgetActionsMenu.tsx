@@ -90,6 +90,10 @@ export const WidgetActionsMenu = ({
   const { getWidgetById } = useWorkbenchWidgetRegistry();
   const { widgets } = useWorkbenchCommands();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  // Mount outlives `isPreviewOpen`: dropping the host the moment the dialog
+  // closes cancels its exit transition, so the preview blinked out of
+  // existence. The host reports when the transition is done instead.
+  const [isPreviewMounted, setIsPreviewMounted] = useState(false);
   const label = resolveWidgetLabel(manifest, t);
   const surface = useMemo(
     () =>
@@ -112,8 +116,16 @@ export const WidgetActionsMenu = ({
   }, [instance.id, widgets]);
   const handlePreview = useCallback(() => {
     flushWorkbenchDrafts();
+    setIsPreviewMounted(true);
     setIsPreviewOpen(true);
   }, []);
+  // Guarded on `isPreviewOpen`: re-opening the preview while it is still
+  // animating out must not have the late exit report drop its mount.
+  const handlePreviewExitComplete = useCallback(() => {
+    if (!isPreviewOpen) {
+      setIsPreviewMounted(false);
+    }
+  }, [isPreviewOpen]);
 
   if (!surface && !HeaderMenu && !canFloat) {
     return null;
@@ -146,9 +158,14 @@ export const WidgetActionsMenu = ({
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      {surface && isPreviewOpen ? (
+      {surface && isPreviewMounted ? (
         <Suspense fallback={null}>
-          <GraphPreviewHost isOpen={isPreviewOpen} surface={surface} onOpenChange={setIsPreviewOpen} />
+          <GraphPreviewHost
+            isOpen={isPreviewOpen}
+            surface={surface}
+            onExitComplete={handlePreviewExitComplete}
+            onOpenChange={setIsPreviewOpen}
+          />
         </Suspense>
       ) : null}
     </>

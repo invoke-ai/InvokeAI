@@ -1,5 +1,4 @@
 import type { GraphPreviewSourceState, InvocationTemplates, ProjectGraphState } from '@features/workflow/contracts';
-import type { TFunction } from 'i18next';
 
 import { compileProjectGraph } from '@features/workflow/graph';
 
@@ -16,8 +15,7 @@ import { compileProjectGraph } from '@features/workflow/graph';
  */
 export const buildLibraryGraphPreviewSource = (
   document: ProjectGraphState,
-  templates: InvocationTemplates,
-  t: TFunction
+  templates: InvocationTemplates
 ): GraphPreviewSourceState => {
   try {
     const graph = compileProjectGraph(document, templates);
@@ -30,7 +28,9 @@ export const buildLibraryGraphPreviewSource = (
       isLive: false,
       notices: [],
       positionHints,
-      summaryRows: [{ id: 'nodes', label: t('graphPreview.nodes'), value: String(graph.nodes.length) }],
+      // No node-count row: the side panel's summary already opens with one, and
+      // adding it here rendered "Nodes" twice.
+      summaryRows: [],
     };
   } catch (error) {
     return {

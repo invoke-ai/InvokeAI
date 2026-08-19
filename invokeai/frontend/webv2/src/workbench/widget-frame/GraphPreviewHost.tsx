@@ -17,10 +17,13 @@ import { buildGraphPreviewSource } from './graphPreviewSource';
 export const GraphPreviewHost = ({
   isOpen,
   surface,
+  onExitComplete,
   onOpenChange,
 }: {
   isOpen: boolean;
   surface: GraphBearingSurfaceContract;
+  /** Fires when the close transition has played out — the menu drops the mount here. */
+  onExitComplete: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
   const { t } = useTranslation();
@@ -46,6 +49,7 @@ export const GraphPreviewHost = ({
       source={source}
       sourceId={surface.sourceId}
       sourceLabel={surface.label}
+      onExitComplete={onExitComplete}
       onOpenChange={onOpenChange}
     />
   );

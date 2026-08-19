@@ -234,6 +234,16 @@ const FIXTURE_SOURCE: GraphPreviewSourceState = {
   ],
 };
 
+/** A library entry: previewed before it has been opened into a project, so nothing has routed it anywhere. */
+const NO_DESTINATION_SOURCE: GraphPreviewSourceState = {
+  destinationLabel: null,
+  graph: FIXTURE_GRAPH,
+  invalidReasons: [],
+  isLive: false,
+  notices: [],
+  summaryRows: [],
+};
+
 const INVALID_SOURCE: GraphPreviewSourceState = {
   destinationLabel: 'Gallery',
   graph: null,
@@ -351,8 +361,35 @@ describe('GraphPreviewDialog', () => {
   let host: HTMLDivElement;
   let root: Root;
   let onOpenChange: (isOpen: boolean) => void;
+  let onExitComplete: () => void;
   let graphPreviewPort: WorkflowGraphPreviewPort;
   let workflowUiAdapter: WorkflowUiAdapter;
+
+  const dialogTree = (
+    source: GraphPreviewSourceState,
+    isOpen: boolean,
+    sourceId: WorkflowInvocationSourceId,
+    hideInvoke: boolean
+  ) => (
+    <StrictMode>
+      <ChakraProvider value={system}>
+        <WorkflowUiProvider adapter={workflowUiAdapter}>
+          <WorkflowGraphPreviewProvider adapter={graphPreviewPort}>
+            <GraphPreviewDialog
+              graphId="preview-graph-id"
+              hideInvoke={hideInvoke}
+              isOpen={isOpen}
+              source={source}
+              sourceId={sourceId}
+              sourceLabel="Generate"
+              onExitComplete={onExitComplete}
+              onOpenChange={onOpenChange}
+            />
+          </WorkflowGraphPreviewProvider>
+        </WorkflowUiProvider>
+      </ChakraProvider>
+    </StrictMode>
+  );
 
   const renderDialog = async (
     source: GraphPreviewSourceState,
@@ -361,25 +398,7 @@ describe('GraphPreviewDialog', () => {
     hideInvoke = false
   ) => {
     await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <WorkflowUiProvider adapter={workflowUiAdapter}>
-              <WorkflowGraphPreviewProvider adapter={graphPreviewPort}>
-                <GraphPreviewDialog
-                  graphId="preview-graph-id"
-                  hideInvoke={hideInvoke}
-                  isOpen={isOpen}
-                  source={source}
-                  sourceId={sourceId}
-                  sourceLabel="Generate"
-                  onOpenChange={onOpenChange}
-                />
-              </WorkflowGraphPreviewProvider>
-            </WorkflowUiProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
+      root.render(dialogTree(source, isOpen, sourceId, hideInvoke));
     });
   };
 
@@ -388,6 +407,7 @@ describe('GraphPreviewDialog', () => {
     document.body.append(host);
     root = createRoot(host);
     onOpenChange = vi.fn((_isOpen: boolean) => {});
+    onExitComplete = vi.fn();
     graphPreviewPort = createGraphPreviewPort();
     workflowUiAdapter = createWorkflowUiAdapter();
     downloads.downloadBlob.mockReset();
@@ -474,6 +494,42 @@ describe('GraphPreviewDialog', () => {
     expect(text).toContain('Gallery');
     expect(text).toContain('3');
     expect(text).toContain('Updates as you change settings.');
+  });
+
+  it('omits the destination row when the source was never routed anywhere', async () => {
+    await renderDialog(NO_DESTINATION_SOURCE);
+
+    const panel = document.querySelector('[role="region"][aria-label="This graph"]');
+    // A "Destination —" row states nothing; the node count still shows.
+    expect(panel?.textContent ?? '').not.toContain('Destination');
+    expect(panel?.textContent ?? '').toContain('Nodes');
+  });
+
+  it('reports when its close transition has finished, so hosts can drop the mount', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    expect(onExitComplete).not.toHaveBeenCalled();
+
+    await renderDialog(FIXTURE_SOURCE, false);
+
+    // The exit animation runs in real time; polling inside `act` keeps its
+    // final commit inside an open act scope.
+    await act(async () => {
+      await vi.waitFor(() => {
+        expect(onExitComplete).toHaveBeenCalled();
+      });
+    });
+  });
+
+  it('caps its height so a tall display gets a landscape dialog, not a full-height column', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]');
+    expect(content).not.toBeNull();
+
+    // 46rem — the ceiling that makes the dialog wider than tall wherever the
+    // viewport is tall enough for the old vh-driven height to overshoot it.
+    expect(content?.getBoundingClientRect().height ?? 0).toBeLessThanOrEqual(46 * 16 + 1);
   });
 
   it('shows the seed notice inline in the summary panel', async () => {
