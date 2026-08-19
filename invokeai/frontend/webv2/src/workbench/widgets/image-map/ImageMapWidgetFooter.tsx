@@ -2,7 +2,7 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { HStack, Icon, Text } from '@chakra-ui/react';
 import { IconButton, Tooltip } from '@platform/ui';
-import { imageMapStore, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import { imageMapStore, refreshImageIndexStatus, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
 import { isIndexing } from '@workbench/image-map/indexProgress';
 import { RefreshCwIcon } from 'lucide-react';
 
@@ -10,6 +10,10 @@ import { ImageIndexProgressInline } from './ImageIndexProgress';
 
 const handleRefresh = () => {
   void refreshImageMapPoints();
+  // The counts too: this footer is the surface that shows them once the map
+  // exists, and counts left stale by a status event missed while offline are
+  // exactly what its refresh should be able to correct.
+  refreshImageIndexStatus();
 };
 
 /**
@@ -18,7 +22,7 @@ const handleRefresh = () => {
  * a manual refresh.
  */
 export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
-  const { data, indexCounts, indexRate, loadState } = imageMapStore.useSnapshot();
+  const { data, indexCounts, indexUpdatedAt, loadState } = imageMapStore.useSnapshot();
 
   // Only the states that actually show a map. `disabled`, `model_missing` and
   // `empty` all carry data too, and each renders its own explanation — a
@@ -42,7 +46,7 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
         {indexing ? (
           <>
             <Text>·</Text>
-            <ImageIndexProgressInline counts={indexCounts} rate={indexRate} />
+            <ImageIndexProgressInline counts={indexCounts} updatedAt={indexUpdatedAt} />
           </>
         ) : null}
         {skipped ? (

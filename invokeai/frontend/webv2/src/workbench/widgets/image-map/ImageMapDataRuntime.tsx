@@ -3,7 +3,12 @@ import type { ImageIndexStatusEvent, ImageMapProjectionReadyEvent } from '@workb
 import { getAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { socketHub } from '@platform/transport/socketHub';
-import { imageMapStore, recordImageIndexStatus, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import {
+  imageMapStore,
+  recordImageIndexStatus,
+  refreshImageIndexStatus,
+  refreshImageMapPoints,
+} from '@workbench/image-map/imageMapStore';
 
 /**
  * Socket-driven refresh for the image map, replacing polling: when the
@@ -27,6 +32,15 @@ const isForAnotherUser = (userId: unknown): boolean => {
 };
 
 export const attachImageMapDataRuntime = (): (() => void) => {
+  // The widget host is mounted whenever the image-map widget is *available*,
+  // not when it is open, so anything unconditional here bills a user who never
+  // looks at the map.
+  const hasLoadedOnce = () => {
+    const { loadState } = imageMapStore.getSnapshot();
+
+    return loadState === 'loaded' || loadState === 'error';
+  };
+
   const refreshIfLoaded = () => {
     const { loadState, renderError } = imageMapStore.getSnapshot();
 
@@ -102,6 +116,16 @@ export const attachImageMapDataRuntime = (): (() => void) => {
 
     if (isReconnect) {
       refreshIfLoaded();
+
+      // Status events are not replayed, so a run that finished during the
+      // outage never announces it: the counts would sit at their last
+      // pre-outage value and the progress UI would claim a backfill is still
+      // running until the page is reloaded. Re-reading them closes that gap —
+      // behind the same guard, so a session that never opened the map still
+      // pays nothing for a flapping connection.
+      if (hasLoadedOnce()) {
+        refreshImageIndexStatus();
+      }
     }
   });
 

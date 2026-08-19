@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  appendRateSample,
   describeIndexProgress,
-  estimateRate,
   formatDuration,
-  getEtaSeconds,
+  getDisplayPercent,
   getIndexPercent,
+  hasProgressed,
   isIndexing,
-  RATE_WINDOW_MS,
+  STALE_AFTER_MS,
   type ImageIndexCounts,
-  type IndexRateSample,
 } from './indexProgress';
 
 const counts = (overrides: Partial<ImageIndexCounts> = {}): ImageIndexCounts => ({
@@ -22,7 +20,7 @@ const counts = (overrides: Partial<ImageIndexCounts> = {}): ImageIndexCounts => 
 });
 
 describe('index progress arithmetic', () => {
-  it('reports the embedded share of the eligible images', () => {
+  it('reports the share of the gallery the index has finished with', () => {
     expect(getIndexPercent(counts())).toBe(25);
   });
 
@@ -30,26 +28,50 @@ describe('index progress arithmetic', () => {
     expect(getIndexPercent(counts({ embedded: 0, pending: 0, total: 0 }))).toBe(0);
   });
 
-  it('clamps a total that lags behind the embedded count', () => {
-    // The counts are two separate queries on the backend, so a deletion landing
-    // between them can leave embedded > total for one event.
-    expect(getIndexPercent(counts({ embedded: 120, total: 100 }))).toBe(100);
+  it('counts images given up on as finished so the bar reaches full', () => {
+    // They never drain. Leaving them out parks the bar short of full for a run
+    // that has in fact finished.
+    expect(getIndexPercent(counts({ embedded: 94, failed: 5, pending: 1, total: 100 }))).toBe(99);
+    expect(getIndexPercent(counts({ embedded: 95, failed: 5, pending: 0, total: 100 }))).toBe(100);
   });
 
-  it('divides the outstanding work by the measured rate', () => {
-    expect(getEtaSeconds(counts({ pending: 60 }), 2)).toBe(30);
+  it('agrees with the counts line it is shown beside', () => {
+    // "300 of 1,000 images" next to "90%" is not something a user can
+    // reconcile; both are read off `pending`, so they cannot diverge.
+    const description = describeIndexProgress(counts({ embedded: 300, failed: 600, pending: 100, total: 1000 }));
+
+    expect(description.counts).toBe('900 of 1,000 images');
+    expect(description.percent).toBe(90);
+    expect(description.skipped).toBe('600 skipped after repeated failures');
   });
 
-  it('has no estimate without a rate, and none once the queue is empty', () => {
-    expect(getEtaSeconds(counts(), null)).toBeNull();
-    expect(getEtaSeconds(counts(), 0)).toBeNull();
-    expect(getEtaSeconds(counts({ pending: 0 }), 2)).toBeNull();
+  it('holds the announced value below full while anything is outstanding', () => {
+    // 99.7% rounds to 100, which tells a screen reader the run is done with
+    // 300 images still queued.
+    expect(getDisplayPercent(counts({ embedded: 99_700, failed: 0, pending: 300, total: 100_000 }))).toBe(99);
+    expect(getDisplayPercent(counts({ embedded: 100_000, failed: 0, pending: 0, total: 100_000 }))).toBe(100);
   });
 
   it('treats only a non-empty queue as indexing', () => {
     expect(isIndexing(null)).toBe(false);
     expect(isIndexing(counts({ pending: 0 }))).toBe(false);
     expect(isIndexing(counts())).toBe(true);
+  });
+});
+
+describe('hasProgressed', () => {
+  it('is progress when the index has done more work', () => {
+    expect(hasProgressed(counts({ embedded: 25 }), counts({ embedded: 26, pending: 74 }))).toBe(true);
+    expect(hasProgressed(counts({ failed: 0 }), counts({ failed: 1, pending: 74 }))).toBe(true);
+    expect(hasProgressed(null, counts())).toBe(true);
+  });
+
+  it('is not progress when only the gallery moved', () => {
+    // `total` shifts whenever anyone saves or deletes an image — including the
+    // very generation the indexer is waiting out. Counting that as progress
+    // would reset the "no progress" clock every time someone generates.
+    expect(hasProgressed(counts({ pending: 75, total: 100 }), counts({ pending: 76, total: 101 }))).toBe(false);
+    expect(hasProgressed(counts(), counts())).toBe(false);
   });
 });
 
@@ -60,76 +82,58 @@ describe('formatDuration', () => {
     expect(formatDuration(3900)).toBe('1h 05m');
   });
 
-  it('never rounds an outstanding queue down to zero', () => {
+  it('never rounds an elapsed interval down to zero', () => {
     expect(formatDuration(0.2)).toBe('1s');
   });
 
+  it('carries a rounded-up remainder instead of rendering a 60th second', () => {
+    // Rounding the parts independently gives "60s", "1m 60s" and "59m 60s".
+    expect(formatDuration(59.6)).toBe('1m 00s');
+    expect(formatDuration(119.6)).toBe('2m 00s');
+    expect(formatDuration(3599.6)).toBe('1h 00m');
+  });
+
+  it('renders the unit boundaries themselves', () => {
+    expect(formatDuration(59)).toBe('59s');
+    expect(formatDuration(60)).toBe('1m 00s');
+    expect(formatDuration(3599)).toBe('59m 59s');
+    expect(formatDuration(3600)).toBe('1h 00m');
+  });
+
   it('renders nothing for a value that is not a duration', () => {
+    expect(formatDuration(Number.NaN)).toBe('');
     expect(formatDuration(Number.POSITIVE_INFINITY)).toBe('');
     expect(formatDuration(-5)).toBe('');
   });
 });
 
-describe('rate estimation', () => {
-  const samples = (...entries: Array<[number, number]>): IndexRateSample[] =>
-    entries.map(([at, embedded]) => ({ at, embedded }));
-
-  it('measures images per second across the retained window', () => {
-    expect(estimateRate(samples([0, 0], [1000, 4], [2000, 10]))).toBe(5);
-  });
-
-  it('has no estimate from a single sample or a stalled one', () => {
-    expect(estimateRate([])).toBeNull();
-    expect(estimateRate(samples([1000, 10]))).toBeNull();
-    expect(estimateRate(samples([0, 10], [5000, 10]))).toBeNull();
-  });
-
-  it('drops samples that have aged out of the window', () => {
-    const aged = samples([0, 0], [RATE_WINDOW_MS - 1000, 10]);
-    const result = appendRateSample(aged, { at: RATE_WINDOW_MS + 1000, embedded: 20 });
-
-    // The 0ms sample is older than the window; the estimate is the recent
-    // 10 images in 2s, not the run-long average of 20 in 61s.
-    expect(result).toHaveLength(2);
-    expect(estimateRate(result)).toBe(5);
-  });
-
-  it('keeps an anchor when events arrive further apart than the window', () => {
-    // The worker parks for the length of every generation, so a gap wider than
-    // the window is routine. Trimming strictly would leave one sample and no
-    // estimate at all for the rest of the run.
-    const parked = samples([0, 100]);
-    const result = appendRateSample(parked, { at: 5 * RATE_WINDOW_MS, embedded: 400 });
-
-    expect(result).toHaveLength(2);
-    expect(estimateRate(result)).toBeCloseTo(1);
-  });
-
-  it('restarts the history when the counts stop being comparable', () => {
-    // A drop in embedded means the index was reset or images were deleted;
-    // measuring across that boundary yields a negative rate.
-    const result = appendRateSample(samples([0, 100], [1000, 120]), { at: 2000, embedded: 5 });
-
-    expect(result).toEqual(samples([2000, 5]));
-    expect(estimateRate(result)).toBeNull();
-  });
-});
-
 describe('describeIndexProgress', () => {
-  it('spells out the counts, the share and the time remaining', () => {
-    const description = describeIndexProgress(counts({ embedded: 1204, pending: 3108, total: 4312 }), 12);
+  it('spells out the counts and the share', () => {
+    const description = describeIndexProgress(counts({ embedded: 1204, pending: 3108, total: 4312 }));
 
-    expect(description.percent).toBeCloseTo(27.92, 2);
     expect(description.counts).toBe(`${(1204).toLocaleString()} of ${(4312).toLocaleString()} images`);
-    expect(description.eta).toBe('About 4m 19s remaining');
-    expect(description.skipped).toBeNull();
+    expect(description.compact).toBe(`${(1204).toLocaleString()}/${(4312).toLocaleString()}`);
+    expect(description.percent).toBe(28);
   });
 
-  it('says it is still measuring rather than inventing a time', () => {
-    expect(describeIndexProgress(counts(), null).eta).toBe('Estimating time remaining…');
+  it('says nothing about staleness while reports are still arriving', () => {
+    expect(describeIndexProgress(counts(), STALE_AFTER_MS - 1).stale).toBeNull();
+  });
+
+  it('states how long the index has stood still, and claims nothing more', () => {
+    const stale = describeIndexProgress(counts(), STALE_AFTER_MS);
+
+    // Not "paused while the queue is busy": the indexer waiting out a
+    // generation and the indexer having died look identical from here, and
+    // the first is routine, so neither may be asserted.
+    expect(stale.stale).toBe('No progress reported for 2m 00s');
+  });
+
+  it('keeps the note honest over long waits', () => {
+    expect(describeIndexProgress(counts(), 3_600_000).stale).toBe('No progress reported for 1h 00m');
   });
 
   it('explains images that were given up on', () => {
-    expect(describeIndexProgress(counts({ failed: 3 }), null).skipped).toBe('3 skipped after repeated failures');
+    expect(describeIndexProgress(counts({ failed: 3 })).skipped).toBe('3 skipped after repeated failures');
   });
 });
