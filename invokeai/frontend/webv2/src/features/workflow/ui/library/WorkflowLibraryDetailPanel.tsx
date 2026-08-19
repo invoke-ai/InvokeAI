@@ -412,14 +412,16 @@ export const WorkflowLibraryDetailPanel = ({
             </Menu.Trigger>
             <Portal>
               <Menu.Positioner>
-                <MenuContent minW="12rem">
+                <MenuContent minW="16rem">
                   <MenuActionItem
+                    hint={t('workflowLibrary.openHint')}
                     icon={WorkflowIcon}
                     label={t('workflowLibrary.open')}
                     value="open"
                     onSelect={handleOpen}
                   />
                   <MenuActionItem
+                    hint={t('workflowLibrary.duplicateHint')}
                     icon={CopyIcon}
                     isDisabled={isDuplicatePending}
                     label={t('workflowLibrary.duplicate')}
@@ -427,12 +429,14 @@ export const WorkflowLibraryDetailPanel = ({
                     onSelect={handleDuplicate}
                   />
                   <MenuActionItem
+                    hint={t('workflowLibrary.forkIntoProjectHint')}
                     icon={GitForkIcon}
                     label={t('workflowLibrary.forkIntoProject')}
                     value="fork-into-project"
                     onSelect={handleFork}
                   />
                   <MenuActionItem
+                    hint={t('workflowLibrary.downloadJsonHint')}
                     icon={DownloadIcon}
                     label={t('workflowLibrary.downloadJson')}
                     value="download-json"
@@ -441,6 +445,7 @@ export const WorkflowLibraryDetailPanel = ({
                   {item.category === 'user' ? (
                     // Bundled defaults are not the account's to delete.
                     <MenuActionItem
+                      hint={t('workflowLibrary.deleteHint')}
                       icon={Trash2Icon}
                       label={t('workflowLibrary.delete')}
                       tone="danger"

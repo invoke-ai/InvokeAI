@@ -84,13 +84,17 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.deleteConfirmBody': 'Delete "{{name}}" from the workflow library? This cannot be undone.',
   'workflowLibrary.deleteConfirmTitle': 'Delete workflow',
   'workflowLibrary.deleteFailed': 'Failed to delete workflow',
+  'workflowLibrary.deleteHint': 'Removes it from your library',
   'workflowLibrary.downloadJson': 'Download JSON',
+  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateFailed': 'Failed to duplicate workflow',
+  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
   'workflowLibrary.duplicateName': '{{name}} copy',
   'workflowLibrary.duplicated': 'Saved a copy under Yours',
   'workflowLibrary.findModel': 'Find {{name}} in the model manager',
   'workflowLibrary.forkIntoProject': 'Fork into new project',
+  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.installQueued': 'Model installs queued',
@@ -99,6 +103,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
+  'workflowLibrary.openHint': 'Replaces the current workflow',
   'workflowLibrary.previewGraph': 'Preview graph',
   'workflowLibrary.requirementInstallable': 'Not installed',
   'workflowLibrary.requirementInstalled': 'Installed',
@@ -621,6 +626,12 @@ describe('WorkflowLibraryDetailPanel', () => {
 
   it('deletes only after the confirmation is accepted', async () => {
     await renderPanel(TEXT_TO_IMAGE);
+
+    await openMenu();
+    // The overflow menu carries the same second-line hints as the graph
+    // preview's "Open as" menu — this is the one place that unification is
+    // asserted, rather than duplicating it under every item.
+    expect(menuItem('delete')?.textContent).toContain('Removes it from your library');
 
     await clickMenuItem('delete');
 
