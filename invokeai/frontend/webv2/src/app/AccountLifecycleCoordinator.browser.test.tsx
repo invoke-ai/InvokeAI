@@ -1,3 +1,5 @@
+import type * as identityModule from '@features/identity';
+
 import { RouterProvider } from '@tanstack/react-router';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -76,7 +78,7 @@ vi.mock('@features/identity', async () => {
   // Modules outside this test's mock map (reached via other import specifiers)
   // still bind real identity exports — spread them so the mock only overrides
   // what the test drives instead of rotting on every new identity export.
-  const actual = await vi.importActual<typeof import('@features/identity')>('@features/identity');
+  const actual = await vi.importActual<typeof identityModule>('@features/identity');
 
   return {
     ...actual,
