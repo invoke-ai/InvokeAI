@@ -10,7 +10,7 @@
  * "leave it as it is" answer would strand the reveal on for the rest of the render with no timer
  * left to end it — the decision must always name the state the overlay ends up in.
  */
-export type SelectedItemRevealDecision = 'reveal' | 'hide';
+type SelectedItemRevealDecision = 'reveal' | 'hide';
 
 export type SelectedItemRevealInputs = {
   /** The user's "show progress in viewer" setting. */
