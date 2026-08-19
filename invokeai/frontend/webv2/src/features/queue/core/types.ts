@@ -74,6 +74,12 @@ export type QueueCompiledSubmission =
       batchCount: number;
       graph: QueueBackendGraph;
       kind: 'workflow';
+      /**
+       * The library record this run's workflow was loaded from, when the project
+       * graph is bound to one. Stamped at compile time so a completed run can be
+       * attributed back to the library record even after the editor moved on.
+       */
+      libraryWorkflowId?: string;
     }
   | {
       batchCount: number;
@@ -111,6 +117,24 @@ export interface QueueResultImage {
   sourceQueueItemId: string;
   thumbnailUrl: string;
   width: number;
+}
+
+/** A settled run of a library-bound workflow, reported once its results are routed. */
+export interface QueueWorkflowRunCompletedEvent {
+  /** Result images in run order; the last one is the run's final output. */
+  imageNames: readonly string[];
+  libraryWorkflowId: string;
+  projectId: string;
+  queueItemId: string;
+}
+
+/**
+ * Optional observer for completed library-bound workflow runs. The Queue owns
+ * neither the workflow library nor the gallery, so the App composition root
+ * supplies the implementation; a missing sink simply disables the notification.
+ */
+export interface QueueWorkflowRunSink {
+  onWorkflowRunCompleted(event: QueueWorkflowRunCompletedEvent): void;
 }
 
 export type QueueItemStatus = 'pending' | 'in_progress' | 'waiting' | 'completed' | 'failed' | 'canceled';

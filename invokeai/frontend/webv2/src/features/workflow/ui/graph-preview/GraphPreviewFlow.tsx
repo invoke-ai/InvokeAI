@@ -1,25 +1,26 @@
 import type { WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
+import type {
+  Edge as FlowEdge,
+  Node as FlowNode,
+  NodeMouseHandler,
+  NodeProps,
+  NodeTypes,
+  ReactFlowInstance,
+} from '@xyflow/react';
+import type { TFunction } from 'i18next';
 
 import { Badge, Box, Stack, Text } from '@chakra-ui/react';
 import { isInvocationNode, type ProjectGraphState, type XYPosition } from '@features/workflow/contracts';
+import { getLayeredPositions } from '@features/workflow/core/graphLayout';
 import '@xyflow/react/dist/style.css';
 import { useWorkflowPreferencesSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { getResolvedWorkflowEdges } from '@features/workflow/utility';
-import {
-  Background,
-  BackgroundVariant,
-  Handle,
-  Position,
-  ReactFlow,
-  type Edge as FlowEdge,
-  type Node as FlowNode,
-  type NodeProps,
-  type NodeTypes,
-} from '@xyflow/react';
-import { useId, useMemo } from 'react';
+import { Background, BackgroundVariant, Handle, Position, ReactFlow } from '@xyflow/react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { flowThemeCss, getFlowColorMode } from './flowTheme';
+import { getNodeSubtitle } from './nodeSummaries';
 
 /**
  * A read-only flow rendering of a compiled `GraphContract` — the "nodes" half
@@ -28,7 +29,10 @@ import { flowThemeCss, getFlowColorMode } from './flowTheme';
  * came from the project graph) and falls back to a layered topological layout.
  */
 
-type PreviewFlowNode = FlowNode<{ inputCount: number; nodeId: string; nodeType: string }, 'preview'>;
+type PreviewFlowNode = FlowNode<
+  { inputCount: number; isSelected: boolean; nodeId: string; nodeType: string; subtitle: string | null },
+  'preview'
+>;
 
 /**
  * A lightweight contract view of an editable document (no templates needed),
@@ -67,8 +71,6 @@ export const documentToPreviewGraph = (
   };
 };
 
-const LAYER_WIDTH = 300;
-const ROW_HEIGHT = 100;
 const handleStyle = { background: 'var(--wb-flow-grid)', border: 'none' } as const;
 const reactFlowProOptions = { hideAttribution: true } as const;
 const reactFlowStyle = { background: 'transparent' } as const;
@@ -77,7 +79,20 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
   const { t } = useTranslation();
 
   return (
-    <Box bg="bg" borderColor="border.emphasized" borderWidth="1px" fontSize="xs" minW="14rem" rounded="lg" shadow="sm">
+    <Box
+      bg="bg"
+      borderColor={data.isSelected ? 'accent.solid' : 'border.emphasized'}
+      borderWidth="1px"
+      fontSize="xs"
+      minW="14rem"
+      // Border + matching outline reads as a 2px solid accent ring — visible
+      // at any zoom, where the previous emphasized border was too subtle.
+      outlineColor="accent.solid"
+      outlineStyle={data.isSelected ? 'solid' : undefined}
+      outlineWidth="1px"
+      rounded="lg"
+      shadow="sm"
+    >
       <Handle position={Position.Left} style={handleStyle} type="target" />
       <Handle position={Position.Right} style={handleStyle} type="source" />
       <Stack gap="0.5" px="3" py="2">
@@ -85,7 +100,7 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
           {data.nodeType}
         </Badge>
         <Text color="fg.subtle" fontSize="2xs" truncate>
-          {data.nodeId} · {t('graphPreview.inputCount', { count: data.inputCount })}
+          {data.subtitle ?? `${data.nodeId} · ${t('graphPreview.inputCount', { count: data.inputCount })}`}
         </Text>
       </Stack>
     </Box>
@@ -94,71 +109,29 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
 
 const nodeTypes: NodeTypes = { preview: PreviewNode };
 
-/** Longest-path-from-roots depth per node; cycle members settle at their first depth. */
-const getNodeDepths = (graph: WorkflowPreviewGraph): Map<string, number> => {
-  const depths = new Map<string, number>();
-  const incoming = new Map<string, string[]>();
+const toPreviewNodes = (
+  graph: WorkflowPreviewGraph,
+  t: TFunction,
+  positionHints?: Record<string, XYPosition>,
+  selectedNodeId?: string | null
+): PreviewFlowNode[] => {
+  const positions = getLayeredPositions(
+    graph.nodes,
+    graph.edges.map((edge) => ({ sourceNodeId: edge.sourceNodeId, targetNodeId: edge.targetNodeId }))
+  );
 
-  for (const edge of graph.edges) {
-    incoming.set(edge.targetNodeId, [...(incoming.get(edge.targetNodeId) ?? []), edge.sourceNodeId]);
-  }
-
-  const resolve = (nodeId: string, seen: Set<string>): number => {
-    const known = depths.get(nodeId);
-
-    if (known !== undefined) {
-      return known;
-    }
-
-    if (seen.has(nodeId)) {
-      return 0;
-    }
-
-    seen.add(nodeId);
-
-    const parents = incoming.get(nodeId) ?? [];
-    const depth = parents.length === 0 ? 0 : Math.max(...parents.map((parent) => resolve(parent, seen))) + 1;
-
-    depths.set(nodeId, depth);
-
-    return depth;
-  };
-
-  for (const node of graph.nodes) {
-    resolve(node.id, new Set());
-  }
-
-  return depths;
-};
-
-const toPreviewNodes = (graph: WorkflowPreviewGraph, positionHints?: Record<string, XYPosition>): PreviewFlowNode[] => {
-  const depths = getNodeDepths(graph);
-  const rowsPerDepth = new Map<number, number>();
-
-  return graph.nodes.map((node) => {
-    const hint = positionHints?.[node.id];
-
-    if (hint) {
-      return {
-        data: { inputCount: Object.keys(node.inputs).length, nodeId: node.id, nodeType: node.type },
-        id: node.id,
-        position: hint,
-        type: 'preview' as const,
-      };
-    }
-
-    const depth = depths.get(node.id) ?? 0;
-    const row = rowsPerDepth.get(depth) ?? 0;
-
-    rowsPerDepth.set(depth, row + 1);
-
-    return {
-      data: { inputCount: Object.keys(node.inputs).length, nodeId: node.id, nodeType: node.type },
-      id: node.id,
-      position: { x: depth * LAYER_WIDTH, y: row * ROW_HEIGHT },
-      type: 'preview' as const,
-    };
-  });
+  return graph.nodes.map((node) => ({
+    data: {
+      inputCount: Object.keys(node.inputs).length,
+      isSelected: node.id === selectedNodeId,
+      nodeId: node.id,
+      nodeType: node.type,
+      subtitle: getNodeSubtitle(node, t),
+    },
+    id: node.id,
+    position: positionHints?.[node.id] ?? positions[node.id] ?? { x: 0, y: 0 },
+    type: 'preview' as const,
+  }));
 };
 
 const toPreviewEdges = (graph: WorkflowPreviewGraph): FlowEdge[] =>
@@ -172,14 +145,36 @@ const toPreviewEdges = (graph: WorkflowPreviewGraph): FlowEdge[] =>
 export const GraphPreviewFlow = ({
   graph,
   positionHints,
+  selectedNodeId = null,
+  onInit,
+  onNodeSelect,
 }: {
   graph: WorkflowPreviewGraph;
   positionHints?: Record<string, XYPosition>;
+  selectedNodeId?: string | null;
+  onInit?: (instance: ReactFlowInstance) => void;
+  onNodeSelect?: (nodeId: string | null) => void;
 }) => {
+  const { t } = useTranslation();
   const themeId = useWorkflowPreferencesSelector((preferences) => preferences.themeId);
   const backgroundId = useId().replace(/:/g, '');
-  const nodes = useMemo(() => toPreviewNodes(graph, positionHints), [graph, positionHints]);
+  const nodes = useMemo(
+    () => toPreviewNodes(graph, t, positionHints, selectedNodeId),
+    [graph, t, positionHints, selectedNodeId]
+  );
   const edges = useMemo(() => toPreviewEdges(graph), [graph]);
+  const handleNodeClick = useCallback<NodeMouseHandler<PreviewFlowNode>>(
+    (_event, node) => onNodeSelect?.(node.id),
+    [onNodeSelect]
+  );
+  const handlePaneClick = useCallback(() => onNodeSelect?.(null), [onNodeSelect]);
+  // xyflow types `onInit` against this component's node/edge generics; the caller
+  // (`GraphPreviewDialog`) only calls generic instance methods (`fitView`), so the
+  // narrower instance is safe to widen back to the public, type-erased signature.
+  const handleInit = useCallback(
+    (instance: ReactFlowInstance<PreviewFlowNode, FlowEdge>) => onInit?.(instance as unknown as ReactFlowInstance),
+    [onInit]
+  );
 
   return (
     <Box bg="bg.inset" css={flowThemeCss} h="full" rounded="md" w="full">
@@ -198,6 +193,9 @@ export const GraphPreviewFlow = ({
         nodeTypes={nodeTypes}
         proOptions={reactFlowProOptions}
         style={reactFlowStyle}
+        onInit={handleInit}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
       >
         <Background
           bgColor="var(--xy-background-color)"

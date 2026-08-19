@@ -94,8 +94,11 @@ describe('Workflow UI read-port isolation', () => {
 
     let setGraphPreview: ((adapter: WorkflowGraphPreviewPort) => void) | null = null;
     const initialGraphPreview: WorkflowGraphPreviewPort = {
+      focusSource: () => {},
       getRoute: () => null,
       invoke: () => Promise.resolve(false),
+      openDocumentInNewProject: () => {},
+      openWorkflowEditor: () => {},
     };
     const GraphPreviewHarness = ({ children }: { children: ReactNode }) => {
       const [graphPreview, setGraphPreviewState] = useState(initialGraphPreview);
@@ -161,8 +164,24 @@ describe('Workflow UI read-port isolation', () => {
     await act(() => capabilities.setSnapshot({ canUseCache: false }));
     expect(counts).toEqual({ capability: 2, graph: 1, preferences: 2, project: 2, projectEqual: 1, services: 1 });
 
-    await act(() => setGraphPreview?.({ getRoute: () => null, invoke: () => Promise.resolve(true) }));
-    await act(() => setGraphPreview?.({ getRoute: () => null, invoke: () => Promise.resolve(false) }));
+    await act(() =>
+      setGraphPreview?.({
+        focusSource: () => {},
+        getRoute: () => null,
+        invoke: () => Promise.resolve(true),
+        openDocumentInNewProject: () => {},
+        openWorkflowEditor: () => {},
+      })
+    );
+    await act(() =>
+      setGraphPreview?.({
+        focusSource: () => {},
+        getRoute: () => null,
+        invoke: () => Promise.resolve(false),
+        openDocumentInNewProject: () => {},
+        openWorkflowEditor: () => {},
+      })
+    );
     expect(counts).toEqual({ capability: 2, graph: 3, preferences: 2, project: 2, projectEqual: 1, services: 1 });
   });
 });

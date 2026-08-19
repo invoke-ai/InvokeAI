@@ -15,7 +15,7 @@ import {
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
-import { updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
+import { clearAddModelsSeed, getAddModelsSeed, updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
@@ -75,7 +75,11 @@ export const AddModelsView = () => {
       left.selectedBundleName === right.selectedBundleName
   );
 
-  const [query, setQuery] = useState('');
+  // Local state, so the box empties when the view unmounts (a tab switch) — but
+  // seeded once from whatever asked to search here on the way in. The read is
+  // pure, because StrictMode double-invokes this initializer; the consuming
+  // clear is the mount effect below.
+  const [query, setQuery] = useState(getAddModelsSeed);
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
   const { isBusy: isPulling, run: runPull } = useScopedAction();
@@ -92,6 +96,8 @@ export const AddModelsView = () => {
   const [starterFilters, setStarterFilters] = useState<StarterModelFilters>(DEFAULT_STARTER_MODEL_FILTERS);
 
   useMountEffect(() => {
+    // One-shot: a seed only ever fills the box the view was opened with.
+    clearAddModelsSeed();
     ensureStartersLoaded();
 
     const owner = captureAccountScope();
