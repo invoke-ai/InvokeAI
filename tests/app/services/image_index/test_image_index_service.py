@@ -3,6 +3,7 @@
 import inspect
 import threading
 import time
+import weakref
 from types import SimpleNamespace
 from typing import Callable
 from unittest.mock import patch
@@ -1630,12 +1631,54 @@ def test_a_degenerate_text_encoder_is_detected(matrix: torch.Tensor, expected: s
     assert expected in defect
 
 
+def test_a_degenerate_text_encoder_is_detected_even_when_its_norms_overflow_float32() -> None:
+    # Identical rows are the failure this guard exists for, but in float32 a
+    # large enough pair overflows the sum of squares: the norms come back inf,
+    # the cosine NaN, and `NaN >= threshold` is False — so the guard used to wave
+    # this through as healthy. The matrix itself is finite, so the non-finite
+    # branch above does not catch it either. Reachable whenever the tower's
+    # weights are garbage rather than absent (see skip_torch_weight_init in
+    # _get_text_encoder, whose monkey-patch can leak process-wide).
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    matrix = torch.full((2, 4), 1e20)
+    assert torch.equal(matrix[0], matrix[1])
+    assert torch.isfinite(matrix).all()
+
+    defect = _text_encoder_defect(_FakeTokenizer(distinct=False), _FakeTextModel(matrix), False)
+
+    assert defect is not None
+    assert "same embedding" in defect
+
+
+def test_a_probe_that_raises_is_reported_as_a_defect_rather_than_escaping() -> None:
+    # A probe that cannot complete has not cleared the encoder. Left to escape it
+    # reaches the router untyped and becomes a 500 instead of the 409 this path
+    # exists to produce. The trigger is a real broken install: a tokenizer whose
+    # ids overrun the tower's vocabulary raises IndexError inside nn.Embedding.
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    class _ExplodingModel:
+        def eval(self) -> "_ExplodingModel":
+            return self
+
+        def __call__(self, **inputs):
+            raise IndexError("index out of range in self")
+
+    defect = _text_encoder_defect(_FakeTokenizer(distinct=True), _ExplodingModel(), False)
+
+    assert defect is not None
+    assert "could not be exercised" in defect
+    assert "IndexError" in defect
+
+
 def test_embed_text_refuses_a_text_encoder_that_cannot_tell_phrases_apart(
     tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # End to end through the lazy loader: the typed error is what the router
     # maps to a 409, so labels and search report unavailable rather than
     # serving results computed from identical vectors.
+    import gc
     import json
 
     import transformers
@@ -1645,26 +1688,118 @@ def test_embed_text_refuses_a_text_encoder_that_cannot_tell_phrases_apart(
 
     (tmp_path / "config.json").write_text(json.dumps({"model_type": "clip", "architectures": ["CLIPModel"]}))
     constant = torch.ones((2, DIM))
+    loads: list[weakref.ReferenceType] = []
+
+    def _load_model(cls, *args, **kwargs):
+        model = _FakeTextModel(constant)
+        loads.append(weakref.ref(model))
+        return model
+
     monkeypatch.setattr(
         transformers.AutoTokenizer, "from_pretrained", classmethod(lambda cls, *a, **k: _FakeTokenizer(distinct=False))
     )
-    monkeypatch.setattr(
-        transformers.CLIPTextModelWithProjection,
-        "from_pretrained",
-        classmethod(lambda cls, *a, **k: _FakeTextModel(constant)),
-    )
+    monkeypatch.setattr(transformers.CLIPTextModelWithProjection, "from_pretrained", classmethod(_load_model))
 
     service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
     service._invoker = SimpleNamespace(services=SimpleNamespace(configuration=SimpleNamespace(models_path=tmp_path)))  # type: ignore[assignment]
     service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
     service._model_id = MODEL_ID
 
-    with pytest.raises(TextSearchUnavailableError, match="same embedding"):
-        service.embed_text("a query")
+    for _ in range(3):
+        with pytest.raises(TextSearchUnavailableError, match="same embedding"):
+            service.embed_text("a query")
 
-    # Nothing was cached, so a later request re-probes rather than serving the
-    # encoder this one rejected.
+    # The rejected encoder is not served...
     assert service._text_encoder is None
+    # ...and not reloaded either. Reloading cannot change the verdict, and every
+    # attempt drags the whole text tower through MODEL_LOAD_LOCK, contending with
+    # generation's model loads — once per search keystroke on a broken install.
+    assert len(loads) == 1
+    # What is remembered is the message. A remembered *exception* would keep the
+    # rejected tower alive through the frames its traceback captured — the leak
+    # test below covers that end; here it is enough that nothing holds a tower.
+    assert isinstance(service._text_encoder_failure, str)
+    gc.collect()
+    assert loads[0]() is None
+
+
+def test_a_failed_vocabulary_build_does_not_pin_the_rejected_text_encoder(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The vocabulary build remembers its failure so a broken install answers the
+    # next request from memory. It must not remember the traceback with it: the
+    # probe rejects the encoder *after* loading it, so those frames hold the
+    # loaded tower — hundreds of MB kept alive for the life of the process.
+    import gc
+    import json
+
+    import transformers
+
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    (tmp_path / "config.json").write_text(json.dumps({"model_type": "clip", "architectures": ["CLIPModel"]}))
+    towers: list[weakref.ReferenceType] = []
+
+    def _load_model(cls, *args, **kwargs):
+        model = _FakeTextModel(torch.ones((2, DIM)))
+        towers.append(weakref.ref(model))
+        return model
+
+    monkeypatch.setattr(
+        transformers.AutoTokenizer, "from_pretrained", classmethod(lambda cls, *a, **k: _FakeTokenizer(distinct=False))
+    )
+    monkeypatch.setattr(transformers.CLIPTextModelWithProjection, "from_pretrained", classmethod(_load_model))
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(  # type: ignore[assignment]
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(models_path=tmp_path, db_path=tmp_path / "db.sqlite"),
+            # Not a real Logger: pytest's logging plugin retains every LogRecord
+            # for the test, and a record carrying exc_info holds the very
+            # traceback whose release is being asserted.
+            logger=SimpleNamespace(warning=lambda *args, **kwargs: None),
+        )
+    )
+    service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+
+    service._build_vocab_embeddings()
+
+    assert service._vocab_failure is not None
+    assert service._vocab_failure.__traceback__ is None
+    assert service._vocab_failure.__cause__ is None
+    gc.collect()
+    assert towers and towers[0]() is None
+
+    # And it does not regrow. Re-raising a persistent exception re-attaches a
+    # traceback to it, so a stored failure cleared only once accumulates a frame
+    # set per labels request, each holding that request's caller frame.
+    holders: list[weakref.ReferenceType] = []
+
+    def one_labels_request() -> None:
+        # Stands in for the router frame, whose `record` is the whole projection.
+        record = np.zeros((50_000, 2), dtype=np.float32)
+        holders.append(weakref.ref(record))
+        with pytest.raises(TextSearchUnavailableError):
+            service.get_vocab_embeddings()
+
+    def frame_count() -> int:
+        count, traceback = 0, service._vocab_failure.__traceback__
+        while traceback is not None:
+            count, traceback = count + 1, traceback.tb_next
+        return count
+
+    one_labels_request()
+    after_one = frame_count()
+    for _ in range(9):
+        one_labels_request()
+
+    # Bounded at the one propagation in flight rather than growing with traffic,
+    # so every caller frame but the current one is released.
+    assert frame_count() == after_one
+    gc.collect()
+    assert [index for index, ref in enumerate(holders) if ref() is not None] == [len(holders) - 1]
 
 
 def test_search_similar_returns_empty_when_not_running(service: ImageIndexService) -> None:

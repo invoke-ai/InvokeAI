@@ -94,20 +94,40 @@ def _text_encoder_defect(tokenizer: Any, model: Any, is_siglip: bool) -> Optiona
     float noise among identical scores, and text search still returns a ranking.
     One forward pass at load time is what separates that from a working encoder.
     """
-    with torch.no_grad():
-        # Same padding rule as _embed_texts: SigLIP was trained pad-to-max-length.
-        inputs = tokenizer(
-            list(_TEXT_PROBE_PAIR),
-            padding="max_length" if is_siglip else True,
-            return_tensors="pt",
-            truncation=True,
-        )
-        outputs = model(**inputs)
-        embeddings = outputs.pooler_output if is_siglip else outputs.text_embeds
-        matrix = embeddings.float().cpu().numpy()
+    try:
+        with torch.no_grad():
+            # Same padding rule as _embed_texts: SigLIP was trained pad-to-max-length.
+            inputs = tokenizer(
+                list(_TEXT_PROBE_PAIR),
+                padding="max_length" if is_siglip else True,
+                return_tensors="pt",
+                truncation=True,
+            )
+            outputs = model(**inputs)
+            embeddings = outputs.pooler_output if is_siglip else outputs.text_embeds
+            matrix = embeddings.float().cpu().numpy()
+    except Exception as e:
+        # A probe that cannot complete has not cleared the encoder, and the
+        # shapes it dies on are the same broken installs it exists to catch: a
+        # tokenizer whose ids overrun the tower's vocabulary raises IndexError
+        # inside nn.Embedding, and one that loaded without a model_max_length
+        # raises ValueError on the SigLIP pad-to-max-length path. Reported as a
+        # defect rather than left to escape, which would reach the router untyped
+        # — a 500 instead of the 409 this path exists to produce — and, being
+        # remembered by nothing, reload the tower on the next keystroke.
+        return f"could not be exercised ({type(e).__name__}: {e})"
 
     if not np.isfinite(matrix).all():
         return "produced a non-finite embedding"
+
+    # float64 for the same reason _normalize_query_vector uses it, and here it is
+    # load-bearing rather than defensive: in float32 a pair of *identical* rows
+    # big enough to overflow the sum of squares gives infinite norms and a NaN
+    # cosine, and `NaN >= threshold` is False — so the exact degeneracy this
+    # function exists to catch was waved through as healthy. Every float32 value
+    # is finite here (checked above), so widening puts both the norms and the dot
+    # product out of overflow and underflow range for good.
+    matrix = matrix.astype(np.float64)
 
     norms = np.linalg.norm(matrix, axis=1)
     if float(norms.min()) == 0.0:
@@ -232,6 +252,20 @@ class ImageIndexService(ImageIndexServiceBase):
         # Lazily-loaded (tokenizer, text_model, is_siglip); None until first text search.
         self._text_encoder: Optional[tuple[Any, Any, bool]] = None
         self._text_encoder_lock = threading.Lock()
+        # Why the load-time probe rejected this text encoder. Reloading cannot
+        # change the verdict — the invoker owns one service instance per run and
+        # a new one is built from scratch, so the same directory is probed every
+        # time — and each attempt pulls the whole text
+        # tower (hundreds of MB) through MODEL_LOAD_LOCK, contending with
+        # generation's model loads, only to reject it again. Without this that
+        # happens once per search keystroke, because the encoder is never assigned
+        # and so nothing downstream of the probe is cached. _vocab_failure does
+        # the same job for cluster labels, which is the only path it covers.
+        #
+        # The message rather than the exception: a stored exception grows two
+        # traceback frames per re-raise, forever, and the frames it captured at
+        # the rejection keep the rejected tower itself alive.
+        self._text_encoder_failure: Optional[str] = None
         # A vocabulary build that already failed. Without this, the very common
         # vision-only install retries AutoTokenizer.from_pretrained — inside
         # MODEL_LOAD_LOCK, contending with generation's model loads — once per
@@ -314,7 +348,14 @@ class ImageIndexService(ImageIndexServiceBase):
             if self._vocab_cache is not None:
                 return self._vocab_cache
             if self._vocab_failure is not None:
-                raise self._vocab_failure
+                # Cleared again on the way out, not just when it was stored:
+                # re-raising a persistent exception re-attaches a fresh traceback
+                # to it, so without this the frames grow by one propagation per
+                # labels request, forever, each set holding that request's caller
+                # frame — whose `record` is the whole projection, coordinates
+                # included. Clearing here bounds it to the one propagation in
+                # flight instead, which the next request replaces.
+                raise self._vocab_failure.with_traceback(None)
             if self._invoker is None or self._model_id is None:
                 raise TextSearchUnavailableError("The image index is not running")
 
@@ -362,10 +403,23 @@ class ImageIndexService(ImageIndexServiceBase):
             try:
                 embeddings = ensemble_phrase_embeddings(self._embed_texts, vocabulary)
             except Exception as e:
+                self._invoker.services.logger.warning("Could not build the cluster vocabulary", exc_info=True)
                 # Remembered, so a vision-only install answers the next request
                 # from memory instead of reloading the absent text tower.
-                self._vocab_failure = e
-                self._invoker.services.logger.warning("Could not build the cluster vocabulary", exc_info=True)
+                #
+                # Stripped of every frame it captured, and logged first because
+                # stripping also empties the `exc_info=True` above. Those frames
+                # reach the locals of whatever raised: since the text encoder is
+                # now probed after loading rather than failing during it, a
+                # rejection is raised with the loaded tower still bound, and
+                # keeping the frames would keep hundreds of MB alive for the life
+                # of the process. __cause__ is dropped for the same reason and is
+                # not information: a load failure already names the underlying
+                # error in its own message. The full detail is in the log above;
+                # only type and message are ever re-raised.
+                e.__cause__ = None
+                e.__context__ = None
+                self._vocab_failure = e.with_traceback(None)
 
                 return
 
@@ -392,6 +446,8 @@ class ImageIndexService(ImageIndexServiceBase):
 
     def _get_text_encoder(self) -> tuple[Any, Any, bool]:
         with self._text_encoder_lock:
+            if self._text_encoder_failure is not None:
+                raise TextSearchUnavailableError(self._text_encoder_failure)
             if self._text_encoder is None:
                 if self._model_config is None:
                     raise TextSearchUnavailableError("The image index has no embedding model loaded")
@@ -428,14 +484,16 @@ class ImageIndexService(ImageIndexServiceBase):
                 model.eval()
                 defect = _text_encoder_defect(tokenizer, model, is_siglip)
                 if defect is not None:
-                    # Cached by the caller as _vocab_failure, so this costs one
-                    # probe per process rather than one per request.
-                    raise TextSearchUnavailableError(
+                    # Remembered, not just raised: this costs one load and one
+                    # probe per process rather than one per request. See
+                    # _text_encoder_failure.
+                    self._text_encoder_failure = (
                         f"The configured embedding model's text encoder {defect}, so cluster labels and "
                         "text search would be meaningless. The usual cause is a model directory with no "
                         "tokenizer files (vocab.json, merges.txt): reinstall the embedding model to get "
-                        "them, or configure image_index_model to a model that has them"
+                        "them, or configure image_index_model to a model that has them, then restart"
                     )
+                    raise TextSearchUnavailableError(self._text_encoder_failure)
                 self._text_encoder = (tokenizer, model, is_siglip)
             return self._text_encoder
 
