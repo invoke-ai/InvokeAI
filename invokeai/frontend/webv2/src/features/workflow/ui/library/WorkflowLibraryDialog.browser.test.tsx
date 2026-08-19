@@ -1,10 +1,14 @@
+import type { StarterModel } from '@features/models';
+import type { WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
 import type {
   WorkflowLibraryBrowseSnapshot,
   WorkflowLibraryEntry,
   WorkflowLibraryEntryEnrichment,
 } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
@@ -64,6 +68,30 @@ vi.mock('./useLoadLibraryWorkflow', () => ({
   useLoadLibraryWorkflow: () => ({ load: loader.load, loadPhase: loader.phase.current }),
 }));
 
+// The detail panel resolves every entry's requirements against the model
+// stores to feed the cards' missing-model badges. Those stores are the models
+// feature's; here they are fixed data so the badge under test comes from the
+// dialog's own wiring, not a live catalog.
+const FLUX_STARTER: StarterModel = {
+  base: 'flux',
+  description: 'FLUX.1 dev',
+  is_installed: false,
+  name: 'FLUX.1 dev',
+  source: 'https://models.test/flux-dev',
+  type: 'main',
+};
+
+vi.mock('@features/models', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureModelsLoaded: vi.fn(() => Promise.resolve()),
+  ensureStartersLoaded: vi.fn(),
+  useActiveInstallSources: () => new Set<string>(),
+  useInstallActions: () => ({ install: vi.fn(), installMany: vi.fn(), pendingSources: new Set() }),
+  useModelsSelector: (selector: (snapshot: unknown) => unknown) => selector({ models: [] }),
+  useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
+    selector({ response: { starter_models: [FLUX_STARTER] } }),
+}));
+
 // The real i18n client fetches en.json over HTTP, which this browser test
 // never boots. Stub `t` with the English strings this dialog renders (plus
 // the `_one`/`_other` plural forms) so assertions check real copy.
@@ -72,15 +100,28 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.allTag': 'All',
   'workflowLibrary.applying': 'Applying workflow…',
   'workflowLibrary.browse': 'Browse',
+  'workflowLibrary.delete': 'Delete',
+  'workflowLibrary.downloadJson': 'Download JSON',
+  'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.empty': 'No workflows match these filters.',
   'workflowLibrary.fetching': 'Fetching workflow…',
+  'workflowLibrary.forkIntoProject': 'Fork into new project',
+  'workflowLibrary.installModels_one': 'Install 1 model',
+  'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.loading': 'Loading workflows…',
   'workflowLibrary.loadingMore': 'Loading more…',
+  'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.nodeCount_one': '{{count}} node',
   'workflowLibrary.nodeCount_other': '{{count}} nodes',
   'workflowLibrary.notRunYet': 'Not run yet',
+  'workflowLibrary.open': 'Open',
+  'workflowLibrary.previewGraph': 'Preview graph',
+  'workflowLibrary.requirementInstallable': 'Not installed',
+  'workflowLibrary.requires': 'Requires',
+  'workflowLibrary.sampleOutput': 'Sample output',
   'workflowLibrary.searchPlaceholder': 'Search names, tags, or descriptions',
   'workflowLibrary.title': 'Workflows',
+  'workflowLibrary.untitled': 'Untitled Workflow',
   'workflowLibrary.yours': 'Yours',
 };
 
@@ -100,10 +141,16 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: translate }) }));
 
 const EMPTY_DOCUMENT = createProjectGraph('library-fixture');
 
-const readyEnrichment = (nodeCount: number, primaryBase: string | null): WorkflowLibraryEntryEnrichment => ({
+const NO_REQUIREMENTS: readonly WorkflowModelRequirement[] = [];
+
+const readyEnrichment = (
+  nodeCount: number,
+  primaryBase: string | null,
+  requirements: readonly WorkflowModelRequirement[] = NO_REQUIREMENTS
+): WorkflowLibraryEntryEnrichment => ({
   document: EMPTY_DOCUMENT,
   nodeCount,
-  requirements: { primaryBase, requirements: [] },
+  requirements: { primaryBase, requirements },
   status: 'ready',
 });
 
@@ -128,7 +175,14 @@ const PORTRAIT = entry('wf-portrait', 'Portrait Studio', readyEnrichment(12, 'sd
   tags: ['portrait'],
   thumbnailUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
 });
-const LANDSCAPE = entry('wf-landscape', 'Landscape Pass', readyEnrichment(7, 'flux'), { tags: ['landscape'] });
+// Its one requirement has no installed match but a starter that can fetch it,
+// so the grid should badge it as one model to install.
+const LANDSCAPE = entry(
+  'wf-landscape',
+  'Landscape Pass',
+  readyEnrichment(7, 'flux', [{ base: 'flux', kind: 'slot', label: 'FLUX checkpoint', modelType: 'main' }]),
+  { tags: ['landscape'] }
+);
 const SKETCH = entry('wf-sketch', 'Sketch To Render', { status: 'pending' });
 const UPSCALE = entry(
   'wf-upscale',
@@ -159,6 +213,13 @@ const withSnapshot = (patch: Partial<WorkflowLibraryBrowseSnapshot>): WorkflowLi
   ...patch,
 });
 
+// The detail panel's ports. The dialog only has to compose them; their own
+// suites cover what they do.
+const UI_ADAPTER = {
+  notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+} as unknown as WorkflowUiAdapter;
+const GRAPH_PREVIEW = { openDocumentInNewProject: vi.fn() } as unknown as WorkflowGraphPreviewPort;
+
 describe('WorkflowLibraryDialog', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -182,7 +243,11 @@ describe('WorkflowLibraryDialog', () => {
       root.render(
         <StrictMode>
           <ChakraProvider value={system}>
-            <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+            <WorkflowUiProvider adapter={UI_ADAPTER}>
+              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+              </WorkflowGraphPreviewProvider>
+            </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
       );
@@ -465,6 +530,46 @@ describe('WorkflowLibraryDialog', () => {
 
     expect(cards()).toHaveLength(0);
     expect(document.body.textContent ?? '').toContain('No workflows match these filters.');
+  });
+
+  it('shows the selected workflow in the rail and follows the selection', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    const detail = () => document.querySelector<HTMLElement>('[data-workflow-detail]');
+
+    expect(detail()?.dataset.workflowDetail).toBe('wf-portrait');
+
+    await act(() => card('wf-landscape')?.click());
+
+    expect(detail()?.dataset.workflowDetail).toBe('wf-landscape');
+    expect(detail()?.textContent).toContain('Landscape Pass');
+  });
+
+  it('opens the selected workflow from the rail, the keyboard-reachable path', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    // Portrait needs nothing installed, so the rail's primary action is Open.
+    await clickText('Open');
+
+    expect(loader.load).toHaveBeenCalledWith(PORTRAIT.item);
+  });
+
+  it('badges the cards with the models their workflows still need', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    // Resolved from the same model data the rail uses: the FLUX slot has no
+    // installed match but a starter that can fetch it.
+    expect(card('wf-landscape')?.textContent).toContain('Install 1 model');
+    expect(card('wf-portrait')?.textContent).not.toContain('Install');
+  });
+
+  it('records the workflow the rail asked to preview', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    await clickText('Preview graph');
+
+    // Task 8 mounts the preview dialog from this pending selection.
+    expect(document.querySelector('[data-pending-preview="wf-portrait"]')).not.toBeNull();
   });
 
   it('shows the busy overlay while a workflow is being applied', async () => {
