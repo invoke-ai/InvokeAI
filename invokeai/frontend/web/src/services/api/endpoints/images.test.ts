@@ -1,5 +1,11 @@
 import { toast } from 'features/toast/toast';
-import { buildChunkedImageBatchQueryFn, chunkImageNames, mergeImageBatchResults } from 'services/api/endpoints/images';
+import i18n from 'i18next';
+import {
+  buildChunkedImageBatchQueryFn,
+  bulkDownloadQueryFn,
+  chunkImageNames,
+  mergeImageBatchResults,
+} from 'services/api/endpoints/images';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '..';
@@ -144,6 +150,113 @@ describe('buildChunkedImageBatchQueryFn', () => {
 
     expect(await result).toEqual({ error: { status: 403, data: 'nope' } });
     expect(dispatch).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+  });
+});
+
+describe('bulkDownloadQueryFn', () => {
+  type Body = { image_names: string[]; board_id?: string };
+  type Request = { url: string; method: string; body: Body };
+  type Response = { data: { bulk_download_item_name: string } } | { error: { status: number; data: string } };
+
+  const run = (baseQuery: (args: Request) => Promise<Response>, body: Body) =>
+    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+    bulkDownloadQueryFn(body, undefined, undefined, baseQuery as any);
+
+  beforeEach(() => {
+    vi.mocked(toast).mockClear();
+    vi.mocked(i18n.t).mockClear();
+  });
+
+  it('issues one request per chunk and returns the first item name', async () => {
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(3);
+    // Only the first name is returned; each background task announces its own zip over the
+    // socket, so the payload is just a handle for the single "preparing" toast.
+    expect(result).toEqual({ data: { bulk_download_item_name: 'item-1.zip' } });
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('sends one request for a board download, which the server expands itself', async () => {
+    const baseQuery = vi.fn(
+      (_args: Request): Promise<Response> => Promise.resolve({ data: { bulk_download_item_name: 'board.zip' } })
+    );
+
+    await run(baseQuery, { image_names: [], board_id: 'board-1' });
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(baseQuery.mock.calls[0]?.[0].body.board_id).toBe('board-1');
+  });
+
+  it('resolves a mid-run failure instead of rejecting, since the earlier zips still arrive', async () => {
+    // The route answers 202 as soon as it has scheduled the background task, so chunk 1's zip
+    // is already being built. Rejecting would drive `matchRejected` -> "problem preparing
+    // download" while that zip lands in the user's downloads anyway.
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        return Promise.resolve({ error: { status: 403, data: 'nope' } });
+      }
+      return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(result).toEqual({ data: { bulk_download_item_name: 'item-1.zip' } });
+    expect(baseQuery).toHaveBeenCalledTimes(2); // stopped, did not keep firing chunks
+    // The 1500 names from the failing chunk on are in no zip at all -- reported here, because
+    // ImagesDownloaded carries no per-name failure list to fold them into.
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0]?.[0]).toMatchObject({
+      id: 'IMAGES_FAILED_TO_DOWNLOAD',
+      status: 'warning',
+    });
+    // Asserted on the interpolation rather than the title, since i18n is mocked to echo the
+    // key. The count is the whole point of the toast: the failing chunk's 1000 names plus the
+    // 500 never sent. Off by one chunk in either direction and the user is told the wrong
+    // number of images are missing from their download.
+    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToDownload', { count: 1500 });
+  });
+
+  it('still schedules-and-reports when the 202 body does not survive the trip back', async () => {
+    // `fetchBaseQuery` resolves an empty entity as `data: null`, so a proxy that strips the
+    // body off the 202 leaves nothing to return -- but the background task was scheduled all
+    // the same and its zip will arrive. Any nullish test over the payload (`!first`) treats
+    // that as nothing-happened and toasts an error over an arriving download.
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        return Promise.resolve({ error: { status: 500, data: 'boom' } });
+      }
+      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+      return Promise.resolve({ data: null as any });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(result).toEqual({ data: null });
+    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToDownload', { count: 1500 });
+  });
+
+  it('reports an error when the first chunk fails, since nothing was scheduled', async () => {
+    const baseQuery = vi.fn(
+      (_args: Request): Promise<Response> => Promise.resolve({ error: { status: 403, data: 'nope' } })
+    );
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(result).toEqual({ error: { status: 403, data: 'nope' } });
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    // Nothing landed, so the failure toast belongs to the `matchRejected` listener alone.
     expect(toast).not.toHaveBeenCalled();
   });
 });

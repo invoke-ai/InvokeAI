@@ -212,6 +212,86 @@ const toastFailedImages = (count: number) => {
   }
 };
 
+/**
+ * The download counterpart. Distinct id and wording: "could not be updated" is wrong for a
+ * download, and sharing the id would let one warning overwrite the other, since the toast
+ * system updates in place.
+ */
+const toastFailedDownloads = (count: number) => {
+  if (count > 0) {
+    toast({
+      id: 'IMAGES_FAILED_TO_DOWNLOAD',
+      title: i18n.t('toast.imagesFailedToDownload', { count }),
+      status: 'warning',
+    });
+  }
+};
+
+/**
+ * Runs `/images/download` one conforming chunk at a time.
+ *
+ * Chunked like the mutating batch routes, but it cannot merge: each request produces its own
+ * bulk-download item, so an oversized selection becomes several zips rather than one. That is
+ * the cost of keeping the selection downloadable at all — the alternative is a 422 the moment
+ * the user hits select-all on a board past the cap.
+ *
+ * Only the first item name is returned, and only to give `matchFulfilled` a name for the single
+ * "preparing" toast. The zips themselves arrive independently: each background task emits its
+ * own `bulk_download_complete`, and the socket handler fetches and saves per event, keyed on the
+ * item name in the event rather than on this payload.
+ *
+ * A mid-run failure therefore cannot be reported as a plain rejection. The route answers 202 the
+ * moment it has scheduled the background task, so every chunk before the failing one is already
+ * producing a zip that will land in the user's downloads. Rejecting drives `matchRejected` and
+ * toasts "problem preparing download" while those zips arrive anyway — the opposite of what
+ * happened. So, exactly as in `buildChunkedImageBatchQueryFn`, only a run where *nothing* was
+ * scheduled surfaces as an error; a partial run resolves and reports the names that never made
+ * it into any zip.
+ */
+export const bulkDownloadQueryFn = async (
+  { image_names, board_id }: components['schemas']['Body_download_images_from_list'],
+  _api: unknown,
+  _extraOptions: unknown,
+  baseQuery: ImagesBaseQuery
+) => {
+  // A board download expands server-side from board_id alone, so there is nothing to split.
+  // Note the server picks board_id over image_names when both are set (`BulkDownloadService`),
+  // so a body carrying both is not a selection this can meaningfully chunk — no caller sends
+  // one, and splitting it would ask for the same full-board zip once per chunk.
+  const chunks = image_names?.length ? chunkImageNames(image_names) : [image_names ?? []];
+  // Tracked separately from the payload rather than inferred from it. `fetchBaseQuery` resolves
+  // an empty response entity as `data: null`, so a 202 whose body did not survive the trip back
+  // leaves nothing to return even though the background task WAS scheduled and its zip is
+  // already being built. Any nullish test over the payload then sends us down the
+  // nothing-happened path and toasts a failure over an arriving download.
+  let scheduled = false;
+  let first: components['schemas']['ImagesDownloaded'] | undefined;
+  for (const [index, chunk] of chunks.entries()) {
+    const response = await baseQuery({
+      url: buildImagesUrl('download'),
+      method: 'POST',
+      body: { image_names: chunk, board_id },
+    });
+    if (response.error) {
+      if (!scheduled) {
+        // Nothing was scheduled, so this is an ordinary failed request — report it as one and
+        // let the `matchRejected` listener raise the failure toast.
+        return { error: response.error };
+      }
+      // Everything from this chunk on is unreached: those names are in no zip. The failing
+      // chunk counts too — it was reached, but nothing was scheduled for it. Toasted here
+      // rather than folded into the payload because `ImagesDownloaded` has no per-name failure
+      // list, and unlike the mutating routes this endpoint has no `onQueryStarted` that would
+      // make this a second reporting site for the same toast id.
+      toastFailedDownloads(chunks.slice(index).flat().length);
+      return { data: first };
+    }
+    scheduled = true;
+    first ??= response.data as components['schemas']['ImagesDownloaded'];
+  }
+  return { data: first as components['schemas']['ImagesDownloaded'] };
+};
+
 export const imagesApi = api.injectEndpoints({
   endpoints: (build) => ({
     /**
@@ -602,34 +682,7 @@ export const imagesApi = api.injectEndpoints({
       components['schemas']['ImagesDownloaded'],
       components['schemas']['Body_download_images_from_list']
     >({
-      /**
-       * Chunked like the mutating batch routes, but it cannot merge: each request produces its
-       * own bulk-download item, so an oversized selection becomes several zips rather than one.
-       * That is the cost of keeping the selection downloadable at all — the alternative is a 422
-       * the moment the user hits select-all on a board past the cap.
-       *
-       * Only the first item name is returned, and only to give `matchFulfilled` a name for the
-       * single "preparing" toast. The zips themselves arrive independently: each background task
-       * emits its own `bulk_download_complete`, and the socket handler fetches and saves per
-       * event, keyed on the item name in the event rather than on this payload.
-       */
-      queryFn: async ({ image_names, board_id }, _api, _extraOptions, baseQuery) => {
-        // A board download expands server-side from board_id alone, so there is nothing to split.
-        const chunks = image_names?.length ? chunkImageNames(image_names) : [image_names ?? []];
-        let first: components['schemas']['ImagesDownloaded'] | undefined;
-        for (const chunk of chunks) {
-          const response = await baseQuery({
-            url: buildImagesUrl('download'),
-            method: 'POST',
-            body: { image_names: chunk, board_id },
-          });
-          if (response.error) {
-            return { error: response.error };
-          }
-          first ??= response.data as components['schemas']['ImagesDownloaded'];
-        }
-        return { data: first as components['schemas']['ImagesDownloaded'] };
-      },
+      queryFn: bulkDownloadQueryFn,
     }),
     /**
      * Get ordered list of image names for selection operations

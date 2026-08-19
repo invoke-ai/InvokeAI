@@ -2049,6 +2049,8 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "imagesFailedToDownload": "{{count}} image could not be prepared for download.",
+        "imagesFailedToDownload_other": "{{count}} images could not be prepared for download.",
         "imagesFailedToUpdate": "{{count}} image could not be updated.",
         "imagesFailedToUpdate_other": "{{count}} images could not be updated.",
         "videoUploaded": "Video Uploaded",
