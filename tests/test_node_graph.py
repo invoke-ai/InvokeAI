@@ -1,5 +1,9 @@
 import copy
 import pickle
+import subprocess
+import sys
+import textwrap
+from pathlib import Path
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -1034,6 +1038,36 @@ def test_nodes_must_return_invocation_output():
         class NoOutputInvocation(BaseInvocation):
             def invoke(self) -> str:
                 return "foo"
+
+
+def test_nodes_must_return_invocation_output_under_optimized_python():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-O",
+            "-c",
+            textwrap.dedent(
+                """
+                from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+
+                try:
+                    @invocation("test_no_output_optimized", version="1.0.0")
+                    class NoOutputInvocation(BaseInvocation):
+                        def invoke(self) -> str:
+                            return "foo"
+                except ValueError:
+                    pass
+                else:
+                    raise SystemExit("invalid invocation return annotation was accepted under python -O")
+                """
+            ),
+        ],
+        capture_output=True,
+        cwd=Path(__file__).resolve().parents[1],
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 def test_collector_different_incomers():

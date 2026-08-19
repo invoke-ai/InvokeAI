@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     state_dict_has_any_keys_ending_with,
     state_dict_has_any_keys_starting_with,
 )
+from invokeai.backend.model_manager.configs.main import _detect_wan_expert
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
@@ -954,6 +955,16 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
     "diffusion_model.tproj.",
     "diffusion_model.txtmlp.",
     "diffusion_model.last.linear.",
+    # kohya/LyCORIS flattens that same native layout into `lora_unet_<path>` (see
+    # krea2_lora_conversion_utils._maybe_convert_kohya_krea2_state_dict). Spelled out per top-level module
+    # rather than as a bare `lora_unet_`, which would match every other architecture's kohya LoRA too.
+    "lora_unet_blocks_",
+    "lora_unet_txtfusion_",
+    "lora_unet_first.",
+    "lora_unet_tmlp_",
+    "lora_unet_tproj_",
+    "lora_unet_txtmlp_",
+    "lora_unet_last_linear.",
     "base_model.model.transformer.transformer_blocks.",
     "text_encoder.",
     "base_model.model.text_encoder.",
@@ -1141,20 +1152,35 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # Run the base-class probe (file-check, lora-suffix, base detection).
         instance = super().from_model_on_disk(mod, override_fields)
 
-        # Auto-detect the expert tag from the filename if the user didn't
-        # override it. ``high_noise`` / ``low_noise`` / hyphenated / concatenated
-        # variants — mirrors the GGUF transformer probe's heuristic.
-        if instance.expert is None:
-            name = mod.path.stem.lower()
-            if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
-                instance.expert = "high"
-            elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
-                instance.expert = "low"
-
         # Auto-detect the model-family variant from inner_dim in the state
         # dict. The override field skips this if the user has set it.
+        #
+        # Resolved *before* the expert tag because the expert is only meaningful for
+        # A14B — see below.
         if instance.variant is None:
             instance.variant = detect_wan_lora_variant(mod.load_state_dict())
+
+        # Auto-detect the expert tag from the filename if the user didn't override
+        # it, using the same helper as the transformer probes so the two can't drift
+        # apart. That also picks up the bare ``HIGH``/``LOW`` convention, which
+        # matters here: an expert-specific LoRA left untagged is applied to *both*
+        # experts by the Wan LoRA loader, which is wrong for the high/low pairs the
+        # Lightning-style distills ship in.
+        #
+        # TI2V-5B is single-transformer, so it has no experts and the denoise path
+        # reads only the primary LoRA list. Tagging a 5B LoRA would route it through
+        # ``_resolve_target("auto", ...)`` into ``loras_low_noise`` alone, where it is
+        # silently inert. The bare-token convention makes that reachable on ordinary
+        # names — ``Wan2.2_TI2V_5B_low_light_v2`` has ``low`` as a standalone token —
+        # so pin the field the same way ``_resolve_wan_expert`` pins the main-model
+        # probe. Only A14B (or an inconclusive variant) gets a tag.
+        #
+        # Note 'none' vs None: this config uses None for "untagged, apply to both",
+        # so a 'none' result must leave the field alone.
+        if instance.expert is None and instance.variant != WanLoRAVariantType.Wan5B:
+            detected = _detect_wan_expert(mod.path.stem)
+            if detected != "none":
+                instance.expert = detected
 
         return instance
 

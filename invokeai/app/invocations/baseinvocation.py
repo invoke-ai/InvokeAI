@@ -780,8 +780,10 @@ def invocation(
             if isinstance(invoke_return_annotation, str):
                 invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
 
-            assert invoke_return_annotation is not BaseInvocationOutput
-            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+            if invoke_return_annotation is BaseInvocationOutput or not issubclass(
+                invoke_return_annotation, BaseInvocationOutput
+            ):
+                raise TypeError
         except Exception:
             raise ValueError(
                 f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'
