@@ -45,8 +45,9 @@ const createMutablePort = <Snapshot,>(initialSnapshot: Snapshot) => {
 };
 
 /**
- * Regression coverage for the "save as new" echo-autosave bug: on the create
- * path, `bindLibraryWorkflow` synchronously adds `libraryWorkflowId` to the
+ * Regression coverage for the create-path echo-autosave bug (`saveToLibrary`
+ * on a graph with no `libraryWorkflowId` yet):
+ * `bindLibraryWorkflow` synchronously adds `libraryWorkflowId` to the
  * stored project graph, but the hook used to mark the autosaver's baseline
  * with the JSON it had serialized *before* the bind — which
  * `serializeWorkflowJson` does not include `id` (added only once
@@ -108,12 +109,12 @@ describe('useSaveWorkflowToLibrary bind-then-sync', () => {
       project: project.port,
     } as unknown as WorkflowUiAdapter;
 
-    let saveAsNew: (() => Promise<string | null>) | null = null;
+    let saveToLibrary: (() => Promise<string | null>) | null = null;
     const Harness = () => {
       const hook = useSaveWorkflowToLibrary();
 
       useEffect(() => {
-        saveAsNew = hook.saveAsNew;
+        saveToLibrary = hook.saveToLibrary;
       });
 
       return null;
@@ -134,7 +135,7 @@ describe('useSaveWorkflowToLibrary bind-then-sync', () => {
 
     try {
       await act(async () => {
-        await saveAsNew?.();
+        await saveToLibrary?.();
       });
 
       expect(bindLibraryWorkflow).toHaveBeenCalledWith('library-workflow-99');
@@ -157,7 +158,7 @@ describe('useSaveWorkflowToLibrary bind-then-sync', () => {
 /**
  * `saveDocumentAsNew` saves an arbitrary document (e.g. a preview payload
  * that never became the active project graph) to the library. Unlike
- * `saveAsNew`, it must not bind the result to the project or mark the
+ * `saveToLibrary`, it must not bind the result to the project or mark the
  * autosaver's synced baseline — the active project graph is untouched.
  */
 describe('useSaveWorkflowToLibrary saveDocumentAsNew', () => {

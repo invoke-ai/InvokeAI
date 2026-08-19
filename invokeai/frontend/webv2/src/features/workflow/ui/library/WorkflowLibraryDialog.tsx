@@ -1,108 +1,66 @@
-/* eslint-disable react/react-compiler, react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { WorkflowLibraryBrowseSnapshot } from '@features/workflow/data/libraryBrowseStore';
+import type { ChangeEvent } from 'react';
 
-import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Spinner, Stack, Tabs, Text } from '@chakra-ui/react';
+import { Box, Dialog, HStack, Input, Portal, SegmentGroup, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
-  deleteLibraryWorkflow,
-  getCachedWorkflowPage,
-  getLibraryWorkflowCached,
-  invalidateWorkflowLibraryCache,
-  listLibraryWorkflowsCached,
-  touchLibraryWorkflowOpenedAt,
-  type WorkflowLibraryCategory,
-  type WorkflowLibraryListItem,
-} from '@features/workflow/queries';
-import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
-import { useWorkflowNotifications, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
-import { parseWorkflowJson, serializeWorkflowJson } from '@features/workflow/utility';
-import {
-  type AccountScope,
-  assertAccountScopeCurrent,
-  captureAccountScope,
-  isAccountScopeCurrent,
-} from '@platform/state/accountLifecycle';
-import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, CloseButton, ConfirmDialog, JsonPreview, Scrollable } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
+  ensureWorkflowLibraryBrowseLoaded,
+  getWorkflowLibraryBrowseSnapshot,
+  setWorkflowLibraryBrowseFilter,
+  useWorkflowLibraryBrowseSelector,
+} from '@features/workflow/data/libraryBrowseStore';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { CloseButton } from '@platform/ui';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { markLibraryGraphSynced } from './librarySyncBridge';
-import { useSaveWorkflowToLibrary } from './useSaveWorkflowToLibrary';
+import { useLoadLibraryWorkflow } from './useLoadLibraryWorkflow';
+import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
+import { WorkflowLibraryTagChips } from './WorkflowLibraryTagChips';
 
 /**
- * Backend workflow library browser: list/search user and default workflows,
- * preview one (read-only nodes / JSON) before loading it into the project
- * graph (with an automatic graph-history snapshot of the current graph), and
- * save the project graph back to the library. Lists serve from the session
- * cache instantly and revalidate in the background.
+ * Backend workflow library browser. Filtering and paging are server side and
+ * live in the browse store, so this shell owns exactly two pieces of state:
+ * the raw text in the search box (debounced into the store) and which card is
+ * selected. Everything else is read back out of the store.
  */
 
-interface WorkflowPreviewState {
-  document: ProjectGraphState;
-  item: WorkflowLibraryListItem;
-  raw: Record<string, unknown>;
-  warnings: string[];
-}
+const SEARCH_DEBOUNCE_MS = 300;
+const DETAIL_RAIL_WIDTH = '18rem';
 
-type WorkflowLoadPhase = 'fetching' | 'applying';
+const CATEGORY_ITEMS = [
+  { labelKey: 'workflowLibrary.browse', value: 'default' },
+  { labelKey: 'workflowLibrary.yours', value: 'user' },
+] as const;
 
-const GraphPreviewPane = lazy(() =>
-  import('@features/workflow/ui/graph-preview/GraphPreviewPane').then((module) => ({
-    default: module.GraphPreviewPane,
-  }))
-);
+/** Flat and shallow-comparable, so unrelated store patches do not re-render the shell. */
+const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
+  category: snapshot.filter.category,
+  entries: snapshot.entries,
+  error: snapshot.error,
+  status: snapshot.status,
+  tag: snapshot.filter.tag,
+  tagCounts: snapshot.tagCounts,
+});
 
-const WorkflowPreviewPane = ({
-  isLoadingWorkflow,
-  preview,
-  onBack,
-  onLoad,
-}: {
-  isLoadingWorkflow: boolean;
-  preview: WorkflowPreviewState;
-  onBack: () => void;
-  onLoad: () => void;
-}) => {
-  const [mode, setMode] = useState<'nodes' | 'json'>('nodes');
+/**
+ * Mounted only while the dialog is open, so its mount effect *is* the "dialog
+ * opened" hook: it kicks the first page load and, on a fresh install with no
+ * saved workflows, lands the user on the bundled defaults instead of an empty
+ * "Yours". The switch is skipped if the user has already moved the filter
+ * while the probe was in flight.
+ */
+const WorkflowLibraryBrowseSession = () => {
+  useMountEffect(() => {
+    void ensureWorkflowLibraryBrowseLoaded().then(() => {
+      const { filter, userTotal } = getWorkflowLibraryBrowseSnapshot();
 
-  return (
-    <Stack gap="2">
-      <HStack gap="2" justify="space-between">
-        <HStack gap="2" minW="0">
-          <Button size="2xs" variant="ghost" onClick={onBack}>
-            ← Back
-          </Button>
-          <MiddleTruncate fontSize="xs" fontWeight="600" minW="0" text={preview.item.name || 'Untitled Workflow'} />
-        </HStack>
-        <HStack flexShrink={0} gap="2">
-          <SegmentGroup.Root
-            size="xs"
-            value={mode}
-            onValueChange={(event) => setMode(event.value === 'json' ? 'json' : 'nodes')}
-          >
-            <SegmentGroup.Indicator />
-            <SegmentGroup.Items
-              items={[
-                { label: 'Nodes', value: 'nodes' },
-                { label: 'JSON', value: 'json' },
-              ]}
-            />
-          </SegmentGroup.Root>
-          <Button loading={isLoadingWorkflow} size="2xs" onClick={onLoad}>
-            Load
-          </Button>
-        </HStack>
-      </HStack>
-      {mode === 'nodes' ? (
-        <Suspense fallback={<Box h="24rem" />}>
-          <GraphPreviewPane document={preview.document} />
-        </Suspense>
-      ) : (
-        <JsonPreview label={`${preview.item.name} JSON`} maxH="24rem" value={preview.raw} />
-      )}
-    </Stack>
-  );
+      if (userTotal === 0 && filter.category === 'user' && !filter.search) {
+        setWorkflowLibraryBrowseFilter({ category: 'default', tag: null });
+      }
+    });
+  });
+
+  return null;
 };
 
 export const WorkflowLibraryDialog = ({
@@ -113,451 +71,149 @@ export const WorkflowLibraryDialog = ({
   onOpenChange: (isOpen: boolean) => void;
 }) => {
   const { t } = useTranslation();
-  const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
-  const { replace } = useProjectGraphCommands();
-  const notify = useWorkflowNotifications();
-  const { saveAsNew, saveToLibrary: saveExistingToLibrary } = useSaveWorkflowToLibrary();
-  const [category, setCategory] = useState<WorkflowLibraryCategory>('user');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [items, setItems] = useState<WorkflowLibraryListItem[]>([]);
-  const [pages, setPages] = useState(0);
-  const [page, setPage] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
-  const [workflowLoad, setWorkflowLoad] = useState<{ id: string; phase: WorkflowLoadPhase } | null>(null);
-  const [previewingWorkflowId, setPreviewingWorkflowId] = useState<string | null>(null);
-  const [preview, setPreview] = useState<WorkflowPreviewState | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<WorkflowLibraryListItem | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const hasAutoSwitchedRef = useRef(false);
-  const refreshTokenRef = useRef(0);
-  const workflowLoadInFlightRef = useRef(false);
-  const isWorkflowLoadPending = workflowLoad !== null;
+  const { category, entries, error, status, tag, tagCounts } = useWorkflowLibraryBrowseSelector(selectBrowseView);
+  const [searchInput, setSearchInput] = useState('');
+  const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refresh = useCallback(
-    (nextPage: number, owner: AccountScope = captureAccountScope()) => {
-      const params = { category, page: nextPage, query: searchTerm, signal: owner.signal };
-      const cached = getCachedWorkflowPage(params);
-      const token = (refreshTokenRef.current += 1);
+  const closeDialog = useCallback(() => onOpenChange(false), [onOpenChange]);
+  const { load, loadPhase } = useLoadLibraryWorkflow(closeDialog);
+  const isLoadPending = loadPhase !== 'idle';
 
-      // A cached page renders instantly; the fetch below only revalidates it.
-      if (cached) {
-        setItems(cached.items);
-        setPage(cached.page);
-        setPages(cached.pages);
-      } else {
-        setIsLoading(true);
+  // Selection is derived, not stored: a filter change or a deletion can retire
+  // the selected row, and the head of the list takes over without an effect.
+  const activeWorkflowId = entries.some((entry) => entry.item.workflow_id === selectedWorkflowId)
+    ? selectedWorkflowId
+    : (entries[0]?.item.workflow_id ?? null);
+
+  const handleDialogOpenChange = useCallback(
+    (event: { open: boolean }) => {
+      if (!isLoadPending) {
+        onOpenChange(event.open);
       }
-
-      listLibraryWorkflowsCached(params)
-        .then((result) => {
-          if (!isAccountScopeCurrent(owner) || token !== refreshTokenRef.current) {
-            return;
-          }
-
-          setItems(result.items);
-          setPage(result.page);
-          setPages(result.pages);
-
-          // A fresh install has no user workflows; land on the bundled
-          // defaults instead of an empty tab. Once per dialog open.
-          if (category === 'user' && result.total === 0 && !searchTerm && !hasAutoSwitchedRef.current) {
-            hasAutoSwitchedRef.current = true;
-            setCategory('default');
-          }
-        })
-        .catch((error: unknown) => {
-          if (!isAccountScopeCurrent(owner) || cached) {
-            return; // Stale-but-rendered beats an error toast on revalidation.
-          }
-
-          notify.error('Workflow library unavailable', getApiErrorMessage(error, 'Failed to list workflows.'));
-        })
-        .finally(() => {
-          if (isAccountScopeCurrent(owner) && token === refreshTokenRef.current) {
-            setIsLoading(false);
-          }
-        });
     },
-    [category, notify, searchTerm]
+    [isLoadPending, onOpenChange]
   );
 
-  useEffect(() => {
-    if (isOpen) {
-      refresh(0);
-    } else {
-      hasAutoSwitchedRef.current = false;
-      setPreview(null);
+  const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    const { value } = event.currentTarget;
+
+    setSearchInput(value);
+
+    if (searchTimerRef.current !== null) {
+      clearTimeout(searchTimerRef.current);
     }
-  }, [isOpen, refresh]);
 
-  const fetchParsedWorkflow = async (item: WorkflowLibraryListItem, owner: AccountScope) => {
-    const raw = await getLibraryWorkflowCached(item.workflow_id, owner.signal);
+    // Deliberately not a `useEffect` cleanup: a debounce that fires after
+    // unmount only patches the store the next open would reload anyway.
+    searchTimerRef.current = setTimeout(() => setWorkflowLibraryBrowseFilter({ search: value }), SEARCH_DEBOUNCE_MS);
+  }, []);
 
-    assertAccountScopeCurrent(owner);
-    const { document, warnings } = parseWorkflowJson(raw);
-
-    return { document, raw, warnings };
-  };
-
-  const loadWorkflow = async (
-    item: WorkflowLibraryListItem,
-    loaded?: { document: ProjectGraphState; warnings: string[] }
-  ) => {
-    const owner = captureAccountScope();
-
-    if (workflowLoadInFlightRef.current) {
-      return;
+  const handleCategoryChange = useCallback((event: { value: string | null }) => {
+    // The store applies filter patches literally, so clearing the tag when the
+    // category changes (its chips do not carry over) is the UI's job.
+    if (event.value === 'default' || event.value === 'user') {
+      setWorkflowLibraryBrowseFilter({ category: event.value, tag: null });
     }
-    workflowLoadInFlightRef.current = true;
+  }, []);
 
-    try {
-      let parsed = loaded;
+  const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
 
-      if (!parsed) {
-        setWorkflowLoad({ id: item.workflow_id, phase: 'fetching' });
-        parsed = await fetchParsedWorkflow(item, owner);
+  const handleOpenWorkflow = useCallback(
+    (workflowId: string) => {
+      const entry = getWorkflowLibraryBrowseSnapshot().entries.find(
+        (candidate) => candidate.item.workflow_id === workflowId
+      );
+
+      if (entry) {
+        void load(entry.item);
       }
-
-      assertAccountScopeCurrent(owner);
-      setWorkflowLoad({ id: item.workflow_id, phase: 'applying' });
-      // Synchronous graph replacement can be expensive for large workflows.
-      // Give React a full frame to commit and paint the busy overlay first.
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-      });
-
-      assertAccountScopeCurrent(owner);
-      replace(parsed.document, `Loaded "${item.name}" from library`);
-      // The freshly-loaded graph is already in sync with the library record it
-      // came from — mark it synced so the autosaver does not immediately
-      // queue a redundant (echo) save the moment the graph reference changes.
-      markLibraryGraphSynced(serializeWorkflowJson(parsed.document));
-
-      for (const warning of parsed.warnings) {
-        notify.info('Workflow load warning', warning);
-      }
-
-      void touchLibraryWorkflowOpenedAt(item.workflow_id, owner.signal).catch(() => {
-        // Recency bookkeeping only; loading already succeeded.
-      });
-      onOpenChange(false);
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error('Failed to load workflow', getApiErrorMessage(error, `Could not load "${item.name}".`));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        workflowLoadInFlightRef.current = false;
-        setWorkflowLoad(null);
-      }
-    }
-  };
-
-  const previewWorkflow = async (item: WorkflowLibraryListItem) => {
-    const owner = captureAccountScope();
-
-    setPreviewingWorkflowId(item.workflow_id);
-
-    try {
-      const { document, raw, warnings } = await fetchParsedWorkflow(item, owner);
-
-      assertAccountScopeCurrent(owner);
-      setPreview({ document, item, raw, warnings });
-    } catch (error) {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
-
-      notify.error('Failed to preview workflow', getApiErrorMessage(error, `Could not preview "${item.name}".`));
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setPreviewingWorkflowId(null);
-      }
-    }
-  };
-
-  const saveToLibrary = async (asNew: boolean) => {
-    const owner = captureAccountScope();
-
-    setIsSaving(true);
-
-    try {
-      // useSaveWorkflowToLibrary already notifies on success/failure and
-      // invalidates the library cache; this dialog only needs to refresh its
-      // own list once the save (and any resulting bind) has landed.
-      const workflowId = asNew ? await saveAsNew() : await saveExistingToLibrary();
-
-      if (workflowId && isAccountScopeCurrent(owner)) {
-        refresh(page, owner);
-      }
-    } finally {
-      if (isAccountScopeCurrent(owner)) {
-        setIsSaving(false);
-      }
-    }
-  };
+    },
+    [load]
+  );
 
   return (
-    <>
-      <Dialog.Root
-        placement="center"
-        open={isOpen}
-        size="lg"
-        onOpenChange={(event) => {
-          if (!isWorkflowLoadPending) {
-            onOpenChange(event.open);
-          }
-        }}
-      >
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content
-              aria-busy={isWorkflowLoadPending}
-              bg="bg.subtle"
-              borderColor="border.subtle"
-              borderWidth="1px"
-              color="fg"
-              position="relative"
-            >
-              {workflowLoad ? (
-                <Stack
-                  alignItems="center"
-                  aria-live="polite"
-                  bg="bg/85"
-                  inset="0"
-                  justifyContent="center"
-                  position="absolute"
-                  role="status"
-                  zIndex="modal"
-                >
-                  <Spinner color="accent.solid" size="lg" />
-                  <Text fontSize="xs" fontWeight="600">
-                    {workflowLoad.phase === 'fetching' ? 'Fetching workflow…' : 'Applying workflow…'}
-                  </Text>
-                </Stack>
-              ) : null}
-              <Dialog.Header>
-                <Dialog.Title>Workflow Library</Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                {preview ? (
-                  <WorkflowPreviewPane
-                    isLoadingWorkflow={workflowLoad?.id === preview.item.workflow_id}
-                    preview={preview}
-                    onBack={() => setPreview(null)}
-                    onLoad={() => void loadWorkflow(preview.item, preview)}
+    <Dialog.Root open={isOpen} placement="center" size="xl" onOpenChange={handleDialogOpenChange}>
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content
+            aria-busy={isLoadPending}
+            h="80vh"
+            maxH="80vh"
+            maxW="min(72rem, calc(100vw - 4rem))"
+            position="relative"
+          >
+            {isLoadPending ? (
+              <Stack
+                alignItems="center"
+                aria-live="polite"
+                bg="bg/85"
+                inset="0"
+                justifyContent="center"
+                position="absolute"
+                role="status"
+                zIndex="modal"
+              >
+                <Spinner color="accent.solid" size="lg" />
+                <Text fontSize="xs" fontWeight="600">
+                  {loadPhase === 'fetching' ? t('workflowLibrary.fetching') : t('workflowLibrary.applying')}
+                </Text>
+              </Stack>
+            ) : null}
+            <Dialog.Header>
+              <Stack gap="2" minW="0" w="full">
+                <HStack gap="3" minW="0">
+                  <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
+                  <Input
+                    aria-label={t('workflowLibrary.searchPlaceholder')}
+                    flex="1"
+                    minW="0"
+                    placeholder={t('workflowLibrary.searchPlaceholder')}
+                    size="xs"
+                    type="search"
+                    value={searchInput}
+                    onChange={handleSearchChange}
                   />
-                ) : (
-                  <Stack gap="3">
-                    <HStack gap="2">
-                      <Tabs.Root
-                        size="sm"
-                        value={category}
-                        variant="enclosed"
-                        onValueChange={(event) => setCategory(event.value as WorkflowLibraryCategory)}
-                      >
-                        <Tabs.List>
-                          <Tabs.Trigger value="user">Yours</Tabs.Trigger>
-                          <Tabs.Trigger value="default">Defaults</Tabs.Trigger>
-                        </Tabs.List>
-                      </Tabs.Root>
-                      <Input
-                        aria-label="Search workflows"
-                        placeholder="Search workflows…"
-                        size="xs"
-                        value={searchTerm}
-                        onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value)}
-                      />
-                    </HStack>
-                    <Scrollable label="Workflow library results" maxH="20rem" minH="8rem">
-                      <Stack gap="1" minW="0" w="full">
-                        {items.map((item) => (
-                          <Box
-                            key={item.workflow_id}
-                            _hover={{ bg: 'bg.muted/60' }}
-                            alignItems="center"
-                            display="grid"
-                            gap="2"
-                            gridTemplateColumns={
-                              category === 'user' ? 'minmax(0, 1fr) auto auto auto' : 'minmax(0, 1fr) auto auto'
-                            }
-                            minW="0"
-                            overflow="hidden"
-                            px="1"
-                            rounded="md"
-                            transition="background var(--wb-motion-duration-fast) ease"
-                            w="full"
-                          >
-                            <Box
-                              as="button"
-                              _focusVisible={{ outline: '2px solid {colors.accent.solid}', outlineOffset: '-2px' }}
-                              aria-disabled={previewingWorkflowId !== null || isWorkflowLoadPending}
-                              cursor="pointer"
-                              flex="1"
-                              minW="0"
-                              px="1"
-                              py="1.5"
-                              rounded="md"
-                              textAlign="start"
-                              title={`Preview "${item.name || 'Untitled Workflow'}"`}
-                              onClick={() => {
-                                if (previewingWorkflowId === null && !isWorkflowLoadPending) {
-                                  void previewWorkflow(item);
-                                }
-                              }}
-                            >
-                              <Stack gap="0" minW="0">
-                                <MiddleTruncate
-                                  fontSize="xs"
-                                  fontWeight="600"
-                                  text={item.name || 'Untitled Workflow'}
-                                />
-                                {item.description ? (
-                                  <Text color="fg.subtle" fontSize="2xs" truncate>
-                                    {item.description}
-                                  </Text>
-                                ) : null}
-                              </Stack>
-                            </Box>
-                            <Button
-                              disabled={previewingWorkflowId !== null || isWorkflowLoadPending}
-                              flexShrink={0}
-                              loading={previewingWorkflowId === item.workflow_id}
-                              size="2xs"
-                              variant="outline"
-                              onClick={() => void previewWorkflow(item)}
-                            >
-                              Preview
-                            </Button>
-                            <Button
-                              disabled={previewingWorkflowId !== null || isWorkflowLoadPending}
-                              flexShrink={0}
-                              loading={workflowLoad?.id === item.workflow_id}
-                              size="2xs"
-                              variant="outline"
-                              onClick={() => void loadWorkflow(item)}
-                            >
-                              Load
-                            </Button>
-                            {category === 'user' ? (
-                              <Button
-                                colorPalette="red"
-                                flexShrink={0}
-                                size="2xs"
-                                variant="ghost"
-                                onClick={() => setPendingDelete(item)}
-                              >
-                                Delete
-                              </Button>
-                            ) : null}
-                          </Box>
-                        ))}
-                        {!isLoading && items.length === 0 ? (
-                          <Text color="fg.subtle" fontSize="2xs" px="2" py="4" textAlign="center">
-                            {category === 'user'
-                              ? 'No saved workflows yet. Save the project graph below to start your library.'
-                              : 'No default workflows are installed on this backend.'}
-                          </Text>
-                        ) : null}
-                        {isLoading ? (
-                          <Text color="fg.subtle" fontSize="2xs" px="2" py="1.5">
-                            Loading workflows…
-                          </Text>
-                        ) : null}
-                      </Stack>
-                    </Scrollable>
-                    {pages > 1 ? (
-                      <HStack gap="2" justify="center">
-                        <Button disabled={page === 0} size="2xs" variant="ghost" onClick={() => refresh(page - 1)}>
-                          Previous
-                        </Button>
-                        <Text color="fg.subtle" fontSize="2xs">
-                          Page {page + 1} of {pages}
-                        </Text>
-                        <Button
-                          disabled={page >= pages - 1}
-                          size="2xs"
-                          variant="ghost"
-                          onClick={() => refresh(page + 1)}
-                        >
-                          Next
-                        </Button>
-                      </HStack>
-                    ) : null}
-                    <Box borderColor="border.subtle" borderTopWidth="1px" pt="3">
-                      <HStack gap="2" justify="space-between">
-                        <Text color="fg.muted" fontSize="2xs" minW="0" truncate>
-                          Project graph: {projectGraph.name || 'Untitled Workflow'}
-                          {projectGraph.libraryWorkflowId ? ' (linked to library)' : ''}
-                        </Text>
-                        <HStack flexShrink={0} gap="2">
-                          {projectGraph.libraryWorkflowId ? (
-                            <Text color="fg.subtle" fontSize="2xs">
-                              {t('widgets.workflow.autosavesToLibrary')}
-                            </Text>
-                          ) : (
-                            <Button
-                              loading={isSaving}
-                              size="2xs"
-                              variant="outline"
-                              onClick={() => void saveToLibrary(false)}
-                            >
-                              {t('widgets.workflow.saveToLibrary')}
-                            </Button>
-                          )}
-                          <Button
-                            loading={isSaving}
-                            size="2xs"
-                            variant="outline"
-                            onClick={() => void saveToLibrary(true)}
-                          >
-                            Save as new
-                          </Button>
-                        </HStack>
-                      </HStack>
-                    </Box>
-                  </Stack>
-                )}
-              </Dialog.Body>
-              <Dialog.CloseTrigger asChild>
-                <CloseButton color="fg.muted" disabled={isWorkflowLoadPending} size="sm" />
-              </Dialog.CloseTrigger>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
-      <ConfirmDialog
-        body={`Delete "${pendingDelete?.name || 'Untitled Workflow'}" from the workflow library? This cannot be undone.`}
-        confirmLabel="Delete"
-        isOpen={pendingDelete !== null}
-        title="Delete workflow"
-        onClose={() => setPendingDelete(null)}
-        onConfirm={async () => {
-          if (!pendingDelete) {
-            return;
-          }
-
-          const owner = captureAccountScope();
-          const workflowId = pendingDelete.workflow_id;
-
-          try {
-            await deleteLibraryWorkflow(workflowId, owner.signal);
-
-            assertAccountScopeCurrent(owner);
-            invalidateWorkflowLibraryCache();
-            refresh(page, owner);
-          } catch (error) {
-            if (!isAccountScopeCurrent(owner)) {
-              return;
-            }
-
-            notify.error('Failed to delete workflow', getApiErrorMessage(error, 'The workflow could not be deleted.'));
-          }
-        }}
-      />
-    </>
+                  <SegmentGroup.Root flexShrink={0} size="xs" value={category} onValueChange={handleCategoryChange}>
+                    <SegmentGroup.Indicator />
+                    {CATEGORY_ITEMS.map((item) => (
+                      <SegmentGroup.Item key={item.value} value={item.value}>
+                        <SegmentGroup.ItemHiddenInput />
+                        <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
+                      </SegmentGroup.Item>
+                    ))}
+                  </SegmentGroup.Root>
+                </HStack>
+                <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
+              </Stack>
+            </Dialog.Header>
+            <Dialog.Body display="flex" flex="1" gap="3" minH="0">
+              <WorkflowLibraryGrid
+                entries={entries}
+                error={error}
+                selectedWorkflowId={activeWorkflowId}
+                status={status}
+                onOpen={handleOpenWorkflow}
+                onSelect={setSelectedWorkflowId}
+              />
+              {/* Task 7 fills this rail with the selected workflow's detail panel. */}
+              <Box
+                borderColor="border.subtle"
+                borderWidth="1px"
+                flexShrink={0}
+                minH="0"
+                rounded="md"
+                w={DETAIL_RAIL_WIDTH}
+              />
+            </Dialog.Body>
+            {isOpen ? <WorkflowLibraryBrowseSession /> : null}
+            <Dialog.CloseTrigger asChild>
+              <CloseButton color="fg.muted" disabled={isLoadPending} size="sm" />
+            </Dialog.CloseTrigger>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 };
