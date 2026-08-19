@@ -603,6 +603,13 @@ class ZImageCheckpointModel(ModelLoader):
                 f"Z-Image: kept {kept} raw fp8 weight(s) quantized (no weight_scale in the checkpoint); "
                 "they will run on the fp8 tensor cores with unit scaling."
             )
+
+        # FP8 *storage* on top. When nothing was kept quantized above, every param is uniform
+        # `model_dtype` here, so the layerwise cast has one unambiguous compute dtype to restore to.
+        # When weights *were* kept fp8, `_apply_fp8_layerwise_casting` bails out on its own (and
+        # says so in the log): its hooks would restore the compute dtype before every forward and
+        # silently disable the fp8 matmul, for no VRAM saving.
+        model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 

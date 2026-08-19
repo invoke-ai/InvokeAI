@@ -181,6 +181,12 @@ class AnimaCheckpointModel(ModelLoader):
                 f"Checkpoint is missing {len(load_result.missing_keys)} keys "
                 f"(expected for inv_freq buffers). First 5: {load_result.missing_keys[:5]}"
             )
+
+        # Without this the `fp8_storage` toggle is shown for Anima models but does nothing. The
+        # state dict was cast to a single `model_dtype` above, so the layerwise cast has one
+        # unambiguous compute dtype to restore to. AnimaTransformer is a plain nn.Module, so this
+        # takes the hook-based path in `_apply_fp8_to_nn_module`.
+        model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 
