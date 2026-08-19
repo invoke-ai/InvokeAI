@@ -115,6 +115,17 @@
       "validation": {}
     },
     {
+      "category": "WEB",
+      "default": 9,
+      "description": "Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.",
+      "env_var": "INVOKEAI_HTTP_COMPRESSION_LEVEL",
+      "literal_values": [],
+      "name": "http_compression_level",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
       "category": "MISC FEATURES",
       "default": false,
       "description": "Enable logging of parsed prompt tokens.",
@@ -526,7 +537,7 @@
     {
       "category": "DEVICE",
       "default": "auto",
-      "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
+      "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)",
       "env_var": "INVOKEAI_DEVICE",
       "literal_values": [],
       "name": "device",
@@ -537,7 +548,7 @@
     {
       "category": "DEVICE",
       "default": "auto",
-      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users \u2014 unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, or `cuda:N` (where N is a device number)",
+      "description": "Devices to use for parallel generation. `auto` (the default) uses every available GPU, running one generation session per GPU concurrently and distributing jobs fairly across users \u2014 unless the legacy `device` setting is pinned to a specific device, in which case `auto` uses only that device (preserving configs that pinned `device` before multi-GPU support existed). Provide an explicit list (e.g. `[cuda:0, cuda:1]`) to use specific devices regardless of `device`, or a single-device list (e.g. `[cuda:0]`) to run serially. On systems without a GPU, `auto` resolves to the single `cpu`/`mps` device.<br>Valid values: `auto`, or a list whose entries are each `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, or `xpu:N` (where N is a device number)",
       "env_var": "INVOKEAI_GENERATION_DEVICES",
       "literal_values": [],
       "name": "generation_devices",
@@ -579,6 +590,17 @@
       "env_var": "INVOKEAI_SEQUENTIAL_GUIDANCE",
       "literal_values": [],
       "name": "sequential_guidance",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": false,
+      "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
+      "env_var": "INVOKEAI_WAN_MEMORY_OPTIMIZATION",
+      "literal_values": [],
+      "name": "wan_memory_optimization",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}

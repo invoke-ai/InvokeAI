@@ -58,6 +58,9 @@ class _FakeCachedModel:
         self.unload_calls += 1
         return 0
 
+    def total_bytes(self) -> int:
+        return 0
+
 
 class _FakeCacheRecord:
     def __init__(self, cached_model: _FakeCachedModel) -> None:
@@ -76,6 +79,10 @@ class _FakeInfo:
 
     def model_on_device(self):
         return _FakeModelOnDevice(self._label, self._model, self._log)
+
+    def unload_from_vram(self, _vram_bytes_to_free, keep_required_weights_in_vram=False):
+        assert keep_required_weights_in_vram is False
+        return self._cache_record.cached_model.full_unload_from_vram()
 
 
 class _FakeContext:
@@ -442,13 +449,13 @@ def test_empty_cache_called_on_swap():
 
 def test_outgoing_expert_force_unloaded_from_vram():
     """Regression: on swap, the previous expert's weights must be explicitly forced
-    off VRAM via ``cached_model.full_unload_from_vram()``.
+    off VRAM via the loaded model's cache-routed unload API.
 
     A14B users observed the high-noise transformer continuing to occupy ~9 GB of
     VRAM during the low-noise step, because the cache's automatic offload heuristic
     underestimated how much room the new expert needed when workspace memory from
     the previous denoise step was still allocated. The swapper sidesteps that by
-    invoking full_unload_from_vram on the outgoing expert directly."""
+    invoking the cache-routed unload on the outgoing expert directly."""
     log: list[str] = []
     high_info = _FakeInfo("HIGH", nn.Linear(1, 1), log)
     low_info = _FakeInfo("LOW", nn.Linear(1, 1), log)
