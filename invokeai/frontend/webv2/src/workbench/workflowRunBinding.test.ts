@@ -26,6 +26,7 @@ const template = {
       description: '',
       exclusiveMaximum: null,
       exclusiveMinimum: null,
+      fieldKind: 'input' as const,
       input: 'any' as const,
       maximum: null,
       minimum: null,

@@ -2,10 +2,10 @@
   "name": "Extend Video - Wan 2.2 Lightning",
   "author": "InvokeAI",
   "description": "This workflow adds frames to an existing video. Provide a starting video and use the sliders to select the starting and ending frames. The workflow will create a new video starting from the selected ending frame and then concatenate the new video to the end of the first video, performing a quick cross-fade at the selected ending frame to generate a smooth transition.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "contact": "",
   "tags": "wan2.2, video to video, video, lightning, lora",
-  "notes": "Each InvokeAI install assigns its own internal model IDs, so the model fields are left blank -- select these in the form after loading:\n\nMain Model node:\n- Main Model: Wan 2.2 I2V A14B High Noise (Q4_K_M GGUF recommended for <=16 GB VRAM)\n- Transformer (Low Noise): Wan 2.2 I2V A14B Low Noise (Q4_K_M)\n- VAE: Wan 2.2 A14B VAE\n- T5 Encoder: Wan T5 Encoder (UMT5-XXL)\n\nLightning LoRAs (4-step distillation, I2V variant):\n- Apply Lightning LoRA (High Noise): Wan 2.2 I2V Lightning High Noise (4-step)\n- Apply Lightning LoRA (Low Noise): Wan 2.2 I2V Lightning Low Noise (4-step)\n\nEdit the \"Concatenate Videos\" node to adjust the transition and number of transition frames.",
+  "notes": "The generated segment is resampled onto your source clip's canvas before the join. The model renders only onto its own canvas family, so the two clips will rarely match, and Concatenate Videos refuses clips of differing size -- 'Size Mismatch' on that node is set to 'match_first' to reconcile them. Your footage keeps its own resolution, so a continuation generated at a smaller canvas is upscaled and will look softer than the source.\n\nEach InvokeAI install assigns its own internal model IDs, so the model fields are left blank -- select these in the form after loading:\n\nMain Model node:\n- Main Model: Wan 2.2 I2V A14B High Noise (Q4_K_M GGUF recommended for <=16 GB VRAM)\n- Transformer (Low Noise): Wan 2.2 I2V A14B Low Noise (Q4_K_M)\n- VAE: Wan 2.2 A14B VAE\n- T5 Encoder: Wan T5 Encoder (UMT5-XXL)\n\nLightning LoRAs (4-step distillation, I2V variant):\n- Apply Lightning LoRA (High Noise): Wan 2.2 I2V Lightning High Noise (4-step)\n- Apply Lightning LoRA (Low Noise): Wan 2.2 I2V Lightning Low Noise (4-step)\n\nEdit the \"Concatenate Videos\" node to adjust the transition and number of transition frames.",
   "exposedFields": [
     {
       "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
@@ -26,30 +26,6 @@
     {
       "nodeId": "1a0e6c7b-9d2f-4b3c-8e1a-2f3d4c5b6a7e",
       "fieldName": "wan_t5_encoder_model"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "target"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "target"
     },
     {
       "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
@@ -588,10 +564,10 @@
       "type": "invocation",
       "data": {
         "id": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "nodePack": "invokeai",
         "label": "",
-        "notes": "",
+        "notes": "Joins the source clip and the generated continuation. Size Mismatch is 'match_first', so the generated clip is resampled onto the source clip's canvas -- the model renders onto its own fixed canvas family and will rarely match your footage, and without this the join fails outright. Your source keeps its own resolution; the generated segment is the part that gets rescaled.",
         "type": "video_concat",
         "inputs": {
           "board": {
@@ -627,6 +603,12 @@
             "label": "",
             "description": "",
             "value": 0
+          },
+          "size_mismatch": {
+            "name": "size_mismatch",
+            "label": "",
+            "description": "",
+            "value": "match_first"
           }
         },
         "isOpen": true,
@@ -744,7 +726,7 @@
       "type": "invocation",
       "data": {
         "id": "52e0f43e-0593-4ba6-bb50-df63464a6189",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

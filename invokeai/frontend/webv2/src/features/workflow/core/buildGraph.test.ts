@@ -16,6 +16,7 @@ const input = (name: string, overrides: Partial<FieldInputTemplate> = {}): Field
   description: '',
   exclusiveMaximum: null,
   exclusiveMinimum: null,
+  fieldKind: 'input',
   input: 'any',
   maximum: null,
   minimum: null,

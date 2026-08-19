@@ -23473,6 +23473,9 @@
                   "wan_i2v",
                   "minimax_h3_t2v",
                   "minimax_h3_i2v",
+                  "minimax_h3_lf2v",
+                  "minimax_h3_flf2v",
+                  "minimax_h3_extend_video",
                   "minimax_h3_txt2img"
                 ],
                 "type": "string"
@@ -23905,6 +23908,103 @@
             "orig_required": false,
             "title": "Ideogram4 Caption"
           },
+          "num_frames": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The number of video frames generated",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Num Frames"
+          },
+          "first_frame_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image used as the video's first frame",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "last_frame_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image used as the video's last frame",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "source_video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The video this generation was derived from, e.g. the clip an extend workflow continues",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "minimax_h3_transformer_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file MiniMax H3 transformer used in place of the main model's transformer",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "minimax_h3_text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file MiniMax H3 Qwen3-VL text encoder used in place of the main model's",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
           "hrf_enabled": {
             "anyOf": [
               {
@@ -24120,7 +24220,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.2.0",
+        "version": "2.3.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -28447,7 +28547,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame, and the\ninput video is echoed back on ``source_video`` so a graph can record the clip the user\nchose rather than the freshly-encoded trim.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -28567,7 +28667,7 @@
         "tags": ["video", "trim", "range", "frames"],
         "title": "Frame Range from Video",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/ExtractVideoRangeOutput"
         }
@@ -28580,6 +28680,13 @@
             "$ref": "#/components/schemas/VideoField",
             "description": "The trimmed video",
             "field_kind": "output",
+            "ui_hidden": false
+          },
+          "source_video": {
+            "$ref": "#/components/schemas/VideoField",
+            "description": "The video the range was taken from",
+            "field_kind": "output",
+            "title": "Source Video",
             "ui_hidden": false
           },
           "width": {
@@ -28642,6 +28749,7 @@
         "required": [
           "output_meta",
           "video",
+          "source_video",
           "width",
           "height",
           "num_frames",
@@ -37073,6 +37181,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
@@ -46005,6 +46116,9 @@
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
               },
               {
@@ -47837,7 +47951,7 @@
             "$ref": "#/components/schemas/VideoOutput"
           },
           "minimax_h3_lora_collection_loader": {
-            "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+            "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
           },
           "minimax_h3_lora_loader": {
             "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
@@ -69256,10 +69370,52 @@
         "tags": ["lora", "model", "minimax"],
         "title": "Apply LoRA Collection - MiniMax H3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+          "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
         }
+      },
+      "MiniMaxH3LoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "MiniMax H3 LoRA collection loader output.\n\nSeparate from the single loader's output because a collection applies zero or more LoRAs,\nso its metadata echo is a list \u2014 which is also what `core_metadata.loras` takes directly,\nwith no intervening collect node.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "MiniMax H3 Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_lora_collection_loader_output",
+            "default": "minimax_h3_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "MiniMaxH3LoRACollectionLoaderOutput",
+        "type": "object"
       },
       "MiniMaxH3LoRALoaderInvocation": {
         "category": "model",
@@ -69348,7 +69504,7 @@
         "tags": ["lora", "model", "minimax"],
         "title": "Apply LoRA - MiniMax H3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
         }
@@ -69372,6 +69528,13 @@
             "title": "MiniMax H3 Transformer",
             "ui_hidden": false
           },
+          "lora_metadata": {
+            "$ref": "#/components/schemas/LoRAMetadataField",
+            "description": "The applied LoRA, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "title": "LoRA Metadata",
+            "ui_hidden": false
+          },
           "type": {
             "const": "minimax_h3_lora_loader_output",
             "default": "minimax_h3_lora_loader_output",
@@ -69380,7 +69543,7 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "type", "type"],
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
         "title": "MiniMaxH3LoRALoaderOutput",
         "type": "object"
       },
@@ -69478,7 +69641,7 @@
         "tags": ["model", "minimax", "video"],
         "title": "Main Model - MiniMax H3",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3ModelLoaderOutput"
         }
@@ -69515,6 +69678,43 @@
             "title": "Audio VAE",
             "ui_hidden": false
           },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The MiniMax H3 model that was loaded.",
+            "field_kind": "output",
+            "title": "Model",
+            "ui_hidden": false
+          },
+          "transformer_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file transformer override that was used, if any.",
+            "field_kind": "output",
+            "title": "Transformer (single file)",
+            "ui_hidden": false
+          },
+          "text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The single-file text encoder override that was used, if any.",
+            "field_kind": "output",
+            "title": "Text Encoder (single file)",
+            "ui_hidden": false
+          },
           "type": {
             "const": "minimax_h3_model_loader_output",
             "default": "minimax_h3_model_loader_output",
@@ -69523,7 +69723,18 @@
             "type": "string"
           }
         },
-        "required": ["output_meta", "transformer", "text_encoder", "vae", "audio_vae", "type", "type"],
+        "required": [
+          "output_meta",
+          "transformer",
+          "text_encoder",
+          "vae",
+          "audio_vae",
+          "model",
+          "transformer_model",
+          "text_encoder_model",
+          "type",
+          "type"
+        ],
         "title": "MiniMaxH3ModelLoaderOutput",
         "type": "object"
       },
@@ -91855,7 +92066,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Join two or more videos into a single MP4.\n\nAudio: if any input carries an audio track, the output gets an AAC track assembled on\nthe emitted timeline \u2014 silent inputs contribute silence, `cut` splices the tracks,\n`crossfade` blends them equal-power over the transition window, and\n`fade_through_black` fades the outgoing track to silence and the incoming one up from\nit, mirroring the video. An fps override retimes audio with the video (a deliberate\nspeed/pitch change). If no input has audio, the output has no audio stream.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nAll inputs must share the same pixel dimensions. Output frame rate defaults to the\nfirst input's fps; override with ``fps`` to force a specific rate (the frames are not\nresampled, only the container is encoded at the new rate).",
+        "description": "Join two or more videos into a single MP4.\n\nAudio: if any input carries an audio track, the output gets an AAC track assembled on\nthe emitted timeline \u2014 silent inputs contribute silence, `cut` splices the tracks,\n`crossfade` blends them equal-power over the transition window, and\n`fade_through_black` fades the outgoing track to silence and the incoming one up from\nit, mirroring the video. An fps override retimes audio with the video (a deliberate\nspeed/pitch change). If no input has audio, the output has no audio stream.\n\nTransitions:\n\n* ``cut`` \u2014 hard splice, no blending. Fastest; total length is the sum of inputs.\n* ``crossfade`` \u2014 linear A\u2192B cross-dissolve over ``transition_frames``. Each boundary\n  consumes ``transition_frames`` from both adjacent clips, so total length is\n  ``sum(inputs) - transition_frames * (n - 1)``.\n* ``fade_through_black`` \u2014 A fades to black, then B fades in from black. Each boundary\n  consumes ``transition_frames // 2`` frames from the preceding clip's tail and the\n  remainder (``transition_frames - transition_frames // 2``) from the next clip's head,\n  so the total emitted is exactly ``transition_frames`` per boundary \u2014 even for odd\n  ``transition_frames`` \u2014 and the overall length equals the sum of inputs.\n\nInputs must share the same pixel dimensions. ``size_mismatch`` decides what happens\nwhen they do not: ``error`` (the default) refuses the join, and ``match_first``\nresamples every later clip onto the first clip's canvas. ``match_first`` is what lets a\ngenerated clip be appended to source footage \u2014 video models render onto their own fixed\ncanvas family, so a generated continuation rarely matches the clip it extends.\n\nOutput frame rate defaults to the first input's fps; override with ``fps`` to force a\nspecific rate (the frames are not resampled in time, only the container is encoded at\nthe new rate).",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -91976,6 +92187,17 @@
             "orig_required": false,
             "title": "Fps"
           },
+          "size_mismatch": {
+            "default": "error",
+            "description": "What to do when the inputs do not all share the same pixel dimensions. 'error' refuses the join; 'match_first' resamples every later clip onto the first clip's canvas, so a generated clip can be appended to source footage it does not match.",
+            "enum": ["error", "match_first"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "error",
+            "orig_required": false,
+            "title": "Size Mismatch",
+            "type": "string"
+          },
           "type": {
             "const": "video_concat",
             "default": "video_concat",
@@ -91988,7 +92210,7 @@
         "tags": ["video", "concat", "transition"],
         "title": "Concatenate Videos",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/VideoOutput"
         }

@@ -112,3 +112,31 @@ def test_invocation_only_saves_complete_requested_range(written: int, should_rai
             output = invocation.invoke(context)
             assert output.end_frame == 4
             context.videos.save.assert_called_once()
+
+
+def test_invocation_echoes_the_source_video_it_was_given() -> None:
+    """`video` is a freshly-encoded trim; `source_video` is what the user actually picked.
+
+    Extend Video records the latter as the generation's provenance -- the trim is an
+    intermediate that never surfaces in the gallery.
+    """
+    invocation = ExtractVideoRangeInvocation(video=VideoField(video_name="input.mp4"), start_frame=0, end_frame=4)
+    context = MagicMock()
+    context.videos.get_path.return_value = Path("input.mp4")
+    context.util.is_canceled.return_value = False
+    base_output = MagicMock(
+        video=VideoField(video_name="output.mp4"), width=32, height=32, num_frames=5, fps=8.0, duration=0.625
+    )
+
+    with (
+        patch("invokeai.app.invocations.video_frame_extract_range.probe_video", return_value=(32, 32, 0.625, 8.0)),
+        patch("invokeai.app.invocations.video_frame_extract_range.decoder_frame_count", return_value=5),
+        patch("invokeai.app.invocations.video_frame_extract_range.make_mp4_writer", return_value=MagicMock()),
+        patch("invokeai.app.invocations.video_frame_extract_range._write_frame_range", return_value=5),
+        patch("invokeai.app.invocations.video_frame_extract_range.extract_audio_pcm", return_value=None),
+        patch("invokeai.app.invocations.video_frame_extract_range.VideoOutput.build", return_value=base_output),
+    ):
+        output = invocation.invoke(context)
+
+    assert output.source_video.video_name == "input.mp4"
+    assert output.video.video_name == "output.mp4"

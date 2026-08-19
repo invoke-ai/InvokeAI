@@ -92,6 +92,39 @@ const openApiFixture = {
         },
         type: 'object',
       },
+      SaveVideoInvocation: {
+        class: 'invocation',
+        output: { $ref: '#/components/schemas/IntegerOutput' },
+        properties: {
+          board: {
+            anyOf: [{ $ref: '#/components/schemas/BoardField' }, { type: 'null' }],
+            field_kind: 'internal',
+            input: 'direct',
+            orig_required: false,
+            title: 'Board',
+          },
+          id: { field_kind: 'node_attribute', title: 'Id', type: 'string' },
+          is_intermediate: { default: false, field_kind: 'node_attribute', type: 'boolean' },
+          latents: {
+            anyOf: [{ $ref: '#/components/schemas/LatentsField' }, { type: 'null' }],
+            field_kind: 'input',
+            input: 'connection',
+            orig_required: true,
+            title: 'Latents',
+          },
+          metadata: {
+            anyOf: [{ $ref: '#/components/schemas/MetadataField' }, { type: 'null' }],
+            field_kind: 'internal',
+            input: 'connection',
+            orig_required: false,
+            title: 'Metadata',
+          },
+          type: { const: 'save_video', default: 'save_video', title: 'type' },
+          use_cache: { default: true, field_kind: 'node_attribute', type: 'boolean' },
+        },
+        title: 'Save Video',
+        type: 'object',
+      },
       LatentsOutput: {
         class: 'output',
         properties: {
@@ -112,7 +145,7 @@ describe('parseOpenApiToTemplates', () => {
   const templates = parseOpenApiToTemplates(openApiFixture);
 
   it('parses invocation schemas into templates, skipping the denylist', () => {
-    expect(Object.keys(templates).sort()).toEqual(['add', 'denoise']);
+    expect(Object.keys(templates).sort()).toEqual(['add', 'denoise', 'save_video']);
 
     const add = templates.add;
 
@@ -149,6 +182,21 @@ describe('parseOpenApiToTemplates', () => {
     });
     expect(denoise?.inputs.scheduler?.type.name).toBe('EnumField');
     expect(denoise?.inputs.scheduler?.options).toEqual(['euler', 'ddim']);
+  });
+
+  it('keeps internal-kind metadata and board inputs, but drops node attributes', () => {
+    // `metadata` and `board` are the only two internal-kind properties in the schema, and
+    // both are real inputs. Without `metadata` a bundled workflow's Core Metadata edge has
+    // no handle to land on and is dropped on re-save; without `board` the seven bundled
+    // workflows that expose it get an error in place of a Linear-tab control.
+    const saveVideo = templates.save_video;
+
+    expect(Object.keys(saveVideo?.inputs ?? {}).sort()).toEqual(['board', 'latents', 'metadata']);
+    expect(saveVideo?.inputs.metadata?.type.name).toBe('MetadataField');
+    expect(saveVideo?.inputs.board?.type.name).toBe('BoardField');
+    expect(saveVideo?.inputs.metadata?.fieldKind).toBe('internal');
+    expect(saveVideo?.inputs.board?.fieldKind).toBe('internal');
+    expect(saveVideo?.inputs.latents?.fieldKind).toBe('input');
   });
 
   it('parses output templates', () => {
