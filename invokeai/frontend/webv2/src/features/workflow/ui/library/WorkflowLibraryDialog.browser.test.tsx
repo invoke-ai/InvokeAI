@@ -805,7 +805,7 @@ describe('WorkflowLibraryDialog', () => {
     expect(closeBox?.left ?? 0).toBeGreaterThanOrEqual(segmentBox?.right ?? 0);
   });
 
-  it('truncates a long workflow name instead of scrolling the rail sideways', async () => {
+  it('wraps a long workflow name in full instead of scrolling the rail sideways', async () => {
     await openWith(withSnapshot({ entries: [LONG_NAMED, PORTRAIT] }));
 
     const detail = document.querySelector<HTMLElement>('[data-workflow-detail]');
@@ -824,8 +824,13 @@ describe('WorkflowLibraryDialog', () => {
     expect(railViewport).not.toBeNull();
     expect(railViewport?.scrollWidth).toBeLessThanOrEqual((railViewport?.clientWidth ?? 0) + 1);
 
-    // The name is still readable — truncated, with the full string on hover.
-    expect(detail?.querySelector(`[title="${LONG_NAME}"]`)).not.toBeNull();
+    // The rail is where the user decides whether to open a workflow, so the
+    // whole name is on screen — wrapped over several lines, never clipped.
+    const heading = [...(detail?.querySelectorAll('p') ?? [])].find((element) => element.textContent === LONG_NAME);
+    expect(heading, 'the full name should be rendered').not.toBeUndefined();
+    expect(heading?.scrollWidth).toBeLessThanOrEqual((heading?.clientWidth ?? 0) + 1);
+    // Wrapped, not squeezed onto one line.
+    expect(heading?.getBoundingClientRect().height ?? 0).toBeGreaterThan(20);
   });
 
   it('shows the busy overlay while a workflow is being applied', async () => {

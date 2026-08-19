@@ -25,7 +25,6 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, ConfirmDialog, IconButton, MenuContent, Scrollable } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   CopyIcon,
   DownloadIcon,
@@ -349,7 +348,15 @@ export const WorkflowLibraryDetailPanel = ({
             ) : null}
           </Stack>
 
-          <MiddleTruncate fontSize="sm" fontWeight="600" minW="0" text={name} />
+          {/* The one place the whole name has to be readable — the rail is what
+              the user consults before opening a workflow, so it wraps instead
+              of truncating. `anywhere` so a delimiter-free name breaks too;
+              containment is the wrap plus the scroll area's zeroed content
+              min-width, not a clamp. (Grid cards still truncate: there the name
+              is a glance, not the answer.) */}
+          <Text fontSize="sm" fontWeight="600" minW="0" overflowWrap="anywhere">
+            {name}
+          </Text>
 
           {item.description ? (
             <Text color="fg.muted" fontSize="2xs" lineClamp={4}>
