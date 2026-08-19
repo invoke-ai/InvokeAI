@@ -22,6 +22,24 @@ vi.mock('@features/workflow/queries', async (importOriginal) => ({
   updateLibraryWorkflow: updateLibraryWorkflowMock,
 }));
 
+const TRANSLATIONS: Record<string, string> = {
+  'common.unknownError': 'Unknown error.',
+  'workflowLibrary.saveFailed': 'Failed to save workflow',
+  'workflowLibrary.saved': 'Workflow saved',
+  'workflowLibrary.savedCreatedBody': 'Saved "{{name}}" to the library.',
+  'workflowLibrary.savedUpdatedBody': 'Updated "{{name}}" in the library.',
+  'workflowLibrary.untitled': 'Untitled Workflow',
+};
+
+const interpolate = (template: string, options?: Record<string, unknown>): string =>
+  options ? template.replaceAll(/\{\{(\w+)\}\}/g, (_match, key: string) => String(options[key] ?? '')) : template;
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) => interpolate(TRANSLATIONS[key] ?? key, options),
+  }),
+}));
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const createMutablePort = <Snapshot,>(initialSnapshot: Snapshot) => {
@@ -273,7 +291,10 @@ describe('useSaveWorkflowToLibrary saveDocumentAsNew', () => {
     });
 
     expect(result).toBeNull();
-    expect(adapter.notifications.error).toHaveBeenCalledWith('Failed to save workflow', expect.any(String));
+    expect(adapter.notifications.error).toHaveBeenCalledWith(
+      TRANSLATIONS['workflowLibrary.saveFailed'],
+      expect.any(String)
+    );
     expect(invalidateWorkflowLibraryCacheMock).not.toHaveBeenCalled();
   });
 });

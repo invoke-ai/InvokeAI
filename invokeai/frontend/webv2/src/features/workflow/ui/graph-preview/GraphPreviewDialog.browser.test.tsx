@@ -176,6 +176,7 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.showNode': 'show node',
   'graphPreview.thisGraph': 'This graph',
   'graphPreview.title': 'Graph preview',
+  'workflowLibrary.saveFailed': 'Failed to save workflow',
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>

@@ -313,6 +313,14 @@ describe('WorkflowLibraryDetailPanel', () => {
     const trigger = document.querySelector<HTMLElement>('[aria-label="More actions"]');
     expect(trigger).not.toBeNull();
 
+    // The trigger is a toggle: clicking it while the menu is already open
+    // (e.g. a caller re-asserts state after an in-flight action left the
+    // menu open, because a disabled item's click never reaches the menu
+    // machine) would close it instead of being the no-op callers expect.
+    if (trigger?.getAttribute('data-state') === 'open') {
+      return;
+    }
+
     await act(async () => {
       trigger?.click();
       await settleFrame();

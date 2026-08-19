@@ -385,12 +385,12 @@ export const WorkflowLibraryDetailPanel = ({
       <Stack borderColor="border.subtle" borderTopWidth="1px" gap="2" p="2.5">
         <HStack gap="2" minW="0">
           {installableCount > 0 ? (
-            // The theme's amber, with the ramp's darkest step for text — that
-            // step is dark in both light and dark schemes, so the one warning
-            // token carries the whole treatment.
+            // The theme's warning tokens — same soft amber fill as the card's
+            // missing-model badge and the requirements list's "installable"
+            // rows, so the one signal reads the same everywhere it appears.
             <Button
-              bg="fg.warning"
-              color="neutral.950"
+              bg="bg.warning"
+              color="fg.warning"
               flex="1"
               minW="0"
               size="sm"

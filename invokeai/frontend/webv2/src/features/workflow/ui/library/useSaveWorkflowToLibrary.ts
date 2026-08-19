@@ -19,6 +19,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { markLibraryGraphSynced } from './librarySyncBridge';
 import { setWorkflowLibrarySyncStatus } from './workflowLibrarySyncStore';
@@ -38,6 +39,7 @@ export const useSaveWorkflowToLibrary = (): {
   const { project: projectStore } = useWorkflowUi();
   const { bindLibraryWorkflow } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
+  const { t } = useTranslation();
 
   const saveToLibrary = useCallback(async (): Promise<string | null> => {
     const owner = captureAccountScope();
@@ -47,18 +49,20 @@ export const useSaveWorkflowToLibrary = (): {
       let workflowId: string;
       let syncedSerialized = serialized;
 
+      const name = projectGraph.name || t('workflowLibrary.untitled');
+
       if (projectGraph.libraryWorkflowId) {
         workflowId = projectGraph.libraryWorkflowId;
         await updateLibraryWorkflow(workflowId, serialized, owner.signal);
 
         assertAccountScopeCurrent(owner);
-        notify.success('Workflow saved', `Updated "${projectGraph.name || 'Untitled Workflow'}" in the library.`);
+        notify.success(t('workflowLibrary.saved'), t('workflowLibrary.savedUpdatedBody', { name }));
       } else {
         workflowId = await createLibraryWorkflow(serialized, owner.signal);
 
         assertAccountScopeCurrent(owner);
         bindLibraryWorkflow(workflowId);
-        notify.success('Workflow saved', `Saved "${projectGraph.name || 'Untitled Workflow'}" to the library.`);
+        notify.success(t('workflowLibrary.saved'), t('workflowLibrary.savedCreatedBody', { name }));
 
         // bindLibraryWorkflow dispatches synchronously, so the store already
         // reflects the bound `libraryWorkflowId`. Re-serialize from that
@@ -80,10 +84,10 @@ export const useSaveWorkflowToLibrary = (): {
         return null;
       }
 
-      notify.error('Failed to save workflow', getApiErrorMessage(error, 'The workflow could not be saved.'));
+      notify.error(t('workflowLibrary.saveFailed'), getApiErrorMessage(error, t('common.unknownError')));
       return null;
     }
-  }, [bindLibraryWorkflow, notify, projectGraph, projectStore]);
+  }, [bindLibraryWorkflow, notify, projectGraph, projectStore, t]);
 
   // Saves an arbitrary document — not necessarily the active project graph —
   // as a new library entry. Used by "Open as → Save to workflow library" for
@@ -107,11 +111,11 @@ export const useSaveWorkflowToLibrary = (): {
           return null;
         }
 
-        notify.error('Failed to save workflow', getApiErrorMessage(error, 'The workflow could not be saved.'));
+        notify.error(t('workflowLibrary.saveFailed'), getApiErrorMessage(error, t('common.unknownError')));
         return null;
       }
     },
-    [notify]
+    [notify, t]
   );
 
   return { saveDocumentAsNew, saveToLibrary };

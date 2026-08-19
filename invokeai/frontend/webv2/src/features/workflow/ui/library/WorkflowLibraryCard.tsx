@@ -113,7 +113,11 @@ export const WorkflowLibraryCard = ({
             </Text>
           ) : null}
           {missingCount > 0 ? (
-            <Badge colorPalette="orange" flexShrink={0} size="xs" variant="subtle">
+            // Same amber as the detail panel's Install button and the
+            // requirements list's "installable" rows — the theme's warning
+            // tokens, not Chakra's stock orange, so it tracks every theme's
+            // own warning hue instead of a fixed one.
+            <Badge bg="bg.warning" color="fg.warning" flexShrink={0} size="xs" variant="subtle">
               {t('workflowLibrary.installModels', { count: missingCount })}
             </Badge>
           ) : null}
