@@ -70,8 +70,8 @@ def _make_quantized_config(fmt: str = "gguf_quantized"):
         (_make_config(ModelType.VAE, fp8=True), None),
         (_make_config(ModelType.LoRA, fp8=True), None),
         # Z-Image used to be listed here. It is no longer excluded — see
-        # `test_should_use_fp8_allows_z_image` for why the exclusion became obsolete. A quantized
-        # model takes its place: its guard must also sit ahead of the device probe.
+        # `test_should_use_fp8_allows_z_image` for why the exclusion became obsolete.
+        # A quantized model takes its place: its guard must also sit ahead of the device probe.
         (_make_quantized_config(), None),
         (_make_config(ModelType.Main, fp8=True), SubModelType.Tokenizer),
         (_make_config(ModelType.Main, fp8=False), None),
