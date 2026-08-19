@@ -1,4 +1,6 @@
 import os
+import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -13,6 +15,7 @@ from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
 from invokeai.app.services.board_records.board_records_common import BoardRecord
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
@@ -299,6 +302,131 @@ def test_star_unstar_reports_failures_and_keeps_partial_successes(
     # not be toasted as a failure.
     assert body["failed_images"] == ["broken.png"]
     assert body["affected_boards"] == ["board-1"]
+
+
+@pytest.mark.parametrize(
+    ("route", "updated_key"),
+    [("star", "starred_images"), ("unstar", "unstarred_images")],
+)
+def test_star_unstar_skips_names_deleted_mid_batch(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    client: TestClient,
+    route: str,
+    updated_key: str,
+) -> None:
+    """A name deleted by a concurrent session is a skip, not a storage failure.
+
+    Reported as an admin, because that is the only caller for which this is reachable: for
+    anyone else `get_user_id` returns None for a missing record and the ownership check
+    already answers 403. It is also the default single-user path, so this WAS the common
+    case -- the name landed in failed_images and toasted "1 image could not be updated"
+    for an image the user no longer had.
+    """
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+
+    def update(image_name: str, changes: Any) -> MagicMock:
+        del changes
+        if image_name == "vanished.png":
+            raise ImageRecordNotFoundException
+        dto = MagicMock()
+        dto.board_id = "board-1"
+        return dto
+
+    images_service.update.side_effect = update
+
+    response = client.post(f"/api/v1/images/{route}", json={"image_names": ["ok.png", "vanished.png"]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body[updated_key] == ["ok.png"]
+    assert body["failed_images"] == []
+
+
+@pytest.mark.parametrize("raise_from", ["get_dto", "delete"])
+def test_delete_skips_names_deleted_mid_batch(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient, raise_from: str
+) -> None:
+    """Same for /delete: the caller asked for the image to be gone, and it is.
+
+    Parametrized over both raise sites because the race window spans them: the loop reads the
+    DTO for its board id and only then deletes, and ImageService.delete re-reads the record, so
+    a name can vanish after the first read succeeds.
+    """
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+
+    def get_dto(image_name: str) -> MagicMock:
+        if image_name == "vanished.png" and raise_from == "get_dto":
+            raise ImageRecordNotFoundException
+        dto = MagicMock()
+        dto.board_id = "board-1"
+        return dto
+
+    def delete(image_name: str) -> None:
+        if image_name == "vanished.png" and raise_from == "delete":
+            raise ImageRecordNotFoundException
+
+    images_service.get_dto.side_effect = get_dto
+    images_service.delete.side_effect = delete
+
+    response = client.post("/api/v1/images/delete", json={"image_names": ["ok.png", "vanished.png"]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted_images"] == ["ok.png"]
+    # Absent from both lists: not deleted by us, and not a failure either.
+    assert body["failed_images"] == []
+
+
+def test_image_records_get_does_not_disguise_a_storage_error_as_not_found(monkeypatch: Any) -> None:
+    """The narrowing itself: a sqlite3.Error out of the SELECT must stay a sqlite3.Error."""
+    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+
+    storage = SqliteImageRecordStorage.__new__(SqliteImageRecordStorage)
+
+    class _Cursor:
+        def execute(self, *args: Any, **kwargs: Any) -> None:
+            raise sqlite3.OperationalError("database disk image is malformed")
+
+    class _Db:
+        @contextmanager
+        def transaction(self):
+            yield _Cursor()
+
+    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
+
+    with pytest.raises(sqlite3.OperationalError):
+        storage.get("a.png")
+
+
+def test_delete_still_reports_a_genuine_storage_failure(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """The not-found skip must stay narrow -- a real deletion failure is still reported.
+
+    This is the half of the storage-error story the route owns. The other half is at the
+    storage layer: image_records.get() used to re-raise every sqlite3.Error as
+    ImageRecordNotFoundException, so a locked or corrupt database was indistinguishable from a
+    concurrent delete and the skip would have answered 200 with two empty lists and no toast at
+    all. See test_image_records_get_does_not_disguise_a_storage_error_as_not_found.
+    """
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+    dto = MagicMock()
+    dto.board_id = "board-1"
+    images_service.get_dto.return_value = dto
+
+    def delete(image_name: str) -> None:
+        if image_name == "broken.png":
+            raise RuntimeError("storage is on fire")
+
+    images_service.delete.side_effect = delete
+
+    response = client.post("/api/v1/images/delete", json={"image_names": ["ok.png", "broken.png"]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted_images"] == ["ok.png"]
+    assert body["failed_images"] == ["broken.png"]
 
 
 @pytest.mark.parametrize("route", ["star", "unstar"])

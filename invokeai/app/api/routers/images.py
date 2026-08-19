@@ -27,6 +27,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
     ImageRecordChanges,
+    ImageRecordNotFoundException,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import (
@@ -541,6 +542,18 @@ async def delete_images_from_list(
                 affected_boards.add(board_id)
             except HTTPException:
                 continue
+            except ImageRecordNotFoundException:
+                # The record is already gone — a concurrent session deleted it after this
+                # iteration's ownership check passed. The caller asked for it to be gone and it
+                # is, so this is a skip, not a storage failure: reporting it in failed_images
+                # toasts "1 image could not be updated" for an outcome the user got. Matches
+                # remove_images_from_board, which resolves the same race for board removal.
+                #
+                # This is narrow only because image_records.get() no longer translates a
+                # sqlite3.Error into this exception — see the comment there. If that
+                # translation ever comes back, a locked or corrupt database would land here
+                # and a whole failed batch would answer 200 with empty result lists.
+                continue
             except Exception:
                 # A genuine deletion failure (not an auth/404 skip) — report it so the
                 # client can surface a partial-failure warning, matching the video path.
@@ -631,6 +644,12 @@ async def star_images_in_list(
                 affected_boards.add(updated_image_dto.board_id or "none")
             except HTTPException:
                 continue
+            except ImageRecordNotFoundException:
+                # Deleted by a concurrent session — a skip, not a storage failure. See
+                # delete_images_from_list. Reachable here through the get_dto read-back inside
+                # ImageService.update: the UPDATE itself matches no row and raises nothing, so
+                # a name that vanished mid-batch surfaces only on the read that follows.
+                continue
             except Exception:
                 # A genuine storage failure, not an auth/404 skip: it used to be swallowed
                 # by `pass`, so the client counted the image as starred and the star
@@ -676,6 +695,9 @@ async def unstar_images_in_list(
                 unstarred_images.add(image_name)
                 affected_boards.add(updated_image_dto.board_id or "none")
             except HTTPException:
+                continue
+            except ImageRecordNotFoundException:
+                # See star_images_in_list.
                 continue
             except Exception:
                 failed_images.add(image_name)
