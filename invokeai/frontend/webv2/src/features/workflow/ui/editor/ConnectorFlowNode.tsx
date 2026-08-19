@@ -2,12 +2,11 @@ import type { FieldType } from '@features/workflow/contracts';
 
 import { Box, Flex } from '@chakra-ui/react';
 import {
-  CONNECTOR_INPUT_HANDLE,
-  CONNECTOR_OUTPUT_HANDLE,
-  getFieldTypeColor,
-  getFieldTypeLabel,
-  isModelFieldType,
-} from '@features/workflow/utility';
+  getWorkflowNodeChromeProps,
+  getWorkflowNodeHandleStyle,
+  WORKFLOW_NODE_HANDLE_SIZE,
+} from '@features/workflow/ui/nodeChrome';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE, getFieldTypeLabel } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo, useMemo } from 'react';
@@ -15,37 +14,17 @@ import { memo, useMemo } from 'react';
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
-import { getWorkflowNodeChromeProps } from './nodeChrome';
 
-const HANDLE_SIZE = 12;
-type HandleSide = 'left' | 'right';
-
+/** An untyped ("any") connector end: a plain grid-tinted dot rather than a field-typed handle. */
 const genericHandleStyle: React.CSSProperties = {
   background: 'var(--wb-flow-grid)',
-  border: '1px solid var(--chakra-colors-bg)',
-  height: HANDLE_SIZE,
-  width: HANDLE_SIZE,
+  border: '1px solid var(--xy-background-color)',
+  height: WORKFLOW_NODE_HANDLE_SIZE,
+  width: WORKFLOW_NODE_HANDLE_SIZE,
 };
 
-const typedHandleStyle = (type: FieldType, side: HandleSide): React.CSSProperties => {
-  const color = getFieldTypeColor(type);
-  const isFilled = type.cardinality === 'SINGLE';
-  const isAngular = isModelFieldType(type) || type.batch;
-  const centeredDiamondTransform = `translate(${side === 'left' ? '-' : ''}50%, -50%) rotate(45deg)`;
-
-  return {
-    background: isFilled ? color : 'var(--xy-background-color)',
-    border: isFilled ? 'none' : `3px solid ${color}`,
-    borderRadius: isAngular ? 3 : '50%',
-    boxShadow: '0 0 0 1px var(--xy-background-color)',
-    height: HANDLE_SIZE,
-    transform: type.batch ? centeredDiamondTransform : undefined,
-    width: HANDLE_SIZE,
-  };
-};
-
-const getConnectorHandleStyle = (type: FieldType | null, side: HandleSide): React.CSSProperties =>
-  type ? typedHandleStyle(type, side) : genericHandleStyle;
+const getConnectorHandleStyle = (type: FieldType | null, side: 'left' | 'right'): React.CSSProperties =>
+  type ? getWorkflowNodeHandleStyle(type, side) : genericHandleStyle;
 
 const getConnectorTitle = (inputType: FieldType | null, outputType: FieldType | null): string => {
   const inputLabel = inputType ? getFieldTypeLabel(inputType) : 'Any input';
@@ -57,11 +36,11 @@ const getConnectorTitle = (inputType: FieldType | null, outputType: FieldType | 
 const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowNodeType>) => {
   const node = data.documentNode;
   const inputHandleStyle = useMemo(
-    () => ({ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -HANDLE_SIZE / 2 }),
+    () => ({ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -WORKFLOW_NODE_HANDLE_SIZE / 2 }),
     [data.inputFieldType]
   );
   const outputHandleStyle = useMemo(
-    () => ({ ...getConnectorHandleStyle(data.outputFieldType, 'right'), right: -HANDLE_SIZE / 2 }),
+    () => ({ ...getConnectorHandleStyle(data.outputFieldType, 'right'), right: -WORKFLOW_NODE_HANDLE_SIZE / 2 }),
     [data.outputFieldType]
   );
 

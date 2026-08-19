@@ -1,12 +1,11 @@
 import type { NodeProps } from '@xyflow/react';
 
 import { Box, Input, Textarea } from '@chakra-ui/react';
+import { getWorkflowNodeChromeProps } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { memo, useCallback, type ChangeEvent } from 'react';
 
 import type { NotesFlowNode as NotesFlowNodeType } from './flowAdapters';
-
-import { getWorkflowNodeChromeProps } from './nodeChrome';
 
 const NotesFlowNodeComponent = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
   const { editGraph } = useProjectGraphCommands();

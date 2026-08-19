@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
 import { useProgressImage } from '@features/queue/react';
+import { getWorkflowNodeHeaderProps, getWorkflowNodeShellProps } from '@features/workflow/ui/nodeChrome';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import {
@@ -12,8 +13,6 @@ import {
 import { memo } from 'react';
 
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
-
-import { getWorkflowNodeChromeProps } from './nodeChrome';
 
 /**
  * The legacy `current_image` UI node: a live monitor inside the graph. Shows
@@ -34,8 +33,8 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
   const latestImage = getLatestImage(galleryValues);
 
   return (
-    <Box bg="bg" fontSize="xs" overflow="hidden" rounded="lg" w="20rem" {...getWorkflowNodeChromeProps({ selected })}>
-      <Flex align="center" bg="bg.subtle" borderBottomWidth="1px" borderColor="border.subtle" px="3" py="1.5">
+    <Box overflow="hidden" w="20rem" {...getWorkflowNodeShellProps({ selected })}>
+      <Flex {...getWorkflowNodeHeaderProps()}>
         <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
         {progressImage ? (
           <Text color="brand.solid" fontSize="2xs" ms="auto">
