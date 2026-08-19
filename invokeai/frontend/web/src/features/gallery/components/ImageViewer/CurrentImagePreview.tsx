@@ -83,8 +83,10 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       setImageToRender(imageDTO);
       // Resolve the progress overlay as soon as the thumbnail settles — on success *or* error.
       // Relying on DndImage's onLoad alone leaves the overlay stuck whenever the image fails to
-      // load, because Chakra reports that as onError instead.
-      onLoadImage();
+      // load, because Chakra reports that as onError instead. The session id lets the lifecycle
+      // attribute the load, so a late-settling thumbnail from an earlier session cannot cut a
+      // different session's resolve illusion short.
+      onLoadImage(imageDTO.session_id ?? null);
     };
 
     if (typeof window === 'undefined' || !previewSrc) {
@@ -231,6 +233,12 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     dependencies: [onHotkeyNextImage],
   });
 
+  // The loaded image identifies its session so the viewer can tell a late load from an earlier
+  // session apart from the one whose preview is currently retained (see onLoadImage).
+  const onLoadRenderedImage = useCallback(() => {
+    onLoadImage(imageToRender?.session_id ?? null);
+  }, [imageToRender?.session_id, onLoadImage]);
+
   const withProgress = shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage;
   // When more than one session is generating concurrently (multi-GPU), tile their previews instead of
   // showing only the most recent one.
@@ -248,7 +256,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     >
       {imageToRender && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <DndImage imageDTO={imageToRender} onLoad={onLoadImage} borderRadius="base" />
+          <DndImage imageDTO={imageToRender} onLoad={onLoadRenderedImage} borderRadius="base" />
         </Flex>
       )}
       {!imageToRender && <NoContentForViewer />}

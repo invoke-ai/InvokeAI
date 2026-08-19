@@ -43,9 +43,8 @@ const MAX_PENDING = 8;
 // Same no-renders window as above: an entry is only meaningful between the auto-switch dispatch
 // and the image's first render, and with the viewer unmounted that render may never come. Without
 // the TTL, remounting the viewer within reach of such an orphan and clicking its image would
-// suppress the reveal. Generous enough for a slow thumbnail fetch (same reasoning as
-// PROGRESS_IMAGE_RESOLVE_TIMEOUT_MS); expiring early merely readmits the 2-second flash on a very
-// slow connection, which is the milder failure.
+// suppress the reveal. Generous enough for a slow thumbnail fetch on a bad connection; expiring
+// early merely readmits the 2-second flash there, which is the milder failure.
 const TTL_MS = 30_000;
 
 export const createAutoSwitchedImageRegistry = (now: () => number = Date.now): AutoSwitchedImageRegistry => {

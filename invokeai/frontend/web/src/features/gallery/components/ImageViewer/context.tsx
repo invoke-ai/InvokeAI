@@ -1,6 +1,12 @@
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
+import type {
+  ViewerProgressDataMap,
+  ViewerProgressDatum,
+} from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
+import { createViewerProgressLifecycle } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
@@ -13,17 +19,7 @@ import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
 
-import { createDeferredClear, getTerminalProgressAction, pickPromotionCandidate } from './progressImageResolution';
-
-/** Live progress for a single in-flight session (queue item). Used to tile the viewer when several
- * sessions run concurrently (multi-GPU). Only items that have produced a preview image are tracked. */
-export type ViewerProgressDatum = {
-  itemId: number;
-  progressEvent: S['InvocationProgressEvent'];
-  progressImage: ProgressImageType;
-};
-
-type ViewerProgressDataMap = Record<number, ViewerProgressDatum | undefined>;
+export type { ViewerProgressDatum } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
 
 type ImageViewerContextValue = {
   $progressEvent: Atom<S['InvocationProgressEvent'] | null>;
@@ -35,7 +31,11 @@ type ImageViewerContextValue = {
   $activeProgressData: Atom<ViewerProgressDatum[]>;
   $isProgressImageResolving: Atom<boolean>;
   $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
-  onLoadImage: () => void;
+  /**
+   * The viewer finished loading the final image/video for the given session (its DTO's
+   * `session_id`, or null when it has none). Ends the completed session's "resolve" illusion.
+   */
+  onLoadImage: (sessionId: string | null) => void;
 };
 
 const ImageViewerContext = createContext<ImageViewerContextValue | null>(null);
@@ -60,51 +60,24 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   )[0];
   const $isProgressImageResolving = useState(() => atom(false))[0];
   const $isTemporarilyShowingSelectedImage = useState(() => atom(false))[0];
-  // Owns both the "clear on load" flag and its backstop timer, so no path can reset one and leak
-  // the other. See createDeferredClear.
-  const [deferredClear] = useState(() => createDeferredClear());
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
-
-  // Cancels a pending deferred clear without touching the preview itself. Every path that takes
-  // responsibility for the preview away from the armed onLoadImage must call this, or the backstop
-  // outlives the generation that armed it and blanks a later one's live preview.
-  const disarmDeferredClear = useCallback(() => {
-    deferredClear.disarm();
-    $isProgressImageResolving.set(false);
-  }, [$isProgressImageResolving, deferredClear]);
-
-  const clearProgressImage = useCallback(() => {
-    disarmDeferredClear();
-    $progressEvent.set(null);
-    $progressImage.set(null);
-  }, [disarmDeferredClear, $progressEvent, $progressImage]);
-
-  // Nulling $progressImage tears down the whole overlay, tiles included — $activeProgressData only
-  // renders while it is set. So when other sessions are still producing previews (multi-GPU), the
-  // backstop must not clear: the overlay has already stopped being this item's to own. Merely
-  // disarming is not enough either — that leaves the shared atoms owned by the finished item, and
-  // the surviving sessions' terminal events would then 'ignore' them as foreign (see
-  // getTerminalProgressAction), stranding the overlay on a stale preview after the last session
-  // ends. Hand the atoms to the most recently active session instead; its own terminal event then
-  // clears or re-arms them normally.
-  const onResolveDeadline = useCallback(() => {
-    const candidate = pickPromotionCandidate($activeProgressData.get());
-    if (candidate) {
-      disarmDeferredClear();
-      $progressEvent.set(candidate.progressEvent);
-      $progressImage.set(candidate.progressImage);
-      return;
-    }
-    clearProgressImage();
-  }, [$activeProgressData, $progressEvent, $progressImage, clearProgressImage, disarmDeferredClear]);
-
-  useEffect(() => {
-    return () => {
-      deferredClear.disarm();
-    };
-  }, [deferredClear]);
+  // Session id -> queue item id, learned from progress events. Outlives the item's terminal event
+  // so a late final-image load can be attributed to the session that produced it.
+  const [itemIdBySessionId] = useState(() => new LRUCache<string, number>({ max: 200 }));
+  // All store mutations live in the lifecycle (extracted for unit testing); the effects below own
+  // the socket subscriptions and the ownership/scope checks on incoming events.
+  const lifecycle = useState(() =>
+    createViewerProgressLifecycle({
+      $progressEvent,
+      $progressImage,
+      $progressData,
+      $isProgressImageResolving,
+      finishedQueueItemIds,
+      itemIdBySessionId,
+    })
+  )[0];
 
   useEffect(() => {
     if (!socket) {
@@ -117,26 +90,11 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       if (getEventScope(store.getState, data) !== 'own') {
         return;
       }
-      if (finishedQueueItemIds.has(data.item_id)) {
+      if (!lifecycle.recordProgress(data)) {
         log.trace(
           { data } as JsonObject,
           `Received InvocationProgressEvent event for already-finished queue item ${data.item_id}`
         );
-        return;
-      }
-      // A new preview supersedes any deferred clear still armed by the previous queue item, whose
-      // final image may never have loaded. Leaving its backstop running would blank this preview
-      // mid-generation.
-      disarmDeferredClear();
-      $progressEvent.set(data);
-      if (data.image) {
-        $progressImage.set(data.image);
-        // Track per-session so the viewer can tile concurrent sessions (multi-GPU).
-        $progressData.setKey(data.item_id, {
-          itemId: data.item_id,
-          progressEvent: data,
-          progressImage: data.image,
-        });
       }
     };
 
@@ -145,7 +103,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('invocation_progress', onInvocationProgress);
     };
-  }, [$progressData, $progressEvent, $progressImage, disarmDeferredClear, finishedQueueItemIds, socket, store]);
+  }, [lifecycle, socket, store]);
 
   useEffect(() => {
     if (!socket) {
@@ -161,41 +119,22 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       if (getEventScope(store.getState, data) !== 'own') {
         return;
       }
-      if (finishedQueueItemIds.has(data.item_id)) {
+      if (data.status === 'in_progress') {
+        // Track the claim itself, not just the progress events that follow it: a queue clear
+        // cancels the items already running before it deletes the rows, so a worker that claims an
+        // item in between never gets a terminal event and its first progress event lands after the
+        // clear (see the lifecycle's onItemStarted).
+        lifecycle.onItemStarted(data.item_id);
+        return;
+      }
+      if (data.status !== 'completed' && data.status !== 'canceled' && data.status !== 'failed') {
+        return;
+      }
+      if (!lifecycle.onTerminal(data, autoSwitch)) {
         log.trace(
           { data } as JsonObject,
           `Received QueueItemStatusChangedEvent event for already-finished queue item ${data.item_id}`
         );
-        return;
-      }
-      if (data.status === 'completed' || data.status === 'canceled' || data.status === 'failed') {
-        finishedQueueItemIds.set(data.item_id, true);
-        // Remove this session's tile from the multi-session preview as soon as it reaches a terminal
-        // state. The single-image "resolve" illusion below is handled separately via onLoadImage.
-        $progressData.setKey(data.item_id, undefined);
-
-        // See getTerminalProgressAction for why each outcome is chosen. 'arm' defers the clear to
-        // onLoadImage so the viewer can create the illusion of the progress image "resolving" into
-        // the final image — clearing it here instead would flicker through the previously-selected
-        // gallery image before the final one appears.
-        const action = getTerminalProgressAction(data, {
-          autoSwitch,
-          globalProgressItemId: $progressEvent.get()?.item_id ?? null,
-        });
-
-        if (action === 'ignore') {
-          return;
-        }
-
-        if (action === 'clear') {
-          clearProgressImage();
-          return;
-        }
-
-        $isProgressImageResolving.set(true);
-        // onLoadImage is not guaranteed to fire — see PROGRESS_IMAGE_RESOLVE_TIMEOUT_MS. Without
-        // this deadline the overlay can cover the finished image until the page is reloaded.
-        deferredClear.arm(onResolveDeadline);
       }
     };
 
@@ -204,62 +143,55 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
     return () => {
       socket.off('queue_item_status_changed', onQueueItemStatusChanged);
     };
-  }, [
-    $isProgressImageResolving,
-    $progressData,
-    $progressEvent,
-    autoSwitch,
-    clearProgressImage,
-    deferredClear,
-    finishedQueueItemIds,
-    onResolveDeadline,
-    socket,
-    store,
-  ]);
+  }, [autoSwitch, lifecycle, socket, store]);
 
-  // The viewer's progress atoms are separate stores from the global ones in services/events/stores,
-  // which setEventListeners already resets on every socket lifecycle transition. Without the same
-  // reset here the two diverge: socket.io has no event replay, so a drop spanning the terminal
-  // queue_item_status_changed loses that event permanently and nothing is left to clear the opaque
-  // overlay covering the finished image. Backgrounding a tab long enough for the connection to be
-  // torn down is the common way to hit this.
-  //
-  // Clearing on disconnect — not just on reconnect — matches the progress *bars*, which already
-  // vanish then. If the generation is in fact still running, the next invocation_progress event
-  // repopulates the preview within a step.
   useEffect(() => {
     if (!socket) {
       return;
     }
 
-    const onSocketLifecycleChange = () => {
-      clearProgressImage();
-      // connect_error fires once per reconnection attempt, i.e. roughly once a second while the
-      // server is down. `set` compares by reference, so an unconditional `set({})` would notify
-      // every subscriber on every attempt; only replace the map when it actually holds something.
-      if (Object.keys($progressData.get()).length > 0) {
-        $progressData.set({});
-      }
+    const onQueueCleared = (data: S['QueueClearedEvent']) => {
+      // Scope is decided inside the lifecycle: it needs the current user id to tell whether the
+      // clear could have deleted this client's items (see onQueueCleared's docstring).
+      const currentUserId = selectCurrentUser(store.getState())?.user_id ?? null;
+      lifecycle.onQueueCleared(data, currentUserId);
     };
 
-    socket.on('connect', onSocketLifecycleChange);
-    socket.on('connect_error', onSocketLifecycleChange);
-    socket.on('disconnect', onSocketLifecycleChange);
+    socket.on('queue_cleared', onQueueCleared);
 
     return () => {
-      socket.off('connect', onSocketLifecycleChange);
-      socket.off('connect_error', onSocketLifecycleChange);
-      socket.off('disconnect', onSocketLifecycleChange);
+      socket.off('queue_cleared', onQueueCleared);
     };
-  }, [$progressData, clearProgressImage, socket]);
+  }, [lifecycle, socket, store]);
 
-  const onLoadImage = useCallback(() => {
-    if (!deferredClear.isArmed()) {
+  useEffect(() => {
+    if (!socket) {
       return;
     }
 
-    clearProgressImage();
-  }, [clearProgressImage, deferredClear]);
+    const onDisconnect = () => {
+      // Mirrors the app-wide progress stores (see setEventListeners): a disconnected socket may
+      // miss terminal events, so previews from before the gap cannot be trusted to ever resolve.
+      lifecycle.reset();
+    };
+
+    socket.on('disconnect', onDisconnect);
+
+    return () => {
+      socket.off('disconnect', onDisconnect);
+      // The socket is being replaced (e.g. an auth-token change swapped $socket for a different
+      // user's connection) or the viewer is unmounting: any tracked sessions belong to the old
+      // connection and will never emit another terminal event here.
+      lifecycle.reset();
+    };
+  }, [lifecycle, socket]);
+
+  const onLoadImage = useCallback(
+    (sessionId: string | null) => {
+      lifecycle.onFinalImageLoaded(sessionId);
+    },
+    [lifecycle]
+  );
 
   const value = useMemo(
     () => ({

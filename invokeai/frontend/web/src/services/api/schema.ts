@@ -157,9 +157,16 @@ export type paths = {
          *     To change the password, both ``current_password`` and ``new_password`` must
          *     be provided. The current password is verified before the change is applied.
          *
+         *     A password change signs out the account's *other* sessions: it bumps the
+         *     revocation epoch, invalidating every previously issued token. This response
+         *     carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+         *     signed in.
+         *
          *     Args:
          *         request: Profile fields to update
          *         current_user: The authenticated user
+         *         http_request: The HTTP request, used to scope the replacement media cookie
+         *         response: The HTTP response, used to return the replacement token
          *
          *     Returns:
          *         The updated user
@@ -294,13 +301,13 @@ export type paths = {
          * @description Delete a user. Requires admin privileges.
          *
          *     Admins can delete any user including other admins, but cannot delete the last
-         *     remaining admin.
+         *     remaining admin, nor the internal system user.
          *
          *     Args:
          *         user_id: The user ID
          *
          *     Raises:
-         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 400 if attempting to delete the last admin or the system user
          *         HTTPException: 404 if user not found
          */
         delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
@@ -310,6 +317,10 @@ export type paths = {
          * Update User
          * @description Update a user. Requires admin privileges.
          *
+         *     Resetting a password revokes the target's existing sessions. An admin resetting
+         *     their own password receives a replacement token in ``X-Refreshed-Token`` so they
+         *     are not signed out by their own action.
+         *
          *     Args:
          *         user_id: The user ID
          *         request: Fields to update
@@ -318,7 +329,8 @@ export type paths = {
          *         The updated user
          *
          *     Raises:
-         *         HTTPException: 400 if password is weak
+         *         HTTPException: 400 if password is weak, if the change would remove the last
+         *             administrator, or if it targets the protected system account
          *         HTTPException: 404 if user not found
          */
         patch: operations["update_user_api_v1_auth_users__user_id__patch"];
@@ -18939,6 +18951,7 @@ export type components = {
          *         external_seedream_base_url: Base URL override for Seedream image generation.
          *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
          *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+         *         http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
          */
         InvokeAIAppConfig: {
             /**
@@ -19013,6 +19026,12 @@ export type components = {
              * @default 127.0.0.1
              */
             forwarded_allow_ips?: string;
+            /**
+             * Http Compression Level
+             * @description Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
+             * @default 9
+             */
+            http_compression_level?: number;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -38040,6 +38059,12 @@ export type components = {
              * @description When user last logged in
              */
             last_login_at?: string | null;
+            /**
+             * Token Epoch
+             * @description Revocation epoch; tokens minted before the current value are rejected
+             * @default 0
+             */
+            token_epoch?: number;
         };
         /**
          * UserProfileUpdateRequest
