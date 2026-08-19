@@ -4,7 +4,7 @@ import type {
   ResolvedModelRequirement,
   WorkflowModelRequirement,
 } from '@features/workflow/core/modelRequirements';
-import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibraryEntry, WorkflowLibraryEntryEnrichment } from '@features/workflow/data/libraryBrowseStore';
 import type { ElementType } from 'react';
 
 import { DataList, Icon, Skeleton, Spinner, Stack, Text } from '@chakra-ui/react';
@@ -85,6 +85,40 @@ export const useModelRequirementDeps = (): ModelRequirementDeps => {
   );
 };
 
+type ReadyEnrichment = Extract<WorkflowLibraryEntryEnrichment, { status: 'ready' }>;
+
+/**
+ * Resolution is keyed by the enrichment object because that is exactly what
+ * changes when one workflow finishes parsing: the browse store publishes a new
+ * `entries` array per *individual* completion, with four workers running, so a
+ * page of 20 lands 20 arrays. Without this, every one of those would re-resolve
+ * every row — quadratic, synchronously, in render. The deps the entry was
+ * resolved under are stored alongside, so a model install or a starter-catalog
+ * load invalidates the entry as it should.
+ */
+const resolutionCache = new WeakMap<
+  ReadyEnrichment,
+  { deps: ModelRequirementDeps; resolved: ResolvedModelRequirement[] }
+>();
+
+/** Resolves one entry's requirements, reusing the previous result when nothing it depends on changed. */
+export const resolveEntryRequirements = (
+  enrichment: ReadyEnrichment,
+  deps: ModelRequirementDeps
+): ResolvedModelRequirement[] => {
+  const cached = resolutionCache.get(enrichment);
+
+  if (cached && cached.deps === deps) {
+    return cached.resolved;
+  }
+
+  const resolved = resolveWorkflowModelRequirements(enrichment.requirements.requirements, deps);
+
+  resolutionCache.set(enrichment, { deps, resolved });
+
+  return resolved;
+};
+
 /**
  * How many models each card would have to *download* to run — the count the
  * grid badges and, on the selected card, exactly what the panel's Install
@@ -105,7 +139,7 @@ export const useWorkflowLibraryMissingCounts = (
         continue;
       }
 
-      const installable = resolveWorkflowModelRequirements(entry.enrichment.requirements.requirements, deps).filter(
+      const installable = resolveEntryRequirements(entry.enrichment, deps).filter(
         (resolved) => resolved.status === 'installable'
       ).length;
 

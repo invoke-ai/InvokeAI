@@ -88,6 +88,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateFailed': 'Failed to duplicate workflow',
   'workflowLibrary.duplicateName': '{{name}} copy',
+  'workflowLibrary.duplicated': 'Saved a copy under Yours',
   'workflowLibrary.forkIntoProject': 'Fork into new project',
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
@@ -529,6 +530,49 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(RAW_WORKFLOW.meta).toStrictEqual({ category: 'default', version: '3.0.0' });
     expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledTimes(1);
     expect(onDuplicated).toHaveBeenCalledWith('wf-copy');
+    // From Browse, the copy lands in a category the user is not looking at, so
+    // the notice is the only confirmation there is.
+    expect(NOTIFICATIONS.success).toHaveBeenCalledWith('Saved a copy under Yours');
+  });
+
+  it('refuses a second duplicate while the first is still in flight', async () => {
+    let release: (raw: Record<string, unknown>) => void = () => {};
+
+    queries.getLibraryWorkflowCached.mockImplementation(
+      () =>
+        new Promise<Record<string, unknown>>((resolve) => {
+          release = resolve;
+        })
+    );
+
+    await renderPanel(DEFAULT_CATEGORY);
+
+    await clickMenuItem('duplicate');
+
+    // Nothing has changed on screen yet — the copy is two round trips away and
+    // lands in a category this view is not showing — so the menu item holds
+    // itself closed instead of letting an impatient second click mint a second
+    // copy.
+    await openMenu();
+    expect(menuItem('duplicate')?.getAttribute('aria-disabled')).toBe('true');
+
+    await act(async () => {
+      menuItem('duplicate')?.click();
+      await settleFrame();
+    });
+
+    await act(async () => {
+      release(RAW_WORKFLOW);
+      await settleFrame();
+    });
+
+    expect(queries.getLibraryWorkflowCached).toHaveBeenCalledTimes(1);
+    expect(queries.createLibraryWorkflow).toHaveBeenCalledTimes(1);
+    expect(NOTIFICATIONS.success).toHaveBeenCalledTimes(1);
+
+    // And it is offered again once the copy exists.
+    await openMenu();
+    expect(menuItem('duplicate')?.getAttribute('aria-disabled')).toBeNull();
   });
 
   it('forks the cached workflow into a fresh project', async () => {

@@ -4,7 +4,6 @@ import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 
 import { Badge, Box, Flex, HStack, Icon, Image, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { getStarterModelInstallSources, useInstallActions } from '@features/models';
-import { resolveWorkflowModelRequirements } from '@features/workflow/core/modelRequirements';
 import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
@@ -31,11 +30,15 @@ import {
   Trash2Icon,
   WorkflowIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatRelativeTime } from './relativeTime';
-import { useModelRequirementDeps, WorkflowRequirementsList } from './WorkflowRequirementsList';
+import {
+  resolveEntryRequirements,
+  useModelRequirementDeps,
+  WorkflowRequirementsList,
+} from './WorkflowRequirementsList';
 
 /**
  * The library's right rail: everything about the selected workflow that
@@ -51,6 +54,7 @@ import { useModelRequirementDeps, WorkflowRequirementsList } from './WorkflowReq
 
 const DETAIL_RAIL_WIDTH = '18rem';
 const THUMBNAIL_ASPECT_RATIO = 3 / 2;
+const DISABLED_ITEM = { opacity: 0.4 } as const;
 const INSTALL_HOVER = { opacity: 0.85 } as const;
 const MENU_ITEM_LAYOUT = { alignItems: 'center', gap: '2.5', py: '1' } as const;
 const MENU_ITEM_ICON_PROPS = { boxSize: '3.5', flexShrink: 0 } as const;
@@ -85,13 +89,18 @@ export const WorkflowLibraryDetailPanel = ({
   // thumbnail without an effect resetting the flag.
   const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  // A duplicate is two round trips with nothing on screen between them, and a
+  // copy of a default lands in a category the user is not looking at — so the
+  // menu item has to hold itself closed until the copy exists, or an impatient
+  // second click mints a second copy.
+  const [isDuplicatePending, setIsDuplicatePending] = useState(false);
+  const isDuplicatePendingRef = useRef(false);
 
   const enrichment = entry?.enrichment ?? null;
+  // Shares the grid's per-entry cache, so selecting a card the badges already
+  // resolved costs nothing.
   const resolved = useMemo(
-    () =>
-      enrichment?.status === 'ready'
-        ? resolveWorkflowModelRequirements(enrichment.requirements.requirements, deps)
-        : null,
+    () => (enrichment?.status === 'ready' ? resolveEntryRequirements(enrichment, deps) : null),
     [deps, enrichment]
   );
   const installableCount = resolved?.filter((requirement) => requirement.status === 'installable').length ?? 0;
@@ -154,12 +163,15 @@ export const WorkflowLibraryDetailPanel = ({
    * loading it.
    */
   const duplicate = useCallback(async () => {
-    if (!entry) {
+    if (!entry || isDuplicatePendingRef.current) {
       return;
     }
 
     const owner = captureAccountScope();
     const { name } = entry.item;
+
+    isDuplicatePendingRef.current = true;
+    setIsDuplicatePending(true);
 
     try {
       const raw = await getLibraryWorkflowCached(entry.item.workflow_id, owner.signal);
@@ -180,10 +192,18 @@ export const WorkflowLibraryDetailPanel = ({
 
       assertAccountScopeCurrent(owner);
       invalidateWorkflowLibraryCache();
+      // The copy is forced into the user category, so from the Browse tab it
+      // lands out of sight — the notice is the only thing that says it worked.
+      notify.success(t('workflowLibrary.duplicated'));
       onDuplicated(workflowId);
     } catch (error) {
       if (isAccountScopeCurrent(owner)) {
         notify.error(t('workflowLibrary.duplicateFailed'), getApiErrorMessage(error, t('common.unknownError')));
+      }
+    } finally {
+      if (isAccountScopeCurrent(owner)) {
+        isDuplicatePendingRef.current = false;
+        setIsDuplicatePending(false);
       }
     }
   }, [entry, notify, onDuplicated, t]);
@@ -378,7 +398,9 @@ export const WorkflowLibraryDetailPanel = ({
                   </Menu.Item>
                   <Menu.Item
                     {...MENU_ITEM_LAYOUT}
+                    _disabled={DISABLED_ITEM}
                     data-menu-item="duplicate"
+                    disabled={isDuplicatePending}
                     value="duplicate"
                     onClick={handleDuplicate}
                   >

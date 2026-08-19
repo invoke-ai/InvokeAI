@@ -2984,6 +2984,7 @@
     "duplicate": "Duplicate",
     "duplicateFailed": "Failed to duplicate workflow",
     "duplicateName": "{{name}} copy",
+    "duplicated": "Saved a copy under Yours",
     "empty": "No workflows match these filters.",
     "fetching": "Fetching workflow…",
     "forkIntoProject": "Fork into new project",
