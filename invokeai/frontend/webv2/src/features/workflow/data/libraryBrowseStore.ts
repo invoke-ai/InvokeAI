@@ -94,20 +94,17 @@ const initialLoadFlight = createTrailingSingleFlight();
 const refreshFlight = createTrailingSingleFlight();
 
 /**
- * Bumped by every list request. A response whose token is no longer the latest
- * belongs to a filter the user has already moved on from, so it is discarded
- * instead of overwriting the current page.
+ * Bumped only when the filter (or the account) changes. A response tagged with
+ * an older generation was requested for a view the user has moved on from, so
+ * it is discarded. Two requests for the *same* filter — a cache-invalidation
+ * refresh racing an infinite-scroll append — are both current, and both
+ * publish: keying staleness to the request order instead would let the append
+ * silently swallow the refresh that removed a deleted row.
  */
-let fetchToken = 0;
+let filterGeneration = 0;
 
-const nextFetchToken = (): number => {
-  fetchToken += 1;
-
-  return fetchToken;
-};
-
-const isFetchCurrent = (token: number, owner: AccountScope): boolean =>
-  token === fetchToken && isAccountScopeCurrent(owner);
+const isFilterCurrent = (generation: number, owner: AccountScope): boolean =>
+  generation === filterGeneration && isAccountScopeCurrent(owner);
 
 // #region Entries
 
@@ -136,6 +133,14 @@ const mergeEntries = (
   });
 };
 
+/** Re-arms rows whose enrichment failed so an explicit revalidation retries them. */
+const retryFailedEnrichment = (entries: readonly WorkflowLibraryEntry[]): readonly WorkflowLibraryEntry[] =>
+  entries.some((entry) => entry.enrichment.status === 'error')
+    ? entries.map((entry) =>
+        entry.enrichment.status === 'error' ? { ...entry, enrichment: PENDING_ENRICHMENT } : entry
+      )
+    : entries;
+
 const publishPage = (result: WorkflowLibraryPage, mode: 'append' | 'replace'): void => {
   const previous = store.getSnapshot().entries;
   const merged = mergeEntries(previous, result.items);
@@ -158,11 +163,15 @@ const publishPage = (result: WorkflowLibraryPage, mode: 'append' | 'replace'): v
 
 /**
  * Templates are needed to know which inputs are model fields. They are a
- * session-lived, shared load, so enrichment waits for the existing snapshot
- * rather than parsing the schema per entry. A failed template load leaves the
- * requirement set empty; the editor surfaces that failure on its own.
+ * session-lived, shared load, so enrichment waits for one shared attempt
+ * instead of parsing the schema per entry. A failed attempt is remembered:
+ * `refreshInvocationTemplates` refetches and reparses the whole OpenAPI
+ * document, so retrying it per entry would turn one outage into a fetch storm.
+ * The memo is re-armed by an explicit refresh, a filter change, or an account
+ * switch.
  */
 let templatesFlight: Promise<void> | null = null;
+let hasTemplateLoadFailed = false;
 
 const loadTemplates = async (): Promise<InvocationTemplates> => {
   const snapshot = getInvocationTemplatesSnapshot();
@@ -171,12 +180,24 @@ const loadTemplates = async (): Promise<InvocationTemplates> => {
     return snapshot.templates;
   }
 
+  if (hasTemplateLoadFailed) {
+    throw new Error('Node definitions are unavailable.');
+  }
+
   templatesFlight ??= refreshInvocationTemplates().finally(() => {
     templatesFlight = null;
   });
   await templatesFlight;
 
-  return getInvocationTemplatesSnapshot().templates;
+  const settled = getInvocationTemplatesSnapshot();
+
+  if (settled.status !== 'loaded') {
+    hasTemplateLoadFailed = true;
+
+    throw new Error(settled.error ?? 'Node definitions are unavailable.');
+  }
+
+  return settled.templates;
 };
 
 const enrichmentQueue: string[] = [];
@@ -285,32 +306,32 @@ const fetchPage = (
   });
 
 const loadFirstPage = async (filter: WorkflowLibraryBrowseFilter, owner: AccountScope): Promise<void> => {
-  const token = nextFetchToken();
+  const generation = filterGeneration;
 
   try {
     const result = await fetchPage(filter, 0, owner);
 
-    if (isFetchCurrent(token, owner)) {
+    if (isFilterCurrent(generation, owner)) {
       publishPage(result, 'replace');
     }
   } catch (error) {
-    if (isFetchCurrent(token, owner)) {
+    if (isFilterCurrent(generation, owner)) {
       store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to load workflows.'), status: 'error' });
     }
   }
 };
 
 const loadMorePages = async (filter: WorkflowLibraryBrowseFilter, page: number, owner: AccountScope): Promise<void> => {
-  const token = nextFetchToken();
+  const generation = filterGeneration;
 
   try {
     const result = await fetchPage(filter, page, owner);
 
-    if (isFetchCurrent(token, owner)) {
+    if (isFilterCurrent(generation, owner)) {
       publishPage(result, 'append');
     }
   } catch (error) {
-    if (isFetchCurrent(token, owner)) {
+    if (isFilterCurrent(generation, owner)) {
       store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to load more workflows.'), status: 'error' });
     }
   }
@@ -373,6 +394,10 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   const owner = captureAccountScope();
   const isCategoryChanged = filter.category !== snapshot.filter.category;
 
+  // Everything already in flight was requested for the previous filter.
+  filterGeneration += 1;
+  hasTemplateLoadFailed = false;
+
   store.patchSnapshot({
     entries: EMPTY_ENTRIES,
     error: null,
@@ -415,6 +440,7 @@ export const ensureWorkflowLibraryBrowseLoaded = (): Promise<void> => {
     const owner = captureAccountScope();
     const { filter } = store.getSnapshot();
 
+    hasTemplateLoadFailed = false;
     store.patchSnapshot({ error: null, status: 'loading' });
 
     await Promise.all([loadFirstPage(filter, owner), loadTagCounts(filter.category, owner), probeUserTotal(owner)]);
@@ -431,7 +457,10 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
     }
 
     const owner = captureAccountScope();
-    const token = nextFetchToken();
+    const generation = filterGeneration;
+
+    // An explicit revalidation is also the retry path for a failed enrichment.
+    hasTemplateLoadFailed = false;
 
     try {
       const results = await Promise.all(
@@ -439,11 +468,11 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
       );
       const last = results[results.length - 1];
 
-      if (last && isFetchCurrent(token, owner)) {
+      if (last && isFilterCurrent(generation, owner)) {
         const items = results.flatMap((result) => result.items);
 
         store.patchSnapshot({
-          entries: mergeEntries(store.getSnapshot().entries, items),
+          entries: mergeEntries(retryFailedEnrichment(store.getSnapshot().entries), items),
           error: null,
           // Deletions can shrink the library below the page the user was on.
           page: Math.min(page, Math.max(0, last.pages - 1)),
@@ -454,7 +483,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
         pumpEnrichment();
       }
     } catch (error) {
-      if (isFetchCurrent(token, owner)) {
+      if (isFilterCurrent(generation, owner)) {
         store.patchSnapshot({ error: getApiErrorMessage(error, 'Failed to refresh workflows.'), status: 'error' });
       }
     }
@@ -493,9 +522,11 @@ onWorkflowLibraryCacheInvalidated(() => {
 
 registerAccountOwnedResource({
   clear: () => {
+    filterGeneration += 1;
     enrichmentQueue.length = 0;
     queuedWorkflowIds.clear();
     templatesFlight = null;
+    hasTemplateLoadFailed = false;
     isRefreshScheduled = false;
     initialLoadFlight.reset();
     refreshFlight.reset();

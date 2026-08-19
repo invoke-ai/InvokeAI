@@ -366,6 +366,53 @@ describe('workflow library entry enrichment', () => {
     });
   });
 
+  it('refetches node definitions at most once for a page when the template load fails', async () => {
+    templates.getInvocationTemplatesSnapshot.mockReturnValue({
+      error: 'Node definitions unavailable.',
+      status: 'error',
+      templates: {},
+    });
+    api.listLibraryWorkflows.mockResolvedValue(
+      buildPage(Array.from({ length: 6 }, (_unused, index) => buildItem(`item-${index}`)))
+    );
+
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await vi.waitFor(() => {
+      expect(
+        browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'error')
+      ).toBe(true);
+    });
+
+    // One attempt for the whole batch — never one OpenAPI reparse per worker.
+    expect(templates.refreshInvocationTemplates).toHaveBeenCalledTimes(1);
+    expect(libraryCache.getLibraryWorkflowCached).not.toHaveBeenCalled();
+  });
+
+  it('retries entries that failed to enrich on the next refresh', async () => {
+    templates.getInvocationTemplatesSnapshot.mockReturnValue({
+      error: 'Node definitions unavailable.',
+      status: 'error',
+      templates: {},
+    });
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a')]));
+
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await vi.waitFor(() => {
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('error');
+    });
+
+    templates.getInvocationTemplatesSnapshot.mockReturnValue({
+      error: null,
+      status: 'loaded',
+      templates: { main_model_loader: MODEL_LOADER_TEMPLATE },
+    });
+
+    await browse.refreshWorkflowLibraryBrowse();
+    await vi.waitFor(() => {
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('ready');
+    });
+  });
+
   it('drops enrichment results for entries that left the snapshot', async () => {
     const stalled = createDeferred<Record<string, unknown>>();
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('gone')]));
@@ -436,6 +483,44 @@ describe('workflow library browse refresh', () => {
     await flushAsyncWork();
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
     expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('idle');
+  });
+
+  it('publishes the refreshed list when an infinite-scroll append races the refresh', async () => {
+    const refreshedFirstPage = createDeferred<WorkflowLibraryPage>();
+    let firstPageCalls = 0;
+
+    api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) => {
+      if (perPage === 1) {
+        return Promise.resolve(buildPage([], { total: 0 }));
+      }
+
+      if (page > 0) {
+        return Promise.resolve(buildPage([buildItem('scrolled')], { page, pages: 3, total: 4 }));
+      }
+
+      firstPageCalls += 1;
+
+      return firstPageCalls === 1
+        ? Promise.resolve(buildPage([buildItem('kept'), buildItem('deleted')], { pages: 3, total: 5 }))
+        : refreshedFirstPage.promise;
+    });
+
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+
+    // A delete invalidated the cache; the user scrolls while the refresh is in flight.
+    const refreshing = browse.refreshWorkflowLibraryBrowse();
+
+    browse.loadNextWorkflowLibraryPage();
+    await vi.waitFor(() => {
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(3);
+    });
+
+    refreshedFirstPage.resolve(buildPage([buildItem('kept')], { pages: 2, total: 3 }));
+    await refreshing;
+
+    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
+    expect(snapshot.entries.map((entry) => entry.item.workflow_id)).toEqual(['kept']);
+    expect(snapshot.status).toBe('loaded');
   });
 
   it('refetches every loaded page and keeps unchanged entry identities', async () => {
