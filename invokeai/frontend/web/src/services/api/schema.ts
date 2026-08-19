@@ -157,9 +157,16 @@ export type paths = {
          *     To change the password, both ``current_password`` and ``new_password`` must
          *     be provided. The current password is verified before the change is applied.
          *
+         *     A password change signs out the account's *other* sessions: it bumps the
+         *     revocation epoch, invalidating every previously issued token. This response
+         *     carries a replacement token in ``X-Refreshed-Token`` so the caller stays
+         *     signed in.
+         *
          *     Args:
          *         request: Profile fields to update
          *         current_user: The authenticated user
+         *         http_request: The HTTP request, used to scope the replacement media cookie
+         *         response: The HTTP response, used to return the replacement token
          *
          *     Returns:
          *         The updated user
@@ -294,13 +301,13 @@ export type paths = {
          * @description Delete a user. Requires admin privileges.
          *
          *     Admins can delete any user including other admins, but cannot delete the last
-         *     remaining admin.
+         *     remaining admin, nor the internal system user.
          *
          *     Args:
          *         user_id: The user ID
          *
          *     Raises:
-         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 400 if attempting to delete the last admin or the system user
          *         HTTPException: 404 if user not found
          */
         delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
@@ -310,6 +317,10 @@ export type paths = {
          * Update User
          * @description Update a user. Requires admin privileges.
          *
+         *     Resetting a password revokes the target's existing sessions. An admin resetting
+         *     their own password receives a replacement token in ``X-Refreshed-Token`` so they
+         *     are not signed out by their own action.
+         *
          *     Args:
          *         user_id: The user ID
          *         request: Fields to update
@@ -318,7 +329,8 @@ export type paths = {
          *         The updated user
          *
          *     Raises:
-         *         HTTPException: 400 if password is weak
+         *         HTTPException: 400 if password is weak, if the change would remove the last
+         *             administrator, or if it targets the protected system account
          *         HTTPException: 404 if user not found
          */
         patch: operations["update_user_api_v1_auth_users__user_id__patch"];
@@ -1398,7 +1410,11 @@ export type paths = {
         };
         /**
          * Get Image Names
-         * @description Gets ordered list of image names with metadata for optimistic updates
+         * @deprecated
+         * @description Gets ordered list of image names with metadata for optimistic updates.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+         *     in one ordered list. This image-only endpoint predates the polymorphic gallery.
          */
         get: operations["get_image_names"];
         put?: never;
@@ -1782,7 +1798,11 @@ export type paths = {
         };
         /**
          * Get Video Names
+         * @deprecated
          * @description Gets ordered list of video names with metadata for optimistic updates.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns images and videos interleaved
+         *     in one ordered list. This video-only endpoint predates the polymorphic gallery.
          */
         get: operations["get_video_names"];
         put?: never;
@@ -1899,6 +1919,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/item_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Gallery Item Names
+         * @description Returns the ordered flat list of item names — used to drive virtualized gallery selection.
+         *
+         *     Names are polymorphic: image and video names are interleaved by `created_at`. A name ending
+         *     in `.mp4` is a video.
+         */
+        get: operations["list_gallery_item_names"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/gallery/items/names": {
         parameters: {
             query?: never;
@@ -1908,7 +1951,12 @@ export type paths = {
         };
         /**
          * Get Gallery Item Names
+         * @deprecated
          * @description Returns an ordered (kind, name) list — used to drive virtualized gallery selection.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names`, which returns the same order as a flat name
+         *     list. The `kind` discriminator here costs a model per row — ~800ms on a 200k-item library —
+         *     for a value callers already derive from the file extension.
          */
         get: operations["get_gallery_item_names"];
         put?: never;
@@ -2084,8 +2132,11 @@ export type paths = {
         };
         /**
          * List Virtual Board Image Names By Date
-         * @description Gets ordered image names for a specific date. Image-only; kept for API compatibility —
-         *     the UI uses the polymorphic `/by_date/{date}/item_names` endpoint.
+         * @deprecated
+         * @description Gets ordered image names for a specific date. Image-only.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which covers images and
+         *     videos in one ordered list.
          */
         get: operations["list_virtual_board_image_names_by_date"];
         put?: never;
@@ -2105,7 +2156,11 @@ export type paths = {
         };
         /**
          * List Virtual Board Item Names By Date
+         * @deprecated
          * @description Gets ordered polymorphic (image + video) item refs for a specific date.
+         *
+         *     Deprecated: use `GET /v1/gallery/item_names?created_date=<date>`, which returns the same
+         *     order as a flat name list instead of one model per item.
          */
         get: operations["list_virtual_board_item_names_by_date"];
         put?: never;
@@ -2505,8 +2560,32 @@ export type paths = {
         /**
          * Get Queue Items By Item Ids
          * @description Gets queue items for the specified queue item ids. Maintains order of item ids.
+         *
+         *     Bound the legacy full-item endpoint as well as the summary endpoint: callers can otherwise
+         *     force one graph deserialization and response copy per supplied id, defeating the queue-list
+         *     optimization with an authenticated memory/CPU exhaustion request.
          */
         post: operations["get_queue_items_by_item_ids"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/{queue_id}/item_summaries_by_ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Queue Item Summaries By Ids
+         * @description Gets lightweight queue item summaries for specified IDs in requested order.
+         */
+        post: operations["get_queue_item_summaries_by_ids"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3038,6 +3117,26 @@ export type paths = {
          * @description Updates the opened_at field of a workflow
          */
         put: operations["update_opened_at"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/i/{workflow_id}/last_run_at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Workflow Last Run At
+         * @description Updates the last_run_at field of a workflow
+         */
+        put: operations["update_workflow_last_run_at"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5183,6 +5282,14 @@ export type components = {
              */
             image_names: string[];
         };
+        /** Body_get_queue_item_summaries_by_ids */
+        Body_get_queue_item_summaries_by_ids: {
+            /**
+             * Item Ids
+             * @description Object containing list of queue item ids to fetch summaries for
+             */
+            item_ids: number[];
+        };
         /** Body_get_queue_items_by_item_ids */
         Body_get_queue_items_by_item_ids: {
             /**
@@ -5195,7 +5302,6 @@ export type components = {
         Body_import_style_presets: {
             /**
              * File
-             * Format: binary
              * @description The file to import
              */
             file: Blob;
@@ -5261,7 +5367,6 @@ export type components = {
         Body_set_workflow_thumbnail: {
             /**
              * Image
-             * Format: binary
              * @description The image file to upload
              */
             image: Blob;
@@ -5284,10 +5389,7 @@ export type components = {
         };
         /** Body_update_model_image */
         Body_update_model_image: {
-            /**
-             * Image
-             * Format: binary
-             */
+            /** Image */
             image: Blob;
         };
         /** Body_update_style_preset */
@@ -5324,10 +5426,7 @@ export type components = {
         };
         /** Body_upload_image */
         Body_upload_image: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: Blob;
             /**
              * Resize To
@@ -5343,10 +5442,7 @@ export type components = {
         };
         /** Body_upload_video */
         Body_upload_video: {
-            /**
-             * File
-             * Format: binary
-             */
+            /** File */
             file: Blob;
             /**
              * Metadata
@@ -8732,7 +8828,7 @@ export type components = {
              * @description The generation mode that output this image
              * @default null
              */
-            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "ernie_image_txt2img" | "ideogram4_txt2img" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "krea2_txt2img" | "krea2_img2img" | "krea2_inpaint" | "krea2_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_i2v" | "minimax_h3_t2v" | "minimax_h3_i2v" | "minimax_h3_txt2img") | null;
+            generation_mode?: ("txt2img" | "img2img" | "inpaint" | "outpaint" | "sdxl_txt2img" | "sdxl_img2img" | "sdxl_inpaint" | "sdxl_outpaint" | "flux_txt2img" | "flux_img2img" | "flux_inpaint" | "flux_outpaint" | "flux2_txt2img" | "flux2_img2img" | "flux2_inpaint" | "flux2_outpaint" | "sd3_txt2img" | "sd3_img2img" | "sd3_inpaint" | "sd3_outpaint" | "cogview4_txt2img" | "cogview4_img2img" | "cogview4_inpaint" | "cogview4_outpaint" | "z_image_txt2img" | "z_image_img2img" | "z_image_inpaint" | "z_image_outpaint" | "ernie_image_txt2img" | "ideogram4_txt2img" | "qwen_image_txt2img" | "qwen_image_img2img" | "qwen_image_inpaint" | "qwen_image_outpaint" | "anima_txt2img" | "anima_img2img" | "anima_inpaint" | "anima_outpaint" | "krea2_txt2img" | "krea2_img2img" | "krea2_inpaint" | "krea2_outpaint" | "wan_txt2img" | "wan_img2img" | "wan_inpaint" | "wan_outpaint" | "wan_i2v" | "minimax_h3_t2v" | "minimax_h3_i2v" | "minimax_h3_lf2v" | "minimax_h3_flf2v" | "minimax_h3_extend_video" | "minimax_h3_txt2img") | null;
             /**
              * Positive Prompt
              * @description The positive prompt parameter
@@ -8873,6 +8969,37 @@ export type components = {
              * @default null
              */
             ideogram4_caption?: string | null;
+            /**
+             * Num Frames
+             * @description The number of video frames generated
+             * @default null
+             */
+            num_frames?: number | null;
+            /**
+             * @description The image used as the video's first frame
+             * @default null
+             */
+            first_frame_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The image used as the video's last frame
+             * @default null
+             */
+            last_frame_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The video this generation was derived from, e.g. the clip an extend workflow continues
+             * @default null
+             */
+            source_video?: components["schemas"]["VideoField"] | null;
+            /**
+             * @description The single-file MiniMax H3 transformer used in place of the main model's transformer
+             * @default null
+             */
+            minimax_h3_transformer_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description The single-file MiniMax H3 Qwen3-VL text encoder used in place of the main model's
+             * @default null
+             */
+            minimax_h3_text_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Hrf Enabled
              * @description Whether or not high resolution fix was enabled.
@@ -11090,7 +11217,9 @@ export type components = {
          *
          *     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
          *     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
-         *     them into a downstream Frame from Video to extract the same boundary frame.
+         *     them into a downstream Frame from Video to extract the same boundary frame, and the
+         *     input video is echoed back on ``source_video`` so a graph can record the clip the user
+         *     chose rather than the freshly-encoded trim.
          */
         ExtractVideoRangeInvocation: {
             /**
@@ -11162,6 +11291,11 @@ export type components = {
         ExtractVideoRangeOutput: {
             /** @description The trimmed video */
             video: components["schemas"]["VideoField"];
+            /**
+             * Source Video
+             * @description The video the range was taken from
+             */
+            source_video: components["schemas"]["VideoField"];
             /**
              * Width
              * @description The width of the video in pixels
@@ -14388,8 +14522,37 @@ export type components = {
          */
         GalleryItemKind: "image" | "video";
         /**
+         * GalleryItemNames
+         * @description Ordered flat list of gallery item names plus counts for optimistic UI.
+         *
+         *     Names are polymorphic — images and videos are interleaved by `created_at`. The kind of a
+         *     given name is its file extension (`.mp4` is a video), which is how every consumer already
+         *     discriminates. Mirrors the shape of the image-only `ImageNamesResult`.
+         */
+        GalleryItemNames: {
+            /**
+             * Item Names
+             * @description Ordered list of image and video names.
+             */
+            item_names: string[];
+            /**
+             * Starred Count
+             * @description Number of starred items (when starred_first=True).
+             */
+            starred_count: number;
+            /**
+             * Total Count
+             * @description Total number of items matching the query.
+             */
+            total_count: number;
+        };
+        /**
          * GalleryItemNamesResult
          * @description Ordered list of gallery item references plus counts for optimistic UI.
+         *
+         *     Deprecated in favour of :class:`GalleryItemNames`. Wrapping every name in an object to
+         *     carry a `kind` discriminator costs ~800ms of model construction on a 200k-item library,
+         *     for a field callers derive from the filename extension anyway.
          */
         GalleryItemNamesResult: {
             /**
@@ -14925,7 +15088,7 @@ export type components = {
              * @description The results of node executions
              */
             results: {
-                [key: string]: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
+                [key: string]: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
             };
             /**
              * Errors
@@ -19022,7 +19185,7 @@ export type components = {
              * Result
              * @description The result of the invocation
              */
-            result: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
+            result: components["schemas"]["AnimaConditioningOutput"] | components["schemas"]["AnimaLLLiteOutput"] | components["schemas"]["AnimaLoRALoaderOutput"] | components["schemas"]["AnimaModelLoaderOutput"] | components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["ErnieImageConditioningOutput"] | components["schemas"]["ErnieImageModelLoaderOutput"] | components["schemas"]["ExtractVideoRangeOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2DevLoRALoaderOutput"] | components["schemas"]["Flux2DevModelLoaderOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["Gemma2EncoderOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["Ideogram4ConditioningOutput"] | components["schemas"]["Ideogram4ModelLoaderOutput"] | components["schemas"]["IfInvocationOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["Krea2ConditioningOutput"] | components["schemas"]["Krea2LoRALoaderOutput"] | components["schemas"]["Krea2ModelLoaderOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["MiniMaxH3ConditioningOutput"] | components["schemas"]["MiniMaxH3DenoiseOutput"] | components["schemas"]["MiniMaxH3FrameConditioningOutput"] | components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"] | components["schemas"]["MiniMaxH3LoRALoaderOutput"] | components["schemas"]["MiniMaxH3ModelLoaderOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PiDDecoderOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["QwenImageConditioningOutput"] | components["schemas"]["QwenImageLoRALoaderOutput"] | components["schemas"]["QwenImageModelLoaderOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["VideoOutput"] | components["schemas"]["WanConditioningOutput"] | components["schemas"]["WanLoRALoaderOutput"] | components["schemas"]["WanModelLoaderOutput"] | components["schemas"]["WanRefImageOutput"] | components["schemas"]["WorkflowReturnGetOutput"] | components["schemas"]["WorkflowReturnOutput"] | components["schemas"]["WorkflowReturnValueOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
         };
         /**
          * InvocationErrorEvent
@@ -19311,7 +19474,7 @@ export type components = {
             minimax_h3_ideal_dimensions: components["schemas"]["IdealSizeOutput"];
             minimax_h3_latents_to_image: components["schemas"]["ImageOutput"];
             minimax_h3_latents_to_video: components["schemas"]["VideoOutput"];
-            minimax_h3_lora_collection_loader: components["schemas"]["MiniMaxH3LoRALoaderOutput"];
+            minimax_h3_lora_collection_loader: components["schemas"]["MiniMaxH3LoRACollectionLoaderOutput"];
             minimax_h3_lora_loader: components["schemas"]["MiniMaxH3LoRALoaderOutput"];
             minimax_h3_model_loader: components["schemas"]["MiniMaxH3ModelLoaderOutput"];
             minimax_h3_text_encoder: components["schemas"]["MiniMaxH3ConditioningOutput"];
@@ -19643,6 +19806,7 @@ export type components = {
          *         external_seedream_base_url: Base URL override for Seedream image generation.
          *         base_url: Public base path when running behind a reverse proxy under a sub-path, e.g. `/invoke`. Set only when the proxy PRESERVES the sub-path (the backend receives `/invoke/api/...`). Leave unset when the proxy strips the sub-path or when serving at the domain root.
          *         forwarded_allow_ips: Comma-separated list of IPs (or `*`) allowed to set X-Forwarded-* headers. Set to the reverse proxy's IP. Only used when `base_url` is set.
+         *         http_compression_level: Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
          */
         InvokeAIAppConfig: {
             /**
@@ -19717,6 +19881,12 @@ export type components = {
              * @default 127.0.0.1
              */
             forwarded_allow_ips?: string;
+            /**
+             * Http Compression Level
+             * @description Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.
+             * @default 9
+             */
+            http_compression_level?: number;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -27268,6 +27438,273 @@ export type components = {
             } | null;
         };
         /**
+         * Main_SDNQ_FLUX_Config
+         * @description Model config for SDNQ-quantized FLUX transformer models.
+         */
+        Main_SDNQ_FLUX_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default flux
+             * @constant
+             */
+            base: "flux";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            variant: components["schemas"]["FluxVariantType"];
+        };
+        /**
+         * Main_SDNQ_Flux2_Config
+         * @description Model config for SDNQ-quantized FLUX.2 transformer models (e.g. Klein 4B / 9B).
+         */
+        Main_SDNQ_Flux2_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default flux2
+             * @constant
+             */
+            base: "flux2";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            variant: components["schemas"]["Flux2VariantType"];
+        };
+        /**
+         * Main_SDNQ_ZImage_Config
+         * @description Model config for SDNQ-quantized Z-Image transformer models.
+         */
+        Main_SDNQ_ZImage_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Type
+             * @default main
+             * @constant
+             */
+            type: "main";
+            /**
+             * Trigger Phrases
+             * @description Set of trigger phrases for this model
+             */
+            trigger_phrases: string[] | null;
+            /** @description Default settings for this model */
+            default_settings: components["schemas"]["MainModelDefaultSettings"] | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default z-image
+             * @constant
+             */
+            base: "z-image";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            variant: components["schemas"]["ZImageVariantType"];
+        };
+        /**
          * Combine Masks
          * @description Combine two masks together by multiplying them using `PIL.ImageChops.multiply()`.
          */
@@ -29423,6 +29860,34 @@ export type components = {
             type: "minimax_h3_lora_collection_loader";
         };
         /**
+         * MiniMaxH3LoRACollectionLoaderOutput
+         * @description MiniMax H3 LoRA collection loader output.
+         *
+         *     Separate from the single loader's output because a collection applies zero or more LoRAs,
+         *     so its metadata echo is a list — which is also what `core_metadata.loras` takes directly,
+         *     with no intervening collect node.
+         */
+        MiniMaxH3LoRACollectionLoaderOutput: {
+            /**
+             * MiniMax H3 Transformer
+             * @description Transformer
+             * @default null
+             */
+            transformer: components["schemas"]["MiniMaxH3TransformerField"] | null;
+            /**
+             * LoRA Metadata
+             * @description The applied LoRAs, in the shape Core Metadata's `loras` field takes.
+             * @default []
+             */
+            lora_metadata: components["schemas"]["LoRAMetadataField"][];
+            /**
+             * type
+             * @default minimax_h3_lora_collection_loader_output
+             * @constant
+             */
+            type: "minimax_h3_lora_collection_loader_output";
+        };
+        /**
          * Apply LoRA - MiniMax H3
          * @description Apply a LoRA model to a MiniMax H3 transformer (e.g. the Turbo step-distillation LoRA).
          */
@@ -29480,6 +29945,11 @@ export type components = {
              * @default null
              */
             transformer: components["schemas"]["MiniMaxH3TransformerField"] | null;
+            /**
+             * LoRA Metadata
+             * @description The applied LoRA, in the shape Core Metadata's `loras` field takes.
+             */
+            lora_metadata: components["schemas"]["LoRAMetadataField"];
             /**
              * type
              * @default minimax_h3_lora_loader_output
@@ -29564,6 +30034,23 @@ export type components = {
              * @description Audio VAE (stereo, 32 kHz) for MiniMax H3
              */
             audio_vae: components["schemas"]["VAEField"];
+            /**
+             * Model
+             * @description The MiniMax H3 model that was loaded.
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Transformer (single file)
+             * @description The single-file transformer override that was used, if any.
+             * @default null
+             */
+            transformer_model: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Text Encoder (single file)
+             * @description The single-file text encoder override that was used, if any.
+             * @default null
+             */
+            text_encoder_model: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * type
              * @default minimax_h3_model_loader_output
@@ -32920,6 +33407,94 @@ export type components = {
             variant: components["schemas"]["Qwen3VariantType"];
         };
         /**
+         * Qwen3Encoder_SDNQ_Config
+         * @description Configuration for SDNQ-quantized Qwen3 Encoder models (single file).
+         */
+        Qwen3Encoder_SDNQ_Config: {
+            /**
+             * Key
+             * @description A unique key for this model.
+             */
+            key: string;
+            /**
+             * Hash
+             * @description The hash of the model file(s).
+             */
+            hash: string;
+            /**
+             * Path
+             * @description Path to the model on the filesystem. Relative paths are relative to the Invoke root directory.
+             */
+            path: string;
+            /**
+             * File Size
+             * @description The size of the model in bytes.
+             */
+            file_size: number;
+            /**
+             * Name
+             * @description Name of the model.
+             */
+            name: string;
+            /**
+             * Description
+             * @description Model description
+             */
+            description: string | null;
+            /**
+             * Source
+             * @description The original source of the model (path, URL or repo_id).
+             */
+            source: string;
+            /** @description The type of source */
+            source_type: components["schemas"]["ModelSourceType"];
+            /**
+             * Source Api Response
+             * @description The original API response from the source, as stringified JSON.
+             */
+            source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
+             * Cover Image
+             * @description Url for image to preview model
+             */
+            cover_image: string | null;
+            /**
+             * Config Path
+             * @description Path to the config for this model, if any.
+             */
+            config_path: string | null;
+            /**
+             * Base
+             * @default any
+             * @constant
+             */
+            base: "any";
+            /**
+             * Type
+             * @default qwen3_encoder
+             * @constant
+             */
+            type: "qwen3_encoder";
+            /**
+             * Format
+             * @default sdnq_quantized
+             * @constant
+             */
+            format: "sdnq_quantized";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /** @description Qwen3 model size variant (4B or 8B) */
+            variant: components["schemas"]["Qwen3VariantType"];
+        };
+        /**
          * Qwen3Encoder_SDNQ_Folder_Config
          * @description Configuration for folder-based SDNQ-quantized Qwen3 Encoder models.
          *
@@ -33483,6 +34058,18 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.
+             * @default 0
+             */
+            tile_size?: number;
+            /**
              * Width
              * @description Resize the image to this width before encoding. If not set, encodes at the image's original size.
              * @default null
@@ -33543,6 +34130,18 @@ export type components = {
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
+            /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.
+             * @default 0
+             */
+            tile_size?: number;
             /**
              * type
              * @default qwen_image_l2i
@@ -36450,6 +37049,83 @@ export type components = {
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
             workflow?: components["schemas"]["WorkflowWithoutID"] | null;
+        };
+        /**
+         * SessionQueueItemSummary
+         * @description Queue item fields needed to render the queue list.
+         */
+        SessionQueueItemSummary: {
+            /**
+             * Item Id
+             * @description The identifier of the session queue item
+             */
+            item_id: number;
+            /**
+             * Created At
+             * @description When this queue item was created
+             */
+            created_at: string;
+            /**
+             * Status
+             * @description The status of this queue item
+             * @enum {string}
+             */
+            status: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "canceled";
+            /**
+             * Device
+             * @description The device that processed this queue item, e.g. 'cuda:1'
+             */
+            device?: string | null;
+            /**
+             * Started At
+             * @description When this queue item was started
+             */
+            started_at: string | null;
+            /**
+             * Completed At
+             * @description When this queue item was completed
+             */
+            completed_at: string | null;
+            /**
+             * Origin
+             * @description The origin of this queue item
+             */
+            origin: string | null;
+            /**
+             * Destination
+             * @description The destination of this queue item
+             */
+            destination: string | null;
+            /**
+             * Batch Id
+             * @description The ID of the batch associated with this queue item
+             */
+            batch_id: string;
+            /**
+             * User Id
+             * @description The ID of the user who created this queue item
+             */
+            user_id: string;
+            /**
+             * User Display Name
+             * @description The display name of the user who created this queue item
+             */
+            user_display_name: string | null;
+            /**
+             * User Email
+             * @description The email of the user who created this queue item
+             */
+            user_email: string | null;
+            /**
+             * Field Values
+             * @description The batch field values used for this queue item
+             */
+            field_values: components["schemas"]["NodeFieldValue"][] | null;
+            /**
+             * Parent Item Id
+             * @description The ID of the parent queue item, if this is a child item
+             */
+            parent_item_id: number | null;
         };
         /** SessionQueueStatus */
         SessionQueueStatus: {
@@ -39603,6 +40279,12 @@ export type components = {
              * @description When user last logged in
              */
             last_login_at?: string | null;
+            /**
+             * Token Epoch
+             * @description Revocation epoch; tokens minted before the current value are rejected
+             * @default 0
+             */
+            token_epoch?: number;
         };
         /**
          * UserProfileUpdateRequest
@@ -40713,6 +41395,10 @@ export type components = {
             msg: string;
             /** Error Type */
             type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
         };
         /** VideoBoardArg */
         VideoBoardArg: {
@@ -40750,9 +41436,15 @@ export type components = {
          *       so the total emitted is exactly ``transition_frames`` per boundary — even for odd
          *       ``transition_frames`` — and the overall length equals the sum of inputs.
          *
-         *     All inputs must share the same pixel dimensions. Output frame rate defaults to the
-         *     first input's fps; override with ``fps`` to force a specific rate (the frames are not
-         *     resampled, only the container is encoded at the new rate).
+         *     Inputs must share the same pixel dimensions. ``size_mismatch`` decides what happens
+         *     when they do not: ``error`` (the default) refuses the join, and ``match_first``
+         *     resamples every later clip onto the first clip's canvas. ``match_first`` is what lets a
+         *     generated clip be appended to source footage — video models render onto their own fixed
+         *     canvas family, so a generated continuation rarely matches the clip it extends.
+         *
+         *     Output frame rate defaults to the first input's fps; override with ``fps`` to force a
+         *     specific rate (the frames are not resampled in time, only the container is encoded at
+         *     the new rate).
          */
         VideoConcatInvocation: {
             /**
@@ -40807,6 +41499,13 @@ export type components = {
              * @default null
              */
             fps?: number | null;
+            /**
+             * Size Mismatch
+             * @description What to do when the inputs do not all share the same pixel dimensions. 'error' refuses the join; 'match_first' resamples every later clip onto the first clip's canvas, so a generated clip can be appended to source footage it does not match.
+             * @default error
+             * @enum {string}
+             */
+            size_mismatch?: "error" | "match_first";
             /**
              * type
              * @default video_concat
@@ -42725,6 +43424,11 @@ export type components = {
              */
             opened_at?: string | null;
             /**
+             * Last Run At
+             * @description The timestamp of the last completed run of this workflow.
+             */
+            last_run_at?: string | null;
+            /**
              * User Id
              * @description The id of the user who owns this workflow.
              */
@@ -42764,6 +43468,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Last Run At
+             * @description The timestamp of the last completed run of this workflow.
+             */
+            last_run_at?: string | null;
             /**
              * User Id
              * @description The id of the user who owns this workflow.
@@ -42827,6 +43536,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Last Run At
+             * @description The timestamp of the last completed run of this workflow.
+             */
+            last_run_at?: string | null;
             /**
              * User Id
              * @description The id of the user who owns this workflow.
@@ -44751,6 +45465,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Another operation on this model is already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -44889,6 +45610,13 @@ export interface operations {
             };
             /** @description The model could not be found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -45055,6 +45783,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Another operation on this model is already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -45093,6 +45828,13 @@ export interface operations {
             };
             /** @description Bad request */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another operation on this model is already in progress */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -47619,6 +48361,56 @@ export interface operations {
             };
         };
     };
+    list_gallery_item_names: {
+        parameters: {
+            query?: {
+                /** @description The origin of items to list. */
+                origin?: components["schemas"]["ResourceOrigin"] | null;
+                /** @description The categories to include. Shared between images and videos. */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Whether to list intermediate items. */
+                is_intermediate?: boolean | null;
+                /** @description The board id to filter by. Use 'none' to find items without a board. */
+                board_id?: string | null;
+                /** @description Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards. */
+                created_date?: string | null;
+                /** @description Inclusive start date (YYYY-MM-DD) to filter by created_at. */
+                created_from?: string | null;
+                /** @description Inclusive end date (YYYY-MM-DD) to filter by created_at. */
+                created_to?: string | null;
+                /** @description The order of sort */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description Whether to sort by starred items first */
+                starred_first?: boolean;
+                /** @description The term to search for */
+                search_term?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryItemNames"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_gallery_item_names: {
         parameters: {
             query?: {
@@ -48837,6 +49629,42 @@ export interface operations {
             };
         };
     };
+    get_queue_item_summaries_by_ids: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_get_queue_item_summaries_by_ids"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionQueueItemSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     resume: {
         parameters: {
             query?: never;
@@ -49908,6 +50736,36 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_workflow_last_run_at: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

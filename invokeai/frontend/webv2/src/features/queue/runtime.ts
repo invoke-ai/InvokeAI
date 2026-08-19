@@ -5,6 +5,7 @@ import type {
   QueueEnqueueWorkflowRequest,
   QueueResultImage,
   QueueResultImageOptions,
+  QueueWorkflowRunSink,
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
@@ -147,7 +148,9 @@ export const createQueueItemBackendSubmission = (
     };
   }
 
-  const { kind: _, ...compiled } = submission;
+  // `libraryWorkflowId` is provenance for the completed-run sink, not something
+  // the backend enqueue accepts; it stays on the snapshot and off the request.
+  const { kind: _, libraryWorkflowId: _libraryWorkflowId, ...compiled } = submission;
   return {
     kind: 'workflow',
     request: {
@@ -185,6 +188,7 @@ export const createQueueRuntime = ({
   history,
   modelLoads,
   nodeExecution,
+  workflowRuns,
 }: {
   backend: QueueBackendPort;
   destinations: QueueResultDestinationPort;
@@ -192,6 +196,7 @@ export const createQueueRuntime = ({
   history: QueueHistoryPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  workflowRuns?: QueueWorkflowRunSink;
 }): QueueRuntime => {
   const owner = captureAccountScope();
   const commands = history.commands;
@@ -307,6 +312,40 @@ export const createQueueRuntime = ({
     return images;
   };
 
+  /**
+   * Reports a settled run back to whoever owns the workflow library, so it can
+   * capture the output as the record's thumbnail and stamp its last-run time.
+   * Only runs compiled from a library-BOUND workflow carry an id, so an ad-hoc
+   * workflow (or any generate run) is never reported.
+   *
+   * Deliberately synchronous, unawaited, and swallowing: last-run capture is
+   * decoration hung off a completed run, and a sink that throws must not turn
+   * that run into a failure or skip its gallery refresh.
+   */
+  const notifyWorkflowRunCompleted = (projectId: string, queueItem: QueueItem, images: QueueResultImage[]): void => {
+    const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+
+    if (
+      !workflowRuns ||
+      submission?.kind !== 'workflow' ||
+      typeof submission.libraryWorkflowId !== 'string' ||
+      images.length === 0
+    ) {
+      return;
+    }
+
+    try {
+      workflowRuns.onWorkflowRunCompleted({
+        imageNames: images.map((image) => image.imageName),
+        libraryWorkflowId: submission.libraryWorkflowId,
+        projectId,
+        queueItemId: queueItem.id,
+      });
+    } catch {
+      // The sink owns its own error reporting; the run is already complete.
+    }
+  };
+
   const routeRunResults = async (
     coordinator: QueueCoordinator,
     projectId: string,
@@ -339,6 +378,7 @@ export const createQueueRuntime = ({
       }
 
       commands.routeResults({ images, projectId, queueItemId: queueItem.id });
+      notifyWorkflowRunCompleted(projectId, queueItem, images);
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }

@@ -115,6 +115,17 @@
       "validation": {}
     },
     {
+      "category": "WEB",
+      "default": 9,
+      "description": "Compression level for gzipped HTTP API responses. 0 disables response compression entirely, 1 is fastest, 9 (the default) is smallest. Compression runs on the event loop and blocks the whole server while it works, and level 9 costs about 5.5x the time of level 1 for 0.4 percentage points of extra compression, so lowering this makes the app noticeably more responsive on large libraries. Set to 0 when a reverse proxy already compresses responses.",
+      "env_var": "INVOKEAI_HTTP_COMPRESSION_LEVEL",
+      "literal_values": [],
+      "name": "http_compression_level",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
       "category": "MISC FEATURES",
       "default": false,
       "description": "Enable logging of parsed prompt tokens.",

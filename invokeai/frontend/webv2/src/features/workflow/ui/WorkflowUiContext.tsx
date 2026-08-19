@@ -45,6 +45,9 @@ export interface WorkflowGraphPreviewPort {
     sourceId?: WorkflowInvocationSourceId
   ): { canInvoke: boolean; label: string; validationMessage?: string } | null;
   invoke(sourceId?: WorkflowInvocationSourceId): Promise<boolean>;
+  focusSource(sourceId?: WorkflowInvocationSourceId): void; // reveal the source's widget (provenance links)
+  openWorkflowEditor(): void; // reveal the workflow editor widget
+  openDocumentInNewProject(document: ProjectGraphState, label: string): void; // fork a preview into a fresh project
 }
 
 /**
@@ -68,6 +71,8 @@ export interface WorkflowUiAdapter {
     measure(name: string, start: string, source: WorkflowPerfSource, end?: string): void;
     time<T>(name: string, source: WorkflowPerfSource, callback: () => T): T;
   };
+  /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
+  openAddModels(query: string): void;
   registerModalHotkeyLayer(id: string): () => void;
   nodeExecution: {
     get(nodeId: string): WorkflowNodeExecutionState | null;
@@ -138,6 +143,8 @@ export const useWorkflowGraphPreview = (): WorkflowGraphPreviewPort => {
 };
 
 export const useWorkflowNotifications = () => useWorkflowUi().notifications;
+
+export const useOpenAddModels = (): ((query: string) => void) => useWorkflowUi().openAddModels;
 
 export const useWorkflowNodeExecutionState = (nodeId: string): WorkflowNodeExecutionState | null => {
   const { nodeExecution } = useWorkflowUi();

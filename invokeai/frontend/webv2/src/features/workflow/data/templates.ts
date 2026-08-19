@@ -195,7 +195,12 @@ const getDefaultValueForType = (type: FieldType, options: string[] | null): unkn
   }
 };
 
-const buildInputTemplate = (name: string, property: JsonObject, type: FieldType): FieldInputTemplate => {
+const buildInputTemplate = (
+  name: string,
+  property: JsonObject,
+  type: FieldType,
+  fieldKind: FieldInputTemplate['fieldKind']
+): FieldInputTemplate => {
   const enumValues = Array.isArray(property.enum)
     ? property.enum
     : property.const !== undefined
@@ -216,6 +221,7 @@ const buildInputTemplate = (name: string, property: JsonObject, type: FieldType)
     description: typeof property.description === 'string' ? property.description : '',
     exclusiveMaximum: getNumberOrNull(property.exclusiveMaximum),
     exclusiveMinimum: getNumberOrNull(property.exclusiveMinimum),
+    fieldKind,
     input,
     maximum: getNumberOrNull(property.maximum),
     minimum: getNumberOrNull(property.minimum),
@@ -275,7 +281,26 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
-    if (rawProperty.field_kind !== 'input') {
+    // `internal` covers exactly two properties across the whole schema: `metadata` and
+    // `board`. Both are real inputs and both must be here.
+    //
+    // `metadata`: a workflow that wires a Core Metadata node into a save node needs that
+    // handle to exist, or the edge is invisible in the editor and dropped on re-save.
+    //
+    // `board`: seven bundled workflows expose it as a linear-UI field. The
+    // exposedFields -> form migration does not check that a field has a template, and
+    // NodeFieldControl renders "This field no longer exists in the project graph." when it
+    // does not — so excluding `board` puts a red error in those workflows' Linear tab. It is
+    // also in v6's templates, which reports a missing-field error for any node instance that
+    // lacks it. Note the value is not fully honoured yet: the queue runtime re-homes results
+    // onto the active gallery board after a run, and `toBoardGraphValue` reads 'auto' as "no
+    // board" where v6 reads it as "the auto-add board".
+    //
+    // The node-level attributes (`id`, `type`, `use_cache`, `is_intermediate`) are
+    // `node_attribute`, so they stay excluded here as well as by RESERVED_INPUT_FIELD_NAMES.
+    const isInternal = rawProperty.field_kind === 'internal';
+
+    if (rawProperty.field_kind !== 'input' && !isInternal) {
       continue;
     }
 
@@ -285,7 +310,7 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
-    inputs[name] = buildInputTemplate(name, rawProperty, fieldType);
+    inputs[name] = buildInputTemplate(name, rawProperty, fieldType, isInternal ? 'internal' : 'input');
   }
 
   const outputRefName = isJsonObject(schema.output) ? getRef(schema.output) : null;

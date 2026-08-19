@@ -780,7 +780,7 @@ async def get_image_map_cluster_labels(
     response_model=ImageMapRefreshResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def refresh_image_map(current_user: CurrentUserOrDefault) -> ImageMapRefreshResponse:
+def refresh_image_map(current_user: CurrentUserOrDefault) -> ImageMapRefreshResponse:
     """Requests a recompute of the current user's image map projection."""
     user_id, is_admin = _scope(current_user)
     if not _claim_refresh_slot(user_id):
@@ -807,7 +807,7 @@ async def refresh_image_map(current_user: CurrentUserOrDefault) -> ImageMapRefre
 
 
 @image_map_router.get("/status", operation_id="get_image_map_status", response_model=ImageMapStatusResponse)
-async def get_image_map_status(current_user: CurrentUserOrDefault) -> ImageMapStatusResponse:
+def get_image_map_status(current_user: CurrentUserOrDefault) -> ImageMapStatusResponse:
     """Gets embedding index progress and the user's projection cache status."""
     services = ApiDependencies.invoker.services
     model_id = services.image_index.model_id

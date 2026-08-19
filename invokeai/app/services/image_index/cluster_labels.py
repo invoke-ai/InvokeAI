@@ -47,7 +47,10 @@ def load_vocabulary() -> list[str]:
 
 # Bump when the text-embedding recipe changes (tokenization/padding/pooling):
 # cached phrase embeddings computed under an old recipe must be discarded.
-_EMBEDDING_RECIPE = "pad-per-model-v2"
+# v3 also retires caches written before the text encoder was probed at load
+# time: a tokenizer-less model dir produced a cache in which every phrase holds
+# the same vector, and nothing about the file itself says so.
+_EMBEDDING_RECIPE = "pad-per-model-v3"
 
 
 def vocab_fingerprint(phrases: list[str]) -> str:

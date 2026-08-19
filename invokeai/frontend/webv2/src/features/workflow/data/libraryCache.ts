@@ -16,8 +16,11 @@ import { getLibraryWorkflow, listLibraryWorkflows, type ListWorkflowsParams, typ
 const pageCache = new Map<string, WorkflowLibraryPage>();
 const workflowCache = new Map<string, Record<string, unknown>>();
 
+/** `JSON.stringify` on a sorted copy avoids delimiter collisions between tag values. */
+const getTagsKey = (tags: string[] | undefined): string => JSON.stringify([...(tags ?? [])].sort());
+
 const getPageKey = (params: ListWorkflowsParams): string =>
-  `${params.category}|${params.page}|${params.perPage ?? 20}|${params.query?.trim() ?? ''}`;
+  `${params.category}|${params.page}|${params.perPage ?? 20}|${params.query?.trim() ?? ''}|${getTagsKey(params.tags)}`;
 
 export const getCachedWorkflowPage = (params: ListWorkflowsParams): WorkflowLibraryPage | null =>
   pageCache.get(getPageKey(params)) ?? null;
@@ -60,9 +63,21 @@ export const getLibraryWorkflowCached = async (
   return result;
 };
 
+const invalidationListeners = new Set<() => void>();
+
+/** Registers a listener fired at the end of every `invalidateWorkflowLibraryCache()` call. */
+export const onWorkflowLibraryCacheInvalidated = (listener: () => void): (() => void) => {
+  invalidationListeners.add(listener);
+  return () => invalidationListeners.delete(listener);
+};
+
 export const invalidateWorkflowLibraryCache = (): void => {
   pageCache.clear();
   workflowCache.clear();
+
+  for (const listener of invalidationListeners) {
+    listener();
+  }
 };
 
 registerAccountOwnedResource({
