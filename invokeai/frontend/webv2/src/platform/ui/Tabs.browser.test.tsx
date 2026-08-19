@@ -18,115 +18,127 @@ afterEach(async () => {
   root = null;
 });
 
+/**
+ * This test drives real pointer input across five variants, and each move costs
+ * whatever the machine can spare. Measured on a loaded 16-core box, the moves
+ * alone took 7–13.5s against the default 15s, and every failure was a timeout
+ * sitting at 12.5–13.6s — never an assertion. The settle waits were flat at
+ * ~1.1s throughout, so synchronization was never the problem; the budget was.
+ * Dropping the redundant unhovers below removes a third of the moves, and this
+ * ceiling covers what is left.
+ */
+const HOVER_SWEEP_TIMEOUT_MS = 60_000;
+
 describe('tab hover styles', () => {
-  it('gives every variant restrained hover feedback without changing selected or disabled tabs', async () => {
-    host = document.createElement('div');
-    document.body.append(host);
-    root = createRoot(host);
-
-    await act(async () => {
-      root?.render(
-        <ChakraProvider value={system}>
-          <Stack>
-            <Box aria-label="muted background probe" bg="bg.muted" />
-            <Box aria-label="faint muted background probe" bg="bg.muted/60" />
-            <Box aria-label="light muted background probe" bg="bg.muted/40" />
-            <Box aria-label="emphasized background probe" bg="bg.emphasized" />
-            <Box aria-label="emphasized border probe" borderColor="border.emphasized" borderWidth="1px" />
-            {variants.map((variant) => (
-              <Tabs.Root key={variant} value="selected" variant={variant}>
-                <Tabs.List>
-                  <Tabs.Trigger aria-label={`${variant} idle`} value="idle">
-                    Idle
-                  </Tabs.Trigger>
-                  <Tabs.Trigger aria-label={`${variant} selected`} value="selected">
-                    Selected
-                  </Tabs.Trigger>
-                  <Tabs.Trigger aria-label={`${variant} disabled`} value="disabled" disabled>
-                    Disabled
-                  </Tabs.Trigger>
-                </Tabs.List>
-              </Tabs.Root>
-            ))}
-          </Stack>
-        </ChakraProvider>
-      );
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, 0);
-      });
-    });
-
-    const mutedBackground = getProbeStyle(host, 'muted background probe').backgroundColor;
-    const faintMutedBackground = getProbeStyle(host, 'faint muted background probe').backgroundColor;
-    const lightMutedBackground = getProbeStyle(host, 'light muted background probe').backgroundColor;
-    const emphasizedBackground = getProbeStyle(host, 'emphasized background probe').backgroundColor;
-    const emphasizedBorder = getProbeStyle(host, 'emphasized border probe').borderColor;
-    const expectedHoverBackgrounds = {
-      enclosed: emphasizedBackground,
-      line: faintMutedBackground,
-      outline: mutedBackground,
-      plain: lightMutedBackground,
-      subtle: mutedBackground,
-    };
-
-    for (const variant of variants) {
-      const idle = host.querySelector<HTMLButtonElement>(`[aria-label="${variant} idle"]`)!;
-      const selected = host.querySelector<HTMLButtonElement>(`[aria-label="${variant} selected"]`)!;
-      const disabled = host.querySelector<HTMLButtonElement>(`[aria-label="${variant} disabled"]`)!;
-      const idleBefore = getInteractionStyles(idle);
-      const selectedBefore = getInteractionStyles(selected);
-      const disabledBefore = getInteractionStyles(disabled);
+  it(
+    'gives every variant restrained hover feedback without changing selected or disabled tabs',
+    async () => {
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
 
       await act(async () => {
-        await userEvent.hover(idle);
-        await waitForSettledStyles(idle);
+        root?.render(
+          <ChakraProvider value={system}>
+            <Stack>
+              <Box aria-label="muted background probe" bg="bg.muted" />
+              <Box aria-label="faint muted background probe" bg="bg.muted/60" />
+              <Box aria-label="light muted background probe" bg="bg.muted/40" />
+              <Box aria-label="emphasized background probe" bg="bg.emphasized" />
+              <Box aria-label="emphasized border probe" borderColor="border.emphasized" borderWidth="1px" />
+              {variants.map((variant) => (
+                <Tabs.Root key={variant} value="selected" variant={variant}>
+                  <Tabs.List>
+                    <Tabs.Trigger aria-label={`${variant} idle`} value="idle">
+                      Idle
+                    </Tabs.Trigger>
+                    <Tabs.Trigger aria-label={`${variant} selected`} value="selected">
+                      Selected
+                    </Tabs.Trigger>
+                    <Tabs.Trigger aria-label={`${variant} disabled`} value="disabled" disabled>
+                      Disabled
+                    </Tabs.Trigger>
+                  </Tabs.List>
+                </Tabs.Root>
+              ))}
+            </Stack>
+          </ChakraProvider>
+        );
+        await new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 0);
+        });
       });
-      const idleHovered = getInteractionStyles(idle);
-      expect(idleHovered.transitionDuration).toBe('0.1s');
-      expect(idleHovered.transitionProperty).toBe('background, border-color, color');
-      expect(idleHovered.backgroundColor).toBe(expectedHoverBackgrounds[variant]);
-      if (variant === 'line' || variant === 'plain') {
-        expect(idleHovered.color).not.toBe(idleBefore.color);
-      } else {
-        expect(idleHovered.color).toBe(idleBefore.color);
+
+      const mutedBackground = getProbeStyle(host, 'muted background probe').backgroundColor;
+      const faintMutedBackground = getProbeStyle(host, 'faint muted background probe').backgroundColor;
+      const lightMutedBackground = getProbeStyle(host, 'light muted background probe').backgroundColor;
+      const emphasizedBackground = getProbeStyle(host, 'emphasized background probe').backgroundColor;
+      const emphasizedBorder = getProbeStyle(host, 'emphasized border probe').borderColor;
+      const expectedHoverBackgrounds = {
+        enclosed: emphasizedBackground,
+        line: faintMutedBackground,
+        outline: mutedBackground,
+        plain: lightMutedBackground,
+        subtle: mutedBackground,
+      };
+
+      for (const variant of variants) {
+        const idle = host.querySelector<HTMLButtonElement>(`[aria-label="${variant} idle"]`)!;
+        const selected = host.querySelector<HTMLButtonElement>(`[aria-label="${variant} selected"]`)!;
+        const disabled = host.querySelector<HTMLButtonElement>(`[aria-label="${variant} disabled"]`)!;
+        const idleBefore = getInteractionStyles(idle);
+        const selectedBefore = getInteractionStyles(selected);
+        const disabledBefore = getInteractionStyles(disabled);
+
+        await act(async () => {
+          await userEvent.hover(idle);
+          await waitForSettledStyles(idle);
+        });
+        const idleHovered = getInteractionStyles(idle);
+        expect(idleHovered.transitionDuration).toBe('0.1s');
+        expect(idleHovered.transitionProperty).toBe('background, border-color, color');
+        expect(idleHovered.backgroundColor).toBe(expectedHoverBackgrounds[variant]);
+        if (variant === 'line' || variant === 'plain') {
+          expect(idleHovered.color).not.toBe(idleBefore.color);
+        } else {
+          expect(idleHovered.color).toBe(idleBefore.color);
+        }
+        if (variant === 'outline') {
+          expect(idleHovered.borderColor).toBe(emphasizedBorder);
+        }
+
+        await act(async () => {
+          await userEvent.hover(selected);
+          await waitForSettledStyles(selected);
+        });
+        expect(getInteractionStyles(selected)).toEqual(selectedBefore);
+
+        await act(async () => {
+          await userEvent.hover(disabled);
+          await waitForSettledStyles(disabled);
+        });
+        expect(getInteractionStyles(disabled)).toEqual(disabledBefore);
       }
-      if (variant === 'outline') {
-        expect(idleHovered.borderColor).toBe(emphasizedBorder);
-      }
+
+      const lineIdle = host.querySelector<HTMLButtonElement>('[aria-label="line idle"]')!;
+      const lineSelected = host.querySelector<HTMLButtonElement>('[aria-label="line selected"]')!;
+      await act(async () => {
+        await userEvent.tab();
+        await userEvent.keyboard('{ArrowLeft}');
+      });
+      expect(document.activeElement).toBe(lineIdle);
+      const focusOutline = getComputedStyle(lineIdle).outline;
+      expect(focusOutline).not.toBe('none');
 
       await act(async () => {
-        await userEvent.unhover(idle);
-        await userEvent.hover(selected);
-        await waitForSettledStyles(selected);
+        await userEvent.hover(lineIdle);
+        await waitForSettledStyles(lineIdle);
       });
-      expect(getInteractionStyles(selected)).toEqual(selectedBefore);
-
-      await act(async () => {
-        await userEvent.unhover(selected);
-        await userEvent.hover(disabled);
-        await waitForSettledStyles(disabled);
-      });
-      expect(getInteractionStyles(disabled)).toEqual(disabledBefore);
-      await act(() => userEvent.unhover(disabled));
-    }
-
-    const lineIdle = host.querySelector<HTMLButtonElement>('[aria-label="line idle"]')!;
-    const lineSelected = host.querySelector<HTMLButtonElement>('[aria-label="line selected"]')!;
-    await act(async () => {
-      await userEvent.tab();
-      await userEvent.keyboard('{ArrowLeft}');
-    });
-    expect(document.activeElement).toBe(lineIdle);
-    const focusOutline = getComputedStyle(lineIdle).outline;
-    expect(focusOutline).not.toBe('none');
-
-    await act(async () => {
-      await userEvent.hover(lineIdle);
-      await waitForSettledStyles(lineIdle);
-    });
-    expect(getComputedStyle(lineIdle).outline).toBe(focusOutline);
-    expect(lineSelected.dataset.selected).toBe('');
-  });
+      expect(getComputedStyle(lineIdle).outline).toBe(focusOutline);
+      expect(lineSelected.dataset.selected).toBe('');
+    },
+    HOVER_SWEEP_TIMEOUT_MS
+  );
 });
 
 const getInteractionStyles = (element: HTMLElement) => {
