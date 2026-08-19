@@ -1,5 +1,7 @@
 import { apiFetchJson } from '@platform/transport/http';
 
+import type { ImageIndexCounts } from './indexProgress';
+
 /** Mirrors the backend's ImageMapState literal. */
 export type ImageMapState = 'disabled' | 'model_missing' | 'empty' | 'computing' | 'ready';
 
@@ -79,6 +81,39 @@ export const fetchImageMapPoints = async (options?: { eps?: number; minSamples?:
   );
 
   return mapPoints(body);
+};
+
+export interface ImageMapStatus {
+  /** Embedding-index counts, or null: the backend omits them for non-admins. */
+  index: ImageIndexCounts | null;
+}
+
+interface BackendImageMapStatusResponse {
+  enabled: boolean;
+  index?: { total: number; embedded: number; failed?: number } | null;
+}
+
+/**
+ * Current index/projection status. Only the index counts are read here: the
+ * projection half of the response duplicates what /points already carries, and
+ * the counts are the one thing no other call returns.
+ */
+export const fetchImageMapStatus = async (): Promise<ImageMapStatus> => {
+  const body = await apiFetchJson<BackendImageMapStatusResponse>('/api/v1/image_map/status');
+
+  if (!body.index) {
+    return { index: null };
+  }
+
+  const { embedded, total } = body.index;
+  const failed = body.index.failed ?? 0;
+
+  return {
+    // `pending` is a computed property on the backend model and so is absent
+    // from the serialized response; it is derived the same way here (failures
+    // are excluded so it can still drain to zero).
+    index: { embedded, failed, pending: Math.max(0, total - embedded - failed), total },
+  };
 };
 
 export const requestImageMapRefresh = async (): Promise<boolean> => {

@@ -9,9 +9,15 @@ vi.mock('@platform/transport/http', () => ({
   getApiErrorMessage: (_error: unknown, fallback: string) => fallback,
 }));
 
-import { fetchImageMapPoints, requestImageMapRefresh } from './api';
+import { fetchImageMapPoints, fetchImageMapStatus, requestImageMapRefresh } from './api';
 import { CLUSTER_PALETTE, getClusterColor, NOISE_COLOR } from './clusterPalette';
-import { imageMapStore, refreshImageMapPoints } from './imageMapStore';
+import {
+  ensureImageMapLoaded,
+  imageMapStore,
+  recordImageIndexStatus,
+  refreshImageIndexStatus,
+  refreshImageMapPoints,
+} from './imageMapStore';
 import {
   ALL_POINTS_TRACE,
   buildAllPointsTrace,
@@ -91,6 +97,7 @@ describe('image map store', () => {
       data: null,
       error: null,
       indexCounts: null,
+      indexUpdatedAt: null,
       loadState: 'idle',
       renderError: null,
     });
@@ -289,6 +296,7 @@ describe('snapshot transitions', () => {
       data: null,
       error: 'boom',
       indexCounts: null,
+      indexUpdatedAt: null,
       loadState: 'error',
       renderError: null,
     });
@@ -316,10 +324,186 @@ describe('snapshot transitions', () => {
       data: null,
       error: null,
       indexCounts: null,
+      indexUpdatedAt: null,
       loadState: 'loaded',
       renderError: 'The map failed to render (WebGL unavailable).',
     });
 
     expect(imageMapStore.getSnapshot().renderError).not.toBeNull();
+  });
+});
+
+/** Lets everything a just-resolved request queued behind it run. */
+const drainMacrotask = (): Promise<void> =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+
+const EMPTY_SNAPSHOT = {
+  clusterLabels: null,
+  data: null,
+  error: null,
+  indexCounts: null,
+  indexUpdatedAt: null,
+  loadState: 'idle',
+  renderError: null,
+} as const;
+
+describe('image map status', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it('derives the pending count the backend computes but does not serialize', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 30, failed: 2, total: 100 } });
+
+    const status = await fetchImageMapStatus();
+
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/status');
+    // Failures are excluded, exactly as `ImageIndexStatus.pending` does it, so
+    // the queue can still drain to zero with images given up on.
+    expect(status.index).toEqual({ embedded: 30, failed: 2, pending: 68, total: 100 });
+  });
+
+  it('has no counts for a non-admin, who is not told the aggregate totals', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: null });
+
+    expect((await fetchImageMapStatus()).index).toBeNull();
+  });
+});
+
+describe('image index progress', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    imageMapStore.setSnapshot({ ...EMPTY_SNAPSHOT });
+  });
+
+  it('stamps when the index last moved so the UI can say how long it has stood still', () => {
+    recordImageIndexStatus({ embedded: 10, failed: 0, pending: 90, total: 100 }, 4_000);
+
+    expect(imageMapStore.getSnapshot().indexUpdatedAt).toBe(4_000);
+  });
+
+  it('does not treat a growing gallery as the index making progress', () => {
+    // `total` moves as the generation the indexer is waiting out saves its
+    // images. Counting that would reset the clock on every generation.
+    recordImageIndexStatus({ embedded: 10, failed: 0, pending: 90, total: 100 }, 1_000);
+    recordImageIndexStatus({ embedded: 10, failed: 0, pending: 95, total: 105 }, 60_000);
+
+    expect(imageMapStore.getSnapshot().indexUpdatedAt).toBe(1_000);
+    expect(imageMapStore.getSnapshot().indexCounts?.total).toBe(105);
+  });
+
+  it('restarts the clock as soon as the index does move', () => {
+    recordImageIndexStatus({ embedded: 10, failed: 0, pending: 90, total: 100 }, 1_000);
+    recordImageIndexStatus({ embedded: 18, failed: 0, pending: 82, total: 100 }, 60_000);
+
+    expect(imageMapStore.getSnapshot().indexUpdatedAt).toBe(60_000);
+  });
+
+  it('seeds the counts from the status endpoint when the map first loads', async () => {
+    // Status events only fire as batches complete, so a panel opened while the
+    // worker is parked behind a generation would otherwise show no progress.
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/status')
+        ? Promise.resolve({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } })
+        : Promise.resolve(BACKEND_RESPONSE)
+    );
+
+    ensureImageMapLoaded();
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts).not.toBeNull());
+    expect(imageMapStore.getSnapshot().indexCounts).toEqual({ embedded: 40, failed: 0, pending: 60, total: 100 });
+  });
+
+  it('does not let a slow seed rewind counts a status event already delivered', async () => {
+    let resolveStatus: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/status')
+        ? new Promise((resolve) => {
+            resolveStatus = resolve;
+          })
+        : Promise.resolve(BACKEND_RESPONSE)
+    );
+
+    ensureImageMapLoaded();
+    recordImageIndexStatus({ embedded: 90, failed: 0, pending: 10, total: 100 }, 1_000);
+    resolveStatus({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+
+    // A macrotask drains everything the resolved seed queued behind it.
+    await drainMacrotask();
+
+    expect(imageMapStore.getSnapshot().indexCounts?.embedded).toBe(90);
+  });
+
+  it('re-reads the counts on every mount, not just the first load of the map', async () => {
+    // The widget is routinely reopened long after the first load — mid-
+    // backfill, with the worker parked and no event due — which is exactly
+    // when the panel has nothing else to show.
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/status')
+        ? Promise.resolve({ enabled: true, index: { embedded: 70, failed: 0, total: 100 } })
+        : Promise.resolve(BACKEND_RESPONSE)
+    );
+
+    imageMapStore.setSnapshot({ ...EMPTY_SNAPSHOT, loadState: 'loaded' });
+    ensureImageMapLoaded();
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts).not.toBeNull());
+    expect(imageMapStore.getSnapshot().indexCounts).toEqual({ embedded: 70, failed: 0, pending: 30, total: 100 });
+  });
+
+  it('lets a later status fetch correct counts an event left stale', async () => {
+    // The run's final `pending: 0` report is lost while the socket is down, so
+    // without this the progress UI claims a finished backfill is still running
+    // until the page is reloaded.
+    recordImageIndexStatus({ embedded: 40, failed: 0, pending: 60, total: 100 }, 1_000);
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 100, failed: 0, total: 100 } });
+
+    refreshImageIndexStatus();
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts?.pending).toBe(0));
+  });
+
+  it('ages the counts from when they last moved, not from when they were re-read', async () => {
+    // Otherwise pressing "Check again" — the one thing a user watching a
+    // frozen bar will do — pushes the note out by another interval, forever.
+    recordImageIndexStatus({ embedded: 40, failed: 0, pending: 60, total: 100 }, 1_000);
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+
+    refreshImageIndexStatus();
+
+    await vi.waitFor(() => expect(mocks.apiFetchJson).toHaveBeenCalled());
+    await drainMacrotask();
+
+    expect(imageMapStore.getSnapshot().indexUpdatedAt).toBe(1_000);
+  });
+
+  it('runs one status request at a time so an older response cannot land last', async () => {
+    // Concurrent requests resolve in no fixed order, and every mount, retry
+    // and reconnect asks for one.
+    const resolvers: Array<(value: unknown) => void> = [];
+    mocks.apiFetchJson.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        })
+    );
+
+    refreshImageIndexStatus();
+    refreshImageIndexStatus();
+    refreshImageIndexStatus();
+
+    expect(resolvers).toHaveLength(1);
+
+    // ...and the claim is released once it settles, so the next caller is not
+    // locked out for the rest of the session.
+    resolvers[0]?.({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts).not.toBeNull());
+
+    refreshImageIndexStatus();
+    expect(resolvers).toHaveLength(2);
+    resolvers[1]?.({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+    await drainMacrotask();
   });
 });
