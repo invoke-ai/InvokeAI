@@ -2,6 +2,7 @@ import { invalidateGallery } from '@features/gallery/queries';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime } from '@features/queue';
+import { createWorkflowRunCaptureSink } from '@features/workflow/queries';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -75,6 +76,9 @@ export const QueueRuntimeAdapter = () => {
       },
       modelLoads: modelLoadActivitySink,
       nodeExecution: nodeExecutionStore,
+      // Closes the loop on a library-bound run: its final output becomes the
+      // workflow's cover image and stamps `last_run_at` on the record.
+      workflowRuns: createWorkflowRunCaptureSink(),
     });
 
     runtime.start();

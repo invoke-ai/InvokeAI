@@ -2847,6 +2847,13 @@ const enqueueCompiledSnapshot = (
           batchCount: sanitizeBatchCount(widgetStates.generate?.values.batchCount),
           graph: backendGraph,
           kind: 'workflow',
+          // Provenance for the completed-run capture: a run submitted from a
+          // library-bound graph knows which record to stamp, even after the
+          // editor has moved on to another workflow. An unbound graph stamps
+          // nothing, so an ad-hoc workflow never writes to the library.
+          ...(project.projectGraph.libraryWorkflowId
+            ? { libraryWorkflowId: project.projectGraph.libraryWorkflowId }
+            : {}),
         }
       : sourceGenerateSettings && effectivePrompts
         ? {
