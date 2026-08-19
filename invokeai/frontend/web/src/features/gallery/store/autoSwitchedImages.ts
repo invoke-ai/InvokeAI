@@ -1,7 +1,7 @@
 /**
- * Names of images the gallery auto-switched to, pending their first render in the viewer.
+ * Marks the gallery selection the auto-switch made, until the viewer renders it.
  *
- * The viewer briefly reveals a newly selected image over the progress overlay so that a
+ * The viewer briefly reveals a newly selected item over the progress overlay so that a
  * mid-generation gallery click is not invisible (see the reveal effect in CurrentImagePreview).
  * Auto-switch selections must not trigger that reveal — but they land asynchronously: the switch is
  * dispatched only after onInvocationComplete's DTO fetch resolves, and the viewer renders it only
@@ -10,69 +10,52 @@
  * time the auto-switch selection reaches the viewer it is indistinguishable from a user click and
  * the reveal flashes the previous result over the live preview for 2 seconds.
  *
- * Recording the image name at dispatch and consuming it on the selection's first render
- * distinguishes the two without depending on event timing.
+ * The marker is scoped to the selection it was recorded for, not to the item name: it survives only
+ * as long as that selection stands. A name-keyed marker cannot tell "this render is the auto-switch
+ * landing" from "the user picked that same item later", so an auto-switch that never rendered —
+ * because the user clicked elsewhere first — would swallow their later click on it, the very dead
+ * click the reveal exists to prevent. Settling on every selection change closes that: once the
+ * selection moves on, the recorded auto-switch can never render, and the marker goes with it.
+ *
+ * That scoping is also why no expiry or bound is needed. At most one marker exists, and only while
+ * its selection is the current one.
  */
-type AutoSwitchedImageRegistry = {
-  /** Records that the gallery is auto-switching to this image. */
-  record: (imageName: string) => void;
+type AutoSwitchedSelectionMarker = {
+  /** Records that the gallery is auto-switching the selection to this item. Call immediately
+   * before dispatching that selection, so the settle it triggers sees the marker. */
+  record: (itemName: string) => void;
   /**
-   * Returns whether this item was recently auto-switched to, removing the entry along with every
-   * entry recorded before it. Call exactly once per rendered-item change — an entry left behind
-   * would suppress a genuine user selection of the same item later.
-   *
-   * Dropping the older entries is what keeps that from happening after concurrent completions
-   * (multi-GPU): two sessions finishing in the same React batch record two names but only the last
-   * selection is ever rendered, so the first entry has no render coming to consume it. It is
-   * superseded, not pending — and unlike the orphans the TTL covers, it never self-heals, because
-   * that item is not the selection any more. The user's next click on it would otherwise read as
-   * an auto-switch and get no reveal: the exact dead click this registry exists to prevent.
+   * Points the marker at the selection that now stands, dropping it unless it is still the one
+   * recorded. Call on every selection change (see addAutoSwitchedSelectionListener).
    */
-  consume: (imageName: string) => boolean;
+  settle: (selectedItemName: string | null) => void;
+  /**
+   * Returns whether the item now rendering is the one the auto-switch selected, clearing the
+   * marker. Call on every change of the rendered item.
+   */
+  consume: (itemName: string) => boolean;
 };
 
-// A selection can be superseded before it ever renders (rapid back-to-back completions), leaving
-// its entry unconsumed. The bound keeps those leftovers from accumulating; a dropped entry's worst
-// case is one spurious 2-second reveal.
-const MAX_PENDING = 8;
-
-// An entry is only meaningful for the handoff window between the auto-switch dispatch and the
-// image's first render (redux propagation plus the thumbnail preload). An entry that outlives that
-// window is an orphan — its selection was superseded before rendering, the viewer was unmounted
-// (comparison mode), or a duplicate completion event re-recorded an already-rendered image — and
-// consuming an orphan later would swallow a genuine user click on that image, the very dead-click
-// the reveal exists to prevent. Generous enough for a slow media fetch; expiring early merely
-// readmits the 2-second flash on a very slow connection, which is the milder failure.
-const TTL_MS = 30_000;
-
-export const createAutoSwitchedImageRegistry = (now: () => number = Date.now): AutoSwitchedImageRegistry => {
-  let pending: { imageName: string; recordedAt: number }[] = [];
-
-  const prune = () => {
-    const cutoff = now() - TTL_MS;
-    pending = pending.filter((entry) => entry.recordedAt >= cutoff);
-  };
+export const createAutoSwitchedSelectionMarker = (): AutoSwitchedSelectionMarker => {
+  let pendingItemName: string | null = null;
 
   return {
-    record: (imageName) => {
-      prune();
-      pending.push({ imageName, recordedAt: now() });
-      if (pending.length > MAX_PENDING) {
-        pending.shift();
+    record: (itemName) => {
+      pendingItemName = itemName;
+    },
+    settle: (selectedItemName) => {
+      if (pendingItemName !== selectedItemName) {
+        pendingItemName = null;
       }
     },
-    consume: (imageName) => {
-      prune();
-      const index = pending.findIndex((entry) => entry.imageName === imageName);
-      if (index === -1) {
+    consume: (itemName) => {
+      if (pendingItemName !== itemName) {
         return false;
       }
-      // Everything recorded before the entry that just rendered was superseded by it — the
-      // selection moved on without those ever rendering — so they go with it.
-      pending.splice(0, index + 1);
+      pendingItemName = null;
       return true;
     },
   };
 };
 
-export const autoSwitchedImages = createAutoSwitchedImageRegistry();
+export const autoSwitchedImages = createAutoSwitchedSelectionMarker();

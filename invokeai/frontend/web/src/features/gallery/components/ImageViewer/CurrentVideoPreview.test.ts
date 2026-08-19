@@ -22,9 +22,10 @@ describe('CurrentVideoPreview progress overlay', () => {
       /withProgress =\s+shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying/
     );
     expect(source).toContain('SELECTED_ITEM_REVEAL_DURATION_MS');
-    // The previous-item ref must be the shared one from the viewer context, so image -> video
-    // clicks still read as a selection change after the preview component swaps.
-    expect(source).toContain('lastRenderedItemNameRef.current = videoName');
+    // The previous-item ref handed to the reveal controller must be the shared one from the
+    // viewer context, so image -> video clicks still read as a selection change after the
+    // preview component swaps.
+    expect(source).toMatch(/createSelectedItemRevealController\(\{\s+lastRenderedItemNameRef,/);
   });
 
   it('tiles concurrent sessions instead of letting them overwrite each other (multi-GPU)', () => {
@@ -34,41 +35,27 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('<ProgressImageTiles data={activeProgressData} />');
   });
 
-  it('does not treat an auto-switch to the finished video as a user reveal', () => {
+  it('routes the reveal decision through the shared controller with the auto-switch marker', () => {
     // The auto-switch selection lands after onInvocationComplete's DTO fetch, so a quickly-started
-    // next render's first progress event can reset $isProgressImageResolving ahead of it. Without
-    // identity-based suppression the handoff reads as a gallery click and hides the new render's
-    // live preview for 2 seconds.
-    expect(source).toContain('autoSwitchedImages.consume(videoName)');
-    // Consumption must happen on every change of the rendered video — an entry left behind would
-    // swallow a genuine later click on the same video — so it cannot sit behind the reveal guards.
-    const revealEffect = source.slice(
-      source.indexOf('const previousRenderedItemName = lastRenderedItemNameRef.current;'),
-      source.indexOf('SELECTED_ITEM_REVEAL_DURATION_MS)')
-    );
-    expect(revealEffect.indexOf('autoSwitchedImages.consume')).toBeLessThan(
-      revealEffect.indexOf('if (!shouldShowProgressInViewer')
-    );
-    // The suppression branch must lower the atom: the effect has already cleared the running
-    // reveal's timer, so returning with it still true would wedge the reveal on.
-    expect(revealEffect).toMatch(
-      /if \(wasAutoSwitchedTo\) \{\s+\$isTemporarilyShowingSelectedImage\.set\(false\);\s+return;/
-    );
+    // next render's first progress event can reset $isProgressImageResolving ahead of it. Timing
+    // cannot tell that handoff from a gallery click; the marker can, and the controller owns the
+    // full sequencing (marker consumption, resolve-window deferral, StrictMode re-arm — see
+    // selectedItemReveal.test.ts for the behavior).
+    expect(source).toMatch(/marker: autoSwitchedImages,/);
+    expect(source).toMatch(/revealController\.run\(\{/);
+    expect(source).toMatch(/isProgressImageResolving,\s+renderedItemName: videoName,/);
+    // The effect cleanup must only cancel the timer — the next run (or the unmount handler below)
+    // owns the revealed flag.
+    expect(source).toMatch(/return \(\) => \{\s+revealController\.clearTimer\(\);\s+\};/);
   });
 
-  it('leaves no path out of the reveal effect with the atom still raised', () => {
-    // Every early return happens after the effect has already cleared the running reveal's timer,
-    // so a return that leaves the atom true wedges the reveal on for the rest of the render. Under
-    // StrictMode the plain mount case reaches the previous-name branch with the ref already
-    // holding this video's name.
-    const revealEffect = source.slice(
-      source.indexOf('const previousRenderedItemName = lastRenderedItemNameRef.current;'),
-      source.indexOf('$isTemporarilyShowingSelectedImage.set(true);')
+  it('does not cover playback or a temporary reveal with the metadata panel', () => {
+    // Playing and revealing both turn withProgress off, so gating the full-screen metadata panel
+    // on !withProgress alone drops it exactly on top of the native controls / the just-revealed
+    // video whenever item details are enabled.
+    expect(source).toMatch(
+      /shouldShowItemDetails && !isPlaying && !isTemporarilyShowingSelectedImage && !withProgress &&/
     );
-    const returns = revealEffect.match(/return;/g) ?? [];
-    const lowered = revealEffect.match(/\$isTemporarilyShowingSelectedImage\.set\(false\);\s+return;/g) ?? [];
-    expect(returns.length).toBeGreaterThan(0);
-    expect(lowered).toHaveLength(returns.length);
   });
 
   it('restores the overlay when playback ends on its own, not only when the player is closed', () => {

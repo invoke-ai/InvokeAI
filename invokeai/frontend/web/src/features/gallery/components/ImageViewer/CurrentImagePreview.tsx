@@ -6,6 +6,7 @@ import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -24,6 +25,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
+import { createSelectedItemRevealController } from './selectedItemReveal';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const activeTab = useAppSelector(selectActiveTab);
@@ -46,7 +48,16 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const isProgressImageResolving = useStore($isProgressImageResolving);
   const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
-  const selectedImageRevealTimeoutId = useRef(0);
+  // One controller per mounted preview component; the previous-item ref inside it is the shared
+  // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
+  const [revealController] = useState(() =>
+    createSelectedItemRevealController({
+      lastRenderedItemNameRef,
+      marker: autoSwitchedImages,
+      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
+      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+    })
+  );
 
   useEffect(() => {
     if (!selectedImageName) {
@@ -91,54 +102,24 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   const hasProgressImage = progressImage !== null;
 
+  // The reveal sequencing (previous-item tracking, auto-switch suppression, resolve-window
+  // deferral, StrictMode re-arm) lives in the controller — see selectedItemReveal.ts.
   useEffect(() => {
-    const renderedImageName = imageToRender?.image_name ?? null;
-    // The previous-item ref is shared with CurrentVideoPreview (via the viewer context) so a click
-    // that switches media type still reads as a selection change here. While a selection exists
-    // but its preload hasn't landed yet (renderedImageName still null on the mount run after a
-    // video -> image swap), the ref must NOT be overwritten — nulling it here would erase the
-    // "previous item was the video" fact and swallow the reveal this run's successor would fire.
-    // A genuinely empty selection does reset it, preserving the no-reveal-on-first-selection rule.
-    const previousRenderedItemName = lastRenderedItemNameRef.current;
-    if (renderedImageName !== null || !selectedImageName) {
-      lastRenderedItemNameRef.current = renderedImageName;
-    }
-
-    window.clearTimeout(selectedImageRevealTimeoutId.current);
-
-    if (
-      !shouldShowProgressInViewer ||
-      !hasProgressImage ||
-      isProgressImageResolving ||
-      !renderedImageName ||
-      renderedImageName !== selectedImageName
-    ) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    // Every path out of here must leave the atom false: the clearTimeout above already killed any
-    // running reveal's timer, so returning with it still true would wedge the reveal on for the
-    // rest of the render.
-    if (previousRenderedItemName === null || previousRenderedItemName === renderedImageName) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    $isTemporarilyShowingSelectedImage.set(true);
-    selectedImageRevealTimeoutId.current = window.setTimeout(() => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    }, SELECTED_ITEM_REVEAL_DURATION_MS);
-
+    revealController.run({
+      shouldShowProgressInViewer,
+      hasProgressImage,
+      isProgressImageResolving,
+      renderedItemName: imageToRender?.image_name ?? null,
+      selectedItemName: selectedImageName ?? null,
+    });
     return () => {
-      window.clearTimeout(selectedImageRevealTimeoutId.current);
+      revealController.clearTimer();
     };
   }, [
-    $isTemporarilyShowingSelectedImage,
     hasProgressImage,
     imageToRender?.image_name,
     isProgressImageResolving,
-    lastRenderedItemNameRef,
+    revealController,
     selectedImageName,
     shouldShowProgressInViewer,
   ]);
@@ -250,7 +231,11 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
       </Flex>
-      {shouldShowItemDetails && imageToRender && !withProgress && (
+      {/* Gated on the reveal state itself, not only on !withProgress (which the reveal turns
+          off): the reveal exists to make a mid-render click visibly land, and the full-screen
+          metadata panel would drop exactly on top of the just-revealed image for the whole
+          window. Mirrors CurrentVideoPreview's gate. */}
+      {shouldShowItemDetails && imageToRender && !isTemporarilyShowingSelectedImage && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <ImageMetadataViewer image={imageToRender} />
         </Box>

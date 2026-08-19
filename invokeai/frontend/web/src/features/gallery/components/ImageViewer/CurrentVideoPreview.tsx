@@ -14,7 +14,11 @@ import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
 import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
-import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
+import {
+  selectLastSelectedItem,
+  selectSelectedBoardId,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
 import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
@@ -36,6 +40,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
+import { createSelectedItemRevealController } from './selectedItemReveal';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
 type Props = {
@@ -100,7 +105,17 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // of letting the sessions overwrite each other's full-size preview. Mirrors CurrentImagePreview.
   const withTiledProgress = withProgress && activeProgressData.length > 1;
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
-  const selectedVideoRevealTimeoutId = useRef(0);
+  const selectedItemName = useAppSelector(selectLastSelectedItem);
+  // One controller per mounted preview component; the previous-item ref inside it is the shared
+  // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
+  const [revealController] = useState(() =>
+    createSelectedItemRevealController({
+      lastRenderedItemNameRef,
+      marker: autoSwitchedImages,
+      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
+      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+    })
+  );
 
   // Whenever the selected video changes, drop back to the idle still + play overlay.
   useEffect(() => {
@@ -111,62 +126,25 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // the opaque progress overlay swallows every video-thumbnail click for the whole render — the
   // selection changes underneath, but nothing visibly happens. Unlike the image path there is no
   // preload step: the <video> renders immediately (first frame paints when metadata arrives), so
-  // the reveal is keyed directly off the selected video name. The previous-item ref is shared with
-  // CurrentImagePreview so an image -> video click still reads as a selection change.
+  // the reveal is keyed directly off the rendered video name. The sequencing (previous-item
+  // tracking, auto-switch suppression, resolve-window deferral, StrictMode re-arm) lives in the
+  // controller — see selectedItemReveal.ts.
   useEffect(() => {
-    const previousRenderedItemName = lastRenderedItemNameRef.current;
-    lastRenderedItemNameRef.current = videoName;
-
-    // Consume on every change of the rendered video, not only when the reveal conditions below
-    // hold — in the common case the auto-switched video renders with no progress showing, and an
-    // entry left behind would suppress a genuine user selection of the same video later. The
-    // registry is keyed by gallery item name, which is polymorphic, so video names share it with
-    // the image path.
-    const wasAutoSwitchedTo =
-      videoName !== null && videoName !== previousRenderedItemName && autoSwitchedImages.consume(videoName);
-
-    window.clearTimeout(selectedVideoRevealTimeoutId.current);
-
-    if (!shouldShowProgressInViewer || !hasProgressImage || isProgressImageResolving || !videoName) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    // Same reasoning as the wasAutoSwitchedTo branch below: the clearTimeout above already killed
-    // any running reveal's timer, so every path out of here must leave the atom false or the reveal
-    // wedges on for the rest of the render. Reachable on a plain mount under StrictMode, whose
-    // double-invoked effect re-enters with the ref already holding this video's name.
-    if (previousRenderedItemName === null || previousRenderedItemName === videoName) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    // The reveal exists to make a mid-render *user* selection visible. An auto-switch to a
-    // just-finished video lands asynchronously — the selection is dispatched only after
-    // onInvocationComplete's DTO fetch — so a quickly-started next render's first progress event
-    // can slot in ahead of it and reset $isProgressImageResolving. By the time the auto-switch
-    // reaches this effect it is indistinguishable by timing from a gallery click, and treating it
-    // as one hides the new render's live preview behind the finished video for 2 seconds. The
-    // set(false) is required: the clearTimeout above already cancelled any running reveal's timer,
-    // so returning with the atom still true would wedge the reveal on.
-    if (wasAutoSwitchedTo) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    $isTemporarilyShowingSelectedImage.set(true);
-    selectedVideoRevealTimeoutId.current = window.setTimeout(() => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    }, SELECTED_ITEM_REVEAL_DURATION_MS);
-
+    revealController.run({
+      shouldShowProgressInViewer,
+      hasProgressImage,
+      isProgressImageResolving,
+      renderedItemName: videoName,
+      selectedItemName: selectedItemName ?? null,
+    });
     return () => {
-      window.clearTimeout(selectedVideoRevealTimeoutId.current);
+      revealController.clearTimer();
     };
   }, [
-    $isTemporarilyShowingSelectedImage,
     hasProgressImage,
     isProgressImageResolving,
-    lastRenderedItemNameRef,
+    revealController,
+    selectedItemName,
     shouldShowProgressInViewer,
     videoName,
   ]);
@@ -464,7 +442,10 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         }}
       />
       {!isPlaying && !withProgress && <VideoPlayButtonOverlay onClick={handlePlay} />}
-      {shouldShowItemDetails && !withProgress && (
+      {/* Gated on the states themselves, not on !withProgress: playing and revealing both turn
+          withProgress off, and the full-screen metadata panel would land exactly on top of the
+          playback controls / the just-revealed video, swallowing the interaction they exist for. */}
+      {shouldShowItemDetails && !isPlaying && !isTemporarilyShowingSelectedImage && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <VideoMetadataViewer video={videoDTO} />
         </Box>

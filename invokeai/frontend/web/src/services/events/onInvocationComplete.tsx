@@ -12,6 +12,7 @@ import {
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection, isVideoField } from 'features/nodes/types/common';
+import { LRUCache } from 'lru-cache';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
@@ -54,15 +55,30 @@ export const buildOnInvocationComplete = (
   dispatch: AppDispatch,
   completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
-  const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
+  // A duplicate delivery of a completion event must not repeat the work below: re-running the
+  // gallery handling double-counts the optimistic board totals and re-dispatches the auto-switch
+  // selection. The shared completedInvocationKeysByItemId map cannot detect this — the
+  // workflow coordinator pre-marks first-delivery events for non-active workflow items before this
+  // handler runs — so the handler tracks what it has processed itself. The invocation id half of
+  // the key is the prepared node's per-execution UUID, so keys cannot collide across distinct
+  // executions even where item ids restart (in-memory DB); the LRU bounds memory.
+  const processedInvocations = new LRUCache<string, boolean>({ max: 1000 });
+
+  // Returns how many image DTOs were fetched, so the caller can tell "this event had no gallery
+  // output" apart from "the output was there but every lookup failed" (see the dedupe-key drop in
+  // the handler below).
+  const addImagesToGallery = async (
+    data: S['InvocationCompleteEvent'],
+    onLookupFailure: () => void
+  ): Promise<number> => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
-      return;
+      return 0;
     }
 
-    const imageDTOs = await getResultImageDTOs(data);
+    const imageDTOs = await getResultImageDTOs(data, onLookupFailure);
     if (imageDTOs.length === 0) {
-      return;
+      return 0;
     }
 
     // For efficiency's sake, we want to minimize the number of dispatches and invalidations we do.
@@ -72,7 +88,7 @@ export const buildOnInvocationComplete = (
 
     for (const imageDTO of imageDTOs) {
       if (imageDTO.is_intermediate) {
-        return;
+        return imageDTOs.length;
       }
 
       const board_id = imageDTO.board_id ?? 'none';
@@ -184,18 +200,24 @@ export const buildOnInvocationComplete = (
     const autoSwitch = selectAutoSwitch(getState());
 
     if (!autoSwitch) {
-      return;
+      return imageDTOs.length;
     }
 
     // Finally, we may need to autoswitch to the new image. We'll only do it for the last image in the list.
     const lastImageDTO = imageDTOs.at(-1);
 
     if (!lastImageDTO) {
-      return;
+      return imageDTOs.length;
     }
 
     const { image_name } = lastImageDTO;
     const board_id = lastImageDTO.board_id ?? 'none';
+
+    // Both branches below auto-switch the selection to this image. Record that so the viewer's
+    // reveal effect can tell the handoff apart from a user's gallery click — this dispatch happens
+    // after an async DTO fetch, so it can land after the next generation's first progress event has
+    // already reset $isProgressImageResolving, and timing alone cannot distinguish the two.
+    autoSwitchedImages.record(image_name);
 
     // With optimistic updates, we can immediately switch to the new image
     const selectedBoardId = selectSelectedBoardId(getState());
@@ -221,9 +243,18 @@ export const buildOnInvocationComplete = (
       // Select the image immediately since we've optimistically updated the cache
       dispatch(imageSelected(lastImageDTO.image_name));
     }
+
+    return imageDTOs.length;
   };
 
-  const getResultImageDTOs = async (data: S['InvocationCompleteEvent']): Promise<ImageDTO[]> => {
+  // getImageDTOSafe swallows fetch errors and returns null, which downstream is indistinguishable
+  // from "this node produced no image". onLookupFailure separates the two: the handler drops this
+  // event's dedupe key when it fires, so a re-delivery redoes the gallery work instead of being
+  // turned away as a duplicate of a delivery whose output never reached the gallery.
+  const getResultImageDTOs = async (
+    data: S['InvocationCompleteEvent'],
+    onLookupFailure: () => void
+  ): Promise<ImageDTO[]> => {
     const { result } = data;
     const imageDTOs: ImageDTO[] = [];
     for (const [_name, value] of objectEntries(result)) {
@@ -231,12 +262,16 @@ export const buildOnInvocationComplete = (
         const imageDTO = await getImageDTOSafe(value.image_name);
         if (imageDTO) {
           imageDTOs.push(imageDTO);
+        } else {
+          onLookupFailure();
         }
       } else if (isImageFieldCollection(value)) {
         for (const imageField of value) {
           const imageDTO = await getImageDTOSafe(imageField.image_name);
           if (imageDTO) {
             imageDTOs.push(imageDTO);
+          } else {
+            onLookupFailure();
           }
         }
       }
@@ -244,7 +279,10 @@ export const buildOnInvocationComplete = (
     return imageDTOs;
   };
 
-  const getResultVideoDTOs = async (data: S['InvocationCompleteEvent']): Promise<VideoDTO[]> => {
+  const getResultVideoDTOs = async (
+    data: S['InvocationCompleteEvent'],
+    onLookupFailure: () => void
+  ): Promise<VideoDTO[]> => {
     const { result } = data;
     const videoDTOs: VideoDTO[] = [];
     for (const [_name, value] of objectEntries(result)) {
@@ -252,6 +290,8 @@ export const buildOnInvocationComplete = (
         const videoDTO = await getVideoDTOSafe(value.video_name);
         if (videoDTO) {
           videoDTOs.push(videoDTO);
+        } else {
+          onLookupFailure();
         }
       }
     }
@@ -267,19 +307,22 @@ export const buildOnInvocationComplete = (
   //      (DndImage onLoad) to clear them. When auto-switching to a video, the viewer swaps
   //      CurrentImagePreview for CurrentVideoPreview, which unmounts the stale progress overlay
   //      so the stuck "Saving video" spinner goes away on its own.
-  const addVideosToGallery = async (data: S['InvocationCompleteEvent']) => {
+  const addVideosToGallery = async (
+    data: S['InvocationCompleteEvent'],
+    onLookupFailure: () => void
+  ): Promise<number> => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
-      return;
+      return 0;
     }
 
-    const videoDTOs = await getResultVideoDTOs(data);
+    const videoDTOs = await getResultVideoDTOs(data, onLookupFailure);
     if (videoDTOs.length === 0) {
-      return;
+      return 0;
     }
 
     const nonIntermediate = videoDTOs.filter((v) => !v.is_intermediate);
     if (nonIntermediate.length === 0) {
-      return;
+      return videoDTOs.length;
     }
 
     // Force the polymorphic gallery list to refetch so the new video shows up. Note: this is
@@ -298,12 +341,12 @@ export const buildOnInvocationComplete = (
 
     const autoSwitch = selectAutoSwitch(getState());
     if (!autoSwitch) {
-      return;
+      return videoDTOs.length;
     }
 
     const lastVideoDTO = nonIntermediate.at(-1);
     if (!lastVideoDTO) {
-      return;
+      return videoDTOs.length;
     }
 
     const { video_name } = lastVideoDTO;
@@ -313,7 +356,7 @@ export const buildOnInvocationComplete = (
     // reveal effect can tell the handoff apart from a user's gallery click — this dispatch happens
     // after an async DTO fetch, so it can land after the next render's first progress event has
     // already reset $isProgressImageResolving, and timing alone cannot distinguish the two. The
-    // registry is keyed by gallery item name, which is polymorphic across images and videos.
+    // marker is keyed by gallery item name, which is polymorphic across images and videos.
     autoSwitchedImages.record(video_name);
 
     // Selection is a polymorphic string[]; useGalleryItemDTO discriminates by filename extension.
@@ -335,6 +378,8 @@ export const buildOnInvocationComplete = (
       }
       dispatch(imageSelected(video_name));
     }
+
+    return videoDTOs.length;
   };
 
   const clearCanvasWorkflowIntegrationProcessing = (data: S['InvocationCompleteEvent']) => {
@@ -361,6 +406,24 @@ export const buildOnInvocationComplete = (
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
+    const invocationKey = `${data.item_id}:${data.invocation.id}`;
+    if (processedInvocations.has(invocationKey)) {
+      log.trace(
+        { data } as JsonObject,
+        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+      );
+      return;
+    }
+    // Mark before the awaits below — a duplicate arriving while the DTO fetch is in flight must be
+    // rejected too. Dropped again below when every DTO lookup failed: the gallery never got any of
+    // that output, so a re-delivery must be free to redo the work rather than be turned away as a
+    // duplicate of a delivery that never landed.
+    processedInvocations.set(invocationKey, true);
+    let hadLookupFailure = false;
+    const onLookupFailure = () => {
+      hadLookupFailure = true;
+    };
+
     const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
     const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
       nodeExecutionState,
@@ -383,10 +446,19 @@ export const buildOnInvocationComplete = (
     clearCanvasWorkflowIntegrationProcessing(data);
 
     // Add images to gallery (canvas workflow integration results go to staging area automatically)
-    await addImagesToGallery(data);
-    await addVideosToGallery(data);
+    const fetchedImageCount = await addImagesToGallery(data, onLookupFailure);
+    const fetchedVideoCount = await addVideosToGallery(data, onLookupFailure);
 
     $lastProgressEvent.set(null);
+
+    // Drop the dedupe key only when a lookup failed AND nothing was fetched: such a delivery
+    // dispatched no gallery work at all, so a re-delivery is free to redo everything (the
+    // node-execution upsert has its own dedupe via completedInvocationKeysByItemId). A partial
+    // failure keeps the key — the fetched DTOs' board totals and optimistic inserts were already
+    // dispatched, and a re-delivery re-running them would double-count.
+    if (hadLookupFailure && fetchedImageCount + fetchedVideoCount === 0) {
+      processedInvocations.delete(invocationKey);
+    }
   };
 };
 
