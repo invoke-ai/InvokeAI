@@ -5,6 +5,7 @@ import type {
   CanvasRegionalGuidanceState,
   RefImageState,
 } from 'features/controlLayers/store/types';
+import { isKrea2ReferenceImageConfig } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import {
   type AnyModelConfigWithExternal,
@@ -28,6 +29,7 @@ const WARNINGS = {
   CONTROL_ADAPTER_NO_CONTROL: 'controlLayers.warnings.controlAdapterNoControl',
   FLUX_FILL_NO_WORKY_WITH_CONTROL_LORA: 'controlLayers.warnings.fluxFillIncompatibleWithControlLoRA',
   CONTROL_ADAPTER_DUPLICATE_ANIMA_LLLITE_MODEL: 'controlLayers.warnings.controlAdapterDuplicateAnimaLLLiteModel',
+  KREA2_ONLY_ONE_REFERENCE_IMAGE: 'controlLayers.warnings.krea2OnlyOneReferenceImage',
 } as const;
 
 type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
@@ -217,6 +219,34 @@ export const getGlobalReferenceImageWarnings = (
       if (config.type !== 'qwen_image_reference_image' && config.type !== 'wan_reference_image') {
         warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
       }
+    }
+  }
+
+  return warnings;
+};
+
+/**
+ * Warnings that depend on the *other* reference images, not just this one.
+ *
+ * Krea-2's style reference splices a single reference's attention keys/values into the target, so the
+ * graph builder consumes exactly one image. Without this the extra entities would be dropped silently,
+ * which reads as "all of them are being used".
+ *
+ * Deliberately separate from `getGlobalReferenceImageWarnings`: the graph builder filters its candidates
+ * on that function returning no warnings, and folding this in would exclude the one image we *do* use.
+ */
+export const getGlobalReferenceImageWarningsInContext = (
+  entity: RefImageState,
+  allEntities: RefImageState[],
+  model: MainOrExternalModelConfig | null | undefined
+): string[] => {
+  const warnings: string[] = [...getGlobalReferenceImageWarnings(entity, model)];
+
+  if (model?.base === 'krea-2') {
+    const usable = allEntities.filter((e) => e.isEnabled && isKrea2ReferenceImageConfig(e.config) && e.config.image);
+    const isUsable = usable.some((e) => e.id === entity.id);
+    if (isUsable && usable.length > 1 && usable[0]?.id !== entity.id) {
+      warnings.push(WARNINGS.KREA2_ONLY_ONE_REFERENCE_IMAGE);
     }
   }
 
