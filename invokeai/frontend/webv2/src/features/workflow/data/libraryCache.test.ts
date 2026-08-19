@@ -80,3 +80,63 @@ describe('workflow library account ownership', () => {
     await expect(cache.getLibraryWorkflowCached('shared-id')).resolves.toEqual({ owner: 'b' });
   });
 });
+
+describe('workflow library page cache keying', () => {
+  beforeEach(() => {
+    account.accountLifecycle.activate('user-a');
+    api.listLibraryWorkflows.mockResolvedValue({ items: [], page: 1, pages: 1, per_page: 20, total: 0 });
+  });
+
+  it('keys distinct tag filters into distinct cache entries, fetching each once', async () => {
+    const upscaling = { ...params, tags: ['upscaling'] };
+    const lora = { ...params, tags: ['lora'] };
+
+    await cache.listLibraryWorkflowsCached(upscaling);
+    await cache.listLibraryWorkflowsCached(lora);
+
+    expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(2);
+    expect(cache.getCachedWorkflowPage(upscaling)).not.toBeNull();
+    expect(cache.getCachedWorkflowPage(lora)).not.toBeNull();
+  });
+
+  it('hits the cache for a repeat request with the same tags regardless of order', async () => {
+    const first = { ...params, tags: ['lora', 'upscaling'] };
+    const second = { ...params, tags: ['upscaling', 'lora'] };
+
+    await cache.listLibraryWorkflowsCached(first);
+
+    // A single fetch populates the cache under a tag-order-normalized key, so a
+    // differently-ordered request for the same tag set reads the same entry
+    // synchronously without triggering another fetch.
+    expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(1);
+    expect(cache.getCachedWorkflowPage(second)).not.toBeNull();
+    expect(cache.getCachedWorkflowPage(second)).toBe(cache.getCachedWorkflowPage(first));
+  });
+
+  it('does not collide an untagged request with a tagged one for the same page', async () => {
+    const untagged = params;
+    const tagged = { ...params, tags: ['lora'] };
+
+    await cache.listLibraryWorkflowsCached(untagged);
+
+    expect(cache.getCachedWorkflowPage(tagged)).toBeNull();
+
+    await cache.listLibraryWorkflowsCached(tagged);
+
+    expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('workflow library cache invalidation listeners', () => {
+  it('notifies registered listeners when the cache is invalidated', () => {
+    const listener = vi.fn();
+    const unsubscribe = cache.onWorkflowLibraryCacheInvalidated(listener);
+
+    cache.invalidateWorkflowLibraryCache();
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    cache.invalidateWorkflowLibraryCache();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});

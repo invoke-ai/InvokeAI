@@ -88,6 +88,11 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
+    def update_last_run_at(self, workflow_id: str, user_id: Optional[str] = None) -> None:
+        """Records that a workflow was just run. When user_id is provided, the UPDATE is scoped to that user."""
+        pass
+
+    @abstractmethod
     def get_all_tags(
         self,
         categories: Optional[list[WorkflowCategory]] = None,

@@ -3045,6 +3045,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/i/{workflow_id}/last_run_at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Workflow Last Run At
+         * @description Updates the last_run_at field of a workflow
+         */
+        put: operations["update_workflow_last_run_at"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/style_presets/i/{style_preset_id}": {
         parameters: {
             query?: never;
@@ -42826,6 +42846,11 @@ export type components = {
              */
             opened_at?: string | null;
             /**
+             * Last Run At
+             * @description The timestamp of the last completed run of this workflow.
+             */
+            last_run_at?: string | null;
+            /**
              * User Id
              * @description The id of the user who owns this workflow.
              */
@@ -42865,6 +42890,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Last Run At
+             * @description The timestamp of the last completed run of this workflow.
+             */
+            last_run_at?: string | null;
             /**
              * User Id
              * @description The id of the user who owns this workflow.
@@ -42928,6 +42958,11 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * Last Run At
+             * @description The timestamp of the last completed run of this workflow.
+             */
+            last_run_at?: string | null;
             /**
              * User Id
              * @description The id of the user who owns this workflow.
@@ -50009,6 +50044,36 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_workflow_last_run_at: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

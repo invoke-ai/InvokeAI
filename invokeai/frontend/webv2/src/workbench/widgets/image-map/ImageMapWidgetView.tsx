@@ -5,11 +5,15 @@ import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@w
 import {
   ensureImageMapLoaded,
   imageMapStore,
+  refreshImageIndexStatus,
   refreshImageMapPoints,
   setClusterLabelsEnabled,
 } from '@workbench/image-map/imageMapStore';
+import { isIndexing } from '@workbench/image-map/indexProgress';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
+
+import { ImageIndexProgressPanel } from './ImageIndexProgress';
 
 // Lazy so the plotly bundle (its own vite chunk, ~1.5MB) loads only when the
 // widget is actually shown.
@@ -17,6 +21,9 @@ const ImageMapPlot = lazy(() => import('./ImageMapPlot'));
 
 const handleRefresh = () => {
   void refreshImageMapPoints();
+  // The counts too: when the retry is the progress panel's, stale counts are
+  // the likeliest reason the user pressed it.
+  refreshImageIndexStatus();
 };
 
 // Module scope: an inline element would be a new value on every render, which
@@ -34,7 +41,7 @@ const plotLoadingFallback = (
  * selects that image in the gallery (and so in Preview).
  */
 export const ImageMapWidgetView = (_props: WidgetViewProps) => {
-  const { data, error, loadState, renderError } = imageMapStore.useSnapshot();
+  const { data, error, indexCounts, indexUpdatedAt, loadState, renderError } = imageMapStore.useSnapshot();
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
   const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
 
@@ -116,6 +123,29 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
         detail="Enable `image_index_enabled` in the server configuration and restart the server to build a semantic index of your gallery."
         title="Image indexing is off"
       />
+    );
+  }
+
+  // Ahead of both `computing` and the empty state: with nothing to draw yet,
+  // how far the backfill has got is the one thing that answers "when will
+  // there be a map?" — a spinner or "nothing to map yet" leaves a user with a
+  // large gallery unable to tell progress from a stall. `computing` is routine
+  // here (the backend asks for a projection as soon as anything is embedded),
+  // so deferring to it would hide the progress for most of a backfill.
+  //
+  // A failed refresh is carried into the panel rather than shadowed by it:
+  // preempting the `error` branch below would otherwise drop both the message
+  // and the only retry the widget has before the map is ready.
+  if (isIndexing(indexCounts)) {
+    return (
+      <Center h="full" p="6">
+        <ImageIndexProgressPanel
+          counts={indexCounts}
+          error={loadState === 'error' ? (error ?? 'Failed to load the image map.') : null}
+          updatedAt={indexUpdatedAt}
+          onRetry={handleRefresh}
+        />
+      </Center>
     );
   }
 

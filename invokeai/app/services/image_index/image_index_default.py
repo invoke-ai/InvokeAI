@@ -326,11 +326,29 @@ class ImageIndexService(ImageIndexServiceBase):
                 # Written aside and renamed: two processes sharing a db_dir can
                 # first-run at once, and a kill mid-write would otherwise leave
                 # a truncated archive that costs another full re-embed.
-                staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp")
+                #
+                # The staging name has to end in `.npz` because np.savez appends
+                # that extension to any path that lacks it: written as `.tmp`,
+                # the archive landed at `.tmp.npz` and the rename below then
+                # failed on the `.tmp` that was never created. The failure was
+                # swallowed by the handler, so the cache never reached disk and
+                # every restart re-embedded the whole vocabulary (minutes,
+                # during which cluster labels are unavailable) while leaking one
+                # orphaned staging file per run.
+                staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
                 np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
                 os.replace(staging_path, cache_path)
             except Exception:
-                self._invoker.services.logger.warning(f"Could not write cluster vocabulary cache to {cache_path}")
+                # With the exception, not just the path. The in-memory cache
+                # below is assigned either way, so a write failure costs
+                # nothing until the next restart and is invisible until someone
+                # goes looking at startup times. The `.tmp` bug above survived
+                # because this line said only that something had gone wrong,
+                # never what — the FileNotFoundError it swallowed names the
+                # missing staging file outright.
+                self._invoker.services.logger.warning(
+                    f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
+                )
             self._vocab_cache = (vocabulary, embeddings)
 
     def _get_text_encoder(self) -> tuple[Any, Any, bool]:

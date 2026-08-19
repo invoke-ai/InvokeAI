@@ -12028,6 +12028,47 @@
         }
       }
     },
+    "/api/v1/workflows/i/{workflow_id}/last_run_at": {
+      "put": {
+        "tags": ["workflows"],
+        "summary": "Update Workflow Last Run At",
+        "description": "Updates the last_run_at field of a workflow",
+        "operationId": "update_workflow_last_run_at",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The workflow to update",
+              "title": "Workflow Id"
+            },
+            "description": "The workflow to update"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/style_presets/i/{style_preset_id}": {
       "get": {
         "tags": ["style_presets"],
@@ -95290,6 +95331,22 @@
             "title": "Opened At",
             "description": "The opened timestamp of the workflow."
           },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At",
+            "description": "The timestamp of the last completed run of this workflow."
+          },
           "user_id": {
             "type": "string",
             "title": "User Id",
@@ -95362,6 +95419,22 @@
             ],
             "title": "Opened At",
             "description": "The opened timestamp of the workflow."
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At",
+            "description": "The timestamp of the last completed run of this workflow."
           },
           "user_id": {
             "type": "string",
@@ -95484,6 +95557,22 @@
             ],
             "title": "Opened At",
             "description": "The opened timestamp of the workflow."
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At",
+            "description": "The timestamp of the last completed run of this workflow."
           },
           "user_id": {
             "type": "string",
