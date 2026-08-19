@@ -42,6 +42,8 @@ const isJsonObject = (value: unknown): value is JsonObject => typeof value === '
 const INVOCATION_DENYLIST = new Set(['graph', 'linear_ui_output']);
 
 const RESERVED_INPUT_FIELD_NAMES = new Set(['id', 'type', 'use_cache', 'is_intermediate']);
+/** `field_kind: 'internal'` properties that are nonetheless real, connectable inputs here. */
+const CONNECTABLE_INTERNAL_FIELD_NAMES = new Set(['metadata']);
 const RESERVED_FIELD_TYPE_NAMES = new Set(['IsIntermediate']);
 
 const OPENAPI_TO_FIELD_TYPE_MAP: Record<string, string> = {
@@ -195,7 +197,12 @@ const getDefaultValueForType = (type: FieldType, options: string[] | null): unkn
   }
 };
 
-const buildInputTemplate = (name: string, property: JsonObject, type: FieldType): FieldInputTemplate => {
+const buildInputTemplate = (
+  name: string,
+  property: JsonObject,
+  type: FieldType,
+  fieldKind: FieldInputTemplate['fieldKind']
+): FieldInputTemplate => {
   const enumValues = Array.isArray(property.enum)
     ? property.enum
     : property.const !== undefined
@@ -216,6 +223,7 @@ const buildInputTemplate = (name: string, property: JsonObject, type: FieldType)
     description: typeof property.description === 'string' ? property.description : '',
     exclusiveMaximum: getNumberOrNull(property.exclusiveMaximum),
     exclusiveMinimum: getNumberOrNull(property.exclusiveMinimum),
+    fieldKind,
     input,
     maximum: getNumberOrNull(property.maximum),
     minimum: getNumberOrNull(property.minimum),
@@ -276,11 +284,21 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
     }
 
     // `internal` covers exactly two properties across the whole schema: `metadata` and
-    // `board`. Both are real, connectable inputs — a workflow that wires a Core Metadata
-    // node into a save node needs the `metadata` handle to exist. The node-level
-    // attributes (`id`, `type`, `use_cache`, `is_intermediate`) are `node_attribute`, so
-    // they stay excluded here as well as by RESERVED_INPUT_FIELD_NAMES.
-    if (rawProperty.field_kind !== 'input' && rawProperty.field_kind !== 'internal') {
+    // `board`. `metadata` is admitted because it is a real, connectable input — a workflow
+    // that wires a Core Metadata node into a save node needs that handle to exist, and
+    // without it the edge is invisible in the editor and dropped on re-save.
+    //
+    // `board` stays out. It is a direct input whose value this app does not honour: the
+    // queue runtime re-homes every result onto the active gallery board after a run
+    // (see `addImagesToDestination`), and `toBoardGraphValue` reads `'auto'` as "no board"
+    // where the v6 editor reads it as "the auto-add board". Admitting it would render a
+    // control on ~104 node types that silently does nothing. Revisit if those two are fixed.
+    //
+    // The node-level attributes (`id`, `type`, `use_cache`, `is_intermediate`) are
+    // `node_attribute`, so they stay excluded here as well as by RESERVED_INPUT_FIELD_NAMES.
+    const isConnectableInternal = rawProperty.field_kind === 'internal' && CONNECTABLE_INTERNAL_FIELD_NAMES.has(name);
+
+    if (rawProperty.field_kind !== 'input' && !isConnectableInternal) {
       continue;
     }
 
@@ -290,7 +308,7 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
-    inputs[name] = buildInputTemplate(name, rawProperty, fieldType);
+    inputs[name] = buildInputTemplate(name, rawProperty, fieldType, isConnectableInternal ? 'internal' : 'input');
   }
 
   const outputRefName = isJsonObject(schema.output) ? getRef(schema.output) : null;

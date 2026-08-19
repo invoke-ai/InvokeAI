@@ -30,6 +30,25 @@ class MiniMaxH3LoRALoaderOutput(BaseInvocationOutput):
     )
 
 
+@invocation_output("minimax_h3_lora_collection_loader_output")
+class MiniMaxH3LoRACollectionLoaderOutput(BaseInvocationOutput):
+    """MiniMax H3 LoRA collection loader output.
+
+    Separate from the single loader's output because a collection applies zero or more LoRAs,
+    so its metadata echo is a list — which is also what `core_metadata.loras` takes directly,
+    with no intervening collect node.
+    """
+
+    transformer: Optional[MiniMaxH3TransformerField] = OutputField(
+        default=None, description=FieldDescriptions.transformer, title="MiniMax H3 Transformer"
+    )
+    lora_metadata: list[LoRAMetadataField] = OutputField(
+        default=[],
+        description="The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+        title="LoRA Metadata",
+    )
+
+
 @invocation(
     "minimax_h3_lora_loader",
     title="Apply LoRA - MiniMax H3",
@@ -92,7 +111,7 @@ class MiniMaxH3LoRALoaderInvocation(BaseInvocation):
     title="Apply LoRA Collection - MiniMax H3",
     tags=["lora", "model", "minimax"],
     category="model",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3LoRACollectionLoader(BaseInvocation):
@@ -112,17 +131,16 @@ class MiniMaxH3LoRACollectionLoader(BaseInvocation):
         title="Transformer",
     )
 
-    def invoke(self, context: InvocationContext) -> MiniMaxH3LoRALoaderOutput:
-        output = MiniMaxH3LoRALoaderOutput()
-
+    def invoke(self, context: InvocationContext) -> MiniMaxH3LoRACollectionLoaderOutput:
         if self.transformer is None:
-            return output
+            return MiniMaxH3LoRACollectionLoaderOutput()
 
-        output.transformer = self.transformer.model_copy(deep=True)
+        transformer = self.transformer.model_copy(deep=True)
 
         if self.loras is None:
-            return output
+            return MiniMaxH3LoRACollectionLoaderOutput(transformer=transformer)
 
+        lora_metadata: list[LoRAMetadataField] = []
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
         for lora in loras:
             lora_key = lora.lora.key
@@ -138,8 +156,9 @@ class MiniMaxH3LoRACollectionLoader(BaseInvocation):
                     f"base={getattr(stored_config.base, 'value', stored_config.base)})."
                 )
 
-            if any(item.lora.key == lora_key for item in output.transformer.loras):
+            if any(item.lora.key == lora_key for item in transformer.loras):
                 continue
-            output.transformer.loras.append(lora)
+            transformer.loras.append(lora)
+            lora_metadata.append(LoRAMetadataField(model=lora.lora, weight=lora.weight))
 
-        return output
+        return MiniMaxH3LoRACollectionLoaderOutput(transformer=transformer, lora_metadata=lora_metadata)

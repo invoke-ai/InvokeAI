@@ -175,6 +175,11 @@ export const getCompatibleInputTemplate = (
     inputTemplates.find(
       (inputTemplate) =>
         !inputTemplate.uiHidden &&
+        // `metadata` sorts first on every WithMetadata node (no `ui_order`, and it precedes
+        // the authored fields in the schema), so without this it would win the drag-to-canvas
+        // auto-connect for any source whose type it accepts — or for any source whose type
+        // could not be resolved, which skips the type check below entirely.
+        inputTemplate.fieldKind !== 'internal' &&
         inputTemplate.input !== 'direct' &&
         (sourceType === null || validateConnectionTypes(sourceType, inputTemplate.type))
     ) ?? null

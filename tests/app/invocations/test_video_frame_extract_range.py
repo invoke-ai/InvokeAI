@@ -112,3 +112,88 @@ def test_invocation_only_saves_complete_requested_range(written: int, should_rai
             output = invocation.invoke(context)
             assert output.end_frame == 4
             context.videos.save.assert_called_once()
+
+
+class TestWriteFrameRangeResizes:
+    """`resize_to` conforms the trimmed clip to a target canvas (see the concat pairing below)."""
+
+    def test_frames_are_resampled_to_the_requested_canvas(self) -> None:
+        writer = RecordingWriter()
+        written = _write_frame_range(_lazy_frames(4, [0]), writer, start=0, end=3, resize_to=(8, 6))
+        assert written == 4
+        assert [f.shape for f in writer.frames] == [(6, 8, 3)] * 4
+
+    def test_matching_frames_pass_through_untouched(self) -> None:
+        writer = RecordingWriter()
+        _write_frame_range(_lazy_frames(2, [0]), writer, start=0, end=1, resize_to=(4, 4))
+        assert [f.shape for f in writer.frames] == [(4, 4, 3)] * 2
+
+
+def _resize_invocation(**kwargs: object) -> tuple[ExtractVideoRangeInvocation, MagicMock]:
+    invocation = ExtractVideoRangeInvocation(
+        video=VideoField(video_name="input.mp4"), start_frame=0, end_frame=4, **kwargs
+    )
+    context = MagicMock()
+    context.videos.get_path.return_value = Path("input.mp4")
+    context.util.is_canceled.return_value = False
+    return invocation, context
+
+
+def test_invocation_saves_the_requested_canvas() -> None:
+    """A 1920x1080 source trimmed onto a 1344x768 canvas must be recorded as 1344x768.
+
+    This is what lets Extend Video concatenate the trimmed source with the generated
+    clip -- `video_concat` rejects mismatched dimensions outright.
+    """
+    invocation, context = _resize_invocation(width=1344, height=768)
+    base_output = MagicMock(
+        video=VideoField(video_name="output.mp4"), width=1344, height=768, num_frames=5, fps=8.0, duration=0.625
+    )
+
+    with (
+        patch("invokeai.app.invocations.video_frame_extract_range.probe_video", return_value=(1920, 1080, 0.625, 8.0)),
+        patch("invokeai.app.invocations.video_frame_extract_range.decoder_frame_count", return_value=5),
+        patch("invokeai.app.invocations.video_frame_extract_range.make_mp4_writer", return_value=MagicMock()),
+        patch("invokeai.app.invocations.video_frame_extract_range._write_frame_range", return_value=5) as write,
+        patch("invokeai.app.invocations.video_frame_extract_range.extract_audio_pcm", return_value=None),
+        patch("invokeai.app.invocations.video_frame_extract_range.VideoOutput.build", return_value=base_output),
+    ):
+        output = invocation.invoke(context)
+
+    assert write.call_args.kwargs["resize_to"] == (1344, 768)
+    saved = context.videos.save.call_args.kwargs
+    assert (saved["width"], saved["height"]) == (1344, 768)
+    assert output.video.video_name == "output.mp4"
+
+
+def test_invocation_keeps_source_dimensions_when_canvas_is_unset() -> None:
+    invocation, context = _resize_invocation()
+    base_output = MagicMock(
+        video=VideoField(video_name="output.mp4"), width=32, height=32, num_frames=5, fps=8.0, duration=0.625
+    )
+
+    with (
+        patch("invokeai.app.invocations.video_frame_extract_range.probe_video", return_value=(32, 32, 0.625, 8.0)),
+        patch("invokeai.app.invocations.video_frame_extract_range.decoder_frame_count", return_value=5),
+        patch("invokeai.app.invocations.video_frame_extract_range.make_mp4_writer", return_value=MagicMock()),
+        patch("invokeai.app.invocations.video_frame_extract_range._write_frame_range", return_value=5) as write,
+        patch("invokeai.app.invocations.video_frame_extract_range.extract_audio_pcm", return_value=None),
+        patch("invokeai.app.invocations.video_frame_extract_range.VideoOutput.build", return_value=base_output),
+    ):
+        invocation.invoke(context)
+
+    assert write.call_args.kwargs["resize_to"] is None
+    saved = context.videos.save.call_args.kwargs
+    assert (saved["width"], saved["height"]) == (32, 32)
+
+
+def test_invocation_rejects_an_odd_requested_canvas() -> None:
+    invocation, context = _resize_invocation(width=1345, height=768)
+
+    with (
+        patch("invokeai.app.invocations.video_frame_extract_range.probe_video", return_value=(1920, 1080, 0.625, 8.0)),
+        patch("invokeai.app.invocations.video_frame_extract_range.decoder_frame_count", return_value=5),
+        pytest.raises(ValueError, match="Requested output size is 1345x768"),
+    ):
+        invocation.invoke(context)
+    context.videos.save.assert_not_called()

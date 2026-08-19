@@ -28506,7 +28506,7 @@
         "category": "video",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
+        "description": "Trim a video to a contiguous frame range and re-encode as MP4.\n\nBoth bounds are inclusive and 0-based \u2014 ``start_frame=10, end_frame=50``\nemits 41 frames. Negative indices count from the end (``end_frame=-1``\nis the final frame), matching ``video_frame_extract``. The output frame\nrate defaults to the source video's frame rate; set ``fps=0`` to inherit\nit (or 16 fps if the source rate can't be probed). If the source has an\naudio track, the same range of it is carried into the output (retimed\nwith the video when the output fps changes playback speed); silent\nsources stay silent.\n\nSetting ``width``/``height`` conforms the trimmed clip to that canvas (0 on an\naxis keeps the source's). This is what lets a trimmed source be concatenated\nwith a generated clip: Concatenate Videos rejects mismatched dimensions, and\nvideo models render onto their own fixed canvas family, so the source segment\nhas to be brought onto the same canvas first.\n\nThe resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as\noutputs, so chained workflows can re-use the boundary indices \u2014 e.g. feeding\nthem into a downstream Frame from Video to extract the same boundary frame.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -28614,6 +28614,28 @@
             "title": "Fps",
             "type": "integer"
           },
+          "width": {
+            "default": 0,
+            "description": "Output width in pixels. 0 = keep the source width. Set both width and height to conform the trimmed clip to a specific canvas \u2014 e.g. to match a generated clip before concatenating, since Concatenate Videos rejects mismatched dimensions.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 0,
+            "description": "Output height in pixels. 0 = keep the source height. Aspect ratio is not preserved: the frame is resampled to exactly the requested canvas.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
           "type": {
             "const": "extract_video_range",
             "default": "extract_video_range",
@@ -28626,7 +28648,7 @@
         "tags": ["video", "trim", "range", "frames"],
         "title": "Frame Range from Video",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/ExtractVideoRangeOutput"
         }
@@ -37132,6 +37154,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
@@ -46064,6 +46089,9 @@
                 "$ref": "#/components/schemas/MiniMaxH3FrameConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
               },
               {
@@ -47896,7 +47924,7 @@
             "$ref": "#/components/schemas/VideoOutput"
           },
           "minimax_h3_lora_collection_loader": {
-            "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+            "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
           },
           "minimax_h3_lora_loader": {
             "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
@@ -69315,10 +69343,52 @@
         "tags": ["lora", "model", "minimax"],
         "title": "Apply LoRA Collection - MiniMax H3",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/MiniMaxH3LoRALoaderOutput"
+          "$ref": "#/components/schemas/MiniMaxH3LoRACollectionLoaderOutput"
         }
+      },
+      "MiniMaxH3LoRACollectionLoaderOutput": {
+        "class": "output",
+        "description": "MiniMax H3 LoRA collection loader output.\n\nSeparate from the single loader's output because a collection applies zero or more LoRAs,\nso its metadata echo is a list \u2014 which is also what `core_metadata.loras` takes directly,\nwith no intervening collect node.",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MiniMaxH3TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "MiniMax H3 Transformer",
+            "ui_hidden": false
+          },
+          "lora_metadata": {
+            "default": [],
+            "description": "The applied LoRAs, in the shape Core Metadata's `loras` field takes.",
+            "field_kind": "output",
+            "items": {
+              "$ref": "#/components/schemas/LoRAMetadataField"
+            },
+            "title": "LoRA Metadata",
+            "type": "array",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_lora_collection_loader_output",
+            "default": "minimax_h3_lora_collection_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "lora_metadata", "type", "type"],
+        "title": "MiniMaxH3LoRACollectionLoaderOutput",
+        "type": "object"
       },
       "MiniMaxH3LoRALoaderInvocation": {
         "category": "model",

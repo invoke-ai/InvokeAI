@@ -114,6 +114,7 @@ const templates: InvocationTemplates = {
         description: '',
         exclusiveMaximum: null,
         exclusiveMinimum: null,
+        fieldKind: 'input',
         input: 'connection',
         maximum: null,
         minimum: null,
@@ -151,6 +152,7 @@ const templates: InvocationTemplates = {
         description: '',
         exclusiveMaximum: null,
         exclusiveMinimum: null,
+        fieldKind: 'input',
         input: 'any',
         maximum: null,
         minimum: null,
@@ -203,6 +205,24 @@ describe('getCompatibleInputTemplate', () => {
     expect(getCompatibleInputTemplate(template, single('IntegerField'))?.name).toBe('early');
     expect(getCompatibleInputTemplate(template, single('ImageField'))).toBeNull();
     expect(getCompatibleInputTemplate(template, null)?.name).toBe('early');
+  });
+
+  it('never auto-connects to an internal-kind input', () => {
+    // `metadata` has no `ui_order` and precedes the authored fields in the schema, so it
+    // sorts first on every WithMetadata node. Dragging onto the canvas must still land on
+    // the node's real input -- including when the source type could not be resolved, which
+    // skips the type check entirely.
+    const baseInput = templates.number.inputs.value;
+    const template = {
+      ...templates.number,
+      inputs: {
+        metadata: { ...baseInput, fieldKind: 'internal' as const, input: 'connection' as const, name: 'metadata' },
+        value: { ...baseInput, name: 'value' },
+      },
+    };
+
+    expect(getCompatibleInputTemplate(template, single('IntegerField'))?.name).toBe('value');
+    expect(getCompatibleInputTemplate(template, null)?.name).toBe('value');
   });
 });
 
