@@ -331,6 +331,79 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
   });
 
+  it('lets a re-delivery retry when the first attempt lost its DTO to a transient failure', async () => {
+    // getImageDTOSafe swallows fetch errors and returns null, so a transient failure silently
+    // drops the image from the gallery. Keeping the dedupe key in that case would make the loss
+    // permanent — the redelivery that could fix it is turned away as a duplicate.
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+      return { unwrap: () => Promise.resolve(undefined) };
+    });
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await handler(buildImageCompleteEvent());
+    expect(
+      dispatched.some((action) => {
+        const payload = (action as { payload?: unknown }).payload;
+        return Array.isArray(payload) && payload.includes('GalleryItemNameList');
+      }),
+      'a failed lookup produces no gallery work'
+    ).toBe(false);
+
+    await handler(buildImageCompleteEvent());
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+    expect(
+      dispatched.some((action) => {
+        const payload = (action as { payload?: unknown }).payload;
+        return Array.isArray(payload) && payload.includes('GalleryItemNameList');
+      }),
+      'the retry must do the gallery work the first delivery lost'
+    ).toBe(true);
+  });
+
+  it('does not retry a partial failure — the fetched DTOs were already dispatched', async () => {
+    // One of two image lookups fails: the successful one's board totals and optimistic insert have
+    // already gone out, so a re-delivery re-running the gallery work would double-count them. The
+    // dedupe key is only dropped when NOTHING was fetched.
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const twoImages = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (twoImages as any).result = {
+      image_1: { image_name: 'first.png' },
+      image_2: { image_name: 'second.png' },
+    };
+
+    await handler(twoImages);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+
+    // The re-delivery must be treated as a duplicate — no further lookups.
+    await handler(twoImages);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+  });
+
   it('still processes distinct invocations of the same queue item', async () => {
     const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
     const getState = vi.fn(() => ({}));

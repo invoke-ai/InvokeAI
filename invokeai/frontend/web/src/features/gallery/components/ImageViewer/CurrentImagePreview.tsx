@@ -119,8 +119,10 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     previousRenderedImageNameRef.current = renderedImageName;
 
     // Consume on every change of the rendered image, not only when the reveal conditions below
-    // hold — each render settles the registry (see autoSwitchedImages.consume), so no stale entry
-    // survives to suppress a genuine user selection of the same image later.
+    // hold — in the common case the auto-switched image renders with no progress showing, and the
+    // marker must not outlive the render it was recorded for. The marker is also dropped whenever
+    // the selection moves on before rendering (see addAutoSwitchedSelectionListener), so it can
+    // never suppress a genuine user selection of the same image later.
     const wasAutoSwitchedTo =
       renderedImageName !== null &&
       renderedImageName !== previousRenderedImageName &&

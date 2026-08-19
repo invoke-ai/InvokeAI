@@ -30,8 +30,8 @@ describe('CurrentImagePreview reveal wiring', () => {
     expect(onReady).toContain('onLoadImage(imageDTO.session_id ?? null)');
   });
 
-  it('settles the auto-switch registry on every rendered-image change', () => {
-    // The consume call must sit before the reveal gates, so entries are settled even when the
+  it('consumes the auto-switch marker on every rendered-image change', () => {
+    // The consume call must sit before the reveal gates, so the marker is cleared even when the
     // auto-switched image renders with no progress showing.
     const revealEffect = currentImagePreview.slice(
       currentImagePreview.indexOf('const renderedImageName ='),

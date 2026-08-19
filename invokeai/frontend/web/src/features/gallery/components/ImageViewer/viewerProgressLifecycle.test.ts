@@ -130,6 +130,34 @@ describe('viewerProgressLifecycle', () => {
       expect(stores.$progressEvent.get()?.item_id).toBe(1);
     });
 
+    it('keeps promoting through a chain of terminations while any session is still generating', () => {
+      // Three sessions, each promotion making the next owner: the shared preview must never be
+      // torn down while something is still generating, no matter how many owners terminate. Each
+      // terminal event here arrives with no further progress event behind it, so a promotion that
+      // left the new owner unprotected would show up as a blank viewer on the next termination.
+      const eventB = buildProgressEvent({ item_id: 2, session_id: 'session-2', image: buildProgressImage(2) });
+      const eventC = buildProgressEvent({ item_id: 3, session_id: 'session-3', image: buildProgressImage(3) });
+      const eventA = buildProgressEvent({ item_id: 1, session_id: 'session-1', image: buildProgressImage(1) });
+      lifecycle.recordProgress(eventC);
+      lifecycle.recordProgress(eventB);
+      lifecycle.recordProgress(eventA);
+
+      // A owns the preview and completes: B reported most recently of the two left, so B takes it.
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 1, status: 'completed' }), true);
+      expect(stores.$progressEvent.get()).toBe(eventB);
+
+      // B is then canceled while C is still generating — C must take the preview, not lose it.
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true);
+      expect(stores.$progressEvent.get()).toBe(eventC);
+      expect(stores.$progressImage.get()).toBe(eventC.image);
+      expect(stores.$isProgressImageResolving.get()).toBe(false);
+
+      // Only when the last session ends does the preview come down.
+      lifecycle.onTerminal(buildTerminalEvent({ item_id: 3, status: 'canceled' }), true);
+      expect(stores.$progressEvent.get()).toBeNull();
+      expect(stores.$progressImage.get()).toBeNull();
+    });
+
     it('leaves the shared preview alone when a non-owner terminates', () => {
       const { eventA } = startTwoSessions();
       lifecycle.onTerminal(buildTerminalEvent({ item_id: 2, status: 'canceled' }), true);
