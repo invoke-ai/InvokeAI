@@ -21,6 +21,17 @@ const mockAnimaVAE = {
   format: 'diffusers' as const,
 };
 
+// The Anima loader accepts a FLUX VAE as a fallback, so it belongs to the Anima *slot* pool
+// (selectAnimaCompatibleVAEModels) but not to the base-driven pool Krea-2 draws from.
+const mockFluxVAE = {
+  key: 'flux-vae-key',
+  hash: 'flux-vae-hash',
+  name: 'FLUX VAE',
+  base: 'flux' as const,
+  type: 'vae' as const,
+  format: 'checkpoint' as const,
+};
+
 const mockAnimaMainModel = {
   key: 'anima-main-key',
   hash: 'anima-main-hash',
@@ -134,6 +145,7 @@ vi.mock('i18next', () => ({
 const mockSelectAnimaQwen3EncoderModels = vi.fn((_state: unknown) => [mockAnimaQwen3Encoder]);
 
 const mockSelectAnimaVAEModels = vi.fn((_state: unknown) => [mockAnimaVAE]);
+const mockSelectAnimaCompatibleVAEModels = vi.fn((_state: unknown) => [mockAnimaVAE] as unknown[]);
 
 // Krea-2 standalone-component selectors (used only by the Krea-2 auto-select branch).
 const mockSelectQwenImageVAEModels = vi.fn((_state: unknown) => [mockKrea2Vae]);
@@ -143,6 +155,7 @@ const mockSelectZImageDiffusersModels = vi.fn((_state: unknown) => [] as unknown
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectAnimaQwen3EncoderModels: (state: unknown) => mockSelectAnimaQwen3EncoderModels(state),
   selectAnimaVAEModels: (state: unknown) => mockSelectAnimaVAEModels(state),
+  selectAnimaCompatibleVAEModels: (state: unknown) => mockSelectAnimaCompatibleVAEModels(state),
   selectQwenImageVAEModels: (state: unknown) => mockSelectQwenImageVAEModels(state),
   selectQwen3VLEncoderModels: (state: unknown) => mockSelectQwen3VLEncoderModels(state),
   selectQwen3EncoderModels: vi.fn(() => []),
@@ -279,6 +292,7 @@ describe('modelSelected listener - Anima defaulting', () => {
     mockDispatch.mockClear();
     mockSelectAnimaQwen3EncoderModels.mockReturnValue([mockAnimaQwen3Encoder]);
     mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([mockAnimaVAE]);
   });
 
   it('should dispatch encoder models with full ModelIdentifierField payloads when switching to Anima', () => {
@@ -350,6 +364,7 @@ describe('modelSelected listener - Anima defaulting', () => {
   it('should not dispatch encoder defaults when no encoder models are available', () => {
     mockSelectAnimaQwen3EncoderModels.mockReturnValue([]);
     mockSelectAnimaVAEModels.mockReturnValue([]);
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([]);
 
     const state = buildMockState({ model: mockFluxMainModel });
     const action = modelSelected(zParameterModel.parse(mockAnimaMainModel));
@@ -508,6 +523,8 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
     // GGUF) transformer, which is what triggers the auto-select branch.
     mockSelectQwenImageVAEModels.mockReturnValue([mockKrea2Vae]);
     mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+    // Krea-2 must read the base-driven pool, never the widened Anima-slot one.
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([mockAnimaVAE, mockFluxVAE]);
     mockSelectQwen3VLEncoderModels.mockReturnValue([mockKrea2Qwen3VlEncoder]);
     mockSelectModelConfigsQuery.mockReturnValue({ data: {} });
     mockSelectModelById.mockReturnValue({ format: 'checkpoint' });

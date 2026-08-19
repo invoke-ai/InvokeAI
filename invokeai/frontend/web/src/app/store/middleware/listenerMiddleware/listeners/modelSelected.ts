@@ -62,6 +62,7 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
+  selectAnimaCompatibleVAEModels,
   selectAnimaQwen3EncoderModels,
   selectAnimaVAEModels,
   selectFluxVAEModels,
@@ -224,7 +225,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (!hasValidConfig) {
             const availableQwen3Encoders = selectAnimaQwen3EncoderModels(state);
-            const availableAnimaVAEs = selectAnimaVAEModels(state);
+            const availableAnimaVAEs = selectAnimaCompatibleVAEModels(state);
 
             if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
               const qwen3Encoder = availableQwen3Encoders[0];

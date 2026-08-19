@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { MainModelConfig } from './types';
 import {
+  isAnimaCompatibleVAEModelConfig,
+  isAnimaVAEModelConfig,
   isFlux2DiffusersMainModelConfig,
   isWanLowNoisePartnerOption,
   isZImageDiffusersMainModelConfig,
@@ -30,6 +32,28 @@ describe('SDNQ pipeline model predicates', () => {
     ['z-image', isZImageDiffusersMainModelConfig],
   ] as const)('rejects a pipeline with no transformer submodel', (base, predicate) => {
     expect(predicate(partialConfig(base, { vae: {}, text_encoder: {}, tokenizer: {} }) as never)).toBe(false);
+  });
+});
+
+// The Anima loader accepts a FLUX VAE beside the Wan/QwenImage one, but Krea-2 draws its own VAE pool
+// from the base-driven `isAnimaVAEModelConfig` and must not be offered FLUX VAEs. The two predicates
+// must therefore stay distinct - collapsing them would widen Krea-2's picker as a side effect.
+describe('Anima VAE predicates', () => {
+  const vae = (base: string) => ({ key: `${base}-vae`, type: 'vae', base, name: `${base} vae` }) as never;
+
+  it('accepts an Anima VAE in both predicates', () => {
+    expect(isAnimaVAEModelConfig(vae('anima'))).toBe(true);
+    expect(isAnimaCompatibleVAEModelConfig(vae('anima'))).toBe(true);
+  });
+
+  it('accepts a FLUX VAE only as Anima-compatible, not as an Anima-base VAE', () => {
+    expect(isAnimaVAEModelConfig(vae('flux'))).toBe(false);
+    expect(isAnimaCompatibleVAEModelConfig(vae('flux'))).toBe(true);
+  });
+
+  it.each(['flux2', 'qwen-image', 'sdxl'])('rejects a %s VAE in both predicates', (base) => {
+    expect(isAnimaVAEModelConfig(vae(base))).toBe(false);
+    expect(isAnimaCompatibleVAEModelConfig(vae(base))).toBe(false);
   });
 });
 

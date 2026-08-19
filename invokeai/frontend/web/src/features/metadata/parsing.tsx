@@ -1540,6 +1540,9 @@ const Flux1VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'Flux1VAEModel',
   parse: async (metadata, store) => {
+    // Check provenance: `vae` is a shared field. Z-Image (and any base whose VAE pool includes FLUX
+    // VAEs) can record a FLUX VAE, which would otherwise land in `params.fluxVAE` (review 4966712044).
+    assertMetadataModelBase(metadata, 'flux', 'Flux1VAEModel');
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
@@ -1564,6 +1567,9 @@ const ZImageQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'ZImageQwen3EncoderModel',
   parse: async (metadata, store) => {
+    // Check provenance: `qwen3_encoder` is also written by Anima and FLUX.2 Klein, and this handler
+    // clears `zImageQwen3SourceModel` on recall (review 4966712044).
+    assertMetadataModelBase(metadata, 'z-image', 'ZImageQwen3EncoderModel');
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
@@ -1613,6 +1619,9 @@ const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'ZImageVAEModel',
   parse: async (metadata, store) => {
+    // Check provenance: `vae` is a shared field, and this handler additionally clears
+    // `zImageQwen3SourceModel` - foreign metadata must never reach it (review 4966712044).
+    assertMetadataModelBase(metadata, 'z-image', 'ZImageVAEModel');
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
@@ -1639,6 +1648,9 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'ZImageQwen3SourceModel',
   parse: async (metadata, store) => {
+    // `qwen3_source` is Z-Image-only today, but this handler clears both other Z-Image slots on recall,
+    // so it is gated on provenance like its siblings rather than on the field being unique.
+    assertMetadataModelBase(metadata, 'z-image', 'ZImageQwen3SourceModel');
     const raw = getProperty(metadata, 'qwen3_source');
     const parsed = await parseModelIdentifier(raw, store, 'main');
     assert(parsed.type === 'main');
@@ -1852,8 +1864,10 @@ const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
-    // isAnimaVAEModelConfig (services/api/types.ts) is base-driven, so this assert is meaningful here.
-    assert(parsed.base === 'anima', 'AnimaVAEModel requires an Anima VAE');
+    // Mirrors isAnimaCompatibleVAEModelConfig, i.e. the Anima VAE picker's own domain: an Anima-base
+    // (Wan/QwenImage) VAE, or a FLUX VAE, which anima_l2i / anima_i2l accept as a fallback. Recalling a
+    // FLUX VAE from a workflow-built Anima image must not be rejected (review 4966712044).
+    assert(parsed.base === 'anima' || parsed.base === 'flux', 'AnimaVAEModel requires an Anima or FLUX VAE');
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaVAEModel handler only works with Anima models');
     return Promise.resolve(parsed);
@@ -1907,6 +1921,9 @@ const Flux2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'Flux2VAEModel',
   parse: async (metadata, store) => {
+    // Check provenance: `vae` is a shared field - e.g. a Krea-2 image (Qwen-Image VAE) recalled while
+    // FLUX.2 is selected would otherwise land in `params.flux2VaeModel`.
+    assertMetadataModelBase(metadata, 'flux2', 'Flux2VAEModel');
     const raw = getProperty(metadata, 'vae');
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
@@ -1930,11 +1947,13 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
   type: 'KleinQwen3EncoderModel',
   parse: async (metadata, store) => {
+    // `qwen3_encoder` is no longer Klein-only: Z-Image and Anima write it too (into their own slots),
+    // so provenance decides, not just the field being present. FLUX.2 [dev] never writes it, so one
+    // flux2 check covers both variants.
+    assertMetadataModelBase(metadata, 'flux2', 'KleinQwen3EncoderModel');
     const raw = getProperty(metadata, 'qwen3_encoder');
     const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
     assert(parsed.type === 'qwen3_encoder');
-    // qwen3_encoder is Klein-only metadata; dev never writes it. Just gate on
-    // base. (parseModelIdentifier already rejects when the field is absent.)
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinQwen3EncoderModel handler only works with FLUX.2 Klein models');
     return Promise.resolve(parsed);

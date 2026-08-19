@@ -24,7 +24,7 @@ vi.mock('features/controlLayers/store/paramsSlice', async (importOriginal) => {
 });
 
 const fakeModel = (
-  type: 'vae' | 'qwen3_encoder' | 'mistral_encoder' | 'qwen3_vl_encoder' | 't5_encoder',
+  type: 'vae' | 'qwen3_encoder' | 'mistral_encoder' | 'qwen3_vl_encoder' | 't5_encoder' | 'main',
   base: string
 ) => ({
   key: `${type}-key`,
@@ -121,7 +121,10 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       nextResolved = fakeModel('qwen3_encoder', 'flux2');
       const store = makeStore();
 
-      const parsed = await ImageMetadataHandlers.KleinQwen3EncoderModel.parse({ qwen3_encoder: nextResolved }, store);
+      const parsed = await ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
+        { qwen3_encoder: nextResolved, model: fakeMainModel('klein_9b') },
+        store
+      );
 
       expect(parsed.key).toBe('qwen3_encoder-key');
       expect(parsed.type).toBe('qwen3_encoder');
@@ -133,7 +136,25 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       const store = makeStore();
 
       await expect(
-        ImageMetadataHandlers.KleinQwen3EncoderModel.parse({ qwen3_encoder: nextResolved }, store)
+        ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
+          { qwen3_encoder: nextResolved, model: fakeMainModel('klein_9b') },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
+    // Z-Image and Anima write the same field into their own slots. Without the provenance check their
+    // encoder would be recalled into `params.kleinQwen3EncoderModel` (review 4966712044).
+    it.each(['z-image', 'anima'])('rejects %s image metadata while FLUX.2 is selected', async (base) => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('qwen3_encoder', base);
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
+          { qwen3_encoder: nextResolved, model: { key: 'main-key', hash: 'h', name: base, base, type: 'main' } },
+          store
+        )
       ).rejects.toThrow();
     });
   });
@@ -566,9 +587,25 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       ).rejects.toThrow();
     });
 
-    it('rejects a non-Anima VAE from Anima metadata', async () => {
+    // The Anima model loader's VAE input has no `ui_model_base`, and anima_l2i / anima_i2l branch
+    // explicitly on FluxAutoEncoder - so a workflow-built Anima image may legitimately carry a FLUX VAE,
+    // and the Anima VAE picker offers those too (isAnimaCompatibleVAEModelConfig). Review 4966712044.
+    it('parses a FLUX VAE from an Anima image', async () => {
       currentBase = 'anima';
-      nextResolved = fakeModel('vae', 'qwen-image');
+      nextResolved = fakeModel('vae', 'flux');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.AnimaVAEModel.parse(
+        { model: fakeMain('anima'), vae: nextResolved },
+        store
+      );
+
+      expect(parsed.base).toBe('flux');
+    });
+
+    it.each(['qwen-image', 'flux2', 'sdxl'])('rejects a %s VAE from Anima metadata', async (vaeBase) => {
+      currentBase = 'anima';
+      nextResolved = fakeModel('vae', vaeBase);
       const store = makeStore();
 
       await expect(
@@ -622,12 +659,15 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
   });
 
   describe('ZImageQwen3EncoderModel', () => {
-    it('parses while Z-Image is selected', async () => {
+    it('parses a Z-Image image while Z-Image is selected', async () => {
       currentBase = 'z-image';
       nextResolved = fakeModel('qwen3_encoder', 'any');
       const store = makeStore();
 
-      const parsed = await ImageMetadataHandlers.ZImageQwen3EncoderModel.parse({ qwen3_encoder: nextResolved }, store);
+      const parsed = await ImageMetadataHandlers.ZImageQwen3EncoderModel.parse(
+        { model: fakeMain('z-image'), qwen3_encoder: nextResolved },
+        store
+      );
 
       expect(parsed.key).toBe('qwen3_encoder-key');
     });
@@ -640,18 +680,102 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       const store = makeStore();
 
       await expect(
-        ImageMetadataHandlers.ZImageQwen3EncoderModel.parse({ qwen3_encoder: nextResolved }, store)
+        ImageMetadataHandlers.ZImageQwen3EncoderModel.parse(
+          { model: fakeMain(base), qwen3_encoder: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
+    // The selected base alone is not enough: viewing an Anima or Klein image while Z-Image is selected
+    // must not populate the Z-Image encoder slot nor clear the source slot (review 4966712044).
+    it.each(['anima', 'flux2'])('rejects %s image metadata while Z-Image is selected', async (base) => {
+      currentBase = 'z-image';
+      nextResolved = fakeModel('qwen3_encoder', 'any');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageQwen3EncoderModel.parse(
+          { model: fakeMain(base), qwen3_encoder: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('ZImageVAEModel', () => {
+    it('parses a Z-Image image while Z-Image is selected', async () => {
+      currentBase = 'z-image';
+      nextResolved = fakeModel('vae', 'z-image');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.ZImageVAEModel.parse(
+        { model: fakeMain('z-image'), vae: nextResolved },
+        store
+      );
+
+      expect(parsed.key).toBe('vae-key');
+    });
+
+    it.each(['flux', 'anima'])('rejects %s image metadata while Z-Image is selected', async (base) => {
+      currentBase = 'z-image';
+      nextResolved = fakeModel('vae', base);
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageVAEModel.parse({ model: fakeMain(base), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    it('rejects when the current base is not Z-Image', async () => {
+      currentBase = 'flux';
+      nextResolved = fakeModel('vae', 'z-image');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageVAEModel.parse({ model: fakeMain('z-image'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('ZImageQwen3SourceModel', () => {
+    it('parses a Z-Image image while Z-Image is selected', async () => {
+      currentBase = 'z-image';
+      nextResolved = fakeModel('main', 'z-image');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.ZImageQwen3SourceModel.parse(
+        { model: fakeMain('z-image'), qwen3_source: nextResolved },
+        store
+      );
+
+      expect(parsed.key).toBe('main-key');
+    });
+
+    it('rejects foreign image metadata while Z-Image is selected', async () => {
+      currentBase = 'z-image';
+      nextResolved = fakeModel('main', 'z-image');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageQwen3SourceModel.parse(
+          { model: fakeMain('anima'), qwen3_source: nextResolved },
+          store
+        )
       ).rejects.toThrow();
     });
   });
 
   describe('Flux1VAEModel', () => {
-    it('parses a FLUX VAE while FLUX.1 is selected', async () => {
+    it('parses a FLUX VAE from a FLUX.1 image while FLUX.1 is selected', async () => {
       currentBase = 'flux';
       nextResolved = fakeModel('vae', 'flux');
       const store = makeStore();
 
-      const parsed = await ImageMetadataHandlers.Flux1VAEModel.parse({ vae: nextResolved }, store);
+      const parsed = await ImageMetadataHandlers.Flux1VAEModel.parse(
+        { model: fakeMain('flux'), vae: nextResolved },
+        store
+      );
 
       expect(parsed.key).toBe('vae-key');
     });
@@ -661,7 +785,9 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       nextResolved = fakeModel('vae', 'flux');
       const store = makeStore();
 
-      await expect(ImageMetadataHandlers.Flux1VAEModel.parse({ vae: nextResolved }, store)).rejects.toThrow();
+      await expect(
+        ImageMetadataHandlers.Flux1VAEModel.parse({ model: fakeMain('flux'), vae: nextResolved }, store)
+      ).rejects.toThrow();
     });
 
     it('rejects a non-FLUX VAE', async () => {
@@ -669,7 +795,46 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       nextResolved = fakeModel('vae', 'sdxl');
       const store = makeStore();
 
-      await expect(ImageMetadataHandlers.Flux1VAEModel.parse({ vae: nextResolved }, store)).rejects.toThrow();
+      await expect(
+        ImageMetadataHandlers.Flux1VAEModel.parse({ model: fakeMain('flux'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    // A non-FLUX.1 image may legitimately carry a FLUX VAE (Z-Image accepts one). Without the provenance
+    // check that VAE would be recalled into `params.fluxVAE` (review 4966712044).
+    it('rejects a FLUX VAE that came from a Z-Image image', async () => {
+      currentBase = 'flux';
+      nextResolved = fakeModel('vae', 'flux');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux1VAEModel.parse({ model: fakeMain('z-image'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+  });
+
+  describe('Flux2VAEModel', () => {
+    it('parses a FLUX.2 image while FLUX.2 is selected', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('vae', 'flux2');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Flux2VAEModel.parse(
+        { model: fakeMain('flux2'), vae: nextResolved },
+        store
+      );
+
+      expect(parsed.key).toBe('vae-key');
+    });
+
+    it('rejects a Krea-2 image while FLUX.2 is selected', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('vae', 'qwen-image');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux2VAEModel.parse({ model: fakeMain('krea-2'), vae: nextResolved }, store)
+      ).rejects.toThrow();
     });
   });
 });

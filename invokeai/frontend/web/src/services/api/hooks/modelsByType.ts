@@ -11,6 +11,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig, AnyModelConfigWithExternal, MainOrExternalModelConfig } from 'services/api/types';
 import {
+  isAnimaCompatibleVAEModelConfig,
   isAnimaInpaintControlNetModelConfig,
   isAnimaQwen3EncoderModelConfig,
   isAnimaVAEModelConfig,
@@ -114,6 +115,8 @@ export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
 export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
+/** The Anima VAE slot itself - wider than `useAnimaVAEModels`, which feeds Krea-2's pool. */
+export const useAnimaCompatibleVAEModels = () => buildModelsHook(isAnimaCompatibleVAEModelConfig)();
 export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
 export const useAnimaInpaintControlNetModels = () => buildModelsHook(isAnimaInpaintControlNetModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
@@ -174,6 +177,7 @@ export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMa
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectAnimaCompatibleVAEModels = buildModelsSelector(isAnimaCompatibleVAEModelConfig);
 export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);
 export const selectWanDiffusersModels = buildModelsSelector(isWanDiffusersMainModelConfig);
 export const selectWanVAEModels = buildModelsSelector(isWanVAEModelConfig);

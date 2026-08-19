@@ -318,6 +318,22 @@ export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+/**
+ * VAEs the Anima model loader accepts. `AnimaModelLoaderInvocation.vae_model` carries no
+ * `ui_model_base`, and both `anima_l2i` and `anima_i2l` branch explicitly on `FluxAutoEncoder`
+ * (4D decode, no Wan denormalisation) beside `AutoencoderKLWan` - a FLUX VAE is a supported
+ * fallback, not merely tolerated.
+ *
+ * Kept separate from `isAnimaVAEModelConfig`, which stays base-driven because Krea-2 draws its
+ * own VAE pool from it and must not be offered FLUX VAEs.
+ */
+export const isAnimaCompatibleVAEModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is VAEModelConfig => {
+  return isAnimaVAEModelConfig(config, excludeSubmodels) || isFlux1VAEModelConfig(config, excludeSubmodels);
+};
+
 export const isQwenImageVAEModelConfig = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
