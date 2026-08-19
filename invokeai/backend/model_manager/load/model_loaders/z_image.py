@@ -35,6 +35,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    QKV_SPLIT_SIDECHANNEL_SUFFIXES,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -48,6 +49,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
+    split_qkv_sidechannel,
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -55,33 +57,6 @@ from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
-
-# Per-layer quantization side-channel entries that sit next to a fused `qkv.weight` and therefore
-# have to be split along with it. The scale spellings are the ones `fp8_scaled` accepts; the marker
-# is a JSON blob describing the layer, identical for all three halves of the split.
-_QKV_SPLIT_SIDECHANNEL_SUFFIXES = ("weight_scale", "scale_weight", "input_scale", "scale_input", "comfy_quant")
-
-
-def _split_qkv_sidechannel(key: str, value: Any) -> tuple[Any, Any, Any]:
-    """Split a fused-QKV scale/marker into the parts belonging to Q, K and V.
-
-    A per-tensor scale (and any marker blob) describes the whole fused tensor, so each third
-    inherits it unchanged. A per-output-channel scale has one entry per row and is split exactly
-    like the weight.
-    """
-    tensor = torch.as_tensor(value) if hasattr(value, "shape") else value
-    if not hasattr(tensor, "shape") or tensor.dim() == 0 or tensor.shape[0] == 1:
-        return (tensor, tensor, tensor)
-    if tensor.numel() == 1 or key.endswith(("comfy_quant", "input_scale", "scale_input")):
-        # A marker blob is a 1-D byte string, not a per-channel vector — never split it.
-        return (tensor, tensor, tensor)
-    if tensor.shape[0] % 3 != 0:
-        raise ValueError(
-            f"Cannot split fused QKV quantization data '{key}': first dimension ({tensor.shape[0]}) is "
-            "neither 1 nor divisible by 3, so it matches neither a per-tensor nor a per-channel scale."
-        )
-    third = tensor.shape[0] // 3
-    return (tensor[:third], tensor[third : 2 * third], tensor[2 * third :])
 
 
 def _remap_z_image_layer_paths(layer_names: Any) -> dict[str, list[str]]:
@@ -169,8 +144,8 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
                 # or the recovered scale is keyed on `...attention.qkv`, a module path that no
                 # longer exists — `attach_fp8_scales` then finds nothing and the three split
                 # weights stay quantized but *unscaled*, i.e. off by 1/weight_scale.
-                if suffix in _QKV_SPLIT_SIDECHANNEL_SUFFIXES:
-                    for name, part in zip(("to_q", "to_k", "to_v"), _split_qkv_sidechannel(key, value), strict=True):
+                if suffix in QKV_SPLIT_SIDECHANNEL_SUFFIXES:
+                    for name, part in zip(("to_q", "to_k", "to_v"), split_qkv_sidechannel(key, value), strict=True):
                         new_sd[f"{prefix}.attention.{name}.{suffix}"] = part
                     continue
                 new_sd[key] = value

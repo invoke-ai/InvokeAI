@@ -162,6 +162,38 @@ def iter_weight_scale_pairs(sd: Mapping[str, Any]) -> Iterable[tuple[str, str]]:
                 break
 
 
+# Per-layer quantization side-channel entries that sit next to a fused `qkv.weight` and therefore
+# have to be carried through a split of it. The scale spellings are the ones this module accepts;
+# the marker is a JSON blob describing the layer, identical for all three parts of the split.
+QKV_SPLIT_SIDECHANNEL_SUFFIXES = ("weight_scale", "scale_weight", "input_scale", "scale_input", "comfy_quant")
+
+
+def split_qkv_sidechannel(key: str, value: Any) -> tuple[Any, Any, Any]:
+    """Split a fused-QKV scale/marker into the parts belonging to Q, K and V.
+
+    A per-tensor scale (and any marker blob) describes the whole fused tensor, so each third
+    inherits it unchanged. A per-output-channel scale has one entry per row and is split exactly
+    like the weight.
+
+    Getting this wrong is silent: a scale left on the fused path is keyed on a module the split
+    model does not have, so `attach_fp8_scales` finds nothing and the three weights stay quantized
+    but *unscaled* -- off by 1/weight_scale, with no error anywhere.
+    """
+    tensor = torch.as_tensor(value) if hasattr(value, "shape") else value
+    if not hasattr(tensor, "shape") or tensor.dim() == 0 or tensor.shape[0] == 1:
+        return (tensor, tensor, tensor)
+    if tensor.numel() == 1 or key.endswith(("comfy_quant", "input_scale", "scale_input")):
+        # A marker blob is a 1-D byte string, not a per-channel vector -- never split it.
+        return (tensor, tensor, tensor)
+    if tensor.shape[0] % 3 != 0:
+        raise ValueError(
+            f"Cannot split fused QKV quantization data '{key}': first dimension ({tensor.shape[0]}) is "
+            "neither 1 nor divisible by 3, so it matches neither a per-tensor nor a per-channel scale."
+        )
+    third = tensor.shape[0] // 3
+    return (tensor[:third], tensor[third : 2 * third], tensor[2 * third :])
+
+
 def is_scale_metadata_key(key: Any) -> bool:
     """Whether ``key`` is fp8 scale/quantization metadata rather than a model tensor.
 
