@@ -29,11 +29,13 @@ export interface HFLookupState {
 export interface ModelsUiSnapshot {
   activeTab: ModelManagerTab;
   /**
-   * The Add Models box's contents. Session state like everything else here, so
-   * a half-typed source survives a tab switch — and so surfaces outside the
-   * manager can seed it before navigating (see {@link requestAddModelsSearch}).
+   * A pending Add Models search, handed over by a surface outside the manager
+   * (see {@link requestAddModelsSearch}). Strictly one-shot: the view takes it
+   * at mount and {@link clearAddModelsSeed} empties it, so the box keeps its own
+   * local state and still resets when the view unmounts. `null` = nothing
+   * pending, which is not the same as a seeded empty string.
    */
-  addModelsQuery: string;
+  addModelsSeed: string | null;
   /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
   selectedKeys: ReadonlySet<string>;
@@ -55,7 +57,7 @@ export interface ModelsUiSnapshot {
 const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   activeModelKey: null,
   activeTab: 'add',
-  addModelsQuery: '',
+  addModelsSeed: null,
   filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
   libraryScrollOffsets: {},
@@ -134,11 +136,27 @@ export const openAddModelsWithBundle = (bundleName: string): void => {
 export const requestAddModelsSearch = (query: string): void => {
   updateModelsUi({
     activeTab: 'add',
-    addModelsQuery: query,
+    addModelsSeed: query,
     hfLookup: null,
     scan: null,
     selectedBundleName: null,
   });
+};
+
+/** Reads a pending seed without consuming it — safe to call from a `useState` initializer, which StrictMode double-invokes. */
+export const getAddModelsSeed = (): string => store.getSnapshot().addModelsSeed ?? '';
+
+/**
+ * Consumes the pending seed. Silent because the only reader took it in the same
+ * commit and nothing subscribes to it: a notify here would be a store write
+ * whose only effect is re-rendering the view that just read it.
+ */
+export const clearAddModelsSeed = (): void => {
+  const snapshot = store.getSnapshot();
+
+  if (snapshot.addModelsSeed !== null) {
+    store.setSnapshotSilently({ ...snapshot, addModelsSeed: null });
+  }
 };
 
 /** Expand the always-visible install queue footer (e.g. from a "View queue" link). */

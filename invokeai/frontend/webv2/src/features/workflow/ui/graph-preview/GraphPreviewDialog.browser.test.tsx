@@ -12,6 +12,7 @@ import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { GraphPreviewDialog } from './GraphPreviewDialog';
 
@@ -521,15 +522,28 @@ describe('GraphPreviewDialog', () => {
     });
   });
 
-  it('caps its height so a tall display gets a landscape dialog, not a full-height column', async () => {
-    await renderDialog(FIXTURE_SOURCE);
+  it('stays landscape on a tall viewport instead of growing into a full-height column', async () => {
+    const original = { height: window.innerHeight, width: window.innerWidth };
 
-    const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]');
-    expect(content).not.toBeNull();
+    try {
+      // Resized deliberately: at the default test viewport (~866px tall) an
+      // 80vh dialog and a 46rem-capped one measure within pixels of each other,
+      // so nothing asserted at that size can tell the two sizings apart.
+      await page.viewport(1280, 1400);
+      await renderDialog(FIXTURE_SOURCE);
 
-    // 46rem — the ceiling that makes the dialog wider than tall wherever the
-    // viewport is tall enough for the old vh-driven height to overshoot it.
-    expect(content?.getBoundingClientRect().height ?? 0).toBeLessThanOrEqual(46 * 16 + 1);
+      const content = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]');
+      expect(content).not.toBeNull();
+
+      const box = content?.getBoundingClientRect();
+
+      // A viewport-proportional height would be ~1100px here; the cap is 46rem.
+      expect(box?.height ?? 0).toBeLessThanOrEqual(46 * 16 + 1);
+      // Which leaves the dialog the shape a graph reads in.
+      expect(box?.width ?? 0).toBeGreaterThan(box?.height ?? 0);
+    } finally {
+      await page.viewport(original.width, original.height);
+    }
   });
 
   it('shows the seed notice inline in the summary panel', async () => {

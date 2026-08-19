@@ -28,7 +28,6 @@ describe('models ui store', () => {
 
     store.updateModelsUi({
       activeTab: 'details',
-      addModelsQuery: 'stale',
       hfLookup: { repo: 'owner/repo', urls: ['a'] },
       scan: { path: '/models', results: [] },
       selectedBundleName: 'Essentials',
@@ -41,10 +40,27 @@ describe('models ui store', () => {
     // Add Models, showing the starter catalog filtered to the request — a
     // leftover scan/HF panel or bundle would hide the catalog entirely.
     expect(snapshot.activeTab).toBe('add');
-    expect(snapshot.addModelsQuery).toBe('Juggernaut XL');
+    expect(store.getAddModelsSeed()).toBe('Juggernaut XL');
     expect(snapshot.hfLookup).toBeNull();
     expect(snapshot.scan).toBeNull();
     expect(snapshot.selectedBundleName).toBeNull();
+  });
+
+  it('hands the Add Models seed over exactly once', async () => {
+    const store = await import('./uiStore');
+
+    expect(store.getAddModelsSeed()).toBe('');
+
+    store.requestAddModelsSearch('Juggernaut XL');
+
+    // Reading is pure — StrictMode double-invokes the initializer that reads it.
+    expect(store.getAddModelsSeed()).toBe('Juggernaut XL');
+    expect(store.getAddModelsSeed()).toBe('Juggernaut XL');
+
+    store.clearAddModelsSeed();
+
+    // The next time Add Models opens on its own, the box is empty again.
+    expect(store.getAddModelsSeed()).toBe('');
   });
 
   it('keeps the bundle selection until it is explicitly replaced', async () => {
