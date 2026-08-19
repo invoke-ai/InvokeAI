@@ -317,6 +317,24 @@ class TestCreatedRangeFiltering:
         ]
         assert result.total_count == 4
 
+    def test_get_item_names_created_range_matches_legacy_result(self, services) -> None:
+        _seed_created_range(services)
+
+        result = services["gallery"].get_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-03-10",
+            created_to="2026-03-11",
+        )
+
+        assert result.item_names == [
+            "range-end.png",
+            "range-video-end.mp4",
+            "range-video.mp4",
+            "range-start.png",
+        ]
+        assert result.total_count == 4
+
     def test_created_date_remains_an_exact_day_filter_without_ranges(self, services) -> None:
         _seed_created_range(services)
 

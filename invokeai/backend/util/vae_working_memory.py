@@ -252,14 +252,25 @@ def estimate_vae_working_memory_wan(
 
 
 def estimate_vae_working_memory_qwen_image(
-    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKLQwenImage,
+    tile_size: int | None = None,
 ) -> int:
     """Estimate the working memory required by the invocation in bytes.
 
     The Qwen Image VAE is a video-style autoencoder that operates on 5D tensors of shape
-    (B, C, num_frames, H, W). Tiling is not used, so peak working memory scales with the full
-    spatial output. The two trailing dimensions are the spatial H/W in latent space (decode) or
-    pixel space (encode), matching the convention used by the other estimators here.
+    (B, C, num_frames, H, W). The two trailing dimensions are the spatial H/W in latent space
+    (decode) or pixel space (encode), matching the convention used by the other estimators here.
+
+    Without tiling, peak working memory scales with the full spatial extent. With tiling it is
+    bounded by a single tile instead, so the estimate must follow suit — otherwise the cache keeps
+    reserving the full-frame figure (~11.8 GB for a 2560x1440 encode on CUDA) and tiling buys
+    nothing. Mirrors ``estimate_vae_working_memory_wan``: one tile plus 25% for the tile overlap,
+    plus the pixel-space buffers, which stay resident on the execution device either way.
+
+    ``tile_size`` is the resolved tile size (the nodes' 0 sentinel already substituted), and assumes
+    the 4:3 tile-to-stride ratio applied by ``patch_qwen_image_vae_tiling``.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
 
@@ -303,7 +314,22 @@ def estimate_vae_working_memory_qwen_image(
     else:  # encode
         scaling_constant = 6300 if is_rocm else 1600
 
-    working_memory = h * w * element_size * scaling_constant
+    if tile_size is not None and tile_size > 0:
+        # Bounded by one tile (plus overlap) rather than the full frame.
+        working_memory = tile_size * tile_size * element_size * scaling_constant * 1.25
+        # The full RGB image is the encode input / decode output and stays resident regardless. Unlike
+        # the per-tile term this scales with the output area, so it is the term that decides whether the
+        # estimate still holds at the resolutions tiling exists for.
+        #
+        # `tiled_decode` holds several pixel-space copies at once: every decoded tile in `rows`
+        # ((tile_min / tile_stride)^2 ~ 1.8 frames at the 4:3 ratio the nodes set), the blended and
+        # cropped `result_rows` (~1 frame) and the final `torch.cat` output (~1 frame). Measured at
+        # ~5 frames on a 2560x1440 fp16 decode. Encode consumes its input image without duplicating it,
+        # and accumulates only latents (16 channels at 1/64 the area — negligible).
+        image_copies = 5 if operation == "decode" else 1
+        working_memory += image_copies * 3 * h * w * element_size
+    else:
+        working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
 

@@ -48,7 +48,7 @@ class ProjectUpdateRequest(BaseModel):
 
 
 @projects_router.get("/", operation_id="list_projects", response_model=list[ProjectSummaryDTO])
-async def list_projects(current_user: CurrentUserOrDefault) -> list[ProjectSummaryDTO]:
+def list_projects(current_user: CurrentUserOrDefault) -> list[ProjectSummaryDTO]:
     """Lists the current user's projects as lightweight summaries (no documents)."""
     return ApiDependencies.invoker.services.project_records.list(current_user.user_id)
 
@@ -56,7 +56,7 @@ async def list_projects(current_user: CurrentUserOrDefault) -> list[ProjectSumma
 @projects_router.post(
     "/", operation_id="create_project", response_model=ProjectRecordDTO, status_code=status.HTTP_201_CREATED
 )
-async def create_project(
+def create_project(
     current_user: CurrentUserOrDefault,
     request: ProjectCreateRequest = Body(description="The project to create"),
 ) -> ProjectRecordDTO:
@@ -76,7 +76,7 @@ async def create_project(
 
 
 @projects_router.get("/{project_id}", operation_id="get_project", response_model=ProjectRecordDTO)
-async def get_project(
+def get_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to get"),
 ) -> ProjectRecordDTO:
@@ -88,7 +88,7 @@ async def get_project(
 
 
 @projects_router.put("/{project_id}", operation_id="update_project", response_model=ProjectRecordDTO)
-async def update_project(
+def update_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to save"),
     request: ProjectUpdateRequest = Body(description="The project document and the revision it is based on"),
@@ -116,7 +116,7 @@ async def update_project(
     operation_id="get_project_board_snapshot",
     response_model=ProjectBoardSnapshotDTO,
 )
-async def get_project_board_snapshot(
+def get_project_board_snapshot(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project whose board to enumerate"),
 ) -> ProjectBoardSnapshotDTO:
@@ -137,7 +137,7 @@ async def get_project_board_snapshot(
 
 
 @projects_router.delete("/{project_id}", operation_id="delete_project", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_project(
+def delete_project(
     current_user: CurrentUserOrDefault,
     project_id: str = Path(description="The id of the project to delete"),
 ) -> None:

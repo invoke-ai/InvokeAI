@@ -1226,6 +1226,10 @@ class TestSessionQueueAuth:
         r = client.get("/api/v1/queue/default/item_ids")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_get_queue_item_summaries_by_ids_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/queue/default/item_summaries_by_ids", json={"item_ids": [1]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
     def test_get_current_queue_item_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/queue/default/current")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
@@ -1907,6 +1911,10 @@ class TestWebSocketAuth:
         # at request time. Patch it to point at the mock invoker.
         mock_deps = MockApiDependencies(mock_invoker)
         monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", mock_deps)
+        # Connect resolves the user record through `resolve_authorized_user`, which binds
+        # ApiDependencies at import time in auth_dependencies — patching the defining
+        # module alone would not reach it.
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
         fastapi_app = FastAPI()
         return SocketIO(fastapi_app)
@@ -2666,16 +2674,21 @@ class TestCustomNodesAuthorization:
 
     def test_install_allows_admin(self, client: TestClient, admin_token: str, monkeypatch: Any, tmp_path: Any) -> None:
         """Admin caller can successfully install a node pack (filesystem/subprocess mocked)."""
+        from types import SimpleNamespace
+
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", lambda: tmp_path)
 
         # Simulate a successful git clone by creating the target dir with __init__.py
-        async def fake_clone_node_pack(source: str, target_dir: Any) -> tuple[int, str]:
+        def fake_clone_node_pack(cmd: list[str], **kwargs: Any) -> Any:
             target_dir = tmp_path / "test-pack"
             target_dir.mkdir(parents=True, exist_ok=True)
             (target_dir / "__init__.py").touch()
-            return 0, ""
+            return SimpleNamespace(returncode=0, stderr="")
 
-        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._clone_node_pack", fake_clone_node_pack)
+        monkeypatch.setattr(
+            "invokeai.app.api.routers.custom_nodes.subprocess.run",
+            fake_clone_node_pack,
+        )
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._load_node_pack", lambda *a, **kw: None)
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._import_workflows_from_pack", lambda *a, **kw: [])
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._write_pack_manifest", lambda *a, **kw: None)

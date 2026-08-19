@@ -35,7 +35,7 @@ def _get_owned_wildcard(wildcard_id: str, user_id: str) -> WildcardRecordDTO:
     operation_id="list_wildcards",
     responses={200: {"model": list[WildcardRecordDTO]}},
 )
-async def list_wildcards(current_user: CurrentUserOrDefault) -> list[WildcardRecordDTO]:
+def list_wildcards(current_user: CurrentUserOrDefault) -> list[WildcardRecordDTO]:
     """Lists the current user's wildcards."""
     return ApiDependencies.invoker.services.wildcard_records.get_many(user_id=current_user.user_id)
 
@@ -46,7 +46,7 @@ async def list_wildcards(current_user: CurrentUserOrDefault) -> list[WildcardRec
     responses={201: {"model": WildcardRecordDTO}},
     status_code=201,
 )
-async def create_wildcard(
+def create_wildcard(
     current_user: CurrentUserOrDefault,
     wildcard: WildcardWithoutId = Body(description="The wildcard to create"),
 ) -> WildcardRecordDTO:
@@ -62,7 +62,7 @@ async def create_wildcard(
     operation_id="update_wildcard",
     responses={200: {"model": WildcardRecordDTO}},
 )
-async def update_wildcard(
+def update_wildcard(
     current_user: CurrentUserOrDefault,
     wildcard_id: str = Path(description="The id of the wildcard to update"),
     changes: WildcardChanges = Body(description="The changes to apply"),
@@ -81,7 +81,7 @@ async def update_wildcard(
     operation_id="delete_wildcard",
     status_code=204,
 )
-async def delete_wildcard(
+def delete_wildcard(
     current_user: CurrentUserOrDefault,
     wildcard_id: str = Path(description="The id of the wildcard to delete"),
 ) -> None:

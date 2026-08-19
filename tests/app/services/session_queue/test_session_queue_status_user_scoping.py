@@ -15,6 +15,7 @@ a single own-count and (b) hid other users' redacted entries entirely. These tes
 restored behavior.
 """
 
+import sqlite3
 import uuid
 
 import pytest
@@ -198,3 +199,62 @@ def test_get_queue_item_ids_returns_all_users_ids(session_queue: SqliteSessionQu
 
     assert set(result.item_ids) == {a_item_id, b_item_id}
     assert result.total_count == 2
+
+
+def test_get_queue_item_summaries_by_ids_returns_only_requested_queue_items_in_order(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    first_id = _insert_queue_item(session_queue, user_id="user-a")
+    second_id = _insert_queue_item(session_queue, user_id="user-b")
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            UPDATE session_queue
+            SET origin = ?, destination = ?, device = ?, field_values = ?
+            WHERE item_id = ?
+            """,
+            (
+                "canvas",
+                "gallery",
+                "cuda:1",
+                '[{"node_path":"node","field_name":"seed","value":123}]',
+                second_id,
+            ),
+        )
+
+    summaries = session_queue.get_queue_item_summaries_by_ids(
+        queue_id="default", item_ids=[second_id, 999999, first_id]
+    )
+
+    assert [item.item_id for item in summaries] == [second_id, first_id]
+    assert summaries[0].origin == "canvas"
+    assert summaries[0].destination == "gallery"
+    assert summaries[0].device == "cuda:1"
+    assert summaries[0].field_values is not None
+    assert summaries[0].field_values[0].field_name == "seed"
+    assert summaries[0].field_values[0].value == 123
+    assert summaries[0].user_id == "user-b"
+    assert summaries[0].created_at is not None
+    assert summaries[0].status == "pending"
+
+
+def test_get_queue_item_summaries_by_ids_chunks_past_the_sqlite_bind_limit(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    """Every id becomes one bind parameter, so a single IN (...) would raise OperationalError once
+    the list outgrows SQLite's per-statement variable limit. The query is chunked instead."""
+    real_ids = [_insert_queue_item(session_queue, user_id="user-a") for _ in range(3)]
+
+    # Size the request off the limit this SQLite build actually enforces (999 on builds older than
+    # 3.32, 32766 since), so the test stays meaningful wherever it runs.
+    with session_queue._db.transaction() as cursor:
+        bind_limit = cursor.connection.getlimit(sqlite3.SQLITE_LIMIT_VARIABLE_NUMBER)
+
+    # Padding ids do not exist, which also covers chunks that match nothing at all.
+    padding_ids = list(range(100_000, 100_000 + bind_limit + 10))
+    split = len(padding_ids) // 2
+    item_ids = [real_ids[0], *padding_ids[:split], real_ids[1], *padding_ids[split:], real_ids[2]]
+
+    summaries = session_queue.get_queue_item_summaries_by_ids(queue_id="default", item_ids=item_ids)
+
+    assert [item.item_id for item in summaries] == real_ids

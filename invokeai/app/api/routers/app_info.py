@@ -53,12 +53,12 @@ class AppVersion(BaseModel):
 
 
 @app_router.get("/version", operation_id="app_version", status_code=200, response_model=AppVersion)
-async def get_version() -> AppVersion:
+def get_version() -> AppVersion:
     return AppVersion(version=__version__)
 
 
 @app_router.get("/app_deps", operation_id="get_app_deps", status_code=200, response_model=dict[str, str])
-async def get_app_deps(current_user: CurrentUserOrDefault) -> dict[str, str]:
+def get_app_deps(current_user: CurrentUserOrDefault) -> dict[str, str]:
     deps: dict[str, str] = {dist.metadata["Name"]: dist.version for dist in distributions()}
     try:
         cuda = getattr(getattr(torch, "version", None), "cuda", None) or "N/A"  # pyright: ignore[reportAttributeAccessIssue]
@@ -73,7 +73,7 @@ async def get_app_deps(current_user: CurrentUserOrDefault) -> dict[str, str]:
 
 
 @app_router.get("/patchmatch_status", operation_id="get_patchmatch_status", status_code=200, response_model=bool)
-async def get_patchmatch_status(current_user: CurrentUserOrDefault) -> bool:
+def get_patchmatch_status(current_user: CurrentUserOrDefault) -> bool:
     return PatchMatch.patchmatch_available()
 
 
@@ -218,7 +218,7 @@ def _redact_config_secrets(config: InvokeAIAppConfig) -> InvokeAIAppConfig:
     status_code=200,
     response_model=list[GenerationDeviceOption],
 )
-async def get_generation_device_options(current_user: CurrentUserOrDefault) -> list[GenerationDeviceOption]:
+def get_generation_device_options(current_user: CurrentUserOrDefault) -> list[GenerationDeviceOption]:
     """List the devices available for generation, for use with the `generation_devices` setting."""
     options: list[GenerationDeviceOption] = []
     if torch.cuda.is_available():
@@ -247,7 +247,7 @@ async def get_generation_device_options(current_user: CurrentUserOrDefault) -> l
 @app_router.get(
     "/runtime_config", operation_id="get_runtime_config", status_code=200, response_model=InvokeAIAppConfigWithSetFields
 )
-async def get_runtime_config(current_admin: AdminUserOrDefault) -> InvokeAIAppConfigWithSetFields:
+def get_runtime_config(current_admin: AdminUserOrDefault) -> InvokeAIAppConfigWithSetFields:
     config = get_config()
     return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=_redact_config_secrets(config))
 
@@ -258,7 +258,7 @@ async def get_runtime_config(current_admin: AdminUserOrDefault) -> InvokeAIAppCo
     status_code=200,
     response_model=InvokeAIAppConfigWithSetFields,
 )
-async def update_runtime_config(
+def update_runtime_config(
     _: AdminUserOrDefault,
     changes: UpdateAppGenerationSettingsRequest = Body(description="Writable runtime configuration changes"),
 ) -> InvokeAIAppConfigWithSetFields:
@@ -291,7 +291,7 @@ async def update_runtime_config(
     status_code=200,
     response_model=list[ExternalProviderStatusModel],
 )
-async def get_external_provider_statuses(current_user: CurrentUserOrDefault) -> list[ExternalProviderStatusModel]:
+def get_external_provider_statuses(current_user: CurrentUserOrDefault) -> list[ExternalProviderStatusModel]:
     statuses = ApiDependencies.invoker.services.external_generation.get_provider_statuses()
     return [status_to_model(status) for status in statuses.values()]
 
@@ -302,7 +302,7 @@ async def get_external_provider_statuses(current_user: CurrentUserOrDefault) -> 
     status_code=200,
     response_model=list[ExternalProviderConfigModel],
 )
-async def get_external_provider_configs(current_admin: AdminUserOrDefault) -> list[ExternalProviderConfigModel]:
+def get_external_provider_configs(current_admin: AdminUserOrDefault) -> list[ExternalProviderConfigModel]:
     config = get_config()
     return [_build_external_provider_config(provider_id, config) for provider_id in EXTERNAL_PROVIDER_FIELDS]
 
@@ -313,7 +313,7 @@ async def get_external_provider_configs(current_admin: AdminUserOrDefault) -> li
     status_code=200,
     response_model=ExternalProviderConfigModel,
 )
-async def set_external_provider_config(
+def set_external_provider_config(
     _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
     update: ExternalProviderConfigUpdate = Body(description="External provider configuration settings"),
@@ -349,7 +349,7 @@ async def set_external_provider_config(
     status_code=200,
     response_model=ExternalProviderConfigModel,
 )
-async def reset_external_provider_config(
+def reset_external_provider_config(
     _: AdminUserOrDefault,
     provider_id: str = Path(description="The external provider identifier"),
 ) -> ExternalProviderConfigModel:
@@ -471,7 +471,7 @@ def _remove_external_models_for_provider(provider_id: str) -> None:
     responses={200: {"description": "The operation was successful"}},
     response_model=LogLevel,
 )
-async def get_log_level(current_admin: AdminUserOrDefault) -> LogLevel:
+def get_log_level(current_admin: AdminUserOrDefault) -> LogLevel:
     """Returns the log level"""
     return LogLevel(ApiDependencies.invoker.services.logger.level)
 
@@ -482,7 +482,7 @@ async def get_log_level(current_admin: AdminUserOrDefault) -> LogLevel:
     responses={200: {"description": "The operation was successful"}},
     response_model=LogLevel,
 )
-async def set_log_level(
+def set_log_level(
     current_admin: AdminUserOrDefault,
     level: LogLevel = Body(description="New log verbosity level"),
 ) -> LogLevel:
@@ -496,7 +496,7 @@ async def set_log_level(
     operation_id="clear_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def clear_invocation_cache(current_admin: AdminUserOrDefault) -> None:
+def clear_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.clear()
 
@@ -506,7 +506,7 @@ async def clear_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     operation_id="enable_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def enable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
+def enable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.enable()
 
@@ -516,7 +516,7 @@ async def enable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     operation_id="disable_invocation_cache",
     responses={200: {"description": "The operation was successful"}},
 )
-async def disable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
+def disable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     """Clears the invocation cache"""
     ApiDependencies.invoker.services.invocation_cache.disable()
 
@@ -526,6 +526,6 @@ async def disable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
     operation_id="get_invocation_cache_status",
     responses={200: {"model": InvocationCacheStatus}},
 )
-async def get_invocation_cache_status(current_admin: AdminUserOrDefault) -> InvocationCacheStatus:
+def get_invocation_cache_status(current_admin: AdminUserOrDefault) -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
