@@ -101,6 +101,13 @@ export const createSelectedItemRevealController = (deps: {
     // Resolve window: leave the ref and the marker exactly as they are (see the module docblock)
     // so whatever lands during it can still be classified — and revealed — when it ends.
     if (isProgressImageResolving) {
+      if (activeRevealItemName !== null && activeRevealItemName === renderedItemName) {
+        // A reveal the user already earned is in flight over this very item. A generation
+        // finishing elsewhere is no reason to slam the overlay back over their click, so re-arm
+        // (the timer was cancelled above) instead of lowering.
+        timerId = schedule(lower, durationMs);
+        return;
+      }
       lower();
       return;
     }

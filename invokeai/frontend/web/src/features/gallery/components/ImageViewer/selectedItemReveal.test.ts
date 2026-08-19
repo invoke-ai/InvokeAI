@@ -208,4 +208,41 @@ describe('createSelectedItemRevealController', () => {
     );
     expect(h2.isRevealed()).toBe(false);
   });
+
+  it('keeps a reveal the user already earned when a generation elsewhere starts resolving', () => {
+    // The clicked item is on screen with its two seconds running. Another session finishing is no
+    // reason to slam the opaque overlay back over it.
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run(rendering('b.png'));
+    expect(h.isRevealed()).toBe(true);
+
+    h.controller.run({ ...rendering('b.png'), isProgressImageResolving: true });
+    expect(h.isRevealed(), 'the granted reveal survives the resolve window').toBe(true);
+
+    // ...and it still ends on its own rather than sticking there.
+    h.fireTimers();
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('lowers during a resolve window when the in-flight reveal is for a different item', () => {
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run(rendering('b.png'));
+    expect(h.isRevealed()).toBe(true);
+    h.controller.run({ ...rendering('c.png'), isProgressImageResolving: true });
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('leaves no stale timer behind when a run supersedes a reveal', () => {
+    // Two timers alive at once means the older one lowers the newer one's reveal early.
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run(rendering('b.png'));
+    h.controller.run(rendering('c.png'));
+    expect(h.pendingTimerCount()).toBe(1);
+
+    h.controller.run({ ...rendering('c.png'), isProgressImageResolving: true });
+    expect(h.pendingTimerCount(), 'the resolve-window re-arm replaces the timer, not adds one').toBe(1);
+  });
 });
