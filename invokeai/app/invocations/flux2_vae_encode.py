@@ -19,6 +19,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 
 
 @invocation(
@@ -46,7 +47,13 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
         The VAE encodes to 32-channel latent space.
         Output latents shape: (B, 32, H/8, W/8).
         """
-        with vae_info.model_on_device() as (_, vae):
+        # See the decode node: FLUX.2 VAE activations are multi-GB, so the cache needs the estimate to
+        # free room rather than discovering the shortfall as an OOM.
+        estimated_working_memory = estimate_vae_working_memory_flux2(
+            operation="encode", image_tensor=image_tensor, vae=vae_info.model
+        )
+
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
             device = TorchDevice.choose_torch_device()
             image_tensor = image_tensor.to(device=device, dtype=vae_dtype)

@@ -458,10 +458,33 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 bn_std=bn_std,
             )
 
+        # Estimate the peak activation memory the transformer forward will need and ask the model cache
+        # to keep that much VRAM free. Without this hint the cache reserves only the small default
+        # working memory and fills the rest of the card with the model, so anything beyond a plain
+        # low-resolution generation OOMs. Reference images are the dominant term: their latents are
+        # concatenated onto the image stream, so three 1024x1024 references quadruple the sequence
+        # (and with it the activation footprint) of a 1024x1024 generation.
+        ref_image_seq_len = ref_image_extension.ref_image_latents.shape[1] if ref_image_extension is not None else 0
+        estimated_working_memory = self._estimate_working_memory(
+            image_seq_len=packed_h * packed_w,
+            ref_image_seq_len=ref_image_seq_len,
+            text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
+            num_loras=len(self.transformer.loras),
+            # The mask itself is already allocated; only the additive bias built per forward is new.
+            # It is skipped entirely when reference images are present (see below).
+            regional_attention_bias_bytes=(
+                regional_extension.restricted_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
+                if regional_extension.restricted_attn_mask is not None and ref_image_seq_len == 0
+                else 0
+            ),
+        )
+
         with ExitStack() as exit_stack:
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
-                context.models.load(self.transformer.transformer).model_on_device()
+                context.models.load(self.transformer.transformer).model_on_device(
+                    working_mem_bytes=estimated_working_memory
+                )
             )
             config = transformer_config
 
@@ -577,6 +600,42 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         mask = mask.to(device=latents.device, dtype=latents.dtype)
         return mask.expand_as(latents)
+
+    def _estimate_working_memory(
+        self,
+        image_seq_len: int,
+        ref_image_seq_len: int,
+        text_seq_len: int,
+        num_loras: int,
+        regional_attention_bias_bytes: int = 0,
+    ) -> int:
+        """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
+
+        FLUX.2 attention runs through SDPA without materializing the O(seq^2) score matrix, so the
+        activation footprint scales *linearly* with the total attended sequence -- text tokens, image
+        tokens, and reference-image tokens alike. Measured on the Klein 9B geometry in bf16 as peak
+        reserved memory, that slope is ~0.39 MB per token and holds from 1.5k to 28k tokens; it is
+        also independent of the block count (a no-grad forward frees each block's intermediates), so
+        the constant applies to both the 4B and 9B variants.
+
+        The reference-image term is what makes this estimate necessary rather than merely nice to
+        have: a 1024x1024 generation is 4096 image tokens (~1.7GB), but attaching three 1024x1024
+        references adds 12288 more for ~6.5GB, and a 1328px tile with three 1328px references reaches
+        ~10.9GB -- against a default ``device_working_mem_gb`` of 3.
+
+        A fixed base covers resolution-independent overhead (transient fp8/GGUF -> bf16 weight casts
+        during the forward, and allocator slack across many steps). LoRA sidecar patches add an extra
+        activation branch per patched layer, so we add a per-LoRA margin.
+        """
+        GB = 1024**3
+        MB = 1024**2
+        per_token_bytes = int(0.4 * MB)
+        estimated = (image_seq_len + ref_image_seq_len + text_seq_len) * per_token_bytes
+        estimated += int(1.0 * GB)
+        estimated += regional_attention_bias_bytes
+        if num_loras > 0:
+            estimated += int(0.5 * num_loras * GB)
+        return estimated
 
     def _load_text_conditioning(
         self,
