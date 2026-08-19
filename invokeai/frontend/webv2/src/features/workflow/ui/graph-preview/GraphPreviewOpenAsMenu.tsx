@@ -1,10 +1,11 @@
 import type { WorkflowInvocationSourceId, WorkflowPreviewGraph } from '@features/workflow/ui/contracts';
 import type { ReactNode } from 'react';
 
-import { Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Menu, Portal } from '@chakra-ui/react';
 import { previewGraphToDocument } from '@features/workflow/core/graphToDocument';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useSaveWorkflowToLibrary } from '@features/workflow/ui/library/useSaveWorkflowToLibrary';
+import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import {
   useWorkflowGraphPreview,
   useWorkflowHostCommands,
@@ -16,11 +17,6 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'top-end' } as const;
-const DISABLED_PROPS = { opacity: 0.4 };
-// Items carry a two-line body (label + hint), so the icon top-aligns with the
-// label line instead of floating centered against both.
-const MENU_ITEM_LAYOUT = { alignItems: 'flex-start', gap: '2.5', py: '1.5' } as const;
-const MENU_ITEM_ICON_PROPS = { boxSize: '3.5', flexShrink: 0, mt: '0.5' } as const;
 
 interface GraphPreviewOpenAsMenuProps {
   children: ReactNode;
@@ -30,15 +26,6 @@ interface GraphPreviewOpenAsMenuProps {
   /** Dialog close after a successful "edit in editor". */
   onClose: () => void;
 }
-
-const MenuItemBody = ({ hint, label }: { hint: string; label: string }) => (
-  <Stack gap="0" minW="0">
-    <Menu.ItemText>{label}</Menu.ItemText>
-    <Text color="fg.subtle" fontSize="2xs">
-      {hint}
-    </Text>
-  </Stack>
-);
 
 /**
  * The graph preview dialog's "Open as" menu — four ways to hand a
@@ -146,41 +133,38 @@ export const GraphPreviewOpenAsMenu = ({
         <Menu.Positioner>
           <Menu.Content minW="16rem">
             {canEditInEditor ? (
-              <Menu.Item
-                {...MENU_ITEM_LAYOUT}
-                _disabled={DISABLED_PROPS}
-                disabled={!isTemplatesLoaded}
+              <MenuActionItem
+                hint={t('graphPreview.editInEditorHint')}
+                icon={PencilRulerIcon}
+                isDisabled={!isTemplatesLoaded}
+                label={t('graphPreview.editInEditor')}
                 value="edit-in-editor"
-                onClick={handleEditInEditor}
-              >
-                <Icon as={PencilRulerIcon} {...MENU_ITEM_ICON_PROPS} />
-                <MenuItemBody hint={t('graphPreview.editInEditorHint')} label={t('graphPreview.editInEditor')} />
-              </Menu.Item>
+                onSelect={handleEditInEditor}
+              />
             ) : null}
-            <Menu.Item
-              {...MENU_ITEM_LAYOUT}
-              _disabled={DISABLED_PROPS}
-              disabled={!isTemplatesLoaded}
+            <MenuActionItem
+              hint={t('graphPreview.saveToLibraryHint')}
+              icon={BookmarkIcon}
+              isDisabled={!isTemplatesLoaded}
+              label={t('graphPreview.saveToLibrary')}
               value="save-to-library"
-              onClick={handleSaveToLibrary}
-            >
-              <Icon as={BookmarkIcon} {...MENU_ITEM_ICON_PROPS} />
-              <MenuItemBody hint={t('graphPreview.saveToLibraryHint')} label={t('graphPreview.saveToLibrary')} />
-            </Menu.Item>
-            <Menu.Item
-              {...MENU_ITEM_LAYOUT}
-              _disabled={DISABLED_PROPS}
-              disabled={!isTemplatesLoaded}
+              onSelect={handleSaveToLibrary}
+            />
+            <MenuActionItem
+              hint={t('graphPreview.forkIntoProjectHint')}
+              icon={GitForkIcon}
+              isDisabled={!isTemplatesLoaded}
+              label={t('graphPreview.forkIntoProject')}
               value="fork-into-project"
-              onClick={handleForkIntoProject}
-            >
-              <Icon as={GitForkIcon} {...MENU_ITEM_ICON_PROPS} />
-              <MenuItemBody hint={t('graphPreview.forkIntoProjectHint')} label={t('graphPreview.forkIntoProject')} />
-            </Menu.Item>
-            <Menu.Item {...MENU_ITEM_LAYOUT} value="download-json" onClick={handleDownloadJson}>
-              <Icon as={DownloadIcon} {...MENU_ITEM_ICON_PROPS} />
-              <MenuItemBody hint={t('graphPreview.downloadJsonHint')} label={t('graphPreview.downloadJson')} />
-            </Menu.Item>
+              onSelect={handleForkIntoProject}
+            />
+            <MenuActionItem
+              hint={t('graphPreview.downloadJsonHint')}
+              icon={DownloadIcon}
+              label={t('graphPreview.downloadJson')}
+              value="download-json"
+              onSelect={handleDownloadJson}
+            />
           </Menu.Content>
         </Menu.Positioner>
       </Portal>

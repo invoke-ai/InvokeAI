@@ -10,7 +10,12 @@ import {
   getLibraryWorkflowCached,
   invalidateWorkflowLibraryCache,
 } from '@features/workflow/queries';
-import { useWorkflowGraphPreview, useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
+import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
+import {
+  useOpenAddModels,
+  useWorkflowGraphPreview,
+  useWorkflowNotifications,
+} from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson } from '@features/workflow/utility';
 import { downloadText } from '@platform/browser/downloadBlob';
 import {
@@ -54,10 +59,18 @@ import {
 
 const DETAIL_RAIL_WIDTH = '18rem';
 const THUMBNAIL_ASPECT_RATIO = 3 / 2;
-const DISABLED_ITEM = { opacity: 0.4 } as const;
 const INSTALL_HOVER = { opacity: 0.85 } as const;
-const MENU_ITEM_LAYOUT = { alignItems: 'center', gap: '2.5', py: '1' } as const;
-const MENU_ITEM_ICON_PROPS = { boxSize: '3.5', flexShrink: 0 } as const;
+/**
+ * zag sets `min-width: fit-content` inline on every scroll-area content box, so
+ * the box grows to its *min-content* width — and a long workflow name
+ * contributes its full unbroken width there, however hard the heading itself
+ * truncates. The rail then scrolled sideways (with no horizontal scrollbar,
+ * since this area is vertical) and clipped every row in it. An inline override
+ * is what it takes to beat an inline style; zeroing it makes the content box
+ * stretch to the viewport and nothing more, so the heading's truncation is what
+ * actually gives.
+ */
+const RAIL_CONTENT_PROPS = { style: { minWidth: 0 } } as const;
 
 export interface WorkflowLibraryDetailPanelProps {
   entry: WorkflowLibraryEntry | null;
@@ -84,6 +97,7 @@ export const WorkflowLibraryDetailPanel = ({
   const deps = useModelRequirementDeps();
   const notify = useWorkflowNotifications();
   const { openDocumentInNewProject } = useWorkflowGraphPreview();
+  const openAddModels = useOpenAddModels();
   const { installMany } = useInstallActions();
   // Keyed by URL rather than a boolean, so a selection change re-arms the
   // thumbnail without an effect resetting the flag.
@@ -118,6 +132,16 @@ export const WorkflowLibraryDetailPanel = ({
   }, [entry, onPreview]);
 
   const handleThumbnailError = useCallback(() => setFailedThumbnailUrl(entry?.item.thumbnail_url ?? null), [entry]);
+
+  // Add Models is a different page, so the library has to get out of the way —
+  // the same handoff a fork into a new project makes.
+  const handleFindModel = useCallback(
+    (query: string) => {
+      openAddModels(query);
+      onClose();
+    },
+    [onClose, openAddModels]
+  );
 
   const install = useCallback(async () => {
     const owner = captureAccountScope();
@@ -307,7 +331,7 @@ export const WorkflowLibraryDetailPanel = ({
       rounded="md"
       w={DETAIL_RAIL_WIDTH}
     >
-      <Scrollable flex="1" label={name} minH="0">
+      <Scrollable contentProps={RAIL_CONTENT_PROPS} flex="1" label={name} minH="0" minW="0">
         <Stack gap="2" minW="0" p="2.5">
           <Stack gap="1" minW="0">
             <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">
@@ -357,6 +381,7 @@ export const WorkflowLibraryDetailPanel = ({
           <WorkflowRequirementsList
             errorMessage={enrichment?.status === 'error' ? enrichment.message : null}
             resolved={resolved}
+            onFindModel={handleFindModel}
           />
         </Stack>
       </Scrollable>
@@ -392,51 +417,40 @@ export const WorkflowLibraryDetailPanel = ({
             <Portal>
               <Menu.Positioner>
                 <MenuContent minW="12rem">
-                  <Menu.Item {...MENU_ITEM_LAYOUT} data-menu-item="open" value="open" onClick={handleOpen}>
-                    <Icon as={WorkflowIcon} {...MENU_ITEM_ICON_PROPS} />
-                    <Menu.ItemText>{t('workflowLibrary.open')}</Menu.ItemText>
-                  </Menu.Item>
-                  <Menu.Item
-                    {...MENU_ITEM_LAYOUT}
-                    _disabled={DISABLED_ITEM}
-                    data-menu-item="duplicate"
-                    disabled={isDuplicatePending}
+                  <MenuActionItem
+                    icon={WorkflowIcon}
+                    label={t('workflowLibrary.open')}
+                    value="open"
+                    onSelect={handleOpen}
+                  />
+                  <MenuActionItem
+                    icon={CopyIcon}
+                    isDisabled={isDuplicatePending}
+                    label={t('workflowLibrary.duplicate')}
                     value="duplicate"
-                    onClick={handleDuplicate}
-                  >
-                    <Icon as={CopyIcon} {...MENU_ITEM_ICON_PROPS} />
-                    <Menu.ItemText>{t('workflowLibrary.duplicate')}</Menu.ItemText>
-                  </Menu.Item>
-                  <Menu.Item
-                    {...MENU_ITEM_LAYOUT}
-                    data-menu-item="fork-into-project"
+                    onSelect={handleDuplicate}
+                  />
+                  <MenuActionItem
+                    icon={GitForkIcon}
+                    label={t('workflowLibrary.forkIntoProject')}
                     value="fork-into-project"
-                    onClick={handleFork}
-                  >
-                    <Icon as={GitForkIcon} {...MENU_ITEM_ICON_PROPS} />
-                    <Menu.ItemText>{t('workflowLibrary.forkIntoProject')}</Menu.ItemText>
-                  </Menu.Item>
-                  <Menu.Item
-                    {...MENU_ITEM_LAYOUT}
-                    data-menu-item="download-json"
+                    onSelect={handleFork}
+                  />
+                  <MenuActionItem
+                    icon={DownloadIcon}
+                    label={t('workflowLibrary.downloadJson')}
                     value="download-json"
-                    onClick={handleDownload}
-                  >
-                    <Icon as={DownloadIcon} {...MENU_ITEM_ICON_PROPS} />
-                    <Menu.ItemText>{t('workflowLibrary.downloadJson')}</Menu.ItemText>
-                  </Menu.Item>
+                    onSelect={handleDownload}
+                  />
                   {item.category === 'user' ? (
                     // Bundled defaults are not the account's to delete.
-                    <Menu.Item
-                      {...MENU_ITEM_LAYOUT}
-                      color="fg.error"
-                      data-menu-item="delete"
+                    <MenuActionItem
+                      icon={Trash2Icon}
+                      label={t('workflowLibrary.delete')}
+                      tone="danger"
                       value="delete"
-                      onClick={openDeleteConfirm}
-                    >
-                      <Icon as={Trash2Icon} {...MENU_ITEM_ICON_PROPS} />
-                      <Menu.ItemText>{t('workflowLibrary.delete')}</Menu.ItemText>
-                    </Menu.Item>
+                      onSelect={openDeleteConfirm}
+                    />
                   ) : null}
                 </MenuContent>
               </Menu.Positioner>
