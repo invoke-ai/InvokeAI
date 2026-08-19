@@ -33,6 +33,11 @@ import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
+/** What a completion event still has outstanding. 'done' rejects any re-delivery;
+ * 'gallery-retryable' means every DTO lookup failed, so a re-delivery may redo the gallery work
+ * (and only that work — see the handler). */
+type ProcessedInvocationState = 'done' | 'gallery-retryable';
+
 // These nodes are passthrough nodes. They do not add images/videos to the gallery — their
 // outputs reference an existing asset — so we must skip the gallery handling for them.
 // Without 'video' here, a Video Primitive completing mid-run would invalidate the gallery
@@ -62,11 +67,12 @@ export const buildOnInvocationComplete = (
   // handler runs — so the handler tracks what it has processed itself. The invocation id half of
   // the key is the prepared node's per-execution UUID, so keys cannot collide across distinct
   // executions even where item ids restart (in-memory DB); the LRU bounds memory.
-  const processedInvocations = new LRUCache<string, boolean>({ max: 1000 });
+  const processedInvocations = new LRUCache<string, ProcessedInvocationState>({ max: 1000 });
 
-  // Returns how many image DTOs were fetched, so the caller can tell "this event had no gallery
-  // output" apart from "the output was there but every lookup failed" (see the dedupe-key drop in
-  // the handler below).
+  // Returns how many DTOs had gallery work dispatched for them, so the caller can tell "this
+  // delivery changed nothing" apart from "part of it landed" (see the retry decision in the handler
+  // below). Paths that bail out before the first dispatch — including an intermediate output, which
+  // never reaches the gallery — count as nothing dispatched.
   const addImagesToGallery = async (
     data: S['InvocationCompleteEvent'],
     onLookupFailure: () => void
@@ -88,7 +94,7 @@ export const buildOnInvocationComplete = (
 
     for (const imageDTO of imageDTOs) {
       if (imageDTO.is_intermediate) {
-        return imageDTOs.length;
+        return 0;
       }
 
       const board_id = imageDTO.board_id ?? 'none';
@@ -322,7 +328,7 @@ export const buildOnInvocationComplete = (
 
     const nonIntermediate = videoDTOs.filter((v) => !v.is_intermediate);
     if (nonIntermediate.length === 0) {
-      return videoDTOs.length;
+      return 0;
     }
 
     // Force the polymorphic gallery list to refetch so the new video shows up. Note: this is
@@ -400,57 +406,64 @@ export const buildOnInvocationComplete = (
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     const invocationKey = `${data.item_id}:${data.invocation.id}`;
-    if (processedInvocations.has(invocationKey)) {
+    const processedState = processedInvocations.get(invocationKey);
+    if (processedState === 'done') {
       log.trace(
         { data } as JsonObject,
         `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
       );
       return;
     }
+    // A re-delivery of an event whose gallery work was lost to a failed lookup redoes that work and
+    // nothing else. The rest of this handler is not idempotent against a *later* generation: the
+    // canvas processing flag and $lastProgressEvent are global, so re-running them here would end
+    // the spinner and blank the progress of whatever is running now.
+    const isGalleryRetry = processedState === 'gallery-retryable';
     // Mark before the awaits below — a duplicate arriving while the DTO fetch is in flight must be
-    // rejected too. Dropped again below when every DTO lookup failed: the gallery never got any of
-    // that output, so a re-delivery must be free to redo the work rather than be turned away as a
-    // duplicate of a delivery that never landed.
-    processedInvocations.set(invocationKey, true);
+    // rejected too.
+    processedInvocations.set(invocationKey, 'done');
     let hadLookupFailure = false;
     const onLookupFailure = () => {
       hadLookupFailure = true;
     };
 
-    const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
-    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
-      nodeExecutionState,
-      data,
-      completedInvocationKeysByItemId
-    );
-
-    if (nodeExecutionState && !updatedNodeExecutionState) {
-      log.trace(
-        { data } as JsonObject,
-        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+    if (!isGalleryRetry) {
+      const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
+      const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
+        nodeExecutionState,
+        data,
+        completedInvocationKeysByItemId
       );
-    }
 
-    if (updatedNodeExecutionState) {
-      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
-    }
+      if (nodeExecutionState && !updatedNodeExecutionState) {
+        log.trace(
+          { data } as JsonObject,
+          `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+        );
+      }
 
-    // Clear canvas workflow integration processing state if needed
-    clearCanvasWorkflowIntegrationProcessing(data);
+      if (updatedNodeExecutionState) {
+        upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
+      }
+
+      // Clear canvas workflow integration processing state if needed
+      clearCanvasWorkflowIntegrationProcessing(data);
+    }
 
     // Add images to gallery (canvas workflow integration results go to staging area automatically)
-    const fetchedImageCount = await addImagesToGallery(data, onLookupFailure);
-    const fetchedVideoCount = await addVideosToGallery(data, onLookupFailure);
+    const dispatchedImageCount = await addImagesToGallery(data, onLookupFailure);
+    const dispatchedVideoCount = await addVideosToGallery(data, onLookupFailure);
 
-    $lastProgressEvent.set(null);
+    if (!isGalleryRetry) {
+      $lastProgressEvent.set(null);
+    }
 
-    // Drop the dedupe key only when a lookup failed AND nothing was fetched: such a delivery
-    // dispatched no gallery work at all, so a re-delivery is free to redo everything (the
-    // node-execution upsert has its own dedupe via completedInvocationKeysByItemId). A partial
-    // failure keeps the key — the fetched DTOs' board totals and optimistic inserts were already
-    // dispatched, and a re-delivery re-running them would double-count.
-    if (hadLookupFailure && fetchedImageCount + fetchedVideoCount === 0) {
-      processedInvocations.delete(invocationKey);
+    // Leave the event open to a retry only when a lookup failed AND this delivery dispatched no
+    // gallery work at all: there is then nothing a re-delivery could double up on. A partial
+    // failure stays 'done' — the DTOs that did resolve had their board totals and optimistic
+    // inserts dispatched, and re-running those would double-count them.
+    if (hadLookupFailure && dispatchedImageCount + dispatchedVideoCount === 0) {
+      processedInvocations.set(invocationKey, 'gallery-retryable');
     }
   };
 };

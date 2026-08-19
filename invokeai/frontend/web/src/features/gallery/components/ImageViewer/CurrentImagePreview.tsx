@@ -26,6 +26,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
+import { getSelectedItemRevealDecision } from './selectedItemReveal';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const activeTab = useAppSelector(selectActiveTab);
@@ -128,29 +129,22 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       renderedImageName !== previousRenderedImageName &&
       autoSwitchedImages.consume(renderedImageName);
 
+    // Clearing the timer before deciding is why getSelectedItemRevealDecision has no third
+    // "leave it alone" outcome: a path that returned without writing the atom would leave a raised
+    // reveal with nothing left to lower it, hiding the live preview for the rest of the render.
     window.clearTimeout(selectedImageRevealTimeoutId.current);
 
-    if (
-      !shouldShowProgressInViewer ||
-      !hasProgressImage ||
-      isProgressImageResolving ||
-      !renderedImageName ||
-      renderedImageName !== selectedImageName
-    ) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
+    const decision = getSelectedItemRevealDecision({
+      shouldShowProgressInViewer,
+      hasProgressImage,
+      isProgressImageResolving,
+      renderedItemName: renderedImageName,
+      selectedItemName: selectedImageName ?? null,
+      previousRenderedItemName: previousRenderedImageName,
+      wasAutoSwitchedTo,
+    });
 
-    if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
-      return;
-    }
-
-    // The reveal exists to make a mid-generation *user* selection visible. An auto-switch to a
-    // just-finished image can land here late — after the next generation's first progress event
-    // has already reset $isProgressImageResolving — and must not flash the previous result over
-    // the live preview. The set(false) is required: the clearTimeout above already cancelled any
-    // running reveal's timer, so returning with the atom still true would wedge the reveal on.
-    if (wasAutoSwitchedTo) {
+    if (decision === 'hide') {
       $isTemporarilyShowingSelectedImage.set(false);
       return;
     }

@@ -30,6 +30,17 @@ describe('CurrentImagePreview reveal wiring', () => {
     expect(onReady).toContain('onLoadImage(imageDTO.session_id ?? null)');
   });
 
+  it('routes the reveal through the shared decision, passing the auto-switch marker to it', () => {
+    // The decision's branches are unit tested in selectedItemReveal.test.ts; what cannot be seen
+    // from there is whether this component still feeds it the marker, or still writes the atom on
+    // the hide path.
+    expect(currentImagePreview).toContain('getSelectedItemRevealDecision({');
+    expect(currentImagePreview).toContain('wasAutoSwitchedTo,');
+    expect(currentImagePreview).toMatch(
+      /if \(decision === 'hide'\) \{\s+\$isTemporarilyShowingSelectedImage\.set\(false\);\s+return;/
+    );
+  });
+
   it('consumes the auto-switch marker on every rendered-image change', () => {
     // The consume call must sit before the reveal gates, so the marker is cleared even when the
     // auto-switched image renders with no progress showing.

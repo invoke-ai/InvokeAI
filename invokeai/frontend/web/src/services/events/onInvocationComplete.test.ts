@@ -117,8 +117,11 @@ vi.mock('services/events/stores', () => ({
 
 // Import AFTER the mocks above are declared (vi.mock is hoisted; explicit ordering here
 // is for the human reader).
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
+import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { getVideoDTOSafe } from 'services/api/endpoints/videos';
+import { $lastProgressEvent } from 'services/events/stores';
 
 import {
   buildOnForeignInvocationComplete,
@@ -157,6 +160,10 @@ const buildImageCompleteEvent = (): S['InvocationCompleteEvent'] =>
 describe('onInvocationComplete polymorphic gallery cache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks resets calls, not implementations — restore the factory default so a test that
+    // turns auto-switch on cannot leak it into the next one.
+    vi.mocked(selectAutoSwitch).mockReturnValue(false);
+    autoSwitchedImages.settle(null);
   });
 
   it('invalidates GalleryItemNameList + GalleryItemList when an image output completes', async () => {
@@ -402,6 +409,168 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     // The re-delivery must be treated as a duplicate — no further lookups.
     await handler(twoImages);
     expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+  });
+
+  it('marks the selection it auto-switches to, so the viewer does not reveal it as a user click', async () => {
+    // Without the marker the finished image flashes over the next generation's live preview for
+    // two seconds — the regression this PR exists to fix. The marker is the only signal that can
+    // tell the handoff from a click, since it lands after the next generation's first progress
+    // event has already reset the timing-based guard.
+    vi.mocked(selectAutoSwitch).mockReturnValue(true);
+    autoSwitchedImages.settle(null);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await handler(buildImageCompleteEvent());
+
+    expect(autoSwitchedImages.consume('fresh-image.png')).toBe(true);
+  });
+
+  it('does not mark anything when auto-switch is off — nothing is selected to be revealed', async () => {
+    vi.mocked(selectAutoSwitch).mockReturnValue(false);
+    autoSwitchedImages.settle(null);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    await handler(buildImageCompleteEvent());
+
+    expect(autoSwitchedImages.consume('fresh-image.png')).toBe(false);
+  });
+
+  it('keeps the dedupe key when only the image half of a mixed result failed', async () => {
+    // The video lookup succeeded, so its board invalidation and auto-switch already went out; a
+    // re-delivery re-running them would invalidate twice and move the selection a second time.
+    vi.mocked(selectAutoSwitch).mockReturnValue(true);
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+    vi.mocked(getVideoDTOSafe).mockResolvedValueOnce({
+      video_name: 'fresh-video.mp4',
+      video_url: 'mock://fresh-video.mp4',
+      thumbnail_url: 'mock://thumb/fresh-video.mp4',
+      is_intermediate: false,
+      is_starred: false,
+      board_id: 'board-123',
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      session_id: 'test-session',
+      node_id: 'test-node',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const mixed = buildImageCompleteEvent();
+    mixed.invocation.type = 'wan_l2v';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mixed as any).result = {
+      image: { image_name: 'lost-image.png' },
+      video: { video_name: 'fresh-video.mp4' },
+    };
+
+    await handler(mixed);
+    expect(getVideoDTOSafe).toHaveBeenCalledTimes(1);
+
+    // The re-delivery must be turned away: the video work already landed.
+    await handler(mixed);
+    expect(getVideoDTOSafe).toHaveBeenCalledTimes(1);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+  });
+
+  it('redoes only the gallery work on a retry, not the global side effects', async () => {
+    // The canvas processing flag and $lastProgressEvent are global: by the time a re-delivery
+    // arrives the user may have started another run, and clearing them again would stop that run's
+    // spinner and blank its progress.
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+      return { unwrap: () => Promise.resolve(undefined) };
+    });
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const canvasEvent = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (canvasEvent as any).origin = 'canvas_workflow_integration';
+
+    await handler(canvasEvent);
+    const canvasClears = () => dispatched.filter((a) => (a as { type?: string }).type === 'mock/canvasComplete').length;
+    expect(canvasClears()).toBe(1);
+    expect($lastProgressEvent.set).toHaveBeenCalledTimes(1);
+
+    // The retry must redo the lost gallery fetch...
+    await handler(canvasEvent);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+    // ...and nothing else.
+    expect(canvasClears()).toBe(1);
+    expect($lastProgressEvent.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not offer a retry to a delivery whose only output was intermediate', async () => {
+    // An intermediate image never reaches the gallery, so a lookup failure alongside it leaves
+    // nothing dispatched — and the retry that could recover the lost image must be allowed.
+    vi.mocked(getImageDTOSafe)
+      .mockResolvedValueOnce(null)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .mockResolvedValueOnce({ image_name: 'intermediate.png', is_intermediate: true, board_id: null } as any);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const twoImages = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (twoImages as any).result = {
+      image_1: { image_name: 'lost.png' },
+      image_2: { image_name: 'intermediate.png' },
+    };
+
+    await handler(twoImages);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+
+    await handler(twoImages);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(4);
   });
 
   it('still processes distinct invocations of the same queue item', async () => {
