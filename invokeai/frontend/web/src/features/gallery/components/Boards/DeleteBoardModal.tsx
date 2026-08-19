@@ -21,6 +21,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import { isVideoName } from 'features/gallery/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import {
@@ -31,7 +32,7 @@ import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
+import { useListGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
 import {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
@@ -52,7 +53,7 @@ const DeleteBoardModal = () => {
   const shouldProtectStarredMedia = useAppSelector(selectSystemShouldProtectStarredMedia);
 
   const boardId = useMemo(() => (boardToDelete === 'none' ? 'none' : boardToDelete?.board_id), [boardToDelete]);
-  const { currentData: boardMedia, isFetching: isFetchingBoardNames } = useGetGalleryItemNamesQuery(
+  const { currentData: boardMedia, isFetching: isFetchingBoardNames } = useListGalleryItemNamesQuery(
     boardId
       ? {
           board_id: boardId,
@@ -63,8 +64,8 @@ const DeleteBoardModal = () => {
       : skipToken
   );
   const boardImageNames = useMemo(
-    () => boardMedia?.items.filter((item) => item.kind === 'image').map((item) => item.name) ?? [],
-    [boardMedia?.items]
+    () => boardMedia?.item_names.filter((name) => !isVideoName(name)) ?? [],
+    [boardMedia?.item_names]
   );
 
   const selectImageUsageSummary = useMemo(
