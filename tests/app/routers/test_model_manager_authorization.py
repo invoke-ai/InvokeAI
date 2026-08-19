@@ -175,12 +175,39 @@ PUBLIC_ROUTES = {
 }
 
 
-def _routes_without_auth() -> set[tuple[str, str]]:
-    """Every (method, path) in the app whose dependency tree contains no auth dependency."""
+# A floor, not an exact count: routes come and go, but a *collapse* means the traversal below stopped
+# seeing the app rather than that the app shrank. Without this the guard fails open — see
+# `_iter_api_route_contexts`.
+MIN_EXPECTED_API_ROUTES = 150
+
+
+def _iter_api_route_contexts() -> list[Any]:
+    """Every API route in the app, with its full external path.
+
+    Walking `app.routes` directly is not enough: since FastAPI 0.141 an included router stays a single
+    node in `app.routes` instead of having its routes copied into it, so `isinstance(route, APIRoute)`
+    matched 2 of ~197 routes and this guard passed while inspecting almost nothing. `iter_route_contexts`
+    is the traversal FastAPI's own OpenAPI generation uses, so by construction it yields exactly the
+    routes the app exposes. The context's `path` is the full external path — `route.path` is only the
+    portion below the router prefix.
+    """
+    from fastapi import routing
     from fastapi.routing import APIRoute
 
-    from invokeai.app.api import auth_dependencies
     from invokeai.app.api_app import app
+
+    contexts = [ctx for ctx in routing.iter_route_contexts(app.routes) if isinstance(ctx.route, APIRoute)]
+    assert len(contexts) >= MIN_EXPECTED_API_ROUTES, (
+        f"Only {len(contexts)} API routes discovered, expected at least {MIN_EXPECTED_API_ROUTES}. FastAPI has "
+        "likely changed how routes are stored again, which makes the auth guard below inspect almost nothing "
+        "and pass. Fix the traversal - do not lower this floor."
+    )
+    return contexts
+
+
+def _routes_without_auth() -> set[tuple[str, str]]:
+    """Every (method, path) in the app whose dependency tree contains no auth dependency."""
+    from invokeai.app.api import auth_dependencies
 
     auth_functions = {
         auth_dependencies.get_current_user,
@@ -194,10 +221,10 @@ def _routes_without_auth() -> set[tuple[str, str]]:
         return any(has_auth(sub) for sub in dependant.dependencies)
 
     return {
-        (method, route.path)
-        for route in app.routes
-        if isinstance(route, APIRoute) and not has_auth(route.dependant)
-        for method in route.methods
+        (method, ctx.path)
+        for ctx in _iter_api_route_contexts()
+        if not has_auth(ctx.route.dependant)
+        for method in ctx.route.methods
     }
 
 
@@ -297,6 +324,7 @@ def test_runtime_config_redacts_secrets() -> None:
         external_openai_api_key="sk-super-secret",
         external_gemini_base_url="https://example.invalid",
         remote_api_tokens=[URLRegexTokenPair(url_regex="example.com", token="bearer-secret")],
+        download_proxy="http://proxy-user:proxy-secret@proxy.example:3128",
     )
     redacted = _redact_config_secrets(config)
 
@@ -306,9 +334,11 @@ def test_runtime_config_redacts_secrets() -> None:
     # Non-secret fields are untouched, and the original config is not mutated.
     assert redacted.remote_api_tokens[0].url_regex == "example.com"
     assert redacted.external_gemini_base_url == "https://example.invalid"
+    assert redacted.download_proxy == REDACTED_SECRET
     assert config.external_openai_api_key == "sk-super-secret"
     assert config.remote_api_tokens is not None
     assert config.remote_api_tokens[0].token == "bearer-secret"
+    assert config.download_proxy == "http://proxy-user:proxy-secret@proxy.example:3128"
 
 
 def test_runtime_config_response_has_no_secrets(

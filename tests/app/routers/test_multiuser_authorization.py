@@ -1259,6 +1259,10 @@ class TestSessionQueueAuth:
         r = client.get("/api/v1/queue/default/item_ids")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_get_queue_item_summaries_by_ids_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/queue/default/item_summaries_by_ids", json={"item_ids": [1]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
     def test_get_current_queue_item_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/queue/default/current")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
@@ -1911,6 +1915,10 @@ class TestWebSocketAuth:
         # at request time. Patch it to point at the mock invoker.
         mock_deps = MockApiDependencies(mock_invoker)
         monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", mock_deps)
+        # Connect resolves the user record through `resolve_authorized_user`, which binds
+        # ApiDependencies at import time in auth_dependencies — patching the defining
+        # module alone would not reach it.
+        monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
         fastapi_app = FastAPI()
         return SocketIO(fastapi_app)
