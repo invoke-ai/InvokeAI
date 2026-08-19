@@ -33,10 +33,16 @@ import type { JsonObject } from 'type-fest';
 
 const log = logger('events');
 
-/** What a completion event still has outstanding. 'done' rejects any re-delivery;
- * 'gallery-retryable' means every DTO lookup failed, so a re-delivery may redo the gallery work
- * (and only that work — see the handler). */
-type ProcessedInvocationState = 'done' | 'gallery-retryable';
+/**
+ * What a completion event still has outstanding.
+ *
+ * `done` rejects any re-delivery. `retryable` names the outputs whose DTO lookup failed — the ones
+ * that never reached the gallery — so a re-delivery can fetch exactly those again. Tracking the
+ * missing outputs rather than the event as a whole is what makes a partial failure recoverable: an
+ * event-wide flag would either re-run the outputs that did land (double-counting their board totals
+ * and optimistic inserts) or abandon the one that did not.
+ */
+type ProcessedInvocationState = { status: 'done' } | { status: 'retryable'; missingNames: ReadonlySet<string> };
 
 // These nodes are passthrough nodes. They do not add images/videos to the gallery — their
 // outputs reference an existing asset — so we must skip the gallery handling for them.
@@ -68,23 +74,34 @@ export const buildOnInvocationComplete = (
   // the key is the prepared node's per-execution UUID, so keys cannot collide across distinct
   // executions even where item ids restart (in-memory DB); the LRU bounds memory.
   const processedInvocations = new LRUCache<string, ProcessedInvocationState>({ max: 1000 });
+  // Deliveries currently fetching, so a duplicate can wait for one instead of being discarded.
+  // Entries live only for the duration of a pass; the LRU above is what bounds long-term memory.
+  const inFlightDeliveries = new Map<string, Promise<void>>();
 
-  // Returns how many DTOs had gallery work dispatched for them, so the caller can tell "this
-  // delivery changed nothing" apart from "part of it landed" (see the retry decision in the handler
-  // below). Paths that bail out before the first dispatch — including an intermediate output, which
-  // never reaches the gallery — count as nothing dispatched.
+  // `retryNames`, when set, restricts this pass to the outputs a previous delivery lost to a failed
+  // lookup — everything else already landed and must not be dispatched twice.
   const addImagesToGallery = async (
     data: S['InvocationCompleteEvent'],
-    onLookupFailure: () => void
-  ): Promise<number> => {
+    onLookupFailure: (imageName: string) => void,
+    retryNames: ReadonlySet<string> | null
+  ) => {
+    // A retry exists to land an output the gallery lost, not to re-run the handoff around it. By
+    // the time a re-delivery arrives the user has had time to select something else, and pulling
+    // the selection back would be a worse failure than the one being repaired.
+    const isRetry = retryNames !== null;
     if (nodeTypeDenylist.includes(data.invocation.type)) {
       log.trace(`Skipping denylisted node type (${data.invocation.type})`);
-      return 0;
+      return;
     }
 
-    const imageDTOs = await getResultImageDTOs(data, onLookupFailure);
+    const fetchedImageDTOs = await getResultImageDTOs(data, onLookupFailure, retryNames);
+    // Intermediates never reach the gallery. Dropping them here rather than bailing out of the
+    // whole pass on the first one (which is what this used to do) matters now that a delivery's
+    // outputs are tracked individually: a sibling abandoned that way is in nobody's missing set,
+    // so no re-delivery could ever recover it. Mirrors addVideosToGallery.
+    const imageDTOs = fetchedImageDTOs.filter((imageDTO) => !imageDTO.is_intermediate);
     if (imageDTOs.length === 0) {
-      return 0;
+      return;
     }
 
     // For efficiency's sake, we want to minimize the number of dispatches and invalidations we do.
@@ -93,10 +110,6 @@ export const buildOnInvocationComplete = (
     const getImageNamesArg = selectGetImageNamesQueryArgs(getState());
 
     for (const imageDTO of imageDTOs) {
-      if (imageDTO.is_intermediate) {
-        return 0;
-      }
-
       const board_id = imageDTO.board_id ?? 'none';
       // update the total images for the board
       boardTotalAdditions[board_id] = (boardTotalAdditions[board_id] || 0) + 1;
@@ -205,15 +218,15 @@ export const buildOnInvocationComplete = (
 
     const autoSwitch = selectAutoSwitch(getState());
 
-    if (!autoSwitch) {
-      return imageDTOs.length;
+    if (!autoSwitch || isRetry) {
+      return;
     }
 
     // Finally, we may need to autoswitch to the new image. We'll only do it for the last image in the list.
     const lastImageDTO = imageDTOs.at(-1);
 
     if (!lastImageDTO) {
-      return imageDTOs.length;
+      return;
     }
 
     const { image_name } = lastImageDTO;
@@ -249,36 +262,44 @@ export const buildOnInvocationComplete = (
       // Select the image immediately since we've optimistically updated the cache
       dispatch(imageSelected(lastImageDTO.image_name));
     }
-
-    return imageDTOs.length;
   };
 
   // getImageDTOSafe swallows fetch errors and returns null, which downstream is indistinguishable
-  // from "this node produced no image". onLookupFailure separates the two: the handler drops this
-  // event's dedupe key when it fires, so a re-delivery redoes the gallery work instead of being
-  // turned away as a duplicate of a delivery whose output never reached the gallery.
+  // from "this node produced no image". onLookupFailure separates the two, naming the output that
+  // was lost so a re-delivery can fetch just that one again.
   const getResultImageDTOs = async (
     data: S['InvocationCompleteEvent'],
-    onLookupFailure: () => void
+    onLookupFailure: (imageName: string) => void,
+    retryNames: ReadonlySet<string> | null
   ): Promise<ImageDTO[]> => {
     const { result } = data;
     const imageDTOs: ImageDTO[] = [];
+    const fetched = new Set<string>();
+    const fetch = async (imageName: string) => {
+      if (retryNames !== null && !retryNames.has(imageName)) {
+        return;
+      }
+      // A result can name the same image twice (an image collection concatenates its inputs
+      // without deduping). It is still one image: fetching it once keeps its board total counted
+      // once, and keeps the retry set — which is keyed by name — from re-admitting an occurrence
+      // that already landed.
+      if (fetched.has(imageName)) {
+        return;
+      }
+      fetched.add(imageName);
+      const imageDTO = await getImageDTOSafe(imageName);
+      if (imageDTO) {
+        imageDTOs.push(imageDTO);
+      } else {
+        onLookupFailure(imageName);
+      }
+    };
     for (const [_name, value] of objectEntries(result)) {
       if (isImageField(value)) {
-        const imageDTO = await getImageDTOSafe(value.image_name);
-        if (imageDTO) {
-          imageDTOs.push(imageDTO);
-        } else {
-          onLookupFailure();
-        }
+        await fetch(value.image_name);
       } else if (isImageFieldCollection(value)) {
         for (const imageField of value) {
-          const imageDTO = await getImageDTOSafe(imageField.image_name);
-          if (imageDTO) {
-            imageDTOs.push(imageDTO);
-          } else {
-            onLookupFailure();
-          }
+          await fetch(imageField.image_name);
         }
       }
     }
@@ -287,17 +308,26 @@ export const buildOnInvocationComplete = (
 
   const getResultVideoDTOs = async (
     data: S['InvocationCompleteEvent'],
-    onLookupFailure: () => void
+    onLookupFailure: (videoName: string) => void,
+    retryNames: ReadonlySet<string> | null
   ): Promise<VideoDTO[]> => {
     const { result } = data;
     const videoDTOs: VideoDTO[] = [];
+    const fetched = new Set<string>();
     for (const [_name, value] of objectEntries(result)) {
       if (isVideoField(value)) {
+        if (retryNames !== null && !retryNames.has(value.video_name)) {
+          continue;
+        }
+        if (fetched.has(value.video_name)) {
+          continue;
+        }
+        fetched.add(value.video_name);
         const videoDTO = await getVideoDTOSafe(value.video_name);
         if (videoDTO) {
           videoDTOs.push(videoDTO);
         } else {
-          onLookupFailure();
+          onLookupFailure(value.video_name);
         }
       }
     }
@@ -315,20 +345,23 @@ export const buildOnInvocationComplete = (
   //      so the stuck "Saving video" spinner goes away on its own.
   const addVideosToGallery = async (
     data: S['InvocationCompleteEvent'],
-    onLookupFailure: () => void
-  ): Promise<number> => {
+    onLookupFailure: (videoName: string) => void,
+    retryNames: ReadonlySet<string> | null
+  ) => {
+    // See addImagesToGallery: a retry does not redo the auto-switch.
+    const isRetry = retryNames !== null;
     if (nodeTypeDenylist.includes(data.invocation.type)) {
-      return 0;
+      return;
     }
 
-    const videoDTOs = await getResultVideoDTOs(data, onLookupFailure);
+    const videoDTOs = await getResultVideoDTOs(data, onLookupFailure, retryNames);
     if (videoDTOs.length === 0) {
-      return 0;
+      return;
     }
 
     const nonIntermediate = videoDTOs.filter((v) => !v.is_intermediate);
     if (nonIntermediate.length === 0) {
-      return 0;
+      return;
     }
 
     // Force the polymorphic gallery list to refetch so the new video shows up. Note: this is
@@ -346,13 +379,13 @@ export const buildOnInvocationComplete = (
     dispatch(galleryApi.util.invalidateTags(getTagsToInvalidateForBoardAffectingMutation(affectedBoards)));
 
     const autoSwitch = selectAutoSwitch(getState());
-    if (!autoSwitch) {
-      return videoDTOs.length;
+    if (!autoSwitch || isRetry) {
+      return;
     }
 
     const lastVideoDTO = nonIntermediate.at(-1);
     if (!lastVideoDTO) {
-      return videoDTOs.length;
+      return;
     }
 
     const { video_name } = lastVideoDTO;
@@ -377,8 +410,6 @@ export const buildOnInvocationComplete = (
       }
       dispatch(imageSelected(video_name));
     }
-
-    return videoDTOs.length;
   };
 
   const clearCanvasWorkflowIntegrationProcessing = (data: S['InvocationCompleteEvent']) => {
@@ -402,32 +433,29 @@ export const buildOnInvocationComplete = (
     }
   };
 
-  return async (data: S['InvocationCompleteEvent']) => {
-    log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
-
-    const invocationKey = `${data.item_id}:${data.invocation.id}`;
-    const processedState = processedInvocations.get(invocationKey);
-    if (processedState === 'done') {
-      log.trace(
-        { data } as JsonObject,
-        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
-      );
-      return;
-    }
-    // A re-delivery of an event whose gallery work was lost to a failed lookup redoes that work and
-    // nothing else. The rest of this handler is not idempotent against a *later* generation: the
-    // canvas processing flag and $lastProgressEvent are global, so re-running them here would end
-    // the spinner and blank the progress of whatever is running now.
-    const isGalleryRetry = processedState === 'gallery-retryable';
-    // Mark before the awaits below — a duplicate arriving while the DTO fetch is in flight must be
-    // rejected too.
-    processedInvocations.set(invocationKey, 'done');
-    let hadLookupFailure = false;
-    const onLookupFailure = () => {
-      hadLookupFailure = true;
+  /**
+   * One pass over a completion event. `retryNames` is null for a first delivery and otherwise names
+   * the outputs an earlier delivery lost, restricting this pass to those.
+   *
+   * Returns the outputs whose lookup failed this time. Bookkeeping is done here, before the
+   * returned promise settles, so a duplicate waiting on it always observes the final state.
+   */
+  const deliver = async (
+    data: S['InvocationCompleteEvent'],
+    invocationKey: string,
+    retryNames: ReadonlySet<string> | null
+  ): Promise<void> => {
+    const isRetry = retryNames !== null;
+    const missingNames = new Set<string>();
+    const onLookupFailure = (itemName: string) => {
+      missingNames.add(itemName);
     };
 
-    if (!isGalleryRetry) {
+    // A retry redoes the lost gallery work and nothing else: the rest of this handler is not
+    // idempotent against a *later* generation, because the canvas processing flag and
+    // $lastProgressEvent are global. Re-running them would end the spinner and blank the progress
+    // of whatever is running by then.
+    if (!isRetry) {
       const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
       const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
         nodeExecutionState,
@@ -450,20 +478,76 @@ export const buildOnInvocationComplete = (
       clearCanvasWorkflowIntegrationProcessing(data);
     }
 
-    // Add images to gallery (canvas workflow integration results go to staging area automatically)
-    const dispatchedImageCount = await addImagesToGallery(data, onLookupFailure);
-    const dispatchedVideoCount = await addVideosToGallery(data, onLookupFailure);
+    try {
+      // Add images to gallery (canvas workflow integration results go to staging area automatically)
+      await addImagesToGallery(data, onLookupFailure, retryNames);
+      await addVideosToGallery(data, onLookupFailure, retryNames);
 
-    if (!isGalleryRetry) {
-      $lastProgressEvent.set(null);
+      if (!isRetry) {
+        $lastProgressEvent.set(null);
+      }
+    } catch (error) {
+      // Both call sites discard this handler's promise, so a throw here would surface as an
+      // unhandled rejection and nothing else. Log it and let the bookkeeping below run: the
+      // outputs whose lookups failed are still worth recording as retryable.
+      log.error({ data, error } as JsonObject, `Error handling invocation complete: ${String(error)}`);
+    } finally {
+      if (missingNames.size > 0) {
+        processedInvocations.set(invocationKey, { status: 'retryable', missingNames });
+      }
+    }
+  };
+
+  return async (data: S['InvocationCompleteEvent']) => {
+    log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
+
+    const invocationKey = `${data.item_id}:${data.invocation.id}`;
+    const logDuplicate = () => {
+      log.trace(
+        { data } as JsonObject,
+        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+      );
+    };
+
+    // A duplicate that lands while the first delivery is still fetching waits for it rather than
+    // being discarded: if that delivery lost outputs to failed lookups, this duplicate is the only
+    // thing that can recover them — nothing re-emits the event on its own. This check must come
+    // before the 'done' one, which the in-flight delivery has already written by now.
+    //
+    // Several duplicates can be waiting here at once. They resume one at a time, and the first to
+    // find work marks the event 'done' again before it suspends, so the rest fall through to the
+    // duplicate branch rather than starting parallel retries.
+    const inFlight = inFlightDeliveries.get(invocationKey);
+    if (inFlight) {
+      await inFlight;
+      if (processedInvocations.get(invocationKey)?.status !== 'retryable') {
+        logDuplicate();
+        return;
+      }
+    } else if (processedInvocations.get(invocationKey)?.status === 'done') {
+      logDuplicate();
+      return;
     }
 
-    // Leave the event open to a retry only when a lookup failed AND this delivery dispatched no
-    // gallery work at all: there is then nothing a re-delivery could double up on. A partial
-    // failure stays 'done' — the DTOs that did resolve had their board totals and optimistic
-    // inserts dispatched, and re-running those would double-count them.
-    if (hadLookupFailure && dispatchedImageCount + dispatchedVideoCount === 0) {
-      processedInvocations.set(invocationKey, 'gallery-retryable');
+    const state = processedInvocations.get(invocationKey);
+    const retryNames = state?.status === 'retryable' ? state.missingNames : null;
+    // Mark before the awaits below so a duplicate cannot start a second pass over the same outputs
+    // while this one is in flight; the handshake above is what lets it retry afterwards instead.
+    processedInvocations.set(invocationKey, { status: 'done' });
+
+    const delivery = deliver(data, invocationKey, retryNames);
+    // Waiters only need to know when the pass finished, not whether it threw.
+    const settled = delivery.then(
+      () => undefined,
+      () => undefined
+    );
+    inFlightDeliveries.set(invocationKey, settled);
+    try {
+      await delivery;
+    } finally {
+      if (inFlightDeliveries.get(invocationKey) === settled) {
+        inFlightDeliveries.delete(invocationKey);
+      }
     }
   };
 };

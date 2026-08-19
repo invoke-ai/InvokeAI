@@ -379,10 +379,10 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     ).toBe(true);
   });
 
-  it('does not retry a partial failure — the fetched DTOs were already dispatched', async () => {
-    // One of two image lookups fails: the successful one's board totals and optimistic insert have
-    // already gone out, so a re-delivery re-running the gallery work would double-count them. The
-    // dedupe key is only dropped when NOTHING was fetched.
+  it('retries only the output whose lookup failed, leaving the ones that landed alone', async () => {
+    // One of two image lookups fails. The successful one's board totals and optimistic insert have
+    // already gone out, so a re-delivery must not touch it — but the lost one is only recoverable
+    // here, since nothing re-emits the event on its own.
     vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
 
     const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
@@ -406,9 +406,79 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     await handler(twoImages);
     expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
 
-    // The re-delivery must be treated as a duplicate — no further lookups.
     await handler(twoImages);
+    // Exactly one more lookup, and it is the one that failed.
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(getImageDTOSafe).mock.calls.at(-1)?.[0]).toBe('first.png');
+
+    // Once everything has landed, the event is closed again.
+    await handler(twoImages);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries a failed lookup inside an image collection', async () => {
+    // Collections are where partial failure is actually plausible: the user sees most of a batch
+    // and silently misses one image, its auto-switch, and its board count.
+    vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const collection = buildImageCompleteEvent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (collection as any).result = {
+      collection: [{ image_name: 'batch-1.png' }, { image_name: 'batch-2.png' }, { image_name: 'batch-3.png' }],
+    };
+
+    await handler(collection);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(3);
+
+    await handler(collection);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(4);
+    expect(vi.mocked(getImageDTOSafe).mock.calls.at(-1)?.[0]).toBe('batch-1.png');
+  });
+
+  it('lets a duplicate that overlapped a lost delivery become the retry', async () => {
+    // The duplicate arrives while the first delivery is still fetching, so it cannot be told yet
+    // that the fetch will fail. Rejecting it outright strands the output: there is no third event.
+    let resolveFirstLookup: (value: null) => void = () => {};
+    vi.mocked(getImageDTOSafe).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstLookup = resolve;
+        })
+    );
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const event = buildImageCompleteEvent();
+    const first = handler(event);
+    const duplicate = handler(event);
+
+    // The first delivery's only lookup fails, losing the image.
+    resolveFirstLookup(null);
+    await Promise.all([first, duplicate]);
+
+    // The duplicate picked the work back up rather than being discarded.
     expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(getImageDTOSafe).mock.calls.at(-1)?.[0]).toBe('fresh-image.png');
   });
 
   it('marks the selection it auto-switches to, so the viewer does not reveal it as a user click', async () => {
@@ -455,7 +525,7 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect(autoSwitchedImages.consume('fresh-image.png')).toBe(false);
   });
 
-  it('keeps the dedupe key when only the image half of a mixed result failed', async () => {
+  it('retries only the image half of a mixed result, not the video that landed', async () => {
     // The video lookup succeeded, so its board invalidation and auto-switch already went out; a
     // re-delivery re-running them would invalidate twice and move the selection a second time.
     vi.mocked(selectAutoSwitch).mockReturnValue(true);
@@ -495,11 +565,12 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
 
     await handler(mixed);
     expect(getVideoDTOSafe).toHaveBeenCalledTimes(1);
-
-    // The re-delivery must be turned away: the video work already landed.
-    await handler(mixed);
-    expect(getVideoDTOSafe).toHaveBeenCalledTimes(1);
     expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+
+    // The re-delivery refetches the lost image and leaves the video alone.
+    await handler(mixed);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+    expect(getVideoDTOSafe).toHaveBeenCalledTimes(1);
   });
 
   it('redoes only the gallery work on a retry, not the global side effects', async () => {
@@ -540,9 +611,9 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect($lastProgressEvent.set).toHaveBeenCalledTimes(1);
   });
 
-  it('does not offer a retry to a delivery whose only output was intermediate', async () => {
-    // An intermediate image never reaches the gallery, so a lookup failure alongside it leaves
-    // nothing dispatched — and the retry that could recover the lost image must be allowed.
+  it('retries the lost output alongside an intermediate one, without redoing the intermediate', async () => {
+    // An intermediate image never reaches the gallery, so there is nothing to redo for it — but the
+    // lookup that failed beside it must still be recoverable.
     vi.mocked(getImageDTOSafe)
       .mockResolvedValueOnce(null)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -569,8 +640,42 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     await handler(twoImages);
     expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
 
+    // Only the lost output is refetched — the intermediate one never had gallery work to redo.
     await handler(twoImages);
-    expect(getImageDTOSafe).toHaveBeenCalledTimes(4);
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(3);
+    expect(vi.mocked(getImageDTOSafe).mock.calls.at(-1)?.[0]).toBe('lost.png');
+  });
+
+  it('serializes several duplicates waiting on one lost delivery into a single retry', async () => {
+    // All three duplicates are parked on the same in-flight delivery. When it fails they all wake
+    // up; only one may pick the work back up, or the retried output lands two or three times over.
+    let resolveFirstLookup: (value: null) => void = () => {};
+    vi.mocked(getImageDTOSafe).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirstLookup = resolve;
+        })
+    );
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const event = buildImageCompleteEvent();
+    const deliveries = [handler(event), handler(event), handler(event), handler(event)];
+
+    resolveFirstLookup(null);
+    await Promise.all(deliveries);
+
+    // One failed lookup plus exactly one retry.
+    expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
   });
 
   it('still processes distinct invocations of the same queue item', async () => {

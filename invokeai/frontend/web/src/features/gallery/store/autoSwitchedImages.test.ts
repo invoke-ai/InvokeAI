@@ -66,4 +66,14 @@ describe('createAutoSwitchedSelectionMarker', () => {
     marker.settle('a.png');
     expect(marker.consume('a.png')).toBe(false);
   });
+
+  it('does not clear a pending marker when a different item is consumed', () => {
+    // The rendered item can lag a just-auto-switched selection: the viewer consumes for whatever
+    // is still on screen, and that must not spend the marker the incoming item is owed.
+    const marker = createAutoSwitchedSelectionMarker();
+    marker.record('a.png');
+    marker.settle('a.png');
+    expect(marker.consume('b.png')).toBe(false);
+    expect(marker.consume('a.png'), 'the marker survives an unrelated consume').toBe(true);
+  });
 });

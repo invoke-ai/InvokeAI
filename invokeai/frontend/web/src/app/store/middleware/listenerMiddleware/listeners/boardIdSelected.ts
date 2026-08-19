@@ -6,10 +6,21 @@ import { galleryApi } from 'services/api/endpoints/gallery';
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
-    matcher: isAnyOf(boardIdSelected, galleryViewChanged),
+    matcher: isAnyOf(boardIdSelected, galleryViewChanged, imageSelected),
     effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {
       // Cancel any in-progress instances of this listener, we don't want to select an item from a previous board
       cancelActiveListeners();
+
+      if (imageSelected.match(action)) {
+        // An explicit selection settles what should be displayed, so a probe still waiting on a
+        // board's items must not overwrite it when it resolves. The gallery's auto-switch dispatches
+        // galleryViewChanged immediately before imageSelected: without this the probe that view
+        // change starts wakes on the selection that follows it, re-selects the first name in a
+        // possibly stale cached list, and undoes the switch — and the viewer then reveals that
+        // wrong image over the live preview, which is the flash the auto-switch marker exists to
+        // prevent. Cancelling above is the whole effect; there is nothing to auto-select here.
+        return;
+      }
 
       if (boardIdSelected.match(action) && action.payload.select) {
         // This action already has a resource selection - skip the below auto-selection logic
