@@ -164,8 +164,21 @@ describe('WorkflowLibraryDialog', () => {
   let root: Root;
   let onOpenChange: (isOpen: boolean) => void;
 
+  /**
+   * Chakra's `SegmentGroup` tracks its indicator rect from an observer that
+   * commits React state a task after the commit that armed it. Under
+   * `StrictMode`'s mount/unmount/remount that lands in the gap *between* two
+   * `act` calls, where React's act queue is null — which is what raised the
+   * "update ... was not wrapped in act(...)" warnings. Awaiting this **inside**
+   * the same `act` scope as the render keeps the queue open across that gap.
+   */
+  const settleFrame = () =>
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
   const renderDialog = async (isOpen = true) => {
-    await act(() => {
+    await act(async () => {
       root.render(
         <StrictMode>
           <ChakraProvider value={system}>
@@ -173,6 +186,7 @@ describe('WorkflowLibraryDialog', () => {
           </ChakraProvider>
         </StrictMode>
       );
+      await settleFrame();
     });
   };
 
@@ -205,7 +219,10 @@ describe('WorkflowLibraryDialog', () => {
     const label = document.querySelector<HTMLInputElement>(`input[value="${value}"]`)?.closest('label');
     expect(label).not.toBeNull();
 
-    await act(() => label?.click());
+    await act(async () => {
+      label?.click();
+      await settleFrame();
+    });
   };
 
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
@@ -227,8 +244,11 @@ describe('WorkflowLibraryDialog', () => {
       Object.defineProperty(viewport, property, { configurable: true, value, writable: true });
     }
 
-    await act(() => {
+    await act(async () => {
       viewport?.dispatchEvent(new Event('scroll'));
+      // The ScrollArea machine reacts to the scroll a task later; see
+      // `settleFrame` for why that has to stay inside this `act` scope.
+      await settleFrame();
     });
   };
 
@@ -415,6 +435,29 @@ describe('WorkflowLibraryDialog', () => {
     expect(cards()).toHaveLength(4);
     expect(document.body.textContent ?? '').toContain('Failed to load more workflows.');
     expect(document.body.textContent ?? '').not.toContain('No workflows match these filters.');
+  });
+
+  it('shows the loading copy on the very first paint, before the store leaves idle', async () => {
+    // The pristine store: `ensureWorkflowLibraryBrowseLoaded` only flips the
+    // status to 'loading' from the open-time effect, so the first paint of a
+    // freshly-booted session renders against 'idle'. That must never read as
+    // "nothing matched".
+    await openWith({
+      entries: [],
+      error: null,
+      filter: { category: 'user', search: '', tag: null },
+      page: 0,
+      pages: 0,
+      status: 'idle',
+      tagCounts: [],
+      total: 0,
+      userTotal: null,
+    });
+
+    const text = document.body.textContent ?? '';
+
+    expect(text).toContain('Loading workflows…');
+    expect(text).not.toContain('No workflows match these filters.');
   });
 
   it('shows the empty state only when nothing loaded', async () => {

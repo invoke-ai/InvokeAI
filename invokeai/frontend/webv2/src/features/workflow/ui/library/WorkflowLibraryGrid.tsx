@@ -87,6 +87,10 @@ export const WorkflowLibraryGrid = ({
 
   const visibleEntries = useMemo(() => dedupeByWorkflowId(entries), [entries]);
   const hasEntries = visibleEntries.length > 0;
+  // 'idle' is the store before anything has been asked of it. The dialog's
+  // open-time load flips it to 'loading', but only after this first paint —
+  // so an idle store is a load about to start, never "nothing matched".
+  const isPending = status === 'idle' || status === 'loading';
 
   return (
     <Scrollable flex="1" label={t('workflowLibrary.title')} minH="0" minW="0" viewportRef={viewportRef}>
@@ -105,12 +109,12 @@ export const WorkflowLibraryGrid = ({
             ))}
           </Box>
         ) : null}
-        {!hasEntries && status === 'loading' ? (
+        {!hasEntries && isPending ? (
           <Text color="fg.subtle" fontSize="xs" py="6" textAlign="center">
             {t('workflowLibrary.loading')}
           </Text>
         ) : null}
-        {!hasEntries && status !== 'loading' ? (
+        {!hasEntries && !isPending ? (
           <Text color="fg.subtle" fontSize="xs" py="6" textAlign="center">
             {error ?? t('workflowLibrary.empty')}
           </Text>
