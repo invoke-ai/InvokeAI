@@ -1,0 +1,656 @@
+import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
+
+import { describe, expect, it } from 'vitest';
+
+import type { VideoSettings } from './types';
+
+import {
+  findWanLightningLoraPair,
+  getDefaultVideoSettings,
+  getLightningToggleResult,
+  getVideoComponentSectionPolicy,
+  getVideoDimensions,
+  getVideoModelAvailabilityReasons,
+  getVideoModelPolicy,
+  getVideoModelSelectionResult,
+  getVideoModes,
+  getVideoPromptPolicy,
+  getVideoValidationReasons,
+  isSupportedVideoModel,
+  isValidVideoNumFrames,
+  snapVideoNumFrames,
+  WAN_LIGHTNING_SAMPLING,
+} from './videoPolicies';
+
+const wanModel = (variant: string, format = 'gguf_quantized', key = `wan-${variant}-${format}`): MainModelConfig => ({
+  base: 'wan',
+  format,
+  key,
+  name: `Wan 2.2 ${variant}`,
+  type: 'main',
+  variant,
+});
+
+const h3Model = (format = 'diffusers', key = `h3-${format}`): MainModelConfig => ({
+  base: 'minimax-h3',
+  format,
+  key,
+  name: 'MiniMax H3',
+  type: 'main',
+  variant: 'fl2va',
+});
+
+const lora = (name: string, variant: string | null = 'a14b', key = `lora-${name}`): GenerationModelCatalogItem => ({
+  base: 'wan',
+  key,
+  name,
+  type: 'lora',
+  variant,
+});
+
+const LIGHTNING_T2V_HIGH = lora('Wan 2.2 T2V Lightning High Noise (4-step)');
+const LIGHTNING_T2V_LOW = lora('Wan 2.2 T2V Lightning Low Noise (4-step)');
+const LIGHTNING_I2V_HIGH = lora('Wan 2.2 I2V Lightning High Noise (4-step)');
+const LIGHTNING_I2V_LOW = lora('Wan 2.2 I2V Lightning Low Noise (4-step)');
+
+const FIRST_FRAME = { height: 1080, image_name: 'first.png', width: 1920 };
+const LAST_FRAME = { height: 1080, image_name: 'last.png', width: 1920 };
+const SOURCE_VIDEO = {
+  endFrame: -2,
+  fps: 16,
+  height: 480,
+  numFrames: 81,
+  startFrame: 0,
+  video_name: 'clip.mp4',
+  width: 832,
+};
+
+const settingsFor = (model?: MainModelConfig, overrides: Partial<VideoSettings> = {}): VideoSettings => ({
+  ...getDefaultVideoSettings(model),
+  ...overrides,
+});
+
+describe('isSupportedVideoModel', () => {
+  it('accepts Wan mains in any format', () => {
+    expect(isSupportedVideoModel(wanModel('t2v_a14b', 'gguf_quantized'))).toBe(true);
+    expect(isSupportedVideoModel(wanModel('i2v_a14b', 'diffusers'))).toBe(true);
+    expect(isSupportedVideoModel(wanModel('ti2v_5b', 'checkpoint'))).toBe(true);
+  });
+
+  it('accepts MiniMax H3 mains only in Diffusers format', () => {
+    expect(isSupportedVideoModel(h3Model('diffusers'))).toBe(true);
+    // Single-file H3 checkpoints are transformer overrides, not selectable mains.
+    expect(isSupportedVideoModel(h3Model('checkpoint'))).toBe(false);
+  });
+
+  it('rejects non-video bases and non-main types', () => {
+    expect(isSupportedVideoModel({ base: 'sdxl', format: 'checkpoint', type: 'main' })).toBe(false);
+    expect(isSupportedVideoModel({ base: 'wan', format: 'checkpoint', type: 'lora' })).toBe(false);
+  });
+});
+
+describe('capabilities matrix', () => {
+  it('gates conditioning modes per Wan variant', () => {
+    expect(getVideoModes(wanModel('t2v_a14b'))).toEqual(['txt2vid']);
+    expect(getVideoModes(wanModel('i2v_a14b'))).toEqual(['first-frame', 'first-last', 'extend']);
+    expect(getVideoModes(wanModel('ti2v_5b'))).toEqual(['txt2vid', 'first-frame', 'extend']);
+  });
+
+  it('gives MiniMax H3 every mode including last-frame-only', () => {
+    expect(getVideoModes(h3Model())).toEqual(['txt2vid', 'first-frame', 'last-frame', 'first-last', 'extend']);
+  });
+
+  it('grants unknown Wan variants permissive A14B capabilities', () => {
+    const unknown = wanModel('some_future_variant');
+
+    expect(getVideoModes(unknown)).toContain('txt2vid');
+    expect(getVideoModes(unknown)).toContain('extend');
+  });
+
+  it('shapes the sampling UI per family', () => {
+    const a14b = getVideoModelPolicy(wanModel('i2v_a14b'), settingsFor(wanModel('i2v_a14b')));
+    const ti2v = getVideoModelPolicy(wanModel('ti2v_5b'), settingsFor(wanModel('ti2v_5b')));
+    const h3 = getVideoModelPolicy(h3Model(), settingsFor(h3Model()));
+
+    expect(a14b.ui).toMatchObject({ cfgLowNoiseVisible: true, cfgVisible: true, fpsVisible: true });
+    expect(a14b.ui.lightningAvailable).toBe(true);
+    expect(a14b.frames).toMatchObject({ defaultValue: 81, kind: 'grid', step: 4 });
+
+    expect(ti2v.ui).toMatchObject({ cfgLowNoiseVisible: false, cfgVisible: true, lightningAvailable: false });
+
+    expect(h3.ui).toMatchObject({
+      audioOutput: true,
+      cfgLowNoiseVisible: false,
+      cfgVisible: false,
+      fpsVisible: false,
+      lightningAvailable: false,
+    });
+    expect(h3.frames.kind).toBe('choices');
+    expect(h3.fps).toMatchObject({ defaultValue: 24, editable: false });
+    expect(h3.defaults.steps).toBe(50);
+  });
+});
+
+describe('frame snapping per model', () => {
+  it('snaps to the Wan 4n + 1 grid and the H3 choice list respectively', () => {
+    expect(snapVideoNumFrames(wanModel('t2v_a14b'), 80)).toBe(81);
+    expect(snapVideoNumFrames(h3Model(), 81)).toBe(90);
+    expect(isValidVideoNumFrames(wanModel('t2v_a14b'), 81)).toBe(true);
+    expect(isValidVideoNumFrames(h3Model(), 81)).toBe(false);
+    expect(isValidVideoNumFrames(h3Model(), 124)).toBe(true);
+  });
+});
+
+describe('getVideoDimensions', () => {
+  it('derives from the aspect-ratio preset in text-to-video', () => {
+    const model = wanModel('t2v_a14b');
+
+    expect(getVideoDimensions(model, settingsFor(model, { aspectRatioId: '16:9', targetResolution: '480p' }))).toEqual({
+      height: 480,
+      source: 'aspect-ratio',
+      width: 848,
+    });
+  });
+
+  it('derives from conditioning media once it is set, ignoring the preset ratio', () => {
+    const model = wanModel('i2v_a14b');
+    const settings = settingsFor(model, {
+      aspectRatioId: '1:1',
+      firstFrameImage: FIRST_FRAME,
+      targetResolution: '720p',
+    });
+
+    expect(getVideoDimensions(model, settings)).toEqual({ height: 720, source: 'first-frame', width: 1280 });
+  });
+
+  it('prefers the source video over frame images, and last frame over the preset', () => {
+    const model = h3Model();
+
+    expect(
+      getVideoDimensions(model, settingsFor(model, { lastFrameImage: LAST_FRAME, sourceVideo: SOURCE_VIDEO }))?.source
+    ).toBe('source-video');
+    expect(getVideoDimensions(model, settingsFor(model, { lastFrameImage: LAST_FRAME }))?.source).toBe('last-frame');
+  });
+
+  it('applies the H3 canvas policy including the area cap', () => {
+    const model = h3Model();
+
+    expect(getVideoDimensions(model, settingsFor(model, { aspectRatioId: '16:9' }))).toEqual({
+      height: 768,
+      source: 'aspect-ratio',
+      width: 1344,
+    });
+  });
+
+  it('coerces a stale target resolution from another family before resolving', () => {
+    const model = h3Model();
+    const settings = settingsFor(model, { targetResolution: '480p' });
+
+    expect(getVideoDimensions(model, settings)).toEqual({ height: 768, source: 'aspect-ratio', width: 1344 });
+  });
+
+  it('returns null for media outside the H3 aspect range', () => {
+    const model = h3Model();
+    const settings = settingsFor(model, {
+      firstFrameImage: { height: 100, image_name: 'strip.png', width: 500 },
+    });
+
+    expect(getVideoDimensions(model, settings)).toBeNull();
+  });
+});
+
+describe('getVideoPromptPolicy', () => {
+  const promptSettings = (overrides: Partial<Parameters<typeof getVideoPromptPolicy>[1]> = {}) => ({
+    cfgScale: 5,
+    cfgScaleLowNoise: null,
+    negativePromptEnabled: true,
+    wanLowNoiseModel: null,
+    ...overrides,
+  });
+
+  it('is cfg-gated for Wan', () => {
+    const model = wanModel('t2v_a14b');
+
+    const atCfg5 = getVideoPromptPolicy(model, promptSettings());
+    const atCfg1 = getVideoPromptPolicy(model, promptSettings({ cfgScale: 1 }));
+
+    expect(atCfg5).toMatchObject({ negativeUsedInGraph: true, negativeVisible: true });
+    expect(atCfg1).toMatchObject({ negativeUsedInGraph: false, negativeVisible: true });
+    expect(atCfg1.negativeHelpText).toMatch(/CFG/);
+  });
+
+  it('counts low-noise CFG > 1 as CFG in use, matching wan_video_denoise do_cfg', () => {
+    const singleFileMain = wanModel('i2v_a14b', 'gguf_quantized');
+    const lowExpert = wanModel('i2v_a14b', 'checkpoint', 'low-expert');
+    const base = promptSettings({ cfgScale: 1, cfgScaleLowNoise: 4 });
+
+    // Low expert wired → the low-noise half runs CFG and consumes the negative prompt.
+    expect(getVideoPromptPolicy(singleFileMain, { ...base, wanLowNoiseModel: lowExpert }).negativeUsedInGraph).toBe(
+      true
+    );
+    // Diffusers A14B mains bundle transformer_2, so the low half exists without a wired expert.
+    expect(getVideoPromptPolicy(wanModel('i2v_a14b', 'diffusers'), base).negativeUsedInGraph).toBe(true);
+    // No second expert at all → the low CFG value never runs.
+    expect(getVideoPromptPolicy(singleFileMain, base).negativeUsedInGraph).toBe(false);
+    // TI2V-5B has no low-noise half regardless of the stale value.
+    expect(getVideoPromptPolicy(wanModel('ti2v_5b', 'diffusers'), base).negativeUsedInGraph).toBe(false);
+  });
+
+  it('never shows a negative prompt for MiniMax H3', () => {
+    expect(getVideoPromptPolicy(h3Model(), promptSettings())).toMatchObject({
+      negativeUsedInGraph: false,
+      negativeVisible: false,
+    });
+  });
+});
+
+describe('Lightning', () => {
+  const model = wanModel('t2v_a14b');
+  const catalog = [LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW, LIGHTNING_I2V_HIGH, LIGHTNING_I2V_LOW, lora('Style LoRA')];
+
+  it('finds the installed pair, preferring the main model’s family', () => {
+    expect(findWanLightningLoraPair(catalog, 't2v_a14b')).toMatchObject({
+      high: { key: LIGHTNING_T2V_HIGH.key },
+      low: { key: LIGHTNING_T2V_LOW.key },
+    });
+    expect(findWanLightningLoraPair(catalog, 'i2v_a14b')).toMatchObject({
+      high: { key: LIGHTNING_I2V_HIGH.key },
+      low: { key: LIGHTNING_I2V_LOW.key },
+    });
+  });
+
+  it('falls back across families and rejects incomplete pairs', () => {
+    expect(findWanLightningLoraPair([LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW], 'i2v_a14b')).not.toBeNull();
+    expect(findWanLightningLoraPair([LIGHTNING_T2V_HIGH], 't2v_a14b')).toBeNull();
+    // 5B mains never match the A14B Lightning LoRAs.
+    expect(findWanLightningLoraPair(catalog, 'ti2v_5b')).toBeNull();
+  });
+
+  it('matches high/low only as delimited tokens, not inside ordinary words', () => {
+    // "Slow" must not read as a low-noise expert; the pair is incomplete.
+    expect(findWanLightningLoraPair([LIGHTNING_T2V_HIGH, lora('Wan Slow Motion Lightning')], 't2v_a14b')).toBeNull();
+    expect(findWanLightningLoraPair([lora('Thigh-Focus Lightning'), LIGHTNING_T2V_LOW], 't2v_a14b')).toBeNull();
+    // Underscore-delimited release filenames still match.
+    expect(
+      findWanLightningLoraPair(
+        [lora('Wan2.2-Lightning_high_noise_model'), lora('Wan2.2-Lightning_low_noise_model')],
+        't2v_a14b'
+      )
+    ).not.toBeNull();
+  });
+
+  it("does not let 'i2v' score inside 'TI2V' when preferring a family", () => {
+    // A mistagged (variant-less) TI2V-named pair listed first must not outrank
+    // the true I2V pair for an I2V main.
+    const ti2vHigh = lora('Wan Lightning TI2V-5B High Noise', null);
+    const ti2vLow = lora('Wan Lightning TI2V-5B Low Noise', null);
+
+    expect(
+      findWanLightningLoraPair([ti2vHigh, ti2vLow, LIGHTNING_I2V_HIGH, LIGHTNING_I2V_LOW], 'i2v_a14b')
+    ).toMatchObject({
+      high: { key: LIGHTNING_I2V_HIGH.key },
+      low: { key: LIGHTNING_I2V_LOW.key },
+    });
+  });
+
+  it('toggling on patches sampling and adds the pair to the visible LoRA list', () => {
+    const base = settingsFor(model, {
+      cfgScale: 5,
+      cfgScaleLowNoise: 4,
+      lightningEnabled: false,
+      loras: [],
+      steps: 40,
+    });
+    const result = getLightningToggleResult(base, model, catalog, true);
+
+    expect(result.missingLoras).toBe(false);
+    expect(result.settings).toMatchObject({ ...WAN_LIGHTNING_SAMPLING, lightningEnabled: true });
+    expect(result.settings.loras.map((entry) => entry.model.key)).toEqual([
+      LIGHTNING_T2V_HIGH.key,
+      LIGHTNING_T2V_LOW.key,
+    ]);
+  });
+
+  it('toggling off removes only the Lightning LoRAs and restores model defaults', () => {
+    const on = getLightningToggleResult(settingsFor(model), model, catalog, true).settings;
+    const withStyle = { ...on, loras: [...on.loras, { isEnabled: true, model: lora('Style LoRA'), weight: 0.5 }] };
+    const off = getLightningToggleResult(withStyle as VideoSettings, model, catalog, false).settings;
+
+    expect(off.lightningEnabled).toBe(false);
+    expect(off).toMatchObject({ cfgScale: 5, cfgScaleLowNoise: 4, steps: 40 });
+    expect(off.loras.map((entry) => entry.model.name)).toEqual(['Style LoRA']);
+  });
+
+  it('reports a missing pair instead of enabling silently', () => {
+    const result = getLightningToggleResult(settingsFor(model), model, [], true);
+
+    expect(result.missingLoras).toBe(true);
+    expect(result.settings.lightningEnabled).toBe(false);
+  });
+
+  it('clears a stale enabled flag when the pair has vanished from the catalog', () => {
+    const stale = settingsFor(model, { lightningEnabled: true, steps: 4 });
+    const result = getLightningToggleResult(stale, model, [], true);
+
+    expect(result.missingLoras).toBe(true);
+    expect(result.settings.lightningEnabled).toBe(false);
+  });
+
+  it('defaults Lightning on for A14B when the pair is installed, off otherwise', () => {
+    const withPair = getDefaultVideoSettings(model, catalog);
+    const withoutPair = getDefaultVideoSettings(model, []);
+    const h3Defaults = getDefaultVideoSettings(h3Model(), catalog);
+
+    expect(withPair.lightningEnabled).toBe(true);
+    expect(withPair.steps).toBe(WAN_LIGHTNING_SAMPLING.steps);
+    expect(withoutPair).toMatchObject({ cfgScale: 5, lightningEnabled: false, steps: 40 });
+    expect(h3Defaults).toMatchObject({ fps: 24, lightningEnabled: false, numFrames: 124, steps: 50 });
+  });
+});
+
+describe('component section policy', () => {
+  it('requires VAE and Wan T5 for split Wan models without a component source', () => {
+    const model = wanModel('i2v_a14b', 'gguf_quantized');
+    const settings = settingsFor(model);
+    const policy = getVideoComponentSectionPolicy(model, settings);
+
+    expect(policy.defaultOpen).toBe(true);
+    expect(policy.slots.map((slot) => slot.key)).toEqual([
+      'componentSourceModel',
+      'vae',
+      'wanT5EncoderModel',
+      'wanLowNoiseModel',
+    ]);
+
+    const reasons = getVideoValidationReasons(model, { ...settings, firstFrameImage: FIRST_FRAME });
+
+    expect(reasons).toContain('Video needs a VAE for Wan models.');
+    expect(reasons).toContain('Video needs a Wan T5 Encoder for Wan models.');
+  });
+
+  it('is satisfied by a Diffusers component source or a Diffusers main', () => {
+    const gguf = wanModel('i2v_a14b', 'gguf_quantized');
+    const withSource = settingsFor(gguf, {
+      componentSourceModel: wanModel('i2v_a14b', 'diffusers'),
+      firstFrameImage: FIRST_FRAME,
+    });
+
+    expect(getVideoValidationReasons(gguf, withSource)).toEqual([]);
+
+    const diffusers = wanModel('i2v_a14b', 'diffusers');
+
+    expect(getVideoValidationReasons(diffusers, settingsFor(diffusers, { firstFrameImage: FIRST_FRAME }))).toEqual([]);
+  });
+
+  it('hides the low-noise expert slot for TI2V-5B and for Diffusers mains', () => {
+    const ti2v = wanModel('ti2v_5b', 'checkpoint');
+
+    expect(getVideoComponentSectionPolicy(ti2v, settingsFor(ti2v)).slots.map((slot) => slot.key)).not.toContain(
+      'wanLowNoiseModel'
+    );
+
+    // A Diffusers A14B main bundles transformer_2; the loader ignores the input.
+    const diffusers = wanModel('i2v_a14b', 'diffusers');
+
+    expect(
+      getVideoComponentSectionPolicy(diffusers, settingsFor(diffusers)).slots.map((slot) => slot.key)
+    ).not.toContain('wanLowNoiseModel');
+  });
+
+  it('constrains the low-noise expert to a different single-file model of the same variant', () => {
+    const model = wanModel('i2v_a14b', 'gguf_quantized');
+    const settings = settingsFor(model);
+    const slot = getVideoComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'wanLowNoiseModel');
+    const ctx = { model, selectedComponents: settings, settings };
+
+    expect(slot?.filter?.(wanModel('i2v_a14b', 'checkpoint', 'low'), ctx)).toBe(true);
+    // Same model as the main is rejected (loader raises on identical keys).
+    expect(slot?.filter?.(model, ctx)).toBe(false);
+    // Diffusers-format experts are rejected (loader requires single-file).
+    expect(slot?.filter?.(wanModel('i2v_a14b', 'diffusers'), ctx)).toBe(false);
+    // Cross-variant experts are rejected (loader requires exact variant equality).
+    expect(slot?.filter?.(wanModel('t2v_a14b', 'checkpoint'), ctx)).toBe(false);
+    // Unknown variants stay allowed — the backend probe is the authority.
+    expect(slot?.filter?.({ ...wanModel('i2v_a14b', 'checkpoint', 'untagged'), variant: null }, ctx)).toBe(true);
+  });
+
+  it('matches the standalone VAE to the main variant by latent channels', () => {
+    const a14b = wanModel('i2v_a14b', 'gguf_quantized');
+    const ti2v = wanModel('ti2v_5b', 'checkpoint');
+    const vae16 = { base: 'wan', key: 'vae16', latent_channels: 16, name: 'Wan 2.1 VAE', type: 'vae' };
+    const vae48 = { base: 'wan', key: 'vae48', latent_channels: 48, name: 'Wan 2.2 VAE', type: 'vae' };
+    const vaeUnknown = { base: 'wan', key: 'vae?', name: 'Mystery Wan VAE', type: 'vae' };
+
+    const slotFor = (model: MainModelConfig) => {
+      const settings = settingsFor(model);
+
+      return {
+        ctx: { model, selectedComponents: settings, settings },
+        slot: getVideoComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'vae'),
+      };
+    };
+
+    const forA14b = slotFor(a14b);
+    const forTi2v = slotFor(ti2v);
+
+    expect(forA14b.slot?.filter?.(vae16, forA14b.ctx)).toBe(true);
+    expect(forA14b.slot?.filter?.(vae48, forA14b.ctx)).toBe(false);
+    expect(forTi2v.slot?.filter?.(vae48, forTi2v.ctx)).toBe(true);
+    expect(forTi2v.slot?.filter?.(vae16, forTi2v.ctx)).toBe(false);
+    // Configs without the field (open union) stay allowed on both.
+    expect(forA14b.slot?.filter?.(vaeUnknown, forA14b.ctx)).toBe(true);
+    expect(forTi2v.slot?.filter?.(vaeUnknown, forTi2v.ctx)).toBe(true);
+  });
+
+  it('a cross-family component source covers the encoder but not the VAE', () => {
+    // TI2V-5B main with an A14B Diffusers source: UMT5 is shared (encoder
+    // satisfied) but the VAE is family-bound, so a VAE is still required.
+    const model = wanModel('ti2v_5b', 'checkpoint');
+    const settings = settingsFor(model, { componentSourceModel: wanModel('i2v_a14b', 'diffusers') });
+    const reasons = getVideoValidationReasons(model, settings);
+
+    expect(reasons).toContain('Video needs a VAE for Wan models.');
+    expect(reasons).not.toContain('Video needs a Wan T5 Encoder for Wan models.');
+  });
+
+  it('offers only optional single-file overrides for MiniMax H3', () => {
+    const model = h3Model();
+    const policy = getVideoComponentSectionPolicy(model, settingsFor(model));
+
+    expect(policy.defaultOpen).toBe(false);
+    expect(policy.slots.map((slot) => slot.key)).toEqual(['h3TransformerModel', 'h3TextEncoderModel']);
+    expect(policy.slots.every((slot) => !slot.required)).toBe(true);
+
+    const transformerSlot = policy.slots[0];
+    const ctx = { model, selectedComponents: settingsFor(model), settings: settingsFor(model) };
+
+    expect(transformerSlot?.filter?.(h3Model('checkpoint'), ctx)).toBe(true);
+    expect(transformerSlot?.filter?.(h3Model('diffusers'), ctx)).toBe(false);
+  });
+});
+
+describe('getVideoModelSelectionResult', () => {
+  it('clears conditioning media the new model cannot consume', () => {
+    const from = settingsFor(wanModel('i2v_a14b'), {
+      firstFrameImage: FIRST_FRAME,
+      lastFrameImage: LAST_FRAME,
+      lightningEnabled: false,
+    });
+    const result = getVideoModelSelectionResult({
+      currentSettings: from,
+      model: wanModel('t2v_a14b'),
+      models: [],
+    });
+
+    expect(result.settings.firstFrameImage).toBeNull();
+    expect(result.settings.lastFrameImage).toBeNull();
+    expect(result.clearedLabels).toContain('First frame');
+    expect(result.clearedLabels).toContain('Last frame');
+  });
+
+  it('keeps a first+last pair on a model with FLF2V, but drops the last frame on TI2V-5B', () => {
+    const from = settingsFor(wanModel('i2v_a14b'), { firstFrameImage: FIRST_FRAME, lastFrameImage: LAST_FRAME });
+
+    const toH3 = getVideoModelSelectionResult({ currentSettings: from, model: h3Model(), models: [] });
+
+    expect(toH3.settings.firstFrameImage).toEqual(FIRST_FRAME);
+    expect(toH3.settings.lastFrameImage).toEqual(LAST_FRAME);
+
+    const to5b = getVideoModelSelectionResult({ currentSettings: from, model: wanModel('ti2v_5b'), models: [] });
+
+    expect(to5b.settings.firstFrameImage).toEqual(FIRST_FRAME);
+    expect(to5b.settings.lastFrameImage).toBeNull();
+  });
+
+  it('drops a destination image for extend when the model lacks the end-frame channel', () => {
+    const from = settingsFor(wanModel('i2v_a14b'), { lastFrameImage: LAST_FRAME, sourceVideo: SOURCE_VIDEO });
+    const to5b = getVideoModelSelectionResult({ currentSettings: from, model: wanModel('ti2v_5b'), models: [] });
+
+    expect(to5b.settings.sourceVideo).toEqual(SOURCE_VIDEO);
+    expect(to5b.settings.lastFrameImage).toBeNull();
+  });
+
+  it('re-fits presets, frames, fps, Lightning, and components when crossing families', () => {
+    const wan = wanModel('t2v_a14b');
+    const catalog = [LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW];
+    const lightningOn = getLightningToggleResult(settingsFor(wan), wan, catalog, true).settings;
+    const from = settingsFor(wan, {
+      ...lightningOn,
+      loras: [...lightningOn.loras, { isEnabled: true, model: lora('Style LoRA') as never, weight: 0.5 }],
+      targetResolution: '480p',
+      vae: { base: 'wan', key: 'wan-vae', name: 'Wan VAE', type: 'vae' },
+      wanT5EncoderModel: { base: 'any', key: 'umt5', name: 'UMT5-XXL', type: 'wan_t5_encoder' },
+    });
+    const result = getVideoModelSelectionResult({ currentSettings: from, model: h3Model(), models: catalog });
+
+    expect(result.settings.targetResolution).toBe('768 highres');
+    expect(result.settings.numFrames).toBe(90); // 81 snapped onto the H3 grid
+    expect(result.settings.fps).toBe(24);
+    expect(result.settings.lightningEnabled).toBe(false);
+    expect(result.settings.steps).toBe(50);
+    expect(result.settings.loras).toEqual([]); // wan LoRAs are incompatible with H3
+    expect(result.settings.vae).toBeNull();
+    expect(result.settings.wanT5EncoderModel).toBeNull();
+    expect(result.clearedLabels).toEqual(
+      expect.arrayContaining(['Target resolution', 'Frames', 'FPS', 'Lightning', 'LoRAs', 'VAE', 'Wan T5 Encoder'])
+    );
+  });
+
+  it('returns no cleared labels when everything carries over', () => {
+    const model = wanModel('i2v_a14b');
+    const from = settingsFor(model, { firstFrameImage: FIRST_FRAME, lightningEnabled: false });
+    const result = getVideoModelSelectionResult({
+      currentSettings: from,
+      model: wanModel('i2v_a14b', 'diffusers'),
+      models: [],
+    });
+
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.settings.modelKey).toBe(wanModel('i2v_a14b', 'diffusers').key);
+  });
+});
+
+describe('getVideoValidationReasons', () => {
+  it('blocks unsupported models', () => {
+    expect(getVideoValidationReasons(h3Model('checkpoint'), settingsFor())).toEqual([
+      'Video needs a supported video model before it can be invoked.',
+    ]);
+  });
+
+  it('reports unsupported modes in plain language', () => {
+    const t2v = wanModel('t2v_a14b', 'diffusers');
+    const i2v = wanModel('i2v_a14b', 'diffusers');
+
+    expect(getVideoValidationReasons(t2v, settingsFor(t2v, { firstFrameImage: FIRST_FRAME }))).toEqual([
+      expect.stringContaining('does not support starting from a first frame'),
+    ]);
+    expect(getVideoValidationReasons(i2v, settingsFor(i2v))).toEqual([
+      expect.stringContaining('does not support text-to-video'),
+    ]);
+  });
+
+  it('rejects a destination image while extending on TI2V-5B', () => {
+    const model = wanModel('ti2v_5b', 'diffusers');
+    const settings = settingsFor(model, { lastFrameImage: LAST_FRAME, sourceVideo: SOURCE_VIDEO });
+
+    expect(getVideoValidationReasons(model, settings)).toEqual([
+      expect.stringContaining('cannot target a destination image'),
+    ]);
+  });
+
+  it('rejects the first-frame + initial-video combination', () => {
+    const model = wanModel('i2v_a14b', 'diffusers');
+    const settings = settingsFor(model, { firstFrameImage: FIRST_FRAME, sourceVideo: SOURCE_VIDEO });
+
+    expect(getVideoValidationReasons(model, settings)).toContainEqual(expect.stringContaining('cannot be combined'));
+  });
+
+  it('validates frames, fps, and steps against the matrix', () => {
+    const wan = wanModel('t2v_a14b', 'diffusers');
+    const h3 = h3Model();
+
+    expect(getVideoValidationReasons(wan, settingsFor(wan, { numFrames: 80 }))).toEqual([
+      expect.stringContaining('4·n + 1'),
+    ]);
+    expect(getVideoValidationReasons(h3, settingsFor(h3, { numFrames: 100 }))).toEqual([
+      expect.stringContaining('17·n + 5'),
+    ]);
+    expect(getVideoValidationReasons(h3, settingsFor(h3, { fps: 16 }))).toEqual([
+      expect.stringContaining('fixed 24 FPS'),
+    ]);
+    expect(getVideoValidationReasons(wan, settingsFor(wan, { fps: 0 }))).toEqual([
+      expect.stringContaining('FPS must be a whole number between'),
+    ]);
+    expect(getVideoValidationReasons(h3, settingsFor(h3, { steps: 1 }))).toEqual([
+      expect.stringContaining('at least 2'),
+    ]);
+  });
+
+  it('rejects fractional fps and steps — the backend fields are integers', () => {
+    const wan = wanModel('t2v_a14b', 'diffusers');
+
+    expect(getVideoValidationReasons(wan, settingsFor(wan, { fps: 12.5 }))).toEqual([
+      expect.stringContaining('whole number'),
+    ]);
+    expect(getVideoValidationReasons(wan, settingsFor(wan, { steps: 4.5 }))).toEqual([
+      expect.stringContaining('whole number'),
+    ]);
+  });
+
+  it('surfaces Wan LoRA family mismatches instead of silently dropping them', () => {
+    const model = wanModel('ti2v_5b', 'diffusers');
+    const settings = settingsFor(model, {
+      loras: [{ isEnabled: true, model: LIGHTNING_T2V_HIGH as never, weight: 1 }],
+    });
+
+    expect(getVideoValidationReasons(model, settings)).toEqual([
+      expect.stringContaining('targets a different Wan model family'),
+    ]);
+  });
+
+  it('accepts a fully valid H3 first-frame setup', () => {
+    const model = h3Model();
+
+    expect(getVideoValidationReasons(model, settingsFor(model, { firstFrameImage: FIRST_FRAME }))).toEqual([]);
+  });
+});
+
+describe('getVideoModelAvailabilityReasons', () => {
+  it('reports uninstalled selections by label', () => {
+    const model = wanModel('i2v_a14b');
+    const settings = settingsFor(model, {
+      loras: [{ isEnabled: true, model: LIGHTNING_T2V_HIGH as never, weight: 1 }],
+      wanT5EncoderModel: { base: 'any', key: 'umt5', name: 'UMT5-XXL', type: 'wan_t5_encoder' },
+    });
+
+    const reasons = getVideoModelAvailabilityReasons(model, settings, []);
+
+    expect(reasons).toContainEqual(expect.stringContaining('is no longer installed'));
+    expect(reasons.some((reason) => reason.includes('UMT5-XXL'))).toBe(true);
+    expect(reasons.some((reason) => reason.includes('Lightning'))).toBe(true);
+
+    const installed = getVideoModelAvailabilityReasons(model, settingsFor(model), [model]);
+
+    expect(installed).toEqual([]);
+  });
+});

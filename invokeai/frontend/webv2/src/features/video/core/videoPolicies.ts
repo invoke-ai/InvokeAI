@@ -1,0 +1,1024 @@
+import type {
+  GenerationModelCatalogItem as ModelConfig,
+  GenerationModelTaxonomyType as ModelTaxonomyType,
+  LoraModelConfig,
+  MainModelConfig,
+} from '@features/generation/contracts';
+
+import {
+  getCompatibleDiffusersComponentSource,
+  isDiffusersMainForBase,
+  isLoraCompatibleWithModel,
+  isLoraModelConfig,
+  isVaeForBases,
+  isWanLoraTargetingMain,
+  SEED_MAX,
+} from '@features/generation/settings';
+
+import type { VideoAspectRatioId, VideoGenerationMode, VideoSettings, VideoTargetResolution } from './types';
+
+import {
+  getVideoAspectRatioParts,
+  MINIMAX_H3_FPS,
+  MINIMAX_H3_NUM_FRAMES_CHOICES,
+  MINIMAX_H3_NUM_FRAMES_DEFAULT,
+  resolveMiniMaxH3Canvas,
+  scaleAndSnapWanDimensions,
+  snapMiniMaxH3NumFrames,
+  snapWanNumFrames,
+  WAN_A14B_PIXEL_MULTIPLE,
+  WAN_FPS_DEFAULT,
+  WAN_FPS_MAX,
+  WAN_FPS_MIN,
+  WAN_NUM_FRAMES_DEFAULT,
+  WAN_NUM_FRAMES_MAX,
+  WAN_NUM_FRAMES_MIN,
+  WAN_NUM_FRAMES_STEP,
+  WAN_TI2V_PIXEL_MULTIPLE,
+  type VideoDimensions,
+} from './dimensions';
+import { isWanLightningLora, resolveVideoMode, VIDEO_ASPECT_RATIO_IDS } from './settings';
+
+// Video capabilities registry keyed by model base AND variant: unlike still-image
+// generation, Wan's variants differ structurally (which conditioning modes exist,
+// the pixel grid, whether a second expert/CFG applies), so base alone is not
+// enough. Display identity stays in @features/models; graph topology will stay
+// explicit in graph.ts.
+
+export type SupportedVideoBase = 'wan' | 'minimax-h3';
+
+export type VideoNegativePromptUsage = 'always' | 'cfg-gated' | 'never';
+
+export interface VideoTargetResolutionOption {
+  id: VideoTargetResolution;
+  label: string;
+}
+
+export interface VideoFramesGridPolicy {
+  kind: 'grid';
+  min: number;
+  max: number;
+  /** Valid counts are `min + k * step` (Wan: 4k + 1, from the VAE's temporal compression). */
+  step: number;
+  defaultValue: number;
+}
+
+export interface VideoFramesChoicesPolicy {
+  kind: 'choices';
+  choices: readonly number[];
+  defaultValue: number;
+}
+
+export type VideoFramesPolicy = VideoFramesGridPolicy | VideoFramesChoicesPolicy;
+
+export interface VideoFpsPolicy {
+  editable: boolean;
+  defaultValue: number;
+  min: number;
+  max: number;
+}
+
+interface VideoVariantConfig {
+  modes: readonly VideoGenerationMode[];
+  pixelMultiple: number;
+  targetResolutions: readonly VideoTargetResolutionOption[];
+  defaults: {
+    targetResolution: VideoTargetResolution;
+    steps: number;
+    cfgScale: number;
+    cfgScaleLowNoise: number | null;
+  };
+  minSteps: number;
+  frames: VideoFramesPolicy;
+  fps: VideoFpsPolicy;
+  cfg: { visible: boolean; lowNoiseVisible: boolean };
+  negativePrompt: { visible: boolean; usage: VideoNegativePromptUsage };
+  lightningAvailable: boolean;
+  audioOutput: boolean;
+}
+
+const WAN_TARGET_RESOLUTION_OPTIONS: readonly VideoTargetResolutionOption[] = [
+  { id: '480p', label: '480p (Wan native)' },
+  { id: '720p', label: '720p (Wan native)' },
+  { id: '1080p', label: '1080p (extrapolated)' },
+];
+
+const MINIMAX_H3_TARGET_RESOLUTION_OPTIONS: readonly VideoTargetResolutionOption[] = [
+  { id: '768 highres', label: '768 highres (H3 native)' },
+  { id: '768 lowres', label: '768 lowres (fast preview)' },
+];
+
+const WAN_FRAMES: VideoFramesGridPolicy = {
+  defaultValue: WAN_NUM_FRAMES_DEFAULT,
+  kind: 'grid',
+  max: WAN_NUM_FRAMES_MAX,
+  min: WAN_NUM_FRAMES_MIN,
+  step: WAN_NUM_FRAMES_STEP,
+};
+
+const WAN_FPS: VideoFpsPolicy = { defaultValue: WAN_FPS_DEFAULT, editable: true, max: WAN_FPS_MAX, min: WAN_FPS_MIN };
+
+// wan_video_denoise defaults: guidance_scale=5.0 (high), guidance_scale_low_noise=4.0.
+const WAN_A14B_COMMON = {
+  cfg: { lowNoiseVisible: true, visible: true },
+  defaults: { cfgScale: 5, cfgScaleLowNoise: 4, steps: 40, targetResolution: '720p' as const },
+  fps: WAN_FPS,
+  frames: WAN_FRAMES,
+  lightningAvailable: true,
+  minSteps: 1,
+  audioOutput: false,
+  negativePrompt: { usage: 'cfg-gated' as const, visible: true },
+  pixelMultiple: WAN_A14B_PIXEL_MULTIPLE,
+  targetResolutions: WAN_TARGET_RESOLUTION_OPTIONS,
+};
+
+const WAN_VARIANTS: Record<string, VideoVariantConfig> = {
+  // The T2V expert pair has no reference-image conditioning channels.
+  t2v_a14b: { ...WAN_A14B_COMMON, modes: ['txt2vid'] },
+  // The I2V expert pair conditions on a reference frame (and optionally an end
+  // frame — FLF2V); it has no text-only mode. Extend is FLF2V machinery fed by
+  // the source video's last frame.
+  i2v_a14b: { ...WAN_A14B_COMMON, modes: ['first-frame', 'first-last', 'extend'] },
+  // TI2V-5B does both text and image conditioning, but its ref encoder has no
+  // end-frame channel, and it is a single expert (no low-noise pair, no
+  // Lightning LoRAs).
+  ti2v_5b: {
+    ...WAN_A14B_COMMON,
+    cfg: { lowNoiseVisible: false, visible: true },
+    defaults: { cfgScale: 5, cfgScaleLowNoise: null, steps: 40, targetResolution: '720p' },
+    lightningAvailable: false,
+    modes: ['txt2vid', 'first-frame', 'extend'],
+    pixelMultiple: WAN_TI2V_PIXEL_MULTIPLE,
+  },
+};
+
+// An unknown Wan variant (new backend release) gets the most permissive A14B
+// capabilities rather than being blocked: the backend probe is the authority.
+const WAN_FALLBACK_VARIANT: VideoVariantConfig = {
+  ...WAN_A14B_COMMON,
+  modes: ['txt2vid', 'first-frame', 'first-last', 'extend'],
+};
+
+// Guidance-distilled: no CFG, no negative prompt, fixed 24 fps, audio included.
+const MINIMAX_H3_FL2VA: VideoVariantConfig = {
+  audioOutput: true,
+  cfg: { lowNoiseVisible: false, visible: false },
+  defaults: { cfgScale: 1, cfgScaleLowNoise: null, steps: 50, targetResolution: '768 highres' },
+  fps: { defaultValue: MINIMAX_H3_FPS, editable: false, max: MINIMAX_H3_FPS, min: MINIMAX_H3_FPS },
+  frames: { choices: MINIMAX_H3_NUM_FRAMES_CHOICES, defaultValue: MINIMAX_H3_NUM_FRAMES_DEFAULT, kind: 'choices' },
+  lightningAvailable: false,
+  minSteps: 2,
+  modes: ['txt2vid', 'first-frame', 'last-frame', 'first-last', 'extend'],
+  negativePrompt: { usage: 'never', visible: false },
+  pixelMultiple: 32,
+  targetResolutions: MINIMAX_H3_TARGET_RESOLUTION_OPTIONS,
+};
+
+export const VIDEO_GENERATION: Record<
+  SupportedVideoBase,
+  { variants: Record<string, VideoVariantConfig>; fallback: VideoVariantConfig }
+> = {
+  'minimax-h3': { fallback: MINIMAX_H3_FL2VA, variants: { fl2va: MINIMAX_H3_FL2VA } },
+  wan: { fallback: WAN_FALLBACK_VARIANT, variants: WAN_VARIANTS },
+};
+
+export const SUPPORTED_VIDEO_BASES = Object.keys(VIDEO_GENERATION) as SupportedVideoBase[];
+
+/**
+ * MiniMax H3 mains must be the Diffusers folder install — the loader sources
+ * five of its six submodels from it; single-file H3 checkpoints are only usable
+ * as the transformer override slot.
+ */
+export const isSupportedVideoModel = <T extends { base: string; type: string; format?: string }>(
+  model: T
+): model is T & MainModelConfig =>
+  model.type === 'main' && (model.base === 'wan' || (model.base === 'minimax-h3' && model.format === 'diffusers'));
+
+export const isVideoModelSelectable = <T extends ModelConfig>(model: T): boolean => isSupportedVideoModel(model);
+
+const getVideoVariantConfig = (
+  model: Pick<MainModelConfig, 'base' | 'type' | 'variant' | 'format'> | undefined
+): VideoVariantConfig | null => {
+  if (!model || !isSupportedVideoModel(model)) {
+    return null;
+  }
+
+  const baseEntry = VIDEO_GENERATION[model.base as SupportedVideoBase];
+  const variant = typeof model.variant === 'string' ? model.variant : '';
+
+  return baseEntry.variants[variant] ?? baseEntry.fallback;
+};
+
+// Fallback keeps UI selectors crash-safe while nothing is selected;
+// isSupportedVideoModel() still blocks invocation.
+const FALLBACK_VARIANT_CONFIG = WAN_FALLBACK_VARIANT;
+
+const getVideoConfig = (
+  model: Pick<MainModelConfig, 'base' | 'type' | 'variant' | 'format'> | undefined
+): VideoVariantConfig => getVideoVariantConfig(model) ?? FALLBACK_VARIANT_CONFIG;
+
+export const getVideoModes = (model: MainModelConfig | undefined): readonly VideoGenerationMode[] =>
+  getVideoConfig(model).modes;
+
+export const isVideoModeSupported = (model: MainModelConfig | undefined, mode: VideoGenerationMode): boolean =>
+  getVideoModes(model).includes(mode);
+
+export const getVideoFramesPolicy = (model: MainModelConfig | undefined): VideoFramesPolicy =>
+  getVideoConfig(model).frames;
+
+export const getVideoFpsPolicy = (model: MainModelConfig | undefined): VideoFpsPolicy => getVideoConfig(model).fps;
+
+export const getVideoTargetResolutionOptions = (
+  model: MainModelConfig | undefined
+): readonly VideoTargetResolutionOption[] => getVideoConfig(model).targetResolutions;
+
+export const getVideoAspectRatioOptions = (_model: MainModelConfig | undefined): readonly VideoAspectRatioId[] =>
+  // Both current families accept every offered ratio (H3's 1:4–4:1 bound is
+  // wider than the preset list); the hook stays per-model for the next family.
+  VIDEO_ASPECT_RATIO_IDS;
+
+const coerceTargetResolution = (
+  config: VideoVariantConfig,
+  targetResolution: VideoTargetResolution
+): VideoTargetResolution =>
+  config.targetResolutions.some((option) => option.id === targetResolution)
+    ? targetResolution
+    : config.defaults.targetResolution;
+
+export const snapVideoNumFrames = (model: MainModelConfig | undefined, numFrames: number): number => {
+  const frames = getVideoConfig(model).frames;
+
+  return frames.kind === 'grid' ? snapWanNumFrames(numFrames) : snapMiniMaxH3NumFrames(numFrames);
+};
+
+export const isValidVideoNumFrames = (model: MainModelConfig | undefined, numFrames: number): boolean => {
+  const frames = getVideoConfig(model).frames;
+
+  if (frames.kind === 'choices') {
+    return frames.choices.includes(numFrames);
+  }
+
+  return (
+    Number.isInteger(numFrames) &&
+    numFrames >= frames.min &&
+    numFrames <= frames.max &&
+    (numFrames - frames.min) % frames.step === 0
+  );
+};
+
+export type VideoDimensionSource = 'aspect-ratio' | 'first-frame' | 'last-frame' | 'source-video';
+
+export interface ResolvedVideoDimensions extends VideoDimensions {
+  source: VideoDimensionSource;
+}
+
+/**
+ * The exact pixel dimensions a graph will run at. Text-to-video derives them
+ * from the aspect-ratio preset; once conditioning media is set, its own ratio
+ * takes over (the panel's Dimensions section locks accordingly) and only the
+ * target-resolution preset still applies. Null when the media's ratio is
+ * outside the model's supported range or the inputs are degenerate — reported
+ * via `getVideoValidationReasons`.
+ */
+export const getVideoDimensions = (
+  model: MainModelConfig | undefined,
+  settings: Pick<
+    VideoSettings,
+    'aspectRatioId' | 'targetResolution' | 'firstFrameImage' | 'lastFrameImage' | 'sourceVideo'
+  >
+): ResolvedVideoDimensions | null => {
+  const config = getVideoConfig(model);
+  const targetResolution = coerceTargetResolution(config, settings.targetResolution);
+
+  const media = settings.sourceVideo
+    ? { ...settings.sourceVideo, source: 'source-video' as const }
+    : settings.firstFrameImage
+      ? { ...settings.firstFrameImage, source: 'first-frame' as const }
+      : settings.lastFrameImage
+        ? { ...settings.lastFrameImage, source: 'last-frame' as const }
+        : null;
+
+  const inputs = media ?? { ...getVideoAspectRatioParts(settings.aspectRatioId), source: 'aspect-ratio' as const };
+
+  const dimensions =
+    model?.base === 'minimax-h3'
+      ? resolveMiniMaxH3Canvas(inputs.width, inputs.height, targetResolution as '768 highres' | '768 lowres')
+      : scaleAndSnapWanDimensions(
+          inputs.width,
+          inputs.height,
+          targetResolution as '480p' | '720p' | '1080p',
+          config.pixelMultiple
+        );
+
+  return dimensions ? { ...dimensions, source: inputs.source } : null;
+};
+
+export const getVideoPromptPolicy = (
+  model: MainModelConfig | undefined,
+  settings: Pick<VideoSettings, 'cfgScale' | 'cfgScaleLowNoise' | 'negativePromptEnabled' | 'wanLowNoiseModel'>
+) => {
+  const config = getVideoConfig(model);
+  // Mirrors wan_video_denoise's do_cfg: negative conditioning is also consumed
+  // when the LOW-noise half runs CFG (> 1) — which needs a second expert, i.e.
+  // a Diffusers dual-expert main or a wired low-noise transformer.
+  const lowNoiseCfgActive =
+    config.cfg.lowNoiseVisible &&
+    (model?.format === 'diffusers' || settings.wanLowNoiseModel !== null) &&
+    settings.cfgScaleLowNoise !== null &&
+    settings.cfgScaleLowNoise > 1;
+  const negativeUsedInGraph =
+    settings.negativePromptEnabled &&
+    (config.negativePrompt.usage === 'always' ||
+      (config.negativePrompt.usage === 'cfg-gated' && (settings.cfgScale > 1 || lowNoiseCfgActive)));
+
+  return {
+    negativeVisible: config.negativePrompt.visible,
+    negativeUsedInGraph,
+    ...(config.negativePrompt.usage === 'cfg-gated'
+      ? { negativeHelpText: 'Used only when CFG is greater than 1.' }
+      : {}),
+  };
+};
+
+export interface VideoModelPolicy {
+  isSupported: boolean;
+  modes: readonly VideoGenerationMode[];
+  pixelMultiple: number;
+  aspectRatioOptions: readonly VideoAspectRatioId[];
+  targetResolutions: readonly VideoTargetResolutionOption[];
+  frames: VideoFramesPolicy;
+  fps: VideoFpsPolicy;
+  defaults: {
+    targetResolution: VideoTargetResolution;
+    steps: number;
+    cfgScale: number;
+    cfgScaleLowNoise: number | null;
+  };
+  prompt: {
+    negativeVisible: boolean;
+    negativeUsedInGraph: boolean;
+    negativeHelpText?: string;
+  };
+  ui: {
+    cfgVisible: boolean;
+    cfgLowNoiseVisible: boolean;
+    fpsVisible: boolean;
+    lightningAvailable: boolean;
+    audioOutput: boolean;
+  };
+}
+
+export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings: VideoSettings): VideoModelPolicy => {
+  const config = getVideoConfig(model);
+
+  return {
+    aspectRatioOptions: getVideoAspectRatioOptions(model),
+    defaults: config.defaults,
+    fps: config.fps,
+    frames: config.frames,
+    isSupported: model ? isSupportedVideoModel(model) : false,
+    modes: config.modes,
+    pixelMultiple: config.pixelMultiple,
+    prompt: getVideoPromptPolicy(model, settings),
+    targetResolutions: config.targetResolutions,
+    ui: {
+      audioOutput: config.audioOutput,
+      cfgLowNoiseVisible: config.cfg.lowNoiseVisible,
+      cfgVisible: config.cfg.visible,
+      fpsVisible: config.fps.editable,
+      lightningAvailable: config.lightningAvailable,
+    },
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Wan Lightning fast path
+
+/** The sampling parameters the Lightning distillation LoRAs are trained for. */
+export const WAN_LIGHTNING_SAMPLING = { cfgScale: 1, cfgScaleLowNoise: 1, steps: 4 } as const;
+
+export interface WanLightningLoraPair {
+  high: LoraModelConfig;
+  low: LoraModelConfig;
+}
+
+// "high"/"low" as standalone words. \b is useless here because release files
+// use underscores ("high_noise_model") where \w breaks no boundary, while a
+// plain word-suffix match swallows "Slow"/"Thigh" — so the token must be
+// delimited by non-alphanumerics (or the string edge) on BOTH sides.
+const HIGH_NOISE_PATTERN = /(?:^|[^a-z0-9])high(?:[^a-z0-9]|$)/i;
+const LOW_NOISE_PATTERN = /(?:^|[^a-z0-9])low(?:[^a-z0-9]|$)/i;
+
+/**
+ * The installed Lightning LoRA pair for a Wan A14B main, if any. When pairs for
+ * more than one family are installed (e.g. T2V and I2V releases), the one
+ * naming the main's family wins; noise assignment comes from the model names.
+ */
+export const findWanLightningLoraPair = (
+  models: readonly ModelConfig[],
+  mainVariant: string | null | undefined
+): WanLightningLoraPair | null => {
+  const candidates = models.filter(
+    (model): model is ModelConfig & LoraModelConfig =>
+      isLoraModelConfig(model) && isWanLightningLora(model) && isWanLoraTargetingMain(model.variant, mainVariant)
+  );
+
+  // Delimited-token match so 'i2v' cannot score inside "TI2V".
+  const familyToken = typeof mainVariant === 'string' ? mainVariant.split('_')[0] : undefined;
+  const familyPattern = familyToken ? new RegExp(`(?:^|[^a-z0-9])${familyToken}(?:[^a-z0-9]|$)`, 'i') : null;
+  const score = (model: LoraModelConfig): number => (familyPattern?.test(model.name) ? 0 : 1);
+  const pick = (pattern: RegExp): LoraModelConfig | null =>
+    candidates.filter((model) => pattern.test(model.name)).sort((a, b) => score(a) - score(b))[0] ?? null;
+
+  const high = pick(HIGH_NOISE_PATTERN);
+  const low = pick(LOW_NOISE_PATTERN);
+
+  return high && low && high.key !== low.key ? { high, low } : null;
+};
+
+export interface LightningToggleResult {
+  settings: VideoSettings;
+  /** True when enabling was requested but no installed Lightning pair was found. */
+  missingLoras: boolean;
+}
+
+/**
+ * Applies the Lightning toggle as a plain settings transition: the LoRA pair
+ * appears in (or leaves) the Concepts list and steps/CFG are patched, so the
+ * graph builder needs no hidden behavior and the user sees exactly what runs.
+ */
+export const getLightningToggleResult = (
+  settings: VideoSettings,
+  model: MainModelConfig,
+  models: readonly ModelConfig[],
+  enabled: boolean
+): LightningToggleResult => {
+  const config = getVideoConfig(model);
+  const withoutLightning = settings.loras.filter((lora) => !isWanLightningLora(lora.model));
+
+  if (!enabled || !config.lightningAvailable) {
+    return {
+      missingLoras: false,
+      settings: {
+        ...settings,
+        cfgScale: config.defaults.cfgScale,
+        cfgScaleLowNoise: config.defaults.cfgScaleLowNoise,
+        lightningEnabled: false,
+        loras: withoutLightning,
+        steps: config.defaults.steps,
+      },
+    };
+  }
+
+  const pair = findWanLightningLoraPair(models, model.variant);
+
+  if (!pair) {
+    // Never leave the flag claiming a fast path that has no LoRAs behind it.
+    return {
+      missingLoras: true,
+      settings: settings.lightningEnabled ? { ...settings, lightningEnabled: false } : settings,
+    };
+  }
+
+  return {
+    missingLoras: false,
+    settings: {
+      ...settings,
+      ...WAN_LIGHTNING_SAMPLING,
+      lightningEnabled: true,
+      loras: [
+        ...withoutLightning,
+        { isEnabled: true, model: pair.high, weight: 1 },
+        { isEnabled: true, model: pair.low, weight: 1 },
+      ],
+    },
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Component slots
+
+export type VideoComponentValueKey =
+  | 'vae'
+  | 'wanT5EncoderModel'
+  | 'wanLowNoiseModel'
+  | 'componentSourceModel'
+  | 'h3TransformerModel'
+  | 'h3TextEncoderModel';
+
+export interface VideoComponentPolicyContext {
+  model: MainModelConfig;
+  settings: VideoSettings;
+  selectedComponents: Pick<VideoSettings, VideoComponentValueKey>;
+}
+
+export interface VideoComponentSlotPolicy {
+  key: VideoComponentValueKey;
+  label: string;
+  modelTypes: readonly ModelTaxonomyType[];
+  valueKind: 'component' | 'vae' | 'main';
+  helpText?: string;
+  filter?: (candidate: ModelConfig, ctx: VideoComponentPolicyContext) => boolean;
+  required?: (ctx: VideoComponentPolicyContext) => boolean;
+  missingMessage?: string;
+}
+
+export interface VideoComponentSectionPolicy {
+  defaultOpen: boolean;
+  slots: readonly VideoComponentSlotPolicy[];
+  validate: (ctx: VideoComponentPolicyContext) => string[];
+}
+
+const VIDEO_COMPONENT_SETTING_LABELS: Record<VideoComponentValueKey, string> = {
+  componentSourceModel: 'Component source',
+  h3TextEncoderModel: 'Text encoder (single file)',
+  h3TransformerModel: 'Transformer (single file)',
+  vae: 'VAE',
+  wanLowNoiseModel: 'Low-noise expert',
+  wanT5EncoderModel: 'Wan T5 Encoder',
+};
+
+const isTi2v5b = (variant: unknown): boolean => variant === 'ti2v_5b';
+
+// A Diffusers Wan main bundles its own VAE and encoder; a GGUF/checkpoint main
+// needs them from standalone models or a Diffusers component source.
+const getWanComponentSource = (ctx: VideoComponentPolicyContext) =>
+  getCompatibleDiffusersComponentSource(ctx.model, ctx.settings.componentSourceModel);
+
+// The UMT5-XXL encoder is shared across Wan families, so any Diffusers source
+// supplies it.
+const isWanEncoderSatisfied = (ctx: VideoComponentPolicyContext): boolean =>
+  ctx.model.format === 'diffusers' || Boolean(getWanComponentSource(ctx));
+
+// The VAE is family-bound (wan_model_loader's source-VAE validation): a source
+// only covers it when its TI2V-5B-ness matches the main's.
+const isWanVaeSatisfied = (ctx: VideoComponentPolicyContext): boolean => {
+  if (ctx.model.format === 'diffusers') {
+    return true;
+  }
+
+  const source = getWanComponentSource(ctx);
+
+  return Boolean(source) && isTi2v5b(source?.variant) === isTi2v5b(ctx.model.variant);
+};
+
+const validateSlots = (slots: readonly VideoComponentSlotPolicy[], ctx: VideoComponentPolicyContext): string[] =>
+  slots.flatMap((slotPolicy) => {
+    if (!slotPolicy.required?.(ctx)) {
+      return [];
+    }
+
+    const value = ctx.selectedComponents[slotPolicy.key];
+    const isValid = value && (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, ctx));
+
+    return isValid ? [] : [slotPolicy.missingMessage ?? `Video needs a ${slotPolicy.label} for this model.`];
+  });
+
+const createComponentPolicy = (
+  defaultOpen: boolean,
+  slots: readonly VideoComponentSlotPolicy[]
+): VideoComponentSectionPolicy => ({
+  defaultOpen,
+  slots,
+  validate: (ctx) => validateSlots(slots, ctx),
+});
+
+const EMPTY_VIDEO_COMPONENT_POLICY = createComponentPolicy(false, []);
+
+// wan_model_loader requires the low-noise expert to be a DIFFERENT single-file
+// model of the SAME variant as the main. Unknown variants stay allowed — the
+// backend probe is the authority.
+const isWanLowNoiseExpertCandidate = (candidate: ModelConfig, ctx: VideoComponentPolicyContext): boolean =>
+  candidate.type === 'main' &&
+  candidate.base === 'wan' &&
+  candidate.format !== 'diffusers' &&
+  candidate.key !== ctx.model.key &&
+  (typeof candidate.variant !== 'string' ||
+    typeof ctx.model.variant !== 'string' ||
+    candidate.variant === ctx.model.variant);
+
+// wan_model_loader validates the standalone VAE's latent channels against the
+// main: TI2V-5B needs the 48-channel Wan 2.2 VAE, A14B the 16-channel Wan 2.1
+// VAE. A config without the field (open union) stays allowed.
+const isWanVaeForMain = (candidate: ModelConfig, ctx: VideoComponentPolicyContext): boolean => {
+  if (!isVaeForBases(['wan'])(candidate)) {
+    return false;
+  }
+
+  const latentChannels = candidate.latent_channels;
+
+  if (typeof latentChannels !== 'number') {
+    return true;
+  }
+
+  return latentChannels === (isTi2v5b(ctx.model.variant) ? 48 : 16);
+};
+
+export const getVideoComponentSectionPolicy = (
+  model: MainModelConfig | undefined,
+  _settings: VideoSettings
+): VideoComponentSectionPolicy => {
+  if (!model || !isSupportedVideoModel(model)) {
+    return EMPTY_VIDEO_COMPONENT_POLICY;
+  }
+
+  if (model.base === 'wan') {
+    const config = getVideoConfig(model);
+    const slots: VideoComponentSlotPolicy[] = [
+      {
+        filter: (candidate) => isDiffusersMainForBase('wan')(candidate),
+        helpText: 'Select a Diffusers Wan model to provide VAE and text-encoder components.',
+        key: 'componentSourceModel',
+        label: 'Component source',
+        modelTypes: ['main'],
+        valueKind: 'main',
+      },
+      {
+        filter: isWanVaeForMain,
+        helpText: 'Required unless a Diffusers component source is available.',
+        key: 'vae',
+        label: 'VAE',
+        missingMessage: 'Video needs a VAE for Wan models.',
+        modelTypes: ['vae'],
+        required: (ctx) => !isWanVaeSatisfied(ctx),
+        valueKind: 'vae',
+      },
+      {
+        filter: (candidate) => candidate.type === 'wan_t5_encoder',
+        helpText: 'Required unless a Diffusers component source is available.',
+        key: 'wanT5EncoderModel',
+        label: 'Wan T5 Encoder',
+        missingMessage: 'Video needs a Wan T5 Encoder for Wan models.',
+        modelTypes: ['wan_t5_encoder'],
+        required: (ctx) => !isWanEncoderSatisfied(ctx),
+        valueKind: 'component',
+      },
+    ];
+
+    // TI2V-5B is a single expert, and a Diffusers A14B main bundles its own
+    // transformer_2 (the loader ignores this input for it) — so the slot is
+    // only offered for single-file A14B mains.
+    if (config.cfg.lowNoiseVisible && model.format !== 'diffusers') {
+      slots.push({
+        filter: isWanLowNoiseExpertCandidate,
+        helpText: 'Optional second A14B expert. Without it the high-noise expert runs the whole schedule.',
+        key: 'wanLowNoiseModel',
+        label: 'Transformer (Low Noise)',
+        modelTypes: ['main'],
+        valueKind: 'main',
+      });
+    }
+
+    return createComponentPolicy(model.format !== 'diffusers', slots);
+  }
+
+  // MiniMax H3: the Diffusers install bundles everything; both slots are
+  // optional single-file overrides (e.g. the int8 repacks).
+  return createComponentPolicy(false, [
+    {
+      filter: (candidate) =>
+        candidate.type === 'main' && candidate.base === 'minimax-h3' && candidate.format === 'checkpoint',
+      helpText: 'Optional single-file transformer (e.g. pruned int8) used in place of the main model’s transformer.',
+      key: 'h3TransformerModel',
+      label: 'Transformer (single file)',
+      modelTypes: ['main'],
+      valueKind: 'main',
+    },
+    {
+      filter: (candidate) => candidate.type === 'qwen3_vl_encoder' && candidate.base === 'minimax-h3',
+      helpText: 'Optional single-file Qwen3-VL encoder used in place of the main model’s text encoder.',
+      key: 'h3TextEncoderModel',
+      label: 'Text encoder (single file)',
+      modelTypes: ['qwen3_vl_encoder'],
+      valueKind: 'component',
+    },
+  ]);
+};
+
+const getVideoComponentPolicyContext = (
+  model: MainModelConfig,
+  settings: VideoSettings
+): VideoComponentPolicyContext => ({
+  model,
+  selectedComponents: {
+    componentSourceModel: settings.componentSourceModel,
+    h3TextEncoderModel: settings.h3TextEncoderModel,
+    h3TransformerModel: settings.h3TransformerModel,
+    vae: settings.vae,
+    wanLowNoiseModel: settings.wanLowNoiseModel,
+    wanT5EncoderModel: settings.wanT5EncoderModel,
+  },
+  settings,
+});
+
+// ---------------------------------------------------------------------------
+// Defaults & model-selection transitions
+
+export const getDefaultVideoSettings = (
+  model?: MainModelConfig,
+  models: readonly ModelConfig[] = []
+): VideoSettings => {
+  const config = getVideoConfig(model);
+
+  const base: VideoSettings = {
+    aspectRatioId: '16:9',
+    batchCount: 1,
+    cfgScale: config.defaults.cfgScale,
+    cfgScaleLowNoise: config.defaults.cfgScaleLowNoise,
+    componentSourceModel: null,
+    firstFrameImage: null,
+    fps: config.fps.defaultValue,
+    h3TextEncoderModel: null,
+    h3TransformerModel: null,
+    lastFrameImage: null,
+    lightningEnabled: false,
+    loras: [],
+    modelKey: model?.key ?? '',
+    negativePrompt: '',
+    negativePromptEnabled: true,
+    negativePromptHeightPx: 56,
+    numFrames: config.frames.defaultValue,
+    positivePrompt: '',
+    positivePromptHeightPx: 96,
+    seed: Math.floor(Math.random() * SEED_MAX),
+    shouldRandomizeSeed: true,
+    sourceVideo: null,
+    steps: config.defaults.steps,
+    targetResolution: config.defaults.targetResolution,
+    vae: null,
+    wanLowNoiseModel: null,
+    wanT5EncoderModel: null,
+  };
+
+  // Lightning defaults ON for Wan A14B when the LoRA pair is installed: the
+  // plain 40-step CFG-5 path is prohibitively slow as an out-of-the-box default.
+  if (model && config.lightningAvailable) {
+    const result = getLightningToggleResult(base, model, models, true);
+
+    if (!result.missingLoras) {
+      return result.settings;
+    }
+  }
+
+  return base;
+};
+
+export const getVideoSettingsWithModelDefaults = (
+  settings: VideoSettings,
+  model: MainModelConfig,
+  models: readonly ModelConfig[] = []
+): VideoSettings => {
+  const modelDefaults = getDefaultVideoSettings(model, models);
+
+  return {
+    ...settings,
+    cfgScale: modelDefaults.cfgScale,
+    cfgScaleLowNoise: modelDefaults.cfgScaleLowNoise,
+    fps: modelDefaults.fps,
+    lightningEnabled: modelDefaults.lightningEnabled,
+    loras: [...settings.loras.filter((lora) => !isWanLightningLora(lora.model)), ...modelDefaults.loras].map((lora) =>
+      isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false }
+    ),
+    modelKey: model.key,
+    numFrames: modelDefaults.numFrames,
+    steps: modelDefaults.steps,
+    targetResolution: modelDefaults.targetResolution,
+  };
+};
+
+export interface VideoModelSelectionResult {
+  settings: VideoSettings;
+  clearedLabels: readonly string[];
+}
+
+const addClearedLabel = (labels: string[], label: string) => {
+  if (!labels.includes(label)) {
+    labels.push(label);
+  }
+};
+
+/**
+ * Canonical transition for every Video model-selection entry point: reconciles
+ * conditioning media against the new model's modes, snaps frames/fps/presets
+ * onto its constraints, and drops incompatible LoRAs and components — reporting
+ * what was cleared so the UI can say so.
+ */
+export const getVideoModelSelectionResult = ({
+  currentSettings,
+  model,
+  models,
+}: {
+  currentSettings: VideoSettings;
+  model: MainModelConfig;
+  models: readonly ModelConfig[];
+}): VideoModelSelectionResult => {
+  const config = getVideoConfig(model);
+  const next: VideoSettings = { ...currentSettings, modelKey: model.key };
+  const clearedLabels: string[] = [];
+  const modes = config.modes;
+
+  if (next.sourceVideo && !modes.includes('extend')) {
+    next.sourceVideo = null;
+    addClearedLabel(clearedLabels, 'Initial video');
+  }
+
+  if (next.firstFrameImage && !modes.includes('first-frame') && !modes.includes('first-last')) {
+    next.firstFrameImage = null;
+    addClearedLabel(clearedLabels, 'First frame');
+  }
+
+  if (next.lastFrameImage) {
+    // The end-frame anchor rides the FLF2V channel whether its partner is a
+    // first frame or a source video; alone it needs a dedicated last-frame mode.
+    const lastFrameSupported =
+      next.firstFrameImage || next.sourceVideo ? modes.includes('first-last') : modes.includes('last-frame');
+
+    if (!lastFrameSupported) {
+      next.lastFrameImage = null;
+      addClearedLabel(clearedLabels, 'Last frame');
+    }
+  }
+
+  if (!config.targetResolutions.some((option) => option.id === next.targetResolution)) {
+    next.targetResolution = config.defaults.targetResolution;
+    addClearedLabel(clearedLabels, 'Target resolution');
+  }
+
+  const snappedFrames = snapVideoNumFrames(model, next.numFrames);
+
+  if (snappedFrames !== next.numFrames) {
+    next.numFrames = snappedFrames;
+    addClearedLabel(clearedLabels, 'Frames');
+  }
+
+  const clampedFps =
+    config.fps.editable && Number.isFinite(next.fps)
+      ? Math.min(config.fps.max, Math.max(config.fps.min, Math.round(next.fps)))
+      : config.fps.defaultValue;
+
+  if (clampedFps !== next.fps) {
+    next.fps = clampedFps;
+    addClearedLabel(clearedLabels, 'FPS');
+  }
+
+  if (next.lightningEnabled && !config.lightningAvailable) {
+    // Lightning wrote steps/CFG, so clearing it restores the new model's own defaults.
+    const result = getLightningToggleResult(next, model, models, false);
+    Object.assign(next, result.settings);
+    addClearedLabel(clearedLabels, 'Lightning');
+  }
+
+  if (next.cfgScaleLowNoise !== null && !config.cfg.lowNoiseVisible) {
+    next.cfgScaleLowNoise = null;
+    addClearedLabel(clearedLabels, 'CFG (Low Noise)');
+  }
+
+  const compatibleLoras = next.loras.filter((lora) => isLoraCompatibleWithModel(lora.model, model));
+
+  if (compatibleLoras.length !== next.loras.length) {
+    next.loras = compatibleLoras;
+    addClearedLabel(clearedLabels, 'LoRAs');
+  }
+
+  const policy = getVideoComponentSectionPolicy(model, next);
+  const slotsByKey = new Map(policy.slots.map((slotPolicy) => [slotPolicy.key, slotPolicy]));
+
+  for (const key of Object.keys(VIDEO_COMPONENT_SETTING_LABELS) as VideoComponentValueKey[]) {
+    const value = next[key];
+
+    if (!value) {
+      continue;
+    }
+
+    const slotPolicy = slotsByKey.get(key);
+    const isCompatible =
+      slotPolicy &&
+      (!slotPolicy.filter || slotPolicy.filter(value as ModelConfig, getVideoComponentPolicyContext(model, next)));
+
+    if (!isCompatible) {
+      next[key] = null;
+      addClearedLabel(clearedLabels, VIDEO_COMPONENT_SETTING_LABELS[key]);
+    }
+  }
+
+  return { clearedLabels, settings: next };
+};
+
+// ---------------------------------------------------------------------------
+// Validation
+
+const VIDEO_MODE_DESCRIPTIONS: Record<VideoGenerationMode, string> = {
+  extend: 'extending a video',
+  'first-frame': 'starting from a first frame',
+  'first-last': 'first-to-last-frame interpolation',
+  'last-frame': 'ending on a last frame',
+  txt2vid: 'text-to-video',
+};
+
+const hasModelKey = (models: readonly ModelConfig[], key: string, type?: string): boolean =>
+  models.some((model) => model.key === key && (!type || model.type === type));
+
+export const getVideoModelAvailabilityReasons = (
+  model: MainModelConfig,
+  settings: VideoSettings,
+  models: readonly ModelConfig[]
+): string[] => {
+  const reasons: string[] = [];
+
+  if (!hasModelKey(models, model.key, model.type)) {
+    reasons.push(`Selected model "${model.name}" is no longer installed.`);
+  }
+
+  for (const key of Object.keys(VIDEO_COMPONENT_SETTING_LABELS) as VideoComponentValueKey[]) {
+    const value = settings[key];
+
+    if (value && !hasModelKey(models, value.key, value.type)) {
+      reasons.push(`${VIDEO_COMPONENT_SETTING_LABELS[key]} "${value.name}" is no longer installed.`);
+    }
+  }
+
+  for (const lora of settings.loras) {
+    if (!hasModelKey(models, lora.model.key, 'lora')) {
+      reasons.push(`LoRA "${lora.model.name}" is no longer installed.`);
+    }
+  }
+
+  return reasons;
+};
+
+export const getVideoValidationReasons = (model: MainModelConfig, settings: VideoSettings): string[] => {
+  if (!isSupportedVideoModel(model)) {
+    return ['Video needs a supported video model before it can be invoked.'];
+  }
+
+  const config = getVideoConfig(model);
+  const reasons: string[] = [];
+  const mode = resolveVideoMode(settings);
+
+  if (settings.firstFrameImage && settings.sourceVideo) {
+    reasons.push('A first frame and an initial video cannot be combined. Clear one of them.');
+  }
+
+  if (!config.modes.includes(mode)) {
+    reasons.push(`${model.name} does not support ${VIDEO_MODE_DESCRIPTIONS[mode]}.`);
+  } else if (mode === 'extend' && settings.lastFrameImage && !config.modes.includes('first-last')) {
+    reasons.push(`${model.name} cannot target a destination image while extending a video.`);
+  }
+
+  if (!isValidVideoNumFrames(model, settings.numFrames)) {
+    reasons.push(
+      config.frames.kind === 'grid'
+        ? `Frame count must be between ${config.frames.min} and ${config.frames.max} in steps of ${config.frames.step} (4·n + 1).`
+        : `Frame count must be one of the ${model.name} grid values (17·n + 5, ${config.frames.choices[0]}–${config.frames.choices[config.frames.choices.length - 1]}).`
+    );
+  }
+
+  // fps and steps are integer fields on the backend nodes; a fractional value
+  // would fail pydantic coercion at enqueue, so reject it here instead.
+  if (!Number.isInteger(settings.fps) || settings.fps < config.fps.min || settings.fps > config.fps.max) {
+    reasons.push(
+      config.fps.editable
+        ? `FPS must be a whole number between ${config.fps.min} and ${config.fps.max}.`
+        : `${model.name} generates at a fixed ${config.fps.defaultValue} FPS.`
+    );
+  }
+
+  if (!Number.isInteger(settings.steps) || settings.steps < config.minSteps) {
+    reasons.push(`Steps must be a whole number of at least ${config.minSteps}.`);
+  }
+
+  if (config.cfg.visible && (!Number.isFinite(settings.cfgScale) || settings.cfgScale < 1)) {
+    reasons.push('CFG must be at least 1.');
+  }
+
+  if (config.cfg.lowNoiseVisible && settings.cfgScaleLowNoise !== null && settings.cfgScaleLowNoise < 0) {
+    reasons.push('CFG (Low Noise) must be at least 0.');
+  }
+
+  if (settings.lightningEnabled && !config.lightningAvailable) {
+    reasons.push('Lightning is only available for Wan A14B models.');
+  }
+
+  if (!getVideoDimensions(model, settings)) {
+    reasons.push(
+      model.base === 'minimax-h3'
+        ? 'MiniMax H3 supports aspect ratios from 1:4 to 4:1. The conditioning media is outside that range.'
+        : 'The conditioning media is too small or degenerate to derive video dimensions from.'
+    );
+  }
+
+  if (model.base === 'wan') {
+    // A14B and 5B Wan LoRAs are not interchangeable — the layer patcher fails
+    // on a tensor-shape mismatch — so say so instead of silently dropping them.
+    for (const lora of settings.loras) {
+      if (lora.isEnabled && !isWanLoraTargetingMain(lora.model.variant, model.variant)) {
+        reasons.push(`${lora.model.name} targets a different Wan model family than ${model.name}.`);
+      }
+    }
+  }
+
+  const componentPolicy = getVideoComponentSectionPolicy(model, settings);
+  reasons.push(...componentPolicy.validate(getVideoComponentPolicyContext(model, settings)));
+
+  return reasons;
+};

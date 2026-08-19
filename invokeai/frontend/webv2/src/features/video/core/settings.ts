@@ -1,0 +1,252 @@
+import type { GenerateLora, ImageWithDims } from '@features/generation/contracts';
+
+import {
+  DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
+  DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
+  isLoraModelConfig,
+  isMainModelConfig,
+  isModelIdentifierConfig,
+  isVaeModelConfig,
+  MAX_NEGATIVE_PROMPT_HEIGHT_PX,
+  MAX_POSITIVE_PROMPT_HEIGHT_PX,
+  MIN_NEGATIVE_PROMPT_HEIGHT_PX,
+  MIN_POSITIVE_PROMPT_HEIGHT_PX,
+  sanitizeBatchCount,
+} from '@features/generation/settings';
+
+import type {
+  MiniMaxH3TargetResolution,
+  VideoAspectRatioId,
+  VideoGenerationMode,
+  VideoSettings,
+  VideoSourceClip,
+  VideoTargetResolution,
+  VideoWidgetValues,
+  WanTargetResolution,
+} from './types';
+
+const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === 'object';
+
+const hasFiniteNumber = (record: Record<string, unknown>, key: string): boolean =>
+  typeof record[key] === 'number' && Number.isFinite(record[key]);
+
+const getClampedNumber = (record: Record<string, unknown>, key: string, min: number, max: number, fallback: number) =>
+  hasFiniteNumber(record, key) ? Math.min(Math.max(record[key] as number, min), max) : fallback;
+
+export const VIDEO_ASPECT_RATIO_IDS: readonly VideoAspectRatioId[] = [
+  '21:9',
+  '16:9',
+  '3:2',
+  '4:3',
+  '1:1',
+  '3:4',
+  '2:3',
+  '9:16',
+  '9:21',
+];
+
+export const isVideoAspectRatioId = (value: unknown): value is VideoAspectRatioId =>
+  typeof value === 'string' && (VIDEO_ASPECT_RATIO_IDS as readonly string[]).includes(value);
+
+export const WAN_TARGET_RESOLUTIONS: readonly WanTargetResolution[] = ['480p', '720p', '1080p'];
+export const MINIMAX_H3_TARGET_RESOLUTIONS: readonly MiniMaxH3TargetResolution[] = ['768 highres', '768 lowres'];
+
+export const isVideoTargetResolution = (value: unknown): value is VideoTargetResolution =>
+  typeof value === 'string' &&
+  ((WAN_TARGET_RESOLUTIONS as readonly string[]).includes(value) ||
+    (MINIMAX_H3_TARGET_RESOLUTIONS as readonly string[]).includes(value));
+
+export const isImageWithDims = (value: unknown): value is ImageWithDims =>
+  isRecord(value) &&
+  typeof value.image_name === 'string' &&
+  hasFiniteNumber(value, 'width') &&
+  hasFiniteNumber(value, 'height');
+
+export const isVideoSourceClip = (value: unknown): value is VideoSourceClip =>
+  isRecord(value) &&
+  typeof value.video_name === 'string' &&
+  hasFiniteNumber(value, 'width') &&
+  hasFiniteNumber(value, 'height') &&
+  hasFiniteNumber(value, 'numFrames') &&
+  hasFiniteNumber(value, 'fps') &&
+  hasFiniteNumber(value, 'startFrame') &&
+  hasFiniteNumber(value, 'endFrame');
+
+const isVideoLora = (value: unknown): value is GenerateLora =>
+  isRecord(value) &&
+  isLoraModelConfig(value.model) &&
+  hasFiniteNumber(value, 'weight') &&
+  typeof value.isEnabled === 'boolean';
+
+/** A Wan Lightning distillation LoRA, identified by name (they carry no dedicated taxonomy). */
+export const isWanLightningLora = (model: { base: string; name: string }): boolean =>
+  model.base === 'wan' && /lightning/i.test(model.name);
+
+const hasLightningLora = (loras: readonly GenerateLora[]): boolean =>
+  loras.some((lora) => isWanLightningLora(lora.model));
+
+/**
+ * Which inputs are filled decides the mode; there is no mode selector. A first
+ * frame and a source video never coexist (normalization and the setters both
+ * enforce it), and a last frame refines whichever mode its partner implies:
+ * with a first frame it becomes FLF2V interpolation, with a source video it is
+ * the destination the extension should land on.
+ */
+export const resolveVideoMode = (
+  settings: Pick<VideoSettings, 'firstFrameImage' | 'lastFrameImage' | 'sourceVideo'>
+): VideoGenerationMode => {
+  if (settings.sourceVideo) {
+    return 'extend';
+  }
+
+  if (settings.firstFrameImage) {
+    return settings.lastFrameImage ? 'first-last' : 'first-frame';
+  }
+
+  return settings.lastFrameImage ? 'last-frame' : 'txt2vid';
+};
+
+/**
+ * The fields of `VideoSettings` that describe how the panel is arranged rather
+ * than what will be generated. Mirrors `GENERATE_UI_STATE_KEYS`.
+ */
+export const VIDEO_UI_STATE_KEYS = {
+  batchCount: true,
+  negativePromptHeightPx: true,
+  positivePromptHeightPx: true,
+} satisfies Partial<Record<keyof VideoSettings, true>>;
+
+/**
+ * Validate stored widget values and fill in fields that older persisted
+ * projects predate. The core fields must be present and well-typed; newer
+ * fields fall back to their defaults so old projects keep their prompts and
+ * frame counts instead of being reset wholesale.
+ */
+export const normalizeVideoSettings = (values: unknown): VideoSettings | null => {
+  if (!isRecord(values)) {
+    return null;
+  }
+
+  const isCoreShapeValid =
+    typeof values.modelKey === 'string' &&
+    typeof values.positivePrompt === 'string' &&
+    typeof values.negativePrompt === 'string' &&
+    typeof values.shouldRandomizeSeed === 'boolean' &&
+    ['numFrames', 'fps', 'steps', 'cfgScale', 'seed'].every((key) => hasFiniteNumber(values, key));
+
+  if (!isCoreShapeValid) {
+    return null;
+  }
+
+  const firstFrameImage = isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
+  // A first frame and a source video are mutually exclusive; if a stale
+  // project somehow holds both, the first frame wins deterministically.
+  const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
+  const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
+
+  return {
+    aspectRatioId: isVideoAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : '16:9',
+    batchCount: sanitizeBatchCount(values.batchCount),
+    cfgScale: values.cfgScale as number,
+    cfgScaleLowNoise: hasFiniteNumber(values, 'cfgScaleLowNoise') ? (values.cfgScaleLowNoise as number) : null,
+    firstFrameImage,
+    fps: values.fps as number,
+    h3TextEncoderModel: isModelIdentifierConfig(values.h3TextEncoderModel) ? values.h3TextEncoderModel : null,
+    h3TransformerModel: isMainModelConfig(values.h3TransformerModel) ? values.h3TransformerModel : null,
+    lastFrameImage: isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
+    // The flag means "the Lightning pair is active": if the LoRAs are gone
+    // (deleted from Concepts, dropped as incompatible), the flag clears with
+    // them rather than claiming a fast path that has nothing behind it.
+    lightningEnabled: values.lightningEnabled === true && hasLightningLora(loras),
+    loras,
+    modelKey: values.modelKey as string,
+    negativePrompt: values.negativePrompt as string,
+    negativePromptEnabled: typeof values.negativePromptEnabled === 'boolean' ? values.negativePromptEnabled : true,
+    negativePromptHeightPx: getClampedNumber(
+      values,
+      'negativePromptHeightPx',
+      MIN_NEGATIVE_PROMPT_HEIGHT_PX,
+      MAX_NEGATIVE_PROMPT_HEIGHT_PX,
+      DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX
+    ),
+    numFrames: values.numFrames as number,
+    positivePrompt: values.positivePrompt as string,
+    positivePromptHeightPx: getClampedNumber(
+      values,
+      'positivePromptHeightPx',
+      MIN_POSITIVE_PROMPT_HEIGHT_PX,
+      MAX_POSITIVE_PROMPT_HEIGHT_PX,
+      DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
+    ),
+    seed: values.seed as number,
+    shouldRandomizeSeed: values.shouldRandomizeSeed as boolean,
+    sourceVideo,
+    steps: values.steps as number,
+    targetResolution: isVideoTargetResolution(values.targetResolution) ? values.targetResolution : '720p',
+    vae: isVaeModelConfig(values.vae) ? values.vae : null,
+    wanLowNoiseModel: isMainModelConfig(values.wanLowNoiseModel) ? values.wanLowNoiseModel : null,
+    wanT5EncoderModel: isModelIdentifierConfig(values.wanT5EncoderModel) ? values.wanT5EncoderModel : null,
+    componentSourceModel: isMainModelConfig(values.componentSourceModel) ? values.componentSourceModel : null,
+  };
+};
+
+export const isVideoSettings = (values: unknown): values is VideoSettings => {
+  const normalized = normalizeVideoSettings(values);
+
+  if (!normalized || !isRecord(values)) {
+    return false;
+  }
+
+  // Strict only over the keys normalize would have to invent.
+  return (
+    isVideoAspectRatioId(values.aspectRatioId) &&
+    isVideoTargetResolution(values.targetResolution) &&
+    typeof values.negativePromptEnabled === 'boolean' &&
+    typeof values.lightningEnabled === 'boolean' &&
+    (values.lightningEnabled === false ||
+      (Array.isArray(values.loras) && hasLightningLora(values.loras.filter(isVideoLora)))) &&
+    hasFiniteNumber(values, 'negativePromptHeightPx') &&
+    hasFiniteNumber(values, 'positivePromptHeightPx') &&
+    (values.cfgScaleLowNoise === null || hasFiniteNumber(values, 'cfgScaleLowNoise')) &&
+    (values.firstFrameImage === null || isImageWithDims(values.firstFrameImage)) &&
+    (values.lastFrameImage === null || isImageWithDims(values.lastFrameImage)) &&
+    (values.sourceVideo === null || isVideoSourceClip(values.sourceVideo)) &&
+    !(values.firstFrameImage !== null && values.sourceVideo !== null) &&
+    Array.isArray(values.loras) &&
+    values.loras.every(isVideoLora) &&
+    (values.vae === null || isVaeModelConfig(values.vae)) &&
+    (values.wanT5EncoderModel === null || isModelIdentifierConfig(values.wanT5EncoderModel)) &&
+    (values.wanLowNoiseModel === null || isMainModelConfig(values.wanLowNoiseModel)) &&
+    (values.componentSourceModel === null || isMainModelConfig(values.componentSourceModel)) &&
+    (values.h3TransformerModel === null || isMainModelConfig(values.h3TransformerModel)) &&
+    (values.h3TextEncoderModel === null || isModelIdentifierConfig(values.h3TextEncoderModel))
+  );
+};
+
+export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues | null => {
+  const settings = normalizeVideoSettings(values);
+
+  if (!settings || !isRecord(values) || !isMainModelConfig(values.model)) {
+    return null;
+  }
+
+  return { ...settings, model: values.model };
+};
+
+export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues =>
+  isVideoSettings(values) && isMainModelConfig((values as unknown as Record<string, unknown>).model);
+
+export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetValues & Record<string, unknown> => ({
+  ...values,
+  componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
+  firstFrameImage: values.firstFrameImage ? { ...values.firstFrameImage } : null,
+  h3TextEncoderModel: values.h3TextEncoderModel ? { ...values.h3TextEncoderModel } : null,
+  h3TransformerModel: values.h3TransformerModel ? { ...values.h3TransformerModel } : null,
+  lastFrameImage: values.lastFrameImage ? { ...values.lastFrameImage } : null,
+  loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
+  model: { ...values.model },
+  sourceVideo: values.sourceVideo ? { ...values.sourceVideo } : null,
+  vae: values.vae ? { ...values.vae } : null,
+  wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
+  wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
+});
