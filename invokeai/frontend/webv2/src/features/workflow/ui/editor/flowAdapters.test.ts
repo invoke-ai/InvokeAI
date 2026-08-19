@@ -31,6 +31,7 @@ const createTemplate = (outputType: FieldType = single('IntegerField')): Invocat
       description: '',
       exclusiveMaximum: null,
       exclusiveMinimum: null,
+      fieldKind: 'input',
       input: 'any',
       maximum: null,
       minimum: null,

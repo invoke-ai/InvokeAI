@@ -98,6 +98,10 @@ class ExtractVideoRangeOutput(BaseInvocationOutput):
     """
 
     video: VideoField = OutputField(description="The trimmed video")
+    # Echoed back so a graph can record what the user actually picked: the `video` output is a
+    # freshly-encoded intermediate, so naming it as a generation's provenance would point at a
+    # clip that never appears in the gallery.
+    source_video: VideoField = OutputField(description="The video the range was taken from", title="Source Video")
     width: int = OutputField(description="The width of the video in pixels")
     height: int = OutputField(description="The height of the video in pixels")
     num_frames: int = OutputField(description="The number of frames in the trimmed video")
@@ -112,7 +116,7 @@ class ExtractVideoRangeOutput(BaseInvocationOutput):
     title="Frame Range from Video",
     tags=["video", "trim", "range", "frames"],
     category="video",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -129,7 +133,9 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     The resolved (positive) ``start_frame`` and ``end_frame`` are also emitted as
     outputs, so chained workflows can re-use the boundary indices — e.g. feeding
-    them into a downstream Frame from Video to extract the same boundary frame.
+    them into a downstream Frame from Video to extract the same boundary frame, and the
+    input video is echoed back on ``source_video`` so a graph can record the clip the user
+    chose rather than the freshly-encoded trim.
     """
 
     video: VideoField = InputField(description="The video to extract a frame range from.")
@@ -262,6 +268,7 @@ class ExtractVideoRangeInvocation(BaseInvocation, WithMetadata, WithBoard):
             base = VideoOutput.build(video_dto)
             return ExtractVideoRangeOutput(
                 video=base.video,
+                source_video=self.video,
                 width=base.width,
                 height=base.height,
                 num_frames=base.num_frames,

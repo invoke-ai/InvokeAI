@@ -27,9 +27,9 @@ import {
   type WorkflowFormElement,
 } from '@features/workflow/contracts';
 import { useInvocationTemplatesSelector, type InvocationTemplatesSnapshot } from '@features/workflow/react';
-import { getWorkflowNodeChromeProps } from '@features/workflow/ui/editor/nodeChrome';
 import { requestNodeSelection, workflowSelectionStore } from '@features/workflow/ui/editor/selectionStore';
 import { FieldDescriptionPopover } from '@features/workflow/ui/fields/FieldDescriptionPopover';
+import { getWorkflowNodeChromeProps } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowHostCommands } from '@features/workflow/ui/WorkflowUiContext';
 import { getFormChildren, getResolvedWorkflowEdges, getWorkflowFieldInvalidReason } from '@features/workflow/utility';

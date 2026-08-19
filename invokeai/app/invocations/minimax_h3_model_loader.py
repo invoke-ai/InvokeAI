@@ -30,6 +30,20 @@ class MiniMaxH3ModelLoaderOutput(BaseInvocationOutput):
     )
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="Video VAE")
     audio_vae: VAEField = OutputField(description=FieldDescriptions.minimax_h3_audio_vae, title="Audio VAE")
+    # The three model identifiers are echoed back out so a graph can record what it ran with.
+    # Their inputs are Input.Direct (a base-filtered picker), so nothing upstream can be read
+    # instead, and a duplicate literal typed into a metadata node would silently go stale.
+    model: ModelIdentifierField = OutputField(description="The MiniMax H3 model that was loaded.", title="Model")
+    transformer_model: Optional[ModelIdentifierField] = OutputField(
+        default=None,
+        description="The single-file transformer override that was used, if any.",
+        title="Transformer (single file)",
+    )
+    text_encoder_model: Optional[ModelIdentifierField] = OutputField(
+        default=None,
+        description="The single-file text encoder override that was used, if any.",
+        title="Text Encoder (single file)",
+    )
 
 
 @invocation(
@@ -37,7 +51,7 @@ class MiniMaxH3ModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - MiniMax H3",
     tags=["model", "minimax", "video"],
     category="model",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
@@ -126,4 +140,7 @@ class MiniMaxH3ModelLoaderInvocation(BaseInvocation):
             text_encoder=MiniMaxH3TextEncoderField(tokenizer=tokenizer, processor=processor, text_encoder=text_encoder),
             vae=VAEField(vae=vae),
             audio_vae=VAEField(vae=audio_vae),
+            model=self.model,
+            transformer_model=self.transformer_model,
+            text_encoder_model=self.text_encoder_model,
         )

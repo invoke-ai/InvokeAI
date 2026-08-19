@@ -1997,6 +1997,34 @@ def test_a_cached_vocabulary_is_reused_instead_of_re_embedded(tmp_path, monkeypa
     assert np.array_equal(cached, matrix)
 
 
+def test_a_failed_cache_write_says_what_went_wrong(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Nothing else reports this failure: the in-memory cache below the handler
+    # is assigned either way, so labelling keeps working and the only symptom
+    # is a slow startup nobody attributes to it. The `.tmp` staging-name bug
+    # survived for exactly that reason — the warning named the cache path but
+    # never the FileNotFoundError that would have identified it outright.
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    recorded: list[tuple[str, object]] = []
+    service._invoker.services.logger = SimpleNamespace(  # type: ignore[union-attr]
+        warning=lambda message, exc_info=False: recorded.append((str(message), exc_info))
+    )
+
+    def _refuse(src: object, dst: object) -> None:
+        raise PermissionError("simulated: another instance holds the cache open")
+
+    monkeypatch.setattr(image_index_default.os, "replace", _refuse)
+
+    service._build_vocab_embeddings()
+
+    assert len(recorded) == 1
+    message, exc_info = recorded[0]
+    assert "Could not write cluster vocabulary cache" in message
+    assert exc_info is True
+    # The run itself is unaffected — which is why the warning has to carry it.
+    assert service._vocab_cache is not None
+
+
 def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:
     # One bad row out of ~11,700 must not discard the whole vocabulary build:
     # that raises past the endpoint's handling as a 500 and, nothing having been

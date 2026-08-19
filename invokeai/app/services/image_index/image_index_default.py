@@ -441,7 +441,16 @@ class ImageIndexService(ImageIndexServiceBase):
                 np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
                 os.replace(staging_path, cache_path)
             except Exception:
-                self._invoker.services.logger.warning(f"Could not write cluster vocabulary cache to {cache_path}")
+                # With the exception, not just the path. The in-memory cache
+                # below is assigned either way, so a write failure costs
+                # nothing until the next restart and is invisible until someone
+                # goes looking at startup times. The `.tmp` bug above survived
+                # because this line said only that something had gone wrong,
+                # never what — the FileNotFoundError it swallowed names the
+                # missing staging file outright.
+                self._invoker.services.logger.warning(
+                    f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
+                )
             self._vocab_cache = (vocabulary, embeddings)
 
     def _get_text_encoder(self) -> tuple[Any, Any, bool]:

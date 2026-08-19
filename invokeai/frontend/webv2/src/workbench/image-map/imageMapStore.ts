@@ -7,8 +7,10 @@ import { createExternalStore } from '@platform/state/externalStore';
 import { getApiErrorMessage } from '@platform/transport/http';
 
 import type { ImageMapPoints } from './api';
+import type { ImageIndexCounts } from './indexProgress';
 
-import { fetchImageMapClusterLabels, fetchImageMapPoints } from './api';
+import { fetchImageMapClusterLabels, fetchImageMapPoints, fetchImageMapStatus } from './api';
+import { hasProgressed } from './indexProgress';
 
 /**
  * Read model for the semantic image map, shared by the widget body and any
@@ -16,20 +18,20 @@ import { fetchImageMapClusterLabels, fetchImageMapPoints } from './api';
  * driven by user action now and by socket events in a later runtime.
  */
 
-export interface ImageIndexCounts {
-  total: number;
-  embedded: number;
-  pending: number;
-  /** Given up on after repeated failures; excluded from `pending`. */
-  failed: number;
-}
-
 export interface ImageMapSnapshot {
   data: ImageMapPoints | null;
   loadState: 'idle' | 'loading' | 'loaded' | 'error';
   error: string | null;
   /** Embedding-index progress; only ever pushed to admins by the backend. */
   indexCounts: ImageIndexCounts | null;
+  /**
+   * When the index last actually moved, so the UI can say how long it has
+   * stood still. Not when the counts were last written: `total` shifts
+   * whenever anyone saves or deletes an image, and a generation running while
+   * the indexer waits for it must not read as the index progressing. Null
+   * whenever there are no counts.
+   */
+  indexUpdatedAt: number | null;
   /** Cluster id -> automatic label; null when unavailable (e.g. no text encoder). */
   clusterLabels: Record<string, string> | null;
   /**
@@ -46,6 +48,7 @@ const EMPTY_IMAGE_MAP_SNAPSHOT: ImageMapSnapshot = {
   data: null,
   error: null,
   indexCounts: null,
+  indexUpdatedAt: null,
   loadState: 'idle',
   renderError: null,
 };
@@ -54,6 +57,10 @@ export const imageMapStore = createExternalStore<ImageMapSnapshot>(EMPTY_IMAGE_M
 
 let inflight: Promise<void> | null = null;
 let rerunRequested = false;
+let statusInflight: Promise<void> | null = null;
+// Bumped by every socket-delivered status report, so a status fetch that
+// started earlier can tell whether one landed while it was in flight.
+let indexEventSequence = 0;
 
 // The projection is per-user server state: a login/logout must drop it before
 // the next account's widgets can observe it.
@@ -64,6 +71,8 @@ registerAccountOwnedResource({
     // Orphan any in-flight labels request so its completion (or failure)
     // cannot touch the next account's labels.
     labelsSequence += 1;
+    statusInflight = null;
+    indexEventSequence += 1;
     imageMapStore.setSnapshot(EMPTY_IMAGE_MAP_SNAPSHOT);
   },
   name: 'image-map',
@@ -221,8 +230,91 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
     });
 };
 
+/**
+ * Fold one status report into the snapshot.
+ *
+ * `measure` marks a socket-delivered report. Only those bump the sequence a
+ * status fetch checks itself against, so a fetch cannot rewind counts an event
+ * delivered while it was in flight.
+ */
+export const recordImageIndexStatus = (
+  counts: ImageIndexCounts,
+  at: number = Date.now(),
+  { measure = true }: { measure?: boolean } = {}
+): void => {
+  if (measure) {
+    indexEventSequence += 1;
+  }
+
+  const { indexCounts: previous, indexUpdatedAt: previousAt } = imageMapStore.getSnapshot();
+  // Only real progress restarts the clock. A re-read that returns the same
+  // work done — which is every re-read while the indexer waits out a
+  // generation, since `total` moves as that generation saves images — would
+  // otherwise hide exactly the stall the note exists to report.
+  const updatedAt = hasProgressed(previous, counts) ? at : (previousAt ?? at);
+
+  imageMapStore.patchSnapshot({ indexCounts: counts, indexUpdatedAt: updatedAt });
+};
+
+/**
+ * Pull the counts from the status endpoint.
+ *
+ * Status events only fire as batches complete, so without this a panel opened
+ * while the worker is parked (it waits out every generation) shows no progress
+ * at all until the queue moves again — and a client that was disconnected when
+ * the run's final `pending === 0` event went out would otherwise show a
+ * finished backfill as still running until the page is reloaded. Called on the
+ * first load, on every socket reconnect, and from the panel's own retry.
+ *
+ * Best-effort: a failure just leaves the socket to fill the counts in.
+ */
+export const refreshImageIndexStatus = (): void => {
+  // One at a time, like the point set above. Every widget mount, every retry
+  // click and every reconnect calls this, and concurrent requests resolve in
+  // no particular order: without the dedup the *oldest* response can land last
+  // and rewind the counts to what the server said before the newer one asked.
+  if (statusInflight) {
+    return;
+  }
+
+  const owner = captureAccountScope();
+  // Events that land while this is in flight are strictly newer than what it
+  // will return, and must not be rewound by it.
+  const sequence = indexEventSequence;
+
+  const request: Promise<void> = fetchImageMapStatus()
+    .then((status) => {
+      // Non-admins get no counts at all — the totals aggregate every user's
+      // images — so `index` is null for them and there is nothing to record.
+      if (status.index === null || !isAccountScopeCurrent(owner) || sequence !== indexEventSequence) {
+        return;
+      }
+
+      recordImageIndexStatus(status.index, Date.now(), { measure: false });
+    })
+    .catch(() => {
+      // Progress detail is optional chrome; the map itself reports its own
+      // load failures.
+    })
+    .finally(() => {
+      // Release only this request's claim: an account switch already cleared
+      // it and may have let a fresh one start.
+      if (statusInflight === request) {
+        statusInflight = null;
+      }
+    });
+
+  statusInflight = request;
+};
+
 export const ensureImageMapLoaded = (): void => {
   if (imageMapStore.getSnapshot().loadState === 'idle') {
     void refreshImageMapPoints();
   }
+
+  // Unguarded, unlike the point set: the counts are one cheap request, and the
+  // widget may well be reopened long after the first load — mid-backfill, with
+  // the worker parked and no event due — which is exactly the case the panel
+  // exists for. The store's own guards stop it rewinding anything newer.
+  refreshImageIndexStatus();
 };

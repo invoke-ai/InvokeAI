@@ -1,0 +1,1268 @@
+{
+  "name": "Extend Video - MiniMax H3",
+  "author": "InvokeAI",
+  "description": "Continue an existing video with MiniMax H3 (FL2VA). Trim the source to the part you want to keep, and the workflow generates a new clip starting from that last frame and cross-fades the two together. The generation parameters, including the source video, are recorded onto the joined result.",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "minimax h3, extend video, video, audio",
+  "notes": "Drop in a video, use the Start Frame and End Frame fields to choose the span you want to keep, and describe what should happen next in the prompt. The frame at End Frame becomes the first frame of the generated continuation, and the two clips are joined with a short cross-fade over that hand-off point. Frames counts here are 0-based and accept negative indices, so End Frame -1 means 'the last frame'.\n\nOnly the newly generated segment is described by the recorded frame count and canvas -- the length of the joined result is the source span plus that segment.\n\nThe generated segment is resampled onto your source clip's canvas before the join. The model renders only onto its own canvas family, so the two clips will rarely match, and Concatenate Videos refuses clips of differing size -- 'Size Mismatch' on that node is set to 'match_first' to reconcile them. Your footage keeps its own resolution, so a continuation generated at a smaller canvas is upscaled and will look softer than the source.\n\nEach InvokeAI install assigns its own internal model IDs, so every model field ships blank -- pick your installed models in the form after loading:\n\n- Model: the MiniMax H3 FL2VA install (diffusers layout). Required.\n- Transformer (single file) / Text Encoder (single file): optional single-file replacements for the install's transformer and Qwen3-VL encoder (e.g. the pruned int8 repacks). Leave blank to use the ones in the main install.\n- LoRA: the MiniMax H3 Turbo step-distillation LoRA.\n\nSteps default to 6, which assumes the Turbo LoRA is loaded. Without a step-distillation LoRA, raise steps to about 50 -- the reference default -- or the result will be badly under-denoised.\n\nMiniMax H3 generates the video and a synchronized stereo soundtrack together; the soundtrack is muxed into the MP4 automatically (AAC, 32 kHz). The frame rate is fixed at 24 fps and frame counts snap to a 17n+5 grid: 124 frames = ~5.2 s, up to 345 frames = 14.4 s. Width and height must be multiples of 32; the native canvas has a 768 px short edge (max 768x1344).\n\nThe model is guidance-distilled: no negative prompt, no CFG.\n\nA keyframe is part of BOTH the text conditioning (vision context) and the VAE frame conditioning -- the denoise node rejects the graph if the two disagree. Each image node here feeds Prompt - MiniMax H3 and Frame Conditioning - MiniMax H3 together, and one MiniMax H3 Ideal Dimensions node feeds the canvas to all three consumers, so the coupling holds automatically. Keep it that way if you edit a copy.\n\nThe Core Metadata node records the prompt, steps, seed, canvas size, frame count, any keyframe images and every model ID onto the saved video, so the gallery's Metadata tab is filled in and the video is findable by searching its prompt text. Each value is read over an edge from the node that actually used it, so nothing recorded can drift from what the form is set to. If you rewire the graph, keep those edges attached.",
+  "exposedFields": [
+    {
+      "nodeId": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "fieldName": "video"
+    },
+    {
+      "nodeId": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "fieldName": "start_frame"
+    },
+    {
+      "nodeId": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "fieldName": "end_frame"
+    },
+    {
+      "nodeId": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "fieldName": "target_resolution"
+    },
+    {
+      "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "transformer_model"
+    },
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "text_encoder_model"
+    },
+    {
+      "nodeId": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "fieldName": "lora"
+    }
+  ],
+  "meta": {
+    "version": "4.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "type": "invocation",
+      "data": {
+        "id": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "Prompt",
+        "notes": "Feeds the text encoder and the metadata record from one place, so the recorded prompt is always the prompt that ran.",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Prompt",
+            "description": "",
+            "value": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": -320
+      }
+    },
+    {
+      "id": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "type": "invocation",
+      "data": {
+        "id": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "transformer_model": {
+            "name": "transformer_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "text_encoder_model": {
+            "name": "text_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 140,
+        "y": 420
+      }
+    },
+    {
+      "id": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "type": "invocation",
+      "data": {
+        "id": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "The Turbo step-distillation LoRA is what makes 6 steps enough. Remove this node and raise the step count to about 50.",
+        "type": "minimax_h3_lora_loader",
+        "inputs": {
+          "lora": {
+            "name": "lora",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "weight": {
+            "name": "weight",
+            "label": "",
+            "description": "",
+            "value": 1
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": 620
+      }
+    },
+    {
+      "id": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+      "type": "invocation",
+      "data": {
+        "id": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "LoRAs (metadata)",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": "",
+            "value": []
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 700
+      }
+    },
+    {
+      "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "type": "invocation",
+      "data": {
+        "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Prompt",
+        "notes": "H3 is guidance-distilled: there is no negative prompt. The prompt and canvas arrive over edges so they always match the denoise node.",
+        "type": "minimax_h3_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Prompt",
+            "description": "",
+            "value": ""
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": -140
+      }
+    },
+    {
+      "id": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "type": "invocation",
+      "data": {
+        "id": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "rand_int",
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "description": "",
+            "value": 2147483647
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 1000,
+        "y": 900
+      }
+    },
+    {
+      "id": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "type": "invocation",
+      "data": {
+        "id": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "Steps",
+        "notes": "6 steps assumes the Turbo LoRA. Without it, about 50.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Steps",
+            "description": "",
+            "value": 6
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": 900
+      }
+    },
+    {
+      "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "type": "invocation",
+      "data": {
+        "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_denoise",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Frames",
+            "description": "",
+            "value": "124"
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 6
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": 0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1420,
+        "y": -60
+      }
+    },
+    {
+      "id": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "type": "invocation",
+      "data": {
+        "id": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+        "version": "2.3.0",
+        "nodePack": "invokeai",
+        "label": "Core Metadata",
+        "notes": "Everything except the generation mode arrives over an edge from the node that used the value, so the record cannot go stale.",
+        "type": "core_metadata",
+        "inputs": {
+          "generation_mode": {
+            "name": "generation_mode",
+            "label": "",
+            "description": "",
+            "value": "minimax_h3_extend_video"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1860,
+        "y": 380
+      }
+    },
+    {
+      "id": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "type": "invocation",
+      "data": {
+        "id": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_latents_to_video",
+        "inputs": {},
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2300,
+        "y": -60
+      }
+    },
+    {
+      "id": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "type": "invocation",
+      "data": {
+        "id": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Trims the source clip to the part you want to keep; the generated continuation starts from the frame at End Frame. The output rate is pinned to 24 fps -- H3 only generates at 24 fps, and the two clips have to share a rate before they can be joined. A source at another rate is retimed here, video and audio together.",
+        "type": "extract_video_range",
+        "inputs": {
+          "video": {
+            "name": "video",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "start_frame": {
+            "name": "start_frame",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "end_frame": {
+            "name": "end_frame",
+            "label": "",
+            "description": "",
+            "value": -1
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24
+          },
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -280,
+        "y": -220
+      }
+    },
+    {
+      "id": "c2b5afb3-d079-4afb-9354-4c1a7aeae73a",
+      "type": "invocation",
+      "data": {
+        "id": "c2b5afb3-d079-4afb-9354-4c1a7aeae73a",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Grabs the last frame of the trimmed clip; it becomes the first frame of the generated continuation.",
+        "type": "video_frame_extract",
+        "inputs": {
+          "frame_index": {
+            "name": "frame_index",
+            "label": "",
+            "description": "",
+            "value": -1
+          },
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 140,
+        "y": -220
+      }
+    },
+    {
+      "id": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "type": "invocation",
+      "data": {
+        "id": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "VAE-encodes the hand-off frame. The same image and canvas must also reach the Prompt node.",
+        "type": "minimax_h3_frame_conditioning",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": 200
+      }
+    },
+    {
+      "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "type": "invocation",
+      "data": {
+        "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Derives the H3 canvas from the source video's aspect ratio.",
+        "type": "minimax_h3_ideal_dimensions",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "target_resolution": {
+            "name": "target_resolution",
+            "label": "",
+            "description": "",
+            "value": "768 highres"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 120,
+        "y": 60
+      }
+    },
+    {
+      "id": "9a94f5c6-8021-47df-9e95-c1bd62046d08",
+      "type": "invocation",
+      "data": {
+        "id": "9a94f5c6-8021-47df-9e95-c1bd62046d08",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "Source Clip",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": "",
+            "value": []
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1860,
+        "y": -320
+      }
+    },
+    {
+      "id": "9aa506d7-9132-48e0-af06-d2ce73157e09",
+      "type": "invocation",
+      "data": {
+        "id": "9aa506d7-9132-48e0-af06-d2ce73157e09",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "Clips to Join",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": "",
+            "value": []
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2300,
+        "y": -320
+      }
+    },
+    {
+      "id": "9ab617e8-a243-49f1-b017-e3df84268f0a",
+      "type": "invocation",
+      "data": {
+        "id": "9ab617e8-a243-49f1-b017-e3df84268f0a",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "float_to_int",
+        "inputs": {
+          "multiple": {
+            "name": "multiple",
+            "label": "",
+            "description": "",
+            "value": 1
+          },
+          "method": {
+            "name": "method",
+            "label": "",
+            "description": "",
+            "value": "Nearest"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 2300,
+        "y": 200
+      }
+    },
+    {
+      "id": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
+      "type": "invocation",
+      "data": {
+        "id": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Joins the trimmed source and the generated continuation, cross-fading over the hand-off frame so the seam is not visible.",
+        "type": "video_concat",
+        "inputs": {
+          "transition": {
+            "name": "transition",
+            "label": "",
+            "description": "",
+            "value": "crossfade"
+          },
+          "transition_frames": {
+            "name": "transition_frames",
+            "label": "",
+            "description": "",
+            "value": 2
+          },
+          "board": {
+            "name": "board",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "size_mismatch": {
+            "name": "size_mismatch",
+            "label": "",
+            "description": "",
+            "value": "match_first"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": 2740,
+        "y": -320
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-9c0f3e11-value-9b2f7d8c-prompt",
+      "source": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "sourceHandle": "value",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-text_encoder-9b2f7d8c-text_encoder",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "text_encoder",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "text_encoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-9b2f7d8c-conditioning-9d3b9faf-positive_conditioning",
+      "source": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "sourceHandle": "conditioning",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "positive_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-transformer-9f10ad7a-transformer",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "transformer",
+      "target": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "targetHandle": "transformer",
+      "type": "default"
+    },
+    {
+      "id": "edge-9f10ad7a-transformer-9d3b9faf-transformer",
+      "source": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "sourceHandle": "transformer",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "transformer",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d1a4f22-value-9d3b9faf-steps",
+      "source": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "sourceHandle": "value",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-9c4cab0b-value-9d3b9faf-seed",
+      "source": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "sourceHandle": "value",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9b2f7d8c-width",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9b2f7d8c-height",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9d3b9faf-width",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9d3b9faf-height",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-video_latents-9e5dcb1c-video_latents",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "video_latents",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "video_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-audio_latents-9e5dcb1c-audio_latents",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "audio_latents",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "audio_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-vae-9e5dcb1c-vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "vae",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-audio_vae-9e5dcb1c-audio_vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "audio_vae",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "audio_vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-9c0f3e11-value-9e2b5033-positive_prompt",
+      "source": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "sourceHandle": "value",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "positive_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d1a4f22-value-9e2b5033-steps",
+      "source": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "sourceHandle": "value",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-9c4cab0b-value-9e2b5033-seed",
+      "source": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "sourceHandle": "value",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-width-9e2b5033-width",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "width",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-height-9e2b5033-height",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "height",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-num_frames-9e2b5033-num_frames",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "num_frames",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "num_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-model-9e2b5033-model",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "model",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "model",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-transformer_model-9e2b5033-minimax_h3_transformer_model",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "transformer_model",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "minimax_h3_transformer_model",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-text_encoder_model-9e2b5033-minimax_h3_text_encoder_model",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "text_encoder_model",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "minimax_h3_text_encoder_model",
+      "type": "default"
+    },
+    {
+      "id": "edge-9f10ad7a-lora_metadata-9f3c6144-item",
+      "source": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "sourceHandle": "lora_metadata",
+      "target": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-9f3c6144-collection-9e2b5033-loras",
+      "source": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+      "sourceHandle": "collection",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "loras",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e2b5033-metadata-9e5dcb1c-metadata",
+      "source": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "sourceHandle": "metadata",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "metadata",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e2b5033-metadata-4b32c22b-metadata",
+      "source": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "sourceHandle": "metadata",
+      "target": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
+      "targetHandle": "metadata",
+      "type": "default"
+    },
+    {
+      "id": "edge-52e0f43e-video-c2b5afb3-video",
+      "source": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "sourceHandle": "video",
+      "target": "c2b5afb3-d079-4afb-9354-4c1a7aeae73a",
+      "targetHandle": "video",
+      "type": "default"
+    },
+    {
+      "id": "edge-c2b5afb3-image-9b2f7d8c-first_image",
+      "source": "c2b5afb3-d079-4afb-9354-4c1a7aeae73a",
+      "sourceHandle": "image",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "first_image",
+      "type": "default"
+    },
+    {
+      "id": "edge-c2b5afb3-image-9a73db93-first_image",
+      "source": "c2b5afb3-d079-4afb-9354-4c1a7aeae73a",
+      "sourceHandle": "image",
+      "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "targetHandle": "first_image",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-vae-9a73db93-vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "vae",
+      "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a73db93-frame_conditioning-9d3b9faf-frame_conditioning",
+      "source": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "sourceHandle": "frame_conditioning",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "frame_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-52e0f43e-width-9e8d7c6b-width",
+      "source": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "sourceHandle": "width",
+      "target": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-52e0f43e-height-9e8d7c6b-height",
+      "source": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "sourceHandle": "height",
+      "target": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9a73db93-width",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
+      "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9a73db93-height",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
+      "target": "9a73db93-75eb-4468-bba1-d0f9d1c21a07",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-52e0f43e-video-9a94f5c6-item",
+      "source": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "sourceHandle": "video",
+      "target": "9a94f5c6-8021-47df-9e95-c1bd62046d08",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a94f5c6-collection-9aa506d7-collection",
+      "source": "9a94f5c6-8021-47df-9e95-c1bd62046d08",
+      "sourceHandle": "collection",
+      "target": "9aa506d7-9132-48e0-af06-d2ce73157e09",
+      "targetHandle": "collection",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e5dcb1c-video-9aa506d7-item",
+      "source": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "sourceHandle": "video",
+      "target": "9aa506d7-9132-48e0-af06-d2ce73157e09",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-9aa506d7-collection-4b32c22b-videos",
+      "source": "9aa506d7-9132-48e0-af06-d2ce73157e09",
+      "sourceHandle": "collection",
+      "target": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
+      "targetHandle": "videos",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e5dcb1c-fps-9ab617e8-value",
+      "source": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "sourceHandle": "fps",
+      "target": "9ab617e8-a243-49f1-b017-e3df84268f0a",
+      "targetHandle": "value",
+      "type": "default"
+    },
+    {
+      "id": "edge-9ab617e8-value-4b32c22b-fps",
+      "source": "9ab617e8-a243-49f1-b017-e3df84268f0a",
+      "sourceHandle": "value",
+      "target": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-c2b5afb3-image-9e2b5033-first_frame_image",
+      "source": "c2b5afb3-d079-4afb-9354-4c1a7aeae73a",
+      "sourceHandle": "image",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "first_frame_image",
+      "type": "default"
+    },
+    {
+      "id": "edge-52e0f43e-source_video-9e2b5033-source_video",
+      "source": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+      "sourceHandle": "source_video",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "source_video",
+      "type": "default"
+    }
+  ],
+  "form": {
+    "elements": {
+      "root": {
+        "id": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "heading-ext-gen",
+            "node-field-ext-video",
+            "container-ext-trim",
+            "node-field-ext-prompt",
+            "node-field-ext-resolution",
+            "container-ext-len",
+            "divider-ext",
+            "heading-ext-model",
+            "container-ext-model"
+          ],
+          "layout": "column"
+        }
+      },
+      "heading-ext-gen": {
+        "id": "heading-ext-gen",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Generation"
+        }
+      },
+      "node-field-ext-video": {
+        "id": "node-field-ext-video",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+            "fieldName": "video"
+          },
+          "showDescription": false
+        }
+      },
+      "container-ext-trim": {
+        "id": "container-ext-trim",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-ext-start",
+            "node-field-ext-end"
+          ],
+          "layout": "row"
+        }
+      },
+      "node-field-ext-start": {
+        "id": "node-field-ext-start",
+        "parentId": "container-ext-trim",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+            "fieldName": "start_frame"
+          },
+          "showDescription": true,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "node-field-ext-end": {
+        "id": "node-field-ext-end",
+        "parentId": "container-ext-trim",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "52e0f43e-0593-4ba6-bb50-df63464a6189",
+            "fieldName": "end_frame"
+          },
+          "showDescription": true,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "node-field-ext-prompt": {
+        "id": "node-field-ext-prompt",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+            "fieldName": "value"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "string-field-config",
+            "component": "textarea"
+          }
+        }
+      },
+      "node-field-ext-resolution": {
+        "id": "node-field-ext-resolution",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+            "fieldName": "target_resolution"
+          },
+          "showDescription": false
+        }
+      },
+      "container-ext-len": {
+        "id": "container-ext-len",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-ext-frames",
+            "node-field-ext-steps"
+          ],
+          "layout": "row"
+        }
+      },
+      "node-field-ext-frames": {
+        "id": "node-field-ext-frames",
+        "parentId": "container-ext-len",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+            "fieldName": "num_frames"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ext-steps": {
+        "id": "node-field-ext-steps",
+        "parentId": "container-ext-len",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+            "fieldName": "value"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "divider-ext": {
+        "id": "divider-ext",
+        "parentId": "root",
+        "type": "divider"
+      },
+      "heading-ext-model": {
+        "id": "heading-ext-model",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Model"
+        }
+      },
+      "container-ext-model": {
+        "id": "container-ext-model",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-ext-model",
+            "node-field-ext-transformer",
+            "node-field-ext-textencoder",
+            "node-field-ext-lora"
+          ],
+          "layout": "column"
+        }
+      },
+      "node-field-ext-model": {
+        "id": "node-field-ext-model",
+        "parentId": "container-ext-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "model"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ext-transformer": {
+        "id": "node-field-ext-transformer",
+        "parentId": "container-ext-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "transformer_model"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ext-textencoder": {
+        "id": "node-field-ext-textencoder",
+        "parentId": "container-ext-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "text_encoder_model"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ext-lora": {
+        "id": "node-field-ext-lora",
+        "parentId": "container-ext-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+            "fieldName": "lora"
+          },
+          "showDescription": false
+        }
+      }
+    },
+    "rootElementId": "root"
+  },
+  "id": "default_minimax_h3_extend"
+}

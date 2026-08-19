@@ -477,3 +477,26 @@ async def update_opened_at(
 
     user_id = None if current_user.is_admin else current_user.user_id
     ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id, user_id=user_id)
+
+
+@workflows_router.put(
+    "/i/{workflow_id}/last_run_at",
+    operation_id="update_workflow_last_run_at",
+    status_code=204,
+)
+async def update_workflow_last_run_at(
+    current_user: CurrentUserOrDefault,
+    workflow_id: str = Path(description="The workflow to update"),
+) -> None:
+    """Updates the last_run_at field of a workflow"""
+    try:
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
+
+    user_id = None if current_user.is_admin else current_user.user_id
+    ApiDependencies.invoker.services.workflow_records.update_last_run_at(workflow_id, user_id=user_id)
