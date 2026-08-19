@@ -1,6 +1,6 @@
 {
-  "browserExecutable": "/home/toast/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome",
-  "capturedAt": "2026-08-18",
+  "browserExecutable": "/home/lstein/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome",
+  "capturedAt": "2026-08-19",
   "routes": [
     {
       "activatedResourceBaseline": {
@@ -25,13 +25,13 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 112,
+      "domContentLoadedMedianMs": 129.2999997138977,
       "id": "launchpad",
       "layoutAckMedianMs": 0,
       "layoutReturnSwitchMedianMs": 0,
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 112.39999999850988,
-      "longestTaskMaxMs": 70,
+      "loadMedianMs": 129.40000009536743,
+      "longestTaskMaxMs": 75,
       "owner": "app",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:launchpad",
@@ -58,7 +58,7 @@
         "scriptRequestCount": 32,
         "totalRawBytes": 1789725
       },
-      "routeReadyMedianMs": 248.19999999925494,
+      "routeReadyMedianMs": 284.8999996185303,
       "scriptSourceOwnerSet": "launchpad-static",
       "stateProfile": "empty"
     },
@@ -85,13 +85,13 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 115.5,
+      "domContentLoadedMedianMs": 125.2000002861023,
       "id": "launchpad",
       "layoutAckMedianMs": 0,
       "layoutReturnSwitchMedianMs": 0,
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 115.59999999776483,
-      "longestTaskMaxMs": 70,
+      "loadMedianMs": 125.30000019073486,
+      "longestTaskMaxMs": 72,
       "owner": "app",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:launchpad",
@@ -118,7 +118,7 @@
         "scriptRequestCount": 32,
         "totalRawBytes": 1789725
       },
-      "routeReadyMedianMs": 268.5999999977648,
+      "routeReadyMedianMs": 296.80000019073486,
       "scriptSourceOwnerSet": "launchpad-static",
       "stateProfile": "representative"
     },
@@ -145,15 +145,15 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 114.59999999776483,
+      "domContentLoadedMedianMs": 127.90000009536743,
       "id": "editor-minimal",
       "layoutAckMedianMs": 0,
       "layoutReturnSwitchMedianMs": 0,
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 114.80000000074506,
-      "longestTaskMaxMs": 98,
+      "loadMedianMs": 128,
+      "longestTaskMaxMs": 106,
       "owner": "workbench",
-      "projectSwitchMedianMs": 37.30000000074506,
+      "projectSwitchMedianMs": 38,
       "readyMark": "invokeai:ready:widget:center:preview",
       "remediationTicket": "deepen-widget-registry-loading",
       "resourceBaseline": {
@@ -163,9 +163,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 114,
-        "scriptRawBytes": 3045777,
+        "scriptRawBytes": 3047217,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3364402
+        "totalRawBytes": 3365842
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
@@ -174,11 +174,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 114,
-        "scriptRawBytes": 3076235,
+        "scriptRawBytes": 3077690,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3398047
+        "totalRawBytes": 3399501
       },
-      "routeReadyMedianMs": 653.3000000007451,
+      "routeReadyMedianMs": 707.3000001907349,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "empty"
     },
@@ -205,15 +205,15 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 112.09999999776483,
+      "domContentLoadedMedianMs": 127.90000009536743,
       "id": "editor-minimal",
       "layoutAckMedianMs": 0,
       "layoutReturnSwitchMedianMs": 0,
       "layoutSwitchMedianMs": 0,
-      "loadMedianMs": 112.29999999701977,
-      "longestTaskMaxMs": 181,
+      "loadMedianMs": 128.09999990463257,
+      "longestTaskMaxMs": 191,
       "owner": "workbench",
-      "projectSwitchMedianMs": 55.79999999701977,
+      "projectSwitchMedianMs": 51.59999990463257,
       "readyMark": "invokeai:ready:widget:center:preview",
       "remediationTicket": "deepen-widget-registry-loading",
       "resourceBaseline": {
@@ -223,9 +223,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 114,
-        "scriptRawBytes": 3045777,
+        "scriptRawBytes": 3047217,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3364402
+        "totalRawBytes": 3365842
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
@@ -234,11 +234,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 114,
-        "scriptRawBytes": 3076235,
+        "scriptRawBytes": 3077690,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3398047
+        "totalRawBytes": 3399501
       },
-      "routeReadyMedianMs": 449.5,
+      "routeReadyMedianMs": 512.7999997138977,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "representative"
     },
@@ -265,13 +265,13 @@
         "scriptRequestCount": 6,
         "totalRawBytes": 287313
       },
-      "domContentLoadedMedianMs": 114.5,
+      "domContentLoadedMedianMs": 127.90000009536743,
       "id": "editor-canvas",
-      "layoutAckMedianMs": 2.400000002235174,
-      "layoutReturnSwitchMedianMs": 38,
-      "layoutSwitchMedianMs": 67.10000000149012,
-      "loadMedianMs": 114.60000000149012,
-      "longestTaskMaxMs": 91,
+      "layoutAckMedianMs": 3.0999999046325684,
+      "layoutReturnSwitchMedianMs": 36.90000009536743,
+      "layoutSwitchMedianMs": 63.5,
+      "loadMedianMs": 128,
+      "longestTaskMaxMs": 110,
       "owner": "canvas",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:canvas",
@@ -283,9 +283,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 120,
-        "scriptRawBytes": 3330245,
+        "scriptRawBytes": 3331685,
         "scriptRequestCount": 115,
-        "totalRawBytes": 3648870
+        "totalRawBytes": 3650310
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
@@ -294,11 +294,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 120,
-        "scriptRawBytes": 3363548,
+        "scriptRawBytes": 3365002,
         "scriptRequestCount": 115,
-        "totalRawBytes": 3685359
+        "totalRawBytes": 3686814
       },
-      "routeReadyMedianMs": 996,
+      "routeReadyMedianMs": 1081.0999999046326,
       "scriptSourceOwnerSet": "editor-canvas-static",
       "stateProfile": "empty"
     },
@@ -325,13 +325,13 @@
         "scriptRequestCount": 6,
         "totalRawBytes": 287313
       },
-      "domContentLoadedMedianMs": 108.5,
+      "domContentLoadedMedianMs": 126.80000019073486,
       "id": "editor-canvas",
-      "layoutAckMedianMs": 2.399999998509884,
-      "layoutReturnSwitchMedianMs": 35.69999999925494,
-      "layoutSwitchMedianMs": 183.89999999850988,
-      "loadMedianMs": 108.60000000149012,
-      "longestTaskMaxMs": 404,
+      "layoutAckMedianMs": 3,
+      "layoutReturnSwitchMedianMs": 35.700000286102295,
+      "layoutSwitchMedianMs": 195.09999990463257,
+      "loadMedianMs": 126.90000009536743,
+      "longestTaskMaxMs": 385,
       "owner": "canvas",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:canvas",
@@ -343,9 +343,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 120,
-        "scriptRawBytes": 3330245,
+        "scriptRawBytes": 3331685,
         "scriptRequestCount": 115,
-        "totalRawBytes": 3648870
+        "totalRawBytes": 3650310
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
@@ -354,11 +354,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 120,
-        "scriptRawBytes": 3363548,
+        "scriptRawBytes": 3365002,
         "scriptRequestCount": 115,
-        "totalRawBytes": 3685359
+        "totalRawBytes": 3686814
       },
-      "routeReadyMedianMs": 1222.5,
+      "routeReadyMedianMs": 1357.0999999046326,
       "scriptSourceOwnerSet": "editor-canvas-static",
       "stateProfile": "representative"
     },
@@ -385,13 +385,13 @@
         "scriptRequestCount": 7,
         "totalRawBytes": 361318
       },
-      "domContentLoadedMedianMs": 110,
+      "domContentLoadedMedianMs": 125,
       "id": "editor-workflow",
-      "layoutAckMedianMs": 2,
-      "layoutReturnSwitchMedianMs": 31.299999997019768,
-      "layoutSwitchMedianMs": 85.30000000074506,
-      "loadMedianMs": 110.10000000149012,
-      "longestTaskMaxMs": 93,
+      "layoutAckMedianMs": 2.6000003814697266,
+      "layoutReturnSwitchMedianMs": 32.60000038146973,
+      "layoutSwitchMedianMs": 80.30000019073486,
+      "loadMedianMs": 125.09999990463257,
+      "longestTaskMaxMs": 113,
       "owner": "workflow",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:workflow",
@@ -403,9 +403,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 122,
-        "scriptRawBytes": 3388104,
+        "scriptRawBytes": 3389544,
         "scriptRequestCount": 116,
-        "totalRawBytes": 3722142
+        "totalRawBytes": 3723582
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -414,11 +414,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 122,
-        "scriptRawBytes": 3421986,
+        "scriptRawBytes": 3423440,
         "scriptRequestCount": 116,
-        "totalRawBytes": 3759364
+        "totalRawBytes": 3760818
       },
-      "routeReadyMedianMs": 1008.5,
+      "routeReadyMedianMs": 1070.5,
       "scriptSourceOwnerSet": "editor-workflow-static",
       "stateProfile": "empty"
     },
@@ -445,13 +445,13 @@
         "scriptRequestCount": 7,
         "totalRawBytes": 361318
       },
-      "domContentLoadedMedianMs": 114.80000000074506,
+      "domContentLoadedMedianMs": 134.5,
       "id": "editor-workflow",
-      "layoutAckMedianMs": 2.599999997764826,
-      "layoutReturnSwitchMedianMs": 40.5,
-      "layoutSwitchMedianMs": 127.89999999850988,
-      "loadMedianMs": 115,
-      "longestTaskMaxMs": 353,
+      "layoutAckMedianMs": 3.4000000953674316,
+      "layoutReturnSwitchMedianMs": 40.799999713897705,
+      "layoutSwitchMedianMs": 141.39999961853027,
+      "loadMedianMs": 134.7999997138977,
+      "longestTaskMaxMs": 440,
       "owner": "workflow",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:workflow",
@@ -463,9 +463,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 122,
-        "scriptRawBytes": 3388104,
+        "scriptRawBytes": 3389544,
         "scriptRequestCount": 116,
-        "totalRawBytes": 3722142
+        "totalRawBytes": 3723582
       },
       "resourceLimits": {
         "cssRawBytes": 17748,
@@ -474,11 +474,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 122,
-        "scriptRawBytes": 3421986,
+        "scriptRawBytes": 3423440,
         "scriptRequestCount": 116,
-        "totalRawBytes": 3759364
+        "totalRawBytes": 3760818
       },
-      "routeReadyMedianMs": 1181.199999999255,
+      "routeReadyMedianMs": 1288.2999997138977,
       "scriptSourceOwnerSet": "editor-workflow-static",
       "stateProfile": "representative"
     },
@@ -505,13 +505,13 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 112.5,
+      "domContentLoadedMedianMs": 153.5,
       "id": "editor-gallery",
       "layoutAckMedianMs": 0,
       "layoutReturnSwitchMedianMs": 0,
-      "layoutSwitchMedianMs": 23,
-      "loadMedianMs": 112.60000000149012,
-      "longestTaskMaxMs": 87,
+      "layoutSwitchMedianMs": 29.40000009536743,
+      "loadMedianMs": 153.60000038146973,
+      "longestTaskMaxMs": 106,
       "owner": "gallery",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:gallery",
@@ -523,9 +523,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 114,
-        "scriptRawBytes": 3045777,
+        "scriptRawBytes": 3047217,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3364402
+        "totalRawBytes": 3365842
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
@@ -534,11 +534,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 114,
-        "scriptRawBytes": 3076235,
+        "scriptRawBytes": 3077690,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3398047
+        "totalRawBytes": 3399501
       },
-      "routeReadyMedianMs": 1216.8999999985099,
+      "routeReadyMedianMs": 1383.9000000953674,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "empty"
     },
@@ -565,13 +565,13 @@
         "scriptRequestCount": 0,
         "totalRawBytes": 0
       },
-      "domContentLoadedMedianMs": 108.69999999925494,
+      "domContentLoadedMedianMs": 158.7999997138977,
       "id": "editor-gallery",
       "layoutAckMedianMs": 0,
       "layoutReturnSwitchMedianMs": 0,
-      "layoutSwitchMedianMs": 85,
-      "loadMedianMs": 108.69999999925494,
-      "longestTaskMaxMs": 162,
+      "layoutSwitchMedianMs": 99.5,
+      "loadMedianMs": 159,
+      "longestTaskMaxMs": 197,
       "owner": "gallery",
       "projectSwitchMedianMs": 0,
       "readyMark": "invokeai:ready:widget:center:gallery",
@@ -583,9 +583,9 @@
         "largestAssetRawBytes": 746305,
         "otherRawBytes": 136426,
         "requestCount": 114,
-        "scriptRawBytes": 3045777,
+        "scriptRawBytes": 3047217,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3364402
+        "totalRawBytes": 3365842
       },
       "resourceLimits": {
         "cssRawBytes": 2181,
@@ -594,11 +594,11 @@
         "largestAssetRawBytes": 753769,
         "otherRawBytes": 137791,
         "requestCount": 114,
-        "scriptRawBytes": 3076235,
+        "scriptRawBytes": 3077690,
         "scriptRequestCount": 109,
-        "totalRawBytes": 3398047
+        "totalRawBytes": 3399501
       },
-      "routeReadyMedianMs": 1438,
+      "routeReadyMedianMs": 1581.1999998092651,
       "scriptSourceOwnerSet": "editor-minimal-static",
       "stateProfile": "representative"
     }
@@ -1611,6 +1611,7 @@
       "source:src/workbench/image-actions/useImageActions.ts",
       "source:src/workbench/image-map/api.ts",
       "source:src/workbench/image-map/imageMapStore.ts",
+      "source:src/workbench/image-map/indexProgress.ts",
       "source:src/workbench/invocation.ts",
       "source:src/workbench/invocationSubmit.ts",
       "source:src/workbench/launchpad/HelpMenu.tsx",
@@ -2509,6 +2510,7 @@
       "source:src/workbench/image-actions/useImageActions.ts",
       "source:src/workbench/image-map/api.ts",
       "source:src/workbench/image-map/imageMapStore.ts",
+      "source:src/workbench/image-map/indexProgress.ts",
       "source:src/workbench/invocation.ts",
       "source:src/workbench/invocationSubmit.ts",
       "source:src/workbench/launchpad/HelpMenu.tsx",
@@ -3563,6 +3565,7 @@
       "source:src/workbench/image-actions/useImageActions.ts",
       "source:src/workbench/image-map/api.ts",
       "source:src/workbench/image-map/imageMapStore.ts",
+      "source:src/workbench/image-map/indexProgress.ts",
       "source:src/workbench/invocation.ts",
       "source:src/workbench/invocationSubmit.ts",
       "source:src/workbench/launchpad/HelpMenu.tsx",
