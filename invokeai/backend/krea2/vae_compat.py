@@ -69,10 +69,11 @@ QWEN_IMAGE_VAE_DEFAULT_TILE_SIZE = 256
 _QWEN_IMAGE_VAE_TILE_STRIDE_NUMERATOR = 3
 _QWEN_IMAGE_VAE_TILE_STRIDE_DENOMINATOR = 4
 
-# diffusers derives the latent-space stride as `tile_sample_stride // spatial_compression_ratio` and
-# uses it as the step of the tile loop, so a stride below 8 makes that step 0 (ValueError) or leaves the
-# pixel and latent steps inconsistent. 64px is the smallest tile whose 3/4 stride is still a clean
-# multiple of 8, and tiles below it are not useful in practice anyway.
+# A cost floor, not a correctness one: `_tile_stride_for` keeps the geometry valid all the way down
+# (smaller tiles decode and encode to the right size), but the tile *count* grows with the inverse
+# square of the stride. At 2560x1440 a 64px tile already emits 1620 tiles; an 8px tile would emit
+# 57,600, and the per-tile Python/kernel-launch overhead dominates long before that. Tiles this small
+# also blend badly, so the field's low end is clamped rather than honoured literally.
 QWEN_IMAGE_VAE_MIN_TILE_SIZE = 64
 
 
@@ -82,7 +83,7 @@ def resolve_qwen_image_vae_tile_size(tile_size: int) -> int:
     ``tile_size <= 0`` is the nodes' "use the default" sentinel (the workflow UI cannot represent
     ``None`` in a number input and sends 0). Values below ``QWEN_IMAGE_VAE_MIN_TILE_SIZE`` are clamped
     rather than rejected, because the field also has to accept the 0 sentinel and so cannot carry a
-    pydantic lower bound.
+    pydantic lower bound. The clamp is about cost, not validity -- see the constant.
     """
     if tile_size <= 0:
         return QWEN_IMAGE_VAE_DEFAULT_TILE_SIZE

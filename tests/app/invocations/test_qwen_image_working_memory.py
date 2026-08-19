@@ -298,7 +298,16 @@ class TestQwenImageWorkingMemory:
 
     @pytest.mark.parametrize(
         "tile_size, expected_min, expected_stride",
-        [(0, 256, 192), (512, 512, 384), (128, 128, 96), (8, 64, 48)],
+        [
+            (0, 256, 192),
+            (512, 512, 384),
+            (128, 128, 96),
+            (8, 64, 48),
+            # 3/4 of these is 54 and 60, neither a multiple of the VAE's 8x spatial compression:
+            # the stride must be rounded down to 48 / 56 or the pixel and latent tile loops disagree.
+            (72, 72, 48),
+            (80, 80, 56),
+        ],
     )
     def test_image_to_latents_sets_a_matched_tile_stride(self, tile_size, expected_min, expected_stride):
         """`enable_tiling` must always receive all four parameters.
@@ -424,14 +433,15 @@ class TestQwenImageVaeTiling:
             temperal_downsample=[False, True, True],
         ).eval()
 
-    @pytest.mark.parametrize("tile_size", [64, 128, 192, 256, 512])
+    # 72 and 80 are the interesting ones: their raw 3/4 stride (54, 60) is not a multiple of 8.
+    @pytest.mark.parametrize("tile_size", [64, 72, 80, 128, 192, 256, 512])
     def test_tiled_decode_keeps_the_full_output_size(self, vae, tile_size):
         latents = torch.zeros(1, 16, 1, 32, 32)  # -> 256x256
         with torch.inference_mode(), patch_qwen_image_vae_tiling(vae, tile_size):
             decoded = vae.decode(latents, return_dict=False)[0]
         assert decoded.shape == (1, 3, 1, 256, 256)
 
-    @pytest.mark.parametrize("tile_size", [64, 128, 192, 256, 512])
+    @pytest.mark.parametrize("tile_size", [64, 72, 80, 128, 192, 256, 512])
     def test_tiled_encode_keeps_the_full_latent_size(self, vae, tile_size):
         image = torch.zeros(1, 3, 1, 256, 256)
         with torch.inference_mode(), patch_qwen_image_vae_tiling(vae, tile_size):
@@ -450,6 +460,28 @@ class TestQwenImageVaeTiling:
             with torch.inference_mode():
                 decoded = vae.decode(latents, return_dict=False)[0]
         assert decoded.shape == (1, 3, 1, 192, 192)  # not 256x256 -- silently truncated
+
+    def test_unrounded_stride_would_misalign(self, vae):
+        """Pin the failure mode the multiple-of-8 rounding exists to prevent.
+
+        `tiled_encode` steps the tile loop by `tile_sample_stride_height` (pixels) but slices each
+        accumulated tile to `tile_sample_stride_height // spatial_compression_ratio` (latents). Unless
+        the pixel stride is exactly 8x the latent stride the two disagree, and the encode silently
+        returns a latent smaller than the image -- the same class of bug as the inherited stride, but
+        reachable from a `multiple_of=8` field value whose 3/4 stride is not itself a multiple of 8.
+        """
+        image = torch.zeros(1, 3, 1, 512, 512)
+        with patch_qwen_image_vae_tiling(vae, 72):
+            # The rounded stride the helper actually applies.
+            assert vae.tile_sample_stride_height == 48
+            with torch.inference_mode():
+                assert vae.encode(image).latent_dist.mode().shape == (1, 16, 1, 64, 64)
+
+            # ...and the un-rounded 3/4 value it deliberately avoids.
+            vae.enable_tiling(tile_sample_stride_height=54, tile_sample_stride_width=54)
+            with torch.inference_mode():
+                misaligned = vae.encode(image).latent_dist.mode()
+        assert misaligned.shape == (1, 16, 1, 57, 57)  # not 64x64 -- silently truncated
 
     def test_tiling_state_is_restored(self, vae):
         """The VAE module belongs to the model cache and outlives the invocation.
