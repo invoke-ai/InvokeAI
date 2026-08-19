@@ -36,6 +36,7 @@ const MODEL_LOADER_TEMPLATE: InvocationTemplate = {
       description: '',
       exclusiveMaximum: null,
       exclusiveMinimum: null,
+      fieldKind: 'input',
       input: 'any',
       maximum: null,
       minimum: null,
