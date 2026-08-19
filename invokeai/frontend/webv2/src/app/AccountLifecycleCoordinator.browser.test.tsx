@@ -73,8 +73,13 @@ const sessionStore = vi.hoisted(() => {
 
 vi.mock('@features/identity', async () => {
   const React = await import('react');
+  // Modules outside this test's mock map (reached via other import specifiers)
+  // still bind real identity exports — spread them so the mock only overrides
+  // what the test drives instead of rotting on every new identity export.
+  const actual = await vi.importActual<typeof import('@features/identity')>('@features/identity');
 
   return {
+    ...actual,
     AuthSessionUnavailableError: identityErrors.AuthSessionUnavailableError,
     AuthUnavailableScreen: ({ onRetry }: { onRetry: () => Promise<void> | void }) => {
       unavailableScreen.setRetry(onRetry);
