@@ -14,8 +14,14 @@ Based on the diffusers `convert_flux2_to_diffusers.py` key mappings.
 """
 
 import re
+from typing import Any
 
 import torch
+
+from invokeai.backend.quantization.fp8_scaled import (
+    QKV_SPLIT_SIDECHANNEL_SUFFIXES,
+    split_qkv_sidechannel,
+)
 
 
 def _flux2_chunk_tensor(tensor, chunks: int):
@@ -134,8 +140,14 @@ def _convert_flux2_single_block_key(key: str, tensor, converted: dict) -> str | 
     return key
 
 
-def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
-    """Convert a FLUX.2 transformer BFL-format state dict to diffusers format."""
+def _convert_flux2_weight_keys(sd: dict) -> dict:
+    """Convert the *weight* keys of a FLUX.2 BFL state dict to diffusers format.
+
+    Quantization side-channel keys must not be routed through here. The block renames below are
+    substring tests, so `img_attn.proj.weight_scale` satisfies `"img_attn.proj.weight" in rest`
+    and would be written to the weight's destination key -- overwriting the weight with its own
+    scale. `convert_flux2_bfl_to_diffusers` keeps them out and places them separately.
+    """
     converted: dict = {}
 
     # Basic key renames
@@ -324,3 +336,70 @@ def convert_flux2_vae_bfl_to_diffusers(sd: dict) -> dict:
         converted[new_key] = tensor
 
     return converted
+
+
+def _flux2_sidechannel_parts(key: Any) -> tuple[str, str] | None:
+    """Split ``<module path>.<suffix>`` for a quantization side-channel key, else None."""
+    if not isinstance(key, str):
+        return None
+    for suffix in QKV_SPLIT_SIDECHANNEL_SUFFIXES:
+        if key.endswith(f".{suffix}"):
+            return key[: -len(suffix) - 1], suffix
+    return None
+
+
+# Divisible by both 3 (the fused QKV split) and 2 (the adaLN scale/shift swap), so a probe runs
+# through every branch of the converter instead of tripping its "malformed, leave alone" guards.
+_PROBE_ROWS = 6
+
+
+def _flux2_sidechannel_destinations(base: str) -> list[str]:
+    """Where a layer's weight ends up after conversion, as module paths.
+
+    Rather than restating the rename rules -- which would drift from the converter the moment one
+    of them changes -- the layer is pushed through the real converter as a lone ``<base>.weight``
+    and the resulting keys are read back. A fused ``qkv`` maps to *three* destinations.
+    """
+    probe = {f"{base}.weight": torch.zeros(_PROBE_ROWS, 1)}
+    return [k[: -len(".weight")] for k in _convert_flux2_weight_keys(probe) if k.endswith(".weight")]
+
+
+def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
+    """Convert a FLUX.2 transformer BFL-format state dict to diffusers format.
+
+    Quantization scales and markers are carried to wherever their weight landed. Doing that is not
+    optional for a scaled-fp8 checkpoint: a scale left on the fused ``qkv`` path is keyed on a
+    module the diffusers model does not have, so `attach_fp8_scales` finds nothing and the three
+    split weights stay quantized but *unscaled* -- off by 1/weight_scale, with nothing logged.
+    """
+    weights = {k: v for k, v in sd.items() if _flux2_sidechannel_parts(k) is None}
+    converted = _convert_flux2_weight_keys(weights)
+
+    for key, value in sd.items():
+        parts = _flux2_sidechannel_parts(key)
+        if parts is None:
+            continue
+        base, suffix = parts
+        destinations = _flux2_sidechannel_destinations(base)
+        if not destinations:
+            # Unknown layer: keep the key as it is. `extract_fp8_scaled_layers` drops a scale with
+            # no matching fp8 weight, which is the safe outcome -- better than guessing a target.
+            converted[key] = value
+        elif len(destinations) == 1:
+            converted[f"{destinations[0]}.{suffix}"] = value
+        else:
+            for destination, part in zip(destinations, split_qkv_sidechannel(key, value), strict=True):
+                converted[f"{destination}.{suffix}"] = part
+
+    return converted
+
+
+def remap_flux2_layer_paths(layer_names: Any) -> dict[str, list[str]]:
+    """Map BFL layer paths to their diffusers equivalents, one-to-many for a fused ``qkv``.
+
+    ``_quantization_metadata`` names its layers in the checkpoint's own scheme, but the scales are
+    extracted *after* the state dict has been renamed. Without this the per-layer flags -- notably
+    ``full_precision_matrix_mult`` -- match nothing and are silently ignored, which is the exact
+    mistake that already cost a debugging round on Krea-2.
+    """
+    return {name: _flux2_sidechannel_destinations(name) for name in layer_names}

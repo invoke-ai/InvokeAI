@@ -125,6 +125,24 @@ class TestDequantizeScaledFp8:
         assert "layer.weight_scale" not in out
         assert "other.weight" in out
 
+    def test_the_scale_weight_spelling_is_folded_too(self) -> None:
+        # Producers use both spellings. Reading only `.weight_scale` left the weight unscaled and
+        # dropped the key anyway, so the error was silent - off by exactly 1/weight_scale.
+        sd = {"layer.weight": torch.tensor([2.0, 4.0]), "layer.scale_weight": torch.tensor(0.5)}
+
+        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
+
+        assert torch.equal(out["layer.weight"], torch.tensor([1.0, 2.0], dtype=torch.bfloat16))
+        assert "layer.scale_weight" not in out
+
+    def test_an_orphan_scale_weight_is_dropped_too(self) -> None:
+        sd = {"other.weight": torch.tensor([1.0]), "layer.scale_weight": torch.tensor(0.5)}
+
+        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
+
+        assert "layer.scale_weight" not in out
+        assert "other.weight" in out
+
 
 class TestConvertKrea2NativeToDiffusers:
     def test_top_level_module_renames(self) -> None:

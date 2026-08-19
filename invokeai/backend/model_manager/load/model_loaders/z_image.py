@@ -34,11 +34,53 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import (
+    QKV_SPLIT_SIDECHANNEL_SUFFIXES,
+    attach_fp8_scales,
+    cast_state_dict,
+    dequantize_fp8_scaled,
+    extract_comfy_quant_hints,
+    extract_fp8_scaled_layers,
+    full_precision_hints_respected,
+    is_scale_metadata_key,
+    iter_weight_scale_pairs,
+    parse_quantization_metadata,
+    predict_cast_state_dict_size,
+    read_safetensors_metadata,
+    should_keep_fp8_weights,
+    split_fp8_scaled_layers,
+    split_qkv_sidechannel,
+    warn_on_unattached_scales,
+)
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
+
+
+def _remap_z_image_layer_paths(layer_names: Any) -> dict[str, list[str]]:
+    """Map native Z-Image layer paths to their diffusers equivalents.
+
+    ``_quantization_metadata`` names its layers in the checkpoint's own scheme, but the scales are
+    extracted after the state dict has been renamed. Rather than restating the rename rules — which
+    would drift — each name is pushed through the real converter as a lone ``<name>.weight`` entry
+    and the resulting keys are read back. A fused ``qkv`` maps to *three* diffusers layers, so the
+    mapping is one-to-many.
+    """
+    mapping: dict[str, list[str]] = {}
+    for name in layer_names:
+        if not isinstance(name, str):
+            continue
+        try:
+            # 3 rows so the qkv split is well-defined; the values themselves are never read.
+            converted = _convert_z_image_gguf_to_diffusers({f"{name}.weight": torch.empty(3, 1)})
+        except Exception:
+            continue
+        targets = [k[: -len(".weight")] for k in converted if isinstance(k, str) and k.endswith(".weight")]
+        if targets:
+            mapping[name] = targets
+    return mapping
 
 
 def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -97,9 +139,15 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             prefix = key.rsplit(".attention.qkv.", 1)[0]
             suffix = key.rsplit(".attention.qkv.", 1)[1]  # "weight" or "bias"
 
-            # Skip non-weight/bias tensors (e.g., FP8 scale_weight tensors)
-            # These are quantization metadata and should not be split
             if suffix not in ("weight", "bias"):
+                # Quantization side-channel for the fused weight. It has to travel with the split,
+                # or the recovered scale is keyed on `...attention.qkv`, a module path that no
+                # longer exists — `attach_fp8_scales` then finds nothing and the three split
+                # weights stay quantized but *unscaled*, i.e. off by 1/weight_scale.
+                if suffix in QKV_SPLIT_SIDECHANNEL_SUFFIXES:
+                    for name, part in zip(("to_q", "to_k", "to_v"), split_qkv_sidechannel(key, value), strict=True):
+                        new_sd[f"{prefix}.attention.{name}.{suffix}"] = part
+                    continue
                 new_sd[key] = value
                 continue
 
@@ -415,6 +463,11 @@ class ZImageCheckpointModel(ModelLoader):
                     stripped_sd[key] = value
             sd = stripped_sd
 
+        # Per-layer `full_precision_matrix_mult` hints, from the safetensors header and/or the
+        # per-tensor `.comfy_quant` markers. The header names layers in the checkpoint's own scheme,
+        # so it is remapped below; the markers ride along through the key conversion instead.
+        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger))
+
         # Check if the state dict is in original format (not diffusers format)
         # Original format has keys like "x_embedder.weight" instead of "all_x_embedder.2-1.weight"
         needs_conversion = any(k.startswith("x_embedder.") for k in sd.keys() if isinstance(k, str))
@@ -422,6 +475,10 @@ class ZImageCheckpointModel(ModelLoader):
         if needs_conversion:
             # Convert from original format to diffusers format
             sd = _convert_z_image_gguf_to_diffusers(sd)
+            path_map = _remap_z_image_layer_paths(header_hints.keys())
+            header_hints = {
+                target: hints for name, hints in header_hints.items() for target in path_map.get(name, [name])
+            }
 
         # Create an empty model with the default Z-Image config
         # Z-Image-Turbo uses these default parameters from diffusers
@@ -451,7 +508,8 @@ class ZImageCheckpointModel(ModelLoader):
         # Filter out keys that don't belong to the ZImageTransformer2DModel.
         # Merged checkpoints (e.g. LoRA-baked models) may bundle text encoder weights
         # (text_encoders.*) or other non-transformer keys alongside the transformer weights.
-        # Also filter FP8 quantization metadata (scale_weight, scaled_fp8).
+        # This runs *before* the scales are extracted so a bundled encoder's own scale keys are
+        # dropped here rather than being recovered as transformer layers that resolve to nothing.
         valid_prefixes = (
             "all_x_embedder.",
             "all_final_layer.",
@@ -463,25 +521,70 @@ class ZImageCheckpointModel(ModelLoader):
             "rope_embedder.",
         )
         valid_exact = {"x_pad_token", "cap_pad_token"}
-        keys_to_remove = [
-            k
-            for k in sd.keys()
-            if not (k.startswith(valid_prefixes) or k in valid_exact)
-            or k.endswith(".scale_weight")
-            or k == "scaled_fp8"
-        ]
+        keys_to_remove = [k for k in sd.keys() if not (k.startswith(valid_prefixes) or k in valid_exact)]
         for k in keys_to_remove:
             del sd[k]
 
-        # Handle memory management and dtype conversion
-        new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
-        self._ram_cache.make_room(new_sd_size)
+        # ComfyUI 'scaled fp8' (fp8 weight + .weight_scale/.scale_weight). Until now the loader
+        # deleted those scales and cast the weight — silently producing a weight off by
+        # 1/weight_scale — and had no way to tell such a checkpoint from a raw fp8 one.
+        layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
-        # Convert to target dtype
-        for k in sd.keys():
-            sd[k] = sd[k].to(model_dtype)
+        # Handle memory management and dtype conversion. A checkpoint that ships raw fp8 weights
+        # (fp8 tensors, no weight_scale) keeps them when the fp8 matmul is available — casting them
+        # here would discard both the VRAM saving and the tensor cores before the model is built.
+        keep_fp8 = should_keep_fp8_weights(self._torch_device)
+        if fp8_layers and not keep_fp8:
+            # Legacy behavior, but now with the scale actually applied: fold it into the weight.
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
+
+        # Honor the model's own precision-sensitive list. Z-Image declares
+        # ["t_embedder", "cap_embedder"], and `TimestepEmbedder.forward` casts its activations to
+        # `self.mlp[0].weight.dtype` — an fp8 weight there turns the activations fp8 and the forward
+        # dies in `x.abs()`. Those layers must be dequantized even though the rest stays quantized.
+        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        # Scaled layers that the cast would dequantize anyway are folded here, scale applied, so
+        # `cast_state_dict` never strips a scale it cannot put back.
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+
+        self._ram_cache.make_room(
+            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+        )
+        kept = cast_state_dict(
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+        )
 
         model.load_state_dict(sd, assign=True)
+
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            self._logger.info(f"Z-Image: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)")
+            warn_on_unattached_scales(self._logger, "Z-Image", attached, fp8_layers)
+            marked = sum(1 for layer in fp8_layers.values() if layer.full_precision_matmul)
+            if marked and full_precision_hints_respected():
+                self._logger.info(
+                    f"Z-Image: {marked} of {len(fp8_layers)} layer(s) are marked full_precision_matrix_mult "
+                    "and will dequantize per forward. Set fp8_compute_full_precision_hints=false to run "
+                    "them on the fp8 tensor cores instead."
+                )
+        elif kept:
+            self._logger.info(
+                f"Z-Image: kept {kept} raw fp8 weight(s) quantized (no weight_scale in the checkpoint); "
+                "they will run on the fp8 tensor cores with unit scaling."
+            )
+
+        # FP8 *storage* on top. When nothing was kept quantized above, every param is uniform
+        # `model_dtype` here, so the layerwise cast has one unambiguous compute dtype to restore to.
+        # When weights *were* kept fp8, `_apply_fp8_layerwise_casting` bails out on its own (and
+        # says so in the log): its hooks would restore the compute dtype before every forward and
+        # silently disable the fp8 matmul, for no VRAM saving.
+        model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 
@@ -960,46 +1063,43 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         # Dequantization formula: dequantized = weight.to(dtype) * weight_scale
         # Reference: https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md
         original_key_count = len(sd)
-        weight_scale_keys = [k for k in sd.keys() if k.endswith(".weight_scale")]
         dequantized_count = 0
 
-        for scale_key in weight_scale_keys:
-            # Get the corresponding weight key (remove "_scale" suffix)
-            weight_key = scale_key.replace(".weight_scale", ".weight")
-            if weight_key in sd:
-                weight = sd[weight_key]
-                scale = sd[scale_key]
-                # Dequantize: convert to float and multiply by scale
-                # Handle block-wise quantization (e.g., FP4 with block_size=8)
-                # where scale has shape [weight_dim / block_size, ...]
-                # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
-                # as PyTorch doesn't support direct type promotion for Float8 types
-                weight_float = weight.float()
-                scale = scale.float()
-                if scale.shape != weight_float.shape and scale.numel() > 1:
-                    # Block-wise quantization: need to expand scale to match weight shape
-                    # Find which dimension differs and repeat scale along that dimension
-                    for dim in range(len(weight_float.shape)):
-                        if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
-                            block_size = weight_float.shape[dim] // scale.shape[dim]
-                            if block_size > 1:
-                                # Repeat scale along this dimension to match weight shape
-                                scale = scale.repeat_interleave(block_size, dim=dim)
-                # Multiply in float32 for precision, but store the compute dtype immediately so the
-                # *whole model* is never materialized in float32. Keeping every dequantized weight as
-                # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs
-                # 1 on disk) and dominates the cold-load RAM peak — enough to swap a 32 GB machine.
-                # Same fix as in the FLUX.2 and Krea-2 loaders.
-                sd[weight_key] = (weight_float * scale).to(model_dtype)
-                del weight_float
-                dequantized_count += 1
+        # Both spellings, because the metadata strip below removes both.
+        for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
+            weight = sd[weight_key]
+            scale = sd[scale_key]
+            # Dequantize: convert to float and multiply by scale
+            # Handle block-wise quantization (e.g., FP4 with block_size=8)
+            # where scale has shape [weight_dim / block_size, ...]
+            # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
+            # as PyTorch doesn't support direct type promotion for Float8 types
+            weight_float = weight.float()
+            scale = scale.float()
+            if scale.shape != weight_float.shape and scale.numel() > 1:
+                # Block-wise quantization: need to expand scale to match weight shape
+                # Find which dimension differs and repeat scale along that dimension
+                for dim in range(len(weight_float.shape)):
+                    if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
+                        block_size = weight_float.shape[dim] // scale.shape[dim]
+                        if block_size > 1:
+                            # Repeat scale along this dimension to match weight shape
+                            scale = scale.repeat_interleave(block_size, dim=dim)
+            # Multiply in float32 for precision, but store the compute dtype immediately so the
+            # *whole model* is never materialized in float32. Keeping every dequantized weight as
+            # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs
+            # 1 on disk) and dominates the cold-load RAM peak — enough to swap a 32 GB machine.
+            # Same fix as in the FLUX.2 and Krea-2 loaders.
+            sd[weight_key] = (weight_float * scale).to(model_dtype)
+            del weight_float
+            dequantized_count += 1
 
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI quantized weights")
 
         # Filter out ComfyUI quantization metadata keys (comfy_quant, weight_scale)
         # These are no longer needed after dequantization
-        comfy_metadata_keys = [k for k in sd.keys() if "comfy_quant" in k or "weight_scale" in k]
+        comfy_metadata_keys = [k for k in sd.keys() if is_scale_metadata_key(k)]
         for k in comfy_metadata_keys:
             del sd[k]
         if comfy_metadata_keys:

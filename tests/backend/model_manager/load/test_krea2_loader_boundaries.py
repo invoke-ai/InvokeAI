@@ -36,6 +36,8 @@ def test_single_file_loader_constructs_and_materializes_model(monkeypatch, tmp_p
     ram_cache = SimpleNamespace(make_room=MagicMock())
     loader = object.__new__(Krea2CheckpointModel)
     loader._ram_cache = ram_cache
+    # ModelLoader.__init__ always sets a logger; this test bypasses __init__, so supply one.
+    loader._logger = MagicMock()
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
 
     monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyKrea2Transformer, raising=False)

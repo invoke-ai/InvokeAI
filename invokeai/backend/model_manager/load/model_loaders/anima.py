@@ -2,7 +2,7 @@
 """Class for Anima model loading in InvokeAI."""
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import accelerate
 
@@ -18,6 +18,20 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     SubModelType,
+)
+from invokeai.backend.quantization.fp8_scaled import (
+    attach_fp8_scales,
+    cast_state_dict,
+    dequantize_fp8_scaled,
+    extract_comfy_quant_hints,
+    extract_fp8_scaled_layers,
+    full_precision_hints_respected,
+    parse_quantization_metadata,
+    predict_cast_state_dict_size,
+    read_safetensors_metadata,
+    should_keep_fp8_weights,
+    split_fp8_scaled_layers,
+    warn_on_unattached_scales,
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -65,6 +79,19 @@ _NON_MODEL_KEY_SUFFIXES = (
     "pos_embedder.seq",
 )
 _NON_MODEL_KEY_PREFIXES = ("model_sampling.",)
+
+
+def _strip_anima_prefix_from_layer_paths(layer_names: Any) -> dict[str, str]:
+    """Map checkpoint-scheme layer names to the paths the module tree actually uses.
+
+    `_quantization_metadata` names its layers in the checkpoint's own scheme -- `net.`-prefixed on
+    every Anima redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
+    has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match nothing
+    and are silently ignored. Rather than restating the prefix list, the names are pushed through
+    the real strip function and read back.
+    """
+    stripped = _strip_anima_bundle_prefix({f"{name}.weight": None for name in layer_names})
+    return {name: key[: -len(".weight")] for name, key in zip(layer_names, stripped.keys(), strict=True)}
 
 
 def _filter_non_model_keys(sd: dict) -> dict:
@@ -125,6 +152,30 @@ class AnimaCheckpointModel(ModelLoader):
         # Drop runtime-derived buffers and exporter metadata that aren't model weights.
         sd = _filter_non_model_keys(sd)
 
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+
+        # ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`. `_filter_non_model_keys` above
+        # keeps those keys, and `load_state_dict` below rejects the checkpoint outright over them --
+        # 500 unexpected keys on a plain scaled export, 749 on one that also ships `comfy_quant`
+        # markers. Such a checkpoint therefore does not load at all today.
+        #
+        # Anima keeps `q_proj`/`k_proj`/`v_proj` separate and the only key rewrite is a prefix strip,
+        # so a sibling scale travels with its weight and nothing has to be split.
+        keep_fp8 = should_keep_fp8_weights(target_device)
+        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+        path_map = _strip_anima_prefix_from_layer_paths(list(header_hints))
+        layer_hints = {
+            **extract_comfy_quant_hints(sd),
+            **{path_map.get(name, name): hints for name, hints in header_hints.items()},
+        }
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+        if fp8_layers and not keep_fp8:
+            # Without the matmul, keeping them quantized would halve VRAM but dequantize on every
+            # forward. Fold the scale into the weight instead.
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
+
         # Create an empty AnimaTransformer with Anima's default architecture parameters
         with accelerate.init_empty_weights():
             model = AnimaTransformer(
@@ -156,18 +207,15 @@ class AnimaCheckpointModel(ModelLoader):
                 image_model="anima",
             )
 
-        # Determine safe dtype
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        # Layers the cast would dequantize anyway are folded here, scale applied, so the cast never
+        # strips a scale that can no longer be put back.
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
 
-        # Handle memory management
-        new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
-        self._ram_cache.make_room(new_sd_size)
-
-        # Convert to target dtype (skip non-float tensors like embedding indices)
-        for k in sd.keys():
-            if sd[k].is_floating_point():
-                sd[k] = sd[k].to(model_dtype)
+        self._ram_cache.make_room(
+            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+        )
+        kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 
         load_result = model.load_state_dict(sd, assign=True, strict=False)
         if load_result.unexpected_keys:
@@ -181,6 +229,25 @@ class AnimaCheckpointModel(ModelLoader):
                 f"Checkpoint is missing {len(load_result.missing_keys)} keys "
                 f"(expected for inv_freq buffers). First 5: {load_result.missing_keys[:5]}"
             )
+
+        # Without this the `fp8_storage` toggle is shown for Anima models but does nothing. The
+        # state dict was cast to a single `model_dtype` above, so the layerwise cast has one
+        # unambiguous compute dtype to restore to. AnimaTransformer is a plain nn.Module, so this
+        # takes the hook-based path in `_apply_fp8_to_nn_module`.
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            logger.info(f"Anima: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)")
+            warn_on_unattached_scales(logger, "Anima", attached, fp8_layers)
+            marked = sum(1 for layer in fp8_layers.values() if layer.full_precision_matmul)
+            if marked and full_precision_hints_respected():
+                logger.info(
+                    f"Anima: {marked} of {len(fp8_layers)} layer(s) are marked full_precision_matrix_mult "
+                    "and will dequantize per forward."
+                )
+        elif kept:
+            logger.info(f"Anima: kept {kept} raw fp8 weight(s) quantized for the fp8 tensor cores.")
+
+        model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 
