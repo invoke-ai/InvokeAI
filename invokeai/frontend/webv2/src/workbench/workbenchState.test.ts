@@ -26,6 +26,7 @@ import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 import {
   clampPanelSize,
+  getPanelCollapseThreshold,
   GRAPH_HISTORY_BYTE_BUDGET,
   isPanelCollapseOvershoot,
   normalizeGraphHistory,
@@ -683,6 +684,11 @@ describe('workbench panel resize bounds', () => {
     expect(isPanelCollapseOvershoot('bottom', 96)).toBe(false);
     expect(isPanelCollapseOvershoot('bottom', 17)).toBe(false);
     expect(isPanelCollapseOvershoot('bottom', 16)).toBe(true);
+  });
+
+  it('exposes the collapse threshold as a size below the floor', () => {
+    expect(getPanelCollapseThreshold('left')).toBe(270);
+    expect(getPanelCollapseThreshold('bottom')).toBe(16);
   });
 
   it('reopens a collapsed region at the size it was collapsed from', () => {

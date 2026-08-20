@@ -427,13 +427,13 @@ export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: nu
   return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
 };
 
-/**
- * True once a resize drag has overshot the floor far enough to mean collapse.
- * Takes the drag's raw, unclamped size — the whole point is the distance
- * `clampPanelSize` throws away.
- */
+/** The size at or below which releasing a resize drag collapses the region. */
+export const getPanelCollapseThreshold = (region: WidgetRegion): number =>
+  getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
+
+/** True once a drag has pushed past the floor far enough that releasing collapses. */
 export const isPanelCollapseOvershoot = (region: WidgetRegion, sizePx: number): boolean =>
-  sizePx <= getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
+  sizePx <= getPanelCollapseThreshold(region);
 
 const now = (): string => new Date().toISOString();
 

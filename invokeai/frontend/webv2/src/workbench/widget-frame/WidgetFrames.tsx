@@ -36,11 +36,7 @@ import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 
 const PANEL_SIZE_STEP_PX = 16;
 
-/**
- * A live resize drag. `sizePx` is what the panel renders at — always inside the
- * region's bounds — while `isCollapseOvershoot` remembers that the pointer went
- * far enough past the floor to mean "collapse", which clamping alone discards.
- */
+/** `sizePx` is the floored size the panel renders at; the flag survives the flooring. */
 interface PanelResizeDrag {
   isCollapseOvershoot: boolean;
   sizePx: number;
@@ -64,9 +60,8 @@ export const WidgetPanelFrame = ({
   const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
   const { layout } = useWorkbenchCommands();
   const [drag, setDrag] = useState<PanelResizeDrag | null>(null);
-  // The drag listens on `window`, so a frame that unmounts mid-gesture (a
-  // preset switch, a widget closing) would otherwise leave the listeners
-  // behind and commit a size to a region that is no longer on screen.
+  // A frame unmounting mid-gesture would otherwise leave window listeners
+  // behind and commit a size to a region no longer on screen.
   const pointerSessionRef = useRef<AbortController | null>(null);
 
   useMountEffect(() => () => pointerSessionRef.current?.abort());
@@ -104,12 +99,21 @@ export const WidgetPanelFrame = ({
 
       let nextDrag: PanelResizeDrag = { isCollapseOvershoot: false, sizePx: clampPanelSize(region, startSizePx) };
 
+      // Keeps the gesture alive when the pointer leaves the window, which is
+      // where it goes when dragging the bottom strip shut. Throws if the
+      // pointer is already gone; the window listeners still carry the drag.
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // No capture available — fall through to the window listeners.
+      }
+
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
         const rawSizePx = startSizePx + deltaPx;
 
-        // Recomputed from the live position every move, never latched, so
-        // dragging back inside the floor disarms the collapse.
+        // Derived from the live position, never latched, so dragging back
+        // inside the floor disarms the collapse.
         nextDrag = {
           isCollapseOvershoot: isPanelCollapseOvershoot(region, rawSizePx),
           sizePx: clampPanelSize(region, rawSizePx),
@@ -122,10 +126,8 @@ export const WidgetPanelFrame = ({
         setDrag(null);
 
         if (nextDrag.isCollapseOvershoot) {
-          // Collapsing is a visibility change, not a resize: `sizePx` keeps the
-          // width the user chose, so the rail button reopens the panel where
-          // they left it — as collapsing from the rail already does. Committing
-          // the floor here would ratchet a 450px panel down to 350 every time.
+          // Visibility change, not a resize — `sizePx` keeps the width the user
+          // chose so the rail button reopens the panel where they left it.
           layout.setRegionCollapsed(region, true);
 
           return;
@@ -134,8 +136,7 @@ export const WidgetPanelFrame = ({
         commitSize(nextDrag.sizePx);
       };
 
-      // A cancelled gesture is an interruption, not an instruction: it keeps
-      // the size the pointer reached but never collapses.
+      // An interruption, not an instruction: keeps the size, never collapses.
       const handlePointerCancel = () => {
         pointerSession.abort();
         setDrag(null);
@@ -153,7 +154,12 @@ export const WidgetPanelFrame = ({
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const step = event.shiftKey ? PANEL_SIZE_STEP_PX * 2 : PANEL_SIZE_STEP_PX;
       const sizeChanges: Partial<Record<string, number>> = isBottom
-        ? { ArrowDown: -step, ArrowUp: step, End: maxPanelSizePx - displaySizePx, Home: minPanelSizePx - displaySizePx }
+        ? {
+            ArrowDown: -step,
+            ArrowUp: step,
+            End: maxPanelSizePx - displaySizePx,
+            Home: minPanelSizePx - displaySizePx,
+          }
         : {
             ArrowLeft: isLeft ? -step : step,
             ArrowRight: isLeft ? step : -step,
@@ -175,12 +181,15 @@ export const WidgetPanelFrame = ({
     () => (isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` }),
     [displaySizePx, isBottom]
   );
+  // Inside the panel's box, never straddling its edge: the frame clips its
+  // overflow, so a handle hung outside loses that half and leaves a ~4px
+  // target sitting behind the border people actually aim at.
   const resizeOrientationProps = useMemo(
-    () => (isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' }),
+    () => (isBottom ? { h: '2', left: '0', right: '0', top: '0' } : { bottom: '0', top: '0', w: '2' }),
     [isBottom]
   );
   const resizeSideProps = useMemo(
-    () => (!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {}),
+    () => (!isBottom ? (isLeft ? { right: '0' } : { left: '0' }) : {}),
     [isBottom, isLeft]
   );
 
@@ -215,13 +224,10 @@ export const WidgetPanelFrame = ({
         position="absolute"
         role="separator"
         tabIndex={0}
-        // The handle is invisible at rest and only shows on hover, but an 8px
-        // strip loses hover the moment a drag starts — so while the drag is
-        // armed to collapse, it lights up on its own. Without it, overshooting
-        // is a gesture with no feedback until the panel vanishes.
+        // Hover is lost the moment the drag starts, so the armed state paints itself.
         bg={isCollapseArmed ? 'accent.solid' : undefined}
         data-collapse-armed={isCollapseArmed ? '' : undefined}
-        opacity={isCollapseArmed ? '0.65' : '0'}
+        opacity={isCollapseArmed ? '1' : '0'}
         transition="opacity var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
         zIndex="1"
         {...resizeOrientationProps}

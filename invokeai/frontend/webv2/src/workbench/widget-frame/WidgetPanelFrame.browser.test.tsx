@@ -156,6 +156,45 @@ describe('WidgetPanelFrame resize', () => {
     expect(separator.getAttribute('aria-valuemax')).toBe('720');
   });
 
+  // The frame clips its overflow, so a handle hung outside the panel edge
+  // loses that half — leaving a sliver behind the border people aim at, and a
+  // gesture that silently does nothing.
+  it.each(['left', 'right', 'bottom'] as const)('keeps the whole %s handle inside the clip', async (region) => {
+    const separator = await renderFrame(region);
+    const handle = separator.getBoundingClientRect();
+    const panel = separator.parentElement!.getBoundingClientRect();
+
+    expect(handle.left).toBeGreaterThanOrEqual(panel.left);
+    expect(handle.right).toBeLessThanOrEqual(panel.right);
+    expect(handle.top).toBeGreaterThanOrEqual(panel.top);
+    expect(handle.bottom).toBeLessThanOrEqual(panel.bottom);
+  });
+
+  it('holds the panel at the floor while the drag keeps going', async () => {
+    const separator = await renderFrame();
+    // Chakra emits the width as a class rather than an inline style.
+    const panelWidth = () => getComputedStyle(separator.parentElement!).width;
+
+    await dragTo(separator, { end: 'none', widthPx: 300 });
+    expect(panelWidth()).toBe('350px');
+    expect(separator.hasAttribute('data-collapse-armed')).toBe(false);
+
+    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -400 })));
+    expect(panelWidth()).toBe('350px');
+    expect(separator.hasAttribute('data-collapse-armed')).toBe(true);
+  });
+
+  it('captures the pointer so the gesture survives leaving the window', async () => {
+    const separator = await renderFrame();
+    const setPointerCapture = vi.spyOn(separator as HTMLElement, 'setPointerCapture');
+
+    await interact(() =>
+      separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, pointerId: 7 }))
+    );
+
+    expect(setPointerCapture).toHaveBeenCalledWith(7);
+  });
+
   it('drops the window listeners when the frame unmounts mid-drag', async () => {
     const separator = await renderFrame();
 
