@@ -28,8 +28,8 @@ import {
   clampPanelSize,
   getPanelCollapseThreshold,
   GRAPH_HISTORY_BYTE_BUDGET,
-  isPanelCollapseOvershoot,
   normalizeGraphHistory,
+  shouldSnapPanelShut,
   normalizeWorkbenchAccount,
 } from './workbenchState';
 import {
@@ -674,16 +674,19 @@ describe('workbench panel resize bounds', () => {
     expect(clampPanelSize('left', 100)).toBe(350);
   });
 
-  it('arms collapse only once a drag clears the floor by the overshoot', () => {
-    expect(isPanelCollapseOvershoot('left', 350)).toBe(false);
-    expect(isPanelCollapseOvershoot('left', 271)).toBe(false);
-    expect(isPanelCollapseOvershoot('left', 270)).toBe(true);
+  it('snaps shut past the overshoot and reopens with hysteresis', () => {
+    expect(shouldSnapPanelShut('left', 350, false)).toBe(false);
+    expect(shouldSnapPanelShut('left', 271, false)).toBe(false);
+    expect(shouldSnapPanelShut('left', 270, false)).toBe(true);
+    // Once shut, dragging back only reopens past the halfway band.
+    expect(shouldSnapPanelShut('left', 290, true)).toBe(true);
+    expect(shouldSnapPanelShut('left', 311, true)).toBe(false);
   });
 
   it('measures the overshoot against whichever floor the region has', () => {
-    expect(isPanelCollapseOvershoot('bottom', 96)).toBe(false);
-    expect(isPanelCollapseOvershoot('bottom', 17)).toBe(false);
-    expect(isPanelCollapseOvershoot('bottom', 16)).toBe(true);
+    expect(shouldSnapPanelShut('bottom', 96, false)).toBe(false);
+    expect(shouldSnapPanelShut('bottom', 17, false)).toBe(false);
+    expect(shouldSnapPanelShut('bottom', 16, false)).toBe(true);
   });
 
   it('exposes the collapse threshold as a size below the floor', () => {

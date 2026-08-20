@@ -427,13 +427,17 @@ export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: nu
   return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
 };
 
-/** The size at or below which releasing a resize drag collapses the region. */
+/** The size at or below which a resize drag snaps the region shut. */
 export const getPanelCollapseThreshold = (region: WidgetRegion): number =>
   getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
 
-/** True once a drag has pushed past the floor far enough that releasing collapses. */
-export const isPanelCollapseOvershoot = (region: WidgetRegion, sizePx: number): boolean =>
-  sizePx <= getPanelCollapseThreshold(region);
+/**
+ * Whether a live drag should have the panel snapped shut, dockview-style: it
+ * snaps at the overshoot threshold and reopens halfway back, so the boundary
+ * has hysteresis instead of flapping a whole panel on one pixel.
+ */
+export const shouldSnapPanelShut = (region: WidgetRegion, rawSizePx: number, isSnapped: boolean): boolean =>
+  rawSizePx <= getPanelCollapseThreshold(region) + (isSnapped ? PANEL_COLLAPSE_OVERSHOOT_PX / 2 : 0);
 
 const now = (): string => new Date().toISOString();
 

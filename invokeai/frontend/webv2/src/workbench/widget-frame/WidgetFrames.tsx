@@ -17,7 +17,7 @@ import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { clampPanelSize, getPanelSizeBounds, isPanelCollapseOvershoot } from '@workbench/workbenchState';
+import { clampPanelSize, getPanelSizeBounds, shouldSnapPanelShut } from '@workbench/workbenchState';
 import { SettingsIcon } from 'lucide-react';
 import {
   useCallback,
@@ -36,9 +36,9 @@ import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 
 const PANEL_SIZE_STEP_PX = 16;
 
-/** `sizePx` is the floored size the panel renders at; the flag survives the flooring. */
+/** `sizePx` is the floored tracked size; `isSnappedShut` survives the flooring. */
 interface PanelResizeDrag {
-  isCollapseOvershoot: boolean;
+  isSnappedShut: boolean;
   sizePx: number;
 }
 
@@ -70,7 +70,10 @@ export const WidgetPanelFrame = ({
   // Clamped at render, not just on commit, so a persisted size from before a
   // bounds change heals on screen immediately instead of on the next resize.
   const displaySizePx = clampPanelSize(region, drag?.sizePx ?? regionState.sizePx);
-  const isCollapseArmed = drag?.isCollapseOvershoot ?? false;
+  // Mid-drag past the threshold the panel snaps shut on screen, dockview-style;
+  // the store's collapse is only committed on release.
+  const isSnappedShut = drag?.isSnappedShut ?? false;
+  const renderSizePx = isSnappedShut ? 0 : displaySizePx;
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
@@ -97,7 +100,7 @@ export const WidgetPanelFrame = ({
 
       pointerSessionRef.current = pointerSession;
 
-      let nextDrag: PanelResizeDrag = { isCollapseOvershoot: false, sizePx: clampPanelSize(region, startSizePx) };
+      let nextDrag: PanelResizeDrag = { isSnappedShut: false, sizePx: clampPanelSize(region, startSizePx) };
 
       // Keeps the gesture alive when the pointer leaves the window, which is
       // where it goes when dragging the bottom strip shut. Throws if the
@@ -112,10 +115,8 @@ export const WidgetPanelFrame = ({
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
         const rawSizePx = startSizePx + deltaPx;
 
-        // Derived from the live position, never latched, so dragging back
-        // inside the floor disarms the collapse.
         nextDrag = {
-          isCollapseOvershoot: isPanelCollapseOvershoot(region, rawSizePx),
+          isSnappedShut: shouldSnapPanelShut(region, rawSizePx, nextDrag.isSnappedShut),
           sizePx: clampPanelSize(region, rawSizePx),
         };
         setDrag(nextDrag);
@@ -125,7 +126,7 @@ export const WidgetPanelFrame = ({
         pointerSession.abort();
         setDrag(null);
 
-        if (nextDrag.isCollapseOvershoot) {
+        if (nextDrag.isSnappedShut) {
           // Visibility change, not a resize — `sizePx` keeps the width the user
           // chose so the rail button reopens the panel where they left it.
           layout.setRegionCollapsed(region, true);
@@ -178,8 +179,8 @@ export const WidgetPanelFrame = ({
     [commitSize, displaySizePx, isBottom, isLeft, maxPanelSizePx, minPanelSizePx]
   );
   const panelSizeProps = useMemo(
-    () => (isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` }),
-    [displaySizePx, isBottom]
+    () => (isBottom ? { h: `${renderSizePx}px`, w: 'full' } : { h: 'full', w: `${renderSizePx}px` }),
+    [renderSizePx, isBottom]
   );
   // Inside the panel's box, never straddling its edge: the frame clips its
   // overflow, so a handle hung outside loses that half and leaves a ~4px
@@ -199,9 +200,9 @@ export const WidgetPanelFrame = ({
       as="aside"
       bg="bg.subtle"
       borderColor="border.subtle"
-      borderRightWidth={isLeft ? '1px' : '0'}
-      borderLeftWidth={!isLeft && !isBottom ? '1px' : '0'}
-      borderTopWidth={isBottom ? '1px' : '0'}
+      borderRightWidth={isLeft && !isSnappedShut ? '1px' : '0'}
+      borderLeftWidth={!isLeft && !isBottom && !isSnappedShut ? '1px' : '0'}
+      borderTopWidth={isBottom && !isSnappedShut ? '1px' : '0'}
       direction="column"
       flexShrink={0}
       overflow="hidden"
@@ -224,10 +225,8 @@ export const WidgetPanelFrame = ({
         position="absolute"
         role="separator"
         tabIndex={0}
-        // Hover is lost the moment the drag starts, so the armed state paints itself.
-        bg={isCollapseArmed ? 'accent.solid' : undefined}
-        data-collapse-armed={isCollapseArmed ? '' : undefined}
-        opacity={isCollapseArmed ? '1' : '0'}
+        data-collapse-armed={isSnappedShut ? '' : undefined}
+        opacity="0"
         transition="opacity var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
         zIndex="1"
         {...resizeOrientationProps}

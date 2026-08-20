@@ -131,7 +131,7 @@ describe('WidgetPanelFrame resize', () => {
     expect(frameMocks.setRegionSize).not.toHaveBeenCalled();
   });
 
-  it('disarms when the drag comes back inside the floor', async () => {
+  it('reopens when the drag comes back inside the floor', async () => {
     const separator = await renderFrame();
 
     await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
@@ -170,7 +170,7 @@ describe('WidgetPanelFrame resize', () => {
     expect(handle.bottom).toBeLessThanOrEqual(panel.bottom);
   });
 
-  it('holds the panel at the floor while the drag keeps going', async () => {
+  it('holds at the floor, then snaps shut on screen at the threshold', async () => {
     const separator = await renderFrame();
     // Chakra emits the width as a class rather than an inline style.
     const panelWidth = () => getComputedStyle(separator.parentElement!).width;
@@ -180,7 +180,7 @@ describe('WidgetPanelFrame resize', () => {
     expect(separator.hasAttribute('data-collapse-armed')).toBe(false);
 
     await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -400 })));
-    expect(panelWidth()).toBe('350px');
+    expect(panelWidth()).toBe('0px');
     expect(separator.hasAttribute('data-collapse-armed')).toBe(true);
   });
 
