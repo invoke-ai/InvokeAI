@@ -50,6 +50,13 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('isMediaReady: paintedVideoName === videoName,');
     expect(source).toContain('setPaintedVideoName(videoName);');
     expect(source).toMatch(/renderedItemName: videoName,/);
+    // Nothing else pins the machine to the atom the overlay actually reads: selectedItemReveal's
+    // own tests substitute their own setRevealed, and every assertion here and in
+    // CurrentImagePreview.test.ts is on the read side. Replacing that wiring with a no-op left
+    // the whole suite green with the reveal dead (found by an adversarial review of the #9434
+    // merge). The machine is constructed once for both previews, so it is checked once.
+    const context = readFileSync(fileURLToPath(new URL('./context.tsx', import.meta.url)), 'utf8');
+    expect(context).toMatch(/setRevealed: \(revealed\) => \$isTemporarilyShowingSelectedImage\.set\(revealed\)/);
   });
 
   it('does not cover playback or a temporary reveal with the metadata panel', () => {
