@@ -622,7 +622,7 @@ class LatentsMetaOutput(LatentsOutput, MetadataOutput):
     title=f"{DenoiseLatentsInvocation.UIConfig.title} + Metadata",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.2.0",
+    version="1.3.0",
 )
 class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
     def invoke(self, context: InvocationContext) -> LatentsMetaOutput:

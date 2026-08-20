@@ -1734,6 +1734,7 @@
         "hiDiffusion": "HiDiffusion",
         "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
         "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionRatiosAuto": "HiDiffusion: Automatic Ratios",
         "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
         "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "coherenceMode": "Mode",
@@ -2178,6 +2179,13 @@
                 "Can boost local detail, but may affect global coherence."
             ]
         },
+        "hidiffusionRatiosAuto": {
+            "heading": "HiDiffusion: Automatic Ratios",
+            "paragraphs": [
+                "Uses the model- and resolution-specific T1 and T2 ratios recommended by HiDiffusion.",
+                "Disable this to set explicit ratio overrides below."
+            ]
+        },
         "hidiffusionT1Ratio": {
             "heading": "HiDiffusion: T1 Ratio",
             "paragraphs": [
@@ -2189,7 +2197,7 @@
             "heading": "HiDiffusion: T2 Ratio",
             "paragraphs": [
                 "Controls the late switch point for HiDiffusion (T2).",
-                "Higher values keep window attention active longer."
+                "Higher values keep the second RAU-Net resolution-aware stage active longer."
             ]
         },
         "clipSkip": {

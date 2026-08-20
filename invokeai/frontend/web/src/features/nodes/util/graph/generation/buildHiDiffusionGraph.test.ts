@@ -32,8 +32,8 @@ const defaultParams = {
   cfgRescaleMultiplier: 0,
   hiDiffusionEnabled: false,
   hiDiffusionRauNetEnabled: false,
-  hiDiffusionT1Ratio: 0.25,
-  hiDiffusionT2Ratio: 0.1,
+  hiDiffusionT1Ratio: 0.25 as number | null,
+  hiDiffusionT2Ratio: 0.1 as number | null,
   hiDiffusionWindowAttnEnabled: false,
   scheduler: 'euler',
   steps: 20,
@@ -192,5 +192,22 @@ describe('HiDiffusion graph metadata', () => {
     expect(metadata.hidiffusion_window_attn).toBe(false);
     expect(metadata.hidiffusion_t1_ratio).toBe(0.25);
     expect(metadata.hidiffusion_t2_ratio).toBe(0.1);
+  });
+
+  it('omits automatic ratio overrides from the SDXL denoise and metadata nodes', async () => {
+    currentModel = sdxlModel;
+    params.hiDiffusionEnabled = true;
+    params.hiDiffusionRauNetEnabled = true;
+    params.hiDiffusionT1Ratio = null;
+    params.hiDiffusionT2Ratio = null;
+
+    const { g } = await buildSDXLGraph(buildGraphArg());
+    const denoise = g.getNodes().find((node) => node.type === 'denoise_latents');
+    const metadata = getMetadata(g);
+
+    expect(denoise?.hidiffusion_t1_ratio).toBeUndefined();
+    expect(denoise?.hidiffusion_t2_ratio).toBeUndefined();
+    expect(metadata.hidiffusion_t1_ratio).toBeNull();
+    expect(metadata.hidiffusion_t2_ratio).toBeNull();
   });
 });
