@@ -114,8 +114,11 @@ const FontSelect = () => {
   const hasUserFontErrors = failedUserFontIds.length > 0;
 
   useEffect(() => {
+    if (userFonts === undefined) {
+      return;
+    }
     setCustomTextFontStacks(customFontStacks);
-  }, [customFontStacks]);
+  }, [customFontStacks, userFonts]);
 
   useEffect(() => {
     if (!isCustomTextFontId(fontId) || !userFonts || userFonts.length === 0) {
@@ -132,16 +135,16 @@ const FontSelect = () => {
   }, [dispatch, fontId, userFonts]);
 
   useEffect(() => {
-    if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
+    if (userFonts === undefined || typeof document === 'undefined' || typeof FontFace === 'undefined') {
       return;
     }
 
-    primeUserFontReadiness(userFonts ?? [], loadedUserFontFaces);
+    primeUserFontReadiness(userFonts, loadedUserFontFaces);
     let isCancelled = false;
 
     void (async () => {
       await syncUserFontFaces({
-        fonts: userFonts ?? [],
+        fonts: userFonts,
         token: authToken,
         baseUrl: getBaseUrl(),
         loadedFontFaces: loadedUserFontFaces,
@@ -162,7 +165,10 @@ const FontSelect = () => {
   }, [authToken, customFontStacks, fontSyncVersion, userFonts]);
 
   useEffect(() => {
-    reconcileUserFontRetryAttempts(autoRetryAttemptsRef.current, userFonts ?? [], userFontReadyStates);
+    if (userFonts === undefined) {
+      return;
+    }
+    reconcileUserFontRetryAttempts(autoRetryAttemptsRef.current, userFonts, userFontReadyStates);
   }, [userFontReadyStates, userFonts]);
 
   useEffect(() => {
