@@ -15,6 +15,9 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'FloatField',
   'ImageField',
   'IntegerField',
+  // The LoRA collection loaders take `LoRAField | list[LoRAField]`; the widget edits that list
+  // inline so a node can apply several LoRAs without a chain of Select LoRA / Collect nodes.
+  'LoRAField',
   'ModelIdentifierField',
   'SchedulerField',
   'StringField',
@@ -65,6 +68,48 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 
 const hasNonEmptyStringProp = (value: unknown, prop: string): boolean =>
   typeof value === 'object' && value !== null && isNonEmptyString((value as Record<string, unknown>)[prop]);
+
+/** A LoRA model identifier paired with its weight — one entry of a LoRA collection field. */
+export interface LoraFieldCollectionEntry {
+  lora: { base: string; hash: string; key: string; name: string; type: string };
+  weight: number;
+}
+
+/**
+ * Every field of the identifier is required, because that is what the backend's own
+ * `ModelIdentifierField` requires: a key-only entry renders as a nameless row and is rejected at
+ * enqueue time with a 422 that names nothing useful, so it is better treated as unreadable here.
+ */
+export const isLoraFieldCollectionEntry = (value: unknown): value is LoraFieldCollectionEntry => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const entry = value as { lora?: unknown; weight?: unknown };
+
+  return (
+    ['base', 'hash', 'key', 'name', 'type'].every((prop) => hasNonEmptyStringProp(entry.lora, prop)) &&
+    typeof entry.weight === 'number' &&
+    Number.isFinite(entry.weight)
+  );
+};
+
+/**
+ * The collection loaders accept `LoRAField | list[LoRAField]`, so a stored value may be a single
+ * entry, a list, or absent. The widget always authors a list; normalizing on read keeps imported
+ * workflows and hand-edited JSON rendering the same way.
+ *
+ * Items are returned as-is, including ones `isLoraFieldCollectionEntry` rejects. The widget writes
+ * the list it is given straight back on the next edit, so discarding or blanking an unreadable item
+ * here would let one click on an unrelated row silently destroy a hand-authored entry.
+ */
+export const toLoraFieldCollectionList = (value: unknown): unknown[] => {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  return value === undefined || value === null ? [] : [value];
+};
 
 const isNumberFieldValueValid = (template: FieldInputTemplate, value: unknown): boolean => {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -129,6 +174,10 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
       return isNonEmptyString(value) && (template.options === null || template.options.includes(value));
     case 'ModelIdentifierField':
       return hasNonEmptyStringProp(value, 'key');
+    case 'LoRAField':
+      // An empty list is a legitimate value: a collection loader with no LoRAs passes its
+      // models through untouched.
+      return Array.isArray(value) ? value.every(isLoraFieldCollectionEntry) : isLoraFieldCollectionEntry(value);
     case 'SchedulerField':
       return isNonEmptyString(value);
     case 'BoardField':
@@ -210,6 +259,7 @@ const FIELD_TYPE_COLORS: Record<string, string> = {
   ImageField: '#c4b5fd',
   IntegerField: '#f87171',
   LatentsField: '#f9a8d4',
+  LoRAField: '#e879f9',
   ModelIdentifierField: '#14b8a6',
   SchedulerField: '#3b82f6',
   StringField: '#facc15',
