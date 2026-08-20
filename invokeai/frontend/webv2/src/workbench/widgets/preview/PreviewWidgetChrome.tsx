@@ -9,13 +9,19 @@ import { usePreviewHeaderContext } from './previewHeaderStore';
 /**
  * The preview widget's header label: `[board] / [image]` for the current
  * selection (published by the view via `previewHeaderStore`), falling back to
- * the static "Preview" title when nothing is selected.
+ * the static "Preview" title when nothing is selected — except in the center,
+ * whose view trigger already names the widget (the gallery label does the
+ * same).
  */
-export const PreviewWidgetLabel = (_props: WidgetLabelProps) => {
+export const PreviewWidgetLabel = ({ region }: WidgetLabelProps) => {
   const { t } = useTranslation();
   const { boardName, itemName } = usePreviewHeaderContext();
 
   if (!itemName || !boardName) {
+    if (region === 'center') {
+      return null;
+    }
+
     return (
       <Text fontSize="xs" fontWeight="700">
         {t('widgets.labels.preview')}
