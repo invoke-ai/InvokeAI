@@ -81,9 +81,9 @@ const isVideoLora = (value: unknown): value is GenerateLora =>
 const getStringArray = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-/** Whether every key the accelerator toggle recorded is still present in the LoRA list. */
+/** Whether every key the accelerator toggle recorded is still present AND enabled in the LoRA list. */
 const areAcceleratorLorasPresent = (keys: readonly string[], loras: readonly GenerateLora[]): boolean =>
-  keys.length > 0 && keys.every((key) => loras.some((lora) => lora.model.key === key));
+  keys.length > 0 && keys.every((key) => loras.some((lora) => lora.model.key === key && lora.isEnabled));
 
 /**
  * Which inputs are filled decides the mode; there is no mode selector. A first

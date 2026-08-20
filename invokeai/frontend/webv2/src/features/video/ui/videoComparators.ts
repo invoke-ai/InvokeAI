@@ -18,6 +18,8 @@ export const areVideoLorasEquivalent = (left: VideoWidgetValues['loras'], right:
   left.every(
     (lora, index) =>
       lora.model.key === right[index]?.model.key &&
+      lora.model.name === right[index]?.model.name &&
+      lora.model.hash === right[index]?.model.hash &&
       lora.weight === right[index]?.weight &&
       lora.isEnabled === right[index]?.isEnabled
   );

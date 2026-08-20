@@ -95,7 +95,7 @@ export const syncVideoWidgetValuesWithModels = (
   const acceleratorAlive =
     base.acceleratorEnabled &&
     base.acceleratorLoraKeys.length > 0 &&
-    base.acceleratorLoraKeys.every((key) => loras.some((lora) => lora.model.key === key));
+    base.acceleratorLoraKeys.every((key) => loras.some((lora) => lora.model.key === key && lora.isEnabled));
   // Reuse the stored array whenever the content is unchanged — the identity
   // guarantee below depends on it.
   const acceleratorLoraKeys = acceleratorAlive || base.acceleratorLoraKeys.length === 0 ? base.acceleratorLoraKeys : [];
