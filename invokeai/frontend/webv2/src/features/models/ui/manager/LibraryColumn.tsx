@@ -193,7 +193,11 @@ export const LibraryColumn = () => {
       <HStack borderBottomWidth={1} flexShrink={0} gap="2" minH="8" px="3" py="1.5">
         <Checkbox.Root
           aria-label={t('models.selectAll')}
-          checked={hasSelection ? (hasUnselectedFiltered ? 'indeterminate' : true) : false}
+          // A filter matching nothing must not read "all selected" — with a
+          // selection held entirely out of view, indeterminate is the honest
+          // state, and the click clears it (the only act left with nothing
+          // visible to add).
+          checked={hasSelection ? (hasUnselectedFiltered || filteredKeys.length === 0 ? 'indeterminate' : true) : false}
           colorPalette="accent"
           disabled={!canSelectAll}
           size="xs"
