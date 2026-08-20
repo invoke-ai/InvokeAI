@@ -5,7 +5,7 @@ import { z } from 'zod';
 export const zTextFontId = z.string().min(1);
 export type TextFontId = string;
 
-type TextFontStack = { id: TextFontId; label: string; stack: string };
+type TextFontStack = { id: TextFontId; label: string; stack: string; aliases?: TextFontId[] };
 
 export const TEXT_FONT_STACKS: Array<TextFontStack> = [
   {
@@ -156,6 +156,10 @@ export const getTextFontStack = (fontId: TextFontId): TextFontStack | undefined 
   const exactMatch = fonts.find((font) => font.id === fontId);
   if (exactMatch) {
     return exactMatch;
+  }
+  const aliasMatch = fonts.find((font) => font.aliases?.includes(fontId));
+  if (aliasMatch) {
+    return aliasMatch;
   }
   if (!isCustomTextFontId(fontId)) {
     return undefined;

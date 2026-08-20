@@ -271,7 +271,37 @@ def test_list_user_fonts_allows_authenticated_access(
     assert r.status_code == status.HTTP_200_OK
     body = r.json()
     assert len(body["fonts"]) == 1
-    assert body["fonts"][0]["id"] == "user:MyFont.ttf"
+    assert body["fonts"][0]["id"] == "user:my font"
+
+
+def test_list_user_fonts_id_is_stable_when_preferred_face_changes(
+    admin_token: str,
+    client: TestClient,
+    mock_invoker: Invoker,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    mock_invoker.services.configuration.fonts_dir = tmp_path / "fonts"
+    fonts_dir = mock_invoker.services.configuration.fonts_path
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "MyFont-Bold.ttf").write_bytes(b"not-a-real-font")
+
+    def get_metadata(font_file: Path) -> tuple[str, str, int, str]:
+        weight = 400 if "Regular" in font_file.stem else 700
+        return ("My Font", "My Font", weight, "normal")
+
+    monkeypatch.setattr("invokeai.app.api.routers.utilities._get_font_metadata", get_metadata)
+
+    first_response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+    first_font = first_response.json()["fonts"][0]
+    assert first_font["id"] == "user:my font"
+    assert first_font["path"] == "MyFont-Bold.ttf"
+
+    (fonts_dir / "MyFont-Regular.ttf").write_bytes(b"not-a-real-font")
+    second_response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+    second_font = second_response.json()["fonts"][0]
+    assert second_font["id"] == first_font["id"]
+    assert second_font["path"] == "MyFont-Regular.ttf"
 
 
 def test_list_user_fonts_skips_malformed_fonts_and_logs_warning(

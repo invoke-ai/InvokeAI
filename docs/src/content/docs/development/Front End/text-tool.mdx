@@ -39,6 +39,6 @@ The Text tool also supports server-managed custom fonts from the configured `fon
 To add or adjust fonts:
 
 1. Update `TEXT_FONT_STACKS` with the new `id`, `label`, and CSS `font-family` stack.
-2. If you add a new stack, extend the `TEXT_FONT_IDS` tuple and update the `canvasTextSlice` schema default (`TEXT_DEFAULT_FONT_ID`).
+2. If the new stack should be the default, update `TEXT_DEFAULT_FONT_ID`.
 3. Provide translation strings for any new labels in `public/locales/*`.
 4. The editor and renderer will automatically pick up the new stack via `getFontStackById()`.

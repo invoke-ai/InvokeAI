@@ -307,7 +307,7 @@ def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsResponse:
         return (0 if style == "normal" else 1, abs(weight - 400), len(path.stem))
 
     fonts: list[UserFont] = []
-    for _, candidates in sorted(family_candidates.items(), key=lambda kv: kv[0]):
+    for family_key, candidates in sorted(family_candidates.items(), key=lambda kv: kv[0]):
         _, selected_relative, selected_family, _, _ = min(candidates, key=lambda c: _candidate_score(c[3], c[4], c[0]))
         faces_by_variant: dict[tuple[int, str], tuple[Path, str, str, int, str]] = {}
         for candidate in candidates:
@@ -332,7 +332,7 @@ def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsResponse:
 
         fonts.append(
             UserFont(
-                id=f"user:{selected_relative}",
+                id=f"user:{family_key}",
                 family=selected_family,
                 label=selected_family,
                 path=selected_relative,

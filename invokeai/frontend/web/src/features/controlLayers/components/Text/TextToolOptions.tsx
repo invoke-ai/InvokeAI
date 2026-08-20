@@ -49,8 +49,10 @@ import {
 import {
   $userFontReadyStates,
   buildCustomTextFontStacks,
+  getUserFontAutoRetryDelayMs,
   loadedUserFontFaces,
   primeUserFontReadiness,
+  reconcileUserFontRetryAttempts,
   syncUserFontFaces,
 } from 'features/controlLayers/text/textUserFonts';
 import { toast } from 'features/toast/toast';
@@ -98,7 +100,7 @@ const FontSelect = () => {
   const fontId = useAppSelector(selectTextFontId);
   const authToken = useAppSelector(selectAuthToken);
   const { data: userFonts } = useListUserFontsQuery();
-  const autoRetryAttemptsRef = useRef(0);
+  const autoRetryAttemptsRef = useRef(new Map<TextFontId, number>());
   const userFontReadyStates = useStore($userFontReadyStates);
   const [fontSyncVersion, setFontSyncVersion] = useState(0);
   const userFontsLabel = t('controlLayers.text.customFonts');
@@ -106,9 +108,10 @@ const FontSelect = () => {
   const missingFontLabel = t('controlLayers.text.missingFont');
   const fontLoadFailedLabel = t('controlLayers.text.fontLoadFailed');
   const customFontStacks = useMemo(() => buildCustomTextFontStacks(userFonts ?? []), [userFonts]);
-  const hasUserFontErrors = useMemo(() => {
-    return (userFonts ?? []).some((font) => userFontReadyStates[font.id] === 'error');
+  const failedUserFontIds = useMemo(() => {
+    return (userFonts ?? []).filter((font) => userFontReadyStates[font.id] === 'error').map((font) => font.id);
   }, [userFontReadyStates, userFonts]);
+  const hasUserFontErrors = failedUserFontIds.length > 0;
 
   useEffect(() => {
     setCustomTextFontStacks(customFontStacks);
@@ -159,24 +162,32 @@ const FontSelect = () => {
   }, [authToken, customFontStacks, fontSyncVersion, userFonts]);
 
   useEffect(() => {
-    if (!hasUserFontErrors) {
-      autoRetryAttemptsRef.current = 0;
-      return;
-    }
-    if (typeof window === 'undefined' || autoRetryAttemptsRef.current >= 2) {
+    reconcileUserFontRetryAttempts(autoRetryAttemptsRef.current, userFonts ?? [], userFontReadyStates);
+  }, [userFontReadyStates, userFonts]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    const delayMs = autoRetryAttemptsRef.current === 0 ? 1000 : 3000;
-    const timeout = window.setTimeout(() => {
-      autoRetryAttemptsRef.current += 1;
-      setFontSyncVersion((version) => version + 1);
-    }, delayMs);
+    const timeouts = failedUserFontIds.flatMap((fontId) => {
+      const attempts = autoRetryAttemptsRef.current.get(fontId) ?? 0;
+      const delayMs = getUserFontAutoRetryDelayMs(attempts);
+      if (delayMs === undefined) {
+        return [];
+      }
+      return [
+        window.setTimeout(() => {
+          autoRetryAttemptsRef.current.set(fontId, attempts + 1);
+          setFontSyncVersion((version) => version + 1);
+        }, delayMs),
+      ];
+    });
 
     return () => {
-      window.clearTimeout(timeout);
+      timeouts.forEach((timeout) => window.clearTimeout(timeout));
     };
-  }, [fontSyncVersion, hasUserFontErrors]);
+  }, [failedUserFontIds, fontSyncVersion]);
 
   useEffect(() => {
     if (!hasUserFontErrors || typeof window === 'undefined') {
@@ -184,6 +195,7 @@ const FontSelect = () => {
     }
 
     const retry = () => {
+      failedUserFontIds.forEach((fontId) => autoRetryAttemptsRef.current.delete(fontId));
       setFontSyncVersion((version) => version + 1);
     };
 
@@ -194,7 +206,7 @@ const FontSelect = () => {
       window.removeEventListener('focus', retry);
       window.removeEventListener('online', retry);
     };
-  }, [hasUserFontErrors]);
+  }, [failedUserFontIds, hasUserFontErrors]);
   useEffect(() => {
     for (const font of userFonts ?? []) {
       if (userFontReadyStates[font.id] !== 'error') {

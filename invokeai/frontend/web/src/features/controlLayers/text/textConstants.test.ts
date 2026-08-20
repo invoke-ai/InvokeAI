@@ -17,10 +17,18 @@ describe('textConstants custom font registry', () => {
     const listener = vi.fn();
     const unsubscribe = subscribeToCustomTextFontStacks(listener);
 
-    setCustomTextFontStacks([{ id: 'user:fonts/MyFont-Regular.ttf', label: 'My Font', stack: '"My Font",sans-serif' }]);
+    setCustomTextFontStacks([
+      {
+        id: 'user:my font',
+        label: 'My Font',
+        stack: '"My Font",sans-serif',
+        aliases: ['user:fonts/MyFont-Regular.ttf'],
+      },
+    ]);
 
     expect(listener).toHaveBeenCalledTimes(1);
     expect(getFontStackById('user:fonts/MyFont-Regular.ttf')).toBe('"My Font",sans-serif');
+    expect(getTextFontStack('user:fonts/MyFont-Regular.ttf')?.id).toBe('user:my font');
 
     unsubscribe();
   });

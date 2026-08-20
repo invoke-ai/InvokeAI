@@ -5,9 +5,12 @@ import {
   awaitUserFontReady,
   buildCustomTextFontStacks,
   clearUserFontRegistryForTests,
+  getUserFontAutoRetryDelayMs,
   getUserFontFaceKey,
   isUserFontReady,
   loadedUserFontFaces,
+  MAX_USER_FONT_AUTO_RETRY_ATTEMPTS,
+  reconcileUserFontRetryAttempts,
   syncUserFontFaces,
 } from './textUserFonts';
 
@@ -20,7 +23,7 @@ describe('textUserFonts', () => {
   };
 
   const font: UserFont = {
-    id: 'user:fonts/MyFont-Regular.ttf',
+    id: 'user:my font',
     family: 'My Font',
     label: 'My Font',
     path: 'fonts/MyFont-Regular.ttf',
@@ -38,8 +41,23 @@ describe('textUserFonts', () => {
         id: font.id,
         label: font.label,
         stack: '"My Font",sans-serif',
+        aliases: ['user:fonts/MyFont-Regular.ttf'],
       },
     ]);
+  });
+
+  it('preserves retry attempts while a failed font is pending', () => {
+    const attempts = new Map([[font.id, MAX_USER_FONT_AUTO_RETRY_ATTEMPTS]]);
+
+    reconcileUserFontRetryAttempts(attempts, [font], { [font.id]: 'pending' });
+    expect(attempts.get(font.id)).toBe(MAX_USER_FONT_AUTO_RETRY_ATTEMPTS);
+
+    reconcileUserFontRetryAttempts(attempts, [font], { [font.id]: 'error' });
+    expect(attempts.get(font.id)).toBe(MAX_USER_FONT_AUTO_RETRY_ATTEMPTS);
+    expect(getUserFontAutoRetryDelayMs(attempts.get(font.id) ?? 0)).toBeUndefined();
+
+    reconcileUserFontRetryAttempts(attempts, [font], { [font.id]: 'ready' });
+    expect(attempts.has(font.id)).toBe(false);
   });
 
   it('loads authenticated font faces and prunes stale entries', async () => {

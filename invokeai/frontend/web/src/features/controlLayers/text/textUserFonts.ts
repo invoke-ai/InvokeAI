@@ -2,7 +2,7 @@ import { isCustomTextFontId, type TextFontId } from 'features/controlLayers/text
 import { atom } from 'nanostores';
 import type { UserFont, UserFontFace } from 'services/api/endpoints/utilities';
 
-type CustomTextFontStack = { id: TextFontId; label: string; stack: string };
+type CustomTextFontStack = { id: TextFontId; label: string; stack: string; aliases: TextFontId[] };
 type UserFontReadyState = 'pending' | 'ready' | 'error';
 type UserFontReadinessResult = Exclude<UserFontReadyState, 'pending'> | 'timeout';
 
@@ -33,12 +33,36 @@ export const loadedUserFontFaces = new Map<string, FontFace>();
 const userFontReadyPromises = new Map<TextFontId, Promise<void>>();
 const userFontReadyResolvers = new Map<TextFontId, () => void>();
 const USER_FONT_READY_TIMEOUT_MS = 2000;
+export const MAX_USER_FONT_AUTO_RETRY_ATTEMPTS = 2;
+
+export const getUserFontAutoRetryDelayMs = (attempts: number): number | undefined => {
+  if (attempts >= MAX_USER_FONT_AUTO_RETRY_ATTEMPTS) {
+    return undefined;
+  }
+  return attempts === 0 ? 1000 : 3000;
+};
+
+export const reconcileUserFontRetryAttempts = (
+  attempts: Map<TextFontId, number>,
+  fonts: Array<UserFont>,
+  readyStates: Record<TextFontId, UserFontReadyState>
+): void => {
+  const activeFontIds = new Set(fonts.map((font) => font.id));
+  for (const fontId of attempts.keys()) {
+    if (!activeFontIds.has(fontId) || readyStates[fontId] === 'ready') {
+      attempts.delete(fontId);
+    }
+  }
+};
 
 export const buildCustomTextFontStacks = (fonts: Array<UserFont>): Array<CustomTextFontStack> => {
   return fonts.map((font) => ({
     id: font.id,
     label: font.label,
     stack: `"${font.family}",sans-serif`,
+    aliases: Array.from(new Set([font.path, ...font.faces.map((face) => face.path)]))
+      .map((path) => `user:${path}`)
+      .filter((id) => id !== font.id),
   }));
 };
 
