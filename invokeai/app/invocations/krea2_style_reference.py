@@ -110,7 +110,9 @@ class Krea2StyleReferenceInvocation(BaseInvocation):
         default=1.0,
         ge=0.0,
         le=2.0,
-        description="Overall style strength. 0 disables the reference; 1.0 is the recommended setting.",
+        description="Overall style strength. 1.0 is the recommended setting. 0 makes the denoise node ignore "
+        "the reference entirely - no capture pass, no retained keys/values - though this node still encodes "
+        "it; disconnect the node to skip that too.",
     )
     blocks: str = InputField(
         default=KREA2_DEFAULT_STYLE_BLOCKS,

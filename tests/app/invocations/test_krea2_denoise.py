@@ -942,6 +942,32 @@ def test_run_diffusion_without_a_style_reference_runs_no_extra_passes(monkeypatc
     assert transformer.installed_processors["transformer_blocks.0.attn.processor"].style_reference_state is None
 
 
+def test_run_diffusion_ignores_a_style_reference_at_strength_zero(monkeypatch, tmp_path) -> None:
+    # 0 is documented as disabling the reference. Running the machinery anyway would cost a capture pass per
+    # step (~2x runtime) and a retained K/V cache, all for an attention mix of 0.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field(style_strength=0.0)
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert transformer.style_modes == [None, None]
+    assert transformer.installed_processors["transformer_blocks.0.attn.processor"].style_reference_state is None
+
+
+def test_run_diffusion_still_runs_a_style_reference_at_a_small_strength(monkeypatch, tmp_path) -> None:
+    # Only an exact 0 is the bypass; anything above it still styles.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field(style_strength=0.01)
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert Krea2StyleReferenceMode.CAPTURE in transformer.style_modes
+
+
 def test_estimate_working_memory_accounts_for_the_style_reference_kv_cache() -> None:
     inv = Krea2DenoiseInvocation.model_construct()
     kwargs = {

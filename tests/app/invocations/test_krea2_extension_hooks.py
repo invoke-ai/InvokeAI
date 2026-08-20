@@ -198,6 +198,25 @@ def test_encode_aligns_callback_values_with_the_conditioning(monkeypatch) -> Non
     assert values[0, 1].item() == 1.0
 
 
+def test_encode_keeps_the_callback_device_and_dtype(monkeypatch) -> None:
+    # The callback is an out-of-tree extension seam, so it may hand back a tensor on the encoder's device
+    # (or in a different dtype). The suffix must follow it - a CPU suffix would make the concat raise
+    # "Expected all tensors to be on the same device".
+    monkeypatch.setattr(
+        "invokeai.backend.krea2.text_encoding.TorchDevice.choose_bfloat16_safe_dtype", lambda _d: torch.float32
+    )
+
+    def build(offset_mapping: torch.Tensor) -> torch.Tensor:
+        return torch.ones(offset_mapping.shape[0], dtype=torch.float16, device="meta")
+
+    _, _, values = encode_krea2_prompt("a prompt", _WordTokenizer(), _StubEncoder(), build)
+
+    assert values is not None
+    assert values.device.type == "meta"
+    assert values.dtype == torch.float16
+    assert values.shape == (1, 512)
+
+
 def test_encode_returns_none_when_the_callback_yields_nothing(monkeypatch) -> None:
     monkeypatch.setattr(
         "invokeai.backend.krea2.text_encoding.TorchDevice.choose_bfloat16_safe_dtype", lambda _d: torch.float32

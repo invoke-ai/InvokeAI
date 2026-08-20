@@ -49,6 +49,21 @@ describe('getGlobalReferenceImageWarningsInContext', () => {
     );
   });
 
+  it('treats a strength of 0 as disabled when deciding which one is used', () => {
+    // 0 is a full bypass - the graph builder skips the entity, so the next one is the one actually used.
+    const entities = [
+      krea2Entity('bypassed', { config: { type: 'krea2_reference_image', styleStrength: 0, image } as never }),
+      krea2Entity('used'),
+    ];
+
+    expect(getGlobalReferenceImageWarningsInContext(entities[1]!, entities, krea2Model)).not.toContain(
+      'controlLayers.warnings.krea2OnlyOneReferenceImage'
+    );
+    expect(getGlobalReferenceImageWarningsInContext(entities[0]!, entities, krea2Model)).not.toContain(
+      'controlLayers.warnings.krea2OnlyOneReferenceImage'
+    );
+  });
+
   it('does not warn when a disabled entity is the extra one', () => {
     const entities = [krea2Entity('used'), krea2Entity('off', { isEnabled: false })];
     expect(getGlobalReferenceImageWarningsInContext(entities[1]!, entities, krea2Model)).not.toContain(

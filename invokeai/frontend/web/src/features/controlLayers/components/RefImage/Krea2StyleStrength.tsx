@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 // Krea-2's style reference has no adapter model and no begin/end step range - style strength is the one
 // knob. It is a master control: besides mixing the styled attention it also pulls the reference key's
-// frequency scaling and the AdaIN strength back toward neutral, so 0 is a true bypass.
+// frequency scaling and the AdaIN strength back toward neutral. At 0 the graph builder omits the style
+// node altogether, so the bypass is free rather than merely invisible.
 const CONSTRAINTS = {
   initial: 1,
   min: 0,

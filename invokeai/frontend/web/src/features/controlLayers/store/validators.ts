@@ -243,7 +243,11 @@ export const getGlobalReferenceImageWarningsInContext = (
   const warnings: string[] = [...getGlobalReferenceImageWarnings(entity, model)];
 
   if (model?.base === 'krea-2') {
-    const usable = allEntities.filter((e) => e.isEnabled && isKrea2ReferenceImageConfig(e.config) && e.config.image);
+    // Mirrors the graph builder's candidate filter, including the strength-0 bypass: a reference at 0 is
+    // skipped entirely, so the next one becomes the one that is used and must not be flagged as extra.
+    const usable = allEntities.filter(
+      (e) => e.isEnabled && isKrea2ReferenceImageConfig(e.config) && e.config.image && e.config.styleStrength > 0
+    );
     const isUsable = usable.some((e) => e.id === entity.id);
     if (isUsable && usable.length > 1 && usable[0]?.id !== entity.id) {
       warnings.push(WARNINGS.KREA2_ONLY_ONE_REFERENCE_IMAGE);

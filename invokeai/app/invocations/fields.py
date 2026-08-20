@@ -412,7 +412,10 @@ class Krea2StyleReferenceField(BaseModel):
     reference_latents_name: str = Field(description="Name of the saved [1, 16, 1, H/8, W/8] reference latents.")
     width: int = Field(description="Image width the reference was encoded at (must match denoise width).")
     height: int = Field(description="Image height the reference was encoded at (must match denoise height).")
-    style_strength: float = Field(default=1.0, description="Overall style strength. 0 disables the reference.")
+    style_strength: float = Field(
+        default=1.0,
+        description="Overall style strength. 0 makes the denoise node skip the reference entirely.",
+    )
     blocks: str = Field(default="7-27", description="Transformer blocks the reference is injected into.")
     ref_k_strength: float = Field(default=1.06, description="Multiplier on the reference key path.")
     adain_strength: float = Field(default=0.85, description="Reference statistics applied to the target Q/K.")

@@ -104,7 +104,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="Training-free style reference. Adds one reference forward per step, so generation "
         "takes roughly twice as long, and retains the reference's attention keys/values for the whole "
         "step (~0.5 GB at 1024x1024, ~1.7 GB at 2560x1440). At 1440p the combined footprint no longer "
-        "fits a 24 GB card alongside the model.",
+        "fits a 24 GB card alongside the model. A style_strength of 0 is ignored entirely and costs "
+        "nothing.",
         input=Input.Connection,
         title="Style Reference",
     )
@@ -420,7 +421,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         style_extension: Krea2StyleReferenceExtension | None = None
         style_ref_prompt_embeds = None
         style_ref_position_ids = None
-        if self.style_reference is not None:
+        # A style strength of 0 is documented as disabling the reference, so treat it as if nothing were
+        # connected: no latents load, no K/V cache, no capture pass, no working-memory reservation. Running
+        # the machinery for a mix of 0 would roughly double generation time for no visible effect.
+        if self.style_reference is not None and self.style_reference.style_strength > 0:
             style_extension = Krea2StyleReferenceExtension.from_field(
                 context,
                 self.style_reference,

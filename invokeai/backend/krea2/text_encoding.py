@@ -117,8 +117,10 @@ def encode_krea2_prompt(
         body_values = build_token_values(body_inputs.offset_mapping[0])
         if body_values is not None:
             # The suffix is never weighted, so extend to the full 546-token layout before applying the
-            # same prefix drop the embeddings and mask get.
-            suffix_values = torch.ones(suffix_inputs.input_ids.shape[1], dtype=body_values.dtype)
+            # same prefix drop the embeddings and mask get. `new_ones` inherits the callback's device and
+            # dtype - the callback is an extension seam, so it may well return a CUDA tensor, and a CPU
+            # suffix would make the concat fail.
+            suffix_values = body_values.new_ones(suffix_inputs.input_ids.shape[1])
             token_values = torch.cat([body_values, suffix_values])[KREA2_START_IDX:].unsqueeze(0)
 
     return prompt_embeds, prompt_mask, token_values

@@ -66,16 +66,33 @@ vi.mock('features/metadata/util/modelFetchingHelpers', () => ({
   fetchModelConfigWithTypeGuard: vi.fn(() => Promise.resolve(model)),
 }));
 
+// The real mode helpers are what assign the denoise dimensions - anything the builder reads off `denoise`
+// before they run is `undefined`. The mocks mirror that so ordering bugs are visible here (review 4977240290).
+let scaledSize = { width: 1024, height: 1024 };
+const applyScaledSize = (denoise: { width?: number; height?: number }) => {
+  denoise.width = scaledSize.width;
+  denoise.height = scaledSize.height;
+};
+
 vi.mock('features/nodes/util/graph/generation/addImageToImage', () => ({
-  addImageToImage: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+  addImageToImage: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return Promise.resolve(l2i);
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addInpaint', () => ({
-  addInpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+  addInpaint: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return Promise.resolve(l2i);
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addOutpaint', () => ({
-  addOutpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+  addOutpaint: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return Promise.resolve(l2i);
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addRegions', () => ({
@@ -95,7 +112,10 @@ vi.mock('features/nodes/util/graph/generation/addWatermarker', () => ({
 }));
 
 vi.mock('features/nodes/util/graph/generation/addTextToImage', () => ({
-  addTextToImage: vi.fn(({ l2i }) => l2i),
+  addTextToImage: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return l2i;
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/graphBuilderUtils', () => ({
@@ -153,6 +173,7 @@ describe('buildKrea2Graph', () => {
     vi.clearAllMocks();
     nextId = 0;
     refImageEntities = [];
+    scaledSize = { width: 1024, height: 1024 };
     params = { ...defaultParams };
     model = { ...baseModel };
   });
@@ -435,9 +456,16 @@ describe('buildKrea2Graph', () => {
       ).toBe(true);
     });
 
-    it('encodes the reference at the denoise resolution', async () => {
-      // The reference's image tokens are appended to the target's, so a size mismatch is a hard error
-      // in the denoise node.
+    // The reference's image tokens are appended to the target's, so a size mismatch is a hard error in the
+    // denoise node. The generation-mode helper is what assigns the denoise dimensions, so the style node has
+    // to be built after it - reading them earlier yields `undefined`, which JSON drops, silently leaving the
+    // node on its 1024x1024 backend default (review 4977240290).
+    it.each([
+      ['1024x1024', { width: 1024, height: 1024 }],
+      ['768x1024', { width: 768, height: 1024 }],
+      ['1152x896', { width: 1152, height: 896 }],
+    ])('encodes the reference at the denoise resolution (%s, txt2img)', async (_label, size) => {
+      scaledSize = size;
       refImageEntities = [styleRefEntity()];
       const { g } = await buildTxt2Img();
 
@@ -446,8 +474,45 @@ describe('buildKrea2Graph', () => {
         string,
         unknown
       >;
+      expect(denoise.width).toBe(size.width);
+      expect(styleReference.width).toBe(size.width);
+      expect(styleReference.height).toBe(size.height);
       expect(styleReference.width).toBe(denoise.width);
       expect(styleReference.height).toBe(denoise.height);
+    });
+
+    it.each(['img2img', 'inpaint', 'outpaint'] as const)(
+      'encodes the reference at the denoise resolution (%s)',
+      async (generationMode) => {
+        scaledSize = { width: 768, height: 1024 };
+        refImageEntities = [styleRefEntity()];
+        const { g } = await buildCanvasMode(generationMode);
+
+        const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+        expect(styleReference.width).toBe(768);
+        expect(styleReference.height).toBe(1024);
+      }
+    );
+
+    // 0 is documented as a full bypass. Emitting the node anyway costs a VAE encode, a capture pass per step
+    // and a retained K/V cache for no visible effect.
+    it('adds no style reference node when the strength is 0', async () => {
+      refImageEntities = [styleRefEntity({ styleStrength: 0 })];
+      const { g } = await buildTxt2Img();
+
+      expect(styleReferenceNode(g)).toBeUndefined();
+      expect((g.getMetadataNode() as unknown as Record<string, unknown>).krea2_style_strength).toBeUndefined();
+    });
+
+    it('falls through to the next reference when the first has a strength of 0', async () => {
+      refImageEntities = [
+        styleRefEntity({ styleStrength: 0 }),
+        { ...styleRefEntity({ styleStrength: 0.5 }), id: 'ref-2' },
+      ];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference.style_strength).toBe(0.5);
     });
 
     it('prefers the cropped image when one exists', async () => {
