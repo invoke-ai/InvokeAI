@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box, Flex, IconButton } from '@invoke-ai/ui-library';
-import { useAppStore } from 'app/store/storeHooks';
 import { typedMemo } from 'common/util/typedMemo';
 import type {
   CollectionMetadataHandler,
@@ -145,29 +144,38 @@ UnrecallableMetadataParsed.displayName = 'UnrecallableMetadataParsed';
 
 const SingleMetadataDatum = typedMemo(
   <T,>({ metadata, handler }: { metadata: unknown; handler: SingleMetadataHandler<T> }) => {
-    const { data } = useSingleMetadataDatum(metadata, handler);
+    // `recall` comes from the hook rather than being `handler.recall`: the hook re-runs the handler's gate
+    // before dispatching, so a row left over from a base switch cannot write into an inactive slot.
+    const { data, recall } = useSingleMetadataDatum(metadata, handler);
 
     if (!data.isParsed) {
       return null;
     }
 
     if (data.isSuccess) {
-      return <SingleMetadataParsed data={data} handler={handler} />;
+      return <SingleMetadataParsed data={data} handler={handler} recall={recall} />;
     }
   }
 );
 SingleMetadataDatum.displayName = 'SingleMetadataDatum';
 
 const SingleMetadataParsed = typedMemo(
-  <T,>({ data, handler }: { data: ParsedSuccessData<T>; handler: SingleMetadataHandler<T> }) => {
+  <T,>({
+    data,
+    handler,
+    recall,
+  }: {
+    data: ParsedSuccessData<T>;
+    handler: SingleMetadataHandler<T>;
+    recall: (value: T) => void;
+  }) => {
     const { t } = useTranslation();
-    const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
 
     const onClick = useCallback(() => {
-      handler.recall(data.value, store);
-    }, [data.value, handler, store]);
+      recall(data.value);
+    }, [data.value, recall]);
 
     return (
       <Flex gap={2}>
@@ -190,7 +198,8 @@ SingleMetadataParsed.displayName = 'SingleMetadataParsed';
 
 const CollectionMetadataDatum = typedMemo(
   <T extends any[]>({ metadata, handler }: { metadata: unknown; handler: CollectionMetadataHandler<T> }) => {
-    const { data } = useCollectionMetadataDatum(metadata, handler);
+    // See `SingleMetadataDatum`: the hook's `recallOne` re-validates, `handler.recallOne` does not.
+    const { data, recallOne } = useCollectionMetadataDatum(metadata, handler);
 
     if (!data.isParsed) {
       return null;
@@ -200,7 +209,7 @@ const CollectionMetadataDatum = typedMemo(
       return (
         <>
           {data.value.map((value, i) => (
-            <CollectionMetadataParsed key={i} value={value} handler={handler} />
+            <CollectionMetadataParsed key={i} value={value} handler={handler} recallOne={recallOne} />
           ))}
         </>
       );
@@ -210,15 +219,22 @@ const CollectionMetadataDatum = typedMemo(
 CollectionMetadataDatum.displayName = 'CollectionMetadataDatum';
 
 const CollectionMetadataParsed = typedMemo(
-  <T extends any[]>({ value, handler }: { value: T[number]; handler: CollectionMetadataHandler<T> }) => {
+  <T extends any[]>({
+    value,
+    handler,
+    recallOne,
+  }: {
+    value: T[number];
+    handler: CollectionMetadataHandler<T>;
+    recallOne: (value: T[number]) => void;
+  }) => {
     const { t } = useTranslation();
-    const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
 
     const onClick = useCallback(() => {
-      handler.recallOne(value, store);
-    }, [handler, store, value]);
+      recallOne(value);
+    }, [recallOne, value]);
 
     return (
       <Flex gap={2}>

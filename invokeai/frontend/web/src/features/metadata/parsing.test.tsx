@@ -1,6 +1,6 @@
 import type { AppStore } from 'app/store/store';
 import type * as paramsSliceModule from 'features/controlLayers/store/paramsSlice';
-import { ImageMetadataHandlers } from 'features/metadata/parsing';
+import { ImageMetadataHandlers, recallIfStillValid } from 'features/metadata/parsing';
 import type * as modelsApiModule from 'services/api/endpoints/models';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -878,5 +878,84 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
         ImageMetadataHandlers.Flux2VAEModel.parse({ model: fakeMain('krea-2'), vae: nextResolved }, store)
       ).rejects.toThrow();
     });
+  });
+});
+
+// A metadata row is parsed once, and the metadata viewer stays open while the user switches models. The
+// row's recall therefore re-runs the handler's gate at click time: `parse` reads the *currently* selected
+// base, so a row left over from the previous base must not write into a slot that is no longer in play.
+// Review 4987208275.
+describe('recallIfStillValid', () => {
+  const animaVae = () => fakeModel('vae', 'anima');
+  const animaMetadata = () => ({ model: { key: 'main-key', hash: 'h', name: 'anima', base: 'anima', type: 'main' } });
+
+  const run = (handler: (typeof ImageMetadataHandlers)['AnimaVAEModel'], metadata: Record<string, unknown>) => {
+    const recall = vi.fn();
+    const store = makeStore();
+    return recallIfStillValid({ metadata, handler, recall, value: nextResolved, store }).then((didRecall) => ({
+      didRecall,
+      recall,
+      store,
+    }));
+  };
+
+  it('recalls while the handler still admits the metadata', async () => {
+    currentBase = 'anima';
+    nextResolved = animaVae();
+
+    const { didRecall, recall } = await run(ImageMetadataHandlers.AnimaVAEModel, {
+      ...animaMetadata(),
+      vae: nextResolved,
+    });
+
+    expect(didRecall).toBe(true);
+    expect(recall).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing once the selected base has moved on', async () => {
+    // The row was parsed under Anima; the user switched to SDXL before the click landed.
+    currentBase = 'sdxl';
+    nextResolved = animaVae();
+
+    const { didRecall, recall } = await run(ImageMetadataHandlers.AnimaVAEModel, {
+      ...animaMetadata(),
+      vae: nextResolved,
+    });
+
+    expect(didRecall).toBe(false);
+    expect(recall).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when the metadata itself no longer passes the gate', async () => {
+    // Provenance failure rather than a base switch - same outcome, same single gate.
+    currentBase = 'anima';
+    nextResolved = animaVae();
+
+    const { didRecall, recall } = await run(ImageMetadataHandlers.AnimaVAEModel, {
+      model: { key: 'main-key', hash: 'h', name: 'krea-2', base: 'krea-2', type: 'main' },
+      vae: nextResolved,
+    });
+
+    expect(didRecall).toBe(false);
+    expect(recall).not.toHaveBeenCalled();
+  });
+
+  it('passes through the value the row owns, not the reparsed one', async () => {
+    // A collection row owns a single item; recalling whatever `parse` returned would recall the whole set.
+    currentBase = 'anima';
+    nextResolved = animaVae();
+    const store = makeStore();
+    const recall = vi.fn();
+    const sentinel = { mine: true };
+
+    await recallIfStillValid({
+      metadata: { ...animaMetadata(), vae: nextResolved },
+      handler: ImageMetadataHandlers.AnimaVAEModel,
+      recall,
+      value: sentinel,
+      store,
+    });
+
+    expect(recall).toHaveBeenCalledWith(sentinel, store);
   });
 });

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Text } from '@invoke-ai/ui-library';
 import type { AppStore } from 'app/store/store';
-import { useAppStore } from 'app/store/storeHooks';
+import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { WrappedError } from 'common/util/result';
 import { get, isArray, isString } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -2639,8 +2639,65 @@ export const MetadataUtils = {
   recallImageDimensions,
 } as const;
 
+/**
+ * The selected base, subscribed to so a change re-runs the parse.
+ *
+ * Handlers read `selectBase(store.getState())` imperatively inside `parse` - they have to, because parsing
+ * also happens outside React (recall-all, hotkeys). A row therefore carries the verdict of whichever base
+ * was selected when it mounted, and the metadata viewer stays open across model switches: without this
+ * subscription, rows that should now appear stay hidden and rows that should now be hidden keep a live
+ * recall button pointed at a slot that is no longer in play.
+ */
+const useSelectedBaseForReparse = (): ReturnType<typeof selectBase> => useAppSelector(selectBase);
+
+/**
+ * Runs a recall only if the handler's own gate still admits the metadata.
+ *
+ * The reparse driven by `useSelectedBaseForReparse` is asynchronous, so there is a window in which a row is
+ * still on screen under a base that no longer admits it. Re-running the gate here closes that window: a
+ * recall that is no longer valid does nothing rather than writing a foreign model into an inactive slot.
+ *
+ * The passed value is what gets recalled, not the reparsed one - for a collection the row owns a single
+ * item, and the row must do what it displays.
+ *
+ * @returns whether the recall ran.
+ */
+export const recallIfStillValid = async <TValue,>(arg: {
+  metadata: unknown;
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<unknown> };
+  recall: (value: TValue, store: AppStore) => void;
+  value: TValue;
+  store: AppStore;
+}): Promise<boolean> => {
+  const { metadata, handler, recall, value, store } = arg;
+  try {
+    await parseMetadataHandler(metadata, handler, store);
+  } catch {
+    // No longer applicable under the current base - the pending reparse is about to drop the row.
+    return false;
+  }
+  recall(value, store);
+  return true;
+};
+
+const useRevalidatedRecall = <TValue,>(
+  metadata: unknown,
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<unknown> },
+  recall: (value: TValue, store: AppStore) => void
+) => {
+  const store = useAppStore();
+
+  return useCallback(
+    (value: TValue) => {
+      void recallIfStillValid({ metadata, handler, recall, value, store });
+    },
+    [metadata, handler, store, recall]
+  );
+};
+
 export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMetadataHandler<T>) {
   const store = useAppStore();
+  const base = useSelectedBaseForReparse();
   const [data, setData] = useState<Data<T>>(() => ({
     isParsed: false,
     isSuccess: false,
@@ -2668,20 +2725,16 @@ export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMeta
     return () => {
       isActive = false;
     };
-  }, [metadata, handler, store]);
+  }, [metadata, handler, store, base]);
 
-  const recall = useCallback(
-    (value: T) => {
-      handler.recall(value, store);
-    },
-    [handler, store]
-  );
+  const recall = useRevalidatedRecall(metadata, handler, handler.recall);
 
   return { data, recall };
 }
 
 export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, handler: CollectionMetadataHandler<T>) {
   const store = useAppStore();
+  const base = useSelectedBaseForReparse();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
   useEffect(() => {
@@ -2703,27 +2756,17 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
     return () => {
       isActive = false;
     };
-  }, [metadata, handler, store]);
+  }, [metadata, handler, store, base]);
 
-  const recallAll = useCallback(
-    (values: T) => {
-      handler.recall(values, store);
-    },
-    [handler, store]
-  );
-
-  const recallOne = useCallback(
-    (value: T[number]) => {
-      handler.recallOne(value, store);
-    },
-    [handler, store]
-  );
+  const recallAll = useRevalidatedRecall(metadata, handler, handler.recall);
+  const recallOne = useRevalidatedRecall(metadata, handler, handler.recallOne);
 
   return { data, recallAll, recallOne };
 }
 
 export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: UnrecallableMetadataHandler<T>) {
   const store = useAppStore();
+  const base = useSelectedBaseForReparse();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
 
   useEffect(() => {
@@ -2745,7 +2788,7 @@ export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: Unre
     return () => {
       isActive = false;
     };
-  }, [metadata, handler, store]);
+  }, [metadata, handler, store, base]);
 
   return { data };
 }
