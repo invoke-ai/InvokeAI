@@ -44,6 +44,18 @@ const log = logger('events');
  */
 type ProcessedInvocationState = { status: 'done' } | { status: 'retryable'; missingNames: ReadonlySet<string> };
 
+/**
+ * When to retry outputs a delivery lost to a failed DTO lookup, and how many times.
+ *
+ * Recovery used to depend on the server happening to re-deliver the completion event: nothing
+ * re-emits one on its own, so an output lost to a transient failure usually stayed lost until the
+ * gallery was refetched for some unrelated reason. These are spaced to ride out a brief network
+ * blip without hammering a server that is actually down, and bounded because an output that is
+ * still missing after ~13 seconds is not coming back from a retry — the image is gone, or the
+ * problem is bigger than this handler.
+ */
+const RETRY_BACKOFF_MS = [1000, 3000, 9000];
+
 // These nodes are passthrough nodes. They do not add images/videos to the gallery — their
 // outputs reference an existing asset — so we must skip the gallery handling for them.
 // Without 'video' here, a Video Primitive completing mid-run would invalidate the gallery
@@ -77,6 +89,8 @@ export const buildOnInvocationComplete = (
   // Deliveries currently fetching, so a duplicate can wait for one instead of being discarded.
   // Entries live only for the duration of a pass; the LRU above is what bounds long-term memory.
   const inFlightDeliveries = new Map<string, Promise<void>>();
+  // The pending refetch for each event, so a new pass supersedes it rather than running beside it.
+  const scheduledRetries = new Map<string, ReturnType<typeof setTimeout>>();
 
   // `retryNames`, when set, restricts this pass to the outputs a previous delivery lost to a failed
   // lookup — everything else already landed and must not be dispatched twice.
@@ -505,6 +519,74 @@ export const buildOnInvocationComplete = (
     }
   };
 
+  /**
+   * Run one pass and record what it left outstanding, scheduling the next attempt if anything is
+   * still missing. `nextAttempt` indexes RETRY_BACKOFF_MS for the retry this pass would schedule;
+   * a socket delivery starts at 0, so its first retry waits RETRY_BACKOFF_MS[0].
+   */
+  const runTrackedDelivery = async (
+    data: S['InvocationCompleteEvent'],
+    invocationKey: string,
+    retryNames: ReadonlySet<string> | null,
+    nextAttempt: number
+  ): Promise<void> => {
+    // This pass supersedes any refetch already queued for the event: leaving that timer armed would
+    // run a second chain of attempts alongside this one, doubling the bound RETRY_BACKOFF_MS is
+    // supposed to impose.
+    const queued = scheduledRetries.get(invocationKey);
+    if (queued !== undefined) {
+      clearTimeout(queued);
+      scheduledRetries.delete(invocationKey);
+    }
+
+    // Mark before the awaits below so a duplicate cannot start a second pass over the same outputs
+    // while this one is in flight; the handshake in the handler is what lets it retry afterwards.
+    processedInvocations.set(invocationKey, { status: 'done' });
+
+    const delivery = deliver(data, invocationKey, retryNames);
+    // Waiters only need to know when the pass finished, not whether it threw.
+    const settled = delivery.then(
+      () => undefined,
+      () => undefined
+    );
+    inFlightDeliveries.set(invocationKey, settled);
+    try {
+      await delivery;
+    } finally {
+      if (inFlightDeliveries.get(invocationKey) === settled) {
+        inFlightDeliveries.delete(invocationKey);
+      }
+    }
+
+    const outcome = processedInvocations.get(invocationKey);
+    if (outcome?.status === 'retryable') {
+      scheduleRetry(data, invocationKey, nextAttempt);
+    }
+  };
+
+  const scheduleRetry = (data: S['InvocationCompleteEvent'], invocationKey: string, attempt: number) => {
+    const delayMs = RETRY_BACKOFF_MS[attempt];
+    if (delayMs === undefined) {
+      log.warn(
+        { data } as JsonObject,
+        `Gave up refetching outputs for ${data.invocation.type} (${data.invocation_source_id}) after ${attempt} attempts`
+      );
+      // Left 'retryable' on purpose: a re-delivered completion can still recover it for free.
+      return;
+    }
+    // Bare setTimeout, not the window member: this module is unit tested outside a DOM.
+    const timeout = setTimeout(() => {
+      scheduledRetries.delete(invocationKey);
+      const state = processedInvocations.get(invocationKey);
+      if (state?.status !== 'retryable') {
+        // A duplicate delivery got there first, or the outputs landed some other way.
+        return;
+      }
+      void runTrackedDelivery(data, invocationKey, state.missingNames, attempt + 1);
+    }, delayMs);
+    scheduledRetries.set(invocationKey, timeout);
+  };
+
   return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
@@ -538,24 +620,7 @@ export const buildOnInvocationComplete = (
 
     const state = processedInvocations.get(invocationKey);
     const retryNames = state?.status === 'retryable' ? state.missingNames : null;
-    // Mark before the awaits below so a duplicate cannot start a second pass over the same outputs
-    // while this one is in flight; the handshake above is what lets it retry afterwards instead.
-    processedInvocations.set(invocationKey, { status: 'done' });
-
-    const delivery = deliver(data, invocationKey, retryNames);
-    // Waiters only need to know when the pass finished, not whether it threw.
-    const settled = delivery.then(
-      () => undefined,
-      () => undefined
-    );
-    inFlightDeliveries.set(invocationKey, settled);
-    try {
-      await delivery;
-    } finally {
-      if (inFlightDeliveries.get(invocationKey) === settled) {
-        inFlightDeliveries.delete(invocationKey);
-      }
-    }
+    await runTrackedDelivery(data, invocationKey, retryNames, 0);
   };
 };
 

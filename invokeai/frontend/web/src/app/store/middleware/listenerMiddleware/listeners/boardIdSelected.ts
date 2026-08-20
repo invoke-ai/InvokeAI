@@ -1,6 +1,6 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
-import { selectGalleryItemNamesQueryArgs, selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { selectGalleryItemNamesQueryArgs, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { galleryApi } from 'services/api/endpoints/gallery';
 
@@ -13,10 +13,17 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
     // view change — but it must also be *cancelled* by any selection that lands while it waits,
     // and a selection arrives through several actions: imageSelected from the gallery's auto-switch
     // and keyboard navigation, selectionChanged from thumbnail clicks, boardIdSelected carrying a
-    // selection. Matching the resulting change of the active item covers all of them, including any
+    // selection. Matching the resulting change of the selection covers all of them, including any
     // writer added later — an action list would silently miss it.
+    //
+    // The whole selection, not just its active item: removing one of several selected thumbnails,
+    // or re-picking the one already active, leaves the last item unchanged while still being the
+    // user settling what they want. Comparing only that item left the probe running through those,
+    // to overwrite their selection when it woke. The state is immutable, so a new array reference
+    // is exactly "the selection was written", and cancelling a probe more often than strictly
+    // needed costs nothing.
     predicate: (action, currentState, previousState) =>
-      startsProbe(action) || selectLastSelectedItem(currentState) !== selectLastSelectedItem(previousState),
+      startsProbe(action) || selectSelection(currentState) !== selectSelection(previousState),
     effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {
       // Cancel any in-progress instances of this listener, we don't want to select an item from a previous board
       cancelActiveListeners();
