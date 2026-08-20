@@ -1984,6 +1984,21 @@ minimax_h3_turbo_lora = StarterModel(
     type=ModelType.LoRA,
     format=ModelFormat.LyCORIS,
 )
+
+# Only the *_comfyui_* files in the LightX2V repo are installable: they carry the native
+# fused-key layout (diffusion_model.blocks.N.attn.qkv_proj) that the H3 LoRA probe accepts.
+# The non-comfyui files use already-diffusers keys (transformer_blocks.N.attn.to_q with
+# PEFT ".default" adapter names), which the probe rejects as a different architecture.
+minimax_h3_lightx2v_turbo_lora = StarterModel(
+    name="MiniMax H3 LightX2V Turbo LoRA",
+    base=BaseModelType.MiniMaxH3,
+    source="lightx2v/Minimax-h3-Turbo::minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+    description="LightX2V step-distillation LoRA for MiniMax H3 (Apache 2.0), 8-step v1.0 (~2 GB): "
+    "renders video+audio in ~8 denoising steps instead of ~50. Apply at strength 1.0 and lower "
+    "Steps to 8. Works with the full and the pruned int8 transformers.",
+    type=ModelType.LoRA,
+    format=ModelFormat.LyCORIS,
+)
 # endregion
 
 alibabacloud_wan26_t2i = StarterModel(
@@ -2508,6 +2523,7 @@ STARTER_MODELS: list[StarterModel] = [
     minimax_h3_int8_text_encoder,
     minimax_h3_components,
     minimax_h3_turbo_lora,
+    minimax_h3_lightx2v_turbo_lora,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
@@ -2679,13 +2695,16 @@ ideogram_bundle: list[StarterModel] = [
     ideogram_4_nf4,
 ]
 
-# The minimal working set for MiniMax H3 video+audio generation (~59 GB): shared components from
-# the official repo plus Comfy-Org's int8 single-file transformer and text encoder. See the
-# license note in the MiniMax H3 region above.
+# The working set for MiniMax H3 video+audio generation (~62 GB): shared components from
+# the official repo plus Comfy-Org's int8 single-file transformer and text encoder, and the
+# two turbo (step-distillation) LoRAs for fast low-step rendering. See the license note in
+# the MiniMax H3 region above.
 minimax_h3_bundle: list[StarterModel] = [
     minimax_h3_components,
     minimax_h3_int8_text_encoder,
     minimax_h3_int8_transformer,
+    minimax_h3_turbo_lora,
+    minimax_h3_lightx2v_turbo_lora,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
