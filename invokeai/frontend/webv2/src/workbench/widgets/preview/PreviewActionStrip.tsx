@@ -3,7 +3,7 @@ import type { ImageActions } from '@workbench/image-actions';
 
 import { HStack, Icon } from '@chakra-ui/react';
 import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } from '@features/gallery/contracts';
-import { IconButton, Tooltip } from '@platform/ui';
+import { Button, IconButton, Tooltip } from '@platform/ui';
 import {
   CopyIcon,
   EllipsisVerticalIcon,
@@ -95,13 +95,25 @@ export const PreviewActionStrip = ({
 
   return (
     <HStack flexShrink={0} gap="0.5">
+      {/* First and worded, not another glyph in the row: it is the strip's one
+          verb that moves the image into actual work. "Edit" like legacy's
+          button; the aria-label keeps the destination. Videos have no canvas
+          destination, so it simply is not offered for them — the same guard
+          the context menu's image-only branch uses. */}
+      {image ? (
+        <Button
+          aria-label={t('widgets.preview.editOnCanvas')}
+          color="fg.muted"
+          size="2xs"
+          variant="ghost"
+          onClick={editOnCanvas}
+        >
+          <Icon as={PencilIcon} boxSize="3.5" />
+          {t('common.edit')}
+        </Button>
+      ) : null}
       {starButton}
       {image ? <StripIconButton icon={ImagesIcon} label="Select for Compare" onClick={selectForCompare} /> : null}
-      {/* Videos have no canvas destination, so the verb simply is not offered
-          for them — the same guard the context menu's image-only branch uses. */}
-      {image ? (
-        <StripIconButton icon={PencilIcon} label={t('widgets.preview.editOnCanvas')} onClick={editOnCanvas} />
-      ) : null}
       {item.kind === 'video' && onCopyCurrentFrame ? (
         <StripIconButton
           disabled={!isVideoFrameCopyAvailable}

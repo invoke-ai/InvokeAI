@@ -88,7 +88,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { countOfTotal: '{{count}} of {{total}}', generating: 'Generating' },
+        common: { countOfTotal: '{{count}} of {{total}}', edit: 'Edit', generating: 'Generating' },
         widgets: {
           preview: {
             copyCurrentFrame: 'Copy Current Frame',
@@ -458,6 +458,9 @@ describe('Preview mixed media footer and actions', () => {
     const editOnCanvas = host?.querySelector<HTMLButtonElement>('[aria-label="Edit on Canvas"]');
 
     expect(editOnCanvas).not.toBeNull();
+    // Leads the strip and carries a visible label, not just a glyph.
+    expect(host?.querySelector('button')).toBe(editOnCanvas);
+    expect(editOnCanvas?.textContent).toContain('Edit');
     expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
     await interact(() => editOnCanvas?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     expect(actions.sendToCanvas).toHaveBeenCalledWith([expect.objectContaining({ imageName: 'shared' })], 'raster');
