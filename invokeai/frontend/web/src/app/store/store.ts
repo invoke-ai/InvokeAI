@@ -16,6 +16,7 @@ import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddlewar
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
 import { addBulkDownloadListeners } from 'app/store/middleware/listenerMiddleware/listeners/bulkDownload';
+import { addGallerySelectionSourceListener } from 'app/store/middleware/listenerMiddleware/listeners/gallerySelectionSource';
 import { addGetOpenAPISchemaListener } from 'app/store/middleware/listenerMiddleware/listeners/getOpenAPISchema';
 import { addImageAddedToBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageAddedToBoard';
 import { addImageRemovedFromBoardFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/imageRemovedFromBoard';
@@ -326,6 +327,7 @@ addImageAddedToBoardFulfilledListener(startAppListening);
 addImageRemovedFromBoardFulfilledListener(startAppListening);
 addBoardIdSelectedListener(startAppListening);
 addArchivedOrDeletedBoardListener(startAppListening);
+addGallerySelectionSourceListener(startAppListening);
 
 // Node schemas
 addGetOpenAPISchemaListener(startAppListening);
