@@ -260,6 +260,14 @@ const config = defineConfig({
     ':root[data-reduce-motion="true"] .chakra-skeleton': {
       animation: 'none !important',
     },
+    // A loading spinner is essential status, not decoration — frozen, its arc
+    // reads as a broken icon. It slows to a crawl instead of stopping; WCAG
+    // 2.3.3 targets non-essential motion only. (Chakra's indeterminate
+    // progress circle already behaves this way: its raw `spin 2s` shorthand
+    // bypasses the animation tokens the reduce-motion condition nulls out.)
+    ':root[data-reduce-motion="true"] .chakra-spinner': {
+      animation: 'spin 2s linear infinite !important',
+    },
   },
   theme: {
     tokens: {
