@@ -94,6 +94,9 @@ export const tabsSlotRecipe = defineSlotRecipe({
         ...chakraSlotRecipes.tabs.variants?.variant?.line,
         trigger: {
           ...chakraSlotRecipes.tabs.variants?.variant?.line?.trigger,
+          // Rounded only at the top: the trigger's hover fill should read as
+          // rising from the underline, not as a floating pill.
+          roundedTop: 'sm',
           _hover: {
             '&:not([data-selected])': { bg: 'bg.muted/60', color: 'fg' },
           },
