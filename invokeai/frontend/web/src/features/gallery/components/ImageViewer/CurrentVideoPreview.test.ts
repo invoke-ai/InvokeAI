@@ -44,6 +44,11 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toMatch(/marker: autoSwitchedImages,/);
     expect(source).toMatch(/revealController\.run\(\{/);
     expect(source).toMatch(/isProgressImageResolving,\s+renderedItemName: videoName,/);
+    // The controller substitutes its own setRevealed in selectedItemReveal.test.ts, so those
+    // tests cannot see whether this component connects it to the atom the overlay actually
+    // reads. Without this line the reveal can be disconnected entirely -- every other assertion
+    // here, and the whole suite, still passes while a mid-render gallery click does nothing.
+    expect(source).toMatch(/setRevealed: \(revealed\) => \$isTemporarilyShowingSelectedImage\.set\(revealed\)/);
     // The effect cleanup must only cancel the timer — the next run (or the unmount handler below)
     // owns the revealed flag.
     expect(source).toMatch(/return \(\) => \{\s+revealController\.clearTimer\(\);\s+\};/);
