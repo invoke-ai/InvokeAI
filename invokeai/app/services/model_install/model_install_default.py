@@ -1365,6 +1365,7 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
+        job.download_parts = multifile_job.download_parts
 
         self._write_install_marker(job, status=InstallStatus.WAITING)
         files_string = "file" if len(remote_files) == 1 else "files"
