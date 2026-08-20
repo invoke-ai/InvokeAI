@@ -1180,6 +1180,7 @@
     "searchModelsPlaceholder": "Search models…",
     "searchOrAdd": "Search or add a model",
     "searchOrAddPlaceholder": "Search models, or paste a URL, file path, or Hugging Face repo",
+    "selectAll": "Select all",
     "selectAllCount": "Select all ({{count}})",
     "selectModel": "Select a model",
     "selectModelDescription": "Pick a model from the library to view details, edit metadata, set per-model defaults, and manage trigger phrases.",

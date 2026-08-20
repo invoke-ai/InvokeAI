@@ -1,5 +1,5 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import { Box, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
+import { Box, Checkbox, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
 import { bulkDeleteModels, bulkReidentifyModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
@@ -54,11 +54,14 @@ export const LibraryColumn = () => {
   const availableTypes = useMemo(() => collectTypes(models), [models]);
   const availableBases = useMemo(() => collectBases(models), [models]);
   const hasSelection = selectedKeys.size > 0;
+  const canSelectAll = models.length > 0;
   const deferredFilters = useDeferredValue(filters);
   // The same filter logic the list renders with (deferred identically), so
   // "Select all" matches exactly what the user sees (search, type/base,
-  // missing-only). The bulk bar is the only consumer — skip it until a
-  // selection exists rather than re-filtering on every search keystroke.
+  // missing-only). Still gated on there being a selection: with none, the
+  // checkbox reads unchecked whatever the filter says, and the click path
+  // below filters on demand — so an empty selection costs nothing on every
+  // search keystroke.
   const filteredKeys = useMemo(
     () =>
       hasSelection ? filterModels(models, deferredFilters, missingModelKeys).map((model) => model.key) : EMPTY_KEYS,
@@ -68,11 +71,22 @@ export const LibraryColumn = () => {
     () => filteredKeys.some((key) => !selectedKeys.has(key)),
     [filteredKeys, selectedKeys]
   );
-  const handleSelectAllFiltered = useCallback(() => {
+  const handleToggleSelectAll = useCallback(() => {
+    if (hasSelection && !hasUnselectedFiltered) {
+      updateModelsUi({ selectedKeys: new Set() });
+
+      return;
+    }
+
+    // Filtered here rather than read from the memo: with nothing selected the
+    // memo is deliberately empty, and this is the one moment the full filtered
+    // set is actually needed.
+    const keys = filterModels(models, filters, missingModelKeys).map((model) => model.key);
+
     // Union: selections made under a previous filter survive, so the delete
     // confirm always shows the true total.
-    updateModelsUi({ selectedKeys: new Set([...selectedKeys, ...filteredKeys]) });
-  }, [filteredKeys, selectedKeys]);
+    updateModelsUi({ selectedKeys: new Set([...selectedKeys, ...keys]) });
+  }, [filters, hasSelection, hasUnselectedFiltered, missingModelKeys, models, selectedKeys]);
   const handleActivate = useCallback((modelKey: string) => openModelDetail(modelKey), []);
   const handleToggleSelected = useCallback((modelKey: string) => toggleModelSelection(modelKey), []);
 
@@ -171,6 +185,53 @@ export const LibraryColumn = () => {
         onChange={(nextFilters) => updateModelsUi({ filters: nextFilters })}
       />
 
+      {/* Docked under the search rather than floating over the list: the
+          selection controls belong to the same block as the filter that
+          decides what "all" means, and a bar that appeared over the last two
+          rows hid the models it was about to act on. Always mounted so
+          starting a selection never shifts the list under the pointer. */}
+      <HStack borderBottomWidth={1} flexShrink={0} gap="2" minH="8" px="3" py="1.5">
+        <Checkbox.Root
+          aria-label={t('models.selectAll')}
+          checked={hasSelection ? (hasUnselectedFiltered ? 'indeterminate' : true) : false}
+          colorPalette="accent"
+          disabled={!canSelectAll}
+          size="xs"
+          onCheckedChange={handleToggleSelectAll}
+        >
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+          <Checkbox.Label color="fg.muted" fontSize="2xs" fontWeight="600">
+            {t('models.selectAll')}
+          </Checkbox.Label>
+        </Checkbox.Root>
+        <Box flex="1" />
+        {hasSelection ? (
+          <>
+            <Text color="fg.muted" fontSize="2xs" fontWeight="600">
+              {t('models.selectedCount', { count: selectedKeys.size })}
+            </Text>
+            <Separator borderColor="border.subtle" h="4" orientation="vertical" />
+            <Button size="2xs" variant="ghost" onClick={() => setIsBulkReidentifyOpen(true)}>
+              <Icon as={RefreshCcwIcon} boxSize="3" />
+              {t('models.reidentifySelected')}
+            </Button>
+            <Button colorPalette="red" size="2xs" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
+              <Icon as={Trash2Icon} boxSize="3" />
+              {t('common.delete')}
+            </Button>
+            <IconButton
+              aria-label={t('models.clearSelection')}
+              size="2xs"
+              variant="ghost"
+              onClick={() => updateModelsUi({ selectedKeys: new Set() })}
+            >
+              <Icon as={XIcon} boxSize="3" />
+            </IconButton>
+          </>
+        ) : null}
+      </HStack>
+
       <ModelLibraryList
         activeModelKey={activeModelKey}
         filters={filters}
@@ -179,59 +240,6 @@ export const LibraryColumn = () => {
         onActivate={handleActivate}
         onToggleSelected={handleToggleSelected}
       />
-
-      {selectedKeys.size > 0 ? (
-        <HStack
-          bg="bg.muted"
-          borderColor="border.emphasized"
-          borderWidth="1px"
-          bottom="2"
-          gap="2"
-          insetX="2"
-          p="1.5"
-          position="absolute"
-          rounded="lg"
-          shadow="lg"
-          zIndex={2}
-        >
-          <Text
-            borderColor="border.subtle"
-            borderStyle="dashed"
-            borderWidth="1px"
-            color="fg.muted"
-            fontSize="2xs"
-            fontWeight="600"
-            px="2"
-            py="1"
-            rounded="md"
-          >
-            {t('models.selectedCount', { count: selectedKeys.size })}
-          </Text>
-          <Separator borderColor="border.subtle" h="5" orientation="vertical" />
-          {hasUnselectedFiltered ? (
-            <Button size="2xs" variant="ghost" onClick={handleSelectAllFiltered}>
-              {t('models.selectAllCount', { count: filteredKeys.length })}
-            </Button>
-          ) : null}
-          <Button size="2xs" variant="outline" onClick={() => setIsBulkReidentifyOpen(true)}>
-            <Icon as={RefreshCcwIcon} boxSize="3" />
-            {t('models.reidentifySelected')}
-          </Button>
-          <Button colorPalette="red" size="2xs" variant="solid" onClick={() => setIsBulkDeleteOpen(true)}>
-            <Icon as={Trash2Icon} boxSize="3" />
-            {t('common.delete')}
-          </Button>
-          <Box flex="1" />
-          <IconButton
-            aria-label={t('models.clearSelection')}
-            size="2xs"
-            variant="ghost"
-            onClick={() => updateModelsUi({ selectedKeys: new Set() })}
-          >
-            <Icon as={XIcon} boxSize="3" />
-          </IconButton>
-        </HStack>
-      ) : null}
 
       <ConfirmDialog
         body={t('models.bulkDeleteBody', { count: selectedKeys.size })}
