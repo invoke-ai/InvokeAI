@@ -2,11 +2,14 @@ import type { BuiltInLayoutPresetId } from '@workbench/layoutContracts';
 import type { LucideIcon } from 'lucide-react';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
-import { Button, Group, IconButton, MenuContent } from '@platform/ui';
+// Concrete modules, not the barrel: `@platform/ui` sits at its direct-importer
+// budget, and this component needs four of its exports.
+import { Button, IconButton } from '@platform/ui/Button';
+import { Group } from '@platform/ui/Group';
+import { MenuContent } from '@platform/ui/Menu';
 import { Link } from '@tanstack/react-router';
-import { LAUNCHPAD_LAYOUT_IDS } from '@workbench/launchpad/intents';
-import { layoutPresets } from '@workbench/layoutPresets';
-import { ChevronDownIcon, LayersIcon, LayoutGridIcon, PlusIcon, TypeIcon, WorkflowIcon } from 'lucide-react';
+import { BUILT_IN_LAYOUT_PRESET_LABELS, LAUNCHPAD_LAYOUT_IDS } from '@workbench/launchpad/intents';
+import { ChevronDownIcon, LayersIcon, PlusIcon, TypeIcon, WorkflowIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -18,20 +21,21 @@ import { useTranslation } from 'react-i18next';
  * layouts so starting from "Edit" does not mean opening a draft and then
  * rearranging it.
  *
- * Labels come from the preset table itself rather than a parallel list, so the
- * menu and the editor's preset strip can never disagree about what a layout is
- * called. Icons are mapped locally: `resolveLayoutPresetIcon` exists for the
- * custom-preset picker and carries its whole curated catalogue, which is a
- * lot of Lucide to pull onto the Launchpad for three entries.
+ * Labels come from the shared id/label map that `layoutPresets` also builds
+ * from, so the menu and the editor's preset strip cannot disagree about what a
+ * layout is called — without the Launchpad having to load the preset table's
+ * three full widget-region snapshots. Icons are mapped locally for the same
+ * reason: `resolveLayoutPresetIcon` exists for the custom-preset picker and
+ * carries its whole curated catalogue.
  */
 
 const NEW_PROJECT_SEARCH = { new: true } as const;
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
-const LAYOUT_ICONS: Record<string, LucideIcon> = {
-  layers: LayersIcon,
-  type: TypeIcon,
-  workflow: WorkflowIcon,
+const LAYOUT_ICONS: Record<BuiltInLayoutPresetId, LucideIcon> = {
+  automate: WorkflowIcon,
+  compose: TypeIcon,
+  edit: LayersIcon,
 };
 
 interface NewProjectLayoutItem {
@@ -41,20 +45,12 @@ interface NewProjectLayoutItem {
   search: { new: true; preset: BuiltInLayoutPresetId };
 }
 
-const LAYOUT_ITEMS: NewProjectLayoutItem[] = LAUNCHPAD_LAYOUT_IDS.flatMap((id) => {
-  const preset = layoutPresets.find((candidate) => candidate.id === id);
-
-  return preset
-    ? [
-        {
-          icon: LAYOUT_ICONS[preset.iconId ?? ''] ?? LayoutGridIcon,
-          id,
-          label: preset.label,
-          search: { new: true, preset: id },
-        },
-      ]
-    : [];
-});
+const LAYOUT_ITEMS: NewProjectLayoutItem[] = LAUNCHPAD_LAYOUT_IDS.map((id) => ({
+  icon: LAYOUT_ICONS[id],
+  id,
+  label: BUILT_IN_LAYOUT_PRESET_LABELS[id],
+  search: { new: true, preset: id },
+}));
 
 export const NewProjectButton = ({ variant = 'solid' }: { variant?: 'outline' | 'solid' }) => {
   const { t } = useTranslation();

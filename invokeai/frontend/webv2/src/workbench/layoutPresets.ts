@@ -11,6 +11,8 @@ import type {
 } from '@workbench/layoutContracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
+import { BUILT_IN_LAYOUT_PRESET_LABELS } from '@workbench/launchpad/intents';
+
 const defaultBottomInstanceIds: WidgetInstanceId[] = [
   'server-status',
   'queue-status',
@@ -149,7 +151,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     hotkeyId: 'selectComposePreset',
     id: 'compose',
     iconId: 'type',
-    label: 'Compose',
+    label: BUILT_IN_LAYOUT_PRESET_LABELS.compose,
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {
       bottom: createRegion({
@@ -188,7 +190,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     hotkeyId: 'selectEditPreset',
     id: 'edit',
     iconId: 'layers',
-    label: 'Edit',
+    label: BUILT_IN_LAYOUT_PRESET_LABELS.edit,
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {
       bottom: createRegion({
@@ -221,7 +223,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
     hotkeyId: 'selectAutomatePreset',
     id: 'automate',
     iconId: 'workflow',
-    label: 'Automate',
+    label: BUILT_IN_LAYOUT_PRESET_LABELS.automate,
     panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
     widgetRegions: {
       bottom: createRegion({

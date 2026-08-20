@@ -1,5 +1,5 @@
 import { Box, ChakraProvider } from '@chakra-ui/react';
-import { Row } from '@platform/ui';
+import { Row } from '@platform/ui/Row';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { getContrastRatio } from '@theme/contrastRatio.testing';
 import { system } from '@theme/system';

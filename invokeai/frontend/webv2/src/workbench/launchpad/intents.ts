@@ -47,6 +47,19 @@ export const isLaunchpadIntentId = (value: unknown): value is LaunchpadIntentId 
  */
 export const LAUNCHPAD_LAYOUT_IDS: readonly BuiltInLayoutPresetId[] = ['compose', 'edit', 'automate'];
 
+/**
+ * Display names for the built-in arrangements, kept here rather than read off
+ * `layoutPresets` so the Launchpad can name them without pulling that table —
+ * which carries three full widget-region snapshots — onto its route chunk.
+ * `layoutPresets` builds its own labels from this map, so there is still one
+ * definition.
+ */
+export const BUILT_IN_LAYOUT_PRESET_LABELS: Record<BuiltInLayoutPresetId, string> = {
+  automate: 'Automate',
+  compose: 'Compose',
+  edit: 'Edit',
+};
+
 export const isLaunchpadLayoutId = (value: unknown): value is BuiltInLayoutPresetId =>
   typeof value === 'string' && LAUNCHPAD_LAYOUT_IDS.includes(value as BuiltInLayoutPresetId);
 
