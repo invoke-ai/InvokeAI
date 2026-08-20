@@ -2271,6 +2271,7 @@
         "shapeRect": "Rectangle",
         "shapeStroke": "Stroke",
         "shapeStrokeWidth": "Stroke width",
+        "size": "Size",
         "textAlignCenter": "Align center",
         "textAlignLeft": "Align left",
         "textAlignRight": "Align right",
