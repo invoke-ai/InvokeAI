@@ -111,12 +111,20 @@ vi.mock('services/events/nodeExecutionState', () => ({
   getUpdatedNodeExecutionStateOnInvocationComplete: vi.fn(() => null),
 }));
 
+// Mocked so a scheduled refetch that blunders into work it should have skipped is observable:
+// deliver() catches its own throw and logs it, which is otherwise invisible from out here.
+vi.mock('app/logging/logger', () => {
+  const log = { debug: vi.fn(), trace: vi.fn(), warn: vi.fn(), error: vi.fn() };
+  return { logger: () => log };
+});
+
 vi.mock('services/events/stores', () => ({
   $lastProgressEvent: { set: vi.fn() },
 }));
 
 // Import AFTER the mocks above are declared (vi.mock is hoisted; explicit ordering here
 // is for the human reader).
+import { logger } from 'app/logging/logger';
 import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
@@ -676,6 +684,124 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
 
     // One failed lookup plus exactly one retry.
     expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+  });
+
+  it('refetches a lost output on its own, without waiting for a duplicate delivery', async () => {
+    // Nothing re-emits a completion event, so before this the recovery path only ran if the server
+    // happened to send the event twice — which usually meant the output stayed missing.
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      await handler(buildImageCompleteEvent());
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(getImageDTOSafe, 'the first backoff step refetches the missing name').toHaveBeenCalledTimes(2);
+
+      // It succeeded this time, so nothing further is scheduled.
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives up after a bounded number of refetches', async () => {
+    // A permanently missing output must not retry forever.
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getImageDTOSafe).mockResolvedValue(null);
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      await handler(buildImageCompleteEvent());
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      // The delivery plus the three backoff steps, and no more.
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(4);
+    } finally {
+      vi.mocked(getImageDTOSafe).mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops a scheduled refetch when a duplicate delivery recovers the output first', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getImageDTOSafe).mockResolvedValueOnce(null);
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      await handler(buildImageCompleteEvent());
+      // A re-delivery lands before the first backoff step and does the work.
+      await handler(buildImageCompleteEvent());
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(getImageDTOSafe, 'the scheduled retry finds nothing left to do').toHaveBeenCalledTimes(2);
+      // ...and it works that out before starting a pass, rather than failing inside one.
+      expect(logger('events').error).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not run a second chain of refetches when a duplicate delivery lands', async () => {
+    // Each pass supersedes the refetch already queued for that event; two chains would run to
+    // exhaustion side by side and double the bound the backoff is there to impose.
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getImageDTOSafe).mockResolvedValue(null);
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      await handler(buildImageCompleteEvent());
+      await vi.advanceTimersByTimeAsync(500);
+      // A duplicate arrives mid-backoff and takes the work over.
+      await handler(buildImageCompleteEvent());
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      // Two deliveries plus one chain of three attempts — not two chains.
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.mocked(getImageDTOSafe).mockReset();
+      vi.useRealTimers();
+    }
   });
 
   it('still processes distinct invocations of the same queue item', async () => {
