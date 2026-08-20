@@ -1,3 +1,5 @@
+import { tokensBelongToSameUser } from 'features/auth/store/authSlice';
+
 const AUTH_GENERATION_KEY = 'auth_generation';
 const MEDIA_AUTH_LOCK = 'invokeai-media-auth';
 const FALLBACK_LOCK_PREFIX = `${MEDIA_AUTH_LOCK}:`;
@@ -42,6 +44,45 @@ export const beginAuthTransition = () => {
 
 export const shouldAcceptRefreshedToken = (requestToken: string, requestGeneration: number) =>
   getAuthGeneration() === requestGeneration && localStorage.getItem('auth_token') === requestToken;
+
+/** The session an operation started under. See `isSameAuthContext`. */
+export type AuthContext = {
+  token: string | null;
+};
+
+export const captureAuthContext = (): AuthContext => ({
+  token: localStorage.getItem('auth_token'),
+});
+
+/**
+ * True while the session an operation began under is still the live one.
+ *
+ * Requests read the bearer token out of localStorage at send time (`dynamicBaseQuery`), so an
+ * operation that issues several of them does not carry one identity: log out and back in as
+ * someone else midway and the remaining requests go out as the new user. Nothing stops that on
+ * its own — RTK Query's `resetApiState` clears the store, not a `queryFn` that is already
+ * running. Callers that fan a single user action out into a sequence of requests must therefore
+ * capture the context up front and check it before each one.
+ *
+ * The comparison is on the identity the token carries, not on the token itself and not on the
+ * auth generation counter:
+ * - Not the bytes, because the sliding-window refresh mints a fresh token for the same login
+ *   mid-operation, and aborting on that would abandon a batch for a routine event.
+ * - Not the generation counter, because `beginAuthTransition` bumps it when a login or logout
+ *   *request is sent*, before anything has changed and regardless of whether it succeeds. A
+ *   login in a second tab — even one that fails, or one that signs the same user back in —
+ *   would abort an unrelated batch in this one. Identity answers the question the counter was
+ *   standing in for, and answers it correctly: whoever the next chunk would be sent as is read
+ *   fresh from localStorage every time.
+ *
+ * `sessionExpiredLogout` removes the token with no request at all, so the token comparison is
+ * what catches it. Two nulls compare equal, which keeps deployments that never issue a token —
+ * the single-user default — out of this entirely.
+ */
+export const isSameAuthContext = (context: AuthContext): boolean => {
+  const token = localStorage.getItem('auth_token');
+  return token === context.token || tokensBelongToSameUser(context.token, token);
+};
 
 const getFallbackLockTickets = (): FallbackLockTicket[] => {
   const tickets: FallbackLockTicket[] = [];

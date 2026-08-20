@@ -1,7 +1,10 @@
+import type { Dispatch, UnknownAction } from '@reduxjs/toolkit';
 import type { FetchArgs, FetchBaseQueryError, QueryReturnValue } from '@reduxjs/toolkit/query';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { getStore } from 'app/store/nanostores/store';
 import { uniq } from 'es-toolkit';
+import type { AuthContext } from 'features/auth/store/authTokenRefresh';
+import { captureAuthContext, isSameAuthContext } from 'features/auth/store/authTokenRefresh';
 import type { CroppableImageWithDims } from 'features/controlLayers/store/types';
 import { ASSETS_CATEGORIES, IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { toast } from 'features/toast/toast';
@@ -73,6 +76,41 @@ type ImagesBaseQuery = (
   args: string | FetchArgs
 ) => QueryReturnValue<unknown, FetchBaseQueryError> | PromiseLike<QueryReturnValue<unknown, FetchBaseQueryError>>;
 
+/**
+ * Stands in for the response of a chunk that was never sent because the session changed under
+ * the operation. Shaped like any other chunk failure so it takes the partial-result path the
+ * loops already have: what the previous chunks committed is reported, the rest is unreached.
+ */
+const AUTH_CHANGED_ERROR: FetchBaseQueryError = {
+  status: 'CUSTOM_ERROR',
+  error: 'Aborted: the authenticated session changed while the operation was running',
+};
+
+/**
+ * Issues one chunk of a multi-request operation, unless the session it started under is gone.
+ *
+ * A selection past the batch cap is split into several requests, and each one picks up whatever
+ * bearer token localStorage holds when it is sent — the loop does not carry the identity it
+ * started with. Log out and back in as another user with the loop still running and the
+ * remaining chunks are applied as that user; on a public board they can land, so half of one
+ * user's delete is committed under another's name, with nothing to roll it back. Nothing else
+ * stops it: `resetApiState` on the logout action clears the cache, not a running `queryFn`.
+ *
+ * So the context is captured before the first chunk and rechecked before each one. See
+ * `isSameAuthContext` for what counts as the same session — notably a sliding-window token
+ * refresh does not, or every long batch would abandon itself.
+ */
+const fetchChunk = async (
+  baseQuery: ImagesBaseQuery,
+  authContext: AuthContext,
+  args: FetchArgs
+): Promise<QueryReturnValue<unknown, FetchBaseQueryError>> => {
+  if (!isSameAuthContext(authContext)) {
+    return { error: AUTH_CHANGED_ERROR };
+  }
+  return await baseQuery(args);
+};
+
 export const chunkImageNames = (image_names: string[]): string[][] => {
   if (image_names.length <= IMAGE_BATCH_CHUNK_SIZE) {
     // Single-request path, byte-for-byte what it was before chunking existed. Note this also
@@ -137,9 +175,10 @@ export const buildChunkedImageBatchQueryFn =
     baseQuery: ImagesBaseQuery
   ) => {
     const results: TResult[] = [];
+    const authContext = captureAuthContext();
     const chunks = chunkImageNames(arg.image_names);
     for (const [index, image_names] of chunks.entries()) {
-      const response = await baseQuery({ ...request(arg), body: { ...arg, image_names } });
+      const response = await fetchChunk(baseQuery, authContext, { ...request(arg), body: { ...arg, image_names } });
       if (response.error) {
         if (results.length === 0) {
           // Nothing was applied, so this is an ordinary failed request — report it as one.
@@ -199,6 +238,25 @@ const getRemoveImagesFromBoardTags = (
 ];
 
 /**
+ * Publishes fetched DTOs into the individual `getImageDTO` caches, which is where every
+ * subscribed component reads from — this batch endpoint holds no cache of its own.
+ */
+const upsertImageDTOs = (dispatch: Dispatch<UnknownAction>, imageDTOs: ImageDTO[]) => {
+  if (imageDTOs.length === 0) {
+    return;
+  }
+  const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
+  for (const imageDTO of imageDTOs) {
+    updates.push({
+      endpointName: 'getImageDTO',
+      arg: imageDTO.image_name,
+      value: imageDTO,
+    });
+  }
+  dispatch(imagesApi.util.upsertQueryEntries(updates));
+};
+
+/**
  * Surfaces the partial-failure warning. Used for both kinds of partial failure: the names the
  * server reported it could not apply, and the names a chunked run never reached.
  */
@@ -254,11 +312,15 @@ export const bulkDownloadQueryFn = async (
   _extraOptions: unknown,
   baseQuery: ImagesBaseQuery
 ) => {
-  // A board download expands server-side from board_id alone, so there is nothing to split.
-  // Note the server picks board_id over image_names when both are set (`BulkDownloadService`),
-  // so a body carrying both is not a selection this can meaningfully chunk — no caller sends
-  // one, and splitting it would ask for the same full-board zip once per chunk.
-  const chunks = image_names?.length ? chunkImageNames(image_names) : [image_names ?? []];
+  // A board download expands server-side from board_id alone, so there is nothing to split —
+  // and the server picks board_id over image_names when both are set (`BulkDownloadService`),
+  // which makes a body carrying both a board download too, not a selection to chunk. Splitting
+  // it would ask for the same full-board zip once per chunk: 1001 names alongside a board id
+  // would schedule two identical full-board jobs. Normalized here to the one request the server
+  // is actually going to honour, so the client cannot amplify a download by sending a field the
+  // server ignores. No UI caller sends both today; the endpoint accepts it.
+  const chunks: (string[] | undefined)[] = board_id ? [undefined] : chunkImageNames(image_names ?? []);
+  const authContext = captureAuthContext();
   // Tracked separately from the payload rather than inferred from it. `fetchBaseQuery` resolves
   // an empty response entity as `data: null`, so a 202 whose body did not survive the trip back
   // leaves nothing to return even though the background task WAS scheduled and its zip is
@@ -267,7 +329,7 @@ export const bulkDownloadQueryFn = async (
   let scheduled = false;
   let first: components['schemas']['ImagesDownloaded'] | undefined;
   for (const [index, chunk] of chunks.entries()) {
-    const response = await baseQuery({
+    const response = await fetchChunk(baseQuery, authContext, {
       url: buildImagesUrl('download'),
       method: 'POST',
       body: { image_names: chunk, board_id },
@@ -283,13 +345,65 @@ export const bulkDownloadQueryFn = async (
       // rather than folded into the payload because `ImagesDownloaded` has no per-name failure
       // list, and unlike the mutating routes this endpoint has no `onQueryStarted` that would
       // make this a second reporting site for the same toast id.
-      toastFailedDownloads(chunks.slice(index).flat().length);
-      return { data: first };
+      toastFailedDownloads(chunks.slice(index).flatMap((names) => names ?? []).length);
+      // Cast, like the return below: `first` is nullish only when a 202 came back with no body
+      // (see `scheduled`), and ImagesDownloaded has no way to say "scheduled, but the body did
+      // not survive the trip". The fulfilled-action listener reads the payload through
+      // optionals for exactly that reason.
+      return { data: first as components['schemas']['ImagesDownloaded'] };
     }
     scheduled = true;
     first ??= response.data as components['schemas']['ImagesDownloaded'];
   }
   return { data: first as components['schemas']['ImagesDownloaded'] };
+};
+
+/**
+ * Fetches DTOs for a list of image names, one conforming chunk at a time.
+ *
+ * Chunked despite being a read: `useRangeBasedImageFetching` unions every virtuoso range seen
+ * inside its throttle window, and a dense grid with a 4096px overscan can carry that past the
+ * cap. The failure was silent — the hook swallows the rejection and nothing listens for it, so
+ * the affected thumbnails simply never loaded.
+ *
+ * Each chunk is published into the individual `getImageDTO` caches as it arrives, rather than
+ * all of them at the end. This mutation rejects on any chunk failure and its one caller never
+ * looks at the rejection, so a transient failure late in a wide range would otherwise throw
+ * away every thumbnail the earlier chunks had already fetched — and they would not be
+ * re-requested either, since the hook asks only for names it cannot find in the cache and the
+ * next request is driven by scrolling, not by the failure.
+ */
+export const imageDTOsByNamesQueryFn = async (
+  { image_names }: components['schemas']['Body_get_images_by_names'],
+  // Typed as the plain store dispatch rather than against `imagesApi.util.upsertQueryEntries`:
+  // naming imagesApi in a signature the endpoint definitions themselves depend on makes its
+  // inferred type circular, and every consumer of the api silently degrades to `any`.
+  { dispatch }: { dispatch: Dispatch<UnknownAction> },
+  _extraOptions: unknown,
+  baseQuery: ImagesBaseQuery
+) => {
+  const authContext = captureAuthContext();
+  const imageDTOs: ImageDTO[] = [];
+  for (const chunk of chunkImageNames(image_names)) {
+    const response = await fetchChunk(baseQuery, authContext, {
+      url: buildImagesUrl('images_by_names'),
+      method: 'POST',
+      body: { image_names: chunk },
+    });
+    if (response.error) {
+      return { error: response.error };
+    }
+    const chunkDTOs = response.data as ImageDTO[];
+    // Checked again after the response, not just before the request: these DTOs were fetched
+    // as whoever was logged in when the chunk went out, and the store they would be written
+    // into may since have been reset for someone else (the logout listener clears the api
+    // state). Publishing them then would seed one user's cache with another's images.
+    if (isSameAuthContext(authContext)) {
+      upsertImageDTOs(dispatch, chunkDTOs);
+    }
+    imageDTOs.push(...chunkDTOs);
+  }
+  return { data: imageDTOs };
 };
 
 export const imagesApi = api.injectEndpoints({
@@ -705,47 +819,9 @@ export const imagesApi = api.injectEndpoints({
       paths['/api/v1/images/images_by_names']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/images/images_by_names']['post']['requestBody']['content']['application/json']
     >({
-      /**
-       * Chunked too, despite being a read: `useRangeBasedImageFetching` unions every virtuoso
-       * range seen inside its throttle window, and a dense grid with a 4096px overscan can carry
-       * that past the cap. The failure was silent — the hook swallows the rejection and nothing
-       * listens for it, so the affected thumbnails simply never loaded. Results concatenate
-       * because the route returns a plain ordered list, and the caller only upserts by name.
-       */
-      queryFn: async ({ image_names }, _api, _extraOptions, baseQuery) => {
-        const imageDTOs: ImageDTO[] = [];
-        for (const chunk of chunkImageNames(image_names)) {
-          const response = await baseQuery({
-            url: buildImagesUrl('images_by_names'),
-            method: 'POST',
-            body: { image_names: chunk },
-          });
-          if (response.error) {
-            return { error: response.error };
-          }
-          imageDTOs.push(...(response.data as ImageDTO[]));
-        }
-        return { data: imageDTOs };
-      },
-      // Don't provide cache tags - we'll manually upsert into individual getImageDTO caches
-      async onQueryStarted(_, { dispatch, queryFulfilled }) {
-        try {
-          const { data: imageDTOs } = await queryFulfilled;
-
-          // Upsert each DTO into the individual image cache
-          const updates: Param0<typeof imagesApi.util.upsertQueryEntries> = [];
-          for (const imageDTO of imageDTOs) {
-            updates.push({
-              endpointName: 'getImageDTO',
-              arg: imageDTO.image_name,
-              value: imageDTO,
-            });
-          }
-          dispatch(imagesApi.util.upsertQueryEntries(updates));
-        } catch {
-          // Handle error if needed
-        }
-      },
+      queryFn: imageDTOsByNamesQueryFn,
+      // No cache tags: the DTOs are upserted into the individual getImageDTO caches by the
+      // queryFn, chunk by chunk, which is also all an onQueryStarted handler would have done.
     }),
   }),
 });

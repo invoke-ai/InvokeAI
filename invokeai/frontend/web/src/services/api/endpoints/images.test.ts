@@ -4,9 +4,12 @@ import {
   buildChunkedImageBatchQueryFn,
   bulkDownloadQueryFn,
   chunkImageNames,
+  imageDTOsByNamesQueryFn,
+  imagesApi,
   mergeImageBatchResults,
 } from 'services/api/endpoints/images';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ImageDTO } from 'services/api/types';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api } from '..';
 
@@ -17,6 +20,42 @@ vi.mock('i18next', () => ({ default: { t: vi.fn((key: string) => key) } }));
 const CHUNK_SIZE = 1000;
 
 const names = (count: number) => Array.from({ length: count }, (_, i) => `image-${i}.png`);
+
+/**
+ * The chunk loops read the live session out of localStorage before every request, so the tests
+ * need a real one to write to. Not available in the default (node) test environment.
+ */
+beforeAll(() => {
+  const values = new Map<string, string>();
+  vi.stubGlobal('localStorage', {
+    clear: () => values.clear(),
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+  });
+});
+
+beforeEach(() => {
+  localStorage.clear();
+});
+
+/** A token shaped like the real JWT: only the `user_id` claim is read back out of it. */
+const tokenFor = (userId: string, issuedAt = 1) =>
+  `header.${btoa(JSON.stringify({ user_id: userId, iat: issuedAt }))}.signature`;
+
+const login = (userId: string, issuedAt = 1) => {
+  localStorage.setItem('auth_token', tokenFor(userId, issuedAt));
+};
+
+/** What a logout + login as someone else leaves behind: a new token AND a bumped generation. */
+const switchUser = (userId: string) => {
+  localStorage.setItem('auth_generation', String(Number(localStorage.getItem('auth_generation') ?? 0) + 1));
+  login(userId);
+};
 
 describe('chunkImageNames', () => {
   it('leaves a conforming list as a single request', () => {
@@ -152,6 +191,86 @@ describe('buildChunkedImageBatchQueryFn', () => {
     expect(dispatch).not.toHaveBeenCalled();
     expect(toast).not.toHaveBeenCalled();
   });
+
+  it('stops when the session changes mid-run, instead of applying the rest as the new user', async () => {
+    // Every request picks up whatever token localStorage holds when it is sent, so a loop that
+    // outlives its own session finishes as whoever logged in next -- on a public board those
+    // writes land, committing half of one user's action under another's name. resetApiState on
+    // the logout action does not help: it clears the cache, not a queryFn that is running.
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        switchUser('user-b');
+      }
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
+    });
+
+    const { result } = run(baseQuery, { image_names: names(2500) });
+
+    // Chunk 3 is never sent. Chunks 1 and 2 already committed, so the run is a partial success
+    // and its unreached names are reported, exactly as for a mid-run server failure.
+    expect(await result).toEqual({
+      data: {
+        added_images: ['chunk-1.png', 'chunk-2.png'],
+        failed_images: names(2500).slice(2000),
+        affected_boards: ['board-1'],
+      },
+    });
+    expect(baseQuery).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps running when a login request elsewhere bumps the auth generation', async () => {
+    // `beginAuthTransition` bumps the shared counter when a login or logout request is *sent*,
+    // before anything has changed and whether or not it succeeds — a second tab opening the
+    // login page must not abandon this tab's batch. The session is judged by who the next
+    // request would go out as, which is unchanged here.
+    login('user-a');
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      localStorage.setItem('auth_generation', '7');
+      return Promise.resolve({ data: { added_images: [], failed_images: [], affected_boards: [] } });
+    });
+
+    const { result } = run(baseQuery, { image_names: names(2500) });
+    await result;
+
+    expect(baseQuery).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps running across a sliding-window token refresh, which is the same session', async () => {
+    // The middleware mints a fresh token on mutating requests. Comparing tokens byte-for-byte
+    // would abandon every batch long enough to be refreshed -- the exact operations chunking
+    // exists for.
+    login('user-a', 1);
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      login('user-a', 2);
+      return Promise.resolve({ data: { added_images: [], failed_images: [], affected_boards: [] } });
+    });
+
+    const { result } = run(baseQuery, { image_names: names(2500) });
+    await result;
+
+    expect(baseQuery).toHaveBeenCalledTimes(3);
+  });
+
+  it('stops when the session simply expires mid-run, which bumps no generation', async () => {
+    // sessionExpiredLogout drops the token with no request of its own -- a 401 anywhere, or a
+    // token that fails validation on load -- so the generation counter never moves. Without the
+    // token half of the check, the loop would run on with no credentials at all.
+    login('user-a');
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      localStorage.removeItem('auth_token');
+      return Promise.resolve({ data: { added_images: [], failed_images: [], affected_boards: [] } });
+    });
+
+    const { result } = run(baseQuery, { image_names: names(2500) });
+    await result;
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('bulkDownloadQueryFn', () => {
@@ -247,6 +366,37 @@ describe('bulkDownloadQueryFn', () => {
     expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToDownload', { count: 1500 });
   });
 
+  it('sends one request when a board id rides along with an oversized name list', async () => {
+    // The server picks board_id over image_names (BulkDownloadService), so each chunk would
+    // schedule the same full-board zip again: 1001 names plus a board id used to produce two
+    // identical whole-board downloads.
+    const baseQuery = vi.fn(
+      (_args: Request): Promise<Response> => Promise.resolve({ data: { bulk_download_item_name: 'board.zip' } })
+    );
+
+    await run(baseQuery, { image_names: names(2500), board_id: 'board-1' });
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(baseQuery.mock.calls[0]?.[0].body).toEqual({ image_names: undefined, board_id: 'board-1' });
+  });
+
+  it('stops scheduling zips when the session changes mid-run', async () => {
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      switchUser('user-b');
+      return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ data: { bulk_download_item_name: 'item-1.zip' } });
+    // The 1500 names in the chunks that were never sent are in no zip.
+    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToDownload', { count: 1500 });
+  });
+
   it('reports an error when the first chunk fails, since nothing was scheduled', async () => {
     const baseQuery = vi.fn(
       (_args: Request): Promise<Response> => Promise.resolve({ error: { status: 403, data: 'nope' } })
@@ -258,5 +408,80 @@ describe('bulkDownloadQueryFn', () => {
     expect(baseQuery).toHaveBeenCalledTimes(1);
     // Nothing landed, so the failure toast belongs to the `matchRejected` listener alone.
     expect(toast).not.toHaveBeenCalled();
+  });
+});
+
+describe('imageDTOsByNamesQueryFn', () => {
+  type Request = { url: string; method: string; body: { image_names: string[] } };
+  type Response = { data: ImageDTO[] } | { error: { status: number; data: string } };
+
+  const dto = (image_name: string) => ({ image_name }) as ImageDTO;
+
+  const run = (baseQuery: (args: Request) => Promise<Response>, image_names: string[]) => {
+    const dispatch = vi.fn();
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const queryApi = { dispatch } as any;
+    const query = baseQuery as any;
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    return { dispatch, result: imageDTOsByNamesQueryFn({ image_names }, queryApi, undefined, query) };
+  };
+
+  it('publishes each chunk as it arrives, so a later failure cannot discard the earlier ones', async () => {
+    // This mutation rejects on any chunk failure and its only caller
+    // (useRangeBasedImageFetching) never looks at the rejection -- so DTOs held back until the
+    // end would be dropped for good. The hook re-requests only names missing from the cache,
+    // and only when the user scrolls, so nothing would come back for them.
+    let call = 0;
+    const baseQuery = vi.fn((args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        return Promise.resolve({ error: { status: 500, data: 'boom' } });
+      }
+      return Promise.resolve({ data: args.body.image_names.map(dto) });
+    });
+
+    const { dispatch, result } = run(baseQuery, names(2500));
+
+    expect(await result).toEqual({ error: { status: 500, data: 'boom' } });
+    // One dispatch, carrying chunk one -- not zero, which is what holding the DTOs back until
+    // the end would produce. Matched on the payload: the action also carries a request id and a
+    // timestamp, both fresh per call.
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    const action = dispatch.mock.calls[0]?.[0] as {
+      type: string;
+      payload: { value: ImageDTO }[];
+    };
+    expect(action.type).toBe(imagesApi.util.upsertQueryEntries([]).type);
+    expect(action.payload.map((entry) => entry.value.image_name)).toEqual(names(1000));
+  });
+
+  it('does not publish a chunk that came back after the session changed', async () => {
+    // The DTOs were fetched as whoever was logged in when the chunk went out. By the time they
+    // land the logout listener may have reset the api state for someone else, and writing them
+    // in then seeds one user's cache with another's images.
+    login('user-a');
+    const baseQuery = vi.fn((args: Request): Promise<Response> => {
+      switchUser('user-b');
+      return Promise.resolve({ data: args.body.image_names.map(dto) });
+    });
+
+    const { dispatch, result } = run(baseQuery, names(2500));
+    await result;
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('stops reading when the session changes mid-run', async () => {
+    login('user-a');
+    const baseQuery = vi.fn((args: Request): Promise<Response> => {
+      switchUser('user-b');
+      return Promise.resolve({ data: args.body.image_names.map(dto) });
+    });
+
+    const { result } = run(baseQuery, names(2500));
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(await result).toEqual({ error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('Aborted') } });
   });
 });
