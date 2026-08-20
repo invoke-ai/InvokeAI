@@ -1,11 +1,14 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { captureAuthContext, isSameAuthContext } from 'features/auth/store/authTokenRefresh';
 import {
+  canRetainFailedSelection,
   changeBoardReset,
+  imagesToChangeSelected,
   isModalOpenChanged,
   selectChangeBoardModalSlice,
   videosToChangeSelected,
@@ -37,6 +40,7 @@ const selectIsModalOpen = createSelector(
 const ChangeBoardModal = () => {
   useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const currentBoardId = useAppSelector(selectSelectedBoardId);
   const currentUser = useAppSelector(selectCurrentUser);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>();
@@ -85,16 +89,27 @@ const ChangeBoardModal = () => {
       return;
     }
 
-    if (imagesToChange.length) {
-      if (selectedBoardId === 'none') {
-        removeImagesFromBoard({ image_names: imagesToChange });
-      } else {
-        addImagesToBoard({
-          image_names: imagesToChange,
-          board_id: selectedBoardId,
-        });
-      }
-    }
+    const authContext = captureAuthContext();
+
+    // Awaited, not fired and forgotten. The batch routes report per-name failures in
+    // `failed_images`, and accepting this dialog resets the selection on the way out
+    // (ConfirmationAlertDialog calls acceptCallback then onClose) — so the names that did not
+    // move used to be dropped along with the ones that did, leaving nothing to retry from.
+    //
+    // Per-name failures are toasted by the endpoint itself (`onQueryStarted`), so what is left
+    // to do here is keep those names selected. A whole-request rejection is different: it means
+    // none of them moved, and nothing toasts those today — neither the endpoint's handler
+    // (documented no-op) nor any matchRejected listener, since only the single-image board
+    // routes have one.
+    const failedImageNamesPromise: Promise<string[]> = !imagesToChange.length
+      ? Promise.resolve([])
+      : (selectedBoardId === 'none'
+          ? removeImagesFromBoard({ image_names: imagesToChange })
+          : addImagesToBoard({ image_names: imagesToChange, board_id: selectedBoardId })
+        )
+          .unwrap()
+          .then((result) => result.failed_images)
+          .catch(() => imagesToChange);
 
     const videoMutations: { videoName: string; promise: Promise<unknown> }[] = [];
     if (videosToChange.length) {
@@ -112,10 +127,30 @@ const ChangeBoardModal = () => {
       }
     }
 
-    const results = await Promise.allSettled(videoMutations.map(({ promise }) => promise));
+    // Both kinds go out together: the video routes take one name at a time, and serializing
+    // them behind the image batch would leave a large move waiting on the other's round trips.
+    const [failedImageNames, results] = await Promise.all([
+      failedImageNamesPromise,
+      Promise.allSettled(videoMutations.map(({ promise }) => promise)),
+    ]);
     const failed = results.filter((result) => result.status === 'rejected');
-    if (failed.length === 0) {
+    // Checked before *any* of the writes below, the reset included: all of them land after an
+    // unbounded await, and the reset is as capable of clearing a selection that now belongs to
+    // someone else as the retain is of overwriting it.
+    if (!canRetainFailedSelection(selectChangeBoardModalSlice(store.getState()), isSameAuthContext(authContext))) {
+      return;
+    }
+    if (failed.length === 0 && failedImageNames.length === 0) {
       dispatch(changeBoardReset());
+      return;
+    }
+    // At most one of these fires: the two selections are mutually exclusive by construction —
+    // imagesToChangeSelected clears video_names and videosToChangeSelected clears image_names,
+    // and every caller opens this dialog through one of them.
+    if (failedImageNames.length > 0) {
+      dispatch(imagesToChangeSelected(failedImageNames));
+    }
+    if (failed.length === 0) {
       return;
     }
     const failedVideoNames = results.flatMap((result, index) =>
@@ -135,6 +170,7 @@ const ChangeBoardModal = () => {
     removeImagesFromBoard,
     removeVideoFromBoard,
     selectedBoardId,
+    store,
     t,
     videosToChange,
   ]);
