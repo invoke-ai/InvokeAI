@@ -28,7 +28,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
         right: { activeInstanceId: 'test-instance', instanceIds: ['test-instance'], sizePx: 240 },
       },
     }),
-  useWorkbenchCommands: () => ({ layout: { setRegionSize: () => {} } }),
+  useWorkbenchCommands: () => ({ layout: { setRegionCollapsed: () => {}, setRegionSize: () => {} } }),
 }));
 
 import { WidgetEnableMenu } from './WidgetEnableMenu';

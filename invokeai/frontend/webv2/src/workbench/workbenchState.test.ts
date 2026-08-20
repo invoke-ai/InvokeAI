@@ -24,7 +24,13 @@ import { layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
-import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory, normalizeWorkbenchAccount } from './workbenchState';
+import {
+  clampPanelSize,
+  GRAPH_HISTORY_BYTE_BUDGET,
+  isPanelCollapseOvershoot,
+  normalizeGraphHistory,
+  normalizeWorkbenchAccount,
+} from './workbenchState';
 import {
   createInitialWorkbenchState,
   nextLayerName,
@@ -657,6 +663,43 @@ describe('workbench widget region defaults', () => {
     expect(getProjectWidgetValues(getActiveProject(preserved), 'generate')).toMatchObject({
       positivePrompt: 'generate positive',
     });
+  });
+});
+
+describe('workbench panel resize bounds', () => {
+  it('clamps a side panel into its raised bounds', () => {
+    expect(clampPanelSize('left', 900)).toBe(720);
+    expect(clampPanelSize('left', 700)).toBe(700);
+    expect(clampPanelSize('left', 100)).toBe(350);
+  });
+
+  it('arms collapse only once a drag clears the floor by the overshoot', () => {
+    expect(isPanelCollapseOvershoot('left', 350)).toBe(false);
+    expect(isPanelCollapseOvershoot('left', 271)).toBe(false);
+    expect(isPanelCollapseOvershoot('left', 270)).toBe(true);
+  });
+
+  it('measures the overshoot against whichever floor the region has', () => {
+    expect(isPanelCollapseOvershoot('bottom', 96)).toBe(false);
+    expect(isPanelCollapseOvershoot('bottom', 17)).toBe(false);
+    expect(isPanelCollapseOvershoot('bottom', 16)).toBe(true);
+  });
+
+  it('reopens a collapsed region at the size it was collapsed from', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { region: 'left', sizePx: 500, type: 'setRegionWidgetSize' });
+
+    const activeInstanceId = getActiveProject(state).widgetRegions.left.activeInstanceId;
+
+    // What a drag past the floor does: hide the panel, leave its width alone.
+    state = workbenchReducer(state, { isCollapsed: true, region: 'left', type: 'setRegionWidgetCollapsed' });
+    expect(getActiveProject(state).widgetRegions.left).toMatchObject({ isCollapsed: true, sizePx: 500 });
+
+    // What the rail button does next: the stored active instance still matches,
+    // so selecting it toggles the collapse back off rather than switching.
+    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: activeInstanceId });
+    expect(getActiveProject(state).widgetRegions.left).toMatchObject({ isCollapsed: false, sizePx: 500 });
   });
 });
 

@@ -11,16 +11,18 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { clampPanelSize, getPanelSizeBounds } from '@workbench/workbenchState';
+import { clampPanelSize, getPanelSizeBounds, isPanelCollapseOvershoot } from '@workbench/workbenchState';
 import { SettingsIcon } from 'lucide-react';
 import {
   useCallback,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -33,6 +35,17 @@ import { WidgetIdentityIcon } from './WidgetIdentityIcon';
 import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 
 const PANEL_SIZE_STEP_PX = 16;
+
+/**
+ * A live resize drag. `sizePx` is what the panel renders at — always inside the
+ * region's bounds — while `isCollapseOvershoot` remembers that the pointer went
+ * far enough past the floor to mean "collapse", which clamping alone discards.
+ */
+interface PanelResizeDrag {
+  isCollapseOvershoot: boolean;
+  sizePx: number;
+}
+
 const RESIZE_HANDLE_HOVER_PROPS = { bg: 'accent.solid', opacity: 0.45 };
 const RESIZE_HANDLE_FOCUS_PROPS = { bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' };
 
@@ -50,12 +63,19 @@ export const WidgetPanelFrame = ({
   const { t } = useTranslation();
   const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
   const { layout } = useWorkbenchCommands();
-  const [dragSizePx, setDragSizePx] = useState<number | null>(null);
+  const [drag, setDrag] = useState<PanelResizeDrag | null>(null);
+  // The drag listens on `window`, so a frame that unmounts mid-gesture (a
+  // preset switch, a widget closing) would otherwise leave the listeners
+  // behind and commit a size to a region that is no longer on screen.
+  const pointerSessionRef = useRef<AbortController | null>(null);
+
+  useMountEffect(() => () => pointerSessionRef.current?.abort());
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
   // Clamped at render, not just on commit, so a persisted size from before a
   // bounds change heals on screen immediately instead of on the next resize.
-  const displaySizePx = clampPanelSize(region, dragSizePx ?? regionState.sizePx);
+  const displaySizePx = clampPanelSize(region, drag?.sizePx ?? regionState.sizePx);
+  const isCollapseArmed = drag?.isCollapseOvershoot ?? false;
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
@@ -77,28 +97,56 @@ export const WidgetPanelFrame = ({
       const startX = event.clientX;
       const startY = event.clientY;
       const startSizePx = regionState.sizePx;
-      let nextSizePx = startSizePx;
       const direction = isLeft ? 1 : -1;
       const pointerSession = new AbortController();
 
+      pointerSessionRef.current = pointerSession;
+
+      let nextDrag: PanelResizeDrag = { isCollapseOvershoot: false, sizePx: clampPanelSize(region, startSizePx) };
+
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
+        const rawSizePx = startSizePx + deltaPx;
 
-        nextSizePx = clampPanelSize(region, startSizePx + deltaPx);
-        setDragSizePx(nextSizePx);
+        // Recomputed from the live position every move, never latched, so
+        // dragging back inside the floor disarms the collapse.
+        nextDrag = {
+          isCollapseOvershoot: isPanelCollapseOvershoot(region, rawSizePx),
+          sizePx: clampPanelSize(region, rawSizePx),
+        };
+        setDrag(nextDrag);
       };
 
       const handlePointerUp = () => {
         pointerSession.abort();
-        setDragSizePx(null);
-        commitSize(nextSizePx);
+        setDrag(null);
+
+        if (nextDrag.isCollapseOvershoot) {
+          // Collapsing is a visibility change, not a resize: `sizePx` keeps the
+          // width the user chose, so the rail button reopens the panel where
+          // they left it — as collapsing from the rail already does. Committing
+          // the floor here would ratchet a 450px panel down to 350 every time.
+          layout.setRegionCollapsed(region, true);
+
+          return;
+        }
+
+        commitSize(nextDrag.sizePx);
+      };
+
+      // A cancelled gesture is an interruption, not an instruction: it keeps
+      // the size the pointer reached but never collapses.
+      const handlePointerCancel = () => {
+        pointerSession.abort();
+        setDrag(null);
+        commitSize(nextDrag.sizePx);
       };
 
       window.addEventListener('pointermove', handlePointerMove, { signal: pointerSession.signal });
       window.addEventListener('pointerup', handlePointerUp, { signal: pointerSession.signal });
-      window.addEventListener('pointercancel', handlePointerUp, { signal: pointerSession.signal });
+      window.addEventListener('pointercancel', handlePointerCancel, { signal: pointerSession.signal });
     },
-    [commitSize, isBottom, isLeft, region, regionState.sizePx]
+    [commitSize, isBottom, isLeft, layout, region, regionState.sizePx]
   );
 
   const handleKeyDown = useCallback(
@@ -164,10 +212,16 @@ export const WidgetPanelFrame = ({
         aria-valuenow={displaySizePx}
         as="div"
         cursor={isBottom ? 'ns-resize' : 'ew-resize'}
-        opacity="0"
         position="absolute"
         role="separator"
         tabIndex={0}
+        // The handle is invisible at rest and only shows on hover, but an 8px
+        // strip loses hover the moment a drag starts — so while the drag is
+        // armed to collapse, it lights up on its own. Without it, overshooting
+        // is a gesture with no feedback until the panel vanishes.
+        bg={isCollapseArmed ? 'accent.solid' : undefined}
+        data-collapse-armed={isCollapseArmed ? '' : undefined}
+        opacity={isCollapseArmed ? '0.65' : '0'}
         transition="opacity var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
         zIndex="1"
         {...resizeOrientationProps}
