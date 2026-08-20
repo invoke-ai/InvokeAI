@@ -23,8 +23,11 @@ export const PreviewWidgetLabel = (_props: WidgetLabelProps) => {
     );
   }
 
+  // `pe` because the frame's header row only pads to `2` and the label sits
+  // against the action cluster; a middle-truncated name otherwise ends flush
+  // with the first button.
   return (
-    <HStack flex="1" gap="1" minW="0">
+    <HStack flex="1" gap="1" minW="0" pe="2">
       <Text flexShrink={0} fontSize="xs" fontWeight="700">
         {boardName}
       </Text>

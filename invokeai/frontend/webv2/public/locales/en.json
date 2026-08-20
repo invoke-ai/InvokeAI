@@ -1933,6 +1933,7 @@
       },
       "compare": "Compare",
       "copyCurrentFrame": "Copy Current Frame",
+      "editOnCanvas": "Edit on Canvas",
       "copyCurrentFrameDrawFailed": "Could not read the current video frame",
       "copyCurrentFrameEncodeFailed": "Could not encode the current video frame",
       "copyCurrentFrameNotReady": "The video does not have a current frame yet",

@@ -6,10 +6,10 @@ import { galleryImageItemToGalleryImage, isGalleryImageItem, toGalleryItemRef } 
 import { IconButton, Tooltip } from '@platform/ui';
 import {
   CopyIcon,
-  DownloadIcon,
   EllipsisVerticalIcon,
   FileJsonIcon,
   ImagesIcon,
+  PencilIcon,
   StarIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -24,6 +24,12 @@ import type { PreviewDensity } from './previewDensity';
  * (anchored under the button) — one source of truth for every image verb,
  * mirroring the legacy viewer's menu button. Compact densities collapse to
  * star + the dropdown.
+ *
+ * The strip earns its space by holding what the dropdown cannot reach in one
+ * click. Copy and Download sat here *and* in the dropdown's quick row, so they
+ * cost a slot each to save nothing; editing on canvas — the one verb that
+ * moves the image into actual work — had no button at all. Copy and Download
+ * stay one click away in the dropdown.
  */
 export const PreviewActionStrip = ({
   actions,
@@ -50,10 +56,9 @@ export const PreviewActionStrip = ({
     [actions, item]
   );
   const selectForCompare = useCallback(() => image && actions.selectForCompare(image), [actions, image]);
-  const copyImage = useCallback(() => image && void actions.copyImage(image), [actions, image]);
+  const editOnCanvas = useCallback(() => image && void actions.sendToCanvas([image], 'raster'), [actions, image]);
   const copyCurrentFrame = useCallback(() => onCopyCurrentFrame?.(), [onCopyCurrentFrame]);
   const openDetails = useCallback(() => onOpenDetails?.(), [onOpenDetails]);
-  const downloadItem = useCallback(() => void actions.downloadItem(item), [actions, item]);
   const openMenu = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       const rect = event.currentTarget.getBoundingClientRect();
@@ -92,7 +97,11 @@ export const PreviewActionStrip = ({
     <HStack flexShrink={0} gap="0.5">
       {starButton}
       {image ? <StripIconButton icon={ImagesIcon} label="Select for Compare" onClick={selectForCompare} /> : null}
-      {image ? <StripIconButton icon={CopyIcon} label="Copy to clipboard" onClick={copyImage} /> : null}
+      {/* Videos have no canvas destination, so the verb simply is not offered
+          for them — the same guard the context menu's image-only branch uses. */}
+      {image ? (
+        <StripIconButton icon={PencilIcon} label={t('widgets.preview.editOnCanvas')} onClick={editOnCanvas} />
+      ) : null}
       {item.kind === 'video' && onCopyCurrentFrame ? (
         <StripIconButton
           disabled={!isVideoFrameCopyAvailable}
@@ -104,7 +113,6 @@ export const PreviewActionStrip = ({
       {item.kind === 'video' && onOpenDetails ? (
         <StripIconButton icon={FileJsonIcon} label={t('widgets.preview.videoDetails')} onClick={openDetails} />
       ) : null}
-      <StripIconButton icon={DownloadIcon} label={`Download ${itemKindLabel}`} onClick={downloadItem} />
       {menuButton}
     </HStack>
   );

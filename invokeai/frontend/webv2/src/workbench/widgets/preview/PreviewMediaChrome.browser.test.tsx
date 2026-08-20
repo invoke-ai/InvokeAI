@@ -92,6 +92,7 @@ void i18n.use(initReactI18next).init({
         widgets: {
           preview: {
             copyCurrentFrame: 'Copy Current Frame',
+            editOnCanvas: 'Edit on Canvas',
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
@@ -404,27 +405,25 @@ describe('Preview mixed media footer and actions', () => {
       />
     );
 
+    // Image-only verbs: a video has no compare partner and no canvas
+    // destination.
     expect(host?.querySelector('[aria-label="Select for Compare"]')).toBeNull();
-    expect(host?.querySelector('[aria-label="Copy to clipboard"]')).toBeNull();
+    expect(host?.querySelector('[aria-label="Edit on Canvas"]')).toBeNull();
 
     const copyFrame = host?.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]');
     const details = host?.querySelector<HTMLButtonElement>('[aria-label="Video Details"]');
     const star = host?.querySelector<HTMLButtonElement>('[aria-label="Unstar video"]');
-    const download = host?.querySelector<HTMLButtonElement>('[aria-label="Download video"]');
     expect(copyFrame).not.toBeNull();
     expect(copyFrame?.disabled).toBe(true);
     expect(details).not.toBeNull();
     expect(star).not.toBeNull();
-    expect(download).not.toBeNull();
 
     await interact(() => details?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
     await interact(() => star?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
-    await interact(() => download?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
 
     expect(onOpenDetails).toHaveBeenCalledOnce();
     expect(onCopyCurrentFrame).not.toHaveBeenCalled();
     expect(actions.setItemsStarred).toHaveBeenCalledWith([{ kind: 'video', name: 'shared' }], false);
-    expect(actions.downloadItem).toHaveBeenCalledWith(sharedVideo);
 
     await render(
       <PreviewActionStrip
@@ -444,23 +443,44 @@ describe('Preview mixed media footer and actions', () => {
     expect(onCopyCurrentFrame).toHaveBeenCalledOnce();
   });
 
-  it('keeps the existing image clipboard action unchanged', async () => {
+  it('sends an image to the canvas as a raster layer', async () => {
     const actions = {
       copyImage: vi.fn(() => Promise.resolve()),
       downloadItem: vi.fn(() => Promise.resolve()),
       selectForCompare: vi.fn(),
+      sendToCanvas: vi.fn(() => Promise.resolve()),
       setItemsStarred: vi.fn(() => Promise.resolve()),
     } as unknown as ImageActions;
 
     await render(
       <PreviewActionStrip actions={actions} density="full" item={sharedImage} onOpenMenu={() => undefined} />
     );
-    const copyImage = host?.querySelector<HTMLButtonElement>('[aria-label="Copy to clipboard"]');
+    const editOnCanvas = host?.querySelector<HTMLButtonElement>('[aria-label="Edit on Canvas"]');
 
-    expect(copyImage).not.toBeNull();
+    expect(editOnCanvas).not.toBeNull();
     expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
-    await interact(() => copyImage?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
-    expect(actions.copyImage).toHaveBeenCalledWith(expect.objectContaining({ imageName: 'shared' }));
+    await interact(() => editOnCanvas?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })));
+    expect(actions.sendToCanvas).toHaveBeenCalledWith([expect.objectContaining({ imageName: 'shared' })], 'raster');
+  });
+
+  // Both remain one click away in the dropdown's quick row, which is why they
+  // left the strip.
+  it('leaves copy and download to the image-actions dropdown', async () => {
+    const actions = {
+      copyImage: vi.fn(() => Promise.resolve()),
+      downloadItem: vi.fn(() => Promise.resolve()),
+      selectForCompare: vi.fn(),
+      sendToCanvas: vi.fn(() => Promise.resolve()),
+      setItemsStarred: vi.fn(() => Promise.resolve()),
+    } as unknown as ImageActions;
+
+    await render(
+      <PreviewActionStrip actions={actions} density="full" item={sharedImage} onOpenMenu={() => undefined} />
+    );
+
+    expect(host?.querySelector('[aria-label="Copy to clipboard"]')).toBeNull();
+    expect(host?.querySelector('[aria-label="Download image"]')).toBeNull();
+    expect(host?.querySelector('[aria-label="Image actions"]')).not.toBeNull();
   });
 });
 
