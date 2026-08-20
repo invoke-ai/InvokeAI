@@ -98,6 +98,7 @@ describe('auth cache isolation', () => {
     store.dispatch(logOut());
 
     expect(store.getState().changeBoardModal).toMatchObject({
+      operation_id: 2,
       isModalOpen: false,
       image_names: [],
       video_names: [],

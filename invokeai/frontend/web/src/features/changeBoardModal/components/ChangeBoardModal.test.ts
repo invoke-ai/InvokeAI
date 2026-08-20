@@ -1,29 +1,55 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { canRetainFailedSelection } from 'features/changeBoardModal/store/slice';
+import {
+  canRetainFailedSelection,
+  changeBoardModalSliceConfig,
+  changeBoardOperationInvalidated,
+  changeBoardReset,
+  imagesToChangeSelected,
+} from 'features/changeBoardModal/store/slice';
 import { describe, expect, it } from 'vitest';
 
 describe('canRetainFailedSelection', () => {
-  const unclaimed = { isModalOpen: false, image_names: [], video_names: [] };
+  const unclaimed = { operation_id: 3, isModalOpen: false, image_names: [], video_names: [] };
 
   it('allows the write-back when nothing has claimed the modal since', () => {
-    expect(canRetainFailedSelection(unclaimed, true)).toBe(true);
+    expect(canRetainFailedSelection(unclaimed, 3, true)).toBe(true);
   });
 
   it('refuses once another selection has claimed the modal', () => {
     // Right-click a different image while a large move is in flight: the dialog is open again
     // with that one name in it. Overwriting it with the earlier request's failures would move
     // a set the user never chose, to the board they picked for something else.
-    expect(canRetainFailedSelection({ ...unclaimed, isModalOpen: true }, true)).toBe(false);
-    expect(canRetainFailedSelection({ ...unclaimed, image_names: ['other.png'] }, true)).toBe(false);
-    expect(canRetainFailedSelection({ ...unclaimed, video_names: ['other.mp4'] }, true)).toBe(false);
+    expect(canRetainFailedSelection({ ...unclaimed, isModalOpen: true }, 3, true)).toBe(false);
+    expect(canRetainFailedSelection({ ...unclaimed, image_names: ['other.png'] }, 3, true)).toBe(false);
+    expect(canRetainFailedSelection({ ...unclaimed, video_names: ['other.mp4'] }, 3, true)).toBe(false);
+  });
+
+  it('refuses after a newer selection was opened and canceled', () => {
+    expect(canRetainFailedSelection(unclaimed, 4, true)).toBe(false);
   });
 
   it('refuses once the session has ended', () => {
     // The logout listener clears this slice along with the api state; re-seeding it afterwards
     // leaves one user's image names in the next user's store.
-    expect(canRetainFailedSelection(unclaimed, false)).toBe(false);
+    expect(canRetainFailedSelection(unclaimed, 3, false)).toBe(false);
+  });
+});
+
+describe('change board operation ownership', () => {
+  it('advances on selection but preserves ownership across the accept reset', () => {
+    const reducer = changeBoardModalSliceConfig.slice.reducer;
+    const selected = reducer(undefined, imagesToChangeSelected(['first.png']));
+    const reset = reducer(selected, changeBoardReset());
+    const newer = reducer(reset, imagesToChangeSelected(['second.png']));
+    const invalidated = reducer(newer, changeBoardOperationInvalidated());
+
+    expect(selected.operation_id).toBe(1);
+    expect(reset.operation_id).toBe(1);
+    expect(newer.operation_id).toBe(2);
+    expect(invalidated.operation_id).toBe(3);
+    expect(invalidated.image_names).toEqual([]);
   });
 });
 

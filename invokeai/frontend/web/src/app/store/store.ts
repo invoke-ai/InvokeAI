@@ -33,7 +33,7 @@ import {
   sessionExpiredLogout,
   tokensBelongToSameUser,
 } from 'features/auth/store/authSlice';
-import { changeBoardModalSliceConfig, changeBoardReset } from 'features/changeBoardModal/store/slice';
+import { changeBoardModalSliceConfig, changeBoardOperationInvalidated } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -288,7 +288,7 @@ startAppListening({
   matcher: isAnyOf(logout, sessionExpiredLogout),
   effect: (_action, { dispatch }) => {
     dispatch(api.util.resetApiState());
-    dispatch(changeBoardReset());
+    dispatch(changeBoardOperationInvalidated());
     cancelDeletion();
   },
 });
@@ -300,7 +300,7 @@ startAppListening({
       return;
     }
     dispatch(api.util.resetApiState());
-    dispatch(changeBoardReset());
+    dispatch(changeBoardOperationInvalidated());
     cancelDeletion();
   },
 });

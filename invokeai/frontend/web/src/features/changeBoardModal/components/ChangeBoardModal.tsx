@@ -96,11 +96,9 @@ const ChangeBoardModal = () => {
     // (ConfirmationAlertDialog calls acceptCallback then onClose) — so the names that did not
     // move used to be dropped along with the ones that did, leaving nothing to retry from.
     //
-    // Per-name failures are toasted by the endpoint itself (`onQueryStarted`), so what is left
-    // to do here is keep those names selected. A whole-request rejection is different: it means
-    // none of them moved, and nothing toasts those today — neither the endpoint's handler
-    // (documented no-op) nor any matchRejected listener, since only the single-image board
-    // routes have one.
+    // Per-name failures and whole-request failures are toasted by the endpoint itself. What is
+    // left to do here is keep names that need a retry selected.
+    const operationId = selectChangeBoardModalSlice(store.getState()).operation_id;
     const failedImageNamesPromise: Promise<string[]> = !imagesToChange.length
       ? Promise.resolve([])
       : (selectedBoardId === 'none'
@@ -137,7 +135,13 @@ const ChangeBoardModal = () => {
     // Checked before *any* of the writes below, the reset included: all of them land after an
     // unbounded await, and the reset is as capable of clearing a selection that now belongs to
     // someone else as the retain is of overwriting it.
-    if (!canRetainFailedSelection(selectChangeBoardModalSlice(store.getState()), isSameAuthContext(authContext))) {
+    if (
+      !canRetainFailedSelection(
+        selectChangeBoardModalSlice(store.getState()),
+        operationId,
+        isSameAuthContext(authContext)
+      )
+    ) {
       return;
     }
     if (failed.length === 0 && failedImageNames.length === 0) {

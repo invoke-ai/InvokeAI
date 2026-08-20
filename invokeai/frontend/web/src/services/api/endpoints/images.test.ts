@@ -7,6 +7,7 @@ import {
   imageDTOsByNamesQueryFn,
   imagesApi,
   mergeImageBatchResults,
+  toastFailedImageBatch,
 } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -88,6 +89,24 @@ describe('mergeImageBatchResults', () => {
       deleted_images: ['a.png', 'b.png'],
       failed_images: ['c.png'],
       affected_boards: ['board-1', 'none'],
+    });
+  });
+});
+
+describe('toastFailedImageBatch', () => {
+  beforeEach(() => {
+    vi.mocked(toast).mockClear();
+    vi.mocked(i18n.t).mockClear();
+  });
+
+  it('reports every unique name when the first request fails', () => {
+    toastFailedImageBatch(['a.png', 'a.png', 'b.png']);
+
+    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToUpdate', { count: 2 });
+    expect(toast).toHaveBeenCalledWith({
+      id: 'IMAGES_FAILED_TO_UPDATE',
+      title: 'toast.imagesFailedToUpdate',
+      status: 'warning',
     });
   });
 });

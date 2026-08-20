@@ -270,6 +270,11 @@ const toastFailedImages = (count: number) => {
   }
 };
 
+/** Reports a whole batch that failed before its first request could commit. */
+export const toastFailedImageBatch = (image_names: string[]) => {
+  toastFailedImages(new Set(image_names).size);
+};
+
 /**
  * The download counterpart. Distinct id and wording: "could not be updated" is wrong for a
  * download, and sharing the id would let one warning overwrite the other, since the toast
@@ -497,16 +502,14 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildImagesUrl('delete'), method: 'POST' }),
         getDeleteImagesTags
       ),
-      async onQueryStarted(_, { queryFulfilled }) {
+      async onQueryStarted({ image_names }, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
           // `handleDeletions` swallows every outcome, so without this a delete that only
           // partly landed — server-side failures or chunks never reached — said nothing at all.
           toastFailedImages(result.failed_images.length);
         } catch {
-          // A rejection means nothing landed at all -- a partial run resolves with data,
-          // not an error. Nothing toasts these rejections today; that gap is unchanged
-          // by this handler, which exists only to surface per-name failures.
+          toastFailedImageBatch(image_names);
         }
       },
       invalidatesTags: (result) => (result ? getDeleteImagesTags(result) : []),
@@ -563,14 +566,12 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildImagesUrl('star'), method: 'POST' }),
         getStarImagesTags
       ),
-      async onQueryStarted(_, { queryFulfilled }) {
+      async onQueryStarted({ image_names }, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
           toastFailedImages(result.failed_images.length);
         } catch {
-          // A rejection means nothing landed at all -- a partial run resolves with data,
-          // not an error. Nothing toasts these rejections today; that gap is unchanged
-          // by this handler, which exists only to surface per-name failures.
+          toastFailedImageBatch(image_names);
         }
       },
       invalidatesTags: (result) => (result ? getStarImagesTags(result) : []),
@@ -586,14 +587,12 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildImagesUrl('unstar'), method: 'POST' }),
         getUnstarImagesTags
       ),
-      async onQueryStarted(_, { queryFulfilled }) {
+      async onQueryStarted({ image_names }, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
           toastFailedImages(result.failed_images.length);
         } catch {
-          // A rejection means nothing landed at all -- a partial run resolves with data,
-          // not an error. Nothing toasts these rejections today; that gap is unchanged
-          // by this handler, which exists only to surface per-name failures.
+          toastFailedImageBatch(image_names);
         }
       },
       invalidatesTags: (result) => (result ? getUnstarImagesTags(result) : []),
@@ -760,14 +759,12 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildBoardImagesUrl('batch'), method: 'POST' }),
         getAddImagesToBoardTags
       ),
-      async onQueryStarted(_, { queryFulfilled }) {
+      async onQueryStarted({ image_names }, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
           toastFailedImages(result.failed_images.length);
         } catch {
-          // A rejection means nothing landed at all -- a partial run resolves with data,
-          // not an error. Nothing toasts these rejections today; that gap is unchanged
-          // by this handler, which exists only to surface per-name failures.
+          toastFailedImageBatch(image_names);
         }
       },
       invalidatesTags: (result) => (result ? getAddImagesToBoardTags(result) : []),
@@ -780,14 +777,12 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildBoardImagesUrl('batch/delete'), method: 'POST' }),
         getRemoveImagesFromBoardTags
       ),
-      async onQueryStarted(_, { queryFulfilled }) {
+      async onQueryStarted({ image_names }, { queryFulfilled }) {
         try {
           const { data: result } = await queryFulfilled;
           toastFailedImages(result.failed_images.length);
         } catch {
-          // A rejection means nothing landed at all -- a partial run resolves with data,
-          // not an error. Nothing toasts these rejections today; that gap is unchanged
-          // by this handler, which exists only to surface per-name failures.
+          toastFailedImageBatch(image_names);
         }
       },
       invalidatesTags: (result) => (result ? getRemoveImagesFromBoardTags(result) : []),
