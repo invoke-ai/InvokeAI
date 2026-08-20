@@ -56,7 +56,9 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   return (
     <HStack flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
       {region === 'center' ? null : (
-        <Text flexShrink={0} fontSize="xs" fontWeight="700">
+        // `pe` evens out the "/": the board button's own start padding already
+        // holds the name 8px off the slash, so the title matches it.
+        <Text flexShrink={0} fontSize="xs" fontWeight="700" pe="2">
           {t('widgets.labels.gallery')}
         </Text>
       )}
