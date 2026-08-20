@@ -6,7 +6,7 @@ import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
+import { $gallerySelection } from 'features/gallery/store/gallerySelectionSource';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -20,12 +20,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
-import { createSelectedItemRevealController } from './selectedItemReveal';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const activeTab = useAppSelector(selectActiveTab);
@@ -40,24 +39,15 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
-    lastRenderedItemNameRef,
+    revealMachine,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
   const activeProgressData = useStore($activeProgressData);
   const isProgressImageResolving = useStore($isProgressImageResolving);
   const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
+  const selection = useStore($gallerySelection);
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
-  // One controller per mounted preview component; the previous-item ref inside it is the shared
-  // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
-  const [revealController] = useState(() =>
-    createSelectedItemRevealController({
-      lastRenderedItemNameRef,
-      marker: autoSwitchedImages,
-      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
-      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
-    })
-  );
 
   useEffect(() => {
     if (!selectedImageName) {
@@ -102,27 +92,18 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   const hasProgressImage = progressImage !== null;
 
-  // The reveal sequencing (previous-item tracking, auto-switch suppression, resolve-window
-  // deferral, StrictMode re-arm) lives in the controller — see selectedItemReveal.ts.
+  // The sequencing lives in the shared machine — see selectedItemReveal.ts. The image path only
+  // renders an image once its preload has settled, so whatever is rendered here has painted.
   useEffect(() => {
-    revealController.run({
+    revealMachine.sync({
+      selection,
+      renderedItemName: imageToRender?.image_name ?? null,
+      isMediaReady: imageToRender !== null,
       shouldShowProgressInViewer,
       hasProgressImage,
       isProgressImageResolving,
-      renderedItemName: imageToRender?.image_name ?? null,
-      selectedItemName: selectedImageName ?? null,
     });
-    return () => {
-      revealController.clearTimer();
-    };
-  }, [
-    hasProgressImage,
-    imageToRender?.image_name,
-    isProgressImageResolving,
-    revealController,
-    selectedImageName,
-    shouldShowProgressInViewer,
-  ]);
+  }, [hasProgressImage, imageToRender, isProgressImageResolving, revealMachine, selection, shouldShowProgressInViewer]);
 
   useEffect(() => {
     return () => {

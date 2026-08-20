@@ -13,12 +13,8 @@ import { dndInputFix } from 'features/dnd/util';
 import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
-import {
-  selectLastSelectedItem,
-  selectSelectedBoardId,
-  selectSelection,
-} from 'features/gallery/store/gallerySelectors';
+import { $gallerySelection } from 'features/gallery/store/gallerySelectionSource';
+import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
@@ -35,12 +31,11 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiCopyBold, PiDownloadSimpleBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 import type { VideoDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
-import { createSelectedItemRevealController } from './selectedItemReveal';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
 type Props = {
@@ -74,6 +69,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isMediaReady, setIsMediaReady] = useState(false);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const activeTab = useAppSelector(selectActiveTab);
@@ -86,7 +82,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
-    lastRenderedItemNameRef,
+    revealMachine,
     onLoadImage,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
@@ -105,21 +101,13 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // of letting the sessions overwrite each other's full-size preview. Mirrors CurrentImagePreview.
   const withTiledProgress = withProgress && activeProgressData.length > 1;
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
-  const selectedItemName = useAppSelector(selectLastSelectedItem);
-  // One controller per mounted preview component; the previous-item ref inside it is the shared
-  // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
-  const [revealController] = useState(() =>
-    createSelectedItemRevealController({
-      lastRenderedItemNameRef,
-      marker: autoSwitchedImages,
-      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
-      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
-    })
-  );
+  const selection = useStore($gallerySelection);
 
-  // Whenever the selected video changes, drop back to the idle still + play overlay.
+  // Whenever the selected video changes, drop back to the idle still + play overlay, and treat the
+  // new element as unpainted until it says otherwise.
   useEffect(() => {
     setIsPlaying(false);
+    setIsMediaReady(false);
   }, [videoName]);
 
   // Mid-generation gallery clicks: mirror CurrentImagePreview's temporary reveal. Without this,
@@ -130,21 +118,23 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // tracking, auto-switch suppression, resolve-window deferral, StrictMode re-arm) lives in the
   // controller — see selectedItemReveal.ts.
   useEffect(() => {
-    revealController.run({
+    revealMachine.sync({
+      selection,
+      renderedItemName: videoName,
+      // A <video> mounts instantly but shows black until it decodes a frame, so mounting is not
+      // the same as being visible — lifting the overlay before then would replace the live preview
+      // with a black rectangle. onLoadedData is the first point a frame is actually available.
+      isMediaReady,
       shouldShowProgressInViewer,
       hasProgressImage,
       isProgressImageResolving,
-      renderedItemName: videoName,
-      selectedItemName: selectedItemName ?? null,
     });
-    return () => {
-      revealController.clearTimer();
-    };
   }, [
     hasProgressImage,
+    isMediaReady,
     isProgressImageResolving,
-    revealController,
-    selectedItemName,
+    revealMachine,
+    selection,
     shouldShowProgressInViewer,
     videoName,
   ]);
@@ -394,6 +384,12 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // browsers populate dimensions/duration but don't actually decode and display the first
   // video frame until playback or a seek — the element just shows its black background.
   // Setting currentTime to 0.0001 nudges the decoder to paint without measurably advancing.
+  // The first decoded frame is on screen: only now is revealing this video over the progress
+  // overlay showing the user anything.
+  const handleLoadedData = useCallback(() => {
+    setIsMediaReady(true);
+  }, []);
+
   const handleLoadedMetadata = useCallback(() => {
     onLoadImage(videoDTO?.session_id ?? null);
     const el = videoRef.current;
@@ -431,6 +427,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         playsInline
         controls={isPlaying}
         onLoadedMetadata={handleLoadedMetadata}
+        onLoadedData={handleLoadedData}
         onEnded={handleClose}
         onError={handleVideoError}
         style={{

@@ -21,11 +21,10 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toMatch(
       /withProgress =\s+shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying/
     );
-    expect(source).toContain('SELECTED_ITEM_REVEAL_DURATION_MS');
-    // The previous-item ref handed to the reveal controller must be the shared one from the
-    // viewer context, so image -> video clicks still read as a selection change after the
-    // preview component swaps.
-    expect(source).toMatch(/createSelectedItemRevealController\(\{\s+lastRenderedItemNameRef,/);
+    // The machine is the one from the viewer context, shared with CurrentImagePreview, so a click
+    // that switches media type is just another selection rather than a component swap to reason
+    // about.
+    expect(source).toContain('revealMachine,');
   });
 
   it('tiles concurrent sessions instead of letting them overwrite each other (multi-GPU)', () => {
@@ -35,18 +34,19 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('<ProgressImageTiles data={activeProgressData} />');
   });
 
-  it('routes the reveal decision through the shared controller with the auto-switch marker', () => {
+  it('drives the shared reveal machine, and only reports the video visible once it has painted', () => {
     // The auto-switch selection lands after onInvocationComplete's DTO fetch, so a quickly-started
     // next render's first progress event can reset $isProgressImageResolving ahead of it. Timing
-    // cannot tell that handoff from a gallery click; the marker can, and the controller owns the
-    // full sequencing (marker consumption, resolve-window deferral, StrictMode re-arm — see
-    // selectedItemReveal.test.ts for the behavior).
-    expect(source).toMatch(/marker: autoSwitchedImages,/);
-    expect(source).toMatch(/revealController\.run\(\{/);
-    expect(source).toMatch(/isProgressImageResolving,\s+renderedItemName: videoName,/);
-    // The effect cleanup must only cancel the timer — the next run (or the unmount handler below)
-    // owns the revealed flag.
-    expect(source).toMatch(/return \(\) => \{\s+revealController\.clearTimer\(\);\s+\};/);
+    // cannot tell that handoff from a gallery click; the selection descriptor can, and the machine
+    // owns the sequencing (see selectedItemReveal.test.ts for the behavior).
+    expect(source).toContain('revealMachine.sync({');
+    // The machine must be told about paint, not about mount: a <video> is black until it decodes.
+    expect(source).toContain('onLoadedData={handleLoadedData}');
+    expect(source).toContain('isMediaReady,');
+    // ...and readiness must reset when the element is swapped for another video.
+    const swapEffect = source.slice(source.indexOf('setIsPlaying(false);'), source.indexOf('}, [videoName]);'));
+    expect(swapEffect).toContain('setIsMediaReady(false);');
+    expect(source).toMatch(/renderedItemName: videoName,/);
   });
 
   it('does not cover playback or a temporary reveal with the metadata panel', () => {
