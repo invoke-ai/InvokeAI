@@ -1,5 +1,6 @@
+import type { ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
-import type { VideoWidgetValues } from '@features/video/core/types';
+import type { VideoSourceClip, VideoWidgetValues } from '@features/video/core/types';
 
 import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { GenerationSettingsSection } from '@features/generation/components';
@@ -7,7 +8,7 @@ import { isMainModelConfig, SEED_MAX } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import { getVideoDurationSeconds, invertVideoAspectRatioId } from '@features/video/core/dimensions';
-import { normalizeVideoWidgetValues, VIDEO_ASPECT_RATIO_IDS } from '@features/video/core/settings';
+import { normalizeVideoWidgetValues, resolveVideoMode, VIDEO_ASPECT_RATIO_IDS } from '@features/video/core/settings';
 import {
   getAcceleratorToggleResult,
   getVideoDimensions,
@@ -18,6 +19,7 @@ import {
 import { createDefaultVideoWidgetValues, syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Field, IconButton, Select } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { toaster } from '@platform/ui/toaster';
 import { ArrowLeftRightIcon, DicesIcon } from 'lucide-react';
@@ -26,6 +28,8 @@ import { useTranslation } from 'react-i18next';
 
 import { areVideoValuesEqual } from './videoComparators';
 import { VideoPromptFields } from './VideoFormFields';
+import { VideoFrameImageField } from './VideoFrameImageField';
+import { VideoSourceClipField } from './VideoSourceClipField';
 import { useVideoUi, useVideoUiActions } from './VideoUiContext';
 
 /**
@@ -51,6 +55,27 @@ const DURATION_FORMATTER = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
   minimumFractionDigits: 1,
 });
+
+/**
+ * A media value the current model cannot consume (persisted from another
+ * model's session, or restored by an optimistic rollback) would otherwise
+ * block invoke invisibly — its section is policy-hidden. This stub is the
+ * visible affordance to clear it.
+ */
+const StaleMediaStub = ({ label, onClear }: { label: string; onClear: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <HStack bg="bg.subtle" gap="2" justify="space-between" p="2" rounded="md">
+      <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+        {label}
+      </Text>
+      <Button flexShrink="0" size="2xs" variant="outline" onClick={onClear}>
+        {t('widgets.video.clearStaleMedia')}
+      </Button>
+    </HStack>
+  );
+};
 
 const VideoModelReconciler = ({
   rawValues,
@@ -103,7 +128,8 @@ export const VideoWidgetView = () => {
   const dimensions = useMemo(() => getVideoDimensions(values.model ?? undefined, values), [values]);
   const durationSeconds = getVideoDurationSeconds(
     values.numFrames,
-    policy.fps.editable ? values.fps : policy.fps.defaultValue
+    // In extend mode the extension inherits the SOURCE clip's frame rate.
+    policy.fps.editable ? (values.sourceVideo?.fps ?? values.fps) : policy.fps.defaultValue
   );
 
   const patch = useCallback((next: Partial<VideoWidgetValues>) => patchValues(next), [patchValues]);
@@ -195,6 +221,25 @@ export const VideoWidgetView = () => {
     [patch, values.aspectRatioId]
   );
 
+  // The mutual exclusion lives in the setters: a first frame and an initial
+  // video are different ways to claim the same conditioning slot, so setting
+  // one clears the other. A last frame combines with either — with a first
+  // frame it interpolates (FLF2V); with a source video it is the destination
+  // the extension should land on.
+  const setFirstFrame = useCallback(
+    (firstFrameImage: ImageWithDims | null) =>
+      patch({ firstFrameImage, ...(firstFrameImage ? { sourceVideo: null } : {}) }),
+    [patch]
+  );
+  const setLastFrame = useCallback((lastFrameImage: ImageWithDims | null) => patch({ lastFrameImage }), [patch]);
+  const setSourceVideo = useCallback(
+    (sourceVideo: VideoSourceClip | null) => patch({ sourceVideo, ...(sourceVideo ? { firstFrameImage: null } : {}) }),
+    [patch]
+  );
+  const clearFirstFrame = useCallback(() => patch({ firstFrameImage: null }), [patch]);
+  const clearLastFrame = useCallback(() => patch({ lastFrameImage: null }), [patch]);
+  const clearSourceVideo = useCallback(() => patch({ sourceVideo: null }), [patch]);
+
   const targetResolutionCollection = useMemo(
     () => createListCollection({ items: policy.targetResolutions.map((option) => ({ ...option, value: option.id })) }),
     [policy.targetResolutions]
@@ -215,11 +260,18 @@ export const VideoWidgetView = () => {
     [policy.frames]
   );
 
-  // Conditioning media locks the aspect ratio in later stack PRs; today the
-  // preset is always the source, so this only reports the derived canvas.
+  const mode = resolveVideoMode(values);
+  const supportsFirstFrame = policy.modes.includes('first-frame') || policy.modes.includes('first-last');
+  const supportsLastFrame = policy.modes.includes('first-last') || policy.modes.includes('last-frame');
+  const supportsExtend = policy.modes.includes('extend');
+  const hasConditioningMedia = Boolean(values.firstFrameImage || values.lastFrameImage || values.sourceVideo);
+  const derivedSourceText = dimensions ? t(`widgets.video.dimensionSource.${dimensions.source}`) : undefined;
   const derivedSizeText = dimensions
-    ? t('widgets.video.derivedSize', { height: dimensions.height, width: dimensions.width })
+    ? `${t('widgets.video.derivedSize', { height: dimensions.height, width: dimensions.width })}${
+        derivedSourceText ? ` — ${derivedSourceText}` : ''
+      }`
     : t('widgets.video.derivedSizeUnavailable');
+  const fpsLockedForExtend = policy.ui.fpsVisible && mode === 'extend';
   const durationText =
     durationSeconds === null
       ? undefined
@@ -247,12 +299,67 @@ export const VideoWidgetView = () => {
         onPatchValues={patch}
       />
 
+      {supportsFirstFrame || supportsLastFrame ? (
+        <GenerationSettingsSection label={t('widgets.video.initialFrames')} sectionId="video-frames" defaultOpen>
+          <Stack gap="3" p="2">
+            {supportsFirstFrame ? (
+              <Field
+                helpText={values.sourceVideo ? undefined : t('widgets.video.firstFrameHelp')}
+                label={t('widgets.video.firstFrame')}
+              >
+                <VideoFrameImageField
+                  disabled={Boolean(values.sourceVideo)}
+                  disabledReason={values.sourceVideo ? t('widgets.video.firstFrameBlocked') : undefined}
+                  dropId="video-first-frame"
+                  image={values.firstFrameImage}
+                  onChange={setFirstFrame}
+                />
+              </Field>
+            ) : null}
+            {supportsLastFrame ? (
+              <Field
+                helpText={
+                  values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp')
+                }
+                label={t('widgets.video.lastFrame')}
+              >
+                <VideoFrameImageField dropId="video-last-frame" image={values.lastFrameImage} onChange={setLastFrame} />
+              </Field>
+            ) : null}
+          </Stack>
+        </GenerationSettingsSection>
+      ) : null}
+
+      {!supportsFirstFrame && values.firstFrameImage ? (
+        <StaleMediaStub label={t('widgets.video.staleFirstFrame')} onClear={clearFirstFrame} />
+      ) : null}
+      {!supportsLastFrame && values.lastFrameImage ? (
+        <StaleMediaStub label={t('widgets.video.staleLastFrame')} onClear={clearLastFrame} />
+      ) : null}
+      {!supportsExtend && values.sourceVideo ? (
+        <StaleMediaStub label={t('widgets.video.staleSourceVideo')} onClear={clearSourceVideo} />
+      ) : null}
+
+      {supportsExtend ? (
+        <GenerationSettingsSection label={t('widgets.video.initialVideo')} sectionId="video-source" defaultOpen>
+          <Stack gap="3" p="2">
+            <VideoSourceClipField
+              disabled={Boolean(values.firstFrameImage)}
+              disabledReason={values.firstFrameImage ? t('widgets.video.initialVideoBlocked') : undefined}
+              sourceVideo={values.sourceVideo}
+              onChange={setSourceVideo}
+            />
+          </Stack>
+        </GenerationSettingsSection>
+      ) : null}
+
       <GenerationSettingsSection label={t('widgets.video.dimensions')} sectionId="video-dimensions" defaultOpen>
         <Stack gap="3" p="2">
           <Field helpText={derivedSizeText} label={t('widgets.video.aspectRatio')}>
             <HStack gap="1">
               <Select
                 collection={ASPECT_RATIO_COLLECTION}
+                disabled={hasConditioningMedia}
                 flex="1"
                 size="xs"
                 value={aspectRatioValue}
@@ -260,6 +367,7 @@ export const VideoWidgetView = () => {
               />
               <IconButton
                 aria-label={t('widgets.video.swapAspectRatio')}
+                disabled={hasConditioningMedia}
                 size="xs"
                 variant="ghost"
                 onClick={swapAspectRatio}
@@ -287,9 +395,13 @@ export const VideoWidgetView = () => {
             />
           </Field>
           {policy.ui.fpsVisible ? (
-            <Field label={t('widgets.video.fps')}>
+            <Field
+              helpText={fpsLockedForExtend ? t('widgets.video.fpsExtendLocked') : undefined}
+              label={t('widgets.video.fps')}
+            >
               <SliderNumberField
                 ariaLabel={t('widgets.video.fps')}
+                disabled={fpsLockedForExtend}
                 max={60}
                 min={policy.fps.min}
                 numberInputMax={policy.fps.max}

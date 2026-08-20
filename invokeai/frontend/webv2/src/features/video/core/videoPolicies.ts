@@ -38,7 +38,7 @@ import {
   WAN_TI2V_PIXEL_MULTIPLE,
   type VideoDimensions,
 } from './dimensions';
-import { resolveVideoMode, VIDEO_ASPECT_RATIO_IDS } from './settings';
+import { MIN_VIDEO_TRIM_FRAMES, resolveVideoMode, VIDEO_ASPECT_RATIO_IDS } from './settings';
 
 // Video capabilities registry keyed by model base AND variant: unlike still-image
 // generation, Wan's variants differ structurally (which conditioning modes exist,
@@ -1110,6 +1110,18 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     (!Number.isInteger(settings.sourceVideo.startFrame) || !Number.isInteger(settings.sourceVideo.endFrame))
   ) {
     reasons.push('The initial video trim bounds must be whole frame numbers.');
+  } else if (settings.sourceVideo) {
+    const { endFrame, numFrames, startFrame } = settings.sourceVideo;
+
+    // The crossfade join consumes a 2-frame tail from the trimmed source, so a
+    // 1-frame trim fails mid-encode; catch it (and out-of-range bounds) here.
+    if (startFrame < 0 || endFrame > numFrames - 1 || endFrame - startFrame + 1 < MIN_VIDEO_TRIM_FRAMES) {
+      reasons.push('The initial video trim must keep at least two frames within the clip.');
+    }
+
+    if (numFrames < MIN_VIDEO_TRIM_FRAMES) {
+      reasons.push('The initial video is too short to extend.');
+    }
   }
 
   if (!getVideoDimensions(model, settings)) {

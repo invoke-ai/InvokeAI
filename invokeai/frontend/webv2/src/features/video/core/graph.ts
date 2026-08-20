@@ -73,8 +73,16 @@ const addExtendScaffolding = (
   newClip: BackendInvocationContract,
   options: { extractFps?: number } = {}
 ) => {
+  // The panel's frame count is an estimate (duration × fps; the records store
+  // no exact count, and VFR uploads can overshoot by a frame or two). A trim
+  // end near the estimated ceiling therefore compiles as a NEGATIVE index —
+  // resolved by the backend against the clip's REAL count — so "keep to the
+  // end" can never land past it. Mid-clip picks stay positive: a negative
+  // offset computed from an overshooting estimate would drift them instead.
+  const tailOffset = sourceVideo.numFrames - 1 - sourceVideo.endFrame;
+  const endFrameLiteral = tailOffset <= 3 ? -(tailOffset + 1) : sourceVideo.endFrame;
   const extract = addNode(graph, {
-    end_frame: sourceVideo.endFrame,
+    end_frame: endFrameLiteral,
     id: 'source_video',
     is_intermediate: true,
     start_frame: sourceVideo.startFrame,

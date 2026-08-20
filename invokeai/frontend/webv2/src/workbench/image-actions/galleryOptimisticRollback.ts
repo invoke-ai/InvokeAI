@@ -31,6 +31,9 @@ const TRACKED_GALLERY_REMOVAL_FIELDS: ReadonlyArray<{ key: string; widgetId: Wid
   { key: 'selectedImageName', widgetId: 'gallery' },
   { key: 'selectedImageNames', widgetId: 'gallery' },
   { key: 'inputImage', widgetId: 'upscale' },
+  { key: 'firstFrameImage', widgetId: 'video' },
+  { key: 'lastFrameImage', widgetId: 'video' },
+  { key: 'sourceVideo', widgetId: 'video' },
 ];
 
 const trackedFieldKey = (projectId: string, widgetId: WidgetTypeId, key: string): string =>

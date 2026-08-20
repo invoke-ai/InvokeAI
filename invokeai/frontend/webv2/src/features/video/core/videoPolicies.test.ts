@@ -57,7 +57,7 @@ const LIGHTNING_I2V_LOW = lora('Wan 2.2 I2V Lightning Low Noise (4-step)');
 const FIRST_FRAME = { height: 1080, image_name: 'first.png', width: 1920 };
 const LAST_FRAME = { height: 1080, image_name: 'last.png', width: 1920 };
 const SOURCE_VIDEO = {
-  endFrame: -2,
+  endFrame: 79,
   fps: 16,
   height: 480,
   numFrames: 81,

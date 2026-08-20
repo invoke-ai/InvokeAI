@@ -3,19 +3,22 @@ import { describe, expect, it } from 'vitest';
 import type { VideoSettings } from './types';
 
 import {
+  clearDeletedVideoMedia,
   cloneVideoWidgetValues,
+  createVideoSourceClip,
   isVideoSettings,
   isVideoSourceClip,
   normalizeVideoSettings,
   normalizeVideoWidgetValues,
   resolveVideoMode,
+  VIDEO_SOURCE_FALLBACK_FPS,
 } from './settings';
 import { getDefaultVideoSettings } from './videoPolicies';
 
 const FIRST_FRAME = { height: 1080, image_name: 'first.png', width: 1920 };
 const LAST_FRAME = { height: 1080, image_name: 'last.png', width: 1920 };
 const SOURCE_VIDEO = {
-  endFrame: -2,
+  endFrame: 79,
   fps: 16,
   height: 480,
   numFrames: 81,
@@ -190,5 +193,66 @@ describe('normalizeVideoWidgetValues / cloneVideoWidgetValues', () => {
     }
     expect(values.firstFrameImage?.image_name).toBe('first.png');
     expect(values.model?.key).toBe('wan-key');
+  });
+});
+
+describe('createVideoSourceClip', () => {
+  it('estimates frames from duration and defaults the trim to drop the final frame', () => {
+    const clip = createVideoSourceClip({ durationSeconds: 5, fps: 16, height: 480, name: 'clip.mp4', width: 832 });
+
+    expect(clip).toEqual({
+      endFrame: 78,
+      fps: 16,
+      height: 480,
+      numFrames: 80,
+      startFrame: 0,
+      video_name: 'clip.mp4',
+      width: 832,
+    });
+  });
+
+  it('falls back to 16 fps when the probe recorded none, mirroring extract_video_range', () => {
+    const clip = createVideoSourceClip({ durationSeconds: 2, height: 480, name: 'clip.mp4', width: 832 });
+
+    expect(clip.fps).toBe(VIDEO_SOURCE_FALLBACK_FPS);
+    expect(clip.numFrames).toBe(32);
+  });
+
+  it('keeps the default end frame at 1 or above so the crossfade tail survives', () => {
+    const clip = createVideoSourceClip({ durationSeconds: 0.1, fps: 16, height: 480, name: 'c.mp4', width: 832 });
+
+    expect(clip.endFrame).toBeGreaterThanOrEqual(1);
+  });
+
+  it('never produces negative trim bounds for very short clips', () => {
+    const clip = createVideoSourceClip({ durationSeconds: 0.05, fps: 16, height: 480, name: 'c.mp4', width: 832 });
+
+    expect(clip.numFrames).toBeGreaterThanOrEqual(1);
+    expect(clip.endFrame).toBeGreaterThanOrEqual(0);
+    expect(clip.startFrame).toBe(0);
+  });
+});
+
+describe('clearDeletedVideoMedia', () => {
+  const withMedia = createSettings({
+    firstFrameImage: FIRST_FRAME,
+    lastFrameImage: LAST_FRAME,
+    sourceVideo: null,
+  });
+
+  it('returns the same object when nothing referenced was deleted', () => {
+    expect(clearDeletedVideoMedia(withMedia, new Set(['other.png']), new Set())).toBe(withMedia);
+  });
+
+  it('clears exactly the deleted references', () => {
+    const cleared = clearDeletedVideoMedia(withMedia, new Set(['first.png']), new Set());
+
+    expect(cleared.firstFrameImage).toBeNull();
+    expect(cleared.lastFrameImage).toEqual(LAST_FRAME);
+
+    const withClip = createSettings({ sourceVideo: SOURCE_VIDEO });
+    const clipCleared = clearDeletedVideoMedia(withClip, new Set(), new Set(['clip.mp4']));
+
+    expect(clipCleared.sourceVideo).toBeNull();
   });
 });

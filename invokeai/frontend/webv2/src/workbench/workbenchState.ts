@@ -117,10 +117,12 @@ import {
   type UpscaleWidgetValues,
 } from '@features/upscale';
 import {
+  clearDeletedVideoMedia,
   cloneVideoWidgetValues,
   compileVideoGraph,
   getVideoDimensions,
   getVideoWidgetValidationReasons,
+  normalizeVideoSettings,
   normalizeVideoWidgetValues,
   resolveVideoSeed,
   syncVideoWidgetValuesWithModels,
@@ -2570,6 +2572,13 @@ const removeGalleryItemsFromAllProjects = (
       return ref.kind === 'image' ? [ref.name] : [];
     })
   );
+  const removedVideoNames = new Set(
+    [...removedItemKeys].flatMap((key) => {
+      const ref = parseGalleryItemKey(key);
+
+      return ref.kind === 'video' ? [ref.name] : [];
+    })
+  );
   let didChange = false;
   const projects = state.projects.map((project) => {
     const withoutGalleryItems = updateProjectWidgetValues(project, 'gallery', (values) => {
@@ -2620,8 +2629,31 @@ const removeGalleryItemsFromAllProjects = (
       return { ...clearDeletedUpscaleInput(values, removedImageNames) };
     });
 
-    didChange ||= withoutUpscaleInput !== project;
-    return withoutUpscaleInput;
+    const withoutVideoMedia = updateProjectWidgetValues(withoutUpscaleInput, 'video', (rawValues) => {
+      const values = normalizeVideoSettings(rawValues);
+
+      if (!values) {
+        return rawValues;
+      }
+
+      const cleared = clearDeletedVideoMedia(values, removedImageNames, removedVideoNames);
+
+      if (cleared === values) {
+        return rawValues;
+      }
+
+      // Patch only the cleared media slots: spreading the whole normalized
+      // settings would rewrite every other key to its normalized form.
+      return {
+        ...rawValues,
+        ...(cleared.firstFrameImage !== values.firstFrameImage ? { firstFrameImage: null } : {}),
+        ...(cleared.lastFrameImage !== values.lastFrameImage ? { lastFrameImage: null } : {}),
+        ...(cleared.sourceVideo !== values.sourceVideo ? { sourceVideo: null } : {}),
+      };
+    });
+
+    didChange ||= withoutVideoMedia !== project;
+    return withoutVideoMedia;
   });
 
   return didChange ? { ...state, projects } : state;
