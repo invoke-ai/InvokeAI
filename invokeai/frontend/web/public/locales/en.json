@@ -2801,6 +2801,7 @@
             "nodeFieldTooltip": "To add a node field, click the small plus sign button on the field in the Workflow Editor, or drag the field by its name into the form.",
             "nodeSettingTooltip": "To add a node setting like Use Cache or Save To Gallery, click the small plus sign button next to it in the node's footer in the Workflow Editor, or drag it by its name into the form.",
             "nodeSettingNotApplicable": "This setting does not apply to this node and will be hidden.",
+            "nodeSettingAdminOnly": "Only an administrator can change this setting. It will be hidden.",
             "addToForm": "Add to Form",
             "removeFromForm": "Remove from Form",
             "label": "Label",

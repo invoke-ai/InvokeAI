@@ -7,7 +7,11 @@ import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
 import { FormElementNodeOverlay } from 'features/nodes/components/sidePanel/builder/FormElementNodeOverlay';
 import { NodeSettingElementLabelEditable } from 'features/nodes/components/sidePanel/builder/NodeSettingElementLabelEditable';
-import { useIsNodeSettingApplicable, useNodeSetting } from 'features/nodes/hooks/useNodeSetting';
+import {
+  useIsNodeSettingApplicable,
+  useIsNodeSettingPermitted,
+  useNodeSetting,
+} from 'features/nodes/hooks/useNodeSetting';
 import type { NodeSettingElement } from 'features/nodes/types/workflow';
 import { NODE_SETTING_CLASS_NAME } from 'features/nodes/types/workflow';
 import { memo, useRef } from 'react';
@@ -56,6 +60,7 @@ const NodeSettingElementEditModeContent = memo(({ el }: { el: NodeSettingElement
   const { t } = useTranslation();
   const { data } = el;
   const isApplicable = useIsNodeSettingApplicable();
+  const isPermitted = useIsNodeSettingPermitted(data.setting);
   const { isChecked, onChange, isConnected } = useNodeSetting(data.nodeId, data.setting);
 
   if (!isApplicable) {
@@ -63,6 +68,17 @@ const NodeSettingElementEditModeContent = memo(({ el }: { el: NodeSettingElement
     return (
       <Text fontWeight="semibold" color="error.300">
         {t('workflows.builder.nodeSettingNotApplicable')}
+      </Text>
+    );
+  }
+
+  if (!isPermitted) {
+    // Same treatment: the element stays in the form and can still be moved or removed here, but its value must not be
+    // reachable - the node cache is a process-global, admin-only policy, and a shared workflow can carry this element
+    // to a non-admin who would otherwise be able to flip and save it.
+    return (
+      <Text fontWeight="semibold" color="error.300">
+        {t('workflows.builder.nodeSettingAdminOnly')}
       </Text>
     );
   }

@@ -4,6 +4,7 @@ import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { WorkflowFieldRenderer } from 'features/controlLayers/components/CanvasWorkflowIntegration/WorkflowFieldRenderer';
+import { WorkflowNodeSettingRenderer } from 'features/controlLayers/components/CanvasWorkflowIntegration/WorkflowNodeSettingRenderer';
 import {
   canvasWorkflowIntegrationImageFieldSelected,
   selectCanvasWorkflowIntegrationFieldValues,
@@ -243,8 +244,7 @@ const FormElementComponentPreview = memo(({ id, elements }: { id: string; elemen
   }
 
   if (isNodeSettingElement(el)) {
-    // Node settings act on the workflow editor's node state, which this preview does not own - nothing to render.
-    return null;
+    return <WorkflowNodeSettingRenderer el={el} />;
   }
 
   // If we get here, it's an unknown element type

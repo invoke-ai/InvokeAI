@@ -1,9 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
-import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { useContainerContext } from 'features/nodes/components/sidePanel/builder/contexts';
 import {
   useIsNodeSettingApplicable,
+  useIsNodeSettingPermitted,
   useNodeSetting,
   useNodeSettingDefaultLabel,
 } from 'features/nodes/hooks/useNodeSetting';
@@ -28,12 +28,12 @@ export const NodeSettingElementViewMode = memo(({ el }: { el: NodeSettingElement
   const containerCtx = useContainerContext();
   const defaultLabel = useNodeSettingDefaultLabel(data.setting);
   const isApplicable = useIsNodeSettingApplicable();
-  const isAdmin = useIsAdmin();
+  const isPermitted = useIsNodeSettingPermitted(data.setting);
   const { isChecked, onChange, isConnected } = useNodeSetting(data.nodeId, data.setting);
 
-  // Settings that no longer apply to their node would render as no-op toggles, so hide them. Node-cache control is
-  // admin-only (single-user mode counts as admin), matching the node footer.
-  if (!isApplicable || (data.setting === 'use_cache' && !isAdmin)) {
+  // Settings that no longer apply to their node would render as no-op toggles, so hide them. Settings the user is
+  // not permitted to change are hidden for the same reason the node footer hides them.
+  if (!isApplicable || !isPermitted) {
     return null;
   }
 

@@ -1,11 +1,11 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Checkbox, Flex, FormControl, FormLabel, Spacer } from '@invoke-ai/ui-library';
-import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { InputFieldHandle } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldHandle';
 import { useNodeSettingDnd } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { useInputFieldTemplateSafe } from 'features/nodes/hooks/useInputFieldTemplateSafe';
 import {
   NODE_SETTING_FIELD_NAMES,
+  useIsNodeSettingPermitted,
   useNodeSetting,
   useNodeSettingDefaultLabel,
 } from 'features/nodes/hooks/useNodeSetting';
@@ -50,13 +50,14 @@ export const NodeSettingFooterControl = memo(({ nodeId, setting }: Props) => {
   // The template is what the handle needs. It should always be present, but a node whose template failed to parse
   // this field must not take the whole footer down with it.
   const fieldTemplate = useInputFieldTemplateSafe(fieldName);
-  const isAdmin = useIsAdmin();
+  const isPermitted = useIsNodeSettingPermitted(setting);
   const draggableRef = useRef<HTMLDivElement>(null);
   const dragHandleRef = useRef<HTMLDivElement>(null);
   const isDragging = useNodeSettingDnd(nodeId, setting, draggableRef, dragHandleRef);
 
-  // Node-cache control is admin-only (single-user mode counts as admin).
-  if (setting === 'use_cache' && !isAdmin) {
+  // Hiding the control here also removes the add-to-form button and the drag handle it hosts, so an unpermitted
+  // setting cannot be put into the form in the first place.
+  if (!isPermitted) {
     return null;
   }
 

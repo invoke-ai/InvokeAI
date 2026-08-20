@@ -1,4 +1,5 @@
 import { useAppDispatch } from 'app/store/storeHooks';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
 import { useInputFieldIsConnected } from 'features/nodes/hooks/useInputFieldIsConnected';
 import { useNodeIsIntermediate } from 'features/nodes/hooks/useNodeIsIntermediate';
 import { useNodeTemplateSafe } from 'features/nodes/hooks/useNodeTemplateSafe';
@@ -28,6 +29,27 @@ export const useNodeSettingDefaultLabel = (setting: NodeSettingName): string => 
     () => (setting === 'use_cache' ? t('invocationCache.useCache') : t('nodes.saveToGallery')),
     [setting, t]
   );
+};
+
+/**
+ * Whether a user may see and change a node setting.
+ *
+ * `use_cache` drives the process-global invocation cache, so it is admin-only (single-user mode counts as admin).
+ *
+ * Exported separately from the hook so the predicate can be unit-tested directly.
+ */
+export const getIsNodeSettingPermitted = (setting: NodeSettingName, isAdmin: boolean): boolean =>
+  setting !== 'use_cache' || isAdmin;
+
+/**
+ * Whether the current user may see and change a node setting.
+ *
+ * This is the single gate for every path that surfaces a setting - the node footer, and the form builder's view and
+ * edit modes. The add-to-form and drag-into-form paths live inside the footer control, so they are gated by it too.
+ */
+export const useIsNodeSettingPermitted = (setting: NodeSettingName): boolean => {
+  const isAdmin = useIsAdmin();
+  return getIsNodeSettingPermitted(setting, isAdmin);
 };
 
 /**

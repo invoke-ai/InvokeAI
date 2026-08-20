@@ -1,5 +1,7 @@
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsAdmin } from 'features/auth/hooks/useIsAdmin';
+import { resolveNodeSettings } from 'features/controlLayers/components/CanvasWorkflowIntegration/nodeSettingOverrides';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
@@ -7,6 +9,7 @@ import {
   canvasWorkflowIntegrationProcessingCompleted,
   canvasWorkflowIntegrationProcessingStarted,
   selectCanvasWorkflowIntegrationFieldValues,
+  selectCanvasWorkflowIntegrationNodeSettingValues,
   selectCanvasWorkflowIntegrationSelectedImageFieldKey,
   selectCanvasWorkflowIntegrationSelectedWorkflowId,
   selectCanvasWorkflowIntegrationSourceEntityIdentifier,
@@ -28,8 +31,10 @@ export const useCanvasWorkflowIntegrationExecute = () => {
   const selectedWorkflowId = useAppSelector(selectCanvasWorkflowIntegrationSelectedWorkflowId);
   const sourceEntityIdentifier = useAppSelector(selectCanvasWorkflowIntegrationSourceEntityIdentifier);
   const fieldValues = useAppSelector(selectCanvasWorkflowIntegrationFieldValues);
+  const nodeSettingValues = useAppSelector(selectCanvasWorkflowIntegrationNodeSettingValues);
   const selectedImageFieldKey = useAppSelector(selectCanvasWorkflowIntegrationSelectedImageFieldKey);
   const canvasSessionId = useAppSelector(selectCanvasSessionId);
+  const isAdmin = useIsAdmin();
 
   const [getWorkflow] = useLazyGetWorkflowQuery();
 
@@ -199,9 +204,16 @@ export const useCanvasWorkflowIntegrationExecute = () => {
         const invocation: Record<string, unknown> = {
           id: nodeId,
           type: nodeData.type,
-          // Canvas output nodes are always intermediate (they go to the staging area, not gallery)
-          is_intermediate: isCanvasOutputNode ? true : (nodeData.isIntermediate ?? false),
-          use_cache: nodeData.useCache ?? true,
+          // Node settings are node attributes, not inputs, so the form preview's values are applied here rather than
+          // in the input loop below
+          ...resolveNodeSettings({
+            nodeId: nodeData.id,
+            isCanvasOutputNode,
+            isIntermediate: nodeData.isIntermediate,
+            useCache: nodeData.useCache,
+            nodeSettingValues,
+            isAdmin,
+          }),
         };
 
         // Add input values to the invocation
@@ -291,6 +303,8 @@ export const useCanvasWorkflowIntegrationExecute = () => {
     getWorkflow,
     t,
     fieldValues,
+    nodeSettingValues,
+    isAdmin,
     selectedImageFieldKey,
     canvasSessionId,
   ]);
