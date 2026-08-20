@@ -89,10 +89,7 @@ export const refreshImageMapPoints = (): Promise<void> => {
   }
 
   const owner = captureAccountScope();
-
-  if (imageMapStore.getSnapshot().loadState === 'idle') {
-    imageMapStore.patchSnapshot({ loadState: 'loading' });
-  }
+  imageMapStore.patchSnapshot({ loadState: 'loading' });
 
   const refresh = fetchImageMapPoints()
     .then((data) => {
