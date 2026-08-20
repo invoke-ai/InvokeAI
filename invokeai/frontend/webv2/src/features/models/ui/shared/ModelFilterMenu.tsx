@@ -1,15 +1,26 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ModelSortField } from '@features/models/core/library';
 import type { ModelTaxonomyType } from '@features/models/core/types';
+import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { IconButton, MenuContent, Scrollable } from '@platform/ui';
-import { CheckIcon, SlidersHorizontalIcon } from 'lucide-react';
+import {
+  ArrowUpDownIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  LayersIcon,
+  ShapesIcon,
+  SlidersHorizontalIcon,
+} from 'lucide-react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const ROOT_POSITIONING = { placement: 'bottom-end' } as const;
+const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
 export interface ModelFilterSortOption<Field extends ModelSortField = ModelSortField> {
   field: Field;
@@ -47,6 +58,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   sortFields,
   typeAllChecked,
   typeFilter,
+  typeSummary,
 }: {
   ariaLabel: string;
   availableBases: string[];
@@ -62,13 +74,29 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   sortFields: readonly ModelFilterSortOption<Field>[];
   typeAllChecked?: boolean;
   typeFilter: ModelTaxonomyType | null;
+  /**
+   * What the Model Type row should read when the filter is neither "all" nor
+   * one of `availableTypes` — the caller's own pseudo-type from
+   * `extraTypeItems`, which this component cannot name for itself.
+   */
+  typeSummary?: string;
 }) => {
   const { t } = useTranslation();
   // Safe to widen: the menu only reports fields drawn from `sortFields`.
   const reportSort = onSortChange as (field: ModelSortField, direction: 'asc' | 'desc') => void;
+  const isAllTypes = typeAllChecked ?? typeFilter === null;
+  const sortLabelKey = sortFields.find((option) => option.field === sortField)?.labelKey;
+  const sortDirectionLabel = sortDirection === 'asc' ? t('common.asc') : t('common.desc');
+  // `default` is the catalog's own order, so a direction on it would name
+  // something the user cannot act on.
+  const sortSummary = sortLabelKey
+    ? sortField === 'default'
+      ? t(sortLabelKey)
+      : `${t(sortLabelKey)} · ${sortDirectionLabel}`
+    : undefined;
 
   return (
-    <Menu.Root closeOnSelect={false} positioning={{ placement: 'bottom-end' }}>
+    <Menu.Root closeOnSelect={false} positioning={ROOT_POSITIONING}>
       <Menu.Trigger asChild>
         <IconButton aria-label={ariaLabel} color={isActive ? 'accent.solid' : 'fg.muted'} size="xs" variant="outline">
           <Icon as={SlidersHorizontalIcon} boxSize="4" />
@@ -76,65 +104,110 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
       </Menu.Trigger>
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="13rem" py="1">
-            <Scrollable maxH="70vh">
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  {t('models.modelType')}
-                </Menu.ItemGroupLabel>
-                <AllTypesFilterMenuItem
-                  isChecked={typeAllChecked ?? typeFilter === null}
-                  label={t('models.allModels')}
+          <MenuContent minW="15rem" py="1">
+            <FilterSubMenu
+              icon={ShapesIcon}
+              label={t('models.modelType')}
+              summary={typeFilter ? getModelTypeLabel(typeFilter) : isAllTypes ? t('models.allModels') : typeSummary}
+            >
+              <AllTypesFilterMenuItem
+                isChecked={isAllTypes}
+                label={t('models.allModels')}
+                onTypeFilterChange={onTypeFilterChange}
+              />
+              {extraTypeItems}
+              {availableTypes.map((type) => (
+                <TypeFilterMenuItem
+                  key={type}
+                  type={type}
+                  typeFilter={typeFilter}
                   onTypeFilterChange={onTypeFilterChange}
                 />
-                {extraTypeItems}
-                {availableTypes.map((type) => (
-                  <TypeFilterMenuItem
-                    key={type}
-                    type={type}
-                    typeFilter={typeFilter}
-                    onTypeFilterChange={onTypeFilterChange}
-                  />
-                ))}
-              </Menu.ItemGroup>
-              <Menu.Separator />
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  {t('models.baseArchitecture')}
-                </Menu.ItemGroupLabel>
-                <AllBasesFilterMenuItem isChecked={baseFilter === null} onBaseFilterChange={onBaseFilterChange} />
-                {availableBases.map((base) => (
-                  <BaseFilterMenuItem
-                    key={base}
-                    base={base}
-                    baseFilter={baseFilter}
-                    onBaseFilterChange={onBaseFilterChange}
-                  />
-                ))}
-              </Menu.ItemGroup>
-              <Menu.Separator />
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  {t('models.sortBy')}
-                </Menu.ItemGroupLabel>
-                {sortFields.map(({ field, labelKey }) => (
-                  <SortFilterMenuItem
-                    key={field}
-                    field={field}
-                    labelKey={labelKey}
-                    sortDirection={sortDirection}
-                    sortField={sortField}
-                    onSortChange={reportSort}
-                  />
-                ))}
-              </Menu.ItemGroup>
-            </Scrollable>
+              ))}
+            </FilterSubMenu>
+            <FilterSubMenu
+              isScrollable
+              icon={LayersIcon}
+              label={t('models.baseArchitecture')}
+              summary={baseFilter ? getModelBaseLabel(baseFilter) : t('models.allBases')}
+            >
+              <AllBasesFilterMenuItem isChecked={baseFilter === null} onBaseFilterChange={onBaseFilterChange} />
+              {availableBases.map((base) => (
+                <BaseFilterMenuItem
+                  key={base}
+                  base={base}
+                  baseFilter={baseFilter}
+                  onBaseFilterChange={onBaseFilterChange}
+                />
+              ))}
+            </FilterSubMenu>
+            <Menu.Separator />
+            <FilterSubMenu icon={ArrowUpDownIcon} label={t('models.sortBy')} summary={sortSummary}>
+              {sortFields.map(({ field, labelKey }) => (
+                <SortFilterMenuItem
+                  key={field}
+                  field={field}
+                  labelKey={labelKey}
+                  sortDirection={sortDirection}
+                  sortField={sortField}
+                  onSortChange={reportSort}
+                />
+              ))}
+            </FilterSubMenu>
           </MenuContent>
         </Menu.Positioner>
       </Portal>
     </Menu.Root>
   );
 };
+
+/**
+ * One filter dimension, folded away behind its own row.
+ *
+ * The three groups used to stack in a single panel that scrolled at 70vh — on
+ * a library with a dozen base architectures, choosing a sort order meant
+ * scrolling past every one of them. Folding each into a submenu costs a
+ * hover, so the row carries its current value: the state stays readable
+ * without opening anything, which is the only reason the flat list was worth
+ * keeping.
+ */
+const FilterSubMenu = ({
+  children,
+  icon,
+  isScrollable = false,
+  label,
+  summary,
+}: {
+  children: ReactNode;
+  icon: LucideIcon;
+  isScrollable?: boolean;
+  label: string;
+  summary?: string;
+}) => (
+  <Menu.Root closeOnSelect={false} positioning={SUBMENU_POSITIONING}>
+    <Menu.TriggerItem>
+      <HStack gap="2" minW="0" w="full">
+        <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+        <Text flexShrink={0} fontSize="xs">
+          {label}
+        </Text>
+        {summary ? (
+          <Text color="fg.subtle" fontSize="2xs" ms="auto" minW="0" truncate>
+            {summary}
+          </Text>
+        ) : null}
+        <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} ms={summary ? undefined : 'auto'} />
+      </HStack>
+    </Menu.TriggerItem>
+    <Portal>
+      <Menu.Positioner>
+        <MenuContent minW="13rem" py="1">
+          {isScrollable ? <Scrollable maxH="60vh">{children}</Scrollable> : children}
+        </MenuContent>
+      </Menu.Positioner>
+    </Portal>
+  </Menu.Root>
+);
 
 /** Checkmark-style menu item shared by the model filter menus. */
 interface FilterMenuItemProps {
