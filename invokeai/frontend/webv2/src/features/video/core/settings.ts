@@ -78,12 +78,12 @@ const isVideoLora = (value: unknown): value is GenerateLora =>
   hasFiniteNumber(value, 'weight') &&
   typeof value.isEnabled === 'boolean';
 
-/** A Wan Lightning distillation LoRA, identified by name (they carry no dedicated taxonomy). */
-export const isWanLightningLora = (model: { base: string; name: string }): boolean =>
-  model.base === 'wan' && /lightning/i.test(model.name);
+const getStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
 
-const hasLightningLora = (loras: readonly GenerateLora[]): boolean =>
-  loras.some((lora) => isWanLightningLora(lora.model));
+/** Whether every key the accelerator toggle recorded is still present in the LoRA list. */
+const areAcceleratorLorasPresent = (keys: readonly string[], loras: readonly GenerateLora[]): boolean =>
+  keys.length > 0 && keys.every((key) => loras.some((lora) => lora.model.key === key));
 
 /**
  * Which inputs are filled decides the mode; there is no mode selector. A first
@@ -143,6 +143,12 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
   // project somehow holds both, the first frame wins deterministically.
   const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
   const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
+  const acceleratorLoraKeys = getStringArray(values.acceleratorLoraKeys);
+  // The flag means "the accelerator LoRAs the toggle added are active": if any
+  // of them is gone (deleted from Concepts, dropped as incompatible), the flag
+  // clears rather than claiming a fast path that has nothing behind it.
+  const acceleratorEnabled =
+    values.acceleratorEnabled === true && areAcceleratorLorasPresent(acceleratorLoraKeys, loras);
 
   return {
     aspectRatioId: isVideoAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : '16:9',
@@ -153,11 +159,9 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     fps: values.fps as number,
     h3TextEncoderModel: isModelIdentifierConfig(values.h3TextEncoderModel) ? values.h3TextEncoderModel : null,
     h3TransformerModel: isMainModelConfig(values.h3TransformerModel) ? values.h3TransformerModel : null,
+    acceleratorEnabled,
+    acceleratorLoraKeys: acceleratorEnabled ? acceleratorLoraKeys : [],
     lastFrameImage: isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
-    // The flag means "the Lightning pair is active": if the LoRAs are gone
-    // (deleted from Concepts, dropped as incompatible), the flag clears with
-    // them rather than claiming a fast path that has nothing behind it.
-    lightningEnabled: values.lightningEnabled === true && hasLightningLora(loras),
     loras,
     modelKey: values.modelKey as string,
     negativePrompt: values.negativePrompt as string,
@@ -202,9 +206,13 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
     isVideoAspectRatioId(values.aspectRatioId) &&
     isVideoTargetResolution(values.targetResolution) &&
     typeof values.negativePromptEnabled === 'boolean' &&
-    typeof values.lightningEnabled === 'boolean' &&
-    (values.lightningEnabled === false ||
-      (Array.isArray(values.loras) && hasLightningLora(values.loras.filter(isVideoLora)))) &&
+    typeof values.acceleratorEnabled === 'boolean' &&
+    Array.isArray(values.acceleratorLoraKeys) &&
+    values.acceleratorLoraKeys.every((key) => typeof key === 'string') &&
+    (values.acceleratorEnabled === false
+      ? (values.acceleratorLoraKeys as string[]).length === 0
+      : Array.isArray(values.loras) &&
+        areAcceleratorLorasPresent(values.acceleratorLoraKeys as string[], values.loras.filter(isVideoLora))) &&
     hasFiniteNumber(values, 'negativePromptHeightPx') &&
     hasFiniteNumber(values, 'positivePromptHeightPx') &&
     (values.cfgScaleLowNoise === null || hasFiniteNumber(values, 'cfgScaleLowNoise')) &&
@@ -238,6 +246,7 @@ export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValue
 
 export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetValues & Record<string, unknown> => ({
   ...values,
+  acceleratorLoraKeys: [...values.acceleratorLoraKeys],
   componentSourceModel: values.componentSourceModel ? { ...values.componentSourceModel } : null,
   firstFrameImage: values.firstFrameImage ? { ...values.firstFrameImage } : null,
   h3TextEncoderModel: values.h3TextEncoderModel ? { ...values.h3TextEncoderModel } : null,

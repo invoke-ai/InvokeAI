@@ -79,7 +79,7 @@ describe('normalizeVideoSettings', () => {
     expect(normalized?.firstFrameImage).toBeNull();
     expect(normalized?.sourceVideo).toBeNull();
     expect(normalized?.loras).toEqual([]);
-    expect(normalized?.lightningEnabled).toBe(false);
+    expect(normalized?.acceleratorEnabled).toBe(false);
     expect(normalized?.positivePrompt).toBe('a dog');
   });
 
@@ -94,29 +94,50 @@ describe('normalizeVideoSettings', () => {
     expect(normalized?.sourceVideo).toBeNull();
   });
 
-  it('clears a Lightning flag whose LoRAs are gone — the flag means the pair is active', () => {
-    const styleLora = {
-      isEnabled: true,
-      model: { base: 'wan', key: 'style', name: 'Style LoRA', type: 'lora' as const },
-      weight: 1,
-    };
+  it('clears an accelerator flag whose recorded LoRAs are gone — the flag means they are active', () => {
     const lightningLora = {
       isEnabled: true,
       model: { base: 'wan', key: 'lit', name: 'Wan Lightning High Noise', type: 'lora' as const },
       weight: 1,
     };
 
-    expect(normalizeVideoSettings({ ...createSettings(), lightningEnabled: true, loras: [] })?.lightningEnabled).toBe(
+    // Flag without recorded keys, or with a recorded key missing from the list, clears.
+    expect(
+      normalizeVideoSettings({ ...createSettings(), acceleratorEnabled: true, loras: [lightningLora] })
+        ?.acceleratorEnabled
+    ).toBe(false);
+    expect(
+      normalizeVideoSettings({
+        ...createSettings(),
+        acceleratorEnabled: true,
+        acceleratorLoraKeys: ['lit', 'gone'],
+        loras: [lightningLora],
+      })
+    ).toMatchObject({ acceleratorEnabled: false, acceleratorLoraKeys: [] });
+    // Flag with all recorded keys present survives.
+    expect(
+      normalizeVideoSettings({
+        ...createSettings(),
+        acceleratorEnabled: true,
+        acceleratorLoraKeys: ['lit'],
+        loras: [lightningLora],
+      })
+    ).toMatchObject({ acceleratorEnabled: true, acceleratorLoraKeys: ['lit'] });
+    expect(isVideoSettings({ ...createSettings(), acceleratorEnabled: true, acceleratorLoraKeys: [], loras: [] })).toBe(
       false
     );
     expect(
-      normalizeVideoSettings({ ...createSettings(), lightningEnabled: true, loras: [styleLora] })?.lightningEnabled
-    ).toBe(false);
-    expect(
-      normalizeVideoSettings({ ...createSettings(), lightningEnabled: true, loras: [lightningLora] })?.lightningEnabled
+      isVideoSettings({
+        ...createSettings(),
+        acceleratorEnabled: true,
+        acceleratorLoraKeys: ['lit'],
+        loras: [lightningLora],
+      })
     ).toBe(true);
-    expect(isVideoSettings({ ...createSettings(), lightningEnabled: true, loras: [] })).toBe(false);
-    expect(isVideoSettings({ ...createSettings(), lightningEnabled: true, loras: [lightningLora] })).toBe(true);
+    // A disabled flag must not carry stale keys.
+    expect(isVideoSettings({ ...createSettings(), acceleratorEnabled: false, acceleratorLoraKeys: ['lit'] })).toBe(
+      false
+    );
   });
 
   it('resolves an illegal first-frame + source-video combination in favor of the first frame', () => {
@@ -135,7 +156,7 @@ describe('isVideoSettings', () => {
   it('is strict over the keys normalize would invent', () => {
     expect(isVideoSettings({ ...createSettings(), aspectRatioId: 'Free' })).toBe(false);
     expect(isVideoSettings({ ...createSettings(), targetResolution: '4k' })).toBe(false);
-    expect(isVideoSettings({ ...createSettings(), lightningEnabled: 'yes' })).toBe(false);
+    expect(isVideoSettings({ ...createSettings(), acceleratorEnabled: 'yes' })).toBe(false);
     expect(isVideoSettings({ ...createSettings(), firstFrameImage: FIRST_FRAME, sourceVideo: SOURCE_VIDEO })).toBe(
       false
     );

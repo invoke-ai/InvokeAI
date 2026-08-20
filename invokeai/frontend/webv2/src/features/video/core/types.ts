@@ -64,11 +64,19 @@ export interface VideoSettings {
   /** Guidance for the low-noise half of a Wan A14B schedule; null reuses `cfgScale`. */
   cfgScaleLowNoise: number | null;
   /**
-   * Wan A14B fast path: the Lightning distillation LoRA pair at 4 steps and
-   * CFG 1. Toggling it patches steps/CFG and the `loras` list — see
-   * `getLightningToggleResult` — so the flag records intent, not hidden state.
+   * The family's distillation fast path: the Lightning LoRA pair at 4 steps /
+   * CFG 1 for Wan A14B, the Turbo LoRA at 6 steps for MiniMax H3. Toggling it
+   * patches steps/CFG and the `loras` list — see `getAcceleratorToggleResult`
+   * — so the flag records intent, not hidden state.
    */
-  lightningEnabled: boolean;
+  acceleratorEnabled: boolean;
+  /**
+   * The keys of the LoRA entries the accelerator toggle added. Turning the
+   * fast path off (or switching families) removes exactly these — never a
+   * user's own LoRA that happens to be named like one — and the enabled flag
+   * cannot outlive them.
+   */
+  acceleratorLoraKeys: string[];
   seed: number;
   shouldRandomizeSeed: boolean;
   loras: GenerateLora[];

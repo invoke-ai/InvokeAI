@@ -1,4 +1,5 @@
 import type {
+  GenerateLora,
   GenerationModelCatalogItem as ModelConfig,
   GenerationModelTaxonomyType as ModelTaxonomyType,
   LoraModelConfig,
@@ -37,7 +38,7 @@ import {
   WAN_TI2V_PIXEL_MULTIPLE,
   type VideoDimensions,
 } from './dimensions';
-import { isWanLightningLora, resolveVideoMode, VIDEO_ASPECT_RATIO_IDS } from './settings';
+import { resolveVideoMode, VIDEO_ASPECT_RATIO_IDS } from './settings';
 
 // Video capabilities registry keyed by model base AND variant: unlike still-image
 // generation, Wan's variants differ structurally (which conditioning modes exist,
@@ -78,6 +79,19 @@ export interface VideoFpsPolicy {
   max: number;
 }
 
+/**
+ * The family's distillation fast path: which LoRA(s) it runs on and the
+ * sampling parameters they were trained for. Wan A14B uses the Lightning
+ * high/low pair; MiniMax H3 uses the single Turbo LoRA (the bundled H3
+ * templates default to it at 6 steps).
+ */
+export interface VideoAcceleratorConfig {
+  label: 'Lightning' | 'Turbo';
+  steps: number;
+  cfgScale: number;
+  cfgScaleLowNoise: number | null;
+}
+
 interface VideoVariantConfig {
   modes: readonly VideoGenerationMode[];
   pixelMultiple: number;
@@ -93,9 +107,23 @@ interface VideoVariantConfig {
   fps: VideoFpsPolicy;
   cfg: { visible: boolean; lowNoiseVisible: boolean };
   negativePrompt: { visible: boolean; usage: VideoNegativePromptUsage };
-  lightningAvailable: boolean;
+  accelerator: VideoAcceleratorConfig | null;
   audioOutput: boolean;
 }
+
+export const WAN_LIGHTNING_ACCELERATOR: VideoAcceleratorConfig = {
+  cfgScale: 1,
+  cfgScaleLowNoise: 1,
+  label: 'Lightning',
+  steps: 4,
+};
+
+export const MINIMAX_H3_TURBO_ACCELERATOR: VideoAcceleratorConfig = {
+  cfgScale: 1,
+  cfgScaleLowNoise: null,
+  label: 'Turbo',
+  steps: 6,
+};
 
 const WAN_TARGET_RESOLUTION_OPTIONS: readonly VideoTargetResolutionOption[] = [
   { id: '480p', label: '480p (Wan native)' },
@@ -120,11 +148,11 @@ const WAN_FPS: VideoFpsPolicy = { defaultValue: WAN_FPS_DEFAULT, editable: true,
 
 // wan_video_denoise defaults: guidance_scale=5.0 (high), guidance_scale_low_noise=4.0.
 const WAN_A14B_COMMON = {
+  accelerator: WAN_LIGHTNING_ACCELERATOR,
   cfg: { lowNoiseVisible: true, visible: true },
   defaults: { cfgScale: 5, cfgScaleLowNoise: 4, steps: 40, targetResolution: '720p' as const },
   fps: WAN_FPS,
   frames: WAN_FRAMES,
-  lightningAvailable: true,
   minSteps: 1,
   audioOutput: false,
   negativePrompt: { usage: 'cfg-gated' as const, visible: true },
@@ -144,9 +172,9 @@ const WAN_VARIANTS: Record<string, VideoVariantConfig> = {
   // Lightning LoRAs).
   ti2v_5b: {
     ...WAN_A14B_COMMON,
+    accelerator: null,
     cfg: { lowNoiseVisible: false, visible: true },
     defaults: { cfgScale: 5, cfgScaleLowNoise: null, steps: 40, targetResolution: '720p' },
-    lightningAvailable: false,
     modes: ['txt2vid', 'first-frame', 'extend'],
     pixelMultiple: WAN_TI2V_PIXEL_MULTIPLE,
   },
@@ -161,12 +189,12 @@ const WAN_FALLBACK_VARIANT: VideoVariantConfig = {
 
 // Guidance-distilled: no CFG, no negative prompt, fixed 24 fps, audio included.
 const MINIMAX_H3_FL2VA: VideoVariantConfig = {
+  accelerator: MINIMAX_H3_TURBO_ACCELERATOR,
   audioOutput: true,
   cfg: { lowNoiseVisible: false, visible: false },
   defaults: { cfgScale: 1, cfgScaleLowNoise: null, steps: 50, targetResolution: '768 highres' },
   fps: { defaultValue: MINIMAX_H3_FPS, editable: false, max: MINIMAX_H3_FPS, min: MINIMAX_H3_FPS },
   frames: { choices: MINIMAX_H3_NUM_FRAMES_CHOICES, defaultValue: MINIMAX_H3_NUM_FRAMES_DEFAULT, kind: 'choices' },
-  lightningAvailable: false,
   minSteps: 2,
   modes: ['txt2vid', 'first-frame', 'last-frame', 'first-last', 'extend'],
   negativePrompt: { usage: 'never', visible: false },
@@ -363,7 +391,8 @@ export interface VideoModelPolicy {
     cfgVisible: boolean;
     cfgLowNoiseVisible: boolean;
     fpsVisible: boolean;
-    lightningAvailable: boolean;
+    /** The family's distillation fast path, or null when it has none. */
+    accelerator: VideoAcceleratorConfig | null;
     audioOutput: boolean;
   };
 }
@@ -382,20 +411,17 @@ export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings
     prompt: getVideoPromptPolicy(model, settings),
     targetResolutions: config.targetResolutions,
     ui: {
+      accelerator: config.accelerator,
       audioOutput: config.audioOutput,
       cfgLowNoiseVisible: config.cfg.lowNoiseVisible,
       cfgVisible: config.cfg.visible,
       fpsVisible: config.fps.editable,
-      lightningAvailable: config.lightningAvailable,
     },
   };
 };
 
 // ---------------------------------------------------------------------------
-// Wan Lightning fast path
-
-/** The sampling parameters the Lightning distillation LoRAs are trained for. */
-export const WAN_LIGHTNING_SAMPLING = { cfgScale: 1, cfgScaleLowNoise: 1, steps: 4 } as const;
+// Distillation fast paths (Wan Lightning, MiniMax H3 Turbo)
 
 export interface WanLightningLoraPair {
   high: LoraModelConfig;
@@ -420,7 +446,10 @@ export const findWanLightningLoraPair = (
 ): WanLightningLoraPair | null => {
   const candidates = models.filter(
     (model): model is ModelConfig & LoraModelConfig =>
-      isLoraModelConfig(model) && isWanLightningLora(model) && isWanLoraTargetingMain(model.variant, mainVariant)
+      isLoraModelConfig(model) &&
+      model.base === 'wan' &&
+      /lightning/i.test(model.name) &&
+      isWanLoraTargetingMain(model.variant, mainVariant)
   );
 
   // Delimited-token match so 'i2v' cannot score inside "TI2V".
@@ -436,47 +465,94 @@ export const findWanLightningLoraPair = (
   return high && low && high.key !== low.key ? { high, low } : null;
 };
 
-export interface LightningToggleResult {
+const TURBO_PATTERN = /(?:^|[^a-z0-9])turbo(?:[^a-z0-9]|$)/i;
+const MINIMAX_H3_NAME_PATTERN = /(?:^|[^a-z0-9])(?:minimax|h3)(?:[^a-z0-9]|$)/i;
+
+/**
+ * The installed MiniMax H3 Turbo distillation LoRA, if any. Distillation LoRAs
+ * carry no dedicated taxonomy, so this is a name heuristic: a delimited
+ * "turbo" token, preferring names that also name the model family, with a
+ * deterministic tie-break — a user's own "Turbo …" style LoRA loses to the
+ * real repack whenever one is installed.
+ */
+export const findMiniMaxH3TurboLora = (models: readonly ModelConfig[]): LoraModelConfig | null => {
+  const score = (model: LoraModelConfig): number => (MINIMAX_H3_NAME_PATTERN.test(model.name) ? 0 : 1);
+
+  return (
+    models
+      .filter(
+        (model): model is ModelConfig & LoraModelConfig =>
+          isLoraModelConfig(model) && model.base === 'minimax-h3' && TURBO_PATTERN.test(model.name)
+      )
+      .sort((a, b) => score(a) - score(b) || a.name.localeCompare(b.name))[0] ?? null
+  );
+};
+
+/** The accelerator LoRA entries for a model, or null when they are not installed. */
+const findAcceleratorLoraEntries = (model: MainModelConfig, models: readonly ModelConfig[]): GenerateLora[] | null => {
+  if (model.base === 'minimax-h3') {
+    const turbo = findMiniMaxH3TurboLora(models);
+
+    return turbo ? [{ isEnabled: true, model: turbo, weight: 1 }] : null;
+  }
+
+  const pair = findWanLightningLoraPair(models, model.variant);
+
+  return pair
+    ? [
+        { isEnabled: true, model: pair.high, weight: 1 },
+        { isEnabled: true, model: pair.low, weight: 1 },
+      ]
+    : null;
+};
+
+export interface AcceleratorToggleResult {
   settings: VideoSettings;
-  /** True when enabling was requested but no installed Lightning pair was found. */
+  /** True when enabling was requested but the accelerator LoRA(s) are not installed. */
   missingLoras: boolean;
 }
 
 /**
- * Applies the Lightning toggle as a plain settings transition: the LoRA pair
- * appears in (or leaves) the Concepts list and steps/CFG are patched, so the
+ * Applies the accelerator toggle as a plain settings transition: the LoRA(s)
+ * appear in (or leave) the Concepts list and steps/CFG are patched, so the
  * graph builder needs no hidden behavior and the user sees exactly what runs.
  */
-export const getLightningToggleResult = (
+export const getAcceleratorToggleResult = (
   settings: VideoSettings,
   model: MainModelConfig,
   models: readonly ModelConfig[],
   enabled: boolean
-): LightningToggleResult => {
+): AcceleratorToggleResult => {
   const config = getVideoConfig(model);
-  const withoutLightning = settings.loras.filter((lora) => !isWanLightningLora(lora.model));
+  // Remove exactly the entries a previous toggle added — never a user's own
+  // LoRA that happens to share a Lightning/Turbo-style name.
+  const previousKeys = new Set(settings.acceleratorLoraKeys);
+  const withoutAccelerators = settings.loras.filter((lora) => !previousKeys.has(lora.model.key));
 
-  if (!enabled || !config.lightningAvailable) {
+  if (!enabled || !config.accelerator) {
     return {
       missingLoras: false,
       settings: {
         ...settings,
+        acceleratorEnabled: false,
+        acceleratorLoraKeys: [],
         cfgScale: config.defaults.cfgScale,
         cfgScaleLowNoise: config.defaults.cfgScaleLowNoise,
-        lightningEnabled: false,
-        loras: withoutLightning,
+        loras: withoutAccelerators,
         steps: config.defaults.steps,
       },
     };
   }
 
-  const pair = findWanLightningLoraPair(models, model.variant);
+  const entries = findAcceleratorLoraEntries(model, models);
 
-  if (!pair) {
+  if (!entries) {
     // Never leave the flag claiming a fast path that has no LoRAs behind it.
     return {
       missingLoras: true,
-      settings: settings.lightningEnabled ? { ...settings, lightningEnabled: false } : settings,
+      settings: settings.acceleratorEnabled
+        ? { ...settings, acceleratorEnabled: false, acceleratorLoraKeys: [] }
+        : settings,
     };
   }
 
@@ -484,13 +560,15 @@ export const getLightningToggleResult = (
     missingLoras: false,
     settings: {
       ...settings,
-      ...WAN_LIGHTNING_SAMPLING,
-      lightningEnabled: true,
+      acceleratorEnabled: true,
+      acceleratorLoraKeys: entries.map((entry) => entry.model.key),
+      cfgScale: config.accelerator.cfgScale,
+      cfgScaleLowNoise: config.accelerator.cfgScaleLowNoise,
       loras: [
-        ...withoutLightning,
-        { isEnabled: true, model: pair.high, weight: 1 },
-        { isEnabled: true, model: pair.low, weight: 1 },
+        ...withoutAccelerators.filter((lora) => !entries.some((e) => e.model.key === lora.model.key)),
+        ...entries,
       ],
+      steps: config.accelerator.steps,
     },
   };
 };
@@ -721,6 +799,8 @@ export const getDefaultVideoSettings = (
   const config = getVideoConfig(model);
 
   const base: VideoSettings = {
+    acceleratorEnabled: false,
+    acceleratorLoraKeys: [],
     aspectRatioId: '16:9',
     batchCount: 1,
     cfgScale: config.defaults.cfgScale,
@@ -731,7 +811,6 @@ export const getDefaultVideoSettings = (
     h3TextEncoderModel: null,
     h3TransformerModel: null,
     lastFrameImage: null,
-    lightningEnabled: false,
     loras: [],
     modelKey: model?.key ?? '',
     negativePrompt: '',
@@ -750,10 +829,11 @@ export const getDefaultVideoSettings = (
     wanT5EncoderModel: null,
   };
 
-  // Lightning defaults ON for Wan A14B when the LoRA pair is installed: the
-  // plain 40-step CFG-5 path is prohibitively slow as an out-of-the-box default.
-  if (model && config.lightningAvailable) {
-    const result = getLightningToggleResult(base, model, models, true);
+  // The accelerator defaults ON when its LoRA(s) are installed: the plain
+  // 40/50-step paths are prohibitively slow as out-of-the-box defaults, and
+  // the bundled video templates make the same choice.
+  if (model && config.accelerator) {
+    const result = getAcceleratorToggleResult(base, model, models, true);
 
     if (!result.missingLoras) {
       return result.settings;
@@ -770,15 +850,21 @@ export const getVideoSettingsWithModelDefaults = (
 ): VideoSettings => {
   const modelDefaults = getDefaultVideoSettings(model, models);
 
+  const previousKeys = new Set(settings.acceleratorLoraKeys);
+
   return {
     ...settings,
+    acceleratorEnabled: modelDefaults.acceleratorEnabled,
+    acceleratorLoraKeys: modelDefaults.acceleratorLoraKeys,
     cfgScale: modelDefaults.cfgScale,
     cfgScaleLowNoise: modelDefaults.cfgScaleLowNoise,
     fps: modelDefaults.fps,
-    lightningEnabled: modelDefaults.lightningEnabled,
-    loras: [...settings.loras.filter((lora) => !isWanLightningLora(lora.model)), ...modelDefaults.loras].map((lora) =>
-      isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false }
-    ),
+    loras: [
+      ...settings.loras.filter(
+        (lora) => !previousKeys.has(lora.model.key) && !modelDefaults.loras.some((d) => d.model.key === lora.model.key)
+      ),
+      ...modelDefaults.loras,
+    ].map((lora) => (isLoraCompatibleWithModel(lora.model, model) ? lora : { ...lora, isEnabled: false })),
     modelKey: model.key,
     numFrames: modelDefaults.numFrames,
     steps: modelDefaults.steps,
@@ -861,11 +947,29 @@ export const getVideoModelSelectionResult = ({
     addClearedLabel(clearedLabels, 'FPS');
   }
 
-  if (next.lightningEnabled && !config.lightningAvailable) {
-    // Lightning wrote steps/CFG, so clearing it restores the new model's own defaults.
-    const result = getLightningToggleResult(next, model, models, false);
-    Object.assign(next, result.settings);
-    addClearedLabel(clearedLabels, 'Lightning');
+  if (next.acceleratorEnabled) {
+    // Carry the "fast path" intent across model switches: when the new model
+    // resolves to the SAME accelerator LoRA set, everything the user may have
+    // tuned (steps, CFG, LoRA weights) is left alone. Only when the identity
+    // changes (Lightning ↔ Turbo) is the toggle re-applied, and when the new
+    // model has no accelerator — or its LoRAs are not installed — the fast
+    // path turns off, restoring the model's own steps/CFG.
+    const targetEntries = config.accelerator ? findAcceleratorLoraEntries(model, models) : null;
+    const targetKeys = targetEntries?.map((entry) => entry.model.key).sort() ?? null;
+    const currentKeys = [...next.acceleratorLoraKeys].sort();
+    const sameAccelerator =
+      targetKeys !== null &&
+      targetKeys.length === currentKeys.length &&
+      targetKeys.every((key, index) => key === currentKeys[index]);
+
+    if (!sameAccelerator) {
+      const result = targetEntries
+        ? getAcceleratorToggleResult(next, model, models, true)
+        : getAcceleratorToggleResult(next, model, models, false);
+
+      Object.assign(next, result.settings);
+      addClearedLabel(clearedLabels, 'Acceleration');
+    }
   }
 
   if (next.cfgScaleLowNoise !== null && !config.cfg.lowNoiseVisible) {
@@ -995,8 +1099,8 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     reasons.push('CFG (Low Noise) must be at least 0.');
   }
 
-  if (settings.lightningEnabled && !config.lightningAvailable) {
-    reasons.push('Lightning is only available for Wan A14B models.');
+  if (settings.acceleratorEnabled && !config.accelerator) {
+    reasons.push(`${model.name} has no distillation fast path. Turn the accelerator off to generate with it.`);
   }
 
   if (!getVideoDimensions(model, settings)) {

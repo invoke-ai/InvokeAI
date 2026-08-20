@@ -5,9 +5,10 @@ import { describe, expect, it } from 'vitest';
 import type { VideoSettings } from './types';
 
 import {
+  findMiniMaxH3TurboLora,
   findWanLightningLoraPair,
   getDefaultVideoSettings,
-  getLightningToggleResult,
+  getAcceleratorToggleResult,
   getVideoComponentSectionPolicy,
   getVideoDimensions,
   getVideoModelAvailabilityReasons,
@@ -19,7 +20,7 @@ import {
   isSupportedVideoModel,
   isValidVideoNumFrames,
   snapVideoNumFrames,
-  WAN_LIGHTNING_SAMPLING,
+  WAN_LIGHTNING_ACCELERATOR,
 } from './videoPolicies';
 
 const wanModel = (variant: string, format = 'gguf_quantized', key = `wan-${variant}-${format}`): MainModelConfig => ({
@@ -113,18 +114,18 @@ describe('capabilities matrix', () => {
     const h3 = getVideoModelPolicy(h3Model(), settingsFor(h3Model()));
 
     expect(a14b.ui).toMatchObject({ cfgLowNoiseVisible: true, cfgVisible: true, fpsVisible: true });
-    expect(a14b.ui.lightningAvailable).toBe(true);
+    expect(a14b.ui.accelerator).toMatchObject({ label: 'Lightning', steps: 4 });
     expect(a14b.frames).toMatchObject({ defaultValue: 81, kind: 'grid', step: 4 });
 
-    expect(ti2v.ui).toMatchObject({ cfgLowNoiseVisible: false, cfgVisible: true, lightningAvailable: false });
+    expect(ti2v.ui).toMatchObject({ accelerator: null, cfgLowNoiseVisible: false, cfgVisible: true });
 
     expect(h3.ui).toMatchObject({
       audioOutput: true,
       cfgLowNoiseVisible: false,
       cfgVisible: false,
       fpsVisible: false,
-      lightningAvailable: false,
     });
+    expect(h3.ui.accelerator).toMatchObject({ label: 'Turbo', steps: 6 });
     expect(h3.frames.kind).toBe('choices');
     expect(h3.fps).toMatchObject({ defaultValue: 24, editable: false });
     expect(h3.defaults.steps).toBe(50);
@@ -297,14 +298,14 @@ describe('Lightning', () => {
     const base = settingsFor(model, {
       cfgScale: 5,
       cfgScaleLowNoise: 4,
-      lightningEnabled: false,
+      acceleratorEnabled: false,
       loras: [],
       steps: 40,
     });
-    const result = getLightningToggleResult(base, model, catalog, true);
+    const result = getAcceleratorToggleResult(base, model, catalog, true);
 
     expect(result.missingLoras).toBe(false);
-    expect(result.settings).toMatchObject({ ...WAN_LIGHTNING_SAMPLING, lightningEnabled: true });
+    expect(result.settings).toMatchObject({ acceleratorEnabled: true, cfgScale: 1, cfgScaleLowNoise: 1, steps: 4 });
     expect(result.settings.loras.map((entry) => entry.model.key)).toEqual([
       LIGHTNING_T2V_HIGH.key,
       LIGHTNING_T2V_LOW.key,
@@ -312,28 +313,28 @@ describe('Lightning', () => {
   });
 
   it('toggling off removes only the Lightning LoRAs and restores model defaults', () => {
-    const on = getLightningToggleResult(settingsFor(model), model, catalog, true).settings;
+    const on = getAcceleratorToggleResult(settingsFor(model), model, catalog, true).settings;
     const withStyle = { ...on, loras: [...on.loras, { isEnabled: true, model: lora('Style LoRA'), weight: 0.5 }] };
-    const off = getLightningToggleResult(withStyle as VideoSettings, model, catalog, false).settings;
+    const off = getAcceleratorToggleResult(withStyle as VideoSettings, model, catalog, false).settings;
 
-    expect(off.lightningEnabled).toBe(false);
+    expect(off.acceleratorEnabled).toBe(false);
     expect(off).toMatchObject({ cfgScale: 5, cfgScaleLowNoise: 4, steps: 40 });
     expect(off.loras.map((entry) => entry.model.name)).toEqual(['Style LoRA']);
   });
 
   it('reports a missing pair instead of enabling silently', () => {
-    const result = getLightningToggleResult(settingsFor(model), model, [], true);
+    const result = getAcceleratorToggleResult(settingsFor(model), model, [], true);
 
     expect(result.missingLoras).toBe(true);
-    expect(result.settings.lightningEnabled).toBe(false);
+    expect(result.settings.acceleratorEnabled).toBe(false);
   });
 
   it('clears a stale enabled flag when the pair has vanished from the catalog', () => {
-    const stale = settingsFor(model, { lightningEnabled: true, steps: 4 });
-    const result = getLightningToggleResult(stale, model, [], true);
+    const stale = settingsFor(model, { acceleratorEnabled: true, steps: 4 });
+    const result = getAcceleratorToggleResult(stale, model, [], true);
 
     expect(result.missingLoras).toBe(true);
-    expect(result.settings.lightningEnabled).toBe(false);
+    expect(result.settings.acceleratorEnabled).toBe(false);
   });
 
   it('defaults Lightning on for A14B when the pair is installed, off otherwise', () => {
@@ -341,10 +342,70 @@ describe('Lightning', () => {
     const withoutPair = getDefaultVideoSettings(model, []);
     const h3Defaults = getDefaultVideoSettings(h3Model(), catalog);
 
-    expect(withPair.lightningEnabled).toBe(true);
-    expect(withPair.steps).toBe(WAN_LIGHTNING_SAMPLING.steps);
-    expect(withoutPair).toMatchObject({ cfgScale: 5, lightningEnabled: false, steps: 40 });
-    expect(h3Defaults).toMatchObject({ fps: 24, lightningEnabled: false, numFrames: 124, steps: 50 });
+    expect(withPair.acceleratorEnabled).toBe(true);
+    expect(withPair.steps).toBe(WAN_LIGHTNING_ACCELERATOR.steps);
+    expect(withoutPair).toMatchObject({ cfgScale: 5, acceleratorEnabled: false, steps: 40 });
+    // The catalog holds no H3 Turbo LoRA, so H3 falls back to its slow defaults.
+    expect(h3Defaults).toMatchObject({ fps: 24, acceleratorEnabled: false, numFrames: 124, steps: 50 });
+  });
+});
+
+describe('MiniMax H3 Turbo', () => {
+  const TURBO = { base: 'minimax-h3', key: 'turbo', name: 'MiniMax H3 Turbo LoRA', type: 'lora' as const };
+
+  it('finds the installed Turbo LoRA by name, ignoring Wan Lightning models', () => {
+    expect(findMiniMaxH3TurboLora([LIGHTNING_T2V_HIGH, TURBO])).toMatchObject({ key: 'turbo' });
+    expect(findMiniMaxH3TurboLora([LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW])).toBeNull();
+  });
+
+  it('defaults Turbo on for H3 when installed, matching the bundled templates (steps 6)', () => {
+    const defaults = getDefaultVideoSettings(h3Model(), [TURBO]);
+
+    expect(defaults).toMatchObject({ acceleratorEnabled: true, steps: 6 });
+    expect(defaults.loras.map((entry) => entry.model.key)).toEqual(['turbo']);
+  });
+
+  it('toggling off restores the slow 50-step default and removes the Turbo LoRA', () => {
+    const on = getDefaultVideoSettings(h3Model(), [TURBO]);
+    const off = getAcceleratorToggleResult(on, h3Model(), [TURBO], false).settings;
+
+    expect(off).toMatchObject({ acceleratorEnabled: false, steps: 50 });
+    expect(off.loras).toEqual([]);
+  });
+
+  it('prefers the family-named Turbo repack over a look-alike, deterministically', () => {
+    const turboRider = { base: 'minimax-h3', key: 'rider', name: 'Turbo Rider', type: 'lora' as const };
+
+    expect(findMiniMaxH3TurboLora([turboRider, TURBO])).toMatchObject({ key: 'turbo' });
+    expect(findMiniMaxH3TurboLora([TURBO, turboRider])).toMatchObject({ key: 'turbo' });
+  });
+
+  it('never strips a user LoRA that merely shares an accelerator-style name', () => {
+    const turboRider = { base: 'minimax-h3', key: 'rider', name: 'Turbo Rider', type: 'lora' as const };
+    const model = h3Model();
+    const catalog = [TURBO, turboRider];
+    const on = getAcceleratorToggleResult(settingsFor(model), model, catalog, true).settings;
+    const withRider = {
+      ...on,
+      loras: [...on.loras, { isEnabled: true, model: turboRider as never, weight: 0.8 }],
+    };
+    const off = getAcceleratorToggleResult(withRider as VideoSettings, model, catalog, false).settings;
+
+    // Only the recorded Turbo entry is removed; "Turbo Rider" is the user's.
+    expect(off.loras.map((entry) => entry.model.key)).toEqual(['rider']);
+    expect(off.acceleratorLoraKeys).toEqual([]);
+  });
+
+  it('carries the fast-path intent across a family switch (Lightning → Turbo)', () => {
+    const wan = wanModel('t2v_a14b');
+    const catalog = [LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW, TURBO];
+    const lightningOn = getAcceleratorToggleResult(settingsFor(wan), wan, catalog, true).settings;
+    const result = getVideoModelSelectionResult({ currentSettings: lightningOn, model: h3Model(), models: catalog });
+
+    expect(result.settings.acceleratorEnabled).toBe(true);
+    expect(result.settings.steps).toBe(6);
+    expect(result.settings.loras.map((entry) => entry.model.key)).toEqual(['turbo']);
+    expect(result.clearedLabels).toContain('Acceleration');
   });
 });
 
@@ -474,7 +535,7 @@ describe('getVideoModelSelectionResult', () => {
     const from = settingsFor(wanModel('i2v_a14b'), {
       firstFrameImage: FIRST_FRAME,
       lastFrameImage: LAST_FRAME,
-      lightningEnabled: false,
+      acceleratorEnabled: false,
     });
     const result = getVideoModelSelectionResult({
       currentSettings: from,
@@ -513,7 +574,7 @@ describe('getVideoModelSelectionResult', () => {
   it('re-fits presets, frames, fps, Lightning, and components when crossing families', () => {
     const wan = wanModel('t2v_a14b');
     const catalog = [LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW];
-    const lightningOn = getLightningToggleResult(settingsFor(wan), wan, catalog, true).settings;
+    const lightningOn = getAcceleratorToggleResult(settingsFor(wan), wan, catalog, true).settings;
     const from = settingsFor(wan, {
       ...lightningOn,
       loras: [...lightningOn.loras, { isEnabled: true, model: lora('Style LoRA') as never, weight: 0.5 }],
@@ -526,19 +587,46 @@ describe('getVideoModelSelectionResult', () => {
     expect(result.settings.targetResolution).toBe('768 highres');
     expect(result.settings.numFrames).toBe(90); // 81 snapped onto the H3 grid
     expect(result.settings.fps).toBe(24);
-    expect(result.settings.lightningEnabled).toBe(false);
+    expect(result.settings.acceleratorEnabled).toBe(false);
     expect(result.settings.steps).toBe(50);
     expect(result.settings.loras).toEqual([]); // wan LoRAs are incompatible with H3
     expect(result.settings.vae).toBeNull();
     expect(result.settings.wanT5EncoderModel).toBeNull();
     expect(result.clearedLabels).toEqual(
-      expect.arrayContaining(['Target resolution', 'Frames', 'FPS', 'Lightning', 'LoRAs', 'VAE', 'Wan T5 Encoder'])
+      expect.arrayContaining(['Target resolution', 'Frames', 'FPS', 'Acceleration', 'LoRAs', 'VAE', 'Wan T5 Encoder'])
     );
+  });
+
+  it('leaves user-tuned sampling and LoRA weights alone when the accelerator carries over unchanged', () => {
+    const wan = wanModel('t2v_a14b');
+    const catalog = [LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW];
+    const on = getAcceleratorToggleResult(settingsFor(wan), wan, catalog, true).settings;
+    const tuned = {
+      ...on,
+      cfgScale: 2,
+      loras: [
+        { ...on.loras[0]!, weight: 0.5 },
+        on.loras[1]!,
+        { isEnabled: true, model: lora('Style LoRA') as never, weight: 0.7 },
+      ],
+      steps: 8,
+    };
+    const result = getVideoModelSelectionResult({
+      currentSettings: tuned,
+      model: wanModel('t2v_a14b', 'checkpoint'),
+      models: catalog,
+    });
+
+    // Same accelerator LoRA set on the new model: nothing is re-applied.
+    expect(result.settings).toMatchObject({ acceleratorEnabled: true, cfgScale: 2, steps: 8 });
+    expect(result.settings.loras[0]?.weight).toBe(0.5);
+    expect(result.settings.loras.map((entry) => entry.model.name)).toContain('Style LoRA');
+    expect(result.clearedLabels).toEqual([]);
   });
 
   it('returns no cleared labels when everything carries over', () => {
     const model = wanModel('i2v_a14b');
-    const from = settingsFor(model, { firstFrameImage: FIRST_FRAME, lightningEnabled: false });
+    const from = settingsFor(model, { firstFrameImage: FIRST_FRAME, acceleratorEnabled: false });
     const result = getVideoModelSelectionResult({
       currentSettings: from,
       model: wanModel('i2v_a14b', 'diffusers'),
