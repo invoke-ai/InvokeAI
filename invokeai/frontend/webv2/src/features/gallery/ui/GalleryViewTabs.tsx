@@ -39,8 +39,7 @@ export const GalleryViewTabs = () => {
   return (
     <SegmentGroup.Root
       aria-label={t('common.view')}
-      // `2xs` is a repo recipe extension the generated Chakra types don't know.
-      size={'2xs' as 'xs'}
+      size="xs"
       value={gallery.galleryView}
       onValueChange={handleViewChange}
     >

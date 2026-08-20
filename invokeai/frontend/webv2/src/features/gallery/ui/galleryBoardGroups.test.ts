@@ -19,16 +19,19 @@ const dogs = createBoard({ id: 'dogs', name: 'dogs' });
 const cats = createBoard({ id: 'cats', name: 'Cats' });
 const archived = createBoard({ archived: true, id: 'gorl', name: 'GORL' });
 const dateBoard = createBoard({ id: 'by_date:2026-07-28', kind: 'date', name: '28 July' });
+const otherProject = createBoard({ id: 'other', name: 'Someone else', projectId: 'project-2' });
+const ownProject = createBoard({ id: 'mine', name: 'My project', projectId: 'project-1' });
 const t = (key: string) => (key === 'widgets.gallery.uncategorized' ? 'Uncategorized' : key);
 
 const groupsOf = (overrides: Partial<Parameters<typeof getGalleryBoardGroups>[0]> = {}) =>
   getGalleryBoardGroups({
-    boards: [uncategorized, dogs, cats, archived, dateBoard],
+    boards: [uncategorized, dogs, cats, archived, dateBoard, otherProject, ownProject],
     projectBoardId: null,
     projectName: 'Project',
     searchTerm: '',
     showArchived: true,
     showDates: true,
+    showOtherProjects: true,
     t,
     ...overrides,
   });
@@ -37,14 +40,14 @@ describe('getGalleryBoardGroups', () => {
   it('splits archived boards into their own section instead of the main list', () => {
     const groups = groupsOf();
 
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['dogs', 'cats', 'none']);
+    expect(groups.yourBoards.map((board) => board.id)).toEqual(['dogs', 'cats', 'other', 'mine', 'none']);
     expect(groups.archivedBoards.map((board) => board.id)).toEqual(['gorl']);
   });
 
   it('puts Uncategorized last and hoists the project board first', () => {
     const groups = groupsOf({ projectBoardId: 'cats' });
 
-    expect(groups.yourBoards.map((board) => board.id)).toEqual(['cats', 'dogs', 'none']);
+    expect(groups.yourBoards.map((board) => board.id)).toEqual(['cats', 'dogs', 'other', 'mine', 'none']);
   });
 
   it('hides the date and archived sections when their toggles are off', () => {
@@ -52,7 +55,19 @@ describe('getGalleryBoardGroups', () => {
 
     expect(groups.archivedBoards).toEqual([]);
     expect(groups.dateBoards).toEqual([]);
+    expect(groups.yourBoards.map((board) => board.id)).toEqual(['dogs', 'cats', 'other', 'mine', 'none']);
+  });
+
+  it('drops boards owned by another project when they are hidden', () => {
+    const groups = groupsOf({ showOtherProjects: false });
+
     expect(groups.yourBoards.map((board) => board.id)).toEqual(['dogs', 'cats', 'none']);
+  });
+
+  it('keeps the open project own board even while other projects are hidden', () => {
+    const groups = groupsOf({ projectBoardId: 'mine', showOtherProjects: false });
+
+    expect(groups.yourBoards.map((board) => board.id)).toEqual(['mine', 'dogs', 'cats', 'none']);
   });
 
   it('filters every section by a case-insensitive substring match', () => {

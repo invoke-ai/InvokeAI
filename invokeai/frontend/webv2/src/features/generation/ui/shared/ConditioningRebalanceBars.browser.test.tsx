@@ -46,7 +46,7 @@ const renderBars = async (weights: readonly number[] = FLAT_WEIGHTS) => {
     throw new Error('rebalance bars did not render');
   }
 
-  return { bars, rect: track.getBoundingClientRect(), track };
+  return { bars, track };
 };
 
 const interact = async (run: () => void) => {
@@ -57,10 +57,14 @@ const interact = async (run: () => void) => {
 };
 
 /** Pointer coordinates that land on `index`'s column at `weight` on the track. */
-const pointAt = (rect: DOMRect, index: number, weight: number) => ({
-  clientX: rect.left + (index + 0.5) * (rect.width / TAP_COUNT),
-  clientY: rect.top + (1 - weight / SCALE) * rect.height,
-});
+const pointAt = (track: HTMLElement, index: number, weight: number) => {
+  const rect = track.getBoundingClientRect();
+
+  return {
+    clientX: rect.left + (index + 0.5) * (rect.width / TAP_COUNT),
+    clientY: rect.top + (1 - weight / SCALE) * rect.height,
+  };
+};
 
 const lastPreview = (): number[] => (onPreview.mock.calls.at(-1)?.[0] as number[] | null) ?? [];
 
@@ -138,8 +142,8 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('drags one bar to the pointed-at weight and commits once on release', async () => {
-    const { rect, track } = await renderBars();
-    const target = pointAt(rect, 3, 6);
+    const { track } = await renderBars();
+    const target = pointAt(track, 3, 6);
 
     await interact(() => {
       track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...target }));
@@ -164,14 +168,14 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('paints across every column a sweep passes, including ones it skipped', async () => {
-    const { rect, track } = await renderBars();
+    const { track } = await renderBars();
 
     await interact(() => {
-      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(rect, 0, 0) }));
+      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 0, 0) }));
     });
     // One large move from the first column to the last: the columns in between get
     // no pointer sample of their own and must still be filled in.
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', pointAt(rect, 11, 8))));
+    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', pointAt(track, 11, 8))));
 
     const painted = lastPreview();
 
@@ -186,12 +190,12 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('clamps a drag that leaves the track instead of reporting an impossible weight', async () => {
-    const { rect, track } = await renderBars();
+    const { track } = await renderBars();
     // Stay in column 5's x band throughout, so this measures vertical clamping only.
-    const { clientX } = pointAt(rect, 5, 4);
+    const { clientX } = pointAt(track, 5, 4);
 
     await interact(() => {
-      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(rect, 5, 4) }));
+      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 5, 4) }));
     });
 
     await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY: -9000 })));
@@ -247,11 +251,15 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('reports the tap under the pointer so the parent can read it out', async () => {
-    const { rect, track } = await renderBars();
+    const { track } = await renderBars();
+    const rect = track.getBoundingClientRect();
+    const settledRect = new DOMRect(rect.left, rect.top, rect.width * 1.5, rect.height);
+    const rectSpy = vi.spyOn(track, 'getBoundingClientRect').mockReturnValue(settledRect);
 
     await interact(() => {
-      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(rect, 7, 3) }));
+      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 7, 3) }));
     });
+    rectSpy.mockRestore();
 
     expect(onActiveIndexChange).toHaveBeenLastCalledWith(7);
   });

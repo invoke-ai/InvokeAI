@@ -1,6 +1,6 @@
 import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
 
-import { HStack, NumberInput } from '@chakra-ui/react';
+import { HStack, NumberInput, Text } from '@chakra-ui/react';
 import { ColorPicker, Slider, ToggleIconButton } from '@platform/ui';
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
 import { useBrushOptions } from '@workbench/widgets/canvas/engineStoreHooks';
@@ -91,6 +91,9 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
         onValueChange={onColorChange}
       />
       <HStack align="center" gap="1.5">
+        <Text color="fg.muted" fontSize="2xs">
+          {t('widgets.canvas.toolOptions.size')}
+        </Text>
         <Slider
           aria-label={sizeAriaLabel}
           formatValue={formatSizePx}
@@ -113,16 +116,21 @@ export const BrushOptions = ({ engine }: ToolOptionsComponentProps) => {
           <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.brushSize')} fontSize="xs" />
         </NumberInput.Root>
       </HStack>
-      <Slider
-        aria-label={opacityAriaLabel}
-        formatValue={formatOpacityPercent}
-        max={100}
-        min={0}
-        size="sm"
-        value={opacityValue}
-        w="6rem"
-        onValueChange={onOpacityChange}
-      />
+      <HStack align="center" gap="1.5">
+        <Text color="fg.muted" fontSize="2xs">
+          {t('widgets.canvas.toolOptions.opacity')}
+        </Text>
+        <Slider
+          aria-label={opacityAriaLabel}
+          formatValue={formatOpacityPercent}
+          max={100}
+          min={0}
+          size="sm"
+          value={opacityValue}
+          w="6rem"
+          onValueChange={onOpacityChange}
+        />
+      </HStack>
       {/*
         Two independent toggles rather than one pressure switch: width and opacity are separate
         pressure responses, and opacity additionally costs a full scratch refill per frame.

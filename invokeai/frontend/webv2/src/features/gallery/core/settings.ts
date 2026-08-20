@@ -34,6 +34,12 @@ export interface GallerySettings {
   showArchivedBoards: boolean;
   showDateBoards: boolean;
   showImageDimensions: boolean;
+  /**
+   * Boards owned by another project. They are readable and already labelled
+   * with a project badge; this hides them for anyone who wants the panel to
+   * be about the project they have open.
+   */
+  showOtherProjectBoards: boolean;
   showPendingItems: boolean;
   starredFirst: boolean;
   thumbnailFit: GalleryThumbnailFit;
@@ -52,6 +58,7 @@ export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
   showArchivedBoards: false,
   showDateBoards: false,
   showImageDimensions: false,
+  showOtherProjectBoards: true,
   showPendingItems: true,
   starredFirst: true,
   thumbnailFit: 'square',
@@ -113,6 +120,10 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
     typeof values.showImageDimensions === 'boolean'
       ? values.showImageDimensions
       : DEFAULT_GALLERY_SETTINGS.showImageDimensions,
+  showOtherProjectBoards:
+    typeof values.showOtherProjectBoards === 'boolean'
+      ? values.showOtherProjectBoards
+      : DEFAULT_GALLERY_SETTINGS.showOtherProjectBoards,
   showPendingItems:
     typeof values.showPendingItems === 'boolean' ? values.showPendingItems : DEFAULT_GALLERY_SETTINGS.showPendingItems,
   // Starred items have a dedicated section, so the backing window must always

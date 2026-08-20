@@ -14,12 +14,25 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  */
 const keepAliveMocks = vi.hoisted(() => {
   const icon = () => null;
-  const widgets: Record<string, { manifest: unknown; status: string }> = {
+  // A settled deferred resource, the shape `use()` can read without
+  // suspending — the center view's icon resolves the implementation to decide
+  // whether to show a spinner, and these fixtures are always "already loaded".
+  const loadedImplementation = () => {
+    const promise: Promise<object> & { status?: string; value?: object } = Promise.resolve({});
+
+    promise.status = 'fulfilled';
+    promise.value = {};
+
+    return { getStatus: () => 'loaded', load: () => promise, preload: () => {}, retry: () => promise };
+  };
+  const widgets: Record<string, { implementation: unknown; manifest: unknown; status: string }> = {
     canvas: {
+      implementation: loadedImplementation(),
       manifest: { centerPlacement: 'view', chrome: { header: 'visible' }, icon, id: 'canvas' },
       status: 'enabled',
     },
     workflow: {
+      implementation: loadedImplementation(),
       manifest: { centerPlacement: 'view', chrome: { header: 'visible' }, icon, id: 'workflow' },
       status: 'enabled',
     },
@@ -132,6 +145,9 @@ vi.mock('@workbench/WorkbenchContext', async () => {
   };
 });
 vi.mock('@workbench/widget-frame', () => ({
+  // Loading state is not what this suite measures; the real component would
+  // suspend on a chunk that does not exist under the mocked registry.
+  WidgetIdentityIcon: () => <Box boxSize="3.5" />,
   WidgetChromeSlotById: () => null,
   WidgetRendererById: ({ instanceId }: { instanceId: string }) => (
     <Box

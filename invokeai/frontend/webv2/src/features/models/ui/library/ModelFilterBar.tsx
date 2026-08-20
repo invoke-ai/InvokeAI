@@ -84,6 +84,7 @@ export const ModelFilterBar = ({
         sortFields={SORT_FIELD_OPTIONS}
         typeAllChecked={filters.typeFilter === null && !filters.missingOnly}
         typeFilter={filters.typeFilter}
+        typeSummary={filters.missingOnly ? t('models.missingFilesCount', { count: missingCount }) : undefined}
         onBaseFilterChange={handleBaseFilterChange}
         onSortChange={handleSortChange}
         onTypeFilterChange={handleTypeFilterChange}

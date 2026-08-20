@@ -106,12 +106,17 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     );
   }
 
+  const retainedDataError = loadState === 'error' ? (error ?? 'Failed to load the image map.') : null;
+
   if (data?.state === 'model_missing') {
     const model = data.modelName ?? 'the model named by `image_index_model`';
 
     return (
       <CenteredMessage
+        actionLabel={retainedDataError ? 'Retry' : undefined}
         detail={`Image indexing is enabled, but the embedding model '${model}' is not installed. Install the CLIP Vision model with this name, then restart the server.`}
+        errorDetail={retainedDataError}
+        onAction={retainedDataError ? handleRefresh : undefined}
         title="Embedding model not installed"
       />
     );
@@ -120,7 +125,10 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
   if (!data || data.state === 'disabled') {
     return (
       <CenteredMessage
+        actionLabel={retainedDataError ? 'Retry' : undefined}
         detail="Enable `image_index_enabled` in the server configuration and restart the server to build a semantic index of your gallery."
+        errorDetail={retainedDataError}
+        onAction={retainedDataError ? handleRefresh : undefined}
         title="Image indexing is off"
       />
     );
@@ -187,12 +195,14 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
 const CenteredMessage = ({
   actionLabel,
   detail,
+  errorDetail,
   onAction,
   title,
 }: {
   title: string;
   detail: string;
   actionLabel?: string;
+  errorDetail?: string | null;
   onAction?: () => void;
 }) => (
   <Center h="full" p="6">
@@ -201,6 +211,11 @@ const CenteredMessage = ({
       <Text color="fg.muted" fontSize="sm">
         {detail}
       </Text>
+      {errorDetail ? (
+        <Text color="fg.error" fontSize="sm" maxW="full" minW="0" overflowWrap="anywhere" role="alert">
+          {errorDetail}
+        </Text>
+      ) : null}
       {actionLabel && onAction ? (
         <Button mt="2" onClick={onAction} size="xs" variant="outline">
           {actionLabel}

@@ -34,7 +34,7 @@ export const StarterList = ({
   isInstallable: boolean;
   loadError: string | null;
   models: StarterModel[];
-  onConfigureExternalProvider: () => void;
+  onConfigureExternalProvider: (providerId: string) => void;
   onInstall: (model: StarterModel) => void;
   pendingSources: ReadonlySet<string>;
   response: StartersSnapshot['response'];
@@ -91,7 +91,7 @@ export const StarterList = ({
               variant="outline"
               onClick={(event) => {
                 event.stopPropagation();
-                onConfigureExternalProvider();
+                onConfigureExternalProvider(externalProviderId);
               }}
             >
               <Icon as={KeyRoundIcon} boxSize="3" />

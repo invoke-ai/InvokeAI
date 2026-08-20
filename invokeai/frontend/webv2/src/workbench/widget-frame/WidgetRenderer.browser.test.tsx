@@ -39,7 +39,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   shallowEqual: Object.is,
   useActiveProjectSelector: (selector: (project: typeof workbenchMocks.project) => unknown) =>
     selector(workbenchMocks.project),
-  useWorkbenchCommands: () => ({ layout: { setRegionSize: () => {} } }),
+  useWorkbenchCommands: () => ({ layout: { setRegionCollapsed: () => {}, setRegionSize: () => {} } }),
 }));
 
 vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({

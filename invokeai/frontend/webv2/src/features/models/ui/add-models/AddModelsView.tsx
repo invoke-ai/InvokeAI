@@ -15,7 +15,14 @@ import {
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
-import { clearAddModelsSeed, getAddModelsSeed, updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
+import {
+  clearAddModelsSeed,
+  getAddModelsSeed,
+  openExternalProviderKeys,
+  openModelManagerTab,
+  updateModelsUi,
+  useModelsUiSelector,
+} from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
@@ -300,7 +307,7 @@ export const AddModelsView = () => {
             <AccessTokenPopover
               value={accessToken}
               onChange={setAccessToken}
-              onManageKeys={() => updateModelsUi({ activeTab: 'keys' })}
+              onManageKeys={() => openModelManagerTab('keys')}
             />
           ) : null}
 
@@ -422,7 +429,7 @@ export const AddModelsView = () => {
                 response={response}
                 selectedBundleSources={selectedBundleSources}
                 status={status}
-                onConfigureExternalProvider={() => updateModelsUi({ activeTab: 'keys' })}
+                onConfigureExternalProvider={openExternalProviderKeys}
                 onInstall={(model) => void installStarter(model)}
               />
             ) : null}

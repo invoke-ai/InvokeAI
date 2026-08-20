@@ -2,6 +2,7 @@ import { Badge, Box, chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui
 import { AccountMenuSection, useCapabilities, useHasAccountSection } from '@features/identity';
 import { getQueueSummary } from '@features/queue/contracts';
 import { APP_VERSION } from '@platform/runtime/appMetadata';
+import { DiscordIcon } from '@platform/ui/BrandIcon';
 import { IconButton } from '@platform/ui/Button';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { MenuContent } from '@platform/ui/Menu';
@@ -19,12 +20,11 @@ import {
   ChevronDownIcon,
   FolderIcon,
   ListOrderedIcon,
-  MessagesSquareIcon,
   SearchIcon,
   SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useTopbarShortcut } from './useTopbarShortcut';
@@ -119,7 +119,7 @@ export const AppMenu = () => {
                 label={t('topbar.appMenu.documentation')}
                 value="documentation"
               />
-              <AppMenuLink href={DISCORD_URL} icon={MessagesSquareIcon} label="Discord" value="discord" />
+              <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
             </HStack>
           </MenuContent>
         </Menu.Positioner>
@@ -205,7 +205,8 @@ const AppMenuLink = ({
   value,
 }: {
   href: string;
-  icon: LucideIcon;
+  /** Lucide for generic destinations, a brand mark where the destination has one. */
+  icon: ElementType;
   label: string;
   value: string;
 }) => (

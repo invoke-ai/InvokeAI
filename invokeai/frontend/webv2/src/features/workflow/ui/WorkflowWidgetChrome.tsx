@@ -112,7 +112,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
           variant="ghost"
           onClick={openWorkflowLibrary}
         >
-          <Icon as={LibraryIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+          <Icon as={LibraryIcon} boxSize="3.5" flexShrink={0} />
           <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
         </Button>
       </Tooltip>

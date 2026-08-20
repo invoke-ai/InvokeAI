@@ -1,3 +1,4 @@
+import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type {
   PlacedWidgetRegionItem,
   WidgetPlacementInstanceMeta,
@@ -10,6 +11,7 @@ import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
   WidgetChromeSlotById,
+  WidgetIdentityIcon,
   WidgetRendererById,
   WidgetSourceLockBadge,
   useWidgetIntentPreloadProps,
@@ -27,7 +29,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Activity, Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { Activity, Suspense, use, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -283,7 +285,7 @@ const CenterViewMenu = ({
           variant="ghost"
         >
           <HStack gap="2" minW="0" position="relative" zIndex="1">
-            {activeItem ? <WidgetIcon icon={activeItem.widget.manifest.icon} boxSize="3.5" /> : null}
+            {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
             <Text fontSize="xs" fontWeight="700" truncate>
               {label}
             </Text>
@@ -338,6 +340,36 @@ const CenterViewMenu = ({
       </Portal>
     </Menu.Root>
   );
+};
+
+/**
+ * The active center view's icon, showing a spinner while its implementation
+ * chunk is still downloading.
+ *
+ * Panel widgets get this from their frame header; the center has no header —
+ * `CenterArea` owns its chrome — so the identity slot in this trigger was the
+ * one place a cold widget looked fully loaded while it was not. Suspense is
+ * the mechanism because `DeferredResource` exposes a status but nothing to
+ * subscribe to; the same `use()`/fallback pair already drives the chrome slots
+ * in `WidgetRenderer`.
+ */
+const CenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  const fallback = useMemo(
+    () => <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} isLoading />,
+    [widget.manifest.icon]
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <LoadedCenterViewIcon widget={widget} />
+    </Suspense>
+  );
+};
+
+const LoadedCenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  use(widget.implementation.load());
+
+  return <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} />;
 };
 
 const CenterViewMenuRow = ({

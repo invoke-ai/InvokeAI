@@ -1,7 +1,8 @@
 import type { SVGProps } from 'react';
 
 /**
- * Brand marks, vendored from Simple Icons (https://simpleicons.org, CC0-1.0).
+ * Brand marks, vendored mostly from Simple Icons (https://simpleicons.org,
+ * CC0-1.0); `origin` records any mark that came from somewhere else.
  *
  * Everything non-brand is a Lucide icon; brands are the only exception, and
  * there are a handful of them. Both `react-icons/si` and the `simple-icons`
@@ -15,12 +16,14 @@ import type { SVGProps } from 'react';
  */
 
 interface BrandIconSource {
-  /** Upstream Simple Icons slug, for refreshing the path later. */
+  /** Upstream slug, for refreshing the path later. */
   slug: string;
   /** Upstream title, used as the accessible name when the icon is not decorative. */
   title: string;
   /** The 24×24 `path` `d` attribute. */
   path: string;
+  /** Where the path came from, when it is not Simple Icons. */
+  origin?: string;
 }
 
 const createBrandIcon = ({ path, title }: BrandIconSource) => {
@@ -70,4 +73,11 @@ export const GoogleGeminiIcon = createBrandIcon({
   path: 'M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81',
   slug: 'googlegemini',
   title: 'Google Gemini',
+});
+
+export const DiscordIcon = createBrandIcon({
+  origin: 'Material Icons (Apache-2.0)',
+  path: 'M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.1.1 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.1 16.1 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.24 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.04.03.04.09-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.06-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02M8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12m6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12',
+  slug: 'discord',
+  title: 'Discord',
 });

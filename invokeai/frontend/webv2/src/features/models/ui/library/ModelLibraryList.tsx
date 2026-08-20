@@ -138,7 +138,10 @@ export const ModelLibraryList = ({
     );
   }
 
-  const firstVisibleIndex = virtualizer.virtualItems[0]?.index ?? 0;
+  // The visible range, not `virtualItems[0]`: the virtual window starts
+  // `overscan` rows above the fold, which held the previous group's header
+  // pinned ~450px past its last row.
+  const firstVisibleIndex = virtualizer.range?.startIndex ?? 0;
   const pinnedHeaderIndex = headerIndexes.reduce<number | null>(
     (pinnedIndex, index) => (firstVisibleIndex >= index ? index : pinnedIndex),
     headerIndexes[0] ?? null
@@ -195,7 +198,18 @@ export const ModelLibraryList = ({
       {/* Pinned copy of the current group's header, above the viewport.
           aria-hidden: it duplicates a header already in the list. */}
       {pinnedRow?.kind === 'header' ? (
-        <Box aria-hidden bg="bg" left="0" pointerEvents="none" position="absolute" right="0" top="0" zIndex={1} px="3">
+        <Box
+          aria-hidden
+          bg="bg"
+          data-pinned-group-header=""
+          left="0"
+          pointerEvents="none"
+          position="absolute"
+          right="0"
+          top="0"
+          zIndex={1}
+          px="3"
+        >
           <GroupHeader count={pinnedRow.group.models.length} label={pinnedRow.group.label} />
         </Box>
       ) : null}

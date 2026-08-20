@@ -217,6 +217,33 @@ describe('image map store', () => {
     expect(snapshot.error).toBe('Failed to load the image map');
     expect(snapshot.data?.points).toHaveLength(2);
   });
+
+  it('enters loading while retrying a failed points request', async () => {
+    const response = {
+      model_name: null,
+      point_count: 0,
+      points: [],
+      stale: false,
+      state: 'disabled',
+      updated_at: null,
+    };
+    let resolveRequest: (value: typeof response) => void = () => {};
+    const request = new Promise<typeof response>((resolve) => {
+      resolveRequest = resolve;
+    });
+
+    imageMapStore.patchSnapshot({ error: 'previous failure', loadState: 'error' });
+    mocks.apiFetchJson.mockReturnValueOnce(request);
+
+    const refresh = refreshImageMapPoints();
+
+    try {
+      expect(imageMapStore.getSnapshot().loadState).toBe('loading');
+    } finally {
+      resolveRequest(response);
+      await refresh;
+    }
+  });
 });
 
 describe('cluster palette', () => {

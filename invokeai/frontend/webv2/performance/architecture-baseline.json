@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 834004,
+        "brotliBytes": 836632,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 833838,
+        "gzipBytes": 836584,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1938174,
+        "initialRawBytes": 1945255,
         "largestAssetRawBytes": 746569,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 67459,
+        "ownedRawBytes": 68878,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -193,6 +193,7 @@
           "source:src/platform/transport/deploymentBase.ts",
           "source:src/platform/transport/http.ts",
           "source:src/platform/transport/socketHub.ts",
+          "source:src/platform/ui/BrandIcon.tsx",
           "source:src/platform/ui/Button.tsx",
           "source:src/platform/ui/ColorPicker.tsx",
           "source:src/platform/ui/Combobox.tsx",
@@ -249,6 +250,7 @@
           "source:src/workbench/launchpad/intents.ts",
           "source:src/workbench/launchpad/pages/HomePage.tsx",
           "source:src/workbench/launchpad/pages/ProjectsPage.tsx",
+          "source:src/workbench/launchpad/projects/NewProjectButton.tsx",
           "source:src/workbench/launchpad/projects/ProjectActionsMenu.tsx",
           "source:src/workbench/launchpad/projects/ProjectCard.tsx",
           "source:src/workbench/launchpad/projects/ProjectCover.tsx",
@@ -284,15 +286,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 842345,
+        "brotliBytes": 844999,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 842177,
+        "gzipBytes": 844950,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1957556,
+        "initialRawBytes": 1964708,
         "largestAssetRawBytes": 754035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 67459,
+        "ownedRawBytes": 68878,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -302,17 +304,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1034640,
+        "brotliBytes": 1037061,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1031951,
+        "gzipBytes": 1034691,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2536883,
+        "initialRawBytes": 2544068,
         "largestAssetRawBytes": 746569,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 111579,
-        "requestCount": 92,
-        "scriptRequestCount": 76,
+        "ownedRawBytes": 112220,
+        "requestCount": 91,
+        "scriptRequestCount": 75,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -630,6 +632,7 @@
           "source:src/platform/transport/deploymentBase.ts",
           "source:src/platform/transport/http.ts",
           "source:src/platform/transport/socketHub.ts",
+          "source:src/platform/ui/BrandIcon.tsx",
           "source:src/platform/ui/Button.tsx",
           "source:src/platform/ui/ColorPicker.tsx",
           "source:src/platform/ui/Combobox.tsx",
@@ -848,24 +851,24 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1044987,
+        "brotliBytes": 1047432,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1042271,
+        "gzipBytes": 1045038,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2562252,
+        "initialRawBytes": 2569509,
         "largestAssetRawBytes": 754035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 111579,
-        "requestCount": 92,
-        "scriptRequestCount": 76
+        "ownedRawBytes": 112220,
+        "requestCount": 91,
+        "scriptRequestCount": 75
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-19",
+  "capturedAt": "2026-08-20",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
