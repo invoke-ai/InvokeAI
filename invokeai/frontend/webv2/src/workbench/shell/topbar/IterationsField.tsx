@@ -19,7 +19,7 @@ export const IterationsField = () => {
   const { batchCount, sourceId } = useActiveProjectSelector(
     (project) => {
       const sourceId = project.invocation.sourceId;
-      const typeId = sourceId === 'upscale' ? 'upscale' : 'generate';
+      const typeId = sourceId === 'upscale' ? 'upscale' : sourceId === 'video' ? 'video' : 'generate';
       const instance = Object.values(project.widgetInstances).find((candidate) => candidate.typeId === typeId);
 
       return { batchCount: getBatchCount(instance?.state.values ?? {}), sourceId };
@@ -33,8 +33,8 @@ export const IterationsField = () => {
         return;
       }
 
-      if (sourceId === 'upscale') {
-        widgets.patchValues('upscale', { batchCount: valueAsNumber });
+      if (sourceId === 'upscale' || sourceId === 'video') {
+        widgets.patchValues(sourceId, { batchCount: valueAsNumber });
       } else {
         generation.setBatchCount(valueAsNumber);
       }

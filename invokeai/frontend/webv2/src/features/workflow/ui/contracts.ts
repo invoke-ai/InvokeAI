@@ -18,7 +18,7 @@ export type WorkflowWidgetPanelRegion = 'left' | 'right' | 'bottom' | 'center';
  * wiring in `app/WorkflowUiAdapter.tsx` and the `GraphPreviewDialog` mount in
  * `workbench/widget-frame/WidgetActionsMenu.tsx`.
  */
-export type WorkflowInvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'canvas';
+export type WorkflowInvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
 
 export interface WorkflowRuntimeApi {
   instanceId: string;

@@ -234,15 +234,22 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
 export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues | null => {
   const settings = normalizeVideoSettings(values);
 
-  if (!settings || !isRecord(values) || !isMainModelConfig(values.model)) {
+  if (!settings || !isRecord(values)) {
     return null;
   }
 
-  return { ...settings, model: values.model };
+  return { ...settings, model: isMainModelConfig(values.model) ? values.model : null };
 };
 
-export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues =>
-  isVideoSettings(values) && isMainModelConfig((values as unknown as Record<string, unknown>).model);
+export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues => {
+  if (!isVideoSettings(values)) {
+    return false;
+  }
+
+  const model = (values as unknown as Record<string, unknown>).model;
+
+  return model === null || isMainModelConfig(model);
+};
 
 export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetValues & Record<string, unknown> => ({
   ...values,
@@ -253,7 +260,7 @@ export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetVa
   h3TransformerModel: values.h3TransformerModel ? { ...values.h3TransformerModel } : null,
   lastFrameImage: values.lastFrameImage ? { ...values.lastFrameImage } : null,
   loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
-  model: { ...values.model },
+  model: values.model ? { ...values.model } : null,
   sourceVideo: values.sourceVideo ? { ...values.sourceVideo } : null,
   vae: values.vae ? { ...values.vae } : null,
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,

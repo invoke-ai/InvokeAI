@@ -174,9 +174,9 @@ describe('isVideoSourceClip', () => {
 describe('normalizeVideoWidgetValues / cloneVideoWidgetValues', () => {
   const model = { base: 'wan', key: 'wan-key', name: 'Wan', type: 'main' as const, variant: 't2v_a14b' };
 
-  it('requires a main model config', () => {
-    expect(normalizeVideoWidgetValues({ ...createSettings(), model })).not.toBeNull();
-    expect(normalizeVideoWidgetValues({ ...createSettings(), model: { key: 'x' } })).toBeNull();
+  it('carries a valid main model and nulls an invalid one', () => {
+    expect(normalizeVideoWidgetValues({ ...createSettings(), model })?.model).toEqual(model);
+    expect(normalizeVideoWidgetValues({ ...createSettings(), model: { key: 'x' } })?.model).toBeNull();
   });
 
   it('clones deeply enough that mutating the clone leaves the original untouched', () => {
@@ -185,8 +185,10 @@ describe('normalizeVideoWidgetValues / cloneVideoWidgetValues', () => {
 
     expect(clone).toEqual(values);
     (clone.firstFrameImage as { image_name: string }).image_name = 'mutated.png';
-    clone.model.key = 'mutated';
+    if (clone.model) {
+      clone.model.key = 'mutated';
+    }
     expect(values.firstFrameImage?.image_name).toBe('first.png');
-    expect(values.model.key).toBe('wan-key');
+    expect(values.model?.key).toBe('wan-key');
   });
 });

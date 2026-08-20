@@ -79,7 +79,7 @@ describe('built-in layout preset descriptors', () => {
         // "Compose with the center view swapped", so the swap has to remain
         // available.
         center: ['preview', 'gallery:center'],
-        left: ['generate', 'upscale'],
+        left: ['generate', 'upscale', 'video'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
         right: ['gallery', 'image-map', 'queue'],
       },
@@ -87,7 +87,7 @@ describe('built-in layout preset descriptors', () => {
         active: { bottom: 'gallery:bottom', center: 'canvas', left: 'generate', right: 'layers' },
         bottom: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
         center: ['canvas', 'preview'],
-        left: ['generate', 'upscale'],
+        left: ['generate', 'upscale', 'video'],
         panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
         right: ['layers', 'preview', 'gallery', 'image-map', 'queue'],
       },

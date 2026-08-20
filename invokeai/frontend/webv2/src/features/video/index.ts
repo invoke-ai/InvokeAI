@@ -79,3 +79,10 @@ export {
   type VideoTargetResolutionOption,
 } from './core/videoPolicies';
 export { compileVideoGraph, type CompiledVideoGraph } from './core/graph';
+export {
+  createDefaultVideoWidgetValues,
+  getVideoWidgetValidationReasons,
+  resolveVideoSeed,
+  syncVideoWidgetValuesWithModels,
+} from './core/widgetValues';
+export { VideoUiProvider, useVideoUi, useVideoUiActions, type VideoUiAdapter } from './ui/VideoUiContext';

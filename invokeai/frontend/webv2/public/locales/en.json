@@ -1473,7 +1473,8 @@
       "serverStatus": "Server Status",
       "upscale": "Upscale",
       "versionStatus": "Version",
-      "workflow": "Workflow"
+      "workflow": "Workflow",
+      "video": "Video"
     },
     "generate": {
       "activeCount_one": "{{count}} active",
@@ -2974,6 +2975,36 @@
       "chipLabel": "Version 7.0",
       "description": "Invoke V7 shell version 7.0.",
       "label": "Version"
+    },
+    "video": {
+      "accelerator": "{{label}} (fast)",
+      "acceleratorHelp": "Runs the {{label}} distillation LoRA at {{steps}} steps. Slower but sometimes higher-quality results with it off.",
+      "acceleratorMissing": "Accelerator LoRA not installed",
+      "acceleratorMissingDescription": "Install the {{label}} LoRA from Model Manager to enable the fast path.",
+      "aspectRatio": "Aspect Ratio",
+      "cfg": "CFG",
+      "cfgLowNoise": "CFG (Low Noise)",
+      "cfgLowNoiseHelp": "Guidance for the low-noise half of the A14B expert schedule.",
+      "derivedSize": "Output size: {{width}} × {{height}}",
+      "derivedSizeUnavailable": "Output size unavailable for the current settings.",
+      "dimensions": "Dimensions",
+      "fixedFps": "This model generates at a fixed {{fps}} FPS.",
+      "fps": "FPS",
+      "frames": "Frames",
+      "framesDuration": "{{seconds}} s at the current frame rate",
+      "mainModel": "Model",
+      "model": "Model",
+      "modelRequired": "Select a Wan 2.2 or MiniMax H3 model.",
+      "randomizeSeed": "Random",
+      "seed": "Seed",
+      "selectModel": "Select a video model…",
+      "settingsAdjusted": "Settings adjusted",
+      "settingsAdjustedDescription": "Adjusted for the selected model: {{labels}}.",
+      "sharedPromptDescription": "The prompt is shared with the Generate panel.",
+      "shuffleSeed": "New random seed",
+      "steps": "Steps",
+      "swapAspectRatio": "Swap orientation",
+      "targetResolution": "Target Resolution"
     }
   },
   "workflowLibrary": {

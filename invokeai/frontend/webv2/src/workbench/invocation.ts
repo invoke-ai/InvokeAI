@@ -18,6 +18,7 @@ import {
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
+import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
@@ -49,6 +50,7 @@ export const invocationSources: InvocationSourceMeta[] = [
   { id: 'generate', label: 'Generate', available: true },
   { id: 'workflow', label: 'Workflow', available: true },
   { id: 'upscale', label: 'Upscale', available: true },
+  { id: 'video', label: 'Video', available: true },
   { id: 'canvas', label: 'Canvas', available: true },
 ];
 
@@ -83,12 +85,14 @@ const sourceWidgetIds: Partial<Record<InvocationSourceId, WidgetId>> = {
   canvas: 'canvas',
   generate: 'generate',
   upscale: 'upscale',
+  video: 'video',
   workflow: 'workflow',
 };
 
 export interface InvocationRouteInput {
   generateValues: Record<string, unknown>;
   upscaleValues: Record<string, unknown>;
+  videoValues: Record<string, unknown>;
   invocation: InvocationRoute;
   mountedWidgetIds: readonly WidgetId[];
   projectGraph: ProjectGraphState;
@@ -132,6 +136,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
   canvasLayers: project.canvas.document.layers,
   generateValues: getProjectWidgetValues(project, 'generate'),
   upscaleValues: getProjectWidgetValues(project, 'upscale'),
+  videoValues: getProjectWidgetValues(project, 'video'),
   invocation: project.invocation,
   mountedWidgetIds: getMountedWidgetIds(project),
   projectGraph: project.projectGraph,
@@ -144,6 +149,7 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.projectGraph === right.projectGraph &&
   left.generateValues === right.generateValues &&
   left.upscaleValues === right.upscaleValues &&
+  left.videoValues === right.videoValues &&
   left.canvasBbox.width === right.canvasBbox.width &&
   left.canvasBbox.height === right.canvasBbox.height &&
   left.canvasLayers === right.canvasLayers &&
@@ -212,6 +218,14 @@ export const resolveInvocationRouteInput = (
 
     validationReasons.push(
       ...(values ? getUpscaleValidationReasons(values, models) : ['Upscale settings are incomplete.'])
+    );
+  }
+
+  if (sourceId === 'video') {
+    const values = normalizeVideoWidgetValues(input.videoValues);
+
+    validationReasons.push(
+      ...(values ? getVideoWidgetValidationReasons(values, models) : ['Video settings are incomplete.'])
     );
   }
 

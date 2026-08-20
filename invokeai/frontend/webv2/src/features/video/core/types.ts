@@ -95,5 +95,6 @@ export interface VideoSettings {
 }
 
 export interface VideoWidgetValues extends VideoSettings {
-  model: MainModelConfig;
+  /** The selected main model; null until the user picks one (or none is installed). */
+  model: MainModelConfig | null;
 }

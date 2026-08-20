@@ -5,6 +5,7 @@ import { GenerationUiAdapterProvider } from './GenerationUiAdapter';
 import { ModelsUiAdapterProvider } from './ModelsUiAdapter';
 import { QueueUiAdapterProvider } from './QueueUiAdapter';
 import { UpscaleUiAdapterProvider } from './UpscaleUiAdapter';
+import { VideoUiAdapterProvider } from './VideoUiAdapter';
 import { workbenchUiPortProviders } from './workbenchPorts';
 import { WorkflowUiAdapterProvider } from './WorkflowUiAdapter';
 
@@ -16,6 +17,7 @@ describe('workbench UI port composition', () => {
       GalleryUiAdapterProvider,
       GenerationUiAdapterProvider,
       UpscaleUiAdapterProvider,
+      VideoUiAdapterProvider,
       WorkflowUiAdapterProvider,
     ]);
   });

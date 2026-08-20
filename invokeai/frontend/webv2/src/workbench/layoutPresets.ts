@@ -32,6 +32,7 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   generate: 'generate',
   'image-map': 'image-map',
   upscale: 'upscale',
+  video: 'video',
   layers: 'layers',
   notifications: 'notifications',
   preview: 'preview',
@@ -173,7 +174,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       left: createRegion({
         activeInstanceId: 'generate',
-        instanceIds: ['generate', 'upscale'],
+        instanceIds: ['generate', 'upscale', 'video'],
         sizePx: 450,
       }),
       right: createRegion({
@@ -206,7 +207,7 @@ export const builtInLayoutPresetDescriptors: BuiltInLayoutPresetDescriptor[] = [
       }),
       left: createRegion({
         activeInstanceId: 'generate',
-        instanceIds: ['generate', 'upscale'],
+        instanceIds: ['generate', 'upscale', 'video'],
         sizePx: 450,
       }),
       right: createRegion({

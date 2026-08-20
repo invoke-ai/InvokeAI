@@ -23,6 +23,6 @@ export const FEATURE_PUBLIC_INTERFACES: Readonly<Record<string, readonly string[
   nodes: [],
   queue: ['contracts', 'devices', 'launchpad', 'menu', 'queries', 'react', 'reveal', 'utility', 'widget'],
   upscale: ['widget'],
-  video: [],
+  video: ['widget'],
   workflow: ['contracts', 'graph', 'paletteSearch', 'preview', 'queries', 'react', 'utility', 'widget'],
 };
