@@ -42,10 +42,13 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('revealMachine.sync({');
     // The machine must be told about paint, not about mount: a <video> is black until it decodes.
     expect(source).toContain('onLoadedData={handleLoadedData}');
-    expect(source).toContain('isMediaReady,');
-    // ...and readiness must reset when the element is swapped for another video.
-    const swapEffect = source.slice(source.indexOf('setIsPlaying(false);'), source.indexOf('}, [videoName]);'));
-    expect(swapEffect).toContain('setIsMediaReady(false);');
+    // Readiness must be reported as *which* video has painted, compared against the one being
+    // rendered. A boolean is reset from a different effect than the one that reads it, and a
+    // passive effect's setState does not reach the next effect's closure in the same commit — so
+    // the sync would see the new video's name with the previous video's readiness and lift the
+    // overlay onto a black element.
+    expect(source).toContain('isMediaReady: paintedVideoName === videoName,');
+    expect(source).toContain('setPaintedVideoName(videoName);');
     expect(source).toMatch(/renderedItemName: videoName,/);
   });
 

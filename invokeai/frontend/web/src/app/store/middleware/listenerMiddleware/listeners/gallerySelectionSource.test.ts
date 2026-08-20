@@ -59,4 +59,17 @@ describe('addGallerySelectionSourceListener', () => {
     store.dispatch({ type: 'auth/logout' });
     expect($gallerySelection.get().name).toBeNull();
   });
+
+  it('does not treat a bare board click as the user picking the item that stays selected', () => {
+    // Clicking a board in the boards list dispatches boardIdSelected with no selection payload and
+    // leaves the selection alone. Counting it would make the viewer reveal an item the user never
+    // clicked, over the live progress preview.
+    const store = buildStore();
+    store.dispatch(imageSelected('a.png'));
+    const beforeBoardClick = $gallerySelection.get().generation;
+
+    store.dispatch(boardIdSelected({ boardId: 'some-other-board' }));
+
+    expect($gallerySelection.get().generation).toBe(beforeBoardClick);
+  });
 });

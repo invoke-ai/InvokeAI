@@ -69,7 +69,11 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMediaReady, setIsMediaReady] = useState(false);
+  // The video whose first frame is on screen. A boolean would be wrong: it is reset from a
+  // different effect than the one that reads it, and a passive effect's setState does not reach the
+  // next effect's closure in the same commit — so a video -> video click read the new name with the
+  // old readiness and revealed a black element.
+  const [paintedVideoName, setPaintedVideoName] = useState<string | null>(null);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const activeTab = useAppSelector(selectActiveTab);
@@ -103,11 +107,9 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
   const selection = useStore($gallerySelection);
 
-  // Whenever the selected video changes, drop back to the idle still + play overlay, and treat the
-  // new element as unpainted until it says otherwise.
+  // Whenever the selected video changes, drop back to the idle still + play overlay.
   useEffect(() => {
     setIsPlaying(false);
-    setIsMediaReady(false);
   }, [videoName]);
 
   // Mid-generation gallery clicks: mirror CurrentImagePreview's temporary reveal. Without this,
@@ -117,6 +119,10 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // the reveal is keyed directly off the rendered video name. The sequencing (previous-item
   // tracking, auto-switch suppression, resolve-window deferral, StrictMode re-arm) lives in the
   // controller — see selectedItemReveal.ts.
+  // Registers this component as a live driver of the machine, so selections landing while the
+  // viewer shows neither preview are settled rather than replayed on return.
+  useEffect(() => revealMachine.attach(), [revealMachine]);
+
   useEffect(() => {
     revealMachine.sync({
       selection,
@@ -124,26 +130,20 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       // A <video> mounts instantly but shows black until it decodes a frame, so mounting is not
       // the same as being visible — lifting the overlay before then would replace the live preview
       // with a black rectangle. onLoadedData is the first point a frame is actually available.
-      isMediaReady,
+      isMediaReady: paintedVideoName === videoName,
       shouldShowProgressInViewer,
       hasProgressImage,
       isProgressImageResolving,
     });
   }, [
     hasProgressImage,
-    isMediaReady,
     isProgressImageResolving,
+    paintedVideoName,
     revealMachine,
     selection,
     shouldShowProgressInViewer,
     videoName,
   ]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
 
   // Register the viewer's <video> as a drag source so users can drag the currently-displayed
   // video onto node fields (e.g. a Video Primitive's "Starting Video" input) directly from
@@ -387,8 +387,8 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // The first decoded frame is on screen: only now is revealing this video over the progress
   // overlay showing the user anything.
   const handleLoadedData = useCallback(() => {
-    setIsMediaReady(true);
-  }, []);
+    setPaintedVideoName(videoName);
+  }, [videoName]);
 
   const handleLoadedMetadata = useCallback(() => {
     onLoadImage(videoDTO?.session_id ?? null);

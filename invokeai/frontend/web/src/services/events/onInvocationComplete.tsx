@@ -89,6 +89,8 @@ export const buildOnInvocationComplete = (
   // Deliveries currently fetching, so a duplicate can wait for one instead of being discarded.
   // Entries live only for the duration of a pass; the LRU above is what bounds long-term memory.
   const inFlightDeliveries = new Map<string, Promise<void>>();
+  // The pending refetch for each event, so a new pass supersedes it rather than running beside it.
+  const scheduledRetries = new Map<string, ReturnType<typeof setTimeout>>();
 
   // `retryNames`, when set, restricts this pass to the outputs a previous delivery lost to a failed
   // lookup — everything else already landed and must not be dispatched twice.
@@ -525,6 +527,15 @@ export const buildOnInvocationComplete = (
     retryNames: ReadonlySet<string> | null,
     nextAttempt: number
   ): Promise<void> => {
+    // This pass supersedes any refetch already queued for the event: leaving that timer armed would
+    // run a second chain of attempts alongside this one, doubling the bound RETRY_BACKOFF_MS is
+    // supposed to impose.
+    const queued = scheduledRetries.get(invocationKey);
+    if (queued !== undefined) {
+      clearTimeout(queued);
+      scheduledRetries.delete(invocationKey);
+    }
+
     // Mark before the awaits below so a duplicate cannot start a second pass over the same outputs
     // while this one is in flight; the handshake in the handler is what lets it retry afterwards.
     processedInvocations.set(invocationKey, { status: 'done' });
@@ -561,7 +572,8 @@ export const buildOnInvocationComplete = (
       return;
     }
     // Bare setTimeout, not the window member: this module is unit tested outside a DOM.
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
+      scheduledRetries.delete(invocationKey);
       const state = processedInvocations.get(invocationKey);
       if (state?.status !== 'retryable') {
         // A duplicate delivery got there first, or the outputs landed some other way.
@@ -569,6 +581,7 @@ export const buildOnInvocationComplete = (
       }
       void runTrackedDelivery(data, invocationKey, state.missingNames, attempt + 1);
     }, delayMs);
+    scheduledRetries.set(invocationKey, timeout);
   };
 
   return async (data: S['InvocationCompleteEvent']) => {

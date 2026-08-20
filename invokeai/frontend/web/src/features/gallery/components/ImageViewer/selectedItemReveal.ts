@@ -51,6 +51,19 @@ type MachineState =
 export type SelectedItemRevealMachine = {
   /** Fold the current inputs in. Called from the preview components' effects. */
   sync: (inputs: SelectedItemRevealInputs) => void;
+  /**
+   * Registers a mounted preview component; the returned function unregisters it. While none is
+   * registered nothing calls `sync`, so selections have to be settled through `noteSelection`
+   * instead.
+   */
+  attach: () => () => void;
+  /**
+   * A selection landed. Ignored while a preview is attached — its next `sync` carries the same
+   * descriptor and decides properly, with the progress state this cannot see. While none is
+   * attached (the viewer is in comparison mode, say) this settles the generation, so returning to
+   * the viewer does not fire a reveal for a click made when no overlay was covering anything.
+   */
+  noteSelection: (selection: GallerySelectionDescriptor) => void;
   /** Drop any reveal and cancel timers. For provider teardown. */
   reset: () => void;
   /** The current state's kind, for tests and debugging. */
@@ -75,8 +88,7 @@ export const createSelectedItemRevealMachine = (deps: {
 
   let state: MachineState = { kind: 'idle', generation: 0 };
   let timerId = 0;
-  // The inputs of the last sync, so a timer firing between syncs can re-decide with them.
-  let lastInputs: SelectedItemRevealInputs | null = null;
+  let attachedPreviews = 0;
 
   const clearTimer = () => {
     cancel(timerId);
@@ -113,15 +125,16 @@ export const createSelectedItemRevealMachine = (deps: {
     timerId = schedule(() => {
       timerId = 0;
       // The media never became ready. Show the item anyway: an empty frame for a moment is a
-      // smaller failure than a click that looks dead for the rest of the render.
-      if (state.kind === 'awaiting-media' && state.generation === generation) {
+      // smaller failure than a click that looks dead for the rest of the render. No generation
+      // check is needed — every transition clears this timer first, so it can only run while this
+      // exact claim is still the one outstanding.
+      if (state.kind === 'awaiting-media') {
         startRevealing(generation, itemName);
       }
     }, mediaGraceMs);
   };
 
   const sync: SelectedItemRevealMachine['sync'] = (inputs) => {
-    lastInputs = inputs;
     const { selection, renderedItemName, isMediaReady } = inputs;
     const { shouldShowProgressInViewer, hasProgressImage, isProgressImageResolving } = inputs;
 
@@ -165,14 +178,22 @@ export const createSelectedItemRevealMachine = (deps: {
 
   return {
     sync,
+    attach: () => {
+      attachedPreviews += 1;
+      return () => {
+        attachedPreviews -= 1;
+      };
+    },
+    noteSelection: (selection) => {
+      if (attachedPreviews > 0) {
+        return;
+      }
+      goIdle(selection.generation);
+    },
     reset: () => {
       clearTimer();
-      lastInputs = null;
       enter({ kind: 'idle', generation: state.generation });
     },
-    peek: () => {
-      void lastInputs;
-      return state.kind;
-    },
+    peek: () => state.kind,
   };
 };

@@ -94,6 +94,10 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   // The sequencing lives in the shared machine — see selectedItemReveal.ts. The image path only
   // renders an image once its preload has settled, so whatever is rendered here has painted.
+  // Registers this component as a live driver of the machine, so selections landing while the
+  // viewer shows neither preview are settled rather than replayed on return.
+  useEffect(() => revealMachine.attach(), [revealMachine]);
+
   useEffect(() => {
     revealMachine.sync({
       selection,
@@ -104,12 +108,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       isProgressImageResolving,
     });
   }, [hasProgressImage, imageToRender, isProgressImageResolving, revealMachine, selection, shouldShowProgressInViewer]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);

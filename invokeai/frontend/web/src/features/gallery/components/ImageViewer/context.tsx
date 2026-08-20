@@ -7,6 +7,7 @@ import type {
   ViewerProgressDatum,
 } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
 import { createViewerProgressLifecycle } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
+import { $gallerySelection } from 'features/gallery/store/gallerySelectionSource';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
@@ -99,6 +100,14 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       itemIdBySessionId,
     })
   )[0];
+
+  // Selections that land while no preview component is mounted (comparison mode) have to be
+  // settled somewhere, or returning to the viewer replays them as a reveal nobody asked for.
+  useEffect(() => $gallerySelection.listen((selection) => revealMachine.noteSelection(selection)), [revealMachine]);
+
+  // The machine outlives the components that drive it, so its timers are this provider's to clean
+  // up: without this an armed grace timer fires on a dead machine and raises an orphaned flag.
+  useEffect(() => () => revealMachine.reset(), [revealMachine]);
 
   useEffect(() => {
     if (!socket) {

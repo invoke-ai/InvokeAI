@@ -41,6 +41,8 @@ const createHarness = () => {
   return {
     machine,
     isRevealed: () => revealed,
+    /** The provider's $gallerySelection subscription. */
+    noteSelection: () => machine.noteSelection(selection),
     pendingTimerCount: () => timers.size,
     /** A selection dispatch, as the gallery source listener would publish it. */
     select: (name: string | null, options: { isAutoSwitch?: boolean } = {}) => {
@@ -193,5 +195,65 @@ describe('createSelectedItemRevealMachine', () => {
     h.syncRendered('b.png');
     expect(h.isRevealed()).toBe(revealedAfterFirst);
     expect(h.pendingTimerCount()).toBe(1);
+  });
+
+  it('holds a claim that has not been shown when a hand-off begins', () => {
+    // The reveal is owed but not yet visible: dropping it here would lose the click entirely,
+    // since nothing else remembers it.
+    const h = createHarness();
+    h.select('b.png');
+    h.sync({ renderedItemName: 'b.png', isMediaReady: false });
+    h.sync({ renderedItemName: 'b.png', isMediaReady: false, isProgressImageResolving: true });
+    expect(h.isRevealed()).toBe(false);
+
+    // The media arrives during the window — still not shown, the hand-off owns the viewer.
+    h.syncRendered('b.png', { isProgressImageResolving: true });
+    expect(h.isRevealed()).toBe(false);
+
+    // ...and it is honoured once the window ends.
+    h.syncRendered('b.png');
+    expect(h.isRevealed()).toBe(true);
+  });
+
+  it('does not reveal a superseded item when its media finally arrives', () => {
+    // The slow video's frame lands after the user has moved on. Revealing it then would show them
+    // an item they are no longer looking at, over a live preview.
+    const h = createHarness();
+    h.select('slow.mp4');
+    h.sync({ renderedItemName: 'slow.mp4', isMediaReady: false });
+
+    h.select('next.png');
+    h.sync({ renderedItemName: 'slow.mp4', isMediaReady: false });
+
+    h.syncRendered('slow.mp4');
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('settles a selection that lands while no preview is mounted, rather than replaying it', () => {
+    // Comparison mode keeps the provider (and the progress preview) alive while unmounting both
+    // preview components, so nothing syncs. Returning must not fire a reveal for a click made
+    // while no overlay was covering anything.
+    const h = createHarness();
+    h.select('a.png');
+    h.syncRendered('a.png');
+    h.fireTimers();
+
+    const detach = h.machine.attach();
+    detach();
+    h.select('picked-while-comparing.png');
+    h.noteSelection();
+
+    h.syncRendered('picked-while-comparing.png');
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('ignores noteSelection while a preview is mounted, leaving the decision to sync', () => {
+    const h = createHarness();
+    const detach = h.machine.attach();
+    h.select('b.png');
+    h.noteSelection();
+    h.syncRendered('b.png');
+    expect(h.isRevealed()).toBe(true);
+    detach();
   });
 });

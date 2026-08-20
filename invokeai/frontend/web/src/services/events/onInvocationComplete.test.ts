@@ -977,6 +977,37 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     }
   });
 
+  it('does not run a second chain of refetches when a duplicate delivery lands', async () => {
+    // Each pass supersedes the refetch already queued for that event; two chains would run to
+    // exhaustion side by side and double the bound the backoff is there to impose.
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getImageDTOSafe).mockResolvedValue(null);
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      await handler(buildImageCompleteEvent());
+      await vi.advanceTimersByTimeAsync(500);
+      // A duplicate arrives mid-backoff and takes the work over.
+      await handler(buildImageCompleteEvent());
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      // Two deliveries plus one chain of three attempts — not two chains.
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(5);
+    } finally {
+      vi.mocked(getImageDTOSafe).mockReset();
+      vi.useRealTimers();
+    }
+  });
+
   it('still processes distinct invocations of the same queue item', async () => {
     const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
     const getState = vi.fn(() => ({}));
