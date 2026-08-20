@@ -816,6 +816,75 @@ describe(validateConnection.name, () => {
     });
   });
 
+  describe('node attribute fields', () => {
+    // `use_cache` and `is_intermediate` are parsed into every template so they can be connection targets, but they
+    // are only reachable on nodes that render a footer - that is where their handle lives.
+    const booleanPrimitive: InvocationTemplate = {
+      title: 'Boolean Primitive',
+      type: 'boolean',
+      version: '1.0.1',
+      tags: ['primitives', 'boolean'],
+      description: 'A boolean primitive value',
+      outputType: 'boolean_output',
+      inputs: {},
+      outputs: {
+        value: {
+          fieldKind: 'output',
+          name: 'value',
+          title: 'Value',
+          description: 'The output boolean',
+          type: { name: 'BooleanField', cardinality: 'SINGLE', batch: false },
+          ui_hidden: false,
+        },
+      },
+      useCache: true,
+      nodePack: 'invokeai',
+      classification: 'stable',
+      category: 'primitives',
+    };
+    const templatesWithBoolean = { ...templates, boolean: booleanPrimitive };
+
+    it.each(['use_cache', 'is_intermediate'])(
+      'should accept a connection to %s on a node that renders a footer',
+      (targetHandle) => {
+        const n1 = buildNode(booleanPrimitive);
+        const n2 = buildNode(img_resize);
+        const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle };
+        const r = validateConnection(c, [n1, n2], [], templatesWithBoolean, null);
+        expect(r).toEqual(null);
+      }
+    );
+
+    it.each(['use_cache', 'is_intermediate'])(
+      'should reject a connection to %s on a node with no footer',
+      (targetHandle) => {
+        // `add` has no gallery output, so it renders no footer and there is no handle to attach to
+        const n1 = buildNode(booleanPrimitive);
+        const n2 = buildNode(add);
+        const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle };
+        const r = validateConnection(c, [n1, n2], [], templatesWithBoolean, null);
+        expect(r).toEqual('nodes.cannotConnectToUnavailableNodeSetting');
+      }
+    );
+
+    it('should still reject a type mismatch on a reachable node attribute field', () => {
+      const n1 = buildNode(add);
+      const n2 = buildNode(img_resize);
+      const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'use_cache' };
+      const r = validateConnection(c, [n1, n2], [], templatesWithBoolean, null);
+      expect(r).toEqual('nodes.fieldTypesMustMatch');
+    });
+
+    it('should not create field instances for node attribute fields', () => {
+      // The value lives on the node itself; an instance would be a second, conflicting source of truth
+      const node = buildNode(img_resize);
+      expect(node.data.inputs.use_cache).toBeUndefined();
+      expect(node.data.inputs.is_intermediate).toBeUndefined();
+      expect(node.data.useCache).toBe(true);
+      expect(node.data.isIntermediate).toBe(true);
+    });
+  });
+
   describe('non-strict mode', () => {
     it('should reject connections from self to self in non-strict mode', () => {
       const c = { source: 'add', sourceHandle: 'value', target: 'add', targetHandle: 'a' };

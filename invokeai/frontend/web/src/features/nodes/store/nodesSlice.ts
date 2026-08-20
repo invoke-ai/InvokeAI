@@ -87,6 +87,7 @@ import type {
   FormElement,
   HeadingElement,
   NodeFieldElement,
+  NodeSettingElement,
   TextElement,
   WorkflowCategory,
   WorkflowV3,
@@ -96,6 +97,7 @@ import {
   isContainerElement,
   isHeadingElement,
   isNodeFieldElement,
+  isNodeSettingElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
@@ -327,10 +329,14 @@ const slice = createSlice({
         // and add changes for each exposed field. If the remove change comes after the add change, we remove the exposed
         // field.
         for (const el of Object.values(state.form.elements)) {
-          if (!isNodeFieldElement(el)) {
+          let nodeId: string;
+          if (isNodeFieldElement(el)) {
+            nodeId = el.data.fieldIdentifier.nodeId;
+          } else if (isNodeSettingElement(el)) {
+            nodeId = el.data.nodeId;
+          } else {
             continue;
           }
-          const { nodeId } = el.data.fieldIdentifier;
           const removeIndex = action.payload.findLastIndex(
             (change) => change.type === 'remove' && change.id === nodeId
           );
@@ -775,6 +781,9 @@ const slice = createSlice({
     formElementNodeFieldDataChanged: (state, action: FormElementDataChangedAction<NodeFieldElement>) => {
       formElementDataChangedReducer(state, action, isNodeFieldElement);
     },
+    formElementNodeSettingDataChanged: (state, action: FormElementDataChangedAction<NodeSettingElement>) => {
+      formElementDataChangedReducer(state, action, isNodeSettingElement);
+    },
     formElementContainerDataChanged: (state, action: FormElementDataChangedAction<ContainerElement>) => {
       formElementDataChangedReducer(state, action, isContainerElement);
     },
@@ -856,6 +865,7 @@ export const {
   formElementHeadingDataChanged,
   formElementTextDataChanged,
   formElementNodeFieldDataChanged,
+  formElementNodeSettingDataChanged,
   formElementContainerDataChanged,
   formFieldInitialValuesChanged,
   workflowLoaded,

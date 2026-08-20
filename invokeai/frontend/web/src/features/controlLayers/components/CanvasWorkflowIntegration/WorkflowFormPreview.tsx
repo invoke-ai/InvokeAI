@@ -4,6 +4,7 @@ import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { WorkflowFieldRenderer } from 'features/controlLayers/components/CanvasWorkflowIntegration/WorkflowFieldRenderer';
+import { WorkflowNodeSettingRenderer } from 'features/controlLayers/components/CanvasWorkflowIntegration/WorkflowNodeSettingRenderer';
 import {
   canvasWorkflowIntegrationImageFieldSelected,
   selectCanvasWorkflowIntegrationFieldValues,
@@ -27,6 +28,7 @@ import {
   isDividerElement,
   isHeadingElement,
   isNodeFieldElement,
+  isNodeSettingElement,
   isTextElement,
   ROOT_CONTAINER_CLASS_NAME,
 } from 'features/nodes/types/workflow';
@@ -239,6 +241,10 @@ const FormElementComponentPreview = memo(({ id, elements }: { id: string; elemen
 
   if (isNodeFieldElement(el)) {
     return <WorkflowFieldRenderer el={el} />;
+  }
+
+  if (isNodeSettingElement(el)) {
+    return <WorkflowNodeSettingRenderer el={el} />;
   }
 
   // If we get here, it's an unknown element type

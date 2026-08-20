@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Divider, Flex, FormControl } from '@invoke-ai/ui-library';
+import { Divider, Flex, FormControl } from '@invoke-ai/ui-library';
 import { InvocationNodeContextProvider } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { InputFieldRenderer } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldRenderer';
@@ -8,10 +8,10 @@ import { useFormElementDnd } from 'features/nodes/components/sidePanel/builder/d
 import { DndListDropIndicator } from 'features/nodes/components/sidePanel/builder/DndListDropIndicator';
 import { FormElementEditModeContent } from 'features/nodes/components/sidePanel/builder/FormElementEditModeContent';
 import { FormElementEditModeHeader } from 'features/nodes/components/sidePanel/builder/FormElementEditModeHeader';
+import { FormElementNodeOverlay } from 'features/nodes/components/sidePanel/builder/FormElementNodeOverlay';
 import { NodeFieldElementDescriptionEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementDescriptionEditable';
 import { NodeFieldElementLabelEditable } from 'features/nodes/components/sidePanel/builder/NodeFieldElementLabelEditable';
 import { NodeFieldElementStringDropdownSettings } from 'features/nodes/components/sidePanel/builder/NodeFieldElementStringDropdownSettings';
-import { useMouseOverFormField, useMouseOverNode } from 'features/nodes/hooks/useMouseOverNode';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { NODE_FIELD_CLASS_NAME } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
@@ -40,7 +40,7 @@ export const NodeFieldElementEditMode = memo(({ el }: { el: NodeFieldElement }) 
   return (
     <Flex ref={draggableRef} id={id} className={NODE_FIELD_CLASS_NAME} sx={sx} data-parent-layout={containerCtx.layout}>
       <NodeFieldElementEditModeContent dragHandleRef={dragHandleRef} el={el} isDragging={isDragging} />
-      <NodeFieldElementOverlay nodeId={el.data.fieldIdentifier.nodeId} />
+      <FormElementNodeOverlay nodeId={el.data.fieldIdentifier.nodeId} />
       <DndListDropIndicator activeDropRegion={activeDropRegion} gap="var(--invoke-space-4)" />
     </Flex>
   );
@@ -91,32 +91,3 @@ const NodeFieldElementEditModeContent = memo(
   }
 );
 NodeFieldElementEditModeContent.displayName = 'NodeFieldElementEditModeContent';
-
-const nodeFieldOverlaySx: SystemStyleObject = {
-  position: 'absolute',
-  top: 0,
-  insetInlineEnd: 0,
-  bottom: 0,
-  insetInlineStart: 0,
-  borderRadius: 'base',
-  transitionProperty: 'none',
-  pointerEvents: 'none',
-  display: 'none',
-  '&[data-is-mouse-over-node-or-form-field="true"]': {
-    display: 'block',
-    bg: 'invokeBlueAlpha.100',
-  },
-};
-
-const NodeFieldElementOverlay = memo(({ nodeId }: { nodeId: string }) => {
-  const mouseOverNode = useMouseOverNode(nodeId);
-  const mouseOverFormField = useMouseOverFormField(nodeId);
-
-  return (
-    <Box
-      sx={nodeFieldOverlaySx}
-      data-is-mouse-over-node-or-form-field={mouseOverNode.isMouseOverNode || mouseOverFormField.isMouseOverFormField}
-    />
-  );
-});
-NodeFieldElementOverlay.displayName = 'NodeFieldElementOverlay';
