@@ -215,6 +215,19 @@ describe('WidgetPanelFrame resize', () => {
     expect(frameMocks.setRegionSize).toHaveBeenCalledExactlyOnceWith('left', 350);
   });
 
+  it('collapses on a further collapse-ward key press at the floor', async () => {
+    frameMocks.sizePx = 350;
+    const separator = await renderFrame();
+
+    // Growing away from the floor is still a plain resize.
+    await interact(() => separator.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+    expect(frameMocks.setRegionSize).toHaveBeenCalledExactlyOnceWith('left', 366);
+    expect(frameMocks.setRegionCollapsed).not.toHaveBeenCalled();
+
+    await interact(() => separator.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' })));
+    expect(frameMocks.setRegionCollapsed).toHaveBeenCalledExactlyOnceWith('left', true);
+  });
+
   it('mirrors the axis and floor of the region it frames', async () => {
     const rightSeparator = await renderFrame('right');
 

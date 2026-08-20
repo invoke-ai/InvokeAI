@@ -174,9 +174,18 @@ export const WidgetPanelFrame = ({
       }
 
       event.preventDefault();
+
+      // Keyboard parity with the drag: a further collapse-ward step at the
+      // floor collapses, instead of silently clamping forever.
+      if (sizeChange < 0 && displaySizePx <= minPanelSizePx) {
+        layout.setRegionCollapsed(region, true);
+
+        return;
+      }
+
       commitSize(displaySizePx + sizeChange);
     },
-    [commitSize, displaySizePx, isBottom, isLeft, maxPanelSizePx, minPanelSizePx]
+    [commitSize, displaySizePx, isBottom, isLeft, layout, maxPanelSizePx, minPanelSizePx, region]
   );
   const panelSizeProps = useMemo(
     () => (isBottom ? { h: `${renderSizePx}px`, w: 'full' } : { h: 'full', w: `${renderSizePx}px` }),
