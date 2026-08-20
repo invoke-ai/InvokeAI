@@ -8,18 +8,19 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui';
 import { PageShell } from '@platform/ui/PageShell';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { IntentTiles } from '@workbench/launchpad/home/IntentTiles';
 import { LivePanel } from '@workbench/launchpad/home/LivePanel';
 import { RecentProjectsRow } from '@workbench/launchpad/home/RecentProjectsRow';
 import { ResumeCard } from '@workbench/launchpad/home/ResumeCard';
 import { KnownBrowserIssuesAlert } from '@workbench/launchpad/KnownBrowserIssuesAlert';
+import { NewProjectButton } from '@workbench/launchpad/projects/NewProjectButton';
 import { prunePinnedProjects, toggleProjectPinPreference } from '@workbench/launchpad/projects/projectPins';
 import { getProjectLibrary, refreshProjectLibrary, useProjectLibrarySelector } from '@workbench/projects/library';
 import { refreshOpenProjects } from '@workbench/projects/openProjects';
 import { useImportProjectFile } from '@workbench/projects/useProjectFileActions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-import { FileUpIcon, PlusIcon } from 'lucide-react';
+import { FileUpIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -32,7 +33,6 @@ import { useTranslation } from 'react-i18next';
  * tiles that open a draft already arranged for the kind of work you named.
  */
 
-const NEW_PROJECT_SEARCH = { new: true } as const;
 const RECENT_PROJECT_COUNT = 4;
 const BROWSER_ISSUES_BANNER = <KnownBrowserIssuesAlert />;
 
@@ -82,12 +82,7 @@ export const HomePage = () => {
             <FileUpIcon />
             {t('projects.importWithEllipsis')}
           </Button>
-          <Button asChild size="xs" variant="solid">
-            <Link search={NEW_PROJECT_SEARCH} to="/app">
-              <PlusIcon />
-              {t('projects.newProject')}
-            </Link>
-          </Button>
+          <NewProjectButton />
         </>
       }
       banner={BROWSER_ISSUES_BANNER}

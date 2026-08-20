@@ -8,8 +8,9 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui';
 import { PageShell } from '@platform/ui/PageShell';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { useNavigate } from '@tanstack/react-router';
 import { KnownBrowserIssuesAlert } from '@workbench/launchpad/KnownBrowserIssuesAlert';
+import { NewProjectButton } from '@workbench/launchpad/projects/NewProjectButton';
 import { prunePinnedProjects, toggleProjectPinPreference } from '@workbench/launchpad/projects/projectPins';
 import { ProjectsBrowser } from '@workbench/launchpad/projects/ProjectsBrowser';
 import { ProjectsToolbar } from '@workbench/launchpad/projects/ProjectsToolbar';
@@ -17,7 +18,7 @@ import { getProjectLibrary, refreshProjectLibrary } from '@workbench/projects/li
 import { refreshOpenProjects } from '@workbench/projects/openProjects';
 import { useImportProjectFile } from '@workbench/projects/useProjectFileActions';
 import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
-import { FileUpIcon, PlusIcon } from 'lucide-react';
+import { FileUpIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -28,8 +29,6 @@ import { useTranslation } from 'react-i18next';
  * the account rather than the browser. The search term deliberately does not —
  * a filter you did not set is a filter you cannot find your way out of.
  */
-
-const NEW_PROJECT_SEARCH = { new: true } as const;
 
 export const ProjectsPage = () => {
   const navigate = useNavigate();
@@ -79,12 +78,7 @@ export const ProjectsPage = () => {
             <FileUpIcon />
             {t('projects.importWithEllipsis')}
           </Button>
-          <Button asChild size="xs" variant="solid">
-            <Link search={NEW_PROJECT_SEARCH} to="/app">
-              <PlusIcon />
-              {t('projects.newProject')}
-            </Link>
-          </Button>
+          <NewProjectButton />
         </>
       }
       banner={

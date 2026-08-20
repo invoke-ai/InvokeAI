@@ -464,6 +464,7 @@
     "libraryDescription": "Every project saved to your account.",
     "listView": "List view",
     "newProject": "New project",
+    "newProjectWithLayout": "Start with a layout",
     "noSavedProjects": "No saved projects yet.",
     "noSavedProjectsDescription": "Create your first project to start generating.",
     "noSearchMatches": "No projects match “{{search}}”.",
