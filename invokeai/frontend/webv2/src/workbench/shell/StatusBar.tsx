@@ -34,8 +34,14 @@ interface BottomWidgetItem extends PlacedWidgetRegionItem<WidgetPlacementInstanc
 
 const BOTTOM_MENU_POSITIONING = { placement: 'top-end' } as const;
 const BOTTOM_MENU_TRIGGER = { kind: 'bottom' } as const;
-const COMPACT_ROW_HOVER_PROPS = { color: 'fg' };
-const COMPACT_ROW_ACTIVE_HOVER_PROPS = { color: 'accent.contrast' };
+/**
+ * Same three-step ladder as the side rails (see `WidgetBar`): the brand hue
+ * marks the open widget through its content colour, on a neutral fill, because
+ * a brand tint of this bar is indistinguishable from it on the light theme.
+ */
+const COMPACT_ROW_HOVER_PROPS = { bg: 'bg.muted', color: 'fg' };
+const COMPACT_ROW_ACTIVE_PROPS = { bg: 'bg.emphasized', color: 'brand.fg' };
+const COMPACT_ROW_ACTIVE_HOVER_PROPS = { bg: 'bg.emphasized', color: 'brand.fg' };
 const TOOLTIP_POSITIONING = { placement: 'top' } as const;
 
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
@@ -198,12 +204,13 @@ const CompactBottomWidget = ({
     <Box ref={setNodeRef} h="full" style={style}>
       <Row
         {...rowDragHandleProps}
-        active={isActive ? 'accent' : 'none'}
         aria-label={item.label}
         aria-pressed={isActive}
+        color={isActive ? undefined : 'fg.muted'}
         cursor={isDragging ? 'grabbing' : item.isExpandable ? 'pointer' : 'default'}
         h="full"
         w="auto"
+        {...(isActive ? COMPACT_ROW_ACTIVE_PROPS : null)}
         _hover={isActive ? COMPACT_ROW_ACTIVE_HOVER_PROPS : COMPACT_ROW_HOVER_PROPS}
         {...activationProps}
         onClick={handleClick}

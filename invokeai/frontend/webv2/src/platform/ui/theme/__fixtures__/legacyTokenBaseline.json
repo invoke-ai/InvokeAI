@@ -78,7 +78,7 @@
     "gray.border": "oklch(84% 0.0095 264)",
     "brand.solid": "oklch(92.041% 0.2103 116.59)",
     "brand.contrast": "oklch(22.5% 0.013 264)",
-    "brand.fg": "oklch(92.041% 0.2103 116.59)",
+    "brand.fg": "color-mix(in oklab, oklch(92.041% 0.2103 116.59) 50%, oklch(22.5% 0.013 264))",
     "brand.subtle": "color-mix(in oklab, oklch(92.041% 0.2103 116.59) 16%, oklch(99.4% 0.002 264))",
     "brand.muted": "color-mix(in oklab, oklch(92.041% 0.2103 116.59) 26%, oklch(99.4% 0.002 264))",
     "brand.emphasized": "color-mix(in oklab, oklch(92.041% 0.2103 116.59) 36%, oklch(99.4% 0.002 264))",
