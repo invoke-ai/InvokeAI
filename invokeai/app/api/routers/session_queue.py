@@ -1,4 +1,6 @@
-from typing import Callable, Optional
+import asyncio
+from collections.abc import Callable
+from typing import Any, Optional, TypeVar
 
 from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
@@ -25,6 +27,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemNotFoundError,
+    SessionQueueItemSummary,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
@@ -32,6 +35,12 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
+
+# Upper bound on the number of item ids a client may ask about in one request. Without it a
+# caller can post tens of thousands of ids, which the SQLite layer would either expand past the
+# per-statement bind limit or grind through in a long-running query. The list is meant to cover
+# the rows a client actually has on screen, so this is far above any legitimate use.
+MAX_QUEUE_ITEM_IDS_PER_REQUEST = 1000
 
 
 class SessionQueueAndProcessorStatus(BaseModel):
@@ -124,57 +133,69 @@ def _get_workflow_call_root_queue_item(queue_item: SessionQueueItem) -> SessionQ
     return ApiDependencies.invoker.services.session_queue.get_queue_item(queue_item.root_item_id)
 
 
-def sanitize_queue_item_for_user(
-    queue_item: SessionQueueItem, current_user_id: str, is_admin: bool
-) -> SessionQueueItem:
-    """Sanitize queue item for non-admin users viewing other users' items.
+# What a non-admin must not see on another user's queue item, and what each field is replaced
+# with. One table for both the full item and the list summary: the two are different projections
+# of the same row, and a second redaction list is how they drift apart - a field stripped from the
+# list but left on the detail view is still leaked. Fields absent from a model are skipped, so the
+# full-item-only entries below simply do not apply to the summary.
+#
+# Replacements are built per call so that no two sanitized items share one mutable object.
+#
+# `device` is deliberately not redacted: it names the GPU the instance ran the job on, which is a
+# property of the hardware rather than of the other user's work, and the queue list has always
+# shown it.
+_REDACTIONS: dict[str, Callable[[], Any]] = {
+    "user_id": lambda: "redacted",
+    "user_display_name": lambda: None,
+    "user_email": lambda: None,
+    "batch_id": lambda: "redacted",
+    "session_id": lambda: "redacted",
+    "origin": lambda: None,
+    "destination": lambda: None,
+    "priority": lambda: 0,
+    "field_values": lambda: None,
+    "retried_from_item_id": lambda: None,
+    "workflow_call_id": lambda: None,
+    "parent_item_id": lambda: None,
+    "parent_session_id": lambda: None,
+    "root_item_id": lambda: None,
+    "workflow_call_depth": lambda: None,
+    "workflow": lambda: None,
+    "error_type": lambda: None,
+    "error_message": lambda: None,
+    "error_traceback": lambda: None,
+    "session": lambda: GraphExecutionState(id="redacted", graph=Graph()),
+}
 
-    For non-admin users viewing queue items belonging to other users,
-    only timestamps, status, and error information are exposed. All other
-    fields (user identity, generation parameters, graphs, workflows) are stripped.
+AnyQueueItem = TypeVar("AnyQueueItem", SessionQueueItem, SessionQueueItemSummary)
+
+
+def sanitize_queue_item_for_user(queue_item: AnyQueueItem, current_user_id: str, is_admin: bool) -> AnyQueueItem:
+    """Sanitize a queue item, or a queue item summary, for a non-admin viewing another user's item.
+
+    Only item_id, queue_id, status, device and the timestamps survive; identity, generation
+    parameters, graphs and workflows are stripped. Admins and the item's owner see everything.
 
     Args:
-        queue_item: The queue item to sanitize
+        queue_item: The queue item or summary to sanitize
         current_user_id: The ID of the current user viewing the item
         is_admin: Whether the current user is an admin
 
     Returns:
-        The sanitized queue item (sensitive fields cleared if necessary)
+        The sanitized item (sensitive fields cleared if necessary)
     """
     # Admins and item owners can see everything
     if is_admin or queue_item.user_id == current_user_id:
-        return strip_missing_image_results(queue_item)
+        if isinstance(queue_item, SessionQueueItem):
+            return strip_missing_image_results(queue_item)
+        return queue_item
 
-    # For non-admins viewing other users' items, strip everything except
-    # item_id, queue_id, status, and timestamps
-    sanitized_item = queue_item.model_copy(deep=False)
-    sanitized_item.user_id = "redacted"
-    sanitized_item.user_display_name = None
-    sanitized_item.user_email = None
-    sanitized_item.batch_id = "redacted"
-    sanitized_item.session_id = "redacted"
-    sanitized_item.origin = None
-    sanitized_item.destination = None
-    sanitized_item.priority = 0
-    sanitized_item.field_values = None
-    sanitized_item.retried_from_item_id = None
-    sanitized_item.workflow_call_id = None
-    sanitized_item.parent_item_id = None
-    sanitized_item.parent_session_id = None
-    sanitized_item.root_item_id = None
-    sanitized_item.workflow_call_depth = None
-    sanitized_item.workflow = None
-    sanitized_item.error_type = None
-    sanitized_item.error_message = None
-    sanitized_item.error_traceback = None
-    # Upstream's per-GPU field, redacted for the same reason as origin/destination/priority: a
-    # non-admin has no business knowing where another user's work is placed.
-    sanitized_item.device = None
-    sanitized_item.session = GraphExecutionState(
-        id="redacted",
-        graph=Graph(),
-    )
-    return sanitized_item
+    updates = {
+        field: build_replacement()
+        for field, build_replacement in _REDACTIONS.items()
+        if field in type(queue_item).model_fields
+    }
+    return queue_item.model_copy(update=updates)
 
 
 def get_queue_item_for_mutation(queue_id: str, item_id: int, current_user: CurrentUserOrDefault) -> SessionQueueItem:
@@ -203,7 +224,7 @@ async def enqueue_batch(
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
     """Processes a batch and enqueues the output graphs for execution for the current user."""
-    assert_image_move_maintenance_inactive()
+    await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
@@ -220,7 +241,7 @@ async def enqueue_batch(
         200: {"model": list[SessionQueueItem]},
     },
 )
-async def list_all_queue_items(
+def list_all_queue_items(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
@@ -244,7 +265,7 @@ async def list_all_queue_items(
         200: {"model": ItemIdsResult},
     },
 )
-async def get_queue_item_ids(
+def get_queue_item_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
@@ -275,14 +296,21 @@ async def get_queue_item_ids(
     operation_id="get_queue_items_by_item_ids",
     responses={200: {"model": list[SessionQueueItem]}},
 )
-async def get_queue_items_by_item_ids(
+def get_queue_items_by_item_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(
-        embed=True, description="Object containing list of queue item ids to fetch queue items for"
+        embed=True,
+        max_length=MAX_QUEUE_ITEM_IDS_PER_REQUEST,
+        description="Object containing list of queue item ids to fetch queue items for",
     ),
 ) -> list[SessionQueueItem]:
-    """Gets queue items for the specified queue item ids. Maintains order of item ids."""
+    """Gets queue items for the specified queue item ids. Maintains order of item ids.
+
+    Bound the legacy full-item endpoint as well as the summary endpoint: callers can otherwise
+    force one graph deserialization and response copy per supplied id, defeating the queue-list
+    optimization with an authenticated memory/CPU exhaustion request.
+    """
     try:
         session_queue_service = ApiDependencies.invoker.services.session_queue
 
@@ -305,12 +333,36 @@ async def get_queue_items_by_item_ids(
         raise HTTPException(status_code=500, detail="Failed to get queue items")
 
 
+@session_queue_router.post(
+    "/{queue_id}/item_summaries_by_ids",
+    operation_id="get_queue_item_summaries_by_ids",
+    responses={200: {"model": list[SessionQueueItemSummary]}},
+)
+def get_queue_item_summaries_by_ids(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(description="The queue id to perform this operation on"),
+    item_ids: list[int] = Body(
+        embed=True,
+        max_length=MAX_QUEUE_ITEM_IDS_PER_REQUEST,
+        description="Object containing list of queue item ids to fetch summaries for",
+    ),
+) -> list[SessionQueueItemSummary]:
+    """Gets lightweight queue item summaries for specified IDs in requested order."""
+    try:
+        summaries = ApiDependencies.invoker.services.session_queue.get_queue_item_summaries_by_ids(
+            queue_id=queue_id, item_ids=item_ids
+        )
+        return [sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin) for item in summaries]
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to get queue item summaries")
+
+
 @session_queue_router.put(
     "/{queue_id}/processor/resume",
     operation_id="resume",
     responses={200: {"model": SessionProcessorStatus}},
 )
-async def resume(
+def resume(
     current_user: AdminUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionProcessorStatus:
@@ -326,7 +378,7 @@ async def resume(
     operation_id="pause",
     responses={200: {"model": SessionProcessorStatus}},
 )
-async def pause(
+def pause(
     current_user: AdminUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionProcessorStatus:
@@ -342,7 +394,7 @@ async def pause(
     operation_id="cancel_all_except_current",
     responses={200: {"model": CancelAllExceptCurrentResult}},
 )
-async def cancel_all_except_current(
+def cancel_all_except_current(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> CancelAllExceptCurrentResult:
@@ -362,7 +414,7 @@ async def cancel_all_except_current(
     operation_id="delete_all_except_current",
     responses={200: {"model": DeleteAllExceptCurrentResult}},
 )
-async def delete_all_except_current(
+def delete_all_except_current(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> DeleteAllExceptCurrentResult:
@@ -382,7 +434,7 @@ async def delete_all_except_current(
     operation_id="cancel_by_batch_ids",
     responses={200: {"model": CancelByBatchIDsResult}},
 )
-async def cancel_by_batch_ids(
+def cancel_by_batch_ids(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_ids: list[str] = Body(description="The list of batch_ids to cancel all queue items for", embed=True),
@@ -403,7 +455,7 @@ async def cancel_by_batch_ids(
     operation_id="cancel_by_destination",
     responses={200: {"model": CancelByDestinationResult}},
 )
-async def cancel_by_destination(
+def cancel_by_destination(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: str = Query(description="The destination to cancel all queue items for"),
@@ -424,7 +476,7 @@ async def cancel_by_destination(
     operation_id="retry_items_by_id",
     responses={200: {"model": RetryItemsResult}},
 )
-async def retry_items_by_id(
+def retry_items_by_id(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(description="The queue item ids to retry"),
@@ -470,7 +522,7 @@ async def retry_items_by_id(
         200: {"model": ClearResult},
     },
 )
-async def clear(
+def clear(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> ClearResult:
@@ -497,7 +549,7 @@ async def clear(
         200: {"model": PruneResult},
     },
 )
-async def prune(
+def prune(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> PruneResult:
@@ -517,7 +569,7 @@ async def prune(
         200: {"model": Optional[SessionQueueItem]},
     },
 )
-async def get_current_queue_item(
+def get_current_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     origin_prefix: Optional[str] = Query(
@@ -541,7 +593,7 @@ async def get_current_queue_item(
         200: {"model": Optional[SessionQueueItem]},
     },
 )
-async def get_next_queue_item(
+def get_next_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     origin_prefix: Optional[str] = Query(
@@ -565,7 +617,7 @@ async def get_next_queue_item(
         200: {"model": SessionQueueAndProcessorStatus},
     },
 )
-async def get_queue_status(
+def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     origin_prefix: Optional[str] = Query(
@@ -597,7 +649,7 @@ async def get_queue_status(
         200: {"model": BatchStatus},
     },
 )
-async def get_batch_status(
+def get_batch_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_id: str = Path(description="The batch to get the status of"),
@@ -620,7 +672,7 @@ async def get_batch_status(
     },
     response_model_exclude_none=True,
 )
-async def get_queue_item(
+def get_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to get"),
@@ -642,7 +694,7 @@ async def get_queue_item(
     "/{queue_id}/i/{item_id}",
     operation_id="delete_queue_item",
 )
-async def delete_queue_item(
+def delete_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to delete"),
@@ -678,7 +730,7 @@ async def delete_queue_item(
         200: {"model": SessionQueueItem},
     },
 )
-async def cancel_queue_item(
+def cancel_queue_item(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to cancel"),
@@ -701,7 +753,7 @@ async def cancel_queue_item(
     operation_id="counts_by_destination",
     responses={200: {"model": SessionQueueCountsByDestination}},
 )
-async def counts_by_destination(
+def counts_by_destination(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Query(description="The destination to query"),
@@ -721,7 +773,7 @@ async def counts_by_destination(
     operation_id="delete_by_destination",
     responses={200: {"model": DeleteByDestinationResult}},
 )
-async def delete_by_destination(
+def delete_by_destination(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Path(description="The destination to query"),

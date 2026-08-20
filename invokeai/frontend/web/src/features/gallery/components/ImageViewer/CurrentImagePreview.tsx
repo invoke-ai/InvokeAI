@@ -202,6 +202,12 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     dependencies: [onHotkeyNextImage],
   });
 
+  // The loaded image identifies its session so the viewer can tell a late load from an earlier
+  // session apart from the one whose preview is currently retained (see onLoadImage).
+  const onLoadRenderedImage = useCallback(() => {
+    onLoadImage(imageToRender?.session_id ?? null);
+  }, [imageToRender?.session_id, onLoadImage]);
+
   const withProgress = shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage;
   // When more than one session is generating concurrently (multi-GPU), tile their previews instead of
   // showing only the most recent one.
@@ -219,7 +225,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     >
       {imageToRender && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <DndImage imageDTO={imageToRender} onLoad={onLoadImage} borderRadius="base" />
+          <DndImage imageDTO={imageToRender} onLoad={onLoadRenderedImage} borderRadius="base" />
         </Flex>
       )}
       {!imageToRender && <NoContentForViewer />}

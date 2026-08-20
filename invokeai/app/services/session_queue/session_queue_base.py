@@ -21,6 +21,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
+    SessionQueueItemSummary,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
@@ -223,6 +224,11 @@ class SessionQueueBase(ABC):
         origin_prefix: Optional[str] = None,
     ) -> ItemIdsResult:
         """Gets all queue item ids that match the given parameters. If user_id is provided, only returns items for that user."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
+        """Gets lightweight queue item summaries in the requested item ID order."""
         pass
 
     @abstractmethod
