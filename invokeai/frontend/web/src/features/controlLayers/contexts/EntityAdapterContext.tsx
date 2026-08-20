@@ -4,6 +4,7 @@ import type { CanvasEntityAdapterControlLayer } from 'features/controlLayers/kon
 import type { CanvasEntityAdapterInpaintMask } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterInpaintMask';
 import type { CanvasEntityAdapterRasterLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer';
 import type { CanvasEntityAdapterRegionalGuidance } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRegionalGuidance';
+import type { CanvasEntityAdapterVectorLayer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterVectorLayer';
 import type { CanvasEntityAdapterFromType } from 'features/controlLayers/konva/CanvasEntity/types';
 import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
 import type { PropsWithChildren } from 'react';
@@ -13,6 +14,7 @@ import { assert } from 'tsafe';
 const EntityAdapterContext = createContext<
   | CanvasEntityAdapterRasterLayer
   | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterVectorLayer
   | CanvasEntityAdapterInpaintMask
   | CanvasEntityAdapterRegionalGuidance
   | null
@@ -57,6 +59,26 @@ export const ControlLayerAdapterGate = memo(({ children }: PropsWithChildren) =>
 });
 
 ControlLayerAdapterGate.displayName = 'ControlLayerAdapterGate';
+
+export const VectorLayerAdapterGate = memo(({ children }: PropsWithChildren) => {
+  const canvasManager = useCanvasManager();
+  const entityIdentifier = useEntityIdentifierContext();
+  const adapters = useSyncExternalStore(
+    canvasManager.adapters.vectorLayers.subscribe,
+    canvasManager.adapters.vectorLayers.getSnapshot
+  );
+  const adapter = useMemo(() => {
+    return adapters.get(entityIdentifier.id) ?? null;
+  }, [adapters, entityIdentifier.id]);
+
+  if (!adapter) {
+    return null;
+  }
+
+  return <EntityAdapterContext.Provider value={adapter}>{children}</EntityAdapterContext.Provider>;
+});
+
+VectorLayerAdapterGate.displayName = 'VectorLayerAdapterGate';
 
 export const InpaintMaskAdapterGate = memo(({ children }: PropsWithChildren) => {
   const canvasManager = useCanvasManager();
@@ -114,6 +136,7 @@ export const useEntityAdapterSafe = (
 ):
   | CanvasEntityAdapterRasterLayer
   | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterVectorLayer
   | CanvasEntityAdapterInpaintMask
   | CanvasEntityAdapterRegionalGuidance
   | null => {
@@ -130,6 +153,10 @@ export const useEntityAdapterSafe = (
     canvasManager.adapters.controlLayers.subscribe,
     canvasManager.adapters.controlLayers.getSnapshot
   );
+  const vectorLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.vectorLayers.subscribe,
+    canvasManager.adapters.vectorLayers.getSnapshot
+  );
   const inpaintMaskAdapters = useSyncExternalStore(
     canvasManager.adapters.inpaintMasks.subscribe,
     canvasManager.adapters.inpaintMasks.getSnapshot
@@ -145,6 +172,9 @@ export const useEntityAdapterSafe = (
     if (entityIdentifier.type === 'control_layer') {
       return controlLayerAdapters.get(entityIdentifier.id) ?? null;
     }
+    if (entityIdentifier.type === 'vector_layer') {
+      return vectorLayerAdapters.get(entityIdentifier.id) ?? null;
+    }
     if (entityIdentifier.type === 'inpaint_mask') {
       return inpaintMaskAdapters.get(entityIdentifier.id) ?? null;
     }
@@ -152,7 +182,14 @@ export const useEntityAdapterSafe = (
       return regionalGuidanceAdapters.get(entityIdentifier.id) ?? null;
     }
     return null;
-  }, [controlLayerAdapters, entityIdentifier, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters]);
+  }, [
+    controlLayerAdapters,
+    entityIdentifier,
+    inpaintMaskAdapters,
+    rasterLayerAdapters,
+    regionalGuidanceAdapters,
+    vectorLayerAdapters,
+  ]);
 
   return adapter;
 };
@@ -162,6 +199,7 @@ export const useEntityAdapter = (
 ):
   | CanvasEntityAdapterRasterLayer
   | CanvasEntityAdapterControlLayer
+  | CanvasEntityAdapterVectorLayer
   | CanvasEntityAdapterInpaintMask
   | CanvasEntityAdapterRegionalGuidance => {
   const adapter = useEntityAdapterSafe(entityIdentifier);
@@ -183,6 +221,10 @@ export const useAllEntityAdapters = () => {
     canvasManager.adapters.controlLayers.subscribe,
     canvasManager.adapters.controlLayers.getSnapshot
   );
+  const vectorLayerAdapters = useSyncExternalStore(
+    canvasManager.adapters.vectorLayers.subscribe,
+    canvasManager.adapters.vectorLayers.getSnapshot
+  );
   const inpaintMaskAdapters = useSyncExternalStore(
     canvasManager.adapters.inpaintMasks.subscribe,
     canvasManager.adapters.inpaintMasks.getSnapshot
@@ -191,10 +233,11 @@ export const useAllEntityAdapters = () => {
     return [
       ...Array.from(rasterLayerAdapters.values()),
       ...Array.from(controlLayerAdapters.values()),
+      ...Array.from(vectorLayerAdapters.values()),
       ...Array.from(inpaintMaskAdapters.values()),
       ...Array.from(regionalGuidanceAdapters.values()),
     ];
-  }, [controlLayerAdapters, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters]);
+  }, [controlLayerAdapters, inpaintMaskAdapters, rasterLayerAdapters, regionalGuidanceAdapters, vectorLayerAdapters]);
 
   return allEntityAdapters;
 };
