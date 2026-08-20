@@ -263,16 +263,17 @@ describe('gallery state view', () => {
     expect(gallery.compareImageKey).toBe('image:shared');
   });
 
-  it('returns an identity-stable semantic reference while the underlying value is unchanged', () => {
-    // An unstable identity here restarts in-flight searches on every
-    // unrelated gallery interaction (it feeds memo/effect dependencies).
+  it('parses a persisted semantic reference for the gallery view', () => {
     const values = { semanticImageQuery: { kind: 'url', url: 'https://x.test/i.png' } };
     const first = getGallerySemanticImageQuery(values);
     const second = getGallerySemanticImageQuery({ ...values });
 
     expect(first).toEqual({ kind: 'url', url: 'https://x.test/i.png' });
-    expect(second).toBe(first);
-    expect(getGallerySemanticImageQuery({ semanticImageQuery: 'other.png' })).not.toBe(first);
+    expect(second).toEqual(first);
+    expect(getGallerySemanticImageQuery({ semanticImageQuery: 'other.png' })).toEqual({
+      imageName: 'other.png',
+      kind: 'image',
+    });
   });
 
   it('threads the parsed semantic reference into the view and hides pending placeholders while ranked', () => {
