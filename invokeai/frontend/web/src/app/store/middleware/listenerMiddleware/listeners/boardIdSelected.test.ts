@@ -1,6 +1,11 @@
 import { configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
-import { gallerySliceConfig, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
+import {
+  gallerySliceConfig,
+  galleryViewChanged,
+  imageSelected,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { api } from 'services/api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -56,5 +61,29 @@ describe('addBoardIdSelectedListener', () => {
     await vi.advanceTimersByTimeAsync(6000);
 
     expect(store.getState().gallery.selection).toEqual([]);
+  });
+
+  it('does not overwrite a selection made through the gallery grid either', () => {
+    // Thumbnail clicks and keyboard navigation dispatch selectionChanged, not imageSelected, so
+    // matching on the action type alone leaves the ordinary path exposed.
+    const store = buildStore();
+
+    store.dispatch(galleryViewChanged('images'));
+    store.dispatch(selectionChanged(['picked.png']));
+
+    return vi.advanceTimersByTimeAsync(6000).then(() => {
+      expect(store.getState().gallery.selection).toEqual(['picked.png']);
+    });
+  });
+
+  it('does not overwrite a multi-selection made while the probe was waiting', () => {
+    const store = buildStore();
+
+    store.dispatch(galleryViewChanged('images'));
+    store.dispatch(selectionChanged(['first.png', 'second.png']));
+
+    return vi.advanceTimersByTimeAsync(6000).then(() => {
+      expect(store.getState().gallery.selection).toEqual(['first.png', 'second.png']);
+    });
   });
 });

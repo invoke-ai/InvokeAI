@@ -245,4 +245,20 @@ describe('createSelectedItemRevealController', () => {
     h.controller.run({ ...rendering('c.png'), isProgressImageResolving: true });
     expect(h.pendingTimerCount(), 'the resolve-window re-arm replaces the timer, not adds one').toBe(1);
   });
+
+  it('reveals the same item re-selected after a clear that happened during a resolve window', () => {
+    // The clear has to be recorded even while resolving: leaving the ref on the item that was
+    // cleared makes re-selecting it read as "nothing changed" when the window ends, and the
+    // re-click stays hidden under the overlay.
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+
+    const resolving = { isProgressImageResolving: true };
+    h.controller.run(inputs({ ...resolving, renderedItemName: null, selectedItemName: null }));
+    h.controller.run({ ...rendering('a.png'), ...resolving });
+
+    // The resolve window ends with the same item selected again.
+    h.controller.run(rendering('a.png'));
+    expect(h.isRevealed()).toBe(true);
+  });
 });

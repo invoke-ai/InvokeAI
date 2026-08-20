@@ -98,8 +98,19 @@ export const createSelectedItemRevealController = (deps: {
   }) => {
     cancel(timerId);
 
-    // Resolve window: leave the ref and the marker exactly as they are (see the module docblock)
-    // so whatever lands during it can still be classified — and revealed — when it ends.
+    const previousRenderedItemName = lastRenderedItemNameRef.current;
+
+    // A cleared selection is recorded even while resolving. The deferral below exists to preserve
+    // the identity of something that landed but has not been classified yet; a clear has no such
+    // identity to keep — it *is* the event — and leaving the ref on the item that was cleared makes
+    // re-selecting that same item read as "nothing changed" once the window ends, so the re-click
+    // stays hidden under the overlay.
+    if (renderedItemName === null && selectedItemName === null && previousRenderedItemName !== null) {
+      lastRenderedItemNameRef.current = SELECTION_CLEARED;
+    }
+
+    // Resolve window: leave the ref and the marker otherwise exactly as they are (see the module
+    // docblock) so whatever lands during it can still be classified — and revealed — when it ends.
     if (isProgressImageResolving) {
       if (activeRevealItemName !== null && activeRevealItemName === renderedItemName) {
         // A reveal the user already earned is in flight over this very item. A generation
@@ -112,14 +123,11 @@ export const createSelectedItemRevealController = (deps: {
       return;
     }
 
-    const previousRenderedItemName = lastRenderedItemNameRef.current;
+    // While a selection exists but its render hasn't landed yet (preload or DTO fetch pending), the
+    // ref must keep the previous item — nulling it would erase the "previous item" fact and swallow
+    // the reveal the successor run would fire. The cleared-selection case is handled above.
     if (renderedItemName !== null) {
       lastRenderedItemNameRef.current = renderedItemName;
-    } else if (selectedItemName === null && previousRenderedItemName !== null) {
-      // Selection cleared. While a selection exists but its render hasn't landed yet (preload or
-      // DTO fetch pending), the ref must keep the previous item — nulling it would erase the
-      // "previous item" fact and swallow the reveal the successor run would fire.
-      lastRenderedItemNameRef.current = SELECTION_CLEARED;
     }
 
     // Consumed before the visibility guards below: in the common case the auto-switched item
