@@ -196,6 +196,7 @@ describe('gallery state view', () => {
       showArchivedBoards: false,
       showDateBoards: false,
       showImageDimensions: false,
+      showOtherProjectBoards: true,
       showPendingItems: true,
       starredFirst: true,
       thumbnailFit: 'square',

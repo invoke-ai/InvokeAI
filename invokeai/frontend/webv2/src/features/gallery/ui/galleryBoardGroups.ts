@@ -17,9 +17,11 @@ export interface GalleryBoardGroups {
 /**
  * Splits the flat board list into the panel's three sections.
  *
- * Pure and total: it filters on `showArchived`/`showDates` itself rather than
- * trusting the query to have excluded them, so grouping can be reasoned about
- * (and tested) without a fetch in the picture.
+ * Pure and total: it filters on `showArchived`/`showDates`/`showOtherProjects`
+ * itself rather than trusting the query to have excluded them, so grouping can
+ * be reasoned about (and tested) without a fetch in the picture. The
+ * other-projects filter has to happen here in any case — `GET /boards/` takes
+ * no project parameter, so the list always arrives complete.
  */
 export const getGalleryBoardGroups = ({
   boards,
@@ -28,6 +30,7 @@ export const getGalleryBoardGroups = ({
   searchTerm,
   showArchived,
   showDates,
+  showOtherProjects,
   t,
 }: {
   boards: readonly GalleryBoard[];
@@ -36,6 +39,7 @@ export const getGalleryBoardGroups = ({
   searchTerm: string;
   showArchived: boolean;
   showDates: boolean;
+  showOtherProjects: boolean;
   t: GalleryBoardTranslate;
 }): GalleryBoardGroups => {
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
@@ -46,8 +50,16 @@ export const getGalleryBoardGroups = ({
   const projectRowName = projectBoard?.name ?? projectName;
 
   const matchesBoardSearch = (board: GalleryBoard) => matchesSearch(getGalleryBoardLabel(board, t));
+  // The open project's own board is never "another project's", whatever the
+  // setting says — hiding the board you are working in would be nonsense.
+  const belongsToVisibleProject = (board: GalleryBoard) =>
+    showOtherProjects || board.projectId === null || board.id === projectBoard?.id;
   const regularBoards = boards.filter(
-    (board) => board.kind === 'board' && board.id !== projectBoard?.id && matchesBoardSearch(board)
+    (board) =>
+      board.kind === 'board' &&
+      board.id !== projectBoard?.id &&
+      belongsToVisibleProject(board) &&
+      matchesBoardSearch(board)
   );
   const dateBoards = showDates ? boards.filter((board) => board.kind === 'date' && matchesBoardSearch(board)) : [];
   const archivedBoards = showArchived ? regularBoards.filter((board) => board.archived) : [];
