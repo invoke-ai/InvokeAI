@@ -1,8 +1,12 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import { isKrea2ReferenceImageConfig } from 'features/controlLayers/store/types';
+import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { zImageField } from 'features/nodes/types/common';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addKrea2LoRAs } from 'features/nodes/util/graph/generation/addKrea2LoRAs';
@@ -184,7 +188,8 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
       },
     });
   }
-  // Krea-2 does not support regional reference-image adapters.
+  // Krea-2 does not support *regional* reference-image adapters. The global style reference is handled after the
+  // generation-mode helper, which is what sets the denoise dimensions it must be encoded at.
   g.deleteNode(ipAdapterCollect.id);
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
@@ -256,6 +261,42 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     g.upsertMetadata({ generation_mode: 'krea2_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  // Global style reference: training-free style transfer via shared-KV reference attention. There is no
+  // adapter model, and the technique supports exactly one reference, so consume the first valid entity.
+  //
+  // Must run *after* the generation-mode helper above: that is what assigns the denoise dimensions, and the
+  // reference has to be encoded at exactly those dimensions. Reading them earlier yields `undefined`, which
+  // JSON drops, leaving the node on its 1024x1024 default and failing every other resolution.
+  const styleRefEntity = selectRefImagesSlice(state).entities.find(
+    (entity) =>
+      entity.isEnabled &&
+      isKrea2ReferenceImageConfig(entity.config) &&
+      entity.config.image !== null &&
+      // A strength of 0 is a full bypass, and the whole reference pipeline (VAE encode, per-step capture
+      // pass, retained K/V cache) is skipped rather than run for no effect.
+      entity.config.styleStrength > 0 &&
+      getGlobalReferenceImageWarnings(entity, model).length === 0
+  );
+  if (styleRefEntity && isKrea2ReferenceImageConfig(styleRefEntity.config) && styleRefEntity.config.image) {
+    const { image, styleStrength } = styleRefEntity.config;
+    assert(
+      denoise.width !== undefined && denoise.height !== undefined,
+      'Krea-2 denoise dimensions must be set before the style reference is encoded'
+    );
+    const styleReference = g.addNode({
+      type: 'krea2_style_reference',
+      id: getPrefixedId('krea2_style_reference'),
+      image: zImageField.parse(image.crop?.image ?? image.original.image),
+      // The reference's image tokens are appended to the target's, so both must be the same size.
+      width: denoise.width,
+      height: denoise.height,
+      style_strength: styleStrength,
+    });
+    g.addEdge(modelLoader, 'vae', styleReference, 'vae');
+    g.addEdge(styleReference, 'style_reference', denoise, 'style_reference');
+    g.upsertMetadata({ krea2_style_strength: styleStrength });
   }
 
   if (state.system.shouldUseNSFWChecker) {

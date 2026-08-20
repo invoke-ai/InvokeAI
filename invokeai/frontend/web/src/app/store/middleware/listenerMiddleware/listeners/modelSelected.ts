@@ -43,6 +43,7 @@ import {
   getEntityIdentifier,
   isAspectRatioID,
   isFlux2ReferenceImageConfig,
+  isKrea2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
   isWanReferenceImageConfig,
 } from 'features/controlLayers/store/types';
@@ -51,6 +52,7 @@ import {
   initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
+  initialKrea2ReferenceImage,
   initialQwenImageReferenceImage,
   initialWanReferenceImage,
 } from 'features/controlLayers/store/util';
@@ -500,6 +502,21 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               continue;
             }
 
+            if (newBase === 'krea-2') {
+              // Switching TO Krea-2 - convert any non-krea2 configs to krea2_reference_image. Krea-2
+              // transfers style training-free, so there is no adapter model to carry over.
+              if (!isKrea2ReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialKrea2ReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
+              continue;
+            }
+
             if (isFlux2ReferenceImageConfig(entity.config)) {
               // Switching AWAY from FLUX.2 - convert flux2_reference_image to the appropriate config type
               let newConfig;
@@ -550,6 +567,29 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
             if (isWanReferenceImageConfig(entity.config)) {
               // Switching AWAY from Wan - convert to the appropriate config type for the new base.
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            if (isKrea2ReferenceImageConfig(entity.config)) {
+              // Switching AWAY from Krea-2 - convert to the appropriate config type for the new base.
               let newConfig;
               if (newGlobalRefImageModel) {
                 const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);

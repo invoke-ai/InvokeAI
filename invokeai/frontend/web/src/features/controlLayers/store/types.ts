@@ -438,6 +438,16 @@ const zWanReferenceImageConfig = z.object({
 });
 export type WanReferenceImageConfig = z.infer<typeof zWanReferenceImageConfig>;
 
+// Krea-2 transfers style training-free, by splicing the reference's attention keys/values into the
+// target's - no adapter model needed. styleStrength is the only knob surfaced here; the rest of the
+// tuning parameters live on the krea2_style_reference node and keep their defaults.
+const zKrea2ReferenceImageConfig = z.object({
+  type: z.literal('krea2_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+  styleStrength: z.number().gte(0).lte(2).default(1),
+});
+export type Krea2ReferenceImageConfig = z.infer<typeof zKrea2ReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -455,6 +465,7 @@ export const zRefImageState = z.object({
     zFlux2ReferenceImageConfig,
     zQwenImageReferenceImageConfig,
     zWanReferenceImageConfig,
+    zKrea2ReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -478,6 +489,9 @@ export const isQwenImageReferenceImageConfig = (
 
 export const isWanReferenceImageConfig = (config: RefImageState['config']): config is WanReferenceImageConfig =>
   config.type === 'wan_reference_image';
+
+export const isKrea2ReferenceImageConfig = (config: RefImageState['config']): config is Krea2ReferenceImageConfig =>
+  config.type === 'krea2_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
