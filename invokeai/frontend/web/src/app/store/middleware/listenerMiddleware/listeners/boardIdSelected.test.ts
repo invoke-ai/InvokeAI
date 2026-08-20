@@ -86,4 +86,32 @@ describe('addBoardIdSelectedListener', () => {
       expect(store.getState().gallery.selection).toEqual(['first.png', 'second.png']);
     });
   });
+
+  it('does not overwrite a multi-selection narrowed while the probe was waiting', () => {
+    // Removing one of two selected thumbnails leaves the *last* selected item unchanged, so a
+    // predicate watching only the active item never fired and the probe survived to replace the
+    // whole selection when it woke.
+    const store = buildStore();
+    store.dispatch(selectionChanged(['first.png', 'second.png']));
+
+    store.dispatch(galleryViewChanged('images'));
+    store.dispatch(selectionChanged(['second.png']));
+
+    return vi.advanceTimersByTimeAsync(6000).then(() => {
+      expect(store.getState().gallery.selection).toEqual(['second.png']);
+    });
+  });
+
+  it('does not overwrite a re-selection of the item already active', () => {
+    // Same shape: the active item does not change, but the user has just said what they want.
+    const store = buildStore();
+    store.dispatch(imageSelected('a.png'));
+
+    store.dispatch(galleryViewChanged('images'));
+    store.dispatch(imageSelected('a.png'));
+
+    return vi.advanceTimersByTimeAsync(6000).then(() => {
+      expect(store.getState().gallery.selection).toEqual(['a.png']);
+    });
+  });
 });
