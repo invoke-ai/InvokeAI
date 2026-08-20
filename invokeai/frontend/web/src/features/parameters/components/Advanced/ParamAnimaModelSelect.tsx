@@ -31,8 +31,8 @@ import {
 import type { ControlNetModelConfig, Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
- * Anima VAE Model Select - Anima-base VAE models (QwenImage/Wan 2.1 VAE) plus FLUX VAEs, which the
- * Anima model loader accepts as a fallback (see isAnimaCompatibleVAEModelConfig).
+ * Anima VAE Model Select - Anima-base VAE models (QwenImage/Wan 2.1 VAE) plus the other VAEs the Anima
+ * model loader accepts: FLUX VAEs and 16-channel Wan VAEs (see isAnimaCompatibleVAEModelConfig).
  */
 const ParamAnimaVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();

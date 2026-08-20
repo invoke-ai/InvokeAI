@@ -311,6 +311,13 @@ export const isFlux2VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+export const isWanVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'wan'
+  );
+};
+
 export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
@@ -319,19 +326,36 @@ export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
 };
 
 /**
- * VAEs the Anima model loader accepts. `AnimaModelLoaderInvocation.vae_model` carries no
- * `ui_model_base`, and both `anima_l2i` and `anima_i2l` branch explicitly on `FluxAutoEncoder`
- * (4D decode, no Wan denormalisation) beside `AutoencoderKLWan` - a FLUX VAE is a supported
- * fallback, not merely tolerated.
+ * Wan VAEs whose latent geometry matches Anima's, i.e. `AutoencoderKLWan` with 16 latent channels
+ * (Wan 2.1 / A14B). The 48-channel TI2V-5B VAE (`Wan2.2-VAE`) is the same class but a different
+ * latent space, so it must stay out.
+ *
+ * Submodels are excluded deliberately: a main model's bundled `vae` carries no `latent_channels` of
+ * its own, so its geometry cannot be verified from the config.
+ */
+const isAnimaCompatibleWanVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return isWanVAEModelConfig(config, true) && 'latent_channels' in config && config.latent_channels === 16;
+};
+
+/**
+ * VAEs the Anima model loader accepts, gated on the backend's latent geometry rather than on base
+ * alone. `AnimaModelLoaderInvocation.vae_model` carries no `ui_model_base`, and both `anima_l2i` and
+ * `anima_i2l` branch explicitly on `FluxAutoEncoder` (4D decode, no Wan denormalisation) beside
+ * `AutoencoderKLWan` - so an Anima-base VAE, a FLUX VAE and a 16-channel Wan VAE are all supported,
+ * not merely tolerated.
  *
  * Kept separate from `isAnimaVAEModelConfig`, which stays base-driven because Krea-2 draws its
- * own VAE pool from it and must not be offered FLUX VAEs.
+ * own VAE pool from it and must not be offered FLUX or Wan VAEs.
  */
 export const isAnimaCompatibleVAEModelConfig = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
 ): config is VAEModelConfig => {
-  return isAnimaVAEModelConfig(config, excludeSubmodels) || isFlux1VAEModelConfig(config, excludeSubmodels);
+  return (
+    isAnimaVAEModelConfig(config, excludeSubmodels) ||
+    isFlux1VAEModelConfig(config, excludeSubmodels) ||
+    isAnimaCompatibleWanVAEModelConfig(config)
+  );
 };
 
 export const isQwenImageVAEModelConfig = (
@@ -341,13 +365,6 @@ export const isQwenImageVAEModelConfig = (
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
     config.base === 'qwen-image'
-  );
-};
-
-export const isWanVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
-  return (
-    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
-    config.base === 'wan'
   );
 };
 

@@ -35,11 +35,13 @@ describe('SDNQ pipeline model predicates', () => {
   });
 });
 
-// The Anima loader accepts a FLUX VAE beside the Wan/QwenImage one, but Krea-2 draws its own VAE pool
-// from the base-driven `isAnimaVAEModelConfig` and must not be offered FLUX VAEs. The two predicates
-// must therefore stay distinct - collapsing them would widen Krea-2's picker as a side effect.
+// The Anima loader accepts a FLUX VAE and a 16-channel Wan VAE beside the Wan/QwenImage one, but Krea-2
+// draws its own VAE pool from the base-driven `isAnimaVAEModelConfig` and must not be offered either.
+// The two predicates must therefore stay distinct - collapsing them would widen Krea-2's picker as a
+// side effect.
 describe('Anima VAE predicates', () => {
-  const vae = (base: string) => ({ key: `${base}-vae`, type: 'vae', base, name: `${base} vae` }) as never;
+  const vae = (base: string, over: Record<string, unknown> = {}) =>
+    ({ key: `${base}-vae`, type: 'vae', base, name: `${base} vae`, ...over }) as never;
 
   it('accepts an Anima VAE in both predicates', () => {
     expect(isAnimaVAEModelConfig(vae('anima'))).toBe(true);
@@ -49,6 +51,22 @@ describe('Anima VAE predicates', () => {
   it('accepts a FLUX VAE only as Anima-compatible, not as an Anima-base VAE', () => {
     expect(isAnimaVAEModelConfig(vae('flux'))).toBe(false);
     expect(isAnimaCompatibleVAEModelConfig(vae('flux'))).toBe(true);
+  });
+
+  // Anima's transformer works in a 16-channel latent space, which the A14B Wan VAE provides. The
+  // 48-channel Wan2.2-VAE (TI2V-5B) is the same AutoencoderKLWan class but a different latent space.
+  it('accepts a 16-channel Wan VAE as Anima-compatible', () => {
+    expect(isAnimaCompatibleVAEModelConfig(vae('wan', { latent_channels: 16 }))).toBe(true);
+    expect(isAnimaVAEModelConfig(vae('wan', { latent_channels: 16 }))).toBe(false);
+  });
+
+  it('rejects a 48-channel Wan VAE', () => {
+    expect(isAnimaCompatibleVAEModelConfig(vae('wan', { latent_channels: 48 }))).toBe(false);
+  });
+
+  // A main model's bundled `vae` submodel carries no `latent_channels`, so its geometry is unverifiable.
+  it('rejects a Wan VAE whose latent channel count is unknown', () => {
+    expect(isAnimaCompatibleVAEModelConfig(vae('wan'))).toBe(false);
   });
 
   it.each(['flux2', 'qwen-image', 'sdxl'])('rejects a %s VAE in both predicates', (base) => {

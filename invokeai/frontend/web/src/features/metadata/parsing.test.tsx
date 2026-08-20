@@ -25,13 +25,17 @@ vi.mock('features/controlLayers/store/paramsSlice', async (importOriginal) => {
 
 const fakeModel = (
   type: 'vae' | 'qwen3_encoder' | 'mistral_encoder' | 'qwen3_vl_encoder' | 't5_encoder' | 'main',
-  base: string
+  base: string,
+  // Extra config fields, for handlers that gate on more than base/type (e.g. a Wan VAE's
+  // `latent_channels`). The store mock resolves these objects as the model's full config.
+  over: Record<string, unknown> = {}
 ) => ({
   key: `${type}-key`,
   hash: 'hash',
   name: `Some ${type}`,
   base,
   type,
+  ...over,
 });
 
 // FLUX.2 main-model config. The `variant` is what the dev-vs-Klein VAE
@@ -606,6 +610,44 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
     it.each(['qwen-image', 'flux2', 'sdxl'])('rejects a %s VAE from Anima metadata', async (vaeBase) => {
       currentBase = 'anima';
       nextResolved = fakeModel('vae', vaeBase);
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.AnimaVAEModel.parse({ model: fakeMain('anima'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    // Anima's transformer works in a 16-channel latent space, so the A14B Wan VAE is as valid an input as
+    // an Anima-base one - `anima_l2i` / `anima_i2l` treat both as AutoencoderKLWan. Recall must gate on
+    // that geometry (`latent_channels`), not on the base alone (review 4972570279).
+    it('parses a 16-channel Wan VAE from an Anima image', async () => {
+      currentBase = 'anima';
+      nextResolved = fakeModel('vae', 'wan', { latent_channels: 16 });
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.AnimaVAEModel.parse(
+        { model: fakeMain('anima'), vae: nextResolved },
+        store
+      );
+
+      expect(parsed.base).toBe('wan');
+    });
+
+    // The 48-channel Wan2.2-VAE (TI2V-5B) is the same class but a different latent space - recalling it
+    // would swap in a VAE that cannot decode Anima latents.
+    it('rejects a 48-channel Wan VAE from Anima metadata', async () => {
+      currentBase = 'anima';
+      nextResolved = fakeModel('vae', 'wan', { latent_channels: 48 });
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.AnimaVAEModel.parse({ model: fakeMain('anima'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    it('rejects a Wan VAE whose latent channel count is unknown', async () => {
+      currentBase = 'anima';
+      nextResolved = fakeModel('vae', 'wan');
       const store = makeStore();
 
       await expect(

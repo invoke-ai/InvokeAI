@@ -154,6 +154,7 @@ import { useTranslation } from 'react-i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
+import { isAnimaCompatibleVAEModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -1862,12 +1863,18 @@ const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     // the Anima slot.
     assertMetadataModelBase(metadata, 'anima', 'AnimaVAEModel');
     const raw = getProperty(metadata, 'vae');
-    const parsed = await parseModelIdentifier(raw, store, 'vae');
-    assert(parsed.type === 'vae');
-    // Mirrors isAnimaCompatibleVAEModelConfig, i.e. the Anima VAE picker's own domain: an Anima-base
-    // (Wan/QwenImage) VAE, or a FLUX VAE, which anima_l2i / anima_i2l accept as a fallback. Recalling a
-    // FLUX VAE from a workflow-built Anima image must not be rejected (review 4966712044).
-    assert(parsed.base === 'anima' || parsed.base === 'flux', 'AnimaVAEModel requires an Anima or FLUX VAE');
+    // Gate on the full config, not just its base: the Anima-compatible set is defined by the backend's
+    // latent geometry, which for Wan VAEs lives in `latent_channels` and is lost in the identifier.
+    const config = await parseModelConfig(raw, store, 'vae');
+    // Defers to the Anima VAE picker's own domain (isAnimaCompatibleVAEModelConfig): an Anima-base
+    // (Wan/QwenImage) VAE, a FLUX VAE, or a 16-channel Wan VAE - all of which anima_l2i / anima_i2l
+    // accept. Recalling those from a workflow-built Anima image must not be rejected (reviews
+    // 4966712044, 4972570279).
+    assert(
+      isAnimaCompatibleVAEModelConfig(config, true),
+      'AnimaVAEModel requires a VAE the Anima model loader accepts'
+    );
+    const parsed = zModelIdentifierField.parse(config);
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaVAEModel handler only works with Anima models');
     return Promise.resolve(parsed);
@@ -2751,13 +2758,21 @@ const getModelIdentiferFromKey = async (key: string, store: AppStore): Promise<A
   return modelConfig;
 };
 
-const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelType): Promise<ModelIdentifierField> => {
+/**
+ * Resolve a metadata model reference to the installed model's *full* config. Handlers that must gate
+ * on more than base and type - e.g. a VAE's latent geometry - need the whole config; the identifier
+ * fields that actually get recalled into state are what `parseModelIdentifier` narrows this down to.
+ */
+const parseModelConfig = async (raw: unknown, store: AppStore, type: ModelType): Promise<AnyModelConfig> => {
   try {
     // First try the current format identifier: key, name, base, type, hash
     const { key } = zModelIdentifierField.parse(raw);
     const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, options));
     const modelConfig = await req.unwrap();
-    return zModelIdentifierField.parse(modelConfig);
+    // Discarded on purpose - the config is what we return; this only asserts it is identifiable, so a
+    // config that isn't still falls through to the lookups below.
+    zModelIdentifierField.parse(modelConfig);
+    return modelConfig;
   } catch {
     // We'll try hash-based lookup next
   }
@@ -2768,7 +2783,8 @@ const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelTy
     if (hash) {
       const req = store.dispatch(modelsApi.endpoints.getModelConfigByHash.initiate(hash, options));
       const modelConfig = await req.unwrap();
-      return zModelIdentifierField.parse(modelConfig);
+      zModelIdentifierField.parse(modelConfig);
+      return modelConfig;
     }
   } catch {
     // We'll try the old format identifier next
@@ -2780,7 +2796,12 @@ const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelTy
   const arg = { name: model_name, base: base_model, type };
   const req = store.dispatch(modelsApi.endpoints.getModelConfigByAttrs.initiate(arg, options));
   const modelConfig = await req.unwrap();
-  return zModelIdentifierField.parse(modelConfig);
+  zModelIdentifierField.parse(modelConfig);
+  return modelConfig;
+};
+
+const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelType): Promise<ModelIdentifierField> => {
+  return zModelIdentifierField.parse(await parseModelConfig(raw, store, type));
 };
 
 const isCompatibleWithMainModel = (candidate: ModelIdentifierField, store: AppStore) => {
