@@ -10,11 +10,13 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
+import { createVideoSourceClip } from '@features/video';
 import { MenuContent, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
+  ClapperboardIcon,
   AsteriskIcon,
   ChevronRightIcon,
   CopyIcon,
@@ -316,6 +318,27 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
+  const { generation, widgets } = useWorkbenchCommands();
+  const openWidget = useOpenWorkbenchWidget();
+  const handleExtendInVideo = useCallback(() => {
+    if (item.kind !== 'video') {
+      return;
+    }
+
+    openWidget('video', { preferredRegions: ['left'] });
+    // An initial video and a first frame are mutually exclusive in the panel.
+    widgets.patchValues('video', {
+      firstFrameImage: null,
+      sourceVideo: createVideoSourceClip({
+        durationSeconds: item.durationSeconds,
+        fps: item.fps,
+        height: item.height,
+        name: item.name,
+        width: item.width,
+      }),
+    });
+    generation.setSource('video');
+  }, [generation, item, openWidget, widgets]);
 
   return (
     <>
@@ -342,6 +365,14 @@ const SingleItemMenuItems = ({
         />
       </HStack>
       <Menu.Separator borderColor="border.subtle" />
+      {item.kind === 'video' ? (
+        <ContextMenuItem
+          icon={ClapperboardIcon}
+          label="Extend in Video"
+          value="extend-in-video"
+          onClick={handleExtendInVideo}
+        />
+      ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
           <ContextMenuItem
@@ -610,6 +641,15 @@ const SingleImageMenuItems = ({
     });
     generation.setSource('upscale');
   }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
+  const handleSendToVideo = useCallback(() => {
+    openWidget('video', { preferredRegions: ['left'] });
+    // The first frame and an initial video are mutually exclusive in the panel.
+    widgets.patchValues('video', {
+      firstFrameImage: { height: image.height, image_name: image.imageName, width: image.width },
+      sourceVideo: null,
+    });
+    generation.setSource('video');
+  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
 
   return (
     <>
@@ -668,6 +708,12 @@ const SingleImageMenuItems = ({
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
+      <ContextMenuItem
+        icon={ClapperboardIcon}
+        label="Send to Video"
+        value="send-to-video"
+        onClick={handleSendToVideo}
+      />
       <ContextMenuItem
         disabled={!actions.canUseAsReferenceImage}
         icon={ImageIcon}

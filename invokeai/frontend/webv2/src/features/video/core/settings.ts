@@ -116,25 +116,27 @@ export const VIDEO_UI_STATE_KEYS = {
   positivePromptHeightPx: true,
 } satisfies Partial<Record<keyof VideoSettings, true>>;
 
+// Model-agnostic fallbacks for healing partial records. They intentionally
+// mirror the Wan fallback in the capability matrix, which cannot be imported
+// here (videoPolicies imports this module); when a model is known, the
+// selection transition re-snaps them to its family anyway.
+const SETTINGS_FALLBACKS = {
+  aspectRatioId: '16:9',
+  cfgScale: 5,
+  fps: 16,
+  numFrames: 81,
+  steps: 40,
+  targetResolution: '720p',
+} as const;
+
 /**
- * Validate stored widget values and fill in fields that older persisted
- * projects predate. The core fields must be present and well-typed; newer
- * fields fall back to their defaults so old projects keep their prompts and
- * frame counts instead of being reset wholesale.
+ * Heals older/partial persisted values without silently clamping invalid user
+ * input, upscale-style: any record normalizes field-by-field (so a seeded
+ * partial write — e.g. "Send to Video" landing on a never-opened widget —
+ * keeps its payload), while range problems stay validation reasons.
  */
 export const normalizeVideoSettings = (values: unknown): VideoSettings | null => {
   if (!isRecord(values)) {
-    return null;
-  }
-
-  const isCoreShapeValid =
-    typeof values.modelKey === 'string' &&
-    typeof values.positivePrompt === 'string' &&
-    typeof values.negativePrompt === 'string' &&
-    typeof values.shouldRandomizeSeed === 'boolean' &&
-    ['numFrames', 'fps', 'steps', 'cfgScale', 'seed'].every((key) => hasFiniteNumber(values, key));
-
-  if (!isCoreShapeValid) {
     return null;
   }
 
@@ -151,20 +153,20 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     values.acceleratorEnabled === true && areAcceleratorLorasPresent(acceleratorLoraKeys, loras);
 
   return {
-    aspectRatioId: isVideoAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : '16:9',
+    aspectRatioId: isVideoAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : SETTINGS_FALLBACKS.aspectRatioId,
     batchCount: sanitizeBatchCount(values.batchCount),
-    cfgScale: values.cfgScale as number,
+    cfgScale: hasFiniteNumber(values, 'cfgScale') ? (values.cfgScale as number) : SETTINGS_FALLBACKS.cfgScale,
     cfgScaleLowNoise: hasFiniteNumber(values, 'cfgScaleLowNoise') ? (values.cfgScaleLowNoise as number) : null,
     firstFrameImage,
-    fps: values.fps as number,
+    fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
     h3TextEncoderModel: isModelIdentifierConfig(values.h3TextEncoderModel) ? values.h3TextEncoderModel : null,
     h3TransformerModel: isMainModelConfig(values.h3TransformerModel) ? values.h3TransformerModel : null,
     acceleratorEnabled,
     acceleratorLoraKeys: acceleratorEnabled ? acceleratorLoraKeys : [],
     lastFrameImage: isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
     loras,
-    modelKey: values.modelKey as string,
-    negativePrompt: values.negativePrompt as string,
+    modelKey: typeof values.modelKey === 'string' ? values.modelKey : '',
+    negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
     negativePromptEnabled: typeof values.negativePromptEnabled === 'boolean' ? values.negativePromptEnabled : true,
     negativePromptHeightPx: getClampedNumber(
       values,
@@ -173,8 +175,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
       MAX_NEGATIVE_PROMPT_HEIGHT_PX,
       DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX
     ),
-    numFrames: values.numFrames as number,
-    positivePrompt: values.positivePrompt as string,
+    numFrames: hasFiniteNumber(values, 'numFrames') ? (values.numFrames as number) : SETTINGS_FALLBACKS.numFrames,
+    positivePrompt: typeof values.positivePrompt === 'string' ? values.positivePrompt : '',
     positivePromptHeightPx: getClampedNumber(
       values,
       'positivePromptHeightPx',
@@ -182,11 +184,13 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
       MAX_POSITIVE_PROMPT_HEIGHT_PX,
       DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
     ),
-    seed: values.seed as number,
-    shouldRandomizeSeed: values.shouldRandomizeSeed as boolean,
+    seed: hasFiniteNumber(values, 'seed') ? (values.seed as number) : 0,
+    shouldRandomizeSeed: typeof values.shouldRandomizeSeed === 'boolean' ? values.shouldRandomizeSeed : true,
     sourceVideo,
-    steps: values.steps as number,
-    targetResolution: isVideoTargetResolution(values.targetResolution) ? values.targetResolution : '720p',
+    steps: hasFiniteNumber(values, 'steps') ? (values.steps as number) : SETTINGS_FALLBACKS.steps,
+    targetResolution: isVideoTargetResolution(values.targetResolution)
+      ? values.targetResolution
+      : SETTINGS_FALLBACKS.targetResolution,
     vae: isVaeModelConfig(values.vae) ? values.vae : null,
     wanLowNoiseModel: isMainModelConfig(values.wanLowNoiseModel) ? values.wanLowNoiseModel : null,
     wanT5EncoderModel: isModelIdentifierConfig(values.wanT5EncoderModel) ? values.wanT5EncoderModel : null,
