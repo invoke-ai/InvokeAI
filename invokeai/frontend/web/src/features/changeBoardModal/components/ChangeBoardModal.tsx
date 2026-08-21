@@ -162,6 +162,12 @@ const ChangeBoardModal = () => {
       dispatch(changeBoardReset());
       return;
     }
+    // Cleared before either reopen below. `selectedBoardId` is component state that the accept
+    // does not reset, and `options` drops whichever board is currently being viewed — so move a
+    // large selection to B, click into B to watch it arrive, and the dialog reopens showing the
+    // "select a board" placeholder while still armed for B. Move would then send the retry to a
+    // target the dialog is not showing. What the combobox displays has to be what Move uses.
+    setSelectedBoardId(null);
     // At most one of these fires: the two selections are mutually exclusive by construction —
     // imagesToChangeSelected clears video_names and videosToChangeSelected clears image_names,
     // and every caller opens this dialog through one of them. Reopen the dialog so retained

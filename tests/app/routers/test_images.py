@@ -351,7 +351,8 @@ def test_delete_skips_names_deleted_mid_batch(
 
     Parametrized over both raise sites because the race window spans them: the loop reads the
     DTO for its board id and only then deletes, and ImageService.delete re-reads the record, so
-    a name can vanish after the first read succeeds.
+    a name can vanish after the first read succeeds. The two sites answer differently on
+    purpose, and the difference is what this asserts — see the branch below.
     """
     images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
 
@@ -359,7 +360,9 @@ def test_delete_skips_names_deleted_mid_batch(
         if image_name == "vanished.png" and raise_from == "get_dto":
             raise ImageRecordNotFoundException
         dto = MagicMock()
-        dto.board_id = "board-1"
+        # Distinct boards on purpose: sharing one would let the surviving image supply the
+        # vanished one's board, and the assertion below could not tell whether it was reported.
+        dto.board_id = "board-2" if image_name == "vanished.png" else "board-1"
         return dto
 
     def delete(image_name: str) -> None:
@@ -373,9 +376,41 @@ def test_delete_skips_names_deleted_mid_batch(
 
     assert response.status_code == 200
     body = response.json()
-    # A concurrent delete satisfies the requested postcondition and must reach the client cleanup
-    # path as a confirmed deletion. The response order is intentionally unspecified.
-    assert set(body["deleted_images"]) == {"ok.png", "vanished.png"}
+    assert body["failed_images"] == []
+    if raise_from == "delete":
+        # Read a line earlier, so the record verifiably existed and a concurrent session removed
+        # it: the requested postcondition holds and must reach the client cleanup path as a
+        # confirmed deletion. Order is intentionally unspecified — the route accumulates a set.
+        assert set(body["deleted_images"]) == {"ok.png", "vanished.png"}
+        # Reported with its board. Every board-scoped tag getDeleteImagesTags publishes comes
+        # from affected_boards, and it ignores deleted_images by design, so dropping the board
+        # here leaves its counts stale while the name is reported gone.
+        assert set(body["affected_boards"]) == {"board-1", "board-2"}
+    else:
+        # The read itself failed, so nothing established the record ever existed. That matters
+        # because assert_image_owner returns immediately for an admin — the default single-user
+        # identity — without touching storage, so a name that never existed reaches this path.
+        # Reporting it deleted would answer for something the caller never had.
+        assert body["deleted_images"] == ["ok.png"]
+        assert set(body["affected_boards"]) == {"board-1"}
+
+
+def test_delete_does_not_report_a_name_that_never_existed(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """The admin path specifically: the ownership check is a no-op that proves nothing."""
+    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+
+    def get_dto(image_name: str) -> MagicMock:
+        raise ImageRecordNotFoundException
+
+    images_service.get_dto.side_effect = get_dto
+
+    response = client.post("/api/v1/images/delete", json={"image_names": ["never-existed.png"]})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted_images"] == []
     assert body["failed_images"] == []
 
 

@@ -90,6 +90,29 @@ describe('ChangeBoardModal', () => {
     expect(source).toMatch(/videosToChangeSelected\(failedVideoNames\)\);\s*dispatch\(isModalOpenChanged\(true\)\);/);
   });
 
+  it('reopens only on the far side of the guard', () => {
+    // Adjacency alone does not place them: a reopen moved above `canRetainFailedSelection` keeps
+    // both patterns above intact while popping the dialog open on a selection that may belong to
+    // someone else, seeded with the previous session's names. Neither reopen may precede it.
+    const guard = source.indexOf('canRetainFailedSelection(');
+    const firstReopen = source.indexOf('isModalOpenChanged(true)');
+
+    expect(guard).toBeGreaterThan(-1);
+    expect(firstReopen).toBeGreaterThan(-1);
+    expect(firstReopen).toBeGreaterThan(guard);
+  });
+
+  it('does not carry a hidden board target into the reopened dialog', () => {
+    // `selectedBoardId` is component state the accept does not reset, and `options` drops the
+    // board being viewed — so a reopen can show the placeholder while still armed for the old
+    // target. Cleared before either reopen so the combobox and Move agree.
+    const clear = source.indexOf('setSelectedBoardId(null)');
+    const firstReopen = source.indexOf('isModalOpenChanged(true)');
+
+    expect(clear).toBeGreaterThan(-1);
+    expect(clear).toBeLessThan(firstReopen);
+  });
+
   it('captures the operation id before awaiting the move, not after it', () => {
     // The whole ownership check rests on this ordering. Read after the await, the id is
     // whatever the slice holds once every newer selection has already come and gone, so the

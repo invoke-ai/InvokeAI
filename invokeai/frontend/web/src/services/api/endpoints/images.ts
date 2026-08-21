@@ -109,6 +109,20 @@ const fetchChunk = async (
     return { error: AUTH_CHANGED_ERROR };
   }
   const response = await baseQuery(args);
+  // The check after the response covers *successful* responses only, because a payload is the
+  // one thing a session that has moved on must not consume. An error carries nothing to
+  // consume, and rewriting it loses what it was — which matters most for the case that reaches
+  // here most often. `dynamicBaseQuery` dispatches `sessionExpiredLogout` on a 401 *before* it
+  // returns, and that reducer clears `auth_token` synchronously, so the token is already gone
+  // by the time this runs: every expired-session 401 would come back as an abort. That is not
+  // a distinction without a difference. An abort is deliberately fatal to the whole run, while
+  // an ordinary chunk failure takes the partial-success path — the one that reports what did
+  // land, so `handleDeletions` can strip committed deletions out of the canvas, nodes and
+  // reference images. Those slices are persisted and have no `sessionExpiredLogout` handler at
+  // all, so a run aborted here leaves them pointing at deleted images across the next login.
+  if (response.error) {
+    return response;
+  }
   return isSameAuthContext(authContext) ? response : { error: AUTH_CHANGED_ERROR };
 };
 
@@ -453,10 +467,14 @@ export const imageDTOsByNamesQueryFn = async (
       return { error: response.error };
     }
     const chunkDTOs = response.data as ImageDTO[];
-    // `fetchChunk` checked the context after the response, so these DTOs still belong to the
-    // session that owns the current cache. A changed session returned above as an error instead
-    // of leaking stale data through this mutation's fulfilled result.
-    upsertImageDTOs(dispatch, chunkDTOs);
+    // Re-checked here as well as inside `fetchChunk`, and not folded into it: `fetchChunk` is
+    // async, so resuming from it is a microtask hop, and a logout that lands in that hop passes
+    // its check and still clears the cache before this line. Only a check with no await between
+    // it and the write closes that. Publishing then would seed one user's cache with another's
+    // images, into a store the logout listener has just reset.
+    if (isSameAuthContext(authContext)) {
+      upsertImageDTOs(dispatch, chunkDTOs);
+    }
     imageDTOs.push(...chunkDTOs);
   }
   return { data: imageDTOs };

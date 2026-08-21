@@ -168,6 +168,24 @@ describe('reportImageBatchOutcome', () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
+  it('does not report a rejection from a session that ended while it was pending', async () => {
+    // The branch the session change actually takes: an auth-changed abort comes back as an
+    // error, so `queryFulfilled` rejects. Guarding only the fulfilled branch would leave the
+    // previous user's whole selection toasted at whoever holds the tab next.
+    login('user-a');
+    let rejectQuery: (reason: unknown) => void = () => {};
+    const queryFulfilled = new Promise<{ data: { failed_images: string[] } }>((_resolve, reject) => {
+      rejectQuery = reject;
+    });
+
+    const outcome = reportImageBatchOutcome({ image_names: names(3) }, { queryFulfilled });
+    switchUser('user-b');
+    rejectQuery(new Error('aborted'));
+    await outcome;
+
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it('is wired into every chunked batch mutation', () => {
     // RTK exposes no way to reach an endpoint's `onQueryStarted` at runtime -- the built
     // endpoint object carries only initiate/select/match*/hooks -- so the wiring is guarded at
@@ -311,6 +329,56 @@ describe('buildChunkedImageBatchQueryFn', () => {
     });
     expect(baseQuery).toHaveBeenCalledTimes(2);
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('discards a response that arrived after the session changed', async () => {
+    // A single-chunk run, so there is no following chunk whose pre-request check could catch
+    // this: the response itself came back into a session that is no longer the one that asked
+    // for it. Without the check after the response, its payload is returned and applied.
+    login('user-a');
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      switchUser('user-b');
+      return Promise.resolve({ data: { added_images: ['a.png'], failed_images: [], affected_boards: ['board-1'] } });
+    });
+
+    const { dispatch, result } = run(baseQuery, { image_names: names(5) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(await result).toEqual({ error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('Aborted') } });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('reports an expired session as the failure it is, not as an abort', async () => {
+    // `dynamicBaseQuery` dispatches `sessionExpiredLogout` on a 401 before it returns, and that
+    // clears the token synchronously — so by the time the post-response check runs the session
+    // has "changed" for every 401 there is. Rewriting those as aborts would make the ordinary
+    // expired-session case fatal to the whole run, skipping the partial-success path that
+    // reports what the server already committed.
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        localStorage.removeItem('auth_token');
+        return Promise.resolve({ error: { status: 401, data: 'expired' } });
+      }
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
+    });
+
+    const { dispatch, result } = run(baseQuery, { image_names: names(2500) });
+
+    // Chunk 1 committed, so this is a partial success and its unreached names are reported --
+    // the same shape a mid-run 500 produces, which is what lets `handleDeletions` prune.
+    expect(await result).toEqual({
+      data: {
+        added_images: ['chunk-1.png'],
+        failed_images: names(2500).slice(1000),
+        affected_boards: ['board-1'],
+      },
+    });
+    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags(getTags()));
   });
 
   it('keeps running when a login request elsewhere bumps the auth generation', async () => {
@@ -471,20 +539,25 @@ describe('bulkDownloadQueryFn', () => {
   });
 
   it('stops scheduling zips when the session changes mid-run', async () => {
+    // Switched on the *second* call, so a zip is already scheduled and `first` is set. Switching
+    // on the first leaves `first` undefined, which makes returning it indistinguishable from
+    // returning nothing -- and returning it is exactly what must not happen.
     login('user-a');
     let call = 0;
     const baseQuery = vi.fn((_args: Request): Promise<Response> => {
       call += 1;
-      switchUser('user-b');
+      if (call === 2) {
+        switchUser('user-b');
+      }
       return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
     });
 
     const result = await run(baseQuery, { image_names: names(2500) });
 
-    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(baseQuery).toHaveBeenCalledTimes(2);
+    // Not `item-1.zip`: that zip belongs to the previous session. Do not expose its item name or
+    // toast the new session about work it did not request.
     expect(result).toEqual({ data: undefined });
-    // The first response belongs to the previous session. Do not expose its item name or toast
-    // the new session about work it did not request.
     expect(toast).not.toHaveBeenCalled();
     expect(i18n.t).not.toHaveBeenCalled();
   });
@@ -545,6 +618,16 @@ describe('imageDTOsByNamesQueryFn', () => {
     };
     expect(action.type).toBe(imagesApi.util.upsertQueryEntries([]).type);
     expect(action.payload.map((entry) => entry.value.image_name)).toEqual(names(1000));
+  });
+
+  it('checks the session with nothing between the check and the publish', () => {
+    // Asserted structurally rather than by counting microtasks, which would break on any change
+    // to the async shape rather than on the property. `fetchChunk` already checks the context
+    // after the response, but resuming from it is a hop, and a logout landing in that hop passes
+    // its check and still clears the cache before the upsert runs. Only a check with no await
+    // between it and the write closes the window, so the write has to sit inside one.
+    const source = readFileSync(fileURLToPath(new URL('./images.ts', import.meta.url)), 'utf8');
+    expect(source).toMatch(/if \(isSameAuthContext\(authContext\)\) \{\s*upsertImageDTOs\(dispatch, chunkDTOs\);\s*\}/);
   });
 
   it('does not publish a chunk that came back after the session changed', async () => {

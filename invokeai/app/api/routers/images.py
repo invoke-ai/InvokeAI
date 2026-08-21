@@ -542,6 +542,13 @@ def delete_images_from_list(
         # be processed twice, and the second pass's not-found error would land the same
         # name in both deleted_images and failed_images.
         for image_name in dict.fromkeys(image_names):
+            # Bound only once the record has been read, which is what separates the two ways
+            # this loop can raise ImageRecordNotFoundException. Still None means the read itself
+            # failed, so nothing here ever established that the record existed — for an admin
+            # the ownership check is a no-op returning before it touches storage, so a name that
+            # never existed reaches that raise. Set means the record was read a line earlier and
+            # only the delete lost the race.
+            board_id: str | None = None
             try:
                 _assert_image_owner(image_name, current_user)
                 image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
@@ -552,10 +559,19 @@ def delete_images_from_list(
             except HTTPException:
                 continue
             except ImageRecordNotFoundException:
+                if board_id is None:
+                    # Never read, so there is no postcondition the caller asked for and nothing
+                    # for the client to clean up. A skip, as before.
+                    continue
                 # The record is already gone — a concurrent session deleted it after this
-                # iteration's ownership check passed. The caller asked for it to be gone and it
-                # is, so report the idempotently satisfied postcondition. The client uses
-                # deleted_images to remove stale selections and references.
+                # iteration read it. The caller asked for it to be gone and it is, so report the
+                # idempotently satisfied postcondition. The client uses deleted_images to remove
+                # stale selections and references. The board is reported with it: every
+                # board-scoped tag getDeleteImagesTags publishes comes from affected_boards, and
+                # it ignores deleted_images by design, so omitting it leaves the board's counts
+                # stale while the name is reported gone.
+                deleted_images.add(image_name)
+                affected_boards.add(board_id)
                 #
                 # Deliberately unlike remove_images_from_board, which skips the same race. Two
                 # reasons it cannot copy this. Its result list feeds
@@ -563,14 +579,12 @@ def delete_images_from_list(
                 # getImageDTO for a record that no longer exists and drive a 404 refetch —
                 # getDeleteImagesTags ignores deleted_images precisely to avoid that. And it
                 # reads the DTO *before* any authorization check, so reporting a 404 as success
-                # would answer for names the caller was never entitled to touch. Here the
-                # ownership check has already passed by the time this can be raised.
+                # would answer for names the caller was never entitled to touch.
                 #
                 # This is narrow only because image_records.get() no longer translates a
                 # sqlite3.Error into this exception — see the comment there. If that
                 # translation ever comes back, a locked or corrupt database would land here
                 # and a whole failed batch would answer 200 with empty result lists.
-                deleted_images.add(image_name)
             except Exception:
                 # A genuine deletion failure (not an auth/404 skip) — report it so the
                 # client can surface a partial-failure warning, matching the video path.
