@@ -557,6 +557,15 @@ def delete_images_from_list(
                 # is, so report the idempotently satisfied postcondition. The client uses
                 # deleted_images to remove stale selections and references.
                 #
+                # Deliberately unlike remove_images_from_board, which skips the same race. Two
+                # reasons it cannot copy this. Its result list feeds
+                # getTagsToInvalidateForImageMutation, so a vanished name there would invalidate
+                # getImageDTO for a record that no longer exists and drive a 404 refetch —
+                # getDeleteImagesTags ignores deleted_images precisely to avoid that. And it
+                # reads the DTO *before* any authorization check, so reporting a 404 as success
+                # would answer for names the caller was never entitled to touch. Here the
+                # ownership check has already passed by the time this can be raised.
+                #
                 # This is narrow only because image_records.get() no longer translates a
                 # sqlite3.Error into this exception — see the comment there. If that
                 # translation ever comes back, a locked or corrupt database would land here

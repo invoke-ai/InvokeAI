@@ -74,13 +74,20 @@ describe('ChangeBoardModal', () => {
 
   it('keeps the images that did not move selected', () => {
     expect(source).toContain('imagesToChangeSelected(failedImageNames)');
-    expect(source).toMatch(/imagesToChangeSelected\(failedImageNames\)[\s\S]*isModalOpenChanged\(true\)/);
     // A rejected request moved nothing at all, so the whole request stays selected.
     expect(source).toContain('.catch(() => imagesToChange)');
   });
 
-  it('reopens with failed videos selected for retry', () => {
-    expect(source).toMatch(/videosToChangeSelected\(failedVideoNames\)[\s\S]*isModalOpenChanged\(true\)/);
+  // Both reopens are matched adjacently rather than through an unbounded `[\s\S]*`. This file
+  // holds two of them, so a gap-matching pattern is satisfied by the *other* one further down:
+  // deleting the image reopen leaves such an assertion green, which is the half that matters
+  // most here, image batches being the subject of these routes.
+  it('reopens with the failed images selected for retry', () => {
+    expect(source).toMatch(/imagesToChangeSelected\(failedImageNames\)\);\s*dispatch\(isModalOpenChanged\(true\)\);/);
+  });
+
+  it('reopens with the failed videos selected for retry', () => {
+    expect(source).toMatch(/videosToChangeSelected\(failedVideoNames\)\);\s*dispatch\(isModalOpenChanged\(true\)\);/);
   });
 
   it('captures the operation id before awaiting the move, not after it', () => {
