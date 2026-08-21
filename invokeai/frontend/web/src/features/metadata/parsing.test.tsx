@@ -607,6 +607,48 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       expect(parsed.base).toBe('flux');
     });
 
+    it('parses a FLUX main-model VAE submodel from Anima metadata', async () => {
+      currentBase = 'anima';
+      const fluxMainWithVae = fakeModel('main', 'flux', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = fluxMainWithVae;
+      const rawVae = { ...fluxMainWithVae, submodel_type: 'vae' };
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.AnimaVAEModel.parse({ model: fakeMain('anima'), vae: rawVae }, store);
+
+      expect(parsed.type).toBe('main');
+      expect(parsed.submodel_type).toBe('vae');
+      expect(parsed.base).toBe('flux');
+    });
+
+    it('normalizes a FLUX main-model VAE submodel without subtype metadata', async () => {
+      currentBase = 'anima';
+      const fluxMainWithVae = fakeModel('main', 'flux', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = fluxMainWithVae;
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.AnimaVAEModel.parse(
+        { model: fakeMain('anima'), vae: fluxMainWithVae },
+        store
+      );
+
+      expect(parsed.type).toBe('main');
+      expect(parsed.submodel_type).toBe('vae');
+      expect(parsed.base).toBe('flux');
+    });
+
+    it('rejects a FLUX main-model submodel without VAE provenance', async () => {
+      currentBase = 'anima';
+      const fluxMainWithVae = fakeModel('main', 'flux', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = fluxMainWithVae;
+      const rawVae = { ...fluxMainWithVae, submodel_type: 'text_encoder' };
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.AnimaVAEModel.parse({ model: fakeMain('anima'), vae: rawVae }, store)
+      ).rejects.toThrow();
+    });
+
     it.each(['qwen-image', 'flux2', 'sdxl'])('rejects a %s VAE from Anima metadata', async (vaeBase) => {
       currentBase = 'anima';
       nextResolved = fakeModel('vae', vaeBase);

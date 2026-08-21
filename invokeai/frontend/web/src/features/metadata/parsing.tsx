@@ -1863,18 +1863,32 @@ const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     // the Anima slot.
     assertMetadataModelBase(metadata, 'anima', 'AnimaVAEModel');
     const raw = getProperty(metadata, 'vae');
+    const rawIdentifier = zModelIdentifierField.safeParse(raw).data;
     // Gate on the full config, not just its base: the Anima-compatible set is defined by the backend's
     // latent geometry, which for Wan VAEs lives in `latent_channels` and is lost in the identifier.
     const config = await parseModelConfig(raw, store, 'vae');
+    const isMainVaeSubmodel =
+      config.type === 'main' &&
+      rawIdentifier?.type === 'main' &&
+      (rawIdentifier.submodel_type === null ||
+        rawIdentifier.submodel_type === undefined ||
+        rawIdentifier.submodel_type === 'vae');
+    assert(
+      config.type !== 'main' || isMainVaeSubmodel,
+      'AnimaVAEModel requires a VAE model or a main model VAE submodel'
+    );
     // Defers to the Anima VAE picker's own domain (isAnimaCompatibleVAEModelConfig): an Anima-base
     // (Wan/QwenImage) VAE, a FLUX VAE, or a 16-channel Wan VAE - all of which anima_l2i / anima_i2l
     // accept. Recalling those from a workflow-built Anima image must not be rejected (reviews
     // 4966712044, 4972570279).
     assert(
-      isAnimaCompatibleVAEModelConfig(config, true),
+      isAnimaCompatibleVAEModelConfig(config, !isMainVaeSubmodel),
       'AnimaVAEModel requires a VAE the Anima model loader accepts'
     );
-    const parsed = zModelIdentifierField.parse(config);
+    const parsed = zModelIdentifierField.parse({
+      ...config,
+      ...(isMainVaeSubmodel ? { submodel_type: 'vae' } : {}),
+    });
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaVAEModel handler only works with Anima models');
     return Promise.resolve(parsed);
