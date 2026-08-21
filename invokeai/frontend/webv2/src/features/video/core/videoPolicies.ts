@@ -798,6 +798,65 @@ const getVideoComponentPolicyContext = (
 });
 
 // ---------------------------------------------------------------------------
+// Wan A14B expert-wiring advisories
+
+export type WanExpertWiringWarning =
+  | { kind: 'swapped' }
+  | { kind: 'high-as-low' }
+  | { kind: 'low-as-main' }
+  | { kind: 'single-low' }
+  | null;
+
+const getWanExpertTag = (model: MainModelConfig | null): 'high' | 'low' | 'none' => {
+  const expert = (model as Record<string, unknown> | null)?.expert;
+
+  return expert === 'high' || expert === 'low' ? expert : 'none';
+};
+
+/**
+ * Advisory only — mirrors wan_model_loader's stance that explicit wiring is
+ * authoritative and the expert tag is a filename heuristic ('none' is common
+ * on community finetunes, and deliberate cross-wiring must stay expressible).
+ * The panel surfaces this as a badge with a one-click swap; nothing blocks.
+ */
+export const getWanExpertWiringWarning = (
+  model: MainModelConfig | null,
+  wanLowNoiseModel: MainModelConfig | null
+): WanExpertWiringWarning => {
+  // Only single-file A14B mains run the explicit high/low wiring.
+  if (!model || model.base !== 'wan' || model.format === 'diffusers') {
+    return null;
+  }
+
+  const config = getVideoConfig(model);
+
+  if (!config.cfg.lowNoiseVisible) {
+    return null;
+  }
+
+  const mainTag = getWanExpertTag(model);
+  const lowTag = getWanExpertTag(wanLowNoiseModel);
+
+  if (wanLowNoiseModel) {
+    if (mainTag === 'low' && lowTag === 'high') {
+      return { kind: 'swapped' };
+    }
+    if (lowTag === 'high') {
+      return { kind: 'high-as-low' };
+    }
+    if (mainTag === 'low') {
+      return { kind: 'low-as-main' };
+    }
+
+    return null;
+  }
+
+  // Single expert running the whole schedule: fine for an untagged or
+  // high-tagged file, but a low-tagged one is usually the wrong single pick.
+  return mainTag === 'low' ? { kind: 'single-low' } : null;
+};
+
+// ---------------------------------------------------------------------------
 // Defaults & model-selection transitions
 
 export const getDefaultVideoSettings = (

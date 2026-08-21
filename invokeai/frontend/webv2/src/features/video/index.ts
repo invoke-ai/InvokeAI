@@ -58,6 +58,7 @@ export {
   getVideoModelPolicy,
   getVideoModelSelectionResult,
   getVideoTargetResolutionOptions,
+  getWanExpertWiringWarning,
   getVideoModes,
   getVideoPromptPolicy,
   getVideoSettingsWithModelDefaults,
@@ -81,6 +82,7 @@ export {
   type VideoModelPolicy,
   type VideoModelSelectionResult,
   type VideoTargetResolutionOption,
+  type WanExpertWiringWarning,
 } from './core/videoPolicies';
 export { compileVideoGraph, type CompiledVideoGraph } from './core/graph';
 export {

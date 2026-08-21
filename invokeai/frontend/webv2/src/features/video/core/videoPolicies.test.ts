@@ -17,6 +17,7 @@ import {
   getVideoModes,
   getVideoPromptPolicy,
   getVideoValidationReasons,
+  getWanExpertWiringWarning,
   isSupportedVideoModel,
   isValidVideoNumFrames,
   snapVideoNumFrames,
@@ -546,6 +547,36 @@ describe('component section policy', () => {
 
     expect(transformerSlot?.filter?.(h3Model('checkpoint'), ctx)).toBe(true);
     expect(transformerSlot?.filter?.(h3Model('diffusers'), ctx)).toBe(false);
+  });
+});
+
+describe('getWanExpertWiringWarning', () => {
+  const tagged = (variant: string, expert: 'high' | 'low' | 'none', key: string): MainModelConfig => ({
+    ...wanModel(variant, 'gguf_quantized', key),
+    expert,
+  });
+
+  it('flags swapped, mislabeled, and single-low wirings on single-file A14B mains', () => {
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'low', 'm'), tagged('i2v_a14b', 'high', 'l'))).toEqual({
+      kind: 'swapped',
+    });
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'none', 'm'), tagged('i2v_a14b', 'high', 'l'))).toEqual({
+      kind: 'high-as-low',
+    });
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'low', 'm'), tagged('i2v_a14b', 'none', 'l'))).toEqual({
+      kind: 'low-as-main',
+    });
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'low', 'm'), null)).toEqual({ kind: 'single-low' });
+  });
+
+  it('stays silent for correct, untagged, Diffusers, TI2V-5B, and non-Wan wirings', () => {
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'high', 'm'), tagged('i2v_a14b', 'low', 'l'))).toBeNull();
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'none', 'm'), tagged('i2v_a14b', 'none', 'l'))).toBeNull();
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'high', 'm'), null)).toBeNull();
+    expect(getWanExpertWiringWarning(wanModel('i2v_a14b', 'diffusers'), null)).toBeNull();
+    expect(getWanExpertWiringWarning(tagged('ti2v_5b', 'low', 'm'), null)).toBeNull();
+    expect(getWanExpertWiringWarning(h3Model(), null)).toBeNull();
+    expect(getWanExpertWiringWarning(null, null)).toBeNull();
   });
 });
 
