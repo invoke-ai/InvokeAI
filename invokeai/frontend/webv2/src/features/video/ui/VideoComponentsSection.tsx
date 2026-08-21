@@ -100,9 +100,9 @@ const ComponentSlotRow = memo(function ComponentSlotRow({
 // Spelled out rather than interpolated, so the translation-key scan can see
 // them and fail the build if a string goes missing.
 const EXPERT_WIRING_MESSAGE_KEYS = {
-  'high-as-low': 'widgets.video.expertWiring.high-as-low',
-  'low-as-main': 'widgets.video.expertWiring.low-as-main',
-  'single-low': 'widgets.video.expertWiring.single-low',
+  'high-as-low': 'widgets.video.expertWiring.highAsLow',
+  'low-as-main': 'widgets.video.expertWiring.lowAsMain',
+  'single-low': 'widgets.video.expertWiring.singleLow',
   swapped: 'widgets.video.expertWiring.swapped',
 } as const;
 
@@ -115,10 +115,20 @@ const WanExpertWiringNotice = memo(function WanExpertWiringNotice({
 }) {
   const { t } = useTranslation();
   const models = useModelsSelector((snapshot) => snapshot.models);
+  // A selection transition computed against an unloaded catalog would judge
+  // the Lightning pair "not installed" and silently strip the accelerator.
+  const modelsLoaded = useModelsSelector((snapshot) => snapshot.status) === 'loaded';
   const warning = useMemo(
     () => getWanExpertWiringWarning(values.model, values.wanLowNoiseModel),
     [values.model, values.wanLowNoiseModel]
   );
+  // Only offer the swap when exchanging roles actually clears the warning: a
+  // high+high or low+low pair would just re-warn about the other file.
+  const swapResolves =
+    warning !== null &&
+    warning.kind !== 'single-low' &&
+    values.wanLowNoiseModel?.format !== 'diffusers' &&
+    getWanExpertWiringWarning(values.wanLowNoiseModel, values.model) === null;
   const swapExperts = useCallback(() => {
     const previousMain = values.model;
     const nextMain = values.wanLowNoiseModel;
@@ -148,7 +158,7 @@ const WanExpertWiringNotice = memo(function WanExpertWiringNotice({
       <Text color="fg.warning" flex="1" fontSize="2xs" textWrap="pretty">
         {message}
       </Text>
-      {warning.kind !== 'single-low' ? (
+      {swapResolves && modelsLoaded ? (
         <Button flexShrink="0" size="2xs" variant="outline" onClick={swapExperts}>
           {t('widgets.video.expertWiring.swap')}
         </Button>

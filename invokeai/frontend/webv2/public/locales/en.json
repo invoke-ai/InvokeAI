@@ -3055,9 +3055,9 @@
       "acceleratorBrokenDescription": "One of its LoRAs was removed or disabled, so steps and CFG were restored to the model's defaults.",
       "resetAllToModelDefaults": "Reset all settings to the model's defaults",
       "expertWiring": {
-        "high-as-low": "\"{{lowName}}\" is tagged as the high-noise expert but is wired as the low-noise one. The wiring is authoritative — swap if unintended.",
-        "low-as-main": "\"{{mainName}}\" is tagged as the low-noise expert but is wired as the main (high-noise) transformer. The wiring is authoritative — swap if unintended.",
-        "single-low": "\"{{mainName}}\" is tagged as the low-noise expert. When running a single expert, the high-noise one is usually the better choice.",
+        "highAsLow": "\"{{lowName}}\" is tagged as the high-noise expert but is wired as the low-noise one. The wiring is authoritative — swap if unintended.",
+        "lowAsMain": "\"{{mainName}}\" is tagged as the low-noise expert but is wired as the main (high-noise) transformer. The wiring is authoritative — swap if unintended.",
+        "singleLow": "\"{{mainName}}\" is tagged as the low-noise expert. When running a single expert, the high-noise one is usually the better choice.",
         "swap": "Swap experts",
         "swapped": "The filename tags suggest these two experts are swapped. The wiring is authoritative — swap if unintended."
       }

@@ -569,6 +569,22 @@ describe('getWanExpertWiringWarning', () => {
     expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'low', 'm'), null)).toEqual({ kind: 'single-low' });
   });
 
+  it('keeps warning after a role exchange of a same-tag pair, so no swap is offered', () => {
+    // high+high and low+low pairs re-warn with roles exchanged — the UI uses
+    // this simulation to withhold the Swap button rather than loop.
+    const highPair = [tagged('i2v_a14b', 'high', 'm'), tagged('i2v_a14b', 'high', 'l')] as const;
+    const lowPair = [tagged('i2v_a14b', 'low', 'm'), tagged('i2v_a14b', 'low', 'l')] as const;
+
+    expect(getWanExpertWiringWarning(highPair[0], highPair[1])).toEqual({ kind: 'high-as-low' });
+    expect(getWanExpertWiringWarning(highPair[1], highPair[0])).toEqual({ kind: 'high-as-low' });
+    expect(getWanExpertWiringWarning(lowPair[0], lowPair[1])).toEqual({ kind: 'low-as-main' });
+    expect(getWanExpertWiringWarning(lowPair[1], lowPair[0])).toEqual({ kind: 'low-as-main' });
+    // Every swappable kind resolves when roles are exchanged.
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'high', 'l'), tagged('i2v_a14b', 'low', 'm'))).toBeNull();
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'high', 'l'), tagged('i2v_a14b', 'none', 'm'))).toBeNull();
+    expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'none', 'l'), tagged('i2v_a14b', 'low', 'm'))).toBeNull();
+  });
+
   it('stays silent for correct, untagged, Diffusers, TI2V-5B, and non-Wan wirings', () => {
     expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'high', 'm'), tagged('i2v_a14b', 'low', 'l'))).toBeNull();
     expect(getWanExpertWiringWarning(tagged('i2v_a14b', 'none', 'm'), tagged('i2v_a14b', 'none', 'l'))).toBeNull();
