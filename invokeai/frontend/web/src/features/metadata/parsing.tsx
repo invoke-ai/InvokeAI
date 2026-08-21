@@ -154,7 +154,13 @@ import { useTranslation } from 'react-i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
-import { isAnimaCompatibleVAEModelConfig, isFlux1VAEModelConfig, isFlux2VAEModelConfig } from 'services/api/types';
+import {
+  isAnimaCompatibleVAEModelConfig,
+  isAnimaQwen3EncoderModelConfig,
+  isFlux1VAEModelConfig,
+  isFlux2VAEModelConfig,
+  isQwen3EncoderModelConfig,
+} from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -1576,12 +1582,18 @@ const ZImageQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     // Check provenance: `qwen3_encoder` is also written by Anima and FLUX.2 Klein, and this handler
     // clears `zImageQwen3SourceModel` on recall (review 4966712044).
     assertMetadataModelBase(metadata, 'z-image', 'ZImageQwen3EncoderModel');
-    const raw = getProperty(metadata, 'qwen3_encoder');
-    const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
-    assert(parsed.type === 'qwen3_encoder');
-    // `qwen3_encoder` is a shared field: Z-Image, Anima and FLUX.2 Klein all write it, each into a
-    // different slot. The encoder itself cannot disambiguate them (Klein and Z-Image encoders both
-    // satisfy isQwen3EncoderModelConfig), so gate on the currently selected base instead.
+    // The picker's domain (`useQwen3EncoderModels`): the 4B/8B encoders, i.e. everything except Anima's
+    // 0.6B, whose 1024-wide embeddings Z-Image cannot consume. That split lives in `variant`, so the
+    // full config is needed - the identifier alone cannot tell the two apart.
+    const parsed = await parseModelIdentifierMatching({
+      raw: getProperty(metadata, 'qwen3_encoder'),
+      store,
+      type: 'qwen3_encoder',
+      isCompatible: isQwen3EncoderModelConfig,
+      handlerType: 'ZImageQwen3EncoderModel',
+    });
+    // Klein and Z-Image encoders both satisfy isQwen3EncoderModelConfig, so the variant cannot separate
+    // those two - the currently selected base does.
     const base = selectBase(store.getState());
     assert(base === 'z-image', 'ZImageQwen3EncoderModel handler only works with Z-Image models');
     return Promise.resolve(parsed);
@@ -1904,12 +1916,17 @@ const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
   parse: async (metadata, store) => {
     // Check provenance: `qwen3_encoder` is also written by Z-Image and FLUX.2 Klein.
     assertMetadataModelBase(metadata, 'anima', 'AnimaQwen3EncoderModel');
-    const raw = getProperty(metadata, 'qwen3_encoder');
-    const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
-    assert(parsed.type === 'qwen3_encoder');
-    // Deliberately no `parsed.base` assert: Anima encoders are identified by `variant` (qwen3_06b), not
-    // by base - see isAnimaQwen3EncoderModelConfig. The provenance check above already guarantees the
-    // value came out of buildAnimaGraph, i.e. out of selectAnimaQwen3EncoderModels.
+    // Deliberately no `base` assert - Anima encoders are identified by `variant`, not by base - but the
+    // variant itself must be checked, which needs the full config: Anima's text encoder produces
+    // 1024-wide embeddings, and a 4B (2560) or 8B (4096) encoder recalled into this slot fails the next
+    // generation. This is the picker's own domain (`useAnimaQwen3EncoderModels`).
+    const parsed = await parseModelIdentifierMatching({
+      raw: getProperty(metadata, 'qwen3_encoder'),
+      store,
+      type: 'qwen3_encoder',
+      isCompatible: isAnimaQwen3EncoderModelConfig,
+      handlerType: 'AnimaQwen3EncoderModel',
+    });
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaQwen3EncoderModel handler only works with Anima models');
     return Promise.resolve(parsed);
@@ -1969,9 +1986,14 @@ const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     // so provenance decides, not just the field being present. FLUX.2 [dev] never writes it, so one
     // flux2 check covers both variants.
     assertMetadataModelBase(metadata, 'flux2', 'KleinQwen3EncoderModel');
-    const raw = getProperty(metadata, 'qwen3_encoder');
-    const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
-    assert(parsed.type === 'qwen3_encoder');
+    // Same domain as the picker (`useQwen3EncoderModels`) - Klein 4B/9B, never Anima's 0.6B.
+    const parsed = await parseModelIdentifierMatching({
+      raw: getProperty(metadata, 'qwen3_encoder'),
+      store,
+      type: 'qwen3_encoder',
+      isCompatible: isQwen3EncoderModelConfig,
+      handlerType: 'KleinQwen3EncoderModel',
+    });
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'KleinQwen3EncoderModel handler only works with FLUX.2 Klein models');
     return Promise.resolve(parsed);
@@ -2837,6 +2859,31 @@ const parseModelConfig = async (raw: unknown, store: AppStore, type: ModelType):
 
 const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelType): Promise<ModelIdentifierField> => {
   return zModelIdentifierField.parse(await parseModelConfig(raw, store, type));
+};
+
+/**
+ * Resolve a metadata model reference and gate it on the *full config*, not on the identifier.
+ *
+ * A `ModelIdentifierField` carries only key/hash/name/base/type, so a handler asserting on it accepts
+ * every sibling of the right type. Where a slot's domain is defined by `variant` - Qwen3 encoders split
+ * into Anima's 0.6B (hidden_size 1024) and the 4B/8B ones Z-Image and Klein use - that is not enough:
+ * recalling the wrong variant fills the slot with an encoder whose embeddings the transformer cannot
+ * consume (review 4997022178).
+ *
+ * @param isCompatible the slot's own domain, i.e. the same guard its picker is built from.
+ * @param handlerType used in the assertion message, so a rejected row is traceable to its handler.
+ */
+const parseModelIdentifierMatching = async (arg: {
+  raw: unknown;
+  store: AppStore;
+  type: ModelType;
+  isCompatible: (config: AnyModelConfig) => boolean;
+  handlerType: string;
+}): Promise<ModelIdentifierField> => {
+  const { raw, store, type, isCompatible, handlerType } = arg;
+  const config = await parseModelConfig(raw, store, type);
+  assert(isCompatible(config), `${handlerType} requires a model this slot can hold`);
+  return zModelIdentifierField.parse(config);
 };
 
 /**

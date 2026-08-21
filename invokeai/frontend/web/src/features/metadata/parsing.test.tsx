@@ -122,7 +122,7 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
   describe('KleinQwen3EncoderModel', () => {
     it('parses metadata.qwen3_encoder when base is flux2', async () => {
       currentBase = 'flux2';
-      nextResolved = fakeModel('qwen3_encoder', 'flux2');
+      nextResolved = fakeModel('qwen3_encoder', 'flux2', { variant: 'qwen3_8b' });
       const store = makeStore();
 
       const parsed = await ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
@@ -136,7 +136,7 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
 
     it('rejects when base is not flux2', async () => {
       currentBase = 'sdxl';
-      nextResolved = fakeModel('qwen3_encoder', 'flux2');
+      nextResolved = fakeModel('qwen3_encoder', 'flux2', { variant: 'qwen3_8b' });
       const store = makeStore();
 
       await expect(
@@ -151,12 +151,27 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
     // encoder would be recalled into `params.kleinQwen3EncoderModel` (review 4966712044).
     it.each(['z-image', 'anima'])('rejects %s image metadata while FLUX.2 is selected', async (base) => {
       currentBase = 'flux2';
-      nextResolved = fakeModel('qwen3_encoder', base);
+      nextResolved = fakeModel('qwen3_encoder', base, { variant: 'qwen3_8b' });
       const store = makeStore();
 
       await expect(
         ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
           { qwen3_encoder: nextResolved, model: { key: 'main-key', hash: 'h', name: base, base, type: 'main' } },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
+    // Klein uses the 4B/8B encoders; Anima's 0.6B produces 1024-wide embeddings it cannot consume. The
+    // split lives in `variant`, which the identifier does not carry (review 4997022178).
+    it('rejects Animas 0.6B encoder', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('qwen3_encoder', 'flux2', { variant: 'qwen3_06b' });
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
+          { qwen3_encoder: nextResolved, model: fakeMainModel('klein_9b') },
           store
         )
       ).rejects.toThrow();
@@ -698,12 +713,19 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
     });
   });
 
+  // Qwen3 encoders are split by `variant`, not by base: Anima's 0.6B produces 1024-wide embeddings, the
+  // 4B (2560) and 8B (4096) ones Z-Image and Klein use do not. The identifier carries no variant, so a
+  // handler asserting only on `type` accepts a sibling whose embeddings the transformer cannot consume
+  // (review 4997022178).
+  const animaEncoder = () => fakeModel('qwen3_encoder', 'any', { variant: 'qwen3_06b' });
+  const largeEncoder = (variant: 'qwen3_4b' | 'qwen3_8b' = 'qwen3_4b') =>
+    fakeModel('qwen3_encoder', 'any', { variant });
+
   describe('AnimaQwen3EncoderModel', () => {
-    // Anima encoders are identified by variant (qwen3_06b), not by base — a base assert here would be
-    // wrong. Provenance plus the current base carry the whole gate.
+    // Anima encoders are identified by variant, not by base - a base assert here would be wrong.
     it('parses regardless of the encoder base', async () => {
       currentBase = 'anima';
-      nextResolved = fakeModel('qwen3_encoder', 'any');
+      nextResolved = animaEncoder();
       const store = makeStore();
 
       const parsed = await ImageMetadataHandlers.AnimaQwen3EncoderModel.parse(
@@ -715,9 +737,37 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       expect(parsed.type).toBe('qwen3_encoder');
     });
 
-    it.each(['z-image', 'flux2'])('rejects %s image metadata, which writes the same field', async (base) => {
+    // The Anima picker offers 0.6B encoders only. A workflow-built Anima image can nonetheless record a
+    // 4B/8B one, and recalling it leaves the slot with an encoder Anima cannot use.
+    it.each(['qwen3_4b', 'qwen3_8b'] as const)('rejects a %s encoder', async (variant) => {
+      currentBase = 'anima';
+      nextResolved = largeEncoder(variant);
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.AnimaQwen3EncoderModel.parse(
+          { model: fakeMain('anima'), qwen3_encoder: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
+    it('rejects an encoder whose variant is unknown', async () => {
       currentBase = 'anima';
       nextResolved = fakeModel('qwen3_encoder', 'any');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.AnimaQwen3EncoderModel.parse(
+          { model: fakeMain('anima'), qwen3_encoder: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
+    it.each(['z-image', 'flux2'])('rejects %s image metadata, which writes the same field', async (base) => {
+      currentBase = 'anima';
+      nextResolved = animaEncoder();
       const store = makeStore();
 
       await expect(
@@ -730,7 +780,7 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
 
     it('rejects when the current base is not Anima', async () => {
       currentBase = 'z-image';
-      nextResolved = fakeModel('qwen3_encoder', 'any');
+      nextResolved = animaEncoder();
       const store = makeStore();
 
       await expect(
@@ -745,7 +795,7 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
   describe('ZImageQwen3EncoderModel', () => {
     it('parses a Z-Image image while Z-Image is selected', async () => {
       currentBase = 'z-image';
-      nextResolved = fakeModel('qwen3_encoder', 'any');
+      nextResolved = largeEncoder();
       const store = makeStore();
 
       const parsed = await ImageMetadataHandlers.ZImageQwen3EncoderModel.parse(
@@ -756,11 +806,25 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       expect(parsed.key).toBe('qwen3_encoder-key');
     });
 
+    // The mirror of the Anima case: Z-Image cannot consume 1024-wide embeddings either.
+    it('rejects Animas 0.6B encoder', async () => {
+      currentBase = 'z-image';
+      nextResolved = animaEncoder();
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageQwen3EncoderModel.parse(
+          { model: fakeMain('z-image'), qwen3_encoder: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
     // This handler recalls into the Z-Image slots (and nulls zImageQwen3SourceModel). Anima and FLUX.2
     // Klein write the same metadata field, so without the base gate they would clobber those slots.
     it.each(['anima', 'flux2'])('rejects when the current base is %s', async (base) => {
       currentBase = base;
-      nextResolved = fakeModel('qwen3_encoder', 'any');
+      nextResolved = largeEncoder();
       const store = makeStore();
 
       await expect(
@@ -775,7 +839,7 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
     // must not populate the Z-Image encoder slot nor clear the source slot (review 4966712044).
     it.each(['anima', 'flux2'])('rejects %s image metadata while Z-Image is selected', async (base) => {
       currentBase = 'z-image';
-      nextResolved = fakeModel('qwen3_encoder', 'any');
+      nextResolved = largeEncoder();
       const store = makeStore();
 
       await expect(
