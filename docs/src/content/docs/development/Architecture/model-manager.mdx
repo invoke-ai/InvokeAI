@@ -736,6 +736,7 @@ The `DownloadQueueService` constructor takes the following arguments:
 | `event_handlers` | List[DownloadEventHandler] | [] | Event handlers |
 | `max_parallel_dl` | int | 5 | Maximum number of simultaneous downloads allowed |
 | `requests_session` | requests.sessions.Session | None | An alternative requests Session object to use for the download |
+| `requests_session_is_trusted` | bool | False | Explicitly trust a caller-supplied Session that bypasses the SSRF socket guard |
 | `quiet` | bool | False | Do work quietly without issuing log messages |
 
 A typical initialization sequence will look like:
@@ -755,7 +756,7 @@ Event handlers can be provided to the queue at initialization time as shown in t
 
 `max_parallel_dl` sets the number of simultaneous active downloads that are allowed. The default of five has not been benchmarked in any way, but seems to give acceptable performance.
 
-`requests_session` can be used to provide a `requests` module Session object that will be used to stream remote URLs to disk. This facility was added for use in the module's unit tests to simulate a remote web server, but may be useful in other contexts.
+`requests_session` can be used to provide a `requests` module Session object that will be used to stream remote URLs to disk. This facility was added for use in the module's unit tests to simulate a remote web server, but may be useful in other contexts. A caller-supplied Session does not have Invoke's socket-level SSRF guard, so it is rejected while the private-address policy is enabled unless `requests_session_is_trusted=True` is also passed. Only opt in for a Session whose destination policy you trust.
 
 `quiet` will prevent the queue from issuing any log messages at the INFO or higher levels.
 

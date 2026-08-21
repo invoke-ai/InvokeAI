@@ -51,6 +51,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         app_config: Optional[InvokeAIAppConfig] = None,
         event_bus: Optional["EventServiceBase"] = None,
         requests_session: Optional[requests.sessions.Session] = None,
+        requests_session_is_trusted: bool = False,
     ):
         """
         Initialize DownloadQueue.
@@ -58,6 +59,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         :param app_config: InvokeAIAppConfig object
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
+        :param requests_session_is_trusted: Accept a caller-supplied session without the SSRF socket guard.
         """
         self._app_config = app_config or get_config()
         self._jobs: Dict[int, DownloadJob] = {}
@@ -73,11 +75,18 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
         # A caller-supplied session is left exactly as given (the tests inject mock
-        # transports). Sessions we build ourselves refuse to connect to a non-public
-        # address, which is the check that holds against DNS rebinding and against host
-        # spellings that `requests` decodes differently from us.
+        # transports), so accepting one requires an explicit trust decision while the
+        # private-address policy is enabled. Sessions we build ourselves refuse to
+        # connect to a non-public address, which is the check that holds against DNS
+        # rebinding and host spellings that `requests` decodes differently from us.
         self._request_proxies: Optional[Dict[str, str]] = None
         if requests_session is not None:
+            if not self._app_config.allow_private_download_urls and not requests_session_is_trusted:
+                raise ValueError(
+                    "A caller-supplied requests_session bypasses the SSRF socket guard. "
+                    "Pass requests_session_is_trusted=True only for a trusted session, or use "
+                    "allow_private_download_urls to opt out of the private-address policy."
+                )
             self._requests = requests_session
         elif self._app_config.allow_private_download_urls:
             # The operator has opted out of the address policy, so ambient proxy variables
