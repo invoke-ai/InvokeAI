@@ -47,6 +47,7 @@ import { useTranslation } from 'react-i18next';
 import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
+import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
@@ -320,6 +321,60 @@ const SingleItemMenuItems = ({
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
   const { generation, widgets } = useWorkbenchCommands();
   const openWidget = useOpenWorkbenchWidget();
+  // Video recall availability, fetched from the item's recorded core_metadata
+  // when the menu opens on a video — the video twin of the image menu's flow.
+  const [videoRecallCapabilities, setVideoRecallCapabilities] = useState<VideoRecallCapabilities>(
+    EMPTY_VIDEO_RECALL_CAPABILITIES
+  );
+  const [isLoadingVideoRecall, setIsLoadingVideoRecall] = useState(false);
+  const videoItemName = item.kind === 'video' ? item.name : null;
+  const getVideoRecallCapabilities = actions.getVideoRecallCapabilities;
+
+  useEffect(() => {
+    if (!videoItemName || item.kind !== 'video') {
+      return;
+    }
+
+    let isCancelled = false;
+    const videoItem = item;
+
+    setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
+    setIsLoadingVideoRecall(true);
+    getVideoRecallCapabilities(videoItem)
+      .then((capabilities) => {
+        if (!isCancelled) {
+          setVideoRecallCapabilities(capabilities);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingVideoRecall(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by name; the item identity churns per render
+  }, [getVideoRecallCapabilities, videoItemName]);
+
+  const makeVideoRecallHandler = useCallback(
+    (kind: VideoRecallKind) => () => {
+      if (item.kind === 'video') {
+        void actions.recallVideoData(item, kind);
+      }
+    },
+    [actions, item]
+  );
+  const handleVideoRecallAll = useMemo(() => makeVideoRecallHandler('all'), [makeVideoRecallHandler]);
+  const handleVideoRecallRemix = useMemo(() => makeVideoRecallHandler('remix'), [makeVideoRecallHandler]);
+  const handleVideoRecallPrompts = useMemo(() => makeVideoRecallHandler('prompts'), [makeVideoRecallHandler]);
+  const handleVideoRecallSeed = useMemo(() => makeVideoRecallHandler('seed'), [makeVideoRecallHandler]);
   const handleExtendInVideo = useCallback(() => {
     if (item.kind !== 'video') {
       return;
@@ -366,12 +421,44 @@ const SingleItemMenuItems = ({
       </HStack>
       <Menu.Separator borderColor="border.subtle" />
       {item.kind === 'video' ? (
-        <ContextMenuItem
-          icon={ClapperboardIcon}
-          label="Extend in Video"
-          value="extend-in-video"
-          onClick={handleExtendInVideo}
-        />
+        <>
+          <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
+              icon={AsteriskIcon}
+              label="Recall All"
+              value="video-recall-all"
+              onClick={handleVideoRecallAll}
+            />
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.remix}
+              icon={ShuffleIcon}
+              label="Remix Video"
+              value="video-remix"
+              onClick={handleVideoRecallRemix}
+            />
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.prompts}
+              icon={QuoteIcon}
+              label="Use Prompt"
+              value="video-use-prompt"
+              onClick={handleVideoRecallPrompts}
+            />
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.seed}
+              icon={SproutIcon}
+              label="Use Seed"
+              value="video-use-seed"
+              onClick={handleVideoRecallSeed}
+            />
+          </ContextSubMenu>
+          <ContextMenuItem
+            icon={ClapperboardIcon}
+            label="Extend in Video"
+            value="extend-in-video"
+            onClick={handleExtendInVideo}
+          />
+        </>
       ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
