@@ -982,6 +982,16 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
     "diffusion_model.tproj.",
     "diffusion_model.txtmlp.",
     "diffusion_model.last.linear.",
+    # kohya/LyCORIS flattens that same native layout into `lora_unet_<path>` (see
+    # krea2_lora_conversion_utils._maybe_convert_kohya_krea2_state_dict). Spelled out per top-level module
+    # rather than as a bare `lora_unet_`, which would match every other architecture's kohya LoRA too.
+    "lora_unet_blocks_",
+    "lora_unet_txtfusion_",
+    "lora_unet_first.",
+    "lora_unet_tmlp_",
+    "lora_unet_tproj_",
+    "lora_unet_txtmlp_",
+    "lora_unet_last_linear.",
     "base_model.model.transformer.transformer_blocks.",
     "text_encoder.",
     "base_model.model.text_encoder.",
