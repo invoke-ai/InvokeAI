@@ -2,7 +2,7 @@ import type { DragEndEvent } from '@dnd-kit/core';
 import type { VideoSourceClip } from '@features/video/core/types';
 import type { ChangeEvent } from 'react';
 
-import { Box, HStack, Input, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Input, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useDndContext, useDndMonitor, useDroppable } from '@dnd-kit/core';
 import { galleryItems, galleryTransfers } from '@features/gallery';
 import { galleryVideoUrls, isGalleryItemDragData } from '@features/gallery/utility';
@@ -47,6 +47,67 @@ const PREVIEW_VIDEO_STYLE = {
   objectFit: 'contain',
   width: '100%',
 } as const;
+
+/**
+ * Small always-visible preview of one trim bound, so both ends of the kept
+ * range stay in view while either slider moves (the large preview only follows
+ * the last-touched bound). Same seek technique as the workflow editor's frame
+ * scrubber: one long-lived muted element, half-frame nudge so rounding cannot
+ * show the neighbouring frame.
+ */
+const TrimBoundThumb = memo(function TrimBoundThumb({
+  fps,
+  frame,
+  label,
+  src,
+}: {
+  fps: number;
+  frame: number;
+  label: string;
+  src: string;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  useEffect(() => {
+    const element = videoRef.current;
+    const time = Math.max(0, (frame + 0.5) / fps);
+
+    if (!element || !Number.isFinite(time)) {
+      return;
+    }
+
+    const seek = () => {
+      element.currentTime = time;
+    };
+
+    // Seeking before metadata arrives is ignored by some browsers; wait for it
+    // once, then seek directly on every later bound change.
+    if (element.readyState >= 1) {
+      seek();
+    } else {
+      element.addEventListener('loadedmetadata', seek, { once: true });
+
+      return () => element.removeEventListener('loadedmetadata', seek);
+    }
+  }, [fps, frame, src]);
+
+  return (
+    <Box bg="blackAlpha.300" flex="1" h="16" minW="0" overflow="hidden" position="relative" rounded="sm">
+      <video key={src} ref={videoRef} muted preload="metadata" src={src} style={PREVIEW_VIDEO_STYLE} />
+      <Badge
+        bottom="1"
+        fontVariantNumeric="tabular-nums"
+        insetInlineStart="1"
+        pointerEvents="none"
+        position="absolute"
+        size="xs"
+        variant="solid"
+      >
+        {`${label} · ${frame}`}
+      </Badge>
+    </Box>
+  );
+});
 
 const getSingleVideoDragName = (data: unknown): string | null => {
   if (!isGalleryItemDragData(data) || data.items.length !== 1) {
@@ -293,6 +354,22 @@ export const VideoSourceClipField = memo(
             </Stack>
           )}
         </DropZone>
+        {sourceVideo && previewSrc ? (
+          <HStack gap="2">
+            <TrimBoundThumb
+              fps={sourceVideo.fps}
+              frame={sourceVideo.startFrame}
+              label={t('widgets.video.trimStart')}
+              src={previewSrc}
+            />
+            <TrimBoundThumb
+              fps={sourceVideo.fps}
+              frame={sourceVideo.endFrame}
+              label={t('widgets.video.trimEnd')}
+              src={previewSrc}
+            />
+          </HStack>
+        ) : null}
         {sourceVideo ? (
           <Stack gap="2">
             <Field helpText={t('widgets.video.trimHelp')} label={t('widgets.video.trimStart')}>
