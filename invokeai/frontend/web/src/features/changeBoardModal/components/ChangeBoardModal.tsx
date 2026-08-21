@@ -164,9 +164,11 @@ const ChangeBoardModal = () => {
     }
     // At most one of these fires: the two selections are mutually exclusive by construction —
     // imagesToChangeSelected clears video_names and videosToChangeSelected clears image_names,
-    // and every caller opens this dialog through one of them.
+    // and every caller opens this dialog through one of them. Reopen the dialog so retained
+    // failures are actionable instead of inert state after the accept close.
     if (failedImageNames.length > 0) {
       dispatch(imagesToChangeSelected(failedImageNames));
+      dispatch(isModalOpenChanged(true));
     }
     if (failed.length === 0) {
       return;
@@ -175,6 +177,7 @@ const ChangeBoardModal = () => {
       result.status === 'rejected' && videoMutations[index] ? [videoMutations[index].videoName] : []
     );
     dispatch(videosToChangeSelected(failedVideoNames));
+    dispatch(isModalOpenChanged(true));
   }, [
     addImagesToBoard,
     addVideoToBoard,

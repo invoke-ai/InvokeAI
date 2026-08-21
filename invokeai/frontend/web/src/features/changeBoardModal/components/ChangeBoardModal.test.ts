@@ -74,8 +74,13 @@ describe('ChangeBoardModal', () => {
 
   it('keeps the images that did not move selected', () => {
     expect(source).toContain('imagesToChangeSelected(failedImageNames)');
+    expect(source).toMatch(/imagesToChangeSelected\(failedImageNames\)[\s\S]*isModalOpenChanged\(true\)/);
     // A rejected request moved nothing at all, so the whole request stays selected.
     expect(source).toContain('.catch(() => imagesToChange)');
+  });
+
+  it('reopens with failed videos selected for retry', () => {
+    expect(source).toMatch(/videosToChangeSelected\(failedVideoNames\)[\s\S]*isModalOpenChanged\(true\)/);
   });
 
   it('captures the operation id before awaiting the move, not after it', () => {

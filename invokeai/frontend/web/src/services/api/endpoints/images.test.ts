@@ -153,6 +153,21 @@ describe('reportImageBatchOutcome', () => {
     });
   });
 
+  it('does not report an outcome from a session that ended while it was pending', async () => {
+    login('user-a');
+    let resolveQuery: (value: { data: { failed_images: string[] } }) => void = () => {};
+    const queryFulfilled = new Promise<{ data: { failed_images: string[] } }>((resolve) => {
+      resolveQuery = resolve;
+    });
+
+    const outcome = reportImageBatchOutcome({ image_names: names(3) }, { queryFulfilled });
+    switchUser('user-b');
+    resolveQuery({ data: { failed_images: ['image-1.png'] } });
+    await outcome;
+
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it('is wired into every chunked batch mutation', () => {
     // RTK exposes no way to reach an endpoint's `onQueryStarted` at runtime -- the built
     // endpoint object carries only initiate/select/match*/hooks -- so the wiring is guarded at
@@ -286,18 +301,16 @@ describe('buildChunkedImageBatchQueryFn', () => {
       });
     });
 
-    const { result } = run(baseQuery, { image_names: names(2500) });
+    const { dispatch, result } = run(baseQuery, { image_names: names(2500) });
 
-    // Chunk 3 is never sent. Chunks 1 and 2 already committed, so the run is a partial success
-    // and its unreached names are reported, exactly as for a mid-run server failure.
+    // The second response is stale as soon as the session changes, so neither it nor a partial
+    // aggregate may reach the new session. The server-side write cannot be rolled back here, but
+    // the next session must refetch its own state rather than consume the old result.
     expect(await result).toEqual({
-      data: {
-        added_images: ['chunk-1.png', 'chunk-2.png'],
-        failed_images: names(2500).slice(2000),
-        affected_boards: ['board-1'],
-      },
+      error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('Aborted') },
     });
     expect(baseQuery).toHaveBeenCalledTimes(2);
+    expect(dispatch).not.toHaveBeenCalled();
   });
 
   it('keeps running when a login request elsewhere bumps the auth generation', async () => {
@@ -469,9 +482,11 @@ describe('bulkDownloadQueryFn', () => {
     const result = await run(baseQuery, { image_names: names(2500) });
 
     expect(baseQuery).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ data: { bulk_download_item_name: 'item-1.zip' } });
-    // The 1500 names in the chunks that were never sent are in no zip.
-    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToDownload', { count: 1500 });
+    expect(result).toEqual({ data: undefined });
+    // The first response belongs to the previous session. Do not expose its item name or toast
+    // the new session about work it did not request.
+    expect(toast).not.toHaveBeenCalled();
+    expect(i18n.t).not.toHaveBeenCalled();
   });
 
   it('reports an error when the first chunk fails, since nothing was scheduled', async () => {

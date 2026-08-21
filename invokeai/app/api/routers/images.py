@@ -554,15 +554,14 @@ def delete_images_from_list(
             except ImageRecordNotFoundException:
                 # The record is already gone — a concurrent session deleted it after this
                 # iteration's ownership check passed. The caller asked for it to be gone and it
-                # is, so this is a skip, not a storage failure: reporting it in failed_images
-                # toasts "1 image could not be updated" for an outcome the user got. Matches
-                # remove_images_from_board, which resolves the same race for board removal.
+                # is, so report the idempotently satisfied postcondition. The client uses
+                # deleted_images to remove stale selections and references.
                 #
                 # This is narrow only because image_records.get() no longer translates a
                 # sqlite3.Error into this exception — see the comment there. If that
                 # translation ever comes back, a locked or corrupt database would land here
                 # and a whole failed batch would answer 200 with empty result lists.
-                continue
+                deleted_images.add(image_name)
             except Exception:
                 # A genuine deletion failure (not an auth/404 skip) — report it so the
                 # client can surface a partial-failure warning, matching the video path.

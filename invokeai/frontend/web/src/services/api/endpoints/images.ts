@@ -76,15 +76,14 @@ type ImagesBaseQuery = (
   args: string | FetchArgs
 ) => QueryReturnValue<unknown, FetchBaseQueryError> | PromiseLike<QueryReturnValue<unknown, FetchBaseQueryError>>;
 
-/**
- * Stands in for the response of a chunk that was never sent because the session changed under
- * the operation. Shaped like any other chunk failure so it takes the partial-result path the
- * loops already have: what the previous chunks committed is reported, the rest is unreached.
- */
+/** A stale response must not be consumed by the session that replaced the requester. */
 const AUTH_CHANGED_ERROR: FetchBaseQueryError = {
   status: 'CUSTOM_ERROR',
   error: 'Aborted: the authenticated session changed while the operation was running',
 };
+
+const isAuthChangedError = (error: FetchBaseQueryError | undefined): boolean =>
+  error?.status === AUTH_CHANGED_ERROR.status && error.error === AUTH_CHANGED_ERROR.error;
 
 /**
  * Issues one chunk of a multi-request operation, unless the session it started under is gone.
@@ -96,9 +95,10 @@ const AUTH_CHANGED_ERROR: FetchBaseQueryError = {
  * user's delete is committed under another's name, with nothing to roll it back. Nothing else
  * stops it: `resetApiState` on the logout action clears the cache, not a running `queryFn`.
  *
- * So the context is captured before the first chunk and rechecked before each one. See
- * `isSameAuthContext` for what counts as the same session — notably a sliding-window token
- * refresh does not, or every long batch would abandon itself.
+ * So the context is captured before the first chunk, rechecked before each request, and checked
+ * again before its response is consumed. See `isSameAuthContext` for what counts as the same
+ * session — notably a sliding-window token refresh does not, or every long batch would abandon
+ * itself.
  */
 const fetchChunk = async (
   baseQuery: ImagesBaseQuery,
@@ -108,7 +108,8 @@ const fetchChunk = async (
   if (!isSameAuthContext(authContext)) {
     return { error: AUTH_CHANGED_ERROR };
   }
-  return await baseQuery(args);
+  const response = await baseQuery(args);
+  return isSameAuthContext(authContext) ? response : { error: AUTH_CHANGED_ERROR };
 };
 
 export const chunkImageNames = (image_names: string[]): string[][] => {
@@ -180,6 +181,11 @@ export const buildChunkedImageBatchQueryFn =
     for (const [index, image_names] of chunks.entries()) {
       const response = await fetchChunk(baseQuery, authContext, { ...request(arg), body: { ...arg, image_names } });
       if (response.error) {
+        if (isAuthChangedError(response.error)) {
+          // A prior chunk may have committed, but its result belongs to the old session. Do not
+          // invalidate the new session or return partial data that its UI can apply.
+          return { error: response.error };
+        }
         if (results.length === 0) {
           // Nothing was applied, so this is an ordinary failed request — report it as one.
           return { error: response.error };
@@ -300,10 +306,17 @@ export const reportImageBatchOutcome = async (
   { image_names }: { image_names: string[] },
   { queryFulfilled }: { queryFulfilled: Promise<{ data: { failed_images: string[] } }> }
 ) => {
+  const authContext = captureAuthContext();
   try {
     const { data: result } = await queryFulfilled;
+    if (!isSameAuthContext(authContext)) {
+      return;
+    }
     toastFailedImages(result.failed_images.length);
   } catch {
+    if (!isSameAuthContext(authContext)) {
+      return;
+    }
     toastFailedImageBatch(image_names);
   }
 };
@@ -373,6 +386,11 @@ export const bulkDownloadQueryFn = async (
       body: { image_names: chunk, board_id },
     });
     if (response.error) {
+      if (isAuthChangedError(response.error)) {
+        // A previous request may already be building a zip for the old session. Do not return its
+        // item name or raise a rejection toast in the new session.
+        return { data: undefined as unknown as components['schemas']['ImagesDownloaded'] };
+      }
       if (!scheduled) {
         // Nothing was scheduled, so this is an ordinary failed request — report it as one and
         // let the `matchRejected` listener raise the failure toast.
@@ -432,13 +450,10 @@ export const imageDTOsByNamesQueryFn = async (
       return { error: response.error };
     }
     const chunkDTOs = response.data as ImageDTO[];
-    // Checked again after the response, not just before the request: these DTOs were fetched
-    // as whoever was logged in when the chunk went out, and the store they would be written
-    // into may since have been reset for someone else (the logout listener clears the api
-    // state). Publishing them then would seed one user's cache with another's images.
-    if (isSameAuthContext(authContext)) {
-      upsertImageDTOs(dispatch, chunkDTOs);
-    }
+    // `fetchChunk` checked the context after the response, so these DTOs still belong to the
+    // session that owns the current cache. A changed session returned above as an error instead
+    // of leaking stale data through this mutation's fulfilled result.
+    upsertImageDTOs(dispatch, chunkDTOs);
     imageDTOs.push(...chunkDTOs);
   }
   return { data: imageDTOs };
