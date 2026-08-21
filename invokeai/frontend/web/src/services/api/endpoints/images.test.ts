@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { toast } from 'features/toast/toast';
 import i18n from 'i18next';
 import {
@@ -7,6 +10,7 @@ import {
   imageDTOsByNamesQueryFn,
   imagesApi,
   mergeImageBatchResults,
+  reportImageBatchOutcome,
   toastFailedImageBatch,
 } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -108,6 +112,58 @@ describe('toastFailedImageBatch', () => {
       title: 'toast.imagesFailedToUpdate',
       status: 'warning',
     });
+  });
+});
+
+describe('reportImageBatchOutcome', () => {
+  beforeEach(() => {
+    vi.mocked(toast).mockClear();
+    vi.mocked(i18n.t).mockClear();
+  });
+
+  it('reports the names the server could not apply when the request resolves', async () => {
+    await reportImageBatchOutcome(
+      { image_names: names(3) },
+      { queryFulfilled: Promise.resolve({ data: { failed_images: ['image-1.png'] } }) }
+    );
+
+    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToUpdate', { count: 1 });
+  });
+
+  it('says nothing when every name was applied', async () => {
+    await reportImageBatchOutcome(
+      { image_names: names(3) },
+      { queryFulfilled: Promise.resolve({ data: { failed_images: [] } }) }
+    );
+
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('reports the whole argument list when the request rejects', async () => {
+    // A rejection out of the chunked queryFn is raised only when nothing was committed, so
+    // every name really is unapplied. Swallowing it leaves a delete or a move that landed
+    // nothing saying nothing at all -- these endpoints have no matchRejected listener.
+    await reportImageBatchOutcome({ image_names: names(3) }, { queryFulfilled: Promise.reject(new Error('boom')) });
+
+    expect(i18n.t).toHaveBeenCalledWith('toast.imagesFailedToUpdate', { count: 3 });
+    expect(toast).toHaveBeenCalledWith({
+      id: 'IMAGES_FAILED_TO_UPDATE',
+      title: 'toast.imagesFailedToUpdate',
+      status: 'warning',
+    });
+  });
+
+  it('is wired into every chunked batch mutation', () => {
+    // RTK exposes no way to reach an endpoint's `onQueryStarted` at runtime -- the built
+    // endpoint object carries only initiate/select/match*/hooks -- so the wiring is guarded at
+    // the source level, as elsewhere in this repo. Counted against the chunked endpoints rather
+    // than a fixed number, so a sixth one that forgets to report its failures fails this.
+    const source = readFileSync(fileURLToPath(new URL('./images.ts', import.meta.url)), 'utf8');
+    const chunked = source.match(/queryFn: buildChunkedImageBatchQueryFn\(/g) ?? [];
+    const wired = source.match(/onQueryStarted: reportImageBatchOutcome,/g) ?? [];
+
+    expect(chunked.length).toBeGreaterThan(0);
+    expect(wired).toHaveLength(chunked.length);
   });
 });
 

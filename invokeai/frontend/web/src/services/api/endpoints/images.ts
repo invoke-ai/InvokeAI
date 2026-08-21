@@ -276,6 +276,34 @@ export const toastFailedImageBatch = (image_names: string[]) => {
 };
 
 /**
+ * The outcome handler shared by all five batch mutations, which report failure identically.
+ *
+ * Both branches matter and neither is reachable from anywhere else. `handleDeletions` and its
+ * siblings swallow every outcome, so without the fulfilled branch a run that only partly landed
+ * — server-side per-name failures, or chunks a mid-run failure never reached — says nothing at
+ * all. And a rejection out of `buildChunkedImageBatchQueryFn` is only ever raised when
+ * `results.length === 0`, i.e. the first chunk failed and the server committed nothing, so the
+ * whole argument list is genuinely unapplied and reporting all of it is exact rather than an
+ * over-count. Nothing else covers that case: these five endpoints have no `matchRejected`
+ * listener, unlike the single-image board routes.
+ *
+ * Extracted rather than repeated inline five times so that the wiring is one unit a test can
+ * hold — an endpoint that swallows its rejection looks identical to one that reports it, and
+ * that difference is invisible to a test of the toast helpers alone.
+ */
+export const reportImageBatchOutcome = async (
+  { image_names }: { image_names: string[] },
+  { queryFulfilled }: { queryFulfilled: Promise<{ data: { failed_images: string[] } }> }
+) => {
+  try {
+    const { data: result } = await queryFulfilled;
+    toastFailedImages(result.failed_images.length);
+  } catch {
+    toastFailedImageBatch(image_names);
+  }
+};
+
+/**
  * The download counterpart. Distinct id and wording: "could not be updated" is wrong for a
  * download, and sharing the id would let one warning overwrite the other, since the toast
  * system updates in place.
@@ -502,16 +530,7 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildImagesUrl('delete'), method: 'POST' }),
         getDeleteImagesTags
       ),
-      async onQueryStarted({ image_names }, { queryFulfilled }) {
-        try {
-          const { data: result } = await queryFulfilled;
-          // `handleDeletions` swallows every outcome, so without this a delete that only
-          // partly landed — server-side failures or chunks never reached — said nothing at all.
-          toastFailedImages(result.failed_images.length);
-        } catch {
-          toastFailedImageBatch(image_names);
-        }
-      },
+      onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getDeleteImagesTags(result) : []),
     }),
     deleteUncategorizedImages: build.mutation<
@@ -566,14 +585,7 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildImagesUrl('star'), method: 'POST' }),
         getStarImagesTags
       ),
-      async onQueryStarted({ image_names }, { queryFulfilled }) {
-        try {
-          const { data: result } = await queryFulfilled;
-          toastFailedImages(result.failed_images.length);
-        } catch {
-          toastFailedImageBatch(image_names);
-        }
-      },
+      onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getStarImagesTags(result) : []),
     }),
     /**
@@ -587,14 +599,7 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildImagesUrl('unstar'), method: 'POST' }),
         getUnstarImagesTags
       ),
-      async onQueryStarted({ image_names }, { queryFulfilled }) {
-        try {
-          const { data: result } = await queryFulfilled;
-          toastFailedImages(result.failed_images.length);
-        } catch {
-          toastFailedImageBatch(image_names);
-        }
-      },
+      onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getUnstarImagesTags(result) : []),
     }),
     uploadImage: build.mutation<
@@ -759,14 +764,7 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildBoardImagesUrl('batch'), method: 'POST' }),
         getAddImagesToBoardTags
       ),
-      async onQueryStarted({ image_names }, { queryFulfilled }) {
-        try {
-          const { data: result } = await queryFulfilled;
-          toastFailedImages(result.failed_images.length);
-        } catch {
-          toastFailedImageBatch(image_names);
-        }
-      },
+      onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getAddImagesToBoardTags(result) : []),
     }),
     removeImagesFromBoard: build.mutation<
@@ -777,14 +775,7 @@ export const imagesApi = api.injectEndpoints({
         () => ({ url: buildBoardImagesUrl('batch/delete'), method: 'POST' }),
         getRemoveImagesFromBoardTags
       ),
-      async onQueryStarted({ image_names }, { queryFulfilled }) {
-        try {
-          const { data: result } = await queryFulfilled;
-          toastFailedImages(result.failed_images.length);
-        } catch {
-          toastFailedImageBatch(image_names);
-        }
-      },
+      onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getRemoveImagesFromBoardTags(result) : []),
     }),
     bulkDownloadImages: build.mutation<

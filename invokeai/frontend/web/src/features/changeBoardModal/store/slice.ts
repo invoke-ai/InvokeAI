@@ -63,8 +63,11 @@ export const {
  *
  * - Another selection can have claimed and released the modal. Right-click a different image
  *   while a large move is in flight, then cancel that second dialog; the state is empty and
- *   closed again, but its operation ID is newer. Without that ID, the earlier request's
- *   failures are accepted and can later be moved to the wrong board.
+ *   closed again, but its operation ID is newer. Without that ID the slice looks unclaimed and
+ *   the earlier request's failures are written in under the newer operation's identity. No
+ *   opener surfaces them as things stand — every one of the four re-seeds the selection before
+ *   it shows the dialog — so this half of the check holds the invariant rather than closing a
+ *   reachable path, and it is what lets the retain stay a plain write into shared state.
  * - The session can have ended. The logout listener invalidates this operation along with the
  *   api state, and re-seeding it afterwards would leave one user's image names in the next
  *   user's store.

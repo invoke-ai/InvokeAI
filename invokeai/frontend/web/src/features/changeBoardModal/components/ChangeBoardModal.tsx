@@ -132,16 +132,29 @@ const ChangeBoardModal = () => {
       Promise.allSettled(videoMutations.map(({ promise }) => promise)),
     ]);
     const failed = results.filter((result) => result.status === 'rejected');
+    const isSameSession = isSameAuthContext(authContext);
+
+    // Reported ahead of the ownership guard below, not behind it. This toast is the only failure
+    // report the video board routes have — unlike the image batch routes, they have no
+    // `onQueryStarted` handler and no `matchRejected` listener, so nothing else says a word if it
+    // does not fire. Behind the guard, opening and cancelling any second dialog while this move
+    // was in flight would leave the user with no notice at all that their move failed, and the
+    // guard exists to protect a shared slice from a stale write, not to decide who gets told
+    // about a request they themselves started. Only the session check applies to it: the failure
+    // belongs to whoever started the move, so it is not raised at whoever holds the tab after a
+    // logout.
+    if (failed.length > 0 && isSameSession) {
+      toast({
+        id: 'VIDEOS_FAILED_TO_MOVE',
+        title: t('toast.videosFailedToMove', { count: failed.length }),
+        status: 'warning',
+      });
+    }
+
     // Checked before *any* of the writes below, the reset included: all of them land after an
     // unbounded await, and the reset is as capable of clearing a selection that now belongs to
     // someone else as the retain is of overwriting it.
-    if (
-      !canRetainFailedSelection(
-        selectChangeBoardModalSlice(store.getState()),
-        operationId,
-        isSameAuthContext(authContext)
-      )
-    ) {
+    if (!canRetainFailedSelection(selectChangeBoardModalSlice(store.getState()), operationId, isSameSession)) {
       return;
     }
     if (failed.length === 0 && failedImageNames.length === 0) {
@@ -161,11 +174,6 @@ const ChangeBoardModal = () => {
       result.status === 'rejected' && videoMutations[index] ? [videoMutations[index].videoName] : []
     );
     dispatch(videosToChangeSelected(failedVideoNames));
-    toast({
-      id: 'VIDEOS_FAILED_TO_MOVE',
-      title: t('toast.videosFailedToMove', { count: failed.length }),
-      status: 'warning',
-    });
   }, [
     addImagesToBoard,
     addVideoToBoard,

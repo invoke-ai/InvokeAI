@@ -77,4 +77,30 @@ describe('ChangeBoardModal', () => {
     // A rejected request moved nothing at all, so the whole request stays selected.
     expect(source).toContain('.catch(() => imagesToChange)');
   });
+
+  it('captures the operation id before awaiting the move, not after it', () => {
+    // The whole ownership check rests on this ordering. Read after the await, the id is
+    // whatever the slice holds once every newer selection has already come and gone, so the
+    // guard compares the current value against itself and admits every stale operation --
+    // silently, since it still typechecks and every other assertion here still passes.
+    const capture = source.indexOf('const operationId =');
+    const settle = source.indexOf('await Promise.all');
+
+    expect(capture).toBeGreaterThan(-1);
+    expect(settle).toBeGreaterThan(-1);
+    expect(capture).toBeLessThan(settle);
+  });
+
+  it('reports failed video moves ahead of the ownership guard', () => {
+    // This toast is the only failure report the video board routes have: no onQueryStarted, no
+    // matchRejected listener, unlike the image batch routes. Behind the guard, opening and
+    // cancelling any second dialog while the move was in flight leaves the user with no notice
+    // at all that it failed.
+    const videoToast = source.indexOf('VIDEOS_FAILED_TO_MOVE');
+    const guard = source.indexOf('canRetainFailedSelection(');
+
+    expect(videoToast).toBeGreaterThan(-1);
+    expect(guard).toBeGreaterThan(-1);
+    expect(videoToast).toBeLessThan(guard);
+  });
 });
