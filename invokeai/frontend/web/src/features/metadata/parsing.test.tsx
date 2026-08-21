@@ -1,6 +1,6 @@
 import type { AppStore } from 'app/store/store';
 import type * as paramsSliceModule from 'features/controlLayers/store/paramsSlice';
-import { ImageMetadataHandlers, recallIfStillValid } from 'features/metadata/parsing';
+import { ImageMetadataHandlers, parseMetadataDatum, recallIfStillValid } from 'features/metadata/parsing';
 import type * as modelsApiModule from 'services/api/endpoints/models';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -788,9 +788,11 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
   });
 
   describe('ZImageVAEModel', () => {
-    it('parses a Z-Image image while Z-Image is selected', async () => {
+    // There is no `base: 'z-image'` VAE config in the backend at all - the Z-Image VAE slot draws from
+    // the FLUX.1 pool (`useFlux1VAEModels`), which is what these fixtures reflect.
+    it('parses a FLUX VAE from a Z-Image image while Z-Image is selected', async () => {
       currentBase = 'z-image';
-      nextResolved = fakeModel('vae', 'z-image');
+      nextResolved = fakeModel('vae', 'flux');
       const store = makeStore();
 
       const parsed = await ImageMetadataHandlers.ZImageVAEModel.parse(
@@ -799,6 +801,34 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       );
 
       expect(parsed.key).toBe('vae-key');
+    });
+
+    // The picker offers a main model's bundled `vae` submodel, so metadata can carry one. Asserting
+    // `type === 'vae'` used to drop the row for exactly those models.
+    it('parses a FLUX main-model VAE submodel from Z-Image metadata', async () => {
+      currentBase = 'z-image';
+      const fluxMainWithVae = fakeModel('main', 'flux', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = fluxMainWithVae;
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.ZImageVAEModel.parse(
+        { model: fakeMain('z-image'), vae: { ...fluxMainWithVae, submodel_type: 'vae' } },
+        store
+      );
+
+      expect(parsed.type).toBe('main');
+      expect(parsed.submodel_type).toBe('vae');
+    });
+
+    // Z-Image explicitly cannot use a FLUX.2 VAE, and no other base's VAE fits either.
+    it.each(['flux2', 'sdxl', 'anima'])('rejects a %s VAE from Z-Image metadata', async (vaeBase) => {
+      currentBase = 'z-image';
+      nextResolved = fakeModel('vae', vaeBase);
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageVAEModel.parse({ model: fakeMain('z-image'), vae: nextResolved }, store)
+      ).rejects.toThrow();
     });
 
     it.each(['flux', 'anima'])('rejects %s image metadata while Z-Image is selected', async (base) => {
@@ -813,7 +843,7 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
 
     it('rejects when the current base is not Z-Image', async () => {
       currentBase = 'flux';
-      nextResolved = fakeModel('vae', 'z-image');
+      nextResolved = fakeModel('vae', 'flux');
       const store = makeStore();
 
       await expect(
@@ -895,6 +925,51 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
         ImageMetadataHandlers.Flux1VAEModel.parse({ model: fakeMain('z-image'), vae: nextResolved }, store)
       ).rejects.toThrow();
     });
+
+    // `useFlux1VAEModels` offers a main model's bundled `vae` submodel, and `handleFLUXVAEModels` can
+    // auto-select one into `params.fluxVAE`. Asserting `type === 'vae'` dropped the row for exactly the
+    // models the picker offered - the recall button the PR set out to fix stayed missing.
+    it('parses a FLUX main-model VAE submodel from FLUX.1 metadata', async () => {
+      currentBase = 'flux';
+      const fluxMainWithVae = fakeModel('main', 'flux', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = fluxMainWithVae;
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Flux1VAEModel.parse(
+        { model: fakeMain('flux'), vae: { ...fluxMainWithVae, submodel_type: 'vae' } },
+        store
+      );
+
+      expect(parsed.type).toBe('main');
+      expect(parsed.submodel_type).toBe('vae');
+      expect(parsed.base).toBe('flux');
+    });
+
+    // `flux_model_loader` cannot load a FLUX.2 VAE, so it must not reach `params.fluxVAE` on recall
+    // either - the auto-default no longer puts one there.
+    it('rejects a FLUX.2 VAE from FLUX.1 metadata', async () => {
+      currentBase = 'flux';
+      nextResolved = fakeModel('vae', 'flux2');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux1VAEModel.parse({ model: fakeMain('flux'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    it('rejects a main model whose reference is not its VAE submodel', async () => {
+      currentBase = 'flux';
+      const fluxMainWithVae = fakeModel('main', 'flux', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = fluxMainWithVae;
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux1VAEModel.parse(
+          { model: fakeMain('flux'), vae: { ...fluxMainWithVae, submodel_type: 'text_encoder' } },
+          store
+        )
+      ).rejects.toThrow();
+    });
   });
 
   describe('Flux2VAEModel', () => {
@@ -918,6 +993,32 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
 
       await expect(
         ImageMetadataHandlers.Flux2VAEModel.parse({ model: fakeMain('krea-2'), vae: nextResolved }, store)
+      ).rejects.toThrow();
+    });
+
+    // Same submodel gap as FLUX.1 / Z-Image: `useFlux2VAEModels` offers bundled VAE submodels.
+    it('parses a FLUX.2 main-model VAE submodel', async () => {
+      currentBase = 'flux2';
+      const flux2MainWithVae = fakeModel('main', 'flux2', { submodels: { vae: { model_type: 'vae' } } });
+      modelRegistry['main-key'] = flux2MainWithVae;
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Flux2VAEModel.parse(
+        { model: fakeMain('flux2'), vae: { ...flux2MainWithVae, submodel_type: 'vae' } },
+        store
+      );
+
+      expect(parsed.type).toBe('main');
+      expect(parsed.submodel_type).toBe('vae');
+    });
+
+    it('rejects a FLUX.1 VAE from FLUX.2 metadata', async () => {
+      currentBase = 'flux2';
+      nextResolved = fakeModel('vae', 'flux');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.Flux2VAEModel.parse({ model: fakeMain('flux2'), vae: nextResolved }, store)
       ).rejects.toThrow();
     });
   });
@@ -999,5 +1100,62 @@ describe('recallIfStillValid', () => {
     });
 
     expect(recall).toHaveBeenCalledWith(sentinel, store);
+  });
+});
+
+// `useMetadataDatum` subscribes to the selected base and re-runs this on every change, which is what
+// makes a row appear or disappear when the user switches models with the viewer open. There is no DOM
+// test framework here to drive the hook itself, so the extracted verdict function carries the coverage:
+// same metadata, same handler, different base => different verdict. Review 4987208275.
+describe('parseMetadataDatum', () => {
+  const animaMetadata = () => ({
+    model: { key: 'main-key', hash: 'h', name: 'anima', base: 'anima', type: 'main' },
+    vae: fakeModel('vae', 'anima'),
+  });
+
+  it('flips a row from hidden to shown when the base becomes the one the handler wants', async () => {
+    nextResolved = fakeModel('vae', 'anima');
+    const metadata = animaMetadata();
+
+    currentBase = 'sdxl';
+    const before = await parseMetadataDatum(metadata, ImageMetadataHandlers.AnimaVAEModel, makeStore());
+    currentBase = 'anima';
+    const after = await parseMetadataDatum(metadata, ImageMetadataHandlers.AnimaVAEModel, makeStore());
+
+    expect(before.isSuccess).toBe(false);
+    expect(before.isError).toBe(true);
+    expect(after.isSuccess).toBe(true);
+    expect(after.value?.base).toBe('anima');
+  });
+
+  it('flips a row from shown to hidden when the base moves away', async () => {
+    nextResolved = fakeModel('vae', 'anima');
+    const metadata = animaMetadata();
+
+    currentBase = 'anima';
+    const before = await parseMetadataDatum(metadata, ImageMetadataHandlers.AnimaVAEModel, makeStore());
+    currentBase = 'z-image';
+    const after = await parseMetadataDatum(metadata, ImageMetadataHandlers.AnimaVAEModel, makeStore());
+
+    expect(before.isSuccess).toBe(true);
+    expect(after.isSuccess).toBe(false);
+    expect(after.isError).toBe(true);
+  });
+
+  // A rejected parse must be reported as an error datum, never as a rejected promise - the hook has no
+  // catch of its own, so a throw here would leave the row stuck in its previous state.
+  it('reports a failed parse as an error datum rather than rejecting', async () => {
+    currentBase = 'anima';
+    nextResolved = fakeModel('vae', 'anima');
+
+    const data = await parseMetadataDatum(
+      { model: { key: 'main-key', hash: 'h', name: 'krea-2', base: 'krea-2', type: 'main' } },
+      ImageMetadataHandlers.AnimaVAEModel,
+      makeStore()
+    );
+
+    expect(data.isParsed).toBe(true);
+    expect(data.isError).toBe(true);
+    expect(data.error).toBeInstanceOf(Error);
   });
 });

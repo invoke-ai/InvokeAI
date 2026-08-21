@@ -154,7 +154,7 @@ import { useTranslation } from 'react-i18next';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
-import { isAnimaCompatibleVAEModelConfig } from 'services/api/types';
+import { isAnimaCompatibleVAEModelConfig, isFlux1VAEModelConfig, isFlux2VAEModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
 
@@ -1544,10 +1544,15 @@ const Flux1VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     // Check provenance: `vae` is a shared field. Z-Image (and any base whose VAE pool includes FLUX
     // VAEs) can record a FLUX VAE, which would otherwise land in `params.fluxVAE` (review 4966712044).
     assertMetadataModelBase(metadata, 'flux', 'Flux1VAEModel');
-    const raw = getProperty(metadata, 'vae');
-    const parsed = await parseModelIdentifier(raw, store, 'vae');
-    assert(parsed.type === 'vae');
-    assert(parsed.base === 'flux', 'Flux1VAEModel requires a FLUX VAE');
+    // The slot's domain is exactly its picker's (`useFlux1VAEModels`): a FLUX.1 VAE, standalone or as a
+    // main model's bundled `vae` submodel. FLUX.2 VAEs are excluded - `flux_model_loader` cannot load
+    // one - and so is every other base.
+    const parsed = await parseVAEModelIdentifier({
+      raw: getProperty(metadata, 'vae'),
+      store,
+      isCompatible: isFlux1VAEModelConfig,
+      handlerType: 'Flux1VAEModel',
+    });
     const base = selectBase(store.getState());
     assert(base === 'flux', 'Flux1VAEModel handler only works with FLUX.1 models');
     return parsed;
@@ -1623,9 +1628,14 @@ const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     // Check provenance: `vae` is a shared field, and this handler additionally clears
     // `zImageQwen3SourceModel` - foreign metadata must never reach it (review 4966712044).
     assertMetadataModelBase(metadata, 'z-image', 'ZImageVAEModel');
-    const raw = getProperty(metadata, 'vae');
-    const parsed = await parseModelIdentifier(raw, store, 'vae');
-    assert(parsed.type === 'vae');
+    // Z-Image borrows the FLUX.1 VAE pool - its picker is `useFlux1VAEModels` and it explicitly cannot
+    // use a FLUX.2 VAE - so this slot has the same domain as `params.fluxVAE`, submodels included.
+    const parsed = await parseVAEModelIdentifier({
+      raw: getProperty(metadata, 'vae'),
+      store,
+      isCompatible: isFlux1VAEModelConfig,
+      handlerType: 'ZImageVAEModel',
+    });
     // Only recall if the current main model is Z-Image
     const base = selectBase(store.getState());
     assert(base === 'z-image', 'ZImageVAEModel handler only works with Z-Image models');
@@ -1862,32 +1872,15 @@ const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     // Without this, a Krea-2 image recalled while Anima is selected would push its Qwen-Image VAE into
     // the Anima slot.
     assertMetadataModelBase(metadata, 'anima', 'AnimaVAEModel');
-    const raw = getProperty(metadata, 'vae');
-    const rawIdentifier = zModelIdentifierField.safeParse(raw).data;
-    // Gate on the full config, not just its base: the Anima-compatible set is defined by the backend's
-    // latent geometry, which for Wan VAEs lives in `latent_channels` and is lost in the identifier.
-    const config = await parseModelConfig(raw, store, 'vae');
-    const isMainVaeSubmodel =
-      config.type === 'main' &&
-      rawIdentifier?.type === 'main' &&
-      (rawIdentifier.submodel_type === null ||
-        rawIdentifier.submodel_type === undefined ||
-        rawIdentifier.submodel_type === 'vae');
-    assert(
-      config.type !== 'main' || isMainVaeSubmodel,
-      'AnimaVAEModel requires a VAE model or a main model VAE submodel'
-    );
     // Defers to the Anima VAE picker's own domain (isAnimaCompatibleVAEModelConfig): an Anima-base
     // (Wan/QwenImage) VAE, a FLUX VAE, or a 16-channel Wan VAE - all of which anima_l2i / anima_i2l
-    // accept. Recalling those from a workflow-built Anima image must not be rejected (reviews
-    // 4966712044, 4972570279).
-    assert(
-      isAnimaCompatibleVAEModelConfig(config, !isMainVaeSubmodel),
-      'AnimaVAEModel requires a VAE the Anima model loader accepts'
-    );
-    const parsed = zModelIdentifierField.parse({
-      ...config,
-      ...(isMainVaeSubmodel ? { submodel_type: 'vae' } : {}),
+    // accept. Gating on the full config matters here beyond the submodel question: the Wan arm reads
+    // `latent_channels`, which the identifier does not carry (reviews 4966712044, 4972570279).
+    const parsed = await parseVAEModelIdentifier({
+      raw: getProperty(metadata, 'vae'),
+      store,
+      isCompatible: isAnimaCompatibleVAEModelConfig,
+      handlerType: 'AnimaVAEModel',
     });
     const base = selectBase(store.getState());
     assert(base === 'anima', 'AnimaVAEModel handler only works with Anima models');
@@ -1945,9 +1938,13 @@ const Flux2VAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     // Check provenance: `vae` is a shared field - e.g. a Krea-2 image (Qwen-Image VAE) recalled while
     // FLUX.2 is selected would otherwise land in `params.flux2VaeModel`.
     assertMetadataModelBase(metadata, 'flux2', 'Flux2VAEModel');
-    const raw = getProperty(metadata, 'vae');
-    const parsed = await parseModelIdentifier(raw, store, 'vae');
-    assert(parsed.type === 'vae');
+    // Same domain as the picker (`useFlux2VAEModels`), which both Klein and [dev] share.
+    const parsed = await parseVAEModelIdentifier({
+      raw: getProperty(metadata, 'vae'),
+      store,
+      isCompatible: isFlux2VAEModelConfig,
+      handlerType: 'Flux2VAEModel',
+    });
     const base = selectBase(store.getState());
     assert(base === 'flux2', 'Flux2VAEModel handler only works with FLUX.2 models');
     return parsed;
@@ -2696,57 +2693,56 @@ export const recallIfStillValid = async <TValue,>(arg: {
 
 const useRevalidatedRecall = <TValue,>(
   metadata: unknown,
-  handler: { parse: (metadata: unknown, store: AppStore) => Promise<unknown> },
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<unknown>; i18nKey: string },
   recall: (value: TValue, store: AppStore) => void
 ) => {
   const store = useAppStore();
 
   return useCallback(
     (value: TValue) => {
-      void recallIfStillValid({ metadata, handler, recall, value, store });
+      void recallIfStillValid({ metadata, handler, recall, value, store }).then((didRecall) => {
+        if (!didRecall) {
+          // The button is still on screen because the reparse has not landed yet. Silently doing
+          // nothing reads as a broken button, so say so - same toast `recallByHandler` uses when a
+          // parse fails.
+          failedToast(t(handler.i18nKey));
+        }
+      });
     },
     [metadata, handler, store, recall]
   );
 };
 
-export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMetadataHandler<T>) {
-  const store = useAppStore();
-  const base = useSelectedBaseForReparse();
-  const [data, setData] = useState<Data<T>>(() => ({
-    isParsed: false,
-    isSuccess: false,
-    isError: false,
-    value: null,
-    error: null,
-  }));
+/**
+ * The parse verdict for one metadata row, against the store's *current* state.
+ *
+ * Extracted from the hooks below so it can be tested directly: the verdict is a function of the selected
+ * base as much as of the metadata (handlers read `selectBase(store.getState())` imperatively inside
+ * `parse`), and there is no DOM test framework here to drive a hook through a base switch.
+ */
+export const parseMetadataDatum = async <T,>(
+  metadata: unknown,
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<T> },
+  store: AppStore
+): Promise<ParsedSuccessData<T> | ParsedErrorData> => {
+  try {
+    return buildParsedSuccessData(await parseMetadataHandler(metadata, handler, store));
+  } catch (error) {
+    return buildParsedErrorData(WrappedError.wrap(error));
+  }
+};
 
-  useEffect(() => {
-    let isActive = true;
-
-    void parseMetadataHandler(metadata, handler, store).then(
-      (value) => {
-        if (isActive) {
-          setData(buildParsedSuccessData(value));
-        }
-      },
-      (error) => {
-        if (isActive) {
-          setData(buildParsedErrorData(WrappedError.wrap(error)));
-        }
-      }
-    );
-
-    return () => {
-      isActive = false;
-    };
-  }, [metadata, handler, store, base]);
-
-  const recall = useRevalidatedRecall(metadata, handler, handler.recall);
-
-  return { data, recall };
-}
-
-export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, handler: CollectionMetadataHandler<T>) {
+/**
+ * Keeps one row's parse verdict in sync with the metadata, the handler and the selected base.
+ *
+ * Single source for all three datum hooks: the `base` dependency is the whole point of the subscription
+ * (see `useSelectedBaseForReparse`), and having it written out three times invited exactly one of them
+ * to be forgotten.
+ */
+const useMetadataDatum = <T,>(
+  metadata: unknown,
+  handler: { parse: (metadata: unknown, store: AppStore) => Promise<T> }
+): Data<T> => {
   const store = useAppStore();
   const base = useSelectedBaseForReparse();
   const [data, setData] = useState<Data<T>>(buildUnparsedData);
@@ -2754,24 +2750,29 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
   useEffect(() => {
     let isActive = true;
 
-    void parseMetadataHandler(metadata, handler, store).then(
-      (value) => {
-        if (isActive) {
-          setData(buildParsedSuccessData(value));
-        }
-      },
-      (error) => {
-        if (isActive) {
-          setData(buildParsedErrorData(WrappedError.wrap(error)));
-        }
+    void parseMetadataDatum(metadata, handler, store).then((next) => {
+      if (isActive) {
+        setData(next);
       }
-    );
+    });
 
     return () => {
       isActive = false;
     };
   }, [metadata, handler, store, base]);
 
+  return data;
+};
+
+export function useSingleMetadataDatum<T>(metadata: unknown, handler: SingleMetadataHandler<T>) {
+  const data = useMetadataDatum(metadata, handler);
+  const recall = useRevalidatedRecall(metadata, handler, handler.recall);
+
+  return { data, recall };
+}
+
+export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, handler: CollectionMetadataHandler<T>) {
+  const data = useMetadataDatum(metadata, handler);
   const recallAll = useRevalidatedRecall(metadata, handler, handler.recall);
   const recallOne = useRevalidatedRecall(metadata, handler, handler.recallOne);
 
@@ -2779,30 +2780,7 @@ export function useCollectionMetadataDatum<T extends any[]>(metadata: unknown, h
 }
 
 export function useUnrecallableMetadataDatum<T>(metadata: unknown, handler: UnrecallableMetadataHandler<T>) {
-  const store = useAppStore();
-  const base = useSelectedBaseForReparse();
-  const [data, setData] = useState<Data<T>>(buildUnparsedData);
-
-  useEffect(() => {
-    let isActive = true;
-
-    void parseMetadataHandler(metadata, handler, store).then(
-      (value) => {
-        if (isActive) {
-          setData(buildParsedSuccessData(value));
-        }
-      },
-      (error) => {
-        if (isActive) {
-          setData(buildParsedErrorData(WrappedError.wrap(error)));
-        }
-      }
-    );
-
-    return () => {
-      isActive = false;
-    };
-  }, [metadata, handler, store, base]);
+  const data = useMetadataDatum(metadata, handler);
 
   return { data };
 }
@@ -2859,6 +2837,51 @@ const parseModelConfig = async (raw: unknown, store: AppStore, type: ModelType):
 
 const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelType): Promise<ModelIdentifierField> => {
   return zModelIdentifierField.parse(await parseModelConfig(raw, store, type));
+};
+
+/**
+ * Resolve a `vae` metadata reference to the identifier a VAE slot should be filled with.
+ *
+ * A VAE slot may legitimately hold a *main model's bundled `vae` submodel*: every VAE picker is built
+ * from a `is*VAEModelConfig` guard called without `excludeSubmodels`, so main models with a `vae`
+ * submodel show up as options, and the graph builders then record that identifier verbatim. Asserting
+ * `parsed.type === 'vae'` - as each of these handlers used to - therefore dropped the metadata row
+ * outright for exactly the models the picker offered.
+ *
+ * Gating on the full config rather than on the identifier also lets callers check properties that the
+ * identifier does not carry, such as a Wan VAE's `latent_channels`.
+ *
+ * @param isCompatible the slot's own domain, i.e. the same guard its picker is built from.
+ * @param handlerType used in the assertion messages, so a rejected row is traceable to its handler.
+ */
+const parseVAEModelIdentifier = async (arg: {
+  raw: unknown;
+  store: AppStore;
+  isCompatible: (config: AnyModelConfig, excludeSubmodels?: boolean) => boolean;
+  handlerType: string;
+}): Promise<ModelIdentifierField> => {
+  const { raw, store, isCompatible, handlerType } = arg;
+  const rawIdentifier = zModelIdentifierField.safeParse(raw).data;
+  const config = await parseModelConfig(raw, store, 'vae');
+  // A main model only qualifies when the reference actually points at its VAE. An absent submodel_type
+  // counts: the linear-UI graph builders record the picker's identifier as-is, without one.
+  const isMainVaeSubmodel =
+    config.type === 'main' &&
+    rawIdentifier?.type === 'main' &&
+    (rawIdentifier.submodel_type === null ||
+      rawIdentifier.submodel_type === undefined ||
+      rawIdentifier.submodel_type === 'vae');
+  assert(
+    config.type !== 'main' || isMainVaeSubmodel,
+    `${handlerType} requires a VAE model or a main model VAE submodel`
+  );
+  assert(isCompatible(config, !isMainVaeSubmodel), `${handlerType} requires a VAE this slot can hold`);
+  // Normalised so the recalled value is unambiguous downstream - a bare main-model identifier in a VAE
+  // slot would be indistinguishable from a main-model selection.
+  return zModelIdentifierField.parse({
+    ...config,
+    ...(isMainVaeSubmodel ? { submodel_type: 'vae' } : {}),
+  });
 };
 
 const isCompatibleWithMainModel = (candidate: ModelIdentifierField, store: AppStore) => {

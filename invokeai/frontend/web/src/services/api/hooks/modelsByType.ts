@@ -157,7 +157,10 @@ const buildModelsSelector =
 
     return modelConfigsAdapterSelectors
       .selectAll(result.data)
-      .filter(typeGuard)
+      // Called with exactly one argument on purpose: several guards take an optional `excludeSubmodels`
+      // second parameter, and a point-free `.filter(typeGuard)` would hand them the array *index* - so
+      // the first entry would be evaluated with submodels included and every other one without.
+      .filter((config): config is T => typeGuard(config))
       .filter((config) => !missingModelKeys.has(config.key));
   };
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
@@ -176,6 +179,12 @@ export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusers
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+/**
+ * FLUX.1 VAEs only. The `params.fluxVAE` and `params.zImageVaeModel` slots both hold one of these -
+ * their pickers are built from `isFlux1VAEModelConfig`, and neither slot can use a FLUX.2 VAE - so the
+ * listeners that auto-fill them must draw from this pool, not from the wider `selectFluxVAEModels`.
+ */
+export const selectFlux1VAEModels = buildModelsSelector(isFlux1VAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
 export const selectAnimaCompatibleVAEModels = buildModelsSelector(isAnimaCompatibleVAEModelConfig);
 export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);

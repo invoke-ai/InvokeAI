@@ -73,6 +73,42 @@ describe('Anima VAE predicates', () => {
     expect(isAnimaVAEModelConfig(vae(base))).toBe(false);
     expect(isAnimaCompatibleVAEModelConfig(vae(base))).toBe(false);
   });
+
+  // Every VAE picker is built from one of these guards called with a *single* argument, so main models
+  // with a bundled `vae` submodel are part of each slot's domain. The `excludeSubmodels` parameter is
+  // what distinguishes that from a geometry check the submodel cannot answer - see the Wan arm below.
+  describe('main-model VAE submodels', () => {
+    const mainWithVae = (base: string) =>
+      ({ key: `${base}-main`, type: 'main', base, name: `${base} main`, submodels: { vae: {} } }) as never;
+
+    it('accepts a FLUX main-model VAE submodel unless submodels are excluded', () => {
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('flux'))).toBe(true);
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('flux'), true)).toBe(false);
+    });
+
+    it('accepts an Anima main-model VAE submodel unless submodels are excluded', () => {
+      expect(isAnimaVAEModelConfig(mainWithVae('anima'))).toBe(true);
+      expect(isAnimaVAEModelConfig(mainWithVae('anima'), true)).toBe(false);
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('anima'))).toBe(true);
+    });
+
+    // A bundled submodel carries no `latent_channels`, so a Wan main model can never clear the geometry
+    // check - regardless of what is passed for `excludeSubmodels`.
+    it('never accepts a Wan main-model VAE submodel', () => {
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('wan'))).toBe(false);
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('wan'), true)).toBe(false);
+    });
+
+    // Point-free `.filter(guard)` would hand these guards the array *index* as `excludeSubmodels`.
+    // TypeScript rejects that at this call site, but not inside `buildModelsSelector`, whose generic
+    // signature declares the guard as single-parameter - see modelsByType.test.ts for that coverage.
+    it('changes its verdict based on the second argument', () => {
+      const config = mainWithVae('flux');
+
+      expect(isAnimaCompatibleVAEModelConfig(config, false)).toBe(true);
+      expect(isAnimaCompatibleVAEModelConfig(config, true)).toBe(false);
+    });
+  });
 });
 
 const wanMain = (over: Record<string, unknown>) =>

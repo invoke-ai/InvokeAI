@@ -42,8 +42,8 @@ import {
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
+  isFlux1VAEModelConfig,
   isFluxReduxModelConfig,
-  isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonFluxVAEModelConfig,
@@ -482,9 +482,13 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
   }
 };
 
-const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
+export const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedFLUXVAEModel = state.params.fluxVAE;
-  const fluxVAEModels = models.filter((m) => isFluxVAEModelConfig(m));
+  // FLUX.1 VAEs only. `params.fluxVAE` feeds `flux_model_loader.vae_model` in the FLUX.1 branch of
+  // buildFLUXGraph - FLUX.2 uses `params.flux2VaeModel` instead - and the picker is built from
+  // `isFlux1VAEModelConfig`. Defaulting from the wider flux+flux2 pool put a FLUX.2 VAE into a slot the
+  // user could not see it in and that FLUX.1 cannot load.
+  const fluxVAEModels = models.filter((m) => isFlux1VAEModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedFLUXVAEModel && fluxVAEModels.some((m) => m.key === selectedFLUXVAEModel.key)) {
