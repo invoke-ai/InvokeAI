@@ -40,7 +40,7 @@ export const GalleryBoardsPanel = () => {
   // container that stops being rendered loses its offset outright.
   usePreservedScrollOffset(boardsViewportRef);
 
-  const { collapsedBoardSections, showArchivedBoards, showDateBoards } = gallery.settings;
+  const { collapsedBoardSections, showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
 
   const groups = useMemo(
     () =>
@@ -51,9 +51,19 @@ export const GalleryBoardsPanel = () => {
         searchTerm,
         showArchived: showArchivedBoards,
         showDates: showDateBoards,
+        showOtherProjects: showOtherProjectBoards,
         t,
       }),
-    [gallery.boards, gallery.projectBoardId, projectName, searchTerm, showArchivedBoards, showDateBoards, t]
+    [
+      gallery.boards,
+      gallery.projectBoardId,
+      projectName,
+      searchTerm,
+      showArchivedBoards,
+      showDateBoards,
+      showOtherProjectBoards,
+      t,
+    ]
   );
 
   const loadedItemBoardIds = useMemo(

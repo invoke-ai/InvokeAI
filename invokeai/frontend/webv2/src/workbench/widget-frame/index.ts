@@ -2,6 +2,7 @@ export { WidgetActionsMenu } from './WidgetActionsMenu';
 export { WidgetBar, type WidgetBarItem } from './WidgetBar';
 export { WidgetEnableMenu, type WidgetEnableMenuItem } from './WidgetEnableMenu';
 export { WidgetFailureBoundary } from './WidgetFailureBoundary';
+export { WidgetIdentityIcon } from './WidgetIdentityIcon';
 export { FieldPlaceholder, WidgetHeader, WidgetHeaderActionsGroup, WidgetPanelFrame } from './WidgetFrames';
 export { StatusWidgetChip } from '@platform/ui';
 export { WidgetInstanceContextMenu, type WidgetInstanceContextMenuTarget } from './WidgetInstanceContextMenu';

@@ -1,6 +1,6 @@
 import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
 
-import { HStack, NumberInput } from '@chakra-ui/react';
+import { HStack, NumberInput, Text } from '@chakra-ui/react';
 import { Slider } from '@platform/ui';
 import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
 import { useEraserOptions } from '@workbench/widgets/canvas/engineStoreHooks';
@@ -63,6 +63,9 @@ export const EraserOptions = ({ engine }: ToolOptionsComponentProps) => {
   return (
     <HStack align="center" gap="3">
       <HStack align="center" gap="1.5">
+        <Text color="fg.muted" fontSize="2xs">
+          {t('widgets.canvas.toolOptions.size')}
+        </Text>
         <Slider
           aria-label={sizeAriaLabel}
           formatValue={formatSizePx}
@@ -85,16 +88,21 @@ export const EraserOptions = ({ engine }: ToolOptionsComponentProps) => {
           <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.eraserSize')} fontSize="xs" />
         </NumberInput.Root>
       </HStack>
-      <Slider
-        aria-label={opacityAriaLabel}
-        formatValue={formatOpacityPercent}
-        max={100}
-        min={0}
-        size="sm"
-        value={opacityValue}
-        w="6rem"
-        onValueChange={onOpacityChange}
-      />
+      <HStack align="center" gap="1.5">
+        <Text color="fg.muted" fontSize="2xs">
+          {t('widgets.canvas.toolOptions.opacity')}
+        </Text>
+        <Slider
+          aria-label={opacityAriaLabel}
+          formatValue={formatOpacityPercent}
+          max={100}
+          min={0}
+          size="sm"
+          value={opacityValue}
+          w="6rem"
+          onValueChange={onOpacityChange}
+        />
+      </HStack>
     </HStack>
   );
 };

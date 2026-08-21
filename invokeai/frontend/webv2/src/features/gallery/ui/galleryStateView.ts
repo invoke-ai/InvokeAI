@@ -14,7 +14,6 @@ import {
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/core/selection';
 import {
-  gallerySemanticReferenceKey,
   parseGallerySemanticReference,
   type GallerySemanticReference,
 } from '@features/gallery/core/semanticImageQuery';
@@ -231,22 +230,8 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
 
-// The parser builds a fresh object per call, but selectors and memo
-// dependencies need identity stability: reuse the previous object while its
-// key is unchanged. (The gallery widget is single-instance, so one slot is
-// enough; a second consumer with a different value would still be correct,
-// merely unmemoized.)
-let lastSemanticReference: GallerySemanticReference | null = null;
-
-export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null => {
-  const parsed = parseGallerySemanticReference(values.semanticImageQuery);
-
-  if (gallerySemanticReferenceKey(parsed) !== gallerySemanticReferenceKey(lastSemanticReference)) {
-    lastSemanticReference = parsed;
-  }
-
-  return lastSemanticReference;
-};
+export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null =>
+  parseGallerySemanticReference(values.semanticImageQuery);
 
 /**
  * Where new results land, resolved against the boards this install actually has.

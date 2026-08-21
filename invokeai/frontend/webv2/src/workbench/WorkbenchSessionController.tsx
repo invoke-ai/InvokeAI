@@ -25,8 +25,16 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
       // applies exactly once and never survives into a later navigation.
       const intent = resolveLaunchpadIntent(search.intent);
 
-      if (intent) {
+      // A named preset wins: the user picked the arrangement itself, so it
+      // outranks whatever arrangement an intent merely implies. The intent
+      // still gets to name the invocation source, which a preset cannot.
+      if (search.preset) {
+        commands.layout.applyPreset(search.preset);
+      } else if (intent) {
         commands.layout.applyPreset(intent.presetId);
+      }
+
+      if (intent) {
         commands.generation.setSource(intent.sourceId);
       }
 

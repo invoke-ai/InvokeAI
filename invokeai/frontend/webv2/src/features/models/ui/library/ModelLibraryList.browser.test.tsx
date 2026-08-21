@@ -102,3 +102,72 @@ describe('ModelLibraryList filter transitions', () => {
     expect(names).toContain('Model lora-2');
   });
 });
+
+describe('ModelLibraryList pinned group header', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    accountLifecycle.activate('library-pin-test-a', ':user:library-pin-test-a');
+    // Enough rows in both groups that the second group's header can reach the
+    // top of an 800px viewport with the first group still inside the
+    // virtualizer's overscan window.
+    setModelsSnapshotForTests({
+      models: [
+        ...Array.from({ length: 20 }, (_, i) => model(`main-${i}`, 'main')),
+        ...Array.from({ length: 20 }, (_, i) => model(`lora-${i}`, 'lora')),
+      ],
+      status: 'loaded',
+    });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  const settleFrame = async () => {
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(undefined));
+      });
+    });
+  };
+
+  const pinnedHeaderText = () => host.querySelector<HTMLElement>('[data-pinned-group-header]')?.textContent ?? '';
+
+  it('swaps the pinned header when a group scrolls under it, not an overscan later', async () => {
+    await act(() => root.render(<Harness filters={DEFAULT_LIBRARY_FILTERS} />));
+    await settleFrame();
+
+    const viewport = host.querySelector<HTMLElement>('[aria-label="models.library"]');
+
+    expect(viewport).not.toBeNull();
+    expect(pinnedHeaderText()).toContain('Main Models');
+
+    const scrollTo = async (top: number) => {
+      await act(async () => {
+        viewport!.scrollTop = top;
+        viewport!.dispatchEvent(new Event('scroll'));
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => resolve(undefined));
+        });
+      });
+    };
+
+    // Rows: main header (30px) + 20 main rows (56px each) put the LoRAs header
+    // at 1150px; one row past it, the first visible row is a lora.
+    await scrollTo(1206);
+    expect(pinnedHeaderText()).toContain('LoRAs');
+
+    await scrollTo(0);
+    expect(pinnedHeaderText()).toContain('Main Models');
+  });
+});

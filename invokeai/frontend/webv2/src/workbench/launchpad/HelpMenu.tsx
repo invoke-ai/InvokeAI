@@ -1,17 +1,11 @@
-import type { LucideIcon } from 'lucide-react';
+import type { ElementType } from 'react';
 
 import { chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { APP_VERSION } from '@platform/runtime/appMetadata';
+import { DiscordIcon } from '@platform/ui/BrandIcon';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
-import {
-  BookOpenTextIcon,
-  ChevronRightIcon,
-  ClapperboardIcon,
-  CircleQuestionMarkIcon,
-  CodeIcon,
-  MessagesSquareIcon,
-} from 'lucide-react';
+import { BookOpenTextIcon, ChevronRightIcon, ClapperboardIcon, CircleQuestionMarkIcon, CodeIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -27,7 +21,8 @@ const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
 
 interface HelpLink {
   href: string;
-  icon: LucideIcon;
+  /** Lucide for generic destinations, a brand mark where the destination has one. */
+  icon: ElementType;
   labelKey: string;
   value: string;
 }
@@ -50,7 +45,7 @@ const GUIDES: HelpLink[] = [
 const COMMUNITY: HelpLink[] = [
   {
     href: 'https://discord.gg/ZmtBAhwWhy',
-    icon: MessagesSquareIcon,
+    icon: DiscordIcon,
     labelKey: 'launchpad.help.discord',
     value: 'discord',
   },

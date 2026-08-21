@@ -26,6 +26,11 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  // Brand marks. The Launchpad's help menu and the editor's app menu both link
+  // to Discord, and without grouping that one shared module the editor pulls
+  // the whole Launchpad chunk in after it — the same regression the
+  // `launchpad/intents.ts` note below describes.
+  '/platform/ui/BrandIcon.tsx',
   '/platform/core/concurrency.ts',
   '/platform/query/client.ts',
   '/platform/time/serverTimestamp.ts',

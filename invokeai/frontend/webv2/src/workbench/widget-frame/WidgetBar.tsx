@@ -127,15 +127,34 @@ export const WidgetBar = ({
   );
 };
 
-const WIDGET_ITEM_SX: SystemStyleObject = {
+/**
+ * Rail states, quietest to loudest: idle icon dimmed, hover one neutral step
+ * up, active a further step with the icon in the brand hue.
+ *
+ * The brand lives in the icon rather than the fill because it cannot live in
+ * the fill: the seed is a 92%-lightness lime, so every brand tint of the light
+ * theme's near-white rail lands within 1.06:1 of it — a state you cannot see.
+ * As an icon on a neutral fill it clears 3:1 on all five themes, which
+ * `RailActiveContrast.browser.test.tsx` pins.
+ *
+ * The attribute selectors outrank `rowRecipe`'s own `_hover`, so hovering the
+ * active item leaves it alone instead of flickering to the hover fill.
+ */
+export const WIDGET_ITEM_SX: SystemStyleObject = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
   rounded: 'md',
   h: 9,
   w: 9,
+  color: 'fg.muted',
   '&[aria-pressed="false"]:hover': {
+    bg: 'bg.muted',
+    color: 'fg',
+  },
+  '&[aria-pressed="true"]': {
     bg: 'bg.emphasized',
+    color: 'brand.fg',
   },
   _disabled: WIDGET_SLOT_DISABLED_PROPS,
 };
@@ -181,7 +200,6 @@ const WidgetSlot = ({
         <Row
           {...dragHandleProps}
           css={WIDGET_ITEM_SX}
-          active={isActive ? 'accent' : 'none'}
           aria-label={item.label}
           aria-disabled={isDisabled}
           aria-pressed={isActive}

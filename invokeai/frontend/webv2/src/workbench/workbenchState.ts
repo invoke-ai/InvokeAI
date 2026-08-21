@@ -398,12 +398,25 @@ export const GRAPH_HISTORY_BYTE_BUDGET = 64 * 1024 * 1024;
 const NOTIFICATION_LIMIT = 100;
 // Side panels host real widget UIs (gallery grid, generate form); below
 // ~350px their toolbars and grids collapse into unusable slivers, so that is
-// the floor rather than a merely-rendered 180px. The bottom strip is a
-// status row, not a widget host, and keeps its own bounds.
+// the floor rather than a merely-rendered 180px. The ceiling exists for the
+// opposite reason: a panel is an inspector, and the work surface it sits
+// beside has to keep enough room to be the thing being worked on. Two maxed
+// side panels come to 1528px with their rails, so on a narrow laptop that is
+// a deliberate, self-inflicted squeeze rather than something a default can
+// walk into. The bottom strip is a status row, not a widget host, and keeps
+// its own bounds.
 const MIN_PANEL_SIZE_PX = 350;
-const MAX_PANEL_SIZE_PX = 520;
+const MAX_PANEL_SIZE_PX = 720;
 const MIN_STATUS_PANEL_SIZE_PX = 96;
 const MAX_STATUS_PANEL_SIZE_PX = 420;
+
+/**
+ * How far a resize drag must push past a region's floor before releasing means
+ * "collapse to the rail" rather than "stop at the minimum". Wide enough that
+ * running into the floor never collapses by accident, short enough to find
+ * without being told it is there.
+ */
+const PANEL_COLLAPSE_OVERSHOOT_PX = 80;
 
 /** The resize bounds for a widget region — shared with the resize handles. */
 export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
@@ -413,6 +426,18 @@ export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: nu
 
   return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
 };
+
+/** The size at or below which a resize drag snaps the region shut. */
+export const getPanelCollapseThreshold = (region: WidgetRegion): number =>
+  getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
+
+/**
+ * Whether a live drag should have the panel snapped shut, dockview-style: it
+ * snaps at the overshoot threshold and reopens halfway back, so the boundary
+ * has hysteresis instead of flapping a whole panel on one pixel.
+ */
+export const shouldSnapPanelShut = (region: WidgetRegion, rawSizePx: number, isSnapped: boolean): boolean =>
+  rawSizePx <= getPanelCollapseThreshold(region) + (isSnapped ? PANEL_COLLAPSE_OVERSHOOT_PX / 2 : 0);
 
 const now = (): string => new Date().toISOString();
 

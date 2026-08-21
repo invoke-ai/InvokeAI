@@ -1,4 +1,4 @@
-"""Tests for the Krea-2 starter-model bundle and its GGUF dependency wiring.
+"""Tests for the Krea-2 and MiniMax H3 starter-model bundles.
 
 A single-file / GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
@@ -76,5 +76,27 @@ def test_krea2_gguf_dependency_models_are_registered_in_starter_models() -> None
     # Every dependency source must itself be an installable starter model.
     starter_sources = {m.source for m in STARTER_MODELS}
     for model in STARTER_BUNDLES[BaseModelType.Krea2].models:
+        for dep in model.dependencies or []:
+            assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"
+
+
+def test_minimax_h3_bundle_contains_working_set_and_turbo_loras() -> None:
+    bundle = STARTER_BUNDLES[BaseModelType.MiniMaxH3]
+    by_source = {model.source: model for model in bundle.models}
+    # The minimal working set: shared components, text encoder, transformer.
+    assert any(s.startswith("MiniMaxAI/MiniMax-H3::") for s in by_source)
+    assert any(m.type is ModelType.Qwen3VLEncoder for m in by_source.values())
+    assert any(m.type is ModelType.Main and m.format is ModelFormat.Checkpoint for m in by_source.values())
+    # Both turbo (step-distillation) LoRAs.
+    loras = [m for m in bundle.models if m.type is ModelType.LoRA]
+    lora_sources = {m.source for m in loras}
+    assert "larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors" in lora_sources
+    assert "lightx2v/Minimax-h3-Turbo::minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors" in lora_sources
+
+
+def test_minimax_h3_bundle_models_are_registered_in_starter_models() -> None:
+    starter_sources = {m.source for m in STARTER_MODELS}
+    for model in STARTER_BUNDLES[BaseModelType.MiniMaxH3].models:
+        assert model.source in starter_sources, f"{model.name} is not registered in STARTER_MODELS"
         for dep in model.dependencies or []:
             assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"

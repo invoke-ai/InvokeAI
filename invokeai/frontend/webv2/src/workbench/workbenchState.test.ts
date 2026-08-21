@@ -24,7 +24,14 @@ import { layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
-import { GRAPH_HISTORY_BYTE_BUDGET, normalizeGraphHistory, normalizeWorkbenchAccount } from './workbenchState';
+import {
+  clampPanelSize,
+  getPanelCollapseThreshold,
+  GRAPH_HISTORY_BYTE_BUDGET,
+  normalizeGraphHistory,
+  shouldSnapPanelShut,
+  normalizeWorkbenchAccount,
+} from './workbenchState';
 import {
   createInitialWorkbenchState,
   nextLayerName,
@@ -657,6 +664,51 @@ describe('workbench widget region defaults', () => {
     expect(getProjectWidgetValues(getActiveProject(preserved), 'generate')).toMatchObject({
       positivePrompt: 'generate positive',
     });
+  });
+});
+
+describe('workbench panel resize bounds', () => {
+  it('clamps a side panel into its raised bounds', () => {
+    expect(clampPanelSize('left', 900)).toBe(720);
+    expect(clampPanelSize('left', 700)).toBe(700);
+    expect(clampPanelSize('left', 100)).toBe(350);
+  });
+
+  it('snaps shut past the overshoot and reopens with hysteresis', () => {
+    expect(shouldSnapPanelShut('left', 350, false)).toBe(false);
+    expect(shouldSnapPanelShut('left', 271, false)).toBe(false);
+    expect(shouldSnapPanelShut('left', 270, false)).toBe(true);
+    // Once shut, dragging back only reopens past the halfway band.
+    expect(shouldSnapPanelShut('left', 290, true)).toBe(true);
+    expect(shouldSnapPanelShut('left', 311, true)).toBe(false);
+  });
+
+  it('measures the overshoot against whichever floor the region has', () => {
+    expect(shouldSnapPanelShut('bottom', 96, false)).toBe(false);
+    expect(shouldSnapPanelShut('bottom', 17, false)).toBe(false);
+    expect(shouldSnapPanelShut('bottom', 16, false)).toBe(true);
+  });
+
+  it('exposes the collapse threshold as a size below the floor', () => {
+    expect(getPanelCollapseThreshold('left')).toBe(270);
+    expect(getPanelCollapseThreshold('bottom')).toBe(16);
+  });
+
+  it('reopens a collapsed region at the size it was collapsed from', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { region: 'left', sizePx: 500, type: 'setRegionWidgetSize' });
+
+    const activeInstanceId = getActiveProject(state).widgetRegions.left.activeInstanceId;
+
+    // What a drag past the floor does: hide the panel, leave its width alone.
+    state = workbenchReducer(state, { isCollapsed: true, region: 'left', type: 'setRegionWidgetCollapsed' });
+    expect(getActiveProject(state).widgetRegions.left).toMatchObject({ isCollapsed: true, sizePx: 500 });
+
+    // What the rail button does next: the stored active instance still matches,
+    // so selecting it toggles the collapse back off rather than switching.
+    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: activeInstanceId });
+    expect(getActiveProject(state).widgetRegions.left).toMatchObject({ isCollapsed: false, sizePx: 500 });
   });
 });
 

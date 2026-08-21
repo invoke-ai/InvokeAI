@@ -100,6 +100,24 @@ const danger: Compute = (theme) => theme.colors.danger;
 const success: Compute = (theme) => theme.colors.success;
 const warning: Compute = (theme) => theme.colors.warning;
 const brandSolid: Compute = (theme) => theme.colors.brand.solid;
+
+/**
+ * Brand as a *foreground* colour rather than a fill.
+ *
+ * The seed is a bright lime picked to carry on the dark themes' near-black
+ * surfaces, where it measures 14.5:1. On the light theme the same value sits at
+ * L≈92% against a 99% white panel and measures 1.20:1 — invisible, which is why
+ * the Invoke mark all but disappeared there. Darkening it halfway into the text
+ * ramp brings it to 4.2:1 on the panel and 4.1:1 on `brand.subtle`: still
+ * unmistakably the brand hue, now actually a colour you can put something in.
+ *
+ * `brand.solid` is untouched — fills keep the bright seed and pair it with
+ * `brand.contrast`.
+ */
+const brandFg: Compute = (theme) =>
+  theme.colorScheme === 'light'
+    ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
+    : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
 
 /** The neutral ramp, emitted as `neutral.50…neutral.950`, one value per theme. */
@@ -172,14 +190,15 @@ const semanticColors = {
   },
   /**
    * Invoke identity palette (lime). Authored from two seeds (`solid` + `contrast`),
-   * like `accent`; the rest derive. NOTE: `brand.fg` is the bright `solid` fill, so
-   * `brand.fg` on `brand.subtle` reads well on the dark themes but is low-contrast in
-   * the light theme — brand is meant for emphasis fills, not body text.
+   * like `accent`; the rest derive. `brand.fg` is the seed on the dark themes and a
+   * darkened mix on the light one (see {@link brandFg}), so it is safe to put text
+   * and icons in on any theme; `brand.solid` stays the bright fill and wants
+   * `brand.contrast` on top of it.
    */
   brand: {
     solid: colorToken(brandSolid),
     contrast: colorToken((theme) => theme.colors.brand.contrast),
-    fg: colorToken(brandSolid),
+    fg: colorToken(brandFg),
     subtle: mix(brandSolid, 16, surface),
     muted: mix(brandSolid, 26, surface),
     emphasized: mix(brandSolid, 36, surface),
@@ -240,6 +259,14 @@ const config = defineConfig({
     },
     ':root[data-reduce-motion="true"] .chakra-skeleton': {
       animation: 'none !important',
+    },
+    // A loading spinner is essential status, not decoration — frozen, its arc
+    // reads as a broken icon. It slows to a crawl instead of stopping; WCAG
+    // 2.3.3 targets non-essential motion only. (Chakra's indeterminate
+    // progress circle already behaves this way: its raw `spin 2s` shorthand
+    // bypasses the animation tokens the reduce-motion condition nulls out.)
+    ':root[data-reduce-motion="true"] .chakra-spinner': {
+      animation: 'spin 2s linear infinite !important',
     },
   },
   theme: {

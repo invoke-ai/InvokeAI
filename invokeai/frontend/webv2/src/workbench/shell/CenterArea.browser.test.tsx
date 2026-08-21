@@ -9,6 +9,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const centerAreaMocks = vi.hoisted(() => {
   const icon = () => null;
+  // A settled deferred resource, the shape `use()` can read without
+  // suspending — the center view's icon resolves the implementation to decide
+  // whether to show a spinner, and this fixture is always "already loaded".
+  const loadedImplementation = () => {
+    const promise: Promise<object> & { status?: string; value?: object } = Promise.resolve({});
+
+    promise.status = 'fulfilled';
+    promise.value = {};
+
+    return { getStatus: () => 'loaded', load: () => promise, preload: () => {}, retry: () => promise };
+  };
   const activeItem = {
     icon,
     id: 'preview-instance',
@@ -17,6 +28,7 @@ const centerAreaMocks = vi.hoisted(() => {
     status: 'enabled',
     typeId: 'preview',
     widget: {
+      implementation: loadedImplementation(),
       manifest: {
         centerPlacement: 'view',
         chrome: { header: 'visible' },
@@ -61,6 +73,9 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     selector({ backendConnection: { status: 'connected' } }),
 }));
 vi.mock('@workbench/widget-frame', () => ({
+  // Loading state is not what this suite measures; the real component would
+  // suspend on a chunk that does not exist under the mocked registry.
+  WidgetIdentityIcon: () => <Box boxSize="3.5" />,
   WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' }) => {
     if (slot === 'actions') {
       return <Box data-testid="trailing-actions" flexShrink={0} w="189px" />;

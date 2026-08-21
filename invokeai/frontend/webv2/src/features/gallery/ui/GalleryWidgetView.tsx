@@ -56,6 +56,10 @@ export const GalleryStatusChip = ({ count }: { count: number }) => {
   );
 };
 
+/** Keeps query identity local to the gallery consumer that owns it. */
+export const useGallerySemanticImageQuery = (value: unknown) =>
+  useMemo(() => getGallerySemanticImageQuery({ semanticImageQuery: value }), [value]);
+
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
     gallery: galleryCommands,
@@ -76,7 +80,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
   const queryClient = useQueryClient();
-  const semanticQuery = getGallerySemanticImageQuery(galleryValues);
+  const semanticQuery = useGallerySemanticImageQuery(galleryValues.semanticImageQuery);
   const data = useGalleryData({
     galleryView,
     page,

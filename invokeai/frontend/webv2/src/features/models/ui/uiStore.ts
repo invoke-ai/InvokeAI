@@ -38,6 +38,14 @@ export interface ModelsUiSnapshot {
   addModelsSeed: string | null;
   /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
+  /**
+   * Provider whose key card should be revealed on the next render of the Keys
+   * tab, set when the user asked to configure one specific provider. One-shot
+   * like {@link ModelsUiSnapshot.addModelsSeed}: the card consumes it, so
+   * returning to the tab later lands on a quiet grid rather than replaying a
+   * highlight the user did not ask for.
+   */
+  highlightProviderId: string | null;
   selectedKeys: ReadonlySet<string>;
   filters: ModelLibraryFilters;
   /** Last folder-scan query and its results, kept across tab switches. */
@@ -60,6 +68,7 @@ const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   addModelsSeed: null,
   filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
+  highlightProviderId: null,
   libraryScrollOffsets: {},
   pickerCompactViews: {},
   queueExpanded: false,
@@ -110,6 +119,22 @@ export const openModelManagerTab = (activeTab: ModelManagerTab): void => {
 /** Focus a model and reveal it in the detail tab (e.g. from a library row). */
 export const openModelDetail = (modelKey: string): void => {
   updateModelsUi({ activeModelKey: modelKey, activeTab: 'details' });
+};
+
+/**
+ * Open the Keys tab pointed at one provider's card.
+ *
+ * The tab alone is not the answer to "configure this provider" — it is a grid
+ * of cards, and the one the user came for may be off-screen. Naming the
+ * provider lets the card reveal itself.
+ */
+export const openExternalProviderKeys = (providerId: string): void => {
+  updateModelsUi({ activeTab: 'keys', highlightProviderId: providerId });
+};
+
+/** Consumes the pending highlight so it fires once per request. */
+export const clearHighlightedProvider = (): void => {
+  updateModelsUi({ highlightProviderId: null });
 };
 
 /**

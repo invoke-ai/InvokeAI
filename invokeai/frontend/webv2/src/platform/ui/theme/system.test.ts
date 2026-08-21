@@ -129,11 +129,15 @@ describe('native Chakra integration', () => {
 });
 
 describe('brand palette derives from its two seeds (like accent)', () => {
-  it('fg/border equal solid; subtle/muted/emphasized mix solid into the surface', () => {
+  it('border equals solid; subtle/muted/emphasized mix solid into the surface', () => {
     for (const theme of THEMES) {
       const solid = resolveToken(sys, theme, 'brand.solid');
       const surface = resolveToken(sys, theme, 'bg.subtle');
-      expect(resolveToken(sys, theme, 'brand.fg')).toBe(solid);
+      // `brand.fg` is the exception: it darkens on the light theme, where the
+      // seed measures 1.20:1 against the panel it would sit on.
+      expect(resolveToken(sys, theme, 'brand.fg')).toBe(
+        theme === 'light' ? `color-mix(in oklab, ${solid} 50%, oklch(22.5% 0.013 264))` : solid
+      );
       expect(resolveToken(sys, theme, 'brand.border')).toBe(solid);
       for (const [key, pct] of [
         ['subtle', 16],
