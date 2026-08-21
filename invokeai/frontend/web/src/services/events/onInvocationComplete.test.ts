@@ -1053,7 +1053,7 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
       await handler(buildImageCompleteEvent());
       expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
 
-      handler.cancelScheduledRetries();
+      handler.dispose();
       await vi.advanceTimersByTimeAsync(120_000);
 
       expect(getImageDTOSafe, 'nothing from the old session fires afterwards').toHaveBeenCalledTimes(1);
@@ -1061,6 +1061,153 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
       vi.mocked(getImageDTOSafe).mockReset();
       vi.useRealTimers();
     }
+  });
+
+  it('does not let a lookup that was already in flight schedule work after disposal', async () => {
+    // Clearing the queued timers is not enough: the DTO request that was mid-flight when the
+    // session ended comes back afterwards, and would schedule its refetch against whatever store
+    // has replaced it.
+    vi.useFakeTimers();
+    try {
+      let failFirstLookup: (value: null) => void = () => {};
+      vi.mocked(getImageDTOSafe).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            failFirstLookup = resolve;
+          })
+      );
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      const delivery = handler(buildImageCompleteEvent());
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(1);
+
+      // The socket goes away while that lookup is still outstanding, and only then does it fail.
+      handler.dispose();
+      failFirstLookup(null);
+      await delivery;
+      // Checked before advancing: a timer armed here would fire and be gone by the time the clock
+      // moved, so asserting afterwards would pass either way.
+      expect(vi.getTimerCount(), 'nothing is armed for a session that has ended').toBe(0);
+
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(getImageDTOSafe, 'and nothing is refetched for it').toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not dispatch an output whose lookup resolved after disposal', async () => {
+    // The DTO belongs to the session that has just ended; inserting it now puts one user's output
+    // in the next user's gallery.
+    vi.useFakeTimers();
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let resolveLookup: (value: any) => void = () => {};
+      vi.mocked(getImageDTOSafe).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveLookup = resolve;
+          })
+      );
+
+      const dispatched: unknown[] = [];
+      const dispatch = vi.fn((action: unknown) => {
+        dispatched.push(action);
+        return { unwrap: () => Promise.resolve(undefined) };
+      });
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      const delivery = handler(buildImageCompleteEvent());
+      handler.dispose();
+      resolveLookup({
+        image_name: 'from-old-session.png',
+        board_id: null,
+        is_intermediate: false,
+        image_category: 'general',
+        session_id: 'old-session',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      await delivery;
+
+      expect(
+        dispatched.some((action) => {
+          const payload = (action as { payload?: unknown }).payload;
+          return Array.isArray(payload) && payload.includes('GalleryItemNameList');
+        }),
+        'no gallery work for the session that ended'
+      ).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resumes the backoff for a duplicate rather than restarting it', async () => {
+    // A stream of duplicates during an outage would otherwise start a fresh 1s chain each time,
+    // so the "bounded" refetch would never actually be bounded.
+    vi.useFakeTimers();
+    try {
+      vi.mocked(getImageDTOSafe).mockResolvedValue(null);
+
+      const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+      const getState = vi.fn(() => ({}));
+      const handler = buildOnInvocationComplete(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        getState as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dispatch as any,
+        new Map()
+      );
+
+      const event = buildImageCompleteEvent();
+      await handler(event);
+      // Duplicates keep arriving *after* each scheduled attempt has fired — the shape that used to
+      // restart the chain rather than continue it.
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(15_000);
+        await handler(event);
+      }
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      // Six deliveries, and one shared chain of three attempts across all of them.
+      expect(getImageDTOSafe).toHaveBeenCalledTimes(9);
+    } finally {
+      vi.mocked(getImageDTOSafe).mockReset();
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores an event delivered after disposal', async () => {
+    // The socket is being torn down, but an event already queued for dispatch can still arrive.
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    handler.dispose();
+    await handler(buildImageCompleteEvent());
+
+    expect(getImageDTOSafe).not.toHaveBeenCalled();
   });
 
   it('still processes distinct invocations of the same queue item', async () => {

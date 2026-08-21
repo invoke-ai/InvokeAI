@@ -42,7 +42,16 @@ const log = logger('events');
  * event-wide flag would either re-run the outputs that did land (double-counting their board totals
  * and optimistic inserts) or abandon the one that did not.
  */
-type ProcessedInvocationState = { status: 'done' } | { status: 'retryable'; missingNames: ReadonlySet<string> };
+type ProcessedInvocationState =
+  | { status: 'done' }
+  | {
+      status: 'retryable';
+      missingNames: ReadonlySet<string>;
+      /** How many refetches this event has already had. Carried on the state rather than passed
+       * down the call chain so a duplicate delivery resumes the backoff instead of restarting it —
+       * a stream of duplicates during an outage would otherwise start a fresh 1s chain each time. */
+      attempts: number;
+    };
 
 /**
  * When to retry outputs a delivery lost to a failed DTO lookup, and how many times.
@@ -58,7 +67,8 @@ const RETRY_BACKOFF_MS = [1000, 3000, 9000];
 
 /** The completion handler, plus the teardown hook its scheduled refetches require. */
 type InvocationCompleteHandler = ((data: S['InvocationCompleteEvent']) => Promise<void>) & {
-  cancelScheduledRetries: () => void;
+  /** Ends this handler's session: nothing it has in flight or queued may touch the next one. */
+  dispose: () => void;
 };
 
 // These nodes are passthrough nodes. They do not add images/videos to the gallery — their
@@ -96,6 +106,11 @@ export const buildOnInvocationComplete = (
   const inFlightDeliveries = new Map<string, Promise<void>>();
   // The pending refetch for each event, so a new pass supersedes it rather than running beside it.
   const scheduledRetries = new Map<string, ReturnType<typeof setTimeout>>();
+  // Set when this handler's socket/session goes away. Every await below is a point where the store
+  // underneath can have become a different user's, so the flag is checked after each one: clearing
+  // the queued timers alone still let a DTO fetch that was already in flight come back and dispatch
+  // into — or schedule more work against — the session that replaced this one.
+  let isDisposed = false;
 
   // `retryNames`, when set, restricts this pass to the outputs a previous delivery lost to a failed
   // lookup — everything else already landed and must not be dispatched twice.
@@ -114,6 +129,11 @@ export const buildOnInvocationComplete = (
     }
 
     const fetchedImageDTOs = await getResultImageDTOs(data, onLookupFailure, retryNames);
+    if (isDisposed) {
+      // The session that asked for these is gone; dispatching now would insert its outputs into
+      // whichever one replaced it.
+      return;
+    }
     // Intermediates never reach the gallery. Dropping them here rather than bailing out of the
     // whole pass on the first one (which is what this used to do) matters now that a delivery's
     // outputs are tracked individually: a sibling abandoned that way is in nobody's missing set,
@@ -386,6 +406,9 @@ export const buildOnInvocationComplete = (
     }
 
     const videoDTOs = await getResultVideoDTOs(data, onLookupFailure, retryNames);
+    if (isDisposed) {
+      return;
+    }
     if (videoDTOs.length === 0) {
       return;
     }
@@ -481,7 +504,8 @@ export const buildOnInvocationComplete = (
   const deliver = async (
     data: S['InvocationCompleteEvent'],
     invocationKey: string,
-    retryNames: ReadonlySet<string> | null
+    retryNames: ReadonlySet<string> | null,
+    attemptsSoFar: number
   ): Promise<void> => {
     const isRetry = retryNames !== null;
     const missingNames = new Set<string>();
@@ -531,7 +555,7 @@ export const buildOnInvocationComplete = (
       log.error({ data, error } as JsonObject, `Error handling invocation complete: ${String(error)}`);
     } finally {
       if (missingNames.size > 0) {
-        processedInvocations.set(invocationKey, { status: 'retryable', missingNames });
+        processedInvocations.set(invocationKey, { status: 'retryable', missingNames, attempts: attemptsSoFar });
       }
     }
   };
@@ -547,6 +571,10 @@ export const buildOnInvocationComplete = (
     retryNames: ReadonlySet<string> | null,
     nextAttempt: number
   ): Promise<void> => {
+    if (isDisposed) {
+      return;
+    }
+
     // This pass supersedes any refetch already queued for the event: leaving that timer armed would
     // run a second chain of attempts alongside this one, doubling the bound RETRY_BACKOFF_MS is
     // supposed to impose.
@@ -560,7 +588,7 @@ export const buildOnInvocationComplete = (
     // while this one is in flight; the handshake in the handler is what lets it retry afterwards.
     processedInvocations.set(invocationKey, { status: 'done' });
 
-    const delivery = deliver(data, invocationKey, retryNames);
+    const delivery = deliver(data, invocationKey, retryNames, nextAttempt);
     // Waiters only need to know when the pass finished, not whether it threw.
     const settled = delivery.then(
       () => undefined,
@@ -577,7 +605,10 @@ export const buildOnInvocationComplete = (
 
     const outcome = processedInvocations.get(invocationKey);
     if (outcome?.status === 'retryable') {
-      scheduleRetry(data, invocationKey, nextAttempt, outcome.missingNames);
+      // nextAttempt is where this pass would resume the backoff; the state carries where the event
+      // actually got to, so a duplicate that superseded a queued retry continues the chain rather
+      // than restarting it at one second.
+      scheduleRetry(data, invocationKey, Math.max(nextAttempt, outcome.attempts), outcome.missingNames);
     }
   };
 
@@ -587,6 +618,9 @@ export const buildOnInvocationComplete = (
     attempt: number,
     missingNames: ReadonlySet<string>
   ) => {
+    if (isDisposed) {
+      return;
+    }
     const delayMs = RETRY_BACKOFF_MS[attempt];
     if (delayMs === undefined) {
       log.warn(
@@ -647,7 +681,11 @@ export const buildOnInvocationComplete = (
 
     const state = processedInvocations.get(invocationKey);
     const retryNames = state?.status === 'retryable' ? state.missingNames : null;
-    await runTrackedDelivery(data, invocationKey, retryNames, 0);
+    // A duplicate resumes this event's backoff where it had got to. Starting it over at one second
+    // would make the bound meaningless: a stream of duplicates during an outage — exactly when
+    // duplicates are likely — would restart the chain indefinitely.
+    const resumeAttempt = state?.status === 'retryable' ? state.attempts : 0;
+    await runTrackedDelivery(data, invocationKey, retryNames, resumeAttempt);
   };
 
   /**
@@ -657,7 +695,8 @@ export const buildOnInvocationComplete = (
    * have them fetch the old session's output and insert it into the new one's gallery and board
    * caches.
    */
-  onInvocationComplete.cancelScheduledRetries = () => {
+  onInvocationComplete.dispose = () => {
+    isDisposed = true;
     for (const timeout of scheduledRetries.values()) {
       clearTimeout(timeout);
     }

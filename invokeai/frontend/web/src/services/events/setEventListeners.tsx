@@ -1047,6 +1047,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   return () => {
-    onInvocationComplete.cancelScheduledRetries();
+    // Ends this socket's session for the completion handler: its queued refetches are dropped, and
+    // anything it already has in flight is barred from dispatching into whatever session replaces
+    // this one.
+    onInvocationComplete.dispose();
   };
 };
