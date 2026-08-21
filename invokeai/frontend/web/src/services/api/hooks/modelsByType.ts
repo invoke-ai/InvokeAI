@@ -155,13 +155,15 @@ const buildModelsSelector =
       modelConfigsAdapterSelectors.selectAll(missingResult.data ?? { ids: [], entities: {} }).map((m) => m.key)
     );
 
-    return modelConfigsAdapterSelectors
-      .selectAll(result.data)
-      // Called with exactly one argument on purpose: several guards take an optional `excludeSubmodels`
-      // second parameter, and a point-free `.filter(typeGuard)` would hand them the array *index* - so
-      // the first entry would be evaluated with submodels included and every other one without.
-      .filter((config): config is T => typeGuard(config))
-      .filter((config) => !missingModelKeys.has(config.key));
+    return (
+      modelConfigsAdapterSelectors
+        .selectAll(result.data)
+        // Called with exactly one argument on purpose: several guards take an optional `excludeSubmodels`
+        // second parameter, and a point-free `.filter(typeGuard)` would hand them the array *index* - so
+        // the first entry would be evaluated with submodels included and every other one without.
+        .filter((config): config is T => typeGuard(config))
+        .filter((config) => !missingModelKeys.has(config.key))
+    );
   };
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
 export const selectGlobalRefImageModels = buildModelsSelector(
