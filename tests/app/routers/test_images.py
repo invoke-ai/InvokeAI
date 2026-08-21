@@ -374,8 +374,8 @@ def test_delete_skips_names_deleted_mid_batch(
     assert response.status_code == 200
     body = response.json()
     # A concurrent delete satisfies the requested postcondition and must reach the client cleanup
-    # path as a confirmed deletion.
-    assert body["deleted_images"] == ["ok.png", "vanished.png"]
+    # path as a confirmed deletion. The response order is intentionally unspecified.
+    assert set(body["deleted_images"]) == {"ok.png", "vanished.png"}
     assert body["failed_images"] == []
 
 
