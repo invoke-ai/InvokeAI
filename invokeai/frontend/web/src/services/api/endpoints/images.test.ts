@@ -321,11 +321,13 @@ describe('buildChunkedImageBatchQueryFn', () => {
 
     const { dispatch, result } = run(baseQuery, { image_names: names(2500) });
 
-    // The second response is stale as soon as the session changes, so neither it nor a partial
-    // aggregate may reach the new session. The server-side write cannot be rolled back here, but
-    // the next session must refetch its own state rather than consume the old result.
+    // The second response is stale as soon as another user takes over, so neither it nor a
+    // partial aggregate may reach the new session. The server-side write cannot be rolled back
+    // here, but the next session must refetch its own state rather than consume the old result.
+    // Pinned to the *changed* wording: both abort errors contain "Aborted", and only the
+    // takeover one may discard committed work like this.
     expect(await result).toEqual({
-      error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('Aborted') },
+      error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('session changed') },
     });
     expect(baseQuery).toHaveBeenCalledTimes(2);
     expect(dispatch).not.toHaveBeenCalled();
@@ -344,7 +346,9 @@ describe('buildChunkedImageBatchQueryFn', () => {
     const { dispatch, result } = run(baseQuery, { image_names: names(5) });
 
     expect(baseQuery).toHaveBeenCalledTimes(1);
-    expect(await result).toEqual({ error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('Aborted') } });
+    expect(await result).toEqual({
+      error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('session changed') },
+    });
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -414,20 +418,36 @@ describe('buildChunkedImageBatchQueryFn', () => {
     expect(baseQuery).toHaveBeenCalledTimes(3);
   });
 
-  it('stops when the session simply expires mid-run, which bumps no generation', async () => {
-    // sessionExpiredLogout drops the token with no request of its own -- a 401 anywhere, or a
-    // token that fails validation on load -- so the generation counter never moves. Without the
-    // token half of the check, the loop would run on with no credentials at all.
+  it('stops on expiry but keeps reporting what the run committed', async () => {
+    // sessionExpiredLogout drops the token with no request of its own -- a 401 on ANY concurrent
+    // request (a gallery poll, a board refetch) clears it synchronously, and the generation
+    // counter never moves -- so the loop must stop: without the token half of the check it
+    // would run on with no credentials at all. But expiry is not a takeover. The committed
+    // chunk belongs to the very user heading for the login screen, and hard-aborting here
+    // discards the partial payload that handleDeletions needs to strip committed deletions out
+    // of the persisted canvas/nodes/reference-image slices -- none of which handle
+    // sessionExpiredLogout -- so the stale references would survive into their next login.
+    // Note the token vanishes while a *successful* chunk is in flight: the post-response check
+    // must consume that payload (same user, work committed), and only then stop.
     login('user-a');
     const baseQuery = vi.fn((_args: Request): Promise<Response> => {
       localStorage.removeItem('auth_token');
-      return Promise.resolve({ data: { added_images: [], failed_images: [], affected_boards: [] } });
+      return Promise.resolve({
+        data: { added_images: ['chunk-1.png'], failed_images: [], affected_boards: ['board-1'] },
+      });
     });
 
-    const { result } = run(baseQuery, { image_names: names(2500) });
-    await result;
+    const { dispatch, result } = run(baseQuery, { image_names: names(2500) });
 
+    expect(await result).toEqual({
+      data: {
+        added_images: ['chunk-1.png'],
+        failed_images: names(2500).slice(1000),
+        affected_boards: ['board-1'],
+      },
+    });
     expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags(getTags()));
   });
 });
 

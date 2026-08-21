@@ -76,14 +76,42 @@ type ImagesBaseQuery = (
   args: string | FetchArgs
 ) => QueryReturnValue<unknown, FetchBaseQueryError> | PromiseLike<QueryReturnValue<unknown, FetchBaseQueryError>>;
 
-/** A stale response must not be consumed by the session that replaced the requester. */
+/**
+ * Another user's session now owns the tab. This is the hard abort: nothing from the old run may
+ * be consumed — not a payload, not a partial aggregate, not a toast — because everything it
+ * carries belongs to whoever started it, and the loops treat it as fatal (`isAuthChangedError`).
+ */
 const AUTH_CHANGED_ERROR: FetchBaseQueryError = {
   status: 'CUSTOM_ERROR',
   error: 'Aborted: the authenticated session changed while the operation was running',
 };
 
+/**
+ * The session ended with no successor: the token is gone — a 401 on *any* concurrent request
+ * dispatches `sessionExpiredLogout`, whose reducer clears `auth_token` synchronously, and a
+ * deliberate logout does the same — and nobody else has logged in. Deliberately NOT matched by
+ * `isAuthChangedError`, so it takes the same partial-success path as an ordinary chunk failure:
+ * there is no new session to protect, the committed chunks belong to the very user who is about
+ * to land on the login screen, and the partial reporting is what lets `handleDeletions` strip
+ * committed deletions out of the persisted slices (canvas, nodes, reference images — none of
+ * which handle `sessionExpiredLogout`) before their next login.
+ */
+const SESSION_ENDED_ERROR: FetchBaseQueryError = {
+  status: 'CUSTOM_ERROR',
+  error: 'Aborted: the authenticated session ended while the operation was running',
+};
+
 const isAuthChangedError = (error: FetchBaseQueryError | undefined): boolean =>
   error?.status === AUTH_CHANGED_ERROR.status && error.error === AUTH_CHANGED_ERROR.error;
+
+/**
+ * Which of the two a failed session check means. The distinction is the whole ballgame: expiry
+ * must degrade into an ordinary failure so committed work is still reported, while a takeover
+ * must abort hard so the new user consumes nothing. Collapsing them in either direction is a
+ * bug this file has now had both ways.
+ */
+const sessionMismatchError = (): FetchBaseQueryError =>
+  localStorage.getItem('auth_token') === null ? SESSION_ENDED_ERROR : AUTH_CHANGED_ERROR;
 
 /**
  * Issues one chunk of a multi-request operation, unless the session it started under is gone.
@@ -98,7 +126,11 @@ const isAuthChangedError = (error: FetchBaseQueryError | undefined): boolean =>
  * So the context is captured before the first chunk, rechecked before each request, and checked
  * again before its response is consumed. See `isSameAuthContext` for what counts as the same
  * session — notably a sliding-window token refresh does not, or every long batch would abandon
- * itself.
+ * itself. A failed check is then triaged by `sessionMismatchError`, because the two ways it can
+ * fail call for opposite treatments — and the token can vanish at *any* await in the run, not
+ * just this chunk's own request: a 401 on any concurrent request (a gallery poll, a board
+ * refetch) clears it synchronously mid-flight. Collapse expiry into the hard abort and every
+ * one of those windows silently discards whatever the earlier chunks already committed.
  */
 const fetchChunk = async (
   baseQuery: ImagesBaseQuery,
@@ -106,24 +138,24 @@ const fetchChunk = async (
   args: FetchArgs
 ): Promise<QueryReturnValue<unknown, FetchBaseQueryError>> => {
   if (!isSameAuthContext(authContext)) {
-    return { error: AUTH_CHANGED_ERROR };
+    return { error: sessionMismatchError() };
   }
   const response = await baseQuery(args);
-  // The check after the response covers *successful* responses only, because a payload is the
-  // one thing a session that has moved on must not consume. An error carries nothing to
-  // consume, and rewriting it loses what it was — which matters most for the case that reaches
-  // here most often. `dynamicBaseQuery` dispatches `sessionExpiredLogout` on a 401 *before* it
-  // returns, and that reducer clears `auth_token` synchronously, so the token is already gone
-  // by the time this runs: every expired-session 401 would come back as an abort. That is not
-  // a distinction without a difference. An abort is deliberately fatal to the whole run, while
-  // an ordinary chunk failure takes the partial-success path — the one that reports what did
-  // land, so `handleDeletions` can strip committed deletions out of the canvas, nodes and
-  // reference images. Those slices are persisted and have no `sessionExpiredLogout` handler at
-  // all, so a run aborted here leaves them pointing at deleted images across the next login.
+  // An error passes through untriaged: it carries nothing the next session could consume, and
+  // rewriting it loses what it was. This chunk's own expired-session 401 is the everyday case —
+  // `dynamicBaseQuery` dispatches `sessionExpiredLogout` before returning it, so the token is
+  // already gone by this line, and a rewrite would turn the ordinary failure into an abort.
   if (response.error) {
     return response;
   }
-  return isSameAuthContext(authContext) ? response : { error: AUTH_CHANGED_ERROR };
+  // A *successful* payload is consumed unless another user has taken over. Mere expiry keeps
+  // the payload: it belongs to the same user, the server committed it, and dropping it would
+  // un-report work that already happened — the loop then stops at the next pre-request check.
+  const token = localStorage.getItem('auth_token');
+  if (token !== null && !isSameAuthContext(authContext)) {
+    return { error: AUTH_CHANGED_ERROR };
+  }
+  return response;
 };
 
 export const chunkImageNames = (image_names: string[]): string[][] => {
@@ -307,13 +339,16 @@ export const toastFailedImageBatch = (image_names: string[]) => {
  * over-count. Nothing else covers that case: these five endpoints have no `matchRejected`
  * listener, unlike the single-image board routes.
  *
- * Two other paths reach this branch with chunks already committed, and the session check is what
- * makes both safe to report on. A session change aborts the run as an error however much landed
- * — deliberately, so the new session cannot consume the old one's aggregate — and the check
- * below is why that does not surface as the previous user's count. The queryFn can also *throw*
- * on the mid-run path (`getTags(merged)` and `merged.failed_images.concat(...)` both read keys
- * straight off a server payload), which would over-count; that needs a response missing a
- * documented key, so it is left as an over-report rather than a silence.
+ * Three other paths reach this branch with chunks already committed, and the session check is
+ * what makes each safe. A *takeover* aborts the run as an error however much landed —
+ * deliberately, so the new session cannot consume the old one's aggregate — and the check below
+ * is why that does not surface as the previous user's count. An *expiry* mid-run resolves with
+ * partial data instead (see `SESSION_ENDED_ERROR`), so it lands on the fulfilled branch, where
+ * the same check keeps the count off the login screen while the queryFn's own invalidation and
+ * `handleDeletions` still do the state work. And the queryFn can *throw* on the mid-run path
+ * (`getTags(merged)` and `merged.failed_images.concat(...)` both read keys straight off a
+ * server payload), which would over-count; that needs a response missing a documented key, so
+ * it is left as an over-report rather than a silence.
  *
  * Extracted rather than repeated inline five times so that the wiring is one unit a test can
  * hold — an endpoint that swallows its rejection looks identical to one that reports it, and
