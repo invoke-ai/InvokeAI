@@ -21,7 +21,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { SELECTED_ITEM_MEDIA_GRACE_MS, SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
@@ -57,6 +57,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       marker: autoSwitchedImages,
       setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
       durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+      mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
     })
   );
 
@@ -131,6 +132,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       hasProgressImage,
       isProgressImageResolving,
       renderedItemName: imageToRender?.image_name ?? null,
+      // The image path only renders once its preload has settled, so whatever it renders has
+      // painted.
+      isMediaReady: imageToRender !== null,
       selectedItemName: selectedImageName ?? null,
     });
     return () => {
@@ -139,6 +143,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   }, [
     hasProgressImage,
     imageToRender?.image_name,
+    imageToRender,
     isProgressImageResolving,
     revealController,
     selectedImageName,

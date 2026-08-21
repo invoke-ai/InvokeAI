@@ -56,6 +56,11 @@ type ProcessedInvocationState = { status: 'done' } | { status: 'retryable'; miss
  */
 const RETRY_BACKOFF_MS = [1000, 3000, 9000];
 
+/** The completion handler, plus the teardown hook its scheduled refetches require. */
+type InvocationCompleteHandler = ((data: S['InvocationCompleteEvent']) => Promise<void>) & {
+  cancelScheduledRetries: () => void;
+};
+
 // These nodes are passthrough nodes. They do not add images/videos to the gallery — their
 // outputs reference an existing asset — so we must skip the gallery handling for them.
 // Without 'video' here, a Video Primitive completing mid-run would invalidate the gallery
@@ -115,6 +120,18 @@ export const buildOnInvocationComplete = (
     // so no re-delivery could ever recover it. Mirrors addVideosToGallery.
     const imageDTOs = fetchedImageDTOs.filter((imageDTO) => !imageDTO.is_intermediate);
     if (imageDTOs.length === 0) {
+      return;
+    }
+
+    if (isRetry) {
+      // A retry lands seconds after the fact, and the optimistic bookkeeping below assumes this
+      // delivery is the first thing to know about the output. By now a gallery refetch, or another
+      // delivery, may already have inserted it: the name-list insert dedupes, but the board totals
+      // are blind increments and would count it twice. Ask the server instead — a retry is rare
+      // enough that one authoritative refresh is cheaper than making every optimistic update
+      // idempotent against the cache.
+      const retriedBoards = [...new Set(imageDTOs.map((imageDTO) => imageDTO.board_id ?? 'none'))];
+      dispatch(galleryApi.util.invalidateTags(getTagsToInvalidateForBoardAffectingMutation(retriedBoards)));
       return;
     }
 
@@ -560,11 +577,16 @@ export const buildOnInvocationComplete = (
 
     const outcome = processedInvocations.get(invocationKey);
     if (outcome?.status === 'retryable') {
-      scheduleRetry(data, invocationKey, nextAttempt);
+      scheduleRetry(data, invocationKey, nextAttempt, outcome.missingNames);
     }
   };
 
-  const scheduleRetry = (data: S['InvocationCompleteEvent'], invocationKey: string, attempt: number) => {
+  const scheduleRetry = (
+    data: S['InvocationCompleteEvent'],
+    invocationKey: string,
+    attempt: number,
+    missingNames: ReadonlySet<string>
+  ) => {
     const delayMs = RETRY_BACKOFF_MS[attempt];
     if (delayMs === undefined) {
       log.warn(
@@ -575,19 +597,24 @@ export const buildOnInvocationComplete = (
       return;
     }
     // Bare setTimeout, not the window member: this module is unit tested outside a DOM.
+    // The names are captured here rather than read back from processedInvocations when the timer
+    // fires: that cache is a bounded LRU, and a burst of completions can evict this entry in the
+    // meantime. Reading it back would turn eviction into "silently give up on the output", which
+    // is the failure the refetch exists to prevent.
+    const missingAtSchedule = missingNames;
     const timeout = setTimeout(() => {
       scheduledRetries.delete(invocationKey);
       const state = processedInvocations.get(invocationKey);
-      if (state?.status !== 'retryable') {
+      if (state !== undefined && state.status !== 'retryable') {
         // A duplicate delivery got there first, or the outputs landed some other way.
         return;
       }
-      void runTrackedDelivery(data, invocationKey, state.missingNames, attempt + 1);
+      void runTrackedDelivery(data, invocationKey, state?.missingNames ?? missingAtSchedule, attempt + 1);
     }, delayMs);
     scheduledRetries.set(invocationKey, timeout);
   };
 
-  return async (data: S['InvocationCompleteEvent']) => {
+  const onInvocationComplete: InvocationCompleteHandler = async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     const invocationKey = `${data.item_id}:${data.invocation.id}`;
@@ -622,6 +649,22 @@ export const buildOnInvocationComplete = (
     const retryNames = state?.status === 'retryable' ? state.missingNames : null;
     await runTrackedDelivery(data, invocationKey, retryNames, 0);
   };
+
+  /**
+   * Drops every pending refetch. Must be called when the socket or the authenticated session goes
+   * away: the timers hold a closure over an event from *that* session but dispatch into whatever
+   * store is current when they fire, so a logout or account switch inside the retry window would
+   * have them fetch the old session's output and insert it into the new one's gallery and board
+   * caches.
+   */
+  onInvocationComplete.cancelScheduledRetries = () => {
+    for (const timeout of scheduledRetries.values()) {
+      clearTimeout(timeout);
+    }
+    scheduledRetries.clear();
+  };
+
+  return onInvocationComplete;
 };
 
 /**

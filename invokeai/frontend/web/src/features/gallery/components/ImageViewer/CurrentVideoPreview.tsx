@@ -35,7 +35,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiCopyBold, PiDownloadSimpleBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 import type { VideoDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { SELECTED_ITEM_MEDIA_GRACE_MS, SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
@@ -74,6 +74,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [paintedVideoName, setPaintedVideoName] = useState<string | null>(null);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const activeTab = useAppSelector(selectActiveTab);
@@ -114,6 +115,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       marker: autoSwitchedImages,
       setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
       durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+      mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
     })
   );
 
@@ -135,6 +137,11 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
       hasProgressImage,
       isProgressImageResolving,
       renderedItemName: videoName,
+      // preload="metadata" plus the near-zero seek does not prove a frame exists: the element is
+      // black until it decodes one. Reported as *which* video has painted rather than a boolean,
+      // because a boolean would be reset from a different effect than the one that reads it, and a
+      // passive effect's setState does not reach the next effect's closure in the same commit.
+      isMediaReady: paintedVideoName === videoName,
       selectedItemName: selectedItemName ?? null,
     });
     return () => {
@@ -143,6 +150,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   }, [
     hasProgressImage,
     isProgressImageResolving,
+    paintedVideoName,
     revealController,
     selectedItemName,
     shouldShowProgressInViewer,
@@ -394,6 +402,11 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // browsers populate dimensions/duration but don't actually decode and display the first
   // video frame until playback or a seek — the element just shows its black background.
   // Setting currentTime to 0.0001 nudges the decoder to paint without measurably advancing.
+  // The first decoded frame is on screen: only now does revealing this video show anything.
+  const handleLoadedData = useCallback(() => {
+    setPaintedVideoName(videoName);
+  }, [videoName]);
+
   const handleLoadedMetadata = useCallback(() => {
     onLoadImage(videoDTO?.session_id ?? null);
     const el = videoRef.current;
@@ -431,6 +444,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         playsInline
         controls={isPlaying}
         onLoadedMetadata={handleLoadedMetadata}
+        onLoadedData={handleLoadedData}
         onEnded={handleClose}
         onError={handleVideoError}
         style={{

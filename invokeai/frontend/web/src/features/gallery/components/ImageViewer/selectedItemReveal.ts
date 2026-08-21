@@ -34,6 +34,10 @@
  */
 
 type SelectedItemRevealInputs = {
+  /** Whether the rendered item has a frame on screen: an image decoded, a video's first frame
+   * painted. A <video> mounts instantly and stays black until it decodes, so mounting is not the
+   * same as being visible. */
+  isMediaReady: boolean;
   /** The user's "show progress in viewer" setting. */
   shouldShowProgressInViewer: boolean;
   /** Whether a live progress preview exists to be covering the viewer at all. */
@@ -67,6 +71,9 @@ export const createSelectedItemRevealController = (deps: {
   /** Writes the shared "temporarily showing selected item" flag. */
   setRevealed: (revealed: boolean) => void;
   durationMs: number;
+  /** How long a reveal waits for the item to paint before showing it anyway: media that will never
+   * become ready must still make the click land rather than swallowing it. */
+  mediaGraceMs: number;
   schedule?: (fn: () => void, ms: number) => number;
   cancel?: (id: number) => void;
 }): SelectedItemRevealController => {
@@ -75,6 +82,7 @@ export const createSelectedItemRevealController = (deps: {
     marker,
     setRevealed,
     durationMs,
+    mediaGraceMs,
     schedule = (fn, ms) => window.setTimeout(fn, ms),
     cancel = (id) => window.clearTimeout(id),
   } = deps;
@@ -82,11 +90,37 @@ export const createSelectedItemRevealController = (deps: {
   // The item this controller's currently-armed reveal is showing, null when none is in flight.
   // This is what lets a StrictMode re-run tell "my own reveal, restarted" from "nothing changed".
   let activeRevealItemName: string | null = null;
+  // The item owed a reveal that is waiting for its media to paint. Held rather than shown, so the
+  // two seconds are spent on a visible frame instead of running out over a black element.
+  let awaitingMediaItemName: string | null = null;
   let timerId = 0;
 
   const lower = () => {
     activeRevealItemName = null;
+    awaitingMediaItemName = null;
     setRevealed(false);
+  };
+
+  const reveal = (itemName: string) => {
+    cancel(timerId);
+    awaitingMediaItemName = null;
+    activeRevealItemName = itemName;
+    setRevealed(true);
+    timerId = schedule(lower, durationMs);
+  };
+
+  /** Owed a reveal, but the item has not painted yet. Bounded, so media that never loads still
+   * makes the click land. */
+  const awaitMedia = (itemName: string) => {
+    cancel(timerId);
+    awaitingMediaItemName = itemName;
+    activeRevealItemName = null;
+    setRevealed(false);
+    timerId = schedule(() => {
+      if (awaitingMediaItemName !== null) {
+        reveal(awaitingMediaItemName);
+      }
+    }, mediaGraceMs);
   };
 
   const run: SelectedItemRevealController['run'] = ({
@@ -95,6 +129,7 @@ export const createSelectedItemRevealController = (deps: {
     isProgressImageResolving,
     renderedItemName,
     selectedItemName,
+    isMediaReady,
   }) => {
     cancel(timerId);
 
@@ -105,13 +140,28 @@ export const createSelectedItemRevealController = (deps: {
     // identity to keep — it *is* the event — and leaving the ref on the item that was cleared makes
     // re-selecting that same item read as "nothing changed" once the window ends, so the re-click
     // stays hidden under the overlay.
-    if (renderedItemName === null && selectedItemName === null && previousRenderedItemName !== null) {
+    // Written whether or not anything had rendered before. `null` means "the viewer has not shown
+    // the user anything yet", which suppresses the reveal — right for the render that happens when
+    // the viewer opens onto an existing selection, wrong for a viewer sitting empty while a
+    // generation runs: the user's first click there is a click like any other, and suppressing it
+    // left their pick behind the overlay. An empty selection is a state the viewer *has* shown, so
+    // it gets the sentinel and the next selection reveals.
+    if (renderedItemName === null && selectedItemName === null) {
       lastRenderedItemNameRef.current = SELECTION_CLEARED;
     }
 
     // Resolve window: leave the ref and the marker otherwise exactly as they are (see the module
     // docblock) so whatever lands during it can still be classified — and revealed — when it ends.
     if (isProgressImageResolving) {
+      if (awaitingMediaItemName !== null && awaitingMediaItemName === renderedItemName) {
+        // Owed but not yet shown: keep the claim, the hand-off owns the viewer for now.
+        timerId = schedule(() => {
+          if (awaitingMediaItemName !== null) {
+            reveal(awaitingMediaItemName);
+          }
+        }, mediaGraceMs);
+        return;
+      }
       if (activeRevealItemName !== null && activeRevealItemName === renderedItemName) {
         // A reveal the user already earned is in flight over this very item. A generation
         // finishing elsewhere is no reason to slam the overlay back over their click, so re-arm
@@ -149,6 +199,20 @@ export const createSelectedItemRevealController = (deps: {
     }
 
     if (previousRenderedItemName === null || previousRenderedItemName === renderedItemName) {
+      if (awaitingMediaItemName === renderedItemName) {
+        // Already owed a reveal for this item, waiting on its first frame. If that frame has since
+        // arrived, show it; otherwise keep holding rather than restarting the wait.
+        if (isMediaReady) {
+          reveal(renderedItemName);
+        } else {
+          timerId = schedule(() => {
+            if (awaitingMediaItemName !== null) {
+              reveal(awaitingMediaItemName);
+            }
+          }, mediaGraceMs);
+        }
+        return;
+      }
       if (activeRevealItemName !== renderedItemName) {
         // Not a change of displayed item — nothing happened that needs to be made visible. The
         // first render after the viewer opens is not a click either.
@@ -168,9 +232,14 @@ export const createSelectedItemRevealController = (deps: {
       return;
     }
 
-    activeRevealItemName = renderedItemName;
-    setRevealed(true);
-    timerId = schedule(lower, durationMs);
+    if (!isMediaReady) {
+      // Spending the two seconds on an element that has not decoded a frame shows the user a black
+      // rectangle where their click should be, then puts the overlay back.
+      awaitMedia(renderedItemName);
+      return;
+    }
+
+    reveal(renderedItemName);
   };
 
   return {

@@ -46,6 +46,11 @@ type ImageViewerContextValue = {
 /** How long a mid-generation gallery click shows the clicked item before the live preview returns. */
 export const SELECTED_ITEM_REVEAL_DURATION_MS = 2000;
 
+/** How long a reveal waits for the selected item's first frame before showing it anyway. Long
+ * enough for a decode on a slow connection, short enough that a click on media that will never
+ * load still lands well inside the reveal it was promised. */
+export const SELECTED_ITEM_MEDIA_GRACE_MS = 1000;
+
 const ImageViewerContext = createContext<ImageViewerContextValue | null>(null);
 
 const log = logger('events');

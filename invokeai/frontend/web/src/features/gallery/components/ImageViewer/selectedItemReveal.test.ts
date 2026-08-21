@@ -22,6 +22,7 @@ const createHarness = () => {
       revealed = value;
     },
     durationMs: 2000,
+    mediaGraceMs: 1000,
     schedule: (fn) => {
       const id = nextTimerId++;
       timers.set(id, fn);
@@ -65,6 +66,9 @@ const inputs = (overrides: Partial<Parameters<ReturnType<typeof createHarness>['
   isProgressImageResolving: false,
   renderedItemName: null as string | null,
   selectedItemName: null as string | null,
+  // Most sequences are about *which* item is revealed, not about waiting for pixels, so the
+  // default is "the item on screen has painted". The media-hold tests override it.
+  isMediaReady: true,
   ...overrides,
 });
 
@@ -259,6 +263,59 @@ describe('createSelectedItemRevealController', () => {
 
     // The resolve window ends with the same item selected again.
     h.controller.run(rendering('a.png'));
+    expect(h.isRevealed()).toBe(true);
+  });
+
+  it('reveals the first click made from an empty viewer during a generation', () => {
+    // The viewer has never shown an item, so there is no previous one to compare against — but the
+    // user's click is still a click, and suppressing it leaves their pick behind the overlay for
+    // the rest of the render.
+    const h = createHarness();
+    h.controller.run(inputs({ renderedItemName: null, selectedItemName: null }));
+
+    h.controller.run(rendering('first-pick.mp4'));
+    expect(h.isRevealed()).toBe(true);
+  });
+
+  it('still does not reveal the render that happens when the viewer opens on a selection', () => {
+    // Nothing was clicked; the viewer is just catching up with a selection that already existed.
+    const h = createHarness();
+    h.controller.run(inputs({ renderedItemName: null, selectedItemName: 'already.png' }));
+    h.controller.run(rendering('already.png'));
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('does not spend the reveal on a video that has not decoded a frame yet', () => {
+    // preload="metadata" and the near-zero seek do not prove a frame exists. Starting the two
+    // seconds at mount let them run out over a black element, then put the overlay back.
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run({ ...rendering('slow.mp4'), isMediaReady: false });
+    expect(h.isRevealed()).toBe(false);
+
+    h.controller.run(rendering('slow.mp4'));
+    expect(h.isRevealed(), 'the reveal starts when the frame is there').toBe(true);
+  });
+
+  it('reveals media that never becomes ready rather than swallowing the click', () => {
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run({ ...rendering('broken.mp4'), isMediaReady: false });
+    h.fireTimers();
+    expect(h.isRevealed()).toBe(true);
+  });
+
+  it('keeps holding a claim across re-runs while the frame is still missing', () => {
+    // StrictMode re-runs the mount effect; the wait must not restart from zero each time, nor be
+    // dropped as "nothing changed".
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run({ ...rendering('slow.mp4'), isMediaReady: false });
+    h.controller.run({ ...rendering('slow.mp4'), isMediaReady: false });
+    expect(h.isRevealed()).toBe(false);
+    expect(h.pendingTimerCount()).toBe(1);
+
+    h.controller.run(rendering('slow.mp4'));
     expect(h.isRevealed()).toBe(true);
   });
 });
