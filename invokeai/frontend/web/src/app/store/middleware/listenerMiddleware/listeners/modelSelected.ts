@@ -178,8 +178,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               // Fallback: try to set Qwen3 Encoder + VAE
               const availableQwen3Encoders = selectQwen3EncoderModels(state);
               // FLUX.1 VAEs only - the Z-Image VAE picker is built from `isFlux1VAEModelConfig` and
-              // Z-Image cannot use a FLUX.2 VAE, so the wider `selectFluxVAEModels` (flux + flux2) would
-              // default the slot to a model the user can neither see in the picker nor generate with.
+              // Z-Image cannot use a FLUX.2 VAE, so a wider flux+flux2 pool would default the slot to
+              // a model the user can neither see in the picker nor generate with.
               const availableFluxVAEs = selectFlux1VAEModels(state);
 
               if (availableQwen3Encoders.length > 0 && availableFluxVAEs.length > 0) {

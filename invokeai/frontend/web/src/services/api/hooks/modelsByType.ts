@@ -25,7 +25,6 @@ import {
   isFlux2VAEModelConfig,
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
-  isFluxVAEModelConfig,
   isGemma2EncoderModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
@@ -180,11 +179,10 @@ export const selectQwenVLEncoderModels = buildModelsSelector(isQwenVLEncoderMode
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
-const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 /**
  * FLUX.1 VAEs only. The `params.fluxVAE` and `params.zImageVaeModel` slots both hold one of these -
  * their pickers are built from `isFlux1VAEModelConfig`, and neither slot can use a FLUX.2 VAE - so the
- * listeners that auto-fill them must draw from this pool, not from the wider `selectFluxVAEModels`.
+ * listeners that auto-fill them must draw from this pool, not from the wider flux+flux2 one.
  */
 export const selectFlux1VAEModels = buildModelsSelector(isFlux1VAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);

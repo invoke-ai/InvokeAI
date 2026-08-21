@@ -290,13 +290,6 @@ export const isNonFluxVAEModelConfig = (
   );
 };
 
-export const isFluxVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
-  return (
-    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
-    (config.base === 'flux' || config.base === 'flux2')
-  );
-};
-
 export const isFlux1VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
