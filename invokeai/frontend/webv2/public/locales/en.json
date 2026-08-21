@@ -3015,7 +3015,7 @@
       "firstFrameBlocked": "Clear the initial video to start from a frame instead.",
       "firstFrameHelp": "The video starts on this image.",
       "fpsExtendLocked": "The extension inherits the source clip's frame rate.",
-      "initialFrames": "Initial Video Frames",
+      "initialFrames": "Start & End Images",
       "initialVideo": "Initial Video",
       "initialVideoBlocked": "Clear the first frame to extend a video instead.",
       "lastFrame": "Last Frame",
