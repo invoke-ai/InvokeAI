@@ -281,11 +281,16 @@ export const toastFailedImageBatch = (image_names: string[]) => {
  * Both branches matter and neither is reachable from anywhere else. `handleDeletions` and its
  * siblings swallow every outcome, so without the fulfilled branch a run that only partly landed
  * — server-side per-name failures, or chunks a mid-run failure never reached — says nothing at
- * all. And a rejection out of `buildChunkedImageBatchQueryFn` is only ever raised when
+ * all. And the rejection `buildChunkedImageBatchQueryFn` *returns* is raised only when
  * `results.length === 0`, i.e. the first chunk failed and the server committed nothing, so the
  * whole argument list is genuinely unapplied and reporting all of it is exact rather than an
  * over-count. Nothing else covers that case: these five endpoints have no `matchRejected`
  * listener, unlike the single-image board routes.
+ *
+ * The one way to reach this branch with chunks already committed is for the queryFn to *throw*
+ * on the mid-run path — `getTags(merged)` and `merged.failed_images.concat(...)` both read keys
+ * straight off a server payload — which over-counts. That needs a response missing a documented
+ * key, so it is left as an over-report rather than a silence.
  *
  * Extracted rather than repeated inline five times so that the wiring is one unit a test can
  * hold — an endpoint that swallows its rejection looks identical to one that reports it, and

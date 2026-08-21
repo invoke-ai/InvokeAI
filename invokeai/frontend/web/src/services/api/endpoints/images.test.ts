@@ -157,9 +157,11 @@ describe('reportImageBatchOutcome', () => {
     // RTK exposes no way to reach an endpoint's `onQueryStarted` at runtime -- the built
     // endpoint object carries only initiate/select/match*/hooks -- so the wiring is guarded at
     // the source level, as elsewhere in this repo. Counted against the chunked endpoints rather
-    // than a fixed number, so a sixth one that forgets to report its failures fails this.
+    // than a fixed number, so a sixth one that forgets to report its failures fails this. The
+    // call sites are matched wherever they are, not only inline after `queryFn:`, since hoisting
+    // one to a const is otherwise enough to slip an unreporting endpoint past this.
     const source = readFileSync(fileURLToPath(new URL('./images.ts', import.meta.url)), 'utf8');
-    const chunked = source.match(/queryFn: buildChunkedImageBatchQueryFn\(/g) ?? [];
+    const chunked = source.match(/buildChunkedImageBatchQueryFn\(/g) ?? [];
     const wired = source.match(/onQueryStarted: reportImageBatchOutcome,/g) ?? [];
 
     expect(chunked.length).toBeGreaterThan(0);

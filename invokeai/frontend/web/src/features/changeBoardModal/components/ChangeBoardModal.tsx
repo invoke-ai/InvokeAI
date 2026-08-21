@@ -134,13 +134,14 @@ const ChangeBoardModal = () => {
     const failed = results.filter((result) => result.status === 'rejected');
     const isSameSession = isSameAuthContext(authContext);
 
-    // Reported ahead of the ownership guard below, not behind it. This toast is the only failure
-    // report the video board routes have — unlike the image batch routes, they have no
-    // `onQueryStarted` handler and no `matchRejected` listener, so nothing else says a word if it
-    // does not fire. Behind the guard, opening and cancelling any second dialog while this move
-    // was in flight would leave the user with no notice at all that their move failed, and the
-    // guard exists to protect a shared slice from a stale write, not to decide who gets told
-    // about a request they themselves started. Only the session check applies to it: the failure
+    // Reported ahead of the ownership guard below, not behind it. Nothing else reports a move
+    // made from this dialog: the video board routes carry no `onQueryStarted` and no
+    // `matchRejected` listener, unlike the image batch routes, and the one other emitter of this
+    // toast id — `settleVideoBoardMutations`, on the drag-and-drop path — only ever settles the
+    // mutations it fired itself. So behind the guard, opening and cancelling any second dialog
+    // while this move was in flight would leave the user with no notice at all that it failed.
+    // The guard exists to keep a stale write out of a shared slice, not to decide who gets told
+    // about a request they themselves started. Only the session check applies here: the failure
     // belongs to whoever started the move, so it is not raised at whoever holds the tab after a
     // logout.
     if (failed.length > 0 && isSameSession) {

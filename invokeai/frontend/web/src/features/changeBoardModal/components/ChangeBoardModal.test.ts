@@ -89,6 +89,12 @@ describe('ChangeBoardModal', () => {
     expect(capture).toBeGreaterThan(-1);
     expect(settle).toBeGreaterThan(-1);
     expect(capture).toBeLessThan(settle);
+    // And that it is the captured constant the guard is handed, not the slice re-read a second
+    // time: passing today's value as both operands leaves the ordering above intact and still
+    // admits every stale operation.
+    expect(source).toMatch(
+      /canRetainFailedSelection\(\s*selectChangeBoardModalSlice\(store\.getState\(\)\),\s*operationId,/
+    );
   });
 
   it('reports failed video moves ahead of the ownership guard', () => {
@@ -102,5 +108,11 @@ describe('ChangeBoardModal', () => {
     expect(videoToast).toBeGreaterThan(-1);
     expect(guard).toBeGreaterThan(-1);
     expect(videoToast).toBeLessThan(guard);
+    // Sitting ahead of the guard is not enough on its own -- re-checking ownership in the
+    // toast's own condition puts it back behind the guard by another route. The failure is
+    // reported to whoever started the move whatever owns the modal by the time it lands.
+    const toastGate = source.slice(source.lastIndexOf('if (', videoToast), videoToast);
+    expect(toastGate).toContain('failed.length > 0');
+    expect(toastGate).not.toContain('operation');
   });
 });
