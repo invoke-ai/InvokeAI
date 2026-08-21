@@ -671,7 +671,14 @@ const SelectedVideoPreview = ({
   );
 
   return (
-    <SelectedMediaPreview {...props} frameHeight={item.height} frameWidth={item.width} item={item} source={source} />
+    <SelectedMediaPreview
+      {...props}
+      dragItem={toGalleryItemRef(item)}
+      frameHeight={item.height}
+      frameWidth={item.width}
+      item={item}
+      source={source}
+    />
   );
 };
 

@@ -8,6 +8,7 @@ import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
+import { GripVerticalIcon } from 'lucide-react';
 import {
   useCallback,
   useId,
@@ -59,6 +60,7 @@ export const PreviewFrame = (props: PreviewFrameProps) => {
     return (
       <PreviewVideo
         key={props.source.itemKey}
+        dragItem={props.dragItem}
         frameHeight={props.frameHeight}
         frameWidth={props.frameWidth}
         isItemCurrent={props.isItemCurrent}
@@ -218,6 +220,7 @@ const PreviewImageFrame = ({
 };
 
 const PreviewVideo = ({
+  dragItem,
   frameHeight,
   frameWidth,
   isItemCurrent,
@@ -228,6 +231,7 @@ const PreviewVideo = ({
   source,
   videoControllerRef,
 }: {
+  dragItem?: GalleryItemRef;
   frameHeight: number;
   frameWidth: number;
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean;
@@ -240,6 +244,22 @@ const PreviewVideo = ({
 }) => {
   const { t } = useTranslation();
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  // The `<video controls>` surface cannot be the drag handle the way the image
+  // frame is: the pointer-move activation threshold would turn every native
+  // seek-bar scrub into a drag. A corner grip carries the same gallery-item
+  // payload instead, so the preview and the gallery thumbnail drop the same
+  // thing everywhere.
+  const dragData = useMemo(() => (dragItem ? getGalleryItemDragData([dragItem]) : undefined), [dragItem]);
+  const disabledDragId = useId();
+  const {
+    isDragging,
+    listeners,
+    setNodeRef: setDragHandleRef,
+  } = useDraggable({
+    data: dragData,
+    disabled: !dragItem,
+    id: dragItem ? getGalleryItemDragId(dragItem, 'preview-frame') : `preview-frame:disabled:${disabledDragId}`,
+  });
   const automaticRefreshUsedRef = useRef(false);
   const pendingRefreshRef = useRef<Promise<boolean> | null>(null);
   const [hasFailed, setHasFailed] = useState(false);
@@ -448,8 +468,32 @@ const PreviewVideo = ({
         bg="black"
         frameHeight={frameHeight}
         frameWidth={frameWidth}
+        opacity={isDragging ? 0.55 : undefined}
         onContextMenu={onContextMenu ? handleContextMenu : undefined}
       >
+        {dragItem ? (
+          // Not a button: like the gallery thumbnail and the image frame, the
+          // drag surface must stay unfocusable — a focusable activator lets the
+          // KeyboardSensor start an invisible drag on Enter/Space that Tab then
+          // DROPS on the closest-center droppable.
+          <Badge
+            ref={setDragHandleRef}
+            {...listeners}
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            insetInlineStart="2"
+            position="absolute"
+            size="xs"
+            title={t('widgets.preview.dragVideo')}
+            top="2"
+            touchAction="none"
+            variant="solid"
+            // Above the failure overlay: a clip that cannot play can still be
+            // dragged into an input, which only needs its name.
+            zIndex="2"
+          >
+            <GripVerticalIcon aria-hidden="true" size={12} />
+          </Badge>
+        ) : null}
         {/* User-provided gallery videos do not include a caption-track contract. */}
         {/* oxlint-disable-next-line jsx-a11y/media-has-caption */}
         <video

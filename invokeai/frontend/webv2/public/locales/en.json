@@ -1942,6 +1942,7 @@
       "copyCurrentFrameUnsupported": "This browser cannot copy video frames",
       "copyCurrentFrameWriteFailed": "Could not write the current video frame to the clipboard",
       "details": "Details",
+      "dragVideo": "Drag video",
       "dropToCompare": "Drop to compare",
       "editOnCanvas": "Edit on Canvas",
       "emptyDescription": "Generate to Gallery, then select a thumbnail in the Gallery widget to inspect it here.",

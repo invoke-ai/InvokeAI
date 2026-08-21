@@ -11,7 +11,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { isGalleryImageDragData } from '@features/gallery/utility';
+import { isGalleryImageDragData, isGalleryItemDragData } from '@features/gallery/utility';
 import { system } from '@theme/system';
 import { widgetCollisionDetection } from '@workbench/widgetDnd';
 import { createInstance } from 'i18next';
@@ -28,7 +28,11 @@ void i18n.use(initReactI18next).init({
   initAsync: false,
   lng: 'en',
   resources: {
-    en: { translation: { widgets: { preview: { dropToCompare: 'Drop to compare', resetZoom: 'Reset zoom' } } } },
+    en: {
+      translation: {
+        widgets: { preview: { dragVideo: 'Drag video', dropToCompare: 'Drop to compare', resetZoom: 'Reset zoom' } },
+      },
+    },
   },
 });
 
@@ -77,7 +81,7 @@ const DragMonitor = ({
   return null;
 };
 
-const renderHarness = async () => {
+const renderHarness = async (media: 'image' | 'video' = 'image') => {
   const onDrop = vi.fn();
   const Harness = () => {
     const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
@@ -86,15 +90,33 @@ const renderHarness = async () => {
       <DndContext collisionDetection={widgetCollisionDetection} sensors={sensors}>
         <DragMonitor onDrop={onDrop} />
         <div style={{ display: 'flex', height: 220, left: 40, position: 'fixed', top: 40, width: 220 }}>
-          <PreviewFrame
-            dragItem={{ kind: 'image', name: 'preview.png' }}
-            frameHeight={128}
-            frameWidth={128}
-            isLive={false}
-            shouldAntialiasLiveImage
-            source={{ itemKey: 'image:preview.png', kind: 'image', source }}
-            variant="framed"
-          />
+          {media === 'image' ? (
+            <PreviewFrame
+              dragItem={{ kind: 'image', name: 'preview.png' }}
+              frameHeight={128}
+              frameWidth={128}
+              isLive={false}
+              shouldAntialiasLiveImage
+              source={{ itemKey: 'image:preview.png', kind: 'image', source }}
+              variant="framed"
+            />
+          ) : (
+            <PreviewFrame
+              dragItem={{ kind: 'video', name: 'preview.mp4' }}
+              frameHeight={128}
+              frameWidth={128}
+              isLive={false}
+              shouldAntialiasLiveImage
+              source={{
+                itemKey: 'video:preview.mp4',
+                kind: 'video',
+                label: 'Video preview.mp4',
+                poster: source.src,
+                src: source.src,
+              }}
+              variant="framed"
+            />
+          )}
         </div>
         <DropTarget />
       </DndContext>
@@ -169,5 +191,37 @@ describe('PreviewFrame image drag', () => {
     await interact(() => pointer('pointerup', image.ownerDocument, 150, 150));
 
     expect(onDrop.mock.calls[0]?.[0]?.overId).toBeNull();
+  });
+});
+
+describe('PreviewFrame video drag', () => {
+  it('drags the shared gallery-item payload from the corner grip handle', async () => {
+    const onDrop = await renderHarness('video');
+    const handle = host!.querySelector<HTMLElement>('[title="Drag video"]')!;
+
+    expect(handle).not.toBeNull();
+    // Unfocusable by design: a focusable activator would let the shell's
+    // KeyboardSensor start an invisible Enter/Space drag that Tab then drops
+    // on the closest-center droppable.
+    expect(handle.tabIndex).toBeLessThan(0);
+    expect(handle.closest('button')).toBeNull();
+    const rect = handle.getBoundingClientRect();
+    const startX = rect.left + rect.width / 2;
+    const startY = rect.top + rect.height / 2;
+
+    await interact(() => pointer('pointerdown', handle, startX, startY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, startX + 30, startY));
+    await interact(() => pointer('pointermove', handle.ownerDocument, 410, 130));
+    await interact(() => pointer('pointerup', handle.ownerDocument, 410, 130));
+
+    expect(onDrop).toHaveBeenCalledOnce();
+    const result = onDrop.mock.calls[0]?.[0];
+
+    expect(result?.overId).toBe('test-image-drop');
+    expect(isGalleryItemDragData(result?.activeData)).toBe(true);
+    expect(result?.activeData).toEqual({
+      items: [{ kind: 'video', name: 'preview.mp4' }],
+      kind: 'gallery-item',
+    });
   });
 });

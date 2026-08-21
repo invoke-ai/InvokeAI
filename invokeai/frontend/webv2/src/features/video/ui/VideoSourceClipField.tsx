@@ -123,7 +123,10 @@ const areSourceClipsEquivalent = (left: VideoSourceClip | null, right: VideoSour
   (left === null && right === null) ||
   (left?.video_name === right?.video_name &&
     left?.startFrame === right?.startFrame &&
-    left?.endFrame === right?.endFrame);
+    left?.endFrame === right?.endFrame &&
+    // The bound thumbnails seek at frame/fps, so a same-name clip hydrated
+    // with a different probed rate must re-render.
+    left?.fps === right?.fps);
 
 export const VideoSourceClipField = memo(
   function VideoSourceClipField({
