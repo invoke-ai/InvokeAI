@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 836868,
+        "brotliBytes": 836866,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 835711,
+        "gzipBytes": 835708,
         "imageRawBytes": 156376,
         "initialRawBytes": 1945680,
         "largestAssetRawBytes": 746569,
@@ -286,10 +286,10 @@
         ]
       },
       "limits": {
-        "brotliBytes": 845237,
+        "brotliBytes": 845235,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 844069,
+        "gzipBytes": 844066,
         "imageRawBytes": 157940,
         "initialRawBytes": 1965137,
         "largestAssetRawBytes": 754035,
@@ -304,15 +304,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1046664,
+        "brotliBytes": 1046885,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1042511,
+        "gzipBytes": 1042774,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2575364,
+        "initialRawBytes": 2576739,
         "largestAssetRawBytes": 746569,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113636,
+        "ownedRawBytes": 113745,
         "requestCount": 93,
         "scriptRequestCount": 77,
         "sourceOwners": [
@@ -860,15 +860,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1057131,
+        "brotliBytes": 1057354,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1052937,
+        "gzipBytes": 1053202,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2601118,
+        "initialRawBytes": 2602507,
         "largestAssetRawBytes": 754035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113636,
+        "ownedRawBytes": 113745,
         "requestCount": 93,
         "scriptRequestCount": 77
       },
@@ -883,7 +883,7 @@
       "specifier": "@platform/ui",
       "owner": "platform-ui",
       "remediationTicket": "return-contracts-to-owners",
-      "maxDirectImporters": 157
+      "maxDirectImporters": 158
     },
     "retiredWorkbenchTypeHub": {
       "specifier": "@workbench/types",
