@@ -1,7 +1,12 @@
 import { Center, Spinner } from '@invoke-ai/ui-library';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } from 'features/auth/store/authSlice';
+import {
+  externalTokenAdopted,
+  sessionExpiredLogout,
+  setCredentials,
+  staleCredentialsDiscarded,
+} from 'features/auth/store/authSlice';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -91,9 +96,12 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
   useEffect(() => {
     // If multiuser is disabled, allow access without authentication
     if (!multiuserEnabled) {
-      // Clear any persisted auth state when switching to single-user mode
+      // Discard the leftover auth state when switching to single-user mode. Deliberately not
+      // `logout()`: that is the account-change action, and the workspace slices reset on it —
+      // a mode switch keeps the same human at the machine, and in single-user mode the wipe
+      // would persist over their stored canvas and workflows. See staleCredentialsDiscarded.
       if (isAuthenticated) {
-        dispatch(logout());
+        dispatch(staleCredentialsDiscarded());
       }
       return;
     }

@@ -31,6 +31,7 @@ import {
   externalTokenAdopted,
   logout,
   sessionExpiredLogout,
+  staleCredentialsDiscarded,
   tokensBelongToSameUser,
 } from 'features/auth/store/authSlice';
 import { changeBoardModalSliceConfig, changeBoardOperationInvalidated } from 'features/changeBoardModal/store/slice';
@@ -299,7 +300,7 @@ export const addAppListener = addListener.withTypes<RootState, AppDispatch>();
 const startAppListening = listenerMiddleware.startListening as AppStartListening;
 
 startAppListening({
-  matcher: isAnyOf(logout, sessionExpiredLogout),
+  matcher: isAnyOf(logout, sessionExpiredLogout, staleCredentialsDiscarded),
   effect: (_action, { dispatch }) => {
     dispatch(api.util.resetApiState());
     dispatch(changeBoardOperationInvalidated());

@@ -31,19 +31,26 @@ describe('IMAGE_BATCH_CHUNK_SIZE', () => {
     // declared in different languages. openapi.json is the committed contract between them
     // (typegen-checks keeps it in sync with the routers), so drift on either side fails here
     // rather than at runtime as a batch of 422s.
+    type ArraySchema = { maxItems?: number; anyOf?: ArraySchema[] };
     const openapi = JSON.parse(
       readFileSync(fileURLToPath(new URL('../../../../openapi.json', import.meta.url)), 'utf8')
     ) as {
-      components: { schemas: Record<string, { properties?: { image_names?: { maxItems?: number } } }> };
+      components: { schemas: Record<string, { properties?: { image_names?: ArraySchema } }> };
     };
+    // A nullable list serializes as anyOf [bounded array, null], so the bound must be dug out
+    // of the variants as well — read flat, the download body silently drops off this check and
+    // its cap can drift alone.
+    const boundOf = (schema: ArraySchema | undefined): number | undefined =>
+      schema?.maxItems ?? schema?.anyOf?.map((variant) => boundOf(variant)).find((bound) => bound !== undefined);
     const bounds = Object.entries(openapi.components.schemas)
-      .map(([name, schema]) => [name, schema.properties?.image_names?.maxItems] as const)
+      .map(([name, schema]) => [name, boundOf(schema.properties?.image_names)] as const)
       .filter((entry): entry is [string, number] => entry[1] !== undefined);
 
-    // Every image_names body the server bounds, bounded by the same number — including the five
-    // batch mutations and the download body. An empty list would mean the server stopped
-    // publishing the cap, which this must notice rather than vacuously pass.
-    expect(bounds.length).toBeGreaterThanOrEqual(5);
+    // Every image_names body the server bounds, bounded by the same number: the five batch
+    // mutations, the DTO read, and the nullable download body. The floor keeps this from
+    // passing vacuously if the server stops publishing the cap — and from quietly shrinking
+    // back to the flat six if the anyOf handling regresses.
+    expect(bounds.length).toBeGreaterThanOrEqual(7);
     for (const [name, maxItems] of bounds) {
       expect(maxItems, name).toBe(CHUNK_SIZE);
     }
