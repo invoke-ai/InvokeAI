@@ -334,7 +334,7 @@
       "type": "invocation",
       "data": {
         "id": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "nodePack": "invokeai",
         "label": "Core Metadata",
         "notes": "Everything except the generation mode arrives over an edge from the node that used the value, so the record cannot go stale.",

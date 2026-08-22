@@ -78,3 +78,4 @@ export {
   type VideoModelSelectionResult,
   type VideoTargetResolutionOption,
 } from './core/videoPolicies';
+export { compileVideoGraph, type CompiledVideoGraph } from './core/graph';

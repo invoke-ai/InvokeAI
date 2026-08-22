@@ -280,7 +280,7 @@ export const addLoraCollectionLoader = (
   return loader;
 };
 
-const addTransformerLoraCollectionLoader = (
+export const addTransformerLoraCollectionLoader = (
   graph: BackendGraphContract,
   loras: GenerateLora[],
   loaderType: string,

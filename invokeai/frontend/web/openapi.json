@@ -23775,7 +23775,10 @@
                   "wan_img2img",
                   "wan_inpaint",
                   "wan_outpaint",
+                  "wan_t2v",
                   "wan_i2v",
+                  "wan_interpolate",
+                  "wan_extend_video",
                   "minimax_h3_t2v",
                   "minimax_h3_i2v",
                   "minimax_h3_lf2v",
@@ -24525,7 +24528,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.3.0",
+        "version": "2.4.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }

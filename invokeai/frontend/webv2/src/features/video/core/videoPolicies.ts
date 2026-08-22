@@ -1103,6 +1103,15 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     reasons.push(`${model.name} has no distillation fast path. Turn the accelerator off to generate with it.`);
   }
 
+  // The trim bounds are integer fields on extract_video_range; a fractional
+  // persisted value would fail pydantic coercion at enqueue.
+  if (
+    settings.sourceVideo &&
+    (!Number.isInteger(settings.sourceVideo.startFrame) || !Number.isInteger(settings.sourceVideo.endFrame))
+  ) {
+    reasons.push('The initial video trim bounds must be whole frame numbers.');
+  }
+
   if (!getVideoDimensions(model, settings)) {
     reasons.push(
       model.base === 'minimax-h3'
