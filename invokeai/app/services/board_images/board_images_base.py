@@ -20,8 +20,9 @@ class BoardImagesServiceABC(ABC):
     def remove_image_from_board(
         self,
         image_name: str,
+        board_id: str,
     ) -> None:
-        """Removes an image from a board."""
+        """Removes an image from the given board."""
         pass
 
     @abstractmethod

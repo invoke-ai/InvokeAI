@@ -20,8 +20,13 @@ class BoardImageRecordStorageBase(ABC):
     def remove_image_from_board(
         self,
         image_name: str,
+        board_id: str,
     ) -> None:
-        """Removes an image from a board."""
+        """Removes an image from the given board.
+
+        Scoped to a board on purpose: callers authorize against the board the image is on, and
+        that decision must not be applied to a different board if the image moves in between.
+        """
         pass
 
     @abstractmethod

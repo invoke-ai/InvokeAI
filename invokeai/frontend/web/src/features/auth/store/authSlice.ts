@@ -104,6 +104,26 @@ const authSlice = createSlice({
         localStorage.removeItem('auth_token');
       }
     },
+    /**
+     * Discards leftover credentials without the account-change semantics of `logout`. The one
+     * caller is ProtectedRoute's multiuser-disabled branch: the server has switched to
+     * single-user mode and a token from the multiuser era is still lying around. That is a mode
+     * switch, not a hand-off to another person — the same human keeps the machine — so the
+     * workspace slices, which reset on `logout` to keep one account's canvas and workflow away
+     * from the next, must not fire. They would not merely flash empty: in single-user mode the
+     * unauthenticated persist is accepted, so the wipe would overwrite the stored workspace for
+     * good. The store listener still clears the api cache on this action, since what is cached
+     * was fetched under multiuser visibility scoping.
+     */
+    staleCredentialsDiscarded: (state) => {
+      state.token = null;
+      state.user = null;
+      state.isAuthenticated = false;
+      state.sessionExpired = false;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('auth_token');
+      }
+    },
     sessionExpiredLogout: (state) => {
       state.token = null;
       state.user = null;
@@ -126,6 +146,7 @@ export const {
   currentUserUpdated,
   logout,
   sessionExpiredLogout,
+  staleCredentialsDiscarded,
   setLoading,
 } = authSlice.actions;
 
