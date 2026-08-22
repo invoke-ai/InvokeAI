@@ -1348,45 +1348,21 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_dto = context.images.save(image=pil_mask, image_category=ImageCategory.MASK)
             return ImageOutput.build(image_dto)
 
-        np_mask = numpy.array(pil_mask)
+        np_mask = numpy.asarray(pil_mask)
 
         # Threshold the mask to create a binary mask - 0 for black, 255 for white
         # If we don't threshold we can get some weird artifacts
-        np_mask = numpy.where(np_mask > self.threshold, 255, 0).astype(numpy.uint8)
+        _, np_result = cv2.threshold(np_mask, self.threshold, 255, cv2.THRESH_BINARY)
 
-        # Create a mask for the black region (1 where black, 0 otherwise)
-        black_mask = (np_mask == 0).astype(numpy.uint8)
+        # Create a distance transform of the thresholded mask. Distances are measured to the
+        # nearest black pixel, so the black region is exactly where dist == 0.
+        dist = cv2.distanceTransform(np_result, cv2.DIST_L2, 5)
 
-        # Invert the black region
-        bg_mask = 1 - black_mask
-
-        # Create a distance transform of the inverted mask
-        dist = cv2.distanceTransform(bg_mask, cv2.DIST_L2, 5)
-
-        # Normalize distances so that pixels <fade_size_px become a linear gradient (0 to 1)
-        d_norm = numpy.clip(dist / self.fade_size_px, 0, 1)
-
-        # Control points: x values (normalized distance) and corresponding fade pct y values.
-
-        # There are some magic numbers here that are used to create a smooth transition:
-        # - The first point is at 0% of fade size from edge of mask (meaning the edge of the mask), and is 0% fade (black)
-        # - The second point is 1px from the edge of the mask and also has 0% fade, effectively expanding the mask
-        #   by 1px. This fixes an issue where artifacts can occur at the edge of the mask
-        # - The third point is at 20% of the fade size from the edge of the mask and has 20% fade
-        # - The fourth point is at 80% of the fade size from the edge of the mask and has 90% fade
-        # - The last point is at 100% of the fade size from the edge of the mask and has 100% fade (white)
-
-        # x values: 0 = mask edge, 1 = fade_size_px from edge
-        x_control = numpy.array([0.0, 1.0 / self.fade_size_px, 0.2, 0.8, 1.0])
-        # y values: 0 = black, 1 = white
-        y_control = numpy.array([0.0, 0.0, 0.2, 0.9, 1.0])
-
-        # Fit a cubic polynomial that smoothly passes through the control points
-        coeffs = numpy.polyfit(x_control, y_control, 3)
-        poly = numpy.poly1d(coeffs)
-
-        # Evaluate the polynomial
-        feather = poly(d_norm)
+        # np_result is also the final image for everywhere except the fade band. The black
+        # region is already 0, and everything at or beyond the fade distance is already 255,
+        # which is what the forced 1.0 below works out to. Only the band still needs the
+        # polynomial, and for the default 16px fade on a 1024x1024 mask that is a few
+        # percent of the pixels rather than all of them.
 
         # The polynomial fit isn't perfect. Points beyond the fade distance are likely to be slightly less than 1.0,
         # even though the control points indicate that they should be exactly 1.0. This is due to the nature of the
@@ -1394,18 +1370,46 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # When this occurs, the area outside the mask and fade-out will not be 100% transparent. For example, it may
         # have an alpha value of 1 instead of 0. So we must force pixels at or beyond the fade distance to exactly 1.0.
+        # That forced 1.0 is 255, which those pixels already hold, so they are left untouched.
 
-        # Force pixels at or beyond the fade distance to exactly 1.0
-        feather = numpy.where(d_norm >= 1.0, 1.0, feather)
+        # The fade band is the only part that still needs the polynomial. Building the mask
+        # in place avoids a second full-size temporary.
+        band = dist > 0
+        band &= dist < self.fade_size_px
 
-        # Clip any other values to ensure they're in the valid range [0,1]
-        feather = numpy.clip(feather, 0, 1)
+        if band.any():
+            # Control points: x values (normalized distance) and corresponding fade pct y values.
 
-        # Build final image.
-        np_result = numpy.where(black_mask == 1, 0, (feather * 255).astype(numpy.uint8))
+            # There are some magic numbers here that are used to create a smooth transition:
+            # - The first point is at 0% of fade size from edge of mask (meaning the edge of the mask), and is 0% fade (black)
+            # - The second point is 1px from the edge of the mask and also has 0% fade, effectively expanding the mask
+            #   by 1px. This fixes an issue where artifacts can occur at the edge of the mask
+            # - The third point is at 20% of the fade size from the edge of the mask and has 20% fade
+            # - The fourth point is at 80% of the fade size from the edge of the mask and has 90% fade
+            # - The last point is at 100% of the fade size from the edge of the mask and has 100% fade (white)
+
+            # x values: 0 = mask edge, 1 = fade_size_px from edge
+            x_control = numpy.array([0.0, 1.0 / self.fade_size_px, 0.2, 0.8, 1.0])
+            # y values: 0 = black, 1 = white
+            y_control = numpy.array([0.0, 0.0, 0.2, 0.9, 1.0])
+
+            # Fit a cubic polynomial that smoothly passes through the control points
+            coeffs = numpy.polyfit(x_control, y_control, 3)
+            poly = numpy.poly1d(coeffs)
+
+            # Evaluate the polynomial on the band only. Normalizing just those distances is
+            # the same as normalizing the whole image and clipping, because 0 < dist < fade_size_px
+            # there. Calling the same poly() keeps the arithmetic identical to before rather
+            # than depending on how a hand-written expression promotes dtypes.
+            feather = poly(dist[band] / self.fade_size_px)
+
+            # Clip any other values to ensure they're in the valid range [0,1]
+            numpy.clip(feather, 0, 1, out=feather)
+
+            np_result[band] = (feather * 255).astype(numpy.uint8)
 
         # Convert back to PIL, grayscale
-        pil_result = Image.fromarray(np_result.astype(numpy.uint8), mode="L")
+        pil_result = Image.fromarray(np_result, mode="L")
 
         image_dto = context.images.save(image=pil_result, image_category=ImageCategory.MASK)
 
