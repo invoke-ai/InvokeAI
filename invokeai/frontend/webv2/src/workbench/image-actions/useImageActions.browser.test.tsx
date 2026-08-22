@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   gallerySelectItem: vi.fn(),
   gallerySetItemMultiSelection: vi.fn(),
   imageMetadata: vi.fn(),
+  imageResolveMany: vi.fn((..._args: unknown[]) => Promise.resolve([])),
+  videoMetadata: vi.fn((..._args: unknown[]) => Promise.resolve(null)),
   invalidateGallery: vi.fn(),
   invalidateGalleryItems: vi.fn(),
   itemDelete: vi.fn(),
@@ -42,7 +44,10 @@ const mocks = vi.hoisted(() => ({
 const preferences = vi.hoisted(() => ({ confirmImageDeletion: false }));
 
 vi.mock('@features/gallery', () => ({
-  galleryImages: { metadata: (...args: unknown[]) => mocks.imageMetadata(...args) },
+  galleryImages: {
+    metadata: (...args: unknown[]) => mocks.imageMetadata(...args),
+    resolveMany: (...args: unknown[]) => mocks.imageResolveMany(...args),
+  },
   galleryItemOrganization: {
     delete: (...args: unknown[]) => mocks.itemDelete(...args),
     moveToBoard: (...args: unknown[]) => mocks.itemMoveToBoard(...args),
@@ -56,6 +61,7 @@ vi.mock('@features/gallery', () => ({
     setStarred: (...args: unknown[]) => mocks.setStarred(...args),
   },
   galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
+  galleryVideos: { metadata: (...args: unknown[]) => mocks.videoMetadata(...args) },
   legacyGeneratedImageToGalleryItem: (image: { boardId?: string; imageName: string; starred?: boolean }) => ({
     boardId: image.boardId ?? 'none',
     kind: 'image' as const,
