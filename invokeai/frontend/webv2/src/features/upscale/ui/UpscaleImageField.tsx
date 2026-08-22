@@ -5,13 +5,19 @@ import type { ChangeEvent } from 'react';
 import { Box, HStack, Image, Input, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
-import { galleryImageUrls, isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
+import {
+  galleryImageUrls,
+  isGalleryImageDragData,
+  isSingleGalleryImageDragData,
+  useGalleryItemDroppable,
+} from '@features/gallery/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
+import { DropTargetOverlay } from '@platform/ui/DropTargetOverlay';
 import { DropZone } from '@platform/ui/DropZone';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ImagePlusIcon, UploadIcon, XIcon } from 'lucide-react';
@@ -60,11 +66,14 @@ export const UpscaleImageField = memo(
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const { isOver, setNodeRef } = useGalleryImageDroppable({
-      data: { kind: DROP_ID },
-      disabled: isLoading,
-      id: DROP_ID,
-    });
+    // Advertise single-image drags only (the drop handler below consumes
+    // exactly one), but stay armed for ANY image drag: a multi-image release
+    // here must remain a dead drop, not fall through to a target underneath.
+    const { acceptsActiveDrag, isOver, setNodeRef } = useGalleryItemDroppable(
+      isSingleGalleryImageDragData,
+      { data: { kind: DROP_ID }, disabled: isLoading, id: DROP_ID },
+      isGalleryImageDragData
+    );
 
     const setGalleryImage = useCallback(
       async (imageName: string) => {
@@ -206,6 +215,7 @@ export const UpscaleImageField = memo(
               </Text>
             </Stack>
           )}
+          <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={t('widgets.upscale.dropImage')} />
         </DropZone>
         <HStack justify="end">
           {inputImage ? (

@@ -85,13 +85,45 @@ export const isGalleryItemDragData = (value: unknown): value is GalleryItemDragD
 export const isGalleryImageDragData = (value: unknown): value is GalleryImageDragData =>
   isGalleryItemDragData(value) && value.items.every((item): item is GalleryImageDragItem => item.kind === 'image');
 
-export const useGalleryImageDroppable = ({ disabled = false, ...args }: UseDroppableArguments) => {
-  const { active } = useDndContext();
-  const acceptsActiveDrag = isGalleryImageDragData(active?.data.current);
-  const droppable = useDroppable({ ...args, disabled: disabled || !acceptsActiveDrag });
+/** For targets that consume exactly one image (keyframes, the upscale input). */
+export const isSingleGalleryImageDragData = (value: unknown): value is GalleryImageDragData =>
+  isGalleryImageDragData(value) && value.items.length === 1;
 
-  return { ...droppable, isOver: acceptsActiveDrag && droppable.isOver };
+/** For targets that consume exactly one video (the initial-video clip). */
+export const isSingleGalleryVideoDragData = (value: unknown): value is GalleryItemDragData =>
+  isGalleryItemDragData(value) && value.items.length === 1 && value.items[0]?.kind === 'video';
+
+/**
+ * A droppable that only participates while a drag matching `shields` is in
+ * flight. `acceptsActiveDrag` is the "potential target" bit the drop
+ * affordances render from (a drag the field's handler would consume exists
+ * ANYWHERE — legacy dnd's `potential` state); `isOver` narrows it to
+ * "hovering this target". `accepts` must match what the drop handler
+ * actually consumes, or the affordance advertises a drop that would no-op.
+ *
+ * `shields` (default: `accepts`) keeps the droppable armed for a WIDER
+ * payload family the handler merely ignores: a single-image field stays a
+ * dead drop for multi-image drags, exactly as before the affordances —
+ * disabling it instead would hand the release to whatever droppable sits
+ * underneath (the collision pipeline is z-blind), e.g. a board row hidden
+ * under a floated widget.
+ */
+export const useGalleryItemDroppable = (
+  accepts: (data: unknown) => boolean,
+  { disabled = false, ...args }: UseDroppableArguments,
+  shields: (data: unknown) => boolean = accepts
+) => {
+  const { active } = useDndContext();
+  const activeData = active?.data.current;
+  const acceptsActiveDrag = !disabled && accepts(activeData);
+  const isShielding = !disabled && shields(activeData);
+  const droppable = useDroppable({ ...args, disabled: !isShielding });
+
+  return { ...droppable, acceptsActiveDrag, isOver: acceptsActiveDrag && droppable.isOver };
 };
+
+export const useGalleryImageDroppable = (args: UseDroppableArguments) =>
+  useGalleryItemDroppable(isGalleryImageDragData, args);
 
 export const isGalleryBoardDropData = (value: unknown): value is GalleryBoardDropData =>
   isRecord(value) &&

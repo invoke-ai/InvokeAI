@@ -5,13 +5,19 @@ import type { ChangeEvent } from 'react';
 import { Box, HStack, Image, Input, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
-import { galleryImageUrls, isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
+import {
+  galleryImageUrls,
+  isGalleryImageDragData,
+  isSingleGalleryImageDragData,
+  useGalleryItemDroppable,
+} from '@features/gallery/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
+import { DropTargetOverlay } from '@platform/ui/DropTargetOverlay';
 import { DropZone } from '@platform/ui/DropZone';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ImagePlusIcon, XIcon } from 'lucide-react';
@@ -46,6 +52,7 @@ export const VideoFrameImageField = memo(
     disabled = false,
     disabledReason,
     dropId,
+    dropLabel,
     image,
     onChange,
   }: {
@@ -54,6 +61,8 @@ export const VideoFrameImageField = memo(
     disabledReason?: string;
     /** Unique droppable id — the first- and last-frame fields render side by side. */
     dropId: string;
+    /** Call-to-action shown while a compatible drag is in flight ("Drop First Frame"). */
+    dropLabel: string;
     image: ImageWithDims | null;
     onChange: (image: ImageWithDims | null) => void;
   }) {
@@ -63,11 +72,14 @@ export const VideoFrameImageField = memo(
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const isInert = disabled || isLoading;
-    const { isOver, setNodeRef } = useGalleryImageDroppable({
-      data: { kind: dropId },
-      disabled: isInert,
-      id: dropId,
-    });
+    // Advertise single-image drags only (the drop handler below consumes
+    // exactly one), but stay armed for ANY image drag: a multi-image release
+    // here must remain a dead drop, not fall through to a target underneath.
+    const { acceptsActiveDrag, isOver, setNodeRef } = useGalleryItemDroppable(
+      isSingleGalleryImageDragData,
+      { data: { kind: dropId }, disabled: isInert, id: dropId },
+      isGalleryImageDragData
+    );
 
     const setGalleryImage = useCallback(
       async (imageName: string) => {
@@ -213,6 +225,7 @@ export const VideoFrameImageField = memo(
               </Text>
             </Stack>
           )}
+          <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={dropLabel} />
         </DropZone>
         <HStack justify="space-between">
           {disabled && disabledReason && image ? (
@@ -251,5 +264,6 @@ export const VideoFrameImageField = memo(
     previous.disabled === next.disabled &&
     previous.disabledReason === next.disabledReason &&
     previous.dropId === next.dropId &&
+    previous.dropLabel === next.dropLabel &&
     areFrameImagesEquivalent(previous.image, next.image)
 );

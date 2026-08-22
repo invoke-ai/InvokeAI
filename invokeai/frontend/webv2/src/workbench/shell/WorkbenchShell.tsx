@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { GalleryDragCursor } from '@features/gallery/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { FocusRegionProvider } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
@@ -289,6 +290,7 @@ export const WorkbenchShell = () => {
           <StatusBar dropState={bottomDropState} />
         </Flex>
         <FloatingWidgetLayer />
+        <GalleryDragCursor />
         <DragOverlay>{activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}</DragOverlay>
       </DndContext>
     </FocusRegionProvider>
