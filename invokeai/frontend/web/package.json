@@ -142,6 +142,7 @@
     "eslint-plugin-storybook": "^10.3.6",
     "eslint-plugin-unused-imports": "^4.4.1",
     "globals": "^16.5.0",
+    "happy-dom": "^20.11.6",
     "knip": "^5.77.4",
     "magic-string": "^0.30.21",
     "openapi-types": "^12.1.3",
