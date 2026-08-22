@@ -8,6 +8,7 @@ export {
   calculateNewSize,
   clampDimension,
   cloneGenerateWidgetValues,
+  DEFAULT_LORA_WEIGHT_CONFIG,
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
   deriveAspectRatioId,

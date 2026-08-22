@@ -1,6 +1,6 @@
 import type { FieldInputTemplate, InvocationTemplates, ProjectGraphState } from './types';
 
-import { isModelFieldType } from './fields';
+import { isLoraFieldCollectionEntry, isModelFieldType, toLoraFieldCollectionList } from './fields';
 import { isInvocationNode } from './types';
 
 /**
@@ -219,8 +219,37 @@ export const extractWorkflowModelRequirements = (
       continue;
     }
 
+    const addExactRequirement = (value: unknown): void => {
+      if (!isDuckTypedModelValue(value)) {
+        return;
+      }
+
+      const identifier = buildIdentifier(value);
+
+      let dedupeKey = identifier.key;
+
+      if (exactKeyHashes.has(identifier.key)) {
+        const existingHash = exactKeyHashes.get(identifier.key);
+
+        if (identifier.hash !== undefined && existingHash !== undefined && existingHash !== identifier.hash) {
+          dedupeKey = `${identifier.key}::${identifier.hash}`;
+        }
+      } else {
+        exactKeyHashes.set(identifier.key, identifier.hash);
+      }
+
+      if (seenExactDedupeKeys.has(dedupeKey)) {
+        return;
+      }
+
+      seenExactDedupeKeys.add(dedupeKey);
+      requirements.push({ identifier, kind: 'exact', label: identifier.name ?? identifier.key });
+    };
+
     for (const fieldTemplate of Object.values(template.inputs)) {
-      if (!isModelFieldType(fieldTemplate.type)) {
+      const isLoraCollection = fieldTemplate.type.name === 'LoRAField';
+
+      if (!isModelFieldType(fieldTemplate.type) && !isLoraCollection) {
         continue;
       }
 
@@ -230,27 +259,27 @@ export const extractWorkflowModelRequirements = (
 
       const value = node.data.inputs[fieldTemplate.name]?.value;
 
-      if (isDuckTypedModelValue(value)) {
-        const identifier = buildIdentifier(value);
+      // A LoRA collection holds its identifiers one level down, and holds several of them. Without
+      // this the LoRAs a collection loader applies are invisible to "what does this workflow need",
+      // even though the same LoRAs wired through Select LoRA nodes are counted.
+      if (isLoraCollection) {
+        const entries = toLoraFieldCollectionList(value);
 
-        let dedupeKey = identifier.key;
-
-        if (exactKeyHashes.has(identifier.key)) {
-          const existingHash = exactKeyHashes.get(identifier.key);
-
-          if (identifier.hash !== undefined && existingHash !== undefined && existingHash !== identifier.hash) {
-            dedupeKey = `${identifier.key}::${identifier.hash}`;
+        for (const entry of entries) {
+          if (isLoraFieldCollectionEntry(entry)) {
+            addExactRequirement(entry.lora);
           }
-        } else {
-          exactKeyHashes.set(identifier.key, identifier.hash);
         }
 
-        if (seenExactDedupeKeys.has(dedupeKey)) {
+        // An empty collection still falls through to the slot path below, so a required-but-blank
+        // field keeps describing what it needs the way every other blank model field does.
+        if (entries.length > 0) {
           continue;
         }
+      }
 
-        seenExactDedupeKeys.add(dedupeKey);
-        requirements.push({ identifier, kind: 'exact', label: identifier.name ?? identifier.key });
+      if (isDuckTypedModelValue(value)) {
+        addExactRequirement(value);
         continue;
       }
 
