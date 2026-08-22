@@ -36,6 +36,20 @@ const TRACKED_GALLERY_REMOVAL_FIELDS: ReadonlyArray<{ key: string; widgetId: Wid
   { key: 'sourceVideo', widgetId: 'video' },
 ];
 
+/**
+ * Widget slots that are mutually exclusive by design (the video widget's
+ * first-frame XOR initial-video rule, enforced by its setters). A rollback
+ * restore is the one write path that bypasses those setters: after our
+ * optimistic clear, the user may have claimed the RIVAL slot, and restoring
+ * this one would recreate a pair no setter can produce — normalization then
+ * masks one of the two, which reads as a silently wrong generation mode.
+ * When the rival slot is occupied, the restore loses.
+ */
+const EXCLUSIVE_RIVAL_FIELDS: ReadonlyArray<{ key: string; rivalKey: string; widgetId: WidgetTypeId }> = [
+  { key: 'firstFrameImage', rivalKey: 'sourceVideo', widgetId: 'video' },
+  { key: 'sourceVideo', rivalKey: 'firstFrameImage', widgetId: 'video' },
+];
+
 const trackedFieldKey = (projectId: string, widgetId: WidgetTypeId, key: string): string =>
   `${projectId}:${widgetId}:${key}`;
 
@@ -139,6 +153,17 @@ export const selectRestorableGalleryWidgetPatches = (
     liveEntries,
     (candidate) => getProjectWidgetValues(projectsById.get(candidate.projectId)!, candidate.widgetId)[candidate.key]
   )) {
+    const rival = EXCLUSIVE_RIVAL_FIELDS.find((field) => field.widgetId === entry.widgetId && field.key === entry.key);
+    const isOccupied = (value: unknown): boolean => value !== null && value !== undefined;
+
+    if (
+      rival &&
+      isOccupied(entry.before) &&
+      isOccupied(getProjectWidgetValues(projectsById.get(entry.projectId)!, entry.widgetId)[rival.rivalKey])
+    ) {
+      continue;
+    }
+
     const groupKey = widgetGroupKey(entry.projectId, entry.widgetId);
     const patch = patchesByGroup.get(groupKey) ?? { projectId: entry.projectId, values: {}, widgetId: entry.widgetId };
 

@@ -310,24 +310,32 @@ export const MIN_VIDEO_TRIM_FRAMES = 2;
 /**
  * Clears conditioning media that no longer exists in the gallery. Returns the
  * input object untouched when nothing changes.
+ *
+ * Deliberately operates on RAW widget values rather than a normalized
+ * snapshot: normalization resolves the first-frame/initial-video exclusion by
+ * masking one slot, and a masked reference would silently survive the
+ * deletion sweep — a dangling media name waiting to resurface.
  */
-export const clearDeletedVideoMedia = (
-  values: VideoSettings,
+export const clearDeletedVideoMedia = <T extends object>(
+  values: T,
   removedImageNames: ReadonlySet<string>,
   removedVideoNames: ReadonlySet<string>
-): VideoSettings => {
-  const clearFirst = values.firstFrameImage !== null && removedImageNames.has(values.firstFrameImage.image_name);
-  const clearLast = values.lastFrameImage !== null && removedImageNames.has(values.lastFrameImage.image_name);
-  const clearSource = values.sourceVideo !== null && removedVideoNames.has(values.sourceVideo.video_name);
+): T => {
+  const slots = values as { firstFrameImage?: unknown; lastFrameImage?: unknown; sourceVideo?: unknown };
+  const clearFirst = isImageWithDims(slots.firstFrameImage) && removedImageNames.has(slots.firstFrameImage.image_name);
+  const clearLast = isImageWithDims(slots.lastFrameImage) && removedImageNames.has(slots.lastFrameImage.image_name);
+  const clearSource = isVideoSourceClip(slots.sourceVideo) && removedVideoNames.has(slots.sourceVideo.video_name);
 
   if (!clearFirst && !clearLast && !clearSource) {
     return values;
   }
 
+  // The spread widens the cleared keys to `null`; T itself declares them
+  // nullable in every real shape (VideoSettings, raw widget values).
   return {
     ...values,
     ...(clearFirst ? { firstFrameImage: null } : {}),
     ...(clearLast ? { lastFrameImage: null } : {}),
     ...(clearSource ? { sourceVideo: null } : {}),
-  };
+  } as T;
 };

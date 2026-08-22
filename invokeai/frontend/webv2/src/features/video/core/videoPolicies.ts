@@ -372,6 +372,8 @@ export interface VideoModelPolicy {
   isSupported: boolean;
   modes: readonly VideoGenerationMode[];
   pixelMultiple: number;
+  /** The family's floor for the steps control (validation enforces it too). */
+  minSteps: number;
   aspectRatioOptions: readonly VideoAspectRatioId[];
   targetResolutions: readonly VideoTargetResolutionOption[];
   frames: VideoFramesPolicy;
@@ -406,6 +408,7 @@ export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings
     fps: config.fps,
     frames: config.frames,
     isSupported: model ? isSupportedVideoModel(model) : false,
+    minSteps: config.minSteps,
     modes: config.modes,
     pixelMultiple: config.pixelMultiple,
     prompt: getVideoPromptPolicy(model, settings),
@@ -864,9 +867,15 @@ export const getVideoSettingsWithModelDefaults = (
     ...settings,
     acceleratorEnabled: modelDefaults.acceleratorEnabled,
     acceleratorLoraKeys: modelDefaults.acceleratorLoraKeys,
+    // The default-bearing layout/component choices reset too: a mispicked
+    // VAE or expert is exactly what a user reaches for reset to undo.
+    aspectRatioId: modelDefaults.aspectRatioId,
     cfgScale: modelDefaults.cfgScale,
     cfgScaleLowNoise: modelDefaults.cfgScaleLowNoise,
+    componentSourceModel: modelDefaults.componentSourceModel,
     fps: modelDefaults.fps,
+    h3TextEncoderModel: modelDefaults.h3TextEncoderModel,
+    h3TransformerModel: modelDefaults.h3TransformerModel,
     loras: [
       ...settings.loras.filter(
         (lora) => !previousKeys.has(lora.model.key) && !modelDefaults.loras.some((d) => d.model.key === lora.model.key)
@@ -877,6 +886,9 @@ export const getVideoSettingsWithModelDefaults = (
     numFrames: modelDefaults.numFrames,
     steps: modelDefaults.steps,
     targetResolution: modelDefaults.targetResolution,
+    vae: modelDefaults.vae,
+    wanLowNoiseModel: modelDefaults.wanLowNoiseModel,
+    wanT5EncoderModel: modelDefaults.wanT5EncoderModel,
   };
 };
 
@@ -907,7 +919,16 @@ export const getVideoModelSelectionResult = ({
   models: readonly ModelConfig[];
 }): VideoModelSelectionResult => {
   const config = getVideoConfig(model);
-  const next: VideoSettings = { ...currentSettings, modelKey: model.key };
+  // A record without a modelKey was healed from a store the panel never
+  // seeded (a fresh project, or a pre-open "Send to Video" payload): its
+  // sampling values are the model-agnostic healing fallbacks, not user
+  // choices. Bootstrap the picked model's own defaults — accelerator
+  // included — instead of preserving fallbacks, then reconcile any seeded
+  // media below exactly like a normal selection.
+  const start = currentSettings.modelKey
+    ? currentSettings
+    : getVideoSettingsWithModelDefaults(currentSettings, model, models);
+  const next: VideoSettings = { ...start, modelKey: model.key };
   const clearedLabels: string[] = [];
   const modes = config.modes;
 
@@ -1129,6 +1150,20 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
 
     if (numFrames < MIN_VIDEO_TRIM_FRAMES) {
       reasons.push('The initial video is too short to extend.');
+    }
+
+    // A Wan extension inherits the source clip's frame rate, and the backend's
+    // wan_l2v/video_concat nodes accept 1-120 fps. An out-of-range clip (a
+    // 240 fps slow-mo, an unprobeable sub-1 fps rate) would enqueue, run the
+    // whole denoise, then die assigning the fps — so block it here instead.
+    if (model.base === 'wan') {
+      const inheritedFps = Math.round(settings.sourceVideo.fps);
+
+      if (inheritedFps < 1 || inheritedFps > 120) {
+        reasons.push(
+          `The initial video's frame rate (${settings.sourceVideo.fps} fps) is outside the 1-120 fps range Wan extension supports.`
+        );
+      }
     }
   }
 

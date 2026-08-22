@@ -75,17 +75,24 @@ const addExtendScaffolding = (
 ) => {
   // The panel's frame count is an estimate (duration × fps; the records store
   // no exact count, and VFR uploads can overshoot by a frame or two). A trim
-  // end near the estimated ceiling therefore compiles as a NEGATIVE index —
+  // bound near the estimated ceiling therefore compiles as a NEGATIVE index —
   // resolved by the backend against the clip's REAL count — so "keep to the
-  // end" can never land past it. Mid-clip picks stay positive: a negative
-  // offset computed from an overshooting estimate would drift them instead.
-  const tailOffset = sourceVideo.numFrames - 1 - sourceVideo.endFrame;
-  const endFrameLiteral = tailOffset <= 3 ? -(tailOffset + 1) : sourceVideo.endFrame;
+  // end" can never land past it. Both bounds get the same treatment: a start
+  // in the tail window would otherwise stay a positive estimate-based index
+  // and land out of range exactly when the end's conversion saves it (the
+  // start is always below the end, so the pair keeps its order when both go
+  // negative). Mid-clip picks stay positive: a negative offset computed from
+  // an overshooting estimate would drift them instead.
+  const toTailAwareIndex = (frame: number): number => {
+    const tailOffset = sourceVideo.numFrames - 1 - frame;
+
+    return tailOffset <= 3 ? -(tailOffset + 1) : frame;
+  };
   const extract = addNode(graph, {
-    end_frame: endFrameLiteral,
+    end_frame: toTailAwareIndex(sourceVideo.endFrame),
     id: 'source_video',
     is_intermediate: true,
-    start_frame: sourceVideo.startFrame,
+    start_frame: toTailAwareIndex(sourceVideo.startFrame),
     type: 'extract_video_range',
     use_cache: false,
     video: { video_name: sourceVideo.video_name },
@@ -157,7 +164,16 @@ const addVideoMetadata = ({
     width,
     ...(settings.firstFrameImage ? { first_frame_image: toImageField(settings.firstFrameImage) } : {}),
     ...(settings.lastFrameImage ? { last_frame_image: toImageField(settings.lastFrameImage) } : {}),
-    ...(settings.sourceVideo ? { source_video: { video_name: settings.sourceVideo.video_name } } : {}),
+    // The trim bounds ride along as plain extras (core_metadata allows extra
+    // fields): without them, recall could only rebuild the clip with its
+    // default trim and the extension would start from the wrong frame.
+    ...(settings.sourceVideo
+      ? {
+          source_video: { video_name: settings.sourceVideo.video_name },
+          source_video_end_frame: settings.sourceVideo.endFrame,
+          source_video_start_frame: settings.sourceVideo.startFrame,
+        }
+      : {}),
     ...(activeLoras.length
       ? { loras: activeLoras.map((lora) => ({ model: toModelIdentifier(lora.model), weight: lora.weight })) }
       : {}),
@@ -309,6 +325,11 @@ const buildWanVideoGraph = (settings: VideoSettings, model: MainModelConfig): Ba
   const metadata = addVideoMetadata({
     extras: {
       cfg_scale: settings.cfgScale,
+      // The delivered frame rate: the extension inherits the source clip's
+      // (rounded, mirroring the float_to_int node the graph wires), every
+      // other mode uses the panel's fps setting. Without this, fps would be
+      // the one user-settable Wan parameter recall could never restore.
+      fps: extendParts && settings.sourceVideo ? Math.round(settings.sourceVideo.fps) : settings.fps,
       ...(policy.ui.cfgLowNoiseVisible && settings.cfgScaleLowNoise !== null
         ? { guidance_scale_low_noise: settings.cfgScaleLowNoise }
         : {}),

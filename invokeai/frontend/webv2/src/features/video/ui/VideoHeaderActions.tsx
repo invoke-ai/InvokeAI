@@ -3,6 +3,7 @@ import { Icon } from '@chakra-ui/react';
 import { useModelsSelector } from '@features/models';
 import { normalizeVideoWidgetValues } from '@features/video/core/settings';
 import { getVideoSettingsWithModelDefaults } from '@features/video/core/videoPolicies';
+import { syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
 import { IconButton, Tooltip } from '@platform/ui';
 import { RotateCcwIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -11,10 +12,10 @@ import { areVideoValuesEqual } from './videoComparators';
 import { useVideoUi } from './VideoUiContext';
 
 /**
- * Widget-header action: reset every model-governed setting (frames, fps,
- * target resolution, steps, CFG, accelerator state) back to the selected
- * model's defaults. Prompts, conditioning media, and non-default-bearing
- * fields are left untouched.
+ * Widget-header action: reset every default-bearing setting (frames, fps,
+ * target resolution, steps, CFG, accelerator state, aspect ratio, component
+ * selections) back to the selected model's defaults. Prompts and conditioning
+ * media are left untouched.
  */
 const sortLorasByKey = <T extends { model: { key: string } }>(loras: readonly T[]): T[] =>
   [...loras].sort((a, b) => a.model.key.localeCompare(b.model.key));
@@ -27,7 +28,11 @@ export const VideoHeaderActions = () => {
   // pair is "not a default" and strip it as the reset — stay disabled until
   // the catalog is authoritative.
   const modelsLoaded = useModelsSelector((snapshot) => snapshot.status) === 'loaded';
-  const values = normalizeVideoWidgetValues(rawValues);
+  // Sync against the catalog exactly like the panel view does: computing from
+  // the raw store would judge (and reset to!) a phantom model the view no
+  // longer shows — e.g. one uninstalled while the panel was open.
+  const normalized = normalizeVideoWidgetValues(rawValues);
+  const values = normalized && modelsLoaded ? syncVideoWidgetValuesWithModels(normalized, models) : normalized;
   const model = values?.model ?? null;
   const defaults =
     modelsLoaded && values && model ? { ...getVideoSettingsWithModelDefaults(values, model, models), model } : null;
