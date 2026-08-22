@@ -14,6 +14,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.image_utils import encode_image_base64
 from invokeai.app.services.external_generation.providers import alibabacloud as alibabacloud_module
 from invokeai.app.services.external_generation.providers.alibabacloud import AlibabaCloudProvider
+from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 
 
@@ -137,7 +138,7 @@ def test_sync_routes_qwen_edit_max_with_reference_images(monkeypatch: pytest.Mon
             },
         )
 
-    def fake_get(url: str, timeout: int, stream: bool = False) -> DummyResponse:
+    def fake_get(_session: Any, url: str, timeout: int, stream: bool = False) -> DummyResponse:
         assert url == image_url
         return DummyResponse(
             ok=True,
@@ -146,7 +147,7 @@ def test_sync_routes_qwen_edit_max_with_reference_images(monkeypatch: pytest.Mon
         )
 
     monkeypatch.setattr("requests.post", fake_post)
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", fake_get)
 
     result = provider.generate(request)
 
@@ -198,11 +199,11 @@ def test_sync_retries_on_429_and_succeeds(monkeypatch: pytest.MonkeyPatch) -> No
             },
         )
 
-    def fake_get(url: str, timeout: int, stream: bool = False) -> DummyResponse:
+    def fake_get(_session: Any, url: str, timeout: int, stream: bool = False) -> DummyResponse:
         return DummyResponse(ok=True, content=image_bytes, headers={"Content-Length": str(len(image_bytes))})
 
     monkeypatch.setattr("requests.post", fake_post)
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", fake_get)
     monkeypatch.setattr("time.sleep", lambda _s: None)
 
     result = provider.generate(request)
@@ -217,10 +218,10 @@ def test_async_parser_does_not_double_count(monkeypatch: pytest.MonkeyPatch) -> 
     image_bytes = _png_bytes(_make_image("magenta"))
     image_url = "https://example.invalid/x.png"
 
-    def fake_get(url: str, timeout: int, stream: bool = False) -> DummyResponse:
+    def fake_get(_session: Any, url: str, timeout: int, stream: bool = False) -> DummyResponse:
         return DummyResponse(ok=True, content=image_bytes, headers={"Content-Length": str(len(image_bytes))})
 
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", fake_get)
 
     output: dict[str, Any] = {
         "results": [
@@ -250,17 +251,33 @@ def test_download_image_size_cap(monkeypatch: pytest.MonkeyPatch) -> None:
     provider = _provider()
     too_big = alibabacloud_module._DOWNLOAD_MAX_BYTES + 1
 
-    def fake_get(url: str, timeout: int, stream: bool = False) -> DummyResponse:
+    def fake_get(_session: Any, url: str, timeout: int, stream: bool = False) -> DummyResponse:
         return DummyResponse(
             ok=True,
             content=b"\x00" * 16,  # body itself is small; we trip the Content-Length check first
             headers={"Content-Length": str(too_big)},
         )
 
-    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", fake_get)
 
     with pytest.raises(ExternalProviderRequestError, match="exceeds"):
         provider._download_image("https://example.invalid/big.png")
+
+
+def test_download_image_rejects_unsafe_provider_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _provider()
+
+    def fail_unguarded_get(*_args: Any, **_kwargs: Any) -> DummyResponse:
+        pytest.fail("provider response URLs must not use the unguarded requests.get path")
+
+    def reject_unsafe_url(*_args: Any, **_kwargs: Any) -> DummyResponse:
+        raise UnsafeDownloadURLException("non-public address")
+
+    monkeypatch.setattr("requests.get", fail_unguarded_get)
+    monkeypatch.setattr("requests.Session.get", reject_unsafe_url)
+
+    with pytest.raises(ExternalProviderRequestError, match="unsafe image URL"):
+        provider._download_image("http://127.0.0.1/internal.png")
 
 
 def test_poll_task_first_call_no_initial_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -289,13 +306,8 @@ def test_poll_task_first_call_no_initial_sleep(monkeypatch: pytest.MonkeyPatch) 
     def fake_download_get(url: str, timeout: int, stream: bool = False) -> DummyResponse:
         return DummyResponse(ok=True, content=image_bytes, headers={"Content-Length": str(len(image_bytes))})
 
-    # Single requests.get is shared by polling (with headers kwarg) and download (no kwarg).
-    def dispatch_get(*args: Any, **kwargs: Any) -> DummyResponse:
-        if "headers" in kwargs and "task" in args[0]:
-            return fake_get(*args, **kwargs)
-        return fake_download_get(*args, **kwargs)
-
-    monkeypatch.setattr("requests.get", dispatch_get)
+    monkeypatch.setattr("requests.get", fake_get)
+    monkeypatch.setattr("requests.Session.get", lambda _session, *args, **kwargs: fake_download_get(*args, **kwargs))
     monkeypatch.setattr("time.sleep", fake_sleep)
 
     result = provider._poll_task(
