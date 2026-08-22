@@ -255,8 +255,41 @@ describe('buildVideoRecallSettings', () => {
     const result = buildVideoRecallSettings({ currentValues, kind: 'all', metadata, models: catalog });
 
     expect(result?.fields).toContain('media');
-    expect(result?.mediaNames).toEqual({ firstFrameName: 'first.png', lastFrameName: null, sourceVideoName: null });
+    expect(result?.mediaNames).toEqual({
+      firstFrameName: 'first.png',
+      lastFrameName: null,
+      sourceVideoName: null,
+      sourceVideoTrim: null,
+    });
     expect(result?.values.firstFrameImage).toBeNull();
+  });
+
+  it('recalls the recorded Wan fps and carries the source-clip trim bounds for the executor', () => {
+    const withFps = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({ fps: 24 }),
+      models: catalog,
+    });
+
+    expect(withFps?.fields).toContain('fps');
+    expect(withFps?.values.fps).toBe(24);
+
+    const extend = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({
+        generation_mode: 'wan_extend_video',
+        model: { key: WAN_I2V.key },
+        source_video: { video_name: 'clip.mp4' },
+        source_video_end_frame: 50,
+        source_video_start_frame: 10,
+      }),
+      models: catalog,
+    });
+
+    expect(extend?.mediaNames.sourceVideoName).toBe('clip.mp4');
+    expect(extend?.mediaNames.sourceVideoTrim).toEqual({ endFrame: 50, startFrame: 10 });
   });
 
   it('restores reuse-primary semantics when the low-noise CFG key is absent', () => {
