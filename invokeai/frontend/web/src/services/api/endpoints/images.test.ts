@@ -25,6 +25,31 @@ vi.mock('i18next', () => ({ default: { t: vi.fn((key: string) => key) } }));
 /** Mirrors MAX_IMAGE_BATCH_SIZE in invokeai/app/api/routers/images.py. */
 const CHUNK_SIZE = 1000;
 
+describe('IMAGE_BATCH_CHUNK_SIZE', () => {
+  it('matches the bound the server actually publishes', () => {
+    // The client-side chunk size exists only to satisfy the server-side cap, and the two are
+    // declared in different languages. openapi.json is the committed contract between them
+    // (typegen-checks keeps it in sync with the routers), so drift on either side fails here
+    // rather than at runtime as a batch of 422s.
+    const openapi = JSON.parse(
+      readFileSync(fileURLToPath(new URL('../../../../openapi.json', import.meta.url)), 'utf8')
+    ) as {
+      components: { schemas: Record<string, { properties?: { image_names?: { maxItems?: number } } }> };
+    };
+    const bounds = Object.entries(openapi.components.schemas)
+      .map(([name, schema]) => [name, schema.properties?.image_names?.maxItems] as const)
+      .filter((entry): entry is [string, number] => entry[1] !== undefined);
+
+    // Every image_names body the server bounds, bounded by the same number — including the five
+    // batch mutations and the download body. An empty list would mean the server stopped
+    // publishing the cap, which this must notice rather than vacuously pass.
+    expect(bounds.length).toBeGreaterThanOrEqual(5);
+    for (const [name, maxItems] of bounds) {
+      expect(maxItems, name).toBe(CHUNK_SIZE);
+    }
+  });
+});
+
 const names = (count: number) => Array.from({ length: count }, (_, i) => `image-${i}.png`);
 
 /**

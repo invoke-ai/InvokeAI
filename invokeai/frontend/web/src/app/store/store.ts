@@ -35,7 +35,7 @@ import {
 } from 'features/auth/store/authSlice';
 import { changeBoardModalSliceConfig, changeBoardOperationInvalidated } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
-import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
+import { canvasClearHistory, canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { canvasTextSliceConfig } from 'features/controlLayers/store/canvasTextSlice';
 import { canvasWorkflowIntegrationSliceConfig } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -59,7 +59,7 @@ import { uiSliceConfig } from 'features/ui/store/uiSlice';
 import { diff } from 'jsondiffpatch';
 import type { SerializeFunction, UnserializeFunction } from 'redux-remember';
 import { REMEMBER_REHYDRATED, rememberEnhancer, rememberReducer } from 'redux-remember';
-import undoable, { newHistory } from 'redux-undo';
+import undoable, { ActionCreators, newHistory } from 'redux-undo';
 import { serializeError } from 'serialize-error';
 import { api } from 'services/api';
 import type { JsonObject } from 'type-fest';
@@ -146,10 +146,24 @@ const rootReducer = combineReducers(ALL_REDUCERS);
 type RootReducerState = ReturnType<typeof rootReducer>;
 
 const accountAwareRootReducer = (state: RootReducerState | undefined, action: UnknownAction): RootReducerState => {
-  if (state && externalTokenAdopted.match(action) && !tokensBelongToSameUser(state.auth.token, action.payload)) {
+  const isForeignAdoption =
+    !!state && externalTokenAdopted.match(action) && !tokensBelongToSameUser(state.auth.token, action.payload);
+  if (isForeignAdoption) {
     state = rootReducer(state, logout());
   }
-  return rootReducer(state, action);
+  state = rootReducer(state, action);
+  // A logout pass resets each workspace slice's *present* through its own `logout` case, but
+  // both undoable slices filter cross-slice actions out of history without emptying it — the
+  // stacks keep the previous account's states, and ctrl+Z would walk the next account straight
+  // back into them. The clears ride the same reducer call rather than the logout listener
+  // because the synthetic pass above (cross-tab adoption) never reaches listeners; this is the
+  // only spot both paths share. Two actions because canvas overrides `clearHistoryType` while
+  // nodes uses redux-undo's default — which also covers any undoable slice added later.
+  if (isForeignAdoption || logout.match(action)) {
+    state = rootReducer(state, canvasClearHistory());
+    state = rootReducer(state, ActionCreators.clearHistory());
+  }
+  return state;
 };
 
 const rememberedRootReducer = rememberReducer(accountAwareRootReducer);
