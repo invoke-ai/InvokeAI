@@ -30,27 +30,10 @@ describe('CurrentImagePreview reveal wiring', () => {
     expect(onReady).toContain('onLoadImage(imageDTO.session_id ?? null)');
   });
 
-  it('routes the reveal through the shared controller with the auto-switch marker', () => {
-    // Mirrors the same check on CurrentVideoPreview: both previews must go through one controller
-    // or the two media types drift apart, and a click that switches type stops reading as a
-    // selection change. The controller owns the sequencing the component used to inline -- marker
-    // consumption, resolve-window deferral, StrictMode re-arm -- and its branches are unit tested
-    // in selectedItemReveal.test.ts, including that the marker is consumed on every change of the
-    // rendered item even when no progress is showing.
-    expect(currentImagePreview).toMatch(/marker: autoSwitchedImages,/);
-    expect(currentImagePreview).toMatch(/revealController\.run\(\{/);
-    expect(currentImagePreview).toMatch(/isProgressImageResolving,\s+renderedItemName: imageToRender\?\.image_name/);
-    // The component must not reimplement any of it alongside the controller.
-    expect(currentImagePreview).not.toContain('getSelectedItemRevealDecision');
-    expect(currentImagePreview).not.toContain('autoSwitchedImages.consume(');
-    // The controller substitutes its own setRevealed in selectedItemReveal.test.ts, so those
-    // tests cannot see whether this component connects it to the atom the overlay actually
-    // reads. Without this line the reveal can be disconnected entirely -- every other assertion
-    // here, and the whole suite, still passes while a mid-render gallery click does nothing.
-    expect(currentImagePreview).toMatch(
-      /setRevealed: \(revealed\) => \$isTemporarilyShowingSelectedImage\.set\(revealed\)/
-    );
-    // The effect cleanup only cancels the timer; the next run owns the revealed flag.
-    expect(currentImagePreview).toMatch(/return \(\) => \{\s+revealController\.clearTimer\(\);\s+\};/);
+  it('routes the reveal through the mounted-tested hook, gated on the settled preload', () => {
+    // The wiring is behaviorally covered in useSelectedItemReveal.test.tsx; this pins that the
+    // component uses it, and that readiness means "the preload settled" on the image path.
+    expect(currentImagePreview).toContain('useSelectedItemReveal({');
+    expect(currentImagePreview).toContain('isMediaReady: imageToRender !== null,');
   });
 });

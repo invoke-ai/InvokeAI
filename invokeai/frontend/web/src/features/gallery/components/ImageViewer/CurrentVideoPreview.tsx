@@ -40,7 +40,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
-import { createSelectedItemRevealController } from './selectedItemReveal';
+import { usePaintedItemName, useSelectedItemReveal } from './useSelectedItemReveal';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
 type Props = {
@@ -74,7 +74,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [paintedVideoName, setPaintedVideoName] = useState<string | null>(null);
+  const { isMediaReady, onPainted } = usePaintedItemName(videoName);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const activeTab = useAppSelector(selectActiveTab);
@@ -109,15 +109,6 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const selectedItemName = useAppSelector(selectLastSelectedItem);
   // One controller per mounted preview component; the previous-item ref inside it is the shared
   // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
-  const [revealController] = useState(() =>
-    createSelectedItemRevealController({
-      lastRenderedItemNameRef,
-      marker: autoSwitchedImages,
-      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
-      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
-      mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
-    })
-  );
 
   // Whenever the selected video changes, drop back to the idle still + play overlay.
   useEffect(() => {
@@ -126,42 +117,23 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
 
   // Mid-generation gallery clicks: mirror CurrentImagePreview's temporary reveal. Without this,
   // the opaque progress overlay swallows every video-thumbnail click for the whole render — the
-  // selection changes underneath, but nothing visibly happens. Unlike the image path there is no
-  // preload step: the <video> renders immediately (first frame paints when metadata arrives), so
-  // the reveal is keyed directly off the rendered video name. The sequencing (previous-item
-  // tracking, auto-switch suppression, resolve-window deferral, StrictMode re-arm) lives in the
-  // controller — see selectedItemReveal.ts.
-  useEffect(() => {
-    revealController.run({
-      shouldShowProgressInViewer,
-      hasProgressImage,
-      isProgressImageResolving,
-      renderedItemName: videoName,
-      // preload="metadata" plus the near-zero seek does not prove a frame exists: the element is
-      // black until it decodes one. Reported as *which* video has painted rather than a boolean,
-      // because a boolean would be reset from a different effect than the one that reads it, and a
-      // passive effect's setState does not reach the next effect's closure in the same commit.
-      isMediaReady: paintedVideoName === videoName,
-      selectedItemName: selectedItemName ?? null,
-    });
-    return () => {
-      revealController.clearTimer();
-    };
-  }, [
+  // selection changes underneath, but nothing visibly happens. The sequencing lives in the
+  // controller (selectedItemReveal.ts); the effect wiring around it lives in the hook, where it is
+  // mounted and tested with real lifecycles. preload="metadata" plus the near-zero seek does not
+  // prove a frame exists, so readiness comes from usePaintedItemName fed by onLoadedData.
+  useSelectedItemReveal({
+    lastRenderedItemNameRef,
+    $isTemporarilyShowingSelectedImage,
+    marker: autoSwitchedImages,
+    durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+    mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
+    renderedItemName: videoName,
+    isMediaReady,
+    selectedItemName: selectedItemName ?? null,
+    shouldShowProgressInViewer,
     hasProgressImage,
     isProgressImageResolving,
-    paintedVideoName,
-    revealController,
-    selectedItemName,
-    shouldShowProgressInViewer,
-    videoName,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
+  });
 
   // Register the viewer's <video> as a drag source so users can drag the currently-displayed
   // video onto node fields (e.g. a Video Primitive's "Starting Video" input) directly from
@@ -402,11 +374,6 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // browsers populate dimensions/duration but don't actually decode and display the first
   // video frame until playback or a seek — the element just shows its black background.
   // Setting currentTime to 0.0001 nudges the decoder to paint without measurably advancing.
-  // The first decoded frame is on screen: only now does revealing this video show anything.
-  const handleLoadedData = useCallback(() => {
-    setPaintedVideoName(videoName);
-  }, [videoName]);
-
   const handleLoadedMetadata = useCallback(() => {
     onLoadImage(videoDTO?.session_id ?? null);
     const el = videoRef.current;
@@ -444,7 +411,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         playsInline
         controls={isPlaying}
         onLoadedMetadata={handleLoadedMetadata}
-        onLoadedData={handleLoadedData}
+        onLoadedData={onPainted}
         onEnded={handleClose}
         onError={handleVideoError}
         style={{

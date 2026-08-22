@@ -22,10 +22,6 @@ describe('CurrentVideoPreview progress overlay', () => {
       /withProgress =\s+shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying/
     );
     expect(source).toContain('SELECTED_ITEM_REVEAL_DURATION_MS');
-    // The previous-item ref handed to the reveal controller must be the shared one from the
-    // viewer context, so image -> video clicks still read as a selection change after the
-    // preview component swaps.
-    expect(source).toMatch(/createSelectedItemRevealController\(\{\s+lastRenderedItemNameRef,/);
   });
 
   it('tiles concurrent sessions instead of letting them overwrite each other (multi-GPU)', () => {
@@ -35,23 +31,15 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toContain('<ProgressImageTiles data={activeProgressData} />');
   });
 
-  it('routes the reveal decision through the shared controller with the auto-switch marker', () => {
-    // The auto-switch selection lands after onInvocationComplete's DTO fetch, so a quickly-started
-    // next render's first progress event can reset $isProgressImageResolving ahead of it. Timing
-    // cannot tell that handoff from a gallery click; the marker can, and the controller owns the
-    // full sequencing (marker consumption, resolve-window deferral, StrictMode re-arm — see
-    // selectedItemReveal.test.ts for the behavior).
-    expect(source).toMatch(/marker: autoSwitchedImages,/);
-    expect(source).toMatch(/revealController\.run\(\{/);
-    expect(source).toMatch(/isProgressImageResolving,\s+renderedItemName: videoName,/);
-    // The controller substitutes its own setRevealed in selectedItemReveal.test.ts, so those
-    // tests cannot see whether this component connects it to the atom the overlay actually
-    // reads. Without this line the reveal can be disconnected entirely -- every other assertion
-    // here, and the whole suite, still passes while a mid-render gallery click does nothing.
-    expect(source).toMatch(/setRevealed: \(revealed\) => \$isTemporarilyShowingSelectedImage\.set\(revealed\)/);
-    // The effect cleanup must only cancel the timer — the next run (or the unmount handler below)
-    // owns the revealed flag.
-    expect(source).toMatch(/return \(\) => \{\s+revealController\.clearTimer\(\);\s+\};/);
+  it('routes the reveal through the mounted-tested hook, fed by the painted-name readiness', () => {
+    // The wiring itself — effect order, cleanup, unmount, the component swap — is behaviorally
+    // covered in useSelectedItemReveal.test.tsx. What only this file can see is that this
+    // component actually uses that hook, with readiness from the real element's onLoadedData
+    // rather than from mount.
+    expect(source).toContain('useSelectedItemReveal({');
+    expect(source).toContain('renderedItemName: videoName,');
+    expect(source).toMatch(/const \{ isMediaReady, onPainted \} = usePaintedItemName\(videoName\);/);
+    expect(source).toContain('onLoadedData={onPainted}');
   });
 
   it('does not cover playback or a temporary reveal with the metadata panel', () => {

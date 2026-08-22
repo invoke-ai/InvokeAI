@@ -26,7 +26,7 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
-import { createSelectedItemRevealController } from './selectedItemReveal';
+import { useSelectedItemReveal } from './useSelectedItemReveal';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const activeTab = useAppSelector(selectActiveTab);
@@ -51,15 +51,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
   // One controller per mounted preview component; the previous-item ref inside it is the shared
   // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
-  const [revealController] = useState(() =>
-    createSelectedItemRevealController({
-      lastRenderedItemNameRef,
-      marker: autoSwitchedImages,
-      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
-      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
-      mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
-    })
-  );
 
   // The reveal gate below deliberately preloads the *thumbnail*, not the full-resolution image. The
   // progress overlay covers this element until onLoadImage fires, so gating on the multi-megabyte
@@ -124,37 +115,22 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   const hasProgressImage = progressImage !== null;
 
-  // The reveal sequencing (previous-item tracking, auto-switch suppression, resolve-window
-  // deferral, StrictMode re-arm) lives in the controller — see selectedItemReveal.ts.
-  useEffect(() => {
-    revealController.run({
-      shouldShowProgressInViewer,
-      hasProgressImage,
-      isProgressImageResolving,
-      renderedItemName: imageToRender?.image_name ?? null,
-      // The image path only renders once its preload has settled, so whatever it renders has
-      // painted.
-      isMediaReady: imageToRender !== null,
-      selectedItemName: selectedImageName ?? null,
-    });
-    return () => {
-      revealController.clearTimer();
-    };
-  }, [
-    hasProgressImage,
-    imageToRender?.image_name,
-    imageToRender,
-    isProgressImageResolving,
-    revealController,
-    selectedImageName,
+  // The reveal sequencing lives in the controller (selectedItemReveal.ts); the effect wiring
+  // around it lives in the hook, where it is mounted and tested with real lifecycles. The image
+  // path only renders an image once its preload has settled, so whatever is rendered has painted.
+  useSelectedItemReveal({
+    lastRenderedItemNameRef,
+    $isTemporarilyShowingSelectedImage,
+    marker: autoSwitchedImages,
+    durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+    mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
+    renderedItemName: imageToRender?.image_name ?? null,
+    isMediaReady: imageToRender !== null,
+    selectedItemName: selectedImageName ?? null,
     shouldShowProgressInViewer,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
+    hasProgressImage,
+    isProgressImageResolving,
+  });
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
