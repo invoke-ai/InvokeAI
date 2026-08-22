@@ -327,6 +327,11 @@ export const buildOnInvocationComplete = (
     const imageDTOs: ImageDTO[] = [];
     const fetched = new Set<string>();
     const fetch = async (imageName: string) => {
+      if (isDisposed) {
+        // The session that wanted these is gone; issuing more requests would fetch under the
+        // replacement session's credentials and write into its RTK cache.
+        return;
+      }
       if (retryNames !== null && !retryNames.has(imageName)) {
         return;
       }
@@ -366,6 +371,9 @@ export const buildOnInvocationComplete = (
     const videoDTOs: VideoDTO[] = [];
     const fetched = new Set<string>();
     for (const [_name, value] of objectEntries(result)) {
+      if (isDisposed) {
+        break;
+      }
       if (isVideoField(value)) {
         if (retryNames !== null && !retryNames.has(value.video_name)) {
           continue;
@@ -545,7 +553,9 @@ export const buildOnInvocationComplete = (
       await addImagesToGallery(data, onLookupFailure, retryNames);
       await addVideosToGallery(data, onLookupFailure, retryNames);
 
-      if (!isRetry) {
+      if (!isRetry && !isDisposed) {
+        // $lastProgressEvent is module-global, shared across handler sessions: a delivery that was
+        // in flight when this session ended must not blank whatever the next session has put there.
         $lastProgressEvent.set(null);
       }
     } catch (error) {

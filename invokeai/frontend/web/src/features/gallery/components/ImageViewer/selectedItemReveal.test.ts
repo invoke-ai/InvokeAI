@@ -318,4 +318,20 @@ describe('createSelectedItemRevealController', () => {
     h.controller.run(rendering('slow.mp4'));
     expect(h.isRevealed()).toBe(true);
   });
+
+  it('carries an unpainted claim through a resolve window that starts under it', () => {
+    // Mid-generation the user clicks a video that has not decoded yet, and the running item then
+    // completes, opening its resolve window. The claim must survive the window: dropping it there
+    // leaves the next run seeing "same item, nothing pending" and the click is swallowed forever.
+    const h = createHarness();
+    h.controller.run(rendering('a.png'));
+    h.controller.run({ ...rendering('v.mp4'), isMediaReady: false });
+    expect(h.isRevealed()).toBe(false);
+
+    h.controller.run({ ...rendering('v.mp4'), isMediaReady: false, isProgressImageResolving: true });
+    expect(h.isRevealed(), 'held, not shown — the hand-off owns the viewer').toBe(false);
+
+    h.controller.run(rendering('v.mp4'));
+    expect(h.isRevealed(), 'the click is honoured once the window ends and the frame is there').toBe(true);
+  });
 });

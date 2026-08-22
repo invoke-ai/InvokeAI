@@ -1152,6 +1152,9 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
         }),
         'no gallery work for the session that ended'
       ).toBe(false);
+      // $lastProgressEvent is module-global: clearing it now would blank whatever the session that
+      // replaced this one has put there.
+      expect($lastProgressEvent.set).not.toHaveBeenCalledWith(null);
     } finally {
       vi.useRealTimers();
     }
@@ -1208,6 +1211,105 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     await handler(buildImageCompleteEvent());
 
     expect(getImageDTOSafe).not.toHaveBeenCalled();
+  });
+
+  it('does not act on a video completion whose lookup resolved after disposal', async () => {
+    // Every other disposal test uses an image event; the video path has its own dispatches — the
+    // board invalidation, the auto-switch marker, the selection — behind its own guard.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let resolveLookup: (value: any) => void = () => {};
+    vi.mocked(getVideoDTOSafe).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveLookup = resolve;
+        })
+    );
+    vi.mocked(selectAutoSwitch).mockReturnValue(true);
+
+    const dispatched: unknown[] = [];
+    const dispatch = vi.fn((action: unknown) => {
+      dispatched.push(action);
+      return { unwrap: () => Promise.resolve(undefined) };
+    });
+    const getState = vi.fn(() => ({}));
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const videoEvent = buildImageCompleteEvent();
+    videoEvent.invocation.type = 'wan_l2v';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (videoEvent as any).result = { video: { video_name: 'from-old-session.mp4' } };
+
+    const delivery = handler(videoEvent);
+    // Disposal must land while the lookup is in flight — disposing before the handler's first
+    // await resumes would be stopped by the fetch-loop guard instead, leaving the post-fetch
+    // guard unexercised.
+    while (vi.mocked(getVideoDTOSafe).mock.calls.length === 0) {
+      await Promise.resolve();
+    }
+    handler.dispose();
+    resolveLookup({
+      video_name: 'from-old-session.mp4',
+      board_id: 'board-123',
+      is_intermediate: false,
+      session_id: 'old-session',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    await delivery;
+
+    expect(imageSelected, 'the dead session must not move the new selection').not.toHaveBeenCalled();
+    expect(
+      dispatched.some((action) => {
+        const payload = (action as { payload?: unknown }).payload;
+        return Array.isArray(payload) && payload.includes('GalleryItemNameList');
+      }),
+      'and must not invalidate its gallery'
+    ).toBe(false);
+  });
+
+  it('stops fetching the rest of a result once its session has ended', async () => {
+    // Disposal mid-collection: the remaining lookups would run under the replacement session's
+    // credentials and write into its cache. One event, image collection + video: dispose during
+    // the first image fetch, and neither the second image nor the video may be requested.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let resolveFirst: (value: any) => void = () => {};
+    vi.mocked(getImageDTOSafe).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+    );
+
+    const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
+    const getState = vi.fn(() => ({}));
+    const handler = buildOnInvocationComplete(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      getState as any,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      dispatch as any,
+      new Map()
+    );
+
+    const mixed = buildImageCompleteEvent();
+    mixed.invocation.type = 'wan_l2v';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (mixed as any).result = {
+      collection: [{ image_name: 'first.png' }, { image_name: 'second.png' }],
+      video: { video_name: 'tail.mp4' },
+    };
+
+    const delivery = handler(mixed);
+    handler.dispose();
+    resolveFirst(null);
+    await delivery;
+
+    expect(getImageDTOSafe, 'no further image lookups after disposal').toHaveBeenCalledTimes(1);
+    expect(getVideoDTOSafe, 'and no video lookup at all').not.toHaveBeenCalled();
   });
 
   it('still processes distinct invocations of the same queue item', async () => {
