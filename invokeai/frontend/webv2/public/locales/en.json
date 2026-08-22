@@ -3040,7 +3040,17 @@
       "clearStaleMedia": "Clear",
       "staleFirstFrame": "A first frame is set, but this model does not support starting from one.",
       "staleLastFrame": "A last frame is set, but this model does not support ending on one.",
-      "staleSourceVideo": "An initial video is set, but this model does not support extending videos."
+      "staleSourceVideo": "An initial video is set, but this model does not support extending videos.",
+      "addLora": "Search compatible concepts…",
+      "components": "Model Components",
+      "componentRequired": "Required for this model.",
+      "concepts": "Concepts",
+      "loraWeight": "Weight for {{name}}",
+      "noLoras": "No concepts added. Compatible LoRAs adjust style and motion.",
+      "removeLora": "Remove {{name}}",
+      "selectComponent": "Select a component model…",
+      "acceleratorBroken": "Accelerator turned off",
+      "acceleratorBrokenDescription": "One of its LoRAs was removed or disabled, so steps and CFG were restored to the model's defaults."
     }
   },
   "workflowLibrary": {

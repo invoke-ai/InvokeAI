@@ -706,14 +706,22 @@ export const getVideoComponentSectionPolicy = (
   if (model.base === 'wan') {
     const config = getVideoConfig(model);
     const slots: VideoComponentSlotPolicy[] = [
-      {
-        filter: (candidate) => isDiffusersMainForBase('wan')(candidate),
-        helpText: 'Select a Diffusers Wan model to provide VAE and text-encoder components.',
-        key: 'componentSourceModel',
-        label: 'Component source',
-        modelTypes: ['main'],
-        valueKind: 'main',
-      },
+      // A Diffusers main is its own component source; the loader ignores the
+      // input for it, so the slot is only offered for single-file mains — and
+      // never lists the selected main itself.
+      ...(model.format === 'diffusers'
+        ? []
+        : [
+            {
+              filter: (candidate: ModelConfig, ctx: VideoComponentPolicyContext) =>
+                isDiffusersMainForBase('wan')(candidate) && candidate.key !== ctx.model.key,
+              helpText: 'Select a Diffusers Wan model to provide VAE and text-encoder components.',
+              key: 'componentSourceModel',
+              label: 'Component source',
+              modelTypes: ['main'],
+              valueKind: 'main',
+            } satisfies VideoComponentSlotPolicy,
+          ]),
       {
         filter: isWanVaeForMain,
         helpText: 'Required unless a Diffusers component source is available.',

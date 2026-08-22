@@ -458,6 +458,25 @@ describe('component section policy', () => {
     ).not.toContain('wanLowNoiseModel');
   });
 
+  it('offers the component-source slot only for single-file mains, never listing the main itself', () => {
+    const diffusers = wanModel('i2v_a14b', 'diffusers');
+
+    expect(
+      getVideoComponentSectionPolicy(diffusers, settingsFor(diffusers)).slots.map((slot) => slot.key)
+    ).not.toContain('componentSourceModel');
+
+    const gguf = wanModel('i2v_a14b', 'gguf_quantized');
+    const settings = settingsFor(gguf);
+    const slot = getVideoComponentSectionPolicy(gguf, settings).slots.find((s) => s.key === 'componentSourceModel');
+    const ctx = { model: gguf, selectedComponents: settings, settings };
+
+    expect(slot?.filter?.(wanModel('i2v_a14b', 'diffusers'), ctx)).toBe(true);
+    // A (hypothetical) diffusers-format selected main must not list itself.
+    expect(slot?.filter?.({ ...gguf, format: 'diffusers' }, { ...ctx, model: { ...gguf, format: 'diffusers' } })).toBe(
+      false
+    );
+  });
+
   it('constrains the low-noise expert to a different single-file model of the same variant', () => {
     const model = wanModel('i2v_a14b', 'gguf_quantized');
     const settings = settingsFor(model);

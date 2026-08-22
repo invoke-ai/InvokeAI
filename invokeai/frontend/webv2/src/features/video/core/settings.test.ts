@@ -137,6 +137,19 @@ describe('normalizeVideoSettings', () => {
         loras: [lightningLora],
       })
     ).toBe(true);
+    // A recorded LoRA that is merely DISABLED also clears the flag: the graph
+    // skips disabled LoRAs, so the fast path would silently run without it.
+    const disabledLightning = { ...lightningLora, isEnabled: false };
+
+    expect(
+      normalizeVideoSettings({
+        ...createSettings(),
+        acceleratorEnabled: true,
+        acceleratorLoraKeys: ['lit'],
+        loras: [disabledLightning],
+      })
+    ).toMatchObject({ acceleratorEnabled: false, acceleratorLoraKeys: [] });
+
     // A disabled flag must not carry stale keys.
     expect(isVideoSettings({ ...createSettings(), acceleratorEnabled: false, acceleratorLoraKeys: ['lit'] })).toBe(
       false

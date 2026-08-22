@@ -27,6 +27,8 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areVideoValuesEqual } from './videoComparators';
+import { VideoComponentsSection } from './VideoComponentsSection';
+import { VideoConceptsSection } from './VideoConceptsSection';
 import { VideoPromptFields } from './VideoFormFields';
 import { VideoFrameImageField } from './VideoFrameImageField';
 import { VideoSourceClipField } from './VideoSourceClipField';
@@ -241,6 +243,38 @@ export const VideoWidgetView = () => {
   const setSourceVideo = useCallback(
     (sourceVideo: VideoSourceClip | null) => patch({ sourceVideo, ...(sourceVideo ? { firstFrameImage: null } : {}) }),
     [patch]
+  );
+  const setLoras = useCallback(
+    (loras: VideoWidgetValues['loras']) => {
+      // Removing or disabling one of the accelerator's LoRAs breaks the fast
+      // path: turn it off explicitly, restore the model's own sampling
+      // defaults (Lightning wrote steps/CFG), keep the user's list edit, and
+      // say so — a silent 4-step run without the distillation pair would just
+      // look like a broken model.
+      const acceleratorBroken =
+        values.acceleratorEnabled &&
+        !values.acceleratorLoraKeys.every((key) => loras.some((lora) => lora.model.key === key && lora.isEnabled));
+
+      if (!acceleratorBroken) {
+        patch({ loras });
+        return;
+      }
+
+      patch({
+        acceleratorEnabled: false,
+        acceleratorLoraKeys: [],
+        cfgScale: policy.defaults.cfgScale,
+        cfgScaleLowNoise: policy.defaults.cfgScaleLowNoise,
+        loras,
+        steps: policy.defaults.steps,
+      });
+      toaster.create({
+        description: t('widgets.video.acceleratorBrokenDescription'),
+        title: t('widgets.video.acceleratorBroken'),
+        type: 'info',
+      });
+    },
+    [patch, policy.defaults, t, values.acceleratorEnabled, values.acceleratorLoraKeys]
   );
   const clearFirstFrame = useCallback(() => patch({ firstFrameImage: null }), [patch]);
   const clearLastFrame = useCallback(() => patch({ lastFrameImage: null }), [patch]);
@@ -531,6 +565,9 @@ export const VideoWidgetView = () => {
           </Field>
         </Stack>
       </GenerationSettingsSection>
+
+      <VideoConceptsSection loras={values.loras} model={values.model} onChangeLoras={setLoras} />
+      <VideoComponentsSection values={values} onPatch={patch} />
     </Stack>
   );
 };
