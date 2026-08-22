@@ -2,6 +2,7 @@ import type { GenerationModelCatalogItem, MainModelConfig } from '@features/gene
 
 import { describe, expect, it } from 'vitest';
 
+import { normalizeVideoWidgetValues } from './settings';
 import { getAcceleratorToggleResult } from './videoPolicies';
 import {
   createDefaultVideoWidgetValues,
@@ -102,6 +103,31 @@ describe('syncVideoWidgetValuesWithModels', () => {
     // family-bound constraints snap.
     expect(synced).toMatchObject({ fps: 24, numFrames: 90, steps: 40, targetResolution: '768 highres' });
     expect(getVideoWidgetValidationReasons(synced, [h3Model()])).toEqual([]);
+  });
+
+  it('bootstraps the picked model’s family defaults (accelerator included) for a never-seeded store', () => {
+    // A fresh project's widget store is `{}`; healing yields model-agnostic
+    // fallbacks with NO modelKey. The selection transition must bootstrap the
+    // picked model's own defaults instead of preserving the fallbacks —
+    // otherwise a fresh H3 panel opens at 40 steps / CFG 5 with Turbo off.
+    const catalog = [h3Model(), lora('MiniMax H3 Turbo LoRA', 'minimax-h3', null)];
+    const healed = normalizeVideoWidgetValues({})!;
+    const synced = syncVideoWidgetValuesWithModels(healed, catalog);
+
+    expect(synced.model?.base).toBe('minimax-h3');
+    // numFrames 124 is H3's own default — not the Wan fallback (81) snapped
+    // onto the H3 grid (90), which is what the preserve path would produce.
+    expect(synced).toMatchObject({ acceleratorEnabled: true, cfgScale: 1, fps: 24, numFrames: 124, steps: 6 });
+
+    // A pre-open seeded payload ("Send to Video") keeps its media through the
+    // same bootstrap.
+    const seeded = normalizeVideoWidgetValues({
+      firstFrameImage: { height: 480, image_name: 'seed.png', width: 832 },
+    })!;
+    const syncedSeeded = syncVideoWidgetValuesWithModels(seeded, catalog);
+
+    expect(syncedSeeded.firstFrameImage).toEqual({ height: 480, image_name: 'seed.png', width: 832 });
+    expect(syncedSeeded.acceleratorEnabled).toBe(true);
   });
 
   it('drops uninstalled or incompatible LoRAs and clears an orphaned accelerator flag', () => {
