@@ -8,6 +8,11 @@ import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
 
 InvokeAI ships **experimental support for the Wan 2.2 model family**, which lets you generate short MP4 clips from a text prompt, an image, or both. Output ranges from a few-second loop (the model's training distribution) up to longer sequences assembled with the [concat trick](#making-longer-videos) below.
 
+## The Video panel
+
+The fastest way to generate video is the **Video panel** in the editor's left rail (next to Generate and Upscale) — no workflow required. Type a prompt and pick a Wan 2.2 or MiniMax H3 model for text-to-video; add a **First Frame** for image-to-video, a **Last Frame** for first-to-last interpolation, or an **Initial Video** (with trim) to extend an existing clip toward an optional destination image. The panel knows each model family's constraints — frame grids, canvas rules, fixed vs. adjustable frame rates, which conditioning modes exist per variant — and derives legal output dimensions from your aspect-ratio preset or the conditioning media automatically. When the matching distillation LoRA is installed (Wan's Lightning pair, H3's Turbo), the panel's **fast path** is on by default at the distilled step counts; switch it off for full-quality sampling. The bundled workflow templates below remain available for advanced graph-level control.
+
+
 :::caution[Experimental]
 Video generation is a prototype feature. Workflows, node fields, and starter-model packaging may change between releases. The underlying models are also new — expect rough edges in coherence and artifacts at longer durations.
 :::

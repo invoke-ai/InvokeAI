@@ -55,11 +55,19 @@ describe('normalizeVideoSettings', () => {
     expect(isVideoSettings(settings)).toBe(true);
   });
 
-  it('rejects values missing the core shape', () => {
+  it('rejects non-records but heals partial records field-by-field, upscale-style', () => {
     expect(normalizeVideoSettings(null)).toBeNull();
-    expect(normalizeVideoSettings({})).toBeNull();
-    expect(normalizeVideoSettings({ ...createSettings(), numFrames: 'many' })).toBeNull();
-    expect(normalizeVideoSettings({ ...createSettings(), positivePrompt: 7 })).toBeNull();
+    expect(normalizeVideoSettings(7)).toBeNull();
+    // A seeded partial write ("Send to Video" on a never-opened widget) keeps
+    // its payload instead of being nulled and wiped by the reconciler.
+    const seeded = normalizeVideoSettings({ firstFrameImage: FIRST_FRAME, sourceVideo: null });
+
+    expect(seeded).not.toBeNull();
+    expect(seeded?.firstFrameImage).toEqual(FIRST_FRAME);
+    expect(seeded).toMatchObject({ fps: 16, modelKey: '', numFrames: 81, steps: 40, targetResolution: '720p' });
+    // Invalid field types heal to defaults rather than failing wholesale.
+    expect(normalizeVideoSettings({ ...createSettings(), numFrames: 'many' })?.numFrames).toBe(81);
+    expect(normalizeVideoSettings({ ...createSettings(), positivePrompt: 7 })?.positivePrompt).toBe('');
   });
 
   it('fills fields older persisted projects predate with defaults', () => {

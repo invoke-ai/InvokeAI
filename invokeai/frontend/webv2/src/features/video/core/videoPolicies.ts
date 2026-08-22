@@ -867,9 +867,15 @@ export const getVideoSettingsWithModelDefaults = (
     ...settings,
     acceleratorEnabled: modelDefaults.acceleratorEnabled,
     acceleratorLoraKeys: modelDefaults.acceleratorLoraKeys,
+    // The default-bearing layout/component choices reset too: a mispicked
+    // VAE or expert is exactly what a user reaches for reset to undo.
+    aspectRatioId: modelDefaults.aspectRatioId,
     cfgScale: modelDefaults.cfgScale,
     cfgScaleLowNoise: modelDefaults.cfgScaleLowNoise,
+    componentSourceModel: modelDefaults.componentSourceModel,
     fps: modelDefaults.fps,
+    h3TextEncoderModel: modelDefaults.h3TextEncoderModel,
+    h3TransformerModel: modelDefaults.h3TransformerModel,
     loras: [
       ...settings.loras.filter(
         (lora) => !previousKeys.has(lora.model.key) && !modelDefaults.loras.some((d) => d.model.key === lora.model.key)
@@ -880,6 +886,9 @@ export const getVideoSettingsWithModelDefaults = (
     numFrames: modelDefaults.numFrames,
     steps: modelDefaults.steps,
     targetResolution: modelDefaults.targetResolution,
+    vae: modelDefaults.vae,
+    wanLowNoiseModel: modelDefaults.wanLowNoiseModel,
+    wanT5EncoderModel: modelDefaults.wanT5EncoderModel,
   };
 };
 
@@ -910,7 +919,16 @@ export const getVideoModelSelectionResult = ({
   models: readonly ModelConfig[];
 }): VideoModelSelectionResult => {
   const config = getVideoConfig(model);
-  const next: VideoSettings = { ...currentSettings, modelKey: model.key };
+  // A record without a modelKey was healed from a store the panel never
+  // seeded (a fresh project, or a pre-open "Send to Video" payload): its
+  // sampling values are the model-agnostic healing fallbacks, not user
+  // choices. Bootstrap the picked model's own defaults — accelerator
+  // included — instead of preserving fallbacks, then reconcile any seeded
+  // media below exactly like a normal selection.
+  const start = currentSettings.modelKey
+    ? currentSettings
+    : getVideoSettingsWithModelDefaults(currentSettings, model, models);
+  const next: VideoSettings = { ...start, modelKey: model.key };
   const clearedLabels: string[] = [];
   const modes = config.modes;
 

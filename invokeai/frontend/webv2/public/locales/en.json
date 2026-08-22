@@ -1362,7 +1362,9 @@
         "upscale": "Upscale an image",
         "upscaleDescription": "Add resolution and detail",
         "workflow": "Build a workflow",
-        "workflowDescription": "Wire nodes together"
+        "workflowDescription": "Wire nodes together",
+        "video": "Generate a video",
+        "videoDescription": "Text, image, or extend an existing clip"
       },
       "queue": {
         "summary": "{{inProgress}} running · {{pending}} queued"
@@ -3050,7 +3052,8 @@
       "removeLora": "Remove {{name}}",
       "selectComponent": "Select a component model…",
       "acceleratorBroken": "Accelerator turned off",
-      "acceleratorBrokenDescription": "One of its LoRAs was removed or disabled, so steps and CFG were restored to the model's defaults."
+      "acceleratorBrokenDescription": "One of its LoRAs was removed or disabled, so steps and CFG were restored to the model's defaults.",
+      "resetAllToModelDefaults": "Reset all settings to the model's defaults"
     }
   },
   "workflowLibrary": {

@@ -20,7 +20,7 @@ import type { BuiltInLayoutPresetId } from '@workbench/layoutContracts';
  * shared between both routes, the preset table is not.
  */
 
-export type LaunchpadIntentId = 'generate' | 'canvas' | 'upscale' | 'workflow';
+export type LaunchpadIntentId = 'generate' | 'canvas' | 'upscale' | 'video' | 'workflow';
 
 export interface LaunchpadIntent {
   id: LaunchpadIntentId;
@@ -28,12 +28,19 @@ export interface LaunchpadIntent {
   sourceId: InvocationSourceId;
 }
 
-export const LAUNCHPAD_INTENT_IDS: readonly LaunchpadIntentId[] = ['generate', 'canvas', 'upscale', 'workflow'];
+export const LAUNCHPAD_INTENT_IDS: readonly LaunchpadIntentId[] = [
+  'generate',
+  'canvas',
+  'upscale',
+  'video',
+  'workflow',
+];
 
 const INTENTS: Record<LaunchpadIntentId, LaunchpadIntent> = {
   canvas: { id: 'canvas', presetId: 'edit', sourceId: 'canvas' },
   generate: { id: 'generate', presetId: 'compose', sourceId: 'generate' },
   upscale: { id: 'upscale', presetId: 'compose', sourceId: 'upscale' },
+  video: { id: 'video', presetId: 'compose', sourceId: 'video' },
   workflow: { id: 'workflow', presetId: 'automate', sourceId: 'workflow' },
 };
 
