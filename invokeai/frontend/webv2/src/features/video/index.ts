@@ -15,7 +15,9 @@ export type {
   WanTargetResolution,
 } from './core/types';
 export {
+  clearDeletedVideoMedia,
   cloneVideoWidgetValues,
+  createVideoSourceClip,
   isImageWithDims,
   isVideoAspectRatioId,
   isVideoSettings,

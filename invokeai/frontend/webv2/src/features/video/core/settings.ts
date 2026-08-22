@@ -266,3 +266,72 @@ export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetVa
   wanLowNoiseModel: values.wanLowNoiseModel ? { ...values.wanLowNoiseModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
 });
+
+/** Fallback frame rate when a clip's probe did not record one (mirrors extract_video_range). */
+export const VIDEO_SOURCE_FALLBACK_FPS = 16;
+
+/**
+ * Builds the panel's source-clip record from a gallery video. The frame count
+ * is an estimate (duration × fps — the records store no exact count); the
+ * backend's extract_video_range resolves authoritative indices at run time.
+ * The default trim keeps everything but the final frame (the bundled extend
+ * templates' `end_frame: -2`): the extension starts on the trimmed clip's last
+ * frame, so keeping the very last one would duplicate it across the seam.
+ */
+export const createVideoSourceClip = (item: {
+  durationSeconds: number;
+  fps?: number;
+  height: number;
+  name: string;
+  width: number;
+}): VideoSourceClip => {
+  const fps = item.fps && Number.isFinite(item.fps) && item.fps > 0 ? item.fps : VIDEO_SOURCE_FALLBACK_FPS;
+  const numFrames = Math.max(1, Math.round(item.durationSeconds * fps));
+
+  return {
+    // Never below 1: the crossfade join needs at least a two-frame trim.
+    endFrame: Math.max(1, numFrames - 2),
+    fps,
+    height: item.height,
+    numFrames,
+    startFrame: 0,
+    video_name: item.name,
+    width: item.width,
+  };
+};
+
+/** The minimum frames a trim must keep — video_concat's crossfade consumes a 2-frame tail. */
+export const MIN_VIDEO_TRIM_FRAMES = 2;
+
+/**
+ * Clears conditioning media that no longer exists in the gallery. Returns the
+ * input object untouched when nothing changes.
+ *
+ * Deliberately operates on RAW widget values rather than a normalized
+ * snapshot: normalization resolves the first-frame/initial-video exclusion by
+ * masking one slot, and a masked reference would silently survive the
+ * deletion sweep — a dangling media name waiting to resurface.
+ */
+export const clearDeletedVideoMedia = <T extends object>(
+  values: T,
+  removedImageNames: ReadonlySet<string>,
+  removedVideoNames: ReadonlySet<string>
+): T => {
+  const slots = values as { firstFrameImage?: unknown; lastFrameImage?: unknown; sourceVideo?: unknown };
+  const clearFirst = isImageWithDims(slots.firstFrameImage) && removedImageNames.has(slots.firstFrameImage.image_name);
+  const clearLast = isImageWithDims(slots.lastFrameImage) && removedImageNames.has(slots.lastFrameImage.image_name);
+  const clearSource = isVideoSourceClip(slots.sourceVideo) && removedVideoNames.has(slots.sourceVideo.video_name);
+
+  if (!clearFirst && !clearLast && !clearSource) {
+    return values;
+  }
+
+  // The spread widens the cleared keys to `null`; T itself declares them
+  // nullable in every real shape (VideoSettings, raw widget values).
+  return {
+    ...values,
+    ...(clearFirst ? { firstFrameImage: null } : {}),
+    ...(clearLast ? { lastFrameImage: null } : {}),
+    ...(clearSource ? { sourceVideo: null } : {}),
+  } as T;
+};

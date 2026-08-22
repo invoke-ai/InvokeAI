@@ -117,6 +117,7 @@ import {
   type UpscaleWidgetValues,
 } from '@features/upscale';
 import {
+  clearDeletedVideoMedia,
   cloneVideoWidgetValues,
   compileVideoGraph,
   getVideoDimensions,
@@ -2570,6 +2571,13 @@ const removeGalleryItemsFromAllProjects = (
       return ref.kind === 'image' ? [ref.name] : [];
     })
   );
+  const removedVideoNames = new Set(
+    [...removedItemKeys].flatMap((key) => {
+      const ref = parseGalleryItemKey(key);
+
+      return ref.kind === 'video' ? [ref.name] : [];
+    })
+  );
   let didChange = false;
   const projects = state.projects.map((project) => {
     const withoutGalleryItems = updateProjectWidgetValues(project, 'gallery', (values) => {
@@ -2620,8 +2628,15 @@ const removeGalleryItemsFromAllProjects = (
       return { ...clearDeletedUpscaleInput(values, removedImageNames) };
     });
 
-    didChange ||= withoutUpscaleInput !== project;
-    return withoutUpscaleInput;
+    // The sweep runs against the RAW slots: normalizing first would let a
+    // reference masked by the first-frame/initial-video exclusion survive the
+    // deletion and resurface later as a dangling media name.
+    const withoutVideoMedia = updateProjectWidgetValues(withoutUpscaleInput, 'video', (rawValues) =>
+      clearDeletedVideoMedia(rawValues, removedImageNames, removedVideoNames)
+    );
+
+    didChange ||= withoutVideoMedia !== project;
+    return withoutVideoMedia;
   });
 
   return didChange ? { ...state, projects } : state;

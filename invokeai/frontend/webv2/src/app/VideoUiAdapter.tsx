@@ -1,8 +1,10 @@
 import type { VideoUiAdapter } from '@features/video';
 import type { ReactNode } from 'react';
 
+import { invalidateGallery } from '@features/gallery/queries';
 import { areProjectPromptDraftsEqual, getPromptDraftFromValues } from '@features/generation/settings';
 import { VideoUiProvider } from '@features/video';
+import { useQueryClient } from '@tanstack/react-query';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -35,6 +37,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
   const commands = useWorkbenchCommands();
+  const queryClient = useQueryClient();
   // The port's callbacks are keyed to the project, not to its contents: rebuilding
   // them whenever `rawValues` changes would hand every consumer new function
   // identities on each keystroke, re-rendering memoized fields that did not change.
@@ -51,6 +54,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     (message) => commands.notifications.reportError({ area: 'video', message, namespace: 'generation' }),
     [commands]
   );
+  const touchGalleryImages = useCallback(() => void invalidateGallery(queryClient), [queryClient]);
   const adapter = useMemo<VideoUiAdapter>(
     () => ({
       ...project,
@@ -58,8 +62,9 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       patchValues,
       reportError,
       showPromptSyntaxHighlighting,
+      touchGalleryImages,
     }),
-    [patchPromptDraft, patchValues, project, reportError, showPromptSyntaxHighlighting]
+    [patchPromptDraft, patchValues, project, reportError, showPromptSyntaxHighlighting, touchGalleryImages]
   );
 
   return <VideoUiProvider adapter={adapter}>{children}</VideoUiProvider>;

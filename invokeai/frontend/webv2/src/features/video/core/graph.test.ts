@@ -31,7 +31,7 @@ const WAN_T5 = { base: 'any', key: 'umt5', name: 'UMT5-XXL', type: 'wan_t5_encod
 const FIRST_FRAME = { height: 1080, image_name: 'first.png', width: 1920 };
 const LAST_FRAME = { height: 1080, image_name: 'last.png', width: 1920 };
 const SOURCE_VIDEO = {
-  endFrame: -2,
+  endFrame: 79,
   fps: 16,
   height: 480,
   numFrames: 81,
@@ -225,6 +225,72 @@ describe('compileVideoGraph — Wan 2.2', () => {
     expect(() => compileVideoGraph(settings, model)).toThrow(/whole frame numbers/);
   });
 
+  it('compiles ceiling-touching trim ends as negative indices (estimate-proof)', () => {
+    const model = wanModel('i2v_a14b');
+    // endFrame == numFrames - 2 (the default trim): compiled as -2 so the
+    // backend resolves it against the clip's REAL frame count.
+    const atDefault = compileVideoGraph(settingsFor(model, { sourceVideo: SOURCE_VIDEO }), model).backendGraph;
+
+    expect(nodeOfType(atDefault, 'extract_video_range').end_frame).toBe(-2);
+
+    // A mid-clip pick stays positive.
+    const midClip = compileVideoGraph(
+      settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: 40 } }),
+      model
+    ).backendGraph;
+
+    expect(nodeOfType(midClip, 'extract_video_range').end_frame).toBe(40);
+  });
+
+  it('compiles ceiling-touching trim STARTS as negative indices too — a keep-the-tail trim survives estimate overshoot', () => {
+    const model = wanModel('i2v_a14b');
+    // numFrames 81: startFrame 77 has tail offset 3 (→ -4), endFrame 79 has
+    // tail offset 1 (→ -2). Both inside the tail window, order preserved.
+    const tailTrim = compileVideoGraph(
+      settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: 79, startFrame: 77 } }),
+      model
+    ).backendGraph;
+
+    expect(nodeOfType(tailTrim, 'extract_video_range')).toMatchObject({ end_frame: -2, start_frame: -4 });
+
+    // Tail offset 4 is the first index OUTSIDE the window: it stays a
+    // positive literal (converting it would drift mid-clip picks when the
+    // estimate overshoots), even when the end still converts.
+    const boundary = compileVideoGraph(
+      settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: 78, startFrame: 76 } }),
+      model
+    ).backendGraph;
+
+    expect(nodeOfType(boundary, 'extract_video_range')).toMatchObject({ end_frame: -3, start_frame: 76 });
+  });
+
+  it('records the delivered fps in Wan metadata — the panel fps normally, the source clip fps for extend', () => {
+    const t2vModel = wanModel('t2v_a14b');
+    const t2v = compileVideoGraph(settingsFor(t2vModel, { fps: 20 }), t2vModel).backendGraph;
+
+    expect(nodeOfType(t2v, 'core_metadata')).toMatchObject({ fps: 20 });
+
+    // Extend inherits the source clip's (rounded) rate, not the panel setting.
+    const extendModel = wanModel('i2v_a14b');
+    const extend = compileVideoGraph(
+      settingsFor(extendModel, { fps: 20, sourceVideo: { ...SOURCE_VIDEO, fps: 23.7 } }),
+      extendModel
+    ).backendGraph;
+
+    expect(nodeOfType(extend, 'core_metadata')).toMatchObject({ fps: 24 });
+  });
+
+  it('refuses a trim shorter than two frames', () => {
+    const model = wanModel('i2v_a14b');
+
+    expect(() =>
+      compileVideoGraph(settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: 10, startFrame: 10 } }), model)
+    ).toThrow(/at least two frames/);
+    expect(() =>
+      compileVideoGraph(settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: 500 } }), model)
+    ).toThrow(/at least two frames/);
+  });
+
   it('extends toward a destination image via the FLF2V end-frame channel', () => {
     const model = wanModel('i2v_a14b');
     const settings = settingsFor(model, { lastFrameImage: LAST_FRAME, sourceVideo: SOURCE_VIDEO });
@@ -348,7 +414,7 @@ describe('compileVideoGraph — MiniMax H3', () => {
   });
 
   it('builds the extend graph with the source resampled to 24 fps', () => {
-    const settings = settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: -1 } });
+    const settings = settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, endFrame: 80 } });
     const { backendGraph } = compileVideoGraph(settings, model);
 
     // H3 renders at a fixed 24 fps; the source is retimed up front so the

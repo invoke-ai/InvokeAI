@@ -16,10 +16,14 @@ export interface VideoUiAdapter {
   rawValues: Record<string, unknown>;
   reportError(message: string): void;
   showPromptSyntaxHighlighting: boolean;
+  touchGalleryImages(): void;
 }
 
 /** The adapter's callbacks, which are stable for the lifetime of a project. */
-export type VideoUiActions = Pick<VideoUiAdapter, 'patchPromptDraft' | 'patchValues' | 'reportError'>;
+export type VideoUiActions = Pick<
+  VideoUiAdapter,
+  'patchPromptDraft' | 'patchValues' | 'reportError' | 'touchGalleryImages'
+>;
 
 const VideoUiContext = createContext<VideoUiAdapter | null>(null);
 /**
@@ -31,10 +35,10 @@ const VideoUiContext = createContext<VideoUiAdapter | null>(null);
 const VideoUiActionsContext = createContext<VideoUiActions | null>(null);
 
 export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter; children: ReactNode }) => {
-  const { patchPromptDraft, patchValues, reportError } = adapter;
+  const { patchPromptDraft, patchValues, reportError, touchGalleryImages } = adapter;
   const actions = useMemo<VideoUiActions>(
-    () => ({ patchPromptDraft, patchValues, reportError }),
-    [patchPromptDraft, patchValues, reportError]
+    () => ({ patchPromptDraft, patchValues, reportError, touchGalleryImages }),
+    [patchPromptDraft, patchValues, reportError, touchGalleryImages]
   );
 
   return (
