@@ -8,7 +8,7 @@ import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
-import { GripVerticalIcon } from 'lucide-react';
+import { GripHorizontalIcon } from 'lucide-react';
 import {
   useCallback,
   useId,
@@ -480,18 +480,22 @@ const PreviewVideo = ({
             ref={setDragHandleRef}
             {...listeners}
             cursor={isDragging ? 'grabbing' : 'grab'}
-            insetInlineStart="2"
+            // Top-center: every corner belongs to some browser's own video
+            // overlays (fullscreen, picture-in-picture), and the bottom strip
+            // is the native control bar.
+            insetInlineStart="50%"
             position="absolute"
             size="xs"
             title={t('widgets.preview.dragVideo')}
             top="2"
             touchAction="none"
+            transform="translateX(-50%)"
             variant="solid"
             // Above the failure overlay: a clip that cannot play can still be
             // dragged into an input, which only needs its name.
             zIndex="2"
           >
-            <GripVerticalIcon aria-hidden="true" size={12} />
+            <GripHorizontalIcon aria-hidden="true" size={12} />
           </Badge>
         ) : null}
         {/* User-provided gallery videos do not include a caption-track contract. */}
