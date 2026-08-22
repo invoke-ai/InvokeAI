@@ -23,7 +23,7 @@ Video generation is a prototype feature. Panel behavior, workflows, and starter-
 
 Open the **Video** entry in the editor's left rail (next to Generate and Upscale). The panel is a complete video pipeline: type a prompt, pick a model, press **Invoke**, and the finished MP4 appears in the gallery.
 
-{/* SCREENSHOT PLACEHOLDER: video-panel-overview.png — the full Video panel in the left rail with a Wan A14B model selected, showing the Prompt, Start & End Images, Initial Video, Dimensions, and Model sections. */}
+![Video Panel Overview](./assets/video-panel-overview.png)
 
 ### Quick start
 
@@ -71,7 +71,7 @@ Two drop targets: **First Frame** and **Last Frame**. Drag an image from the gal
 * A **last frame** anchors where it ends. Combined with a first frame, the model interpolates between the two. On MiniMax H3 a last frame also works **alone** — the video builds toward your image.
 * Setting a first frame **disables the Initial Video section**, and vice-versa: a clip can start from a still or continue a video, not both. The disabled section says which input to clear.
 
-{/* SCREENSHOT PLACEHOLDER: video-panel-start-end-images.png — the Start & End Images section with a first-frame image set, showing the Initial Video section below it in its disabled state. */}
+![Video Panel Start and End Images](./assets/video-panel-start-end-images.png)
 
 ### Initial Video
 
@@ -84,7 +84,7 @@ Drop or upload an existing video to **extend** it. The section shows the clip wi
 
 Run extend repeatedly — each output can be the next run's initial video — to grow a clip well past a single generation's length. See [making longer videos](#making-longer-videos).
 
-{/* SCREENSHOT PLACEHOLDER: video-panel-initial-video.png — the Initial Video section with a clip loaded, showing the trim sliders and the start/end bound thumbnails. */}
+![Video Panel Initial Video](./assets/video-panel-initial-video.png)
 
 ### Dimensions
 
@@ -106,7 +106,7 @@ Model select plus the sampling controls:
 * **Seed** with a randomize toggle.
 * The **fast-path toggle** — **Lightning** on Wan A14B, **Turbo** on MiniMax H3. When the matching distillation LoRA is installed the toggle defaults **on**, setting the distilled step count (4 for Lightning, 6 for Turbo) and CFG 1. Turning it off restores the model's full-quality defaults (40 steps / CFG 5 on Wan, 50 steps on H3). The toggle works by adding or removing the LoRA in the Concepts list — what you see there is exactly what runs.
 
-{/* SCREENSHOT PLACEHOLDER: video-panel-model-section.png — the Model section with a Wan A14B model selected and the Lightning toggle on, showing Steps 4 and both CFG fields. */}
+![Video Panel Model Section](./assets/video-panel-model-section.png)
 
 ### Concepts
 
@@ -122,7 +122,7 @@ What appears here depends on the model:
 
 If a Wan A14B pairing looks mis-wired — for example a low-noise-tagged file in the main slot — the panel shows a **non-blocking advisory** beneath the slots with a one-click **Swap experts** action. The tags come from a filename heuristic and your explicit wiring always wins, so deliberate cross-wiring still runs (the backend logs the same warning at generation time).
 
-{/* SCREENSHOT PLACEHOLDER: video-panel-expert-advisory.png — the Model Components section showing the expert-wiring advisory badge with its Swap experts button. */}
+![Video Panel Expert Advisory, Low/High Noise Switch](./assets/video-panel-expert-advisory.png)
 
 ### Recalling parameters
 
@@ -196,7 +196,7 @@ The **MiniMax H3** starter bundle (~62 GB) installs the working set:
 * **MiniMax H3 FL2VA Transformer (int8, pruned)** (~21 GB) and **MiniMax H3 Text Encoder (int8)** (~27 GB) — single-file builds that slot into the panel's **Model Components** overrides (the bundled templates and the panel wire them the same way).
 * **MiniMax H3 Turbo LoRA** and **MiniMax H3 LightX2V Turbo LoRA** — two independent step-distillation LoRAs (both Apache 2.0); the Turbo toggle picks one automatically.
 
-H3 is the heaviest local video option — plan on a high-VRAM GPU (24 GB+) with `enable_partial_loading` and generous system RAM for offloaded weights.
+H3 is the heaviest local video option — With 16 GB VRAM, `enable_partial_loading` enabled and 32 GB of system RAM it can create a full 345 frame video (about 14s) at 768x768 resolution, but for larger or longer videos a high-VRAM GPU (24 GB+) is strongly recommended.
 
 :::caution[License restrictions]
 MiniMax H3 is distributed under the **MiniMax H3 Community License**, which restricts use by territory (currently excluding the US, EU, UK, and South Korea) — and the restriction **extends to model outputs**. Review the terms at [huggingface.co/MiniMaxAI/MiniMax-H3](https://huggingface.co/MiniMaxAI/MiniMax-H3) before installing. The Turbo LoRAs themselves are Apache 2.0.
@@ -231,6 +231,8 @@ Each iteration's source is itself a generation output, so artifacts compound —
 1. **Trim the bridge point a few frames back from the end** — boundary frames are the most artifact-prone.
 2. **Refresh a bridge frame with a low-strength img2img pass** (SDXL or FLUX at ~0.2 strength) before using it as a first frame for the next segment.
 3. **Don't chain more than 4–5 segments** without refreshing in between.
+
+Also, be aware that the extended video only has access to information present in the bridge frame (i.e. the last frame of the previous video). So if a character in the first video has their face obscured in the bridge frame, the character's face may be completely different in the extended part of the video.
 
 ### In the workflow editor
 
