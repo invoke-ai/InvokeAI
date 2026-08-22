@@ -673,6 +673,21 @@ describe('getVideoValidationReasons', () => {
     expect(getVideoValidationReasons(model, settings)).toContainEqual(expect.stringContaining('cannot be combined'));
   });
 
+  it('rejects a Wan extension whose source clip frame rate falls outside 1-120 fps', () => {
+    const model = wanModel('i2v_a14b', 'diffusers');
+
+    // wan_l2v/video_concat accept 1-120; an out-of-range clip would fail only
+    // AFTER the denoise. A slow-mo clip and an unprobeable sub-1 fps rate both
+    // block up front; an ordinary clip raises nothing.
+    expect(
+      getVideoValidationReasons(model, settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, fps: 240 } }))
+    ).toContainEqual(expect.stringContaining('1-120 fps'));
+    expect(
+      getVideoValidationReasons(model, settingsFor(model, { sourceVideo: { ...SOURCE_VIDEO, fps: 0.3 } }))
+    ).toContainEqual(expect.stringContaining('1-120 fps'));
+    expect(getVideoValidationReasons(model, settingsFor(model, { sourceVideo: SOURCE_VIDEO }))).toEqual([]);
+  });
+
   it('validates frames, fps, and steps against the matrix', () => {
     const wan = wanModel('t2v_a14b', 'diffusers');
     const h3 = h3Model();

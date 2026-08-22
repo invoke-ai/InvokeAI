@@ -1122,6 +1122,20 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     if (numFrames < MIN_VIDEO_TRIM_FRAMES) {
       reasons.push('The initial video is too short to extend.');
     }
+
+    // A Wan extension inherits the source clip's frame rate, and the backend's
+    // wan_l2v/video_concat nodes accept 1-120 fps. An out-of-range clip (a
+    // 240 fps slow-mo, an unprobeable sub-1 fps rate) would enqueue, run the
+    // whole denoise, then die assigning the fps — so block it here instead.
+    if (model.base === 'wan') {
+      const inheritedFps = Math.round(settings.sourceVideo.fps);
+
+      if (inheritedFps < 1 || inheritedFps > 120) {
+        reasons.push(
+          `The initial video's frame rate (${settings.sourceVideo.fps} fps) is outside the 1-120 fps range Wan extension supports.`
+        );
+      }
+    }
   }
 
   if (!getVideoDimensions(model, settings)) {
