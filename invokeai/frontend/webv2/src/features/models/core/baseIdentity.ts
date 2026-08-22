@@ -100,6 +100,12 @@ export const MODEL_BASES = {
     colorPalette: 'cyan',
     description: 'Video architecture used for image generation at a single frame.',
   },
+  'minimax-h3': {
+    base: 'minimax-h3',
+    label: 'MiniMax H3',
+    colorPalette: 'orange',
+    description: 'Video architecture that generates video with synchronized audio.',
+  },
   any: {
     base: 'any',
     label: 'Any',
