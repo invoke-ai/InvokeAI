@@ -228,6 +228,58 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       const parsed = await ImageMetadataHandlers.VAEModel.parse({ vae: nextResolved }, store);
       expect(parsed.key).toBe('vae-key');
     });
+
+    // The selected base alone is not enough. With no main model selected - startup, or after the last
+    // one is uninstalled - `selectBase` is null and every dedicated handler bows out, so an Anima image
+    // fell through to here and offered a recall into the (for Anima dead) `params.vae`. Review
+    // 4998711432.
+    it.each(['flux', 'flux2', 'z-image', 'krea-2', 'anima'])(
+      'rejects a %s image even when no main model is selected',
+      async (imageBase) => {
+        currentBase = null;
+        nextResolved = fakeModel('vae', imageBase);
+        const store = makeStore();
+
+        await expect(
+          ImageMetadataHandlers.VAEModel.parse(
+            {
+              model: { key: 'main-key', hash: 'h', name: imageBase, base: imageBase, type: 'main' },
+              vae: nextResolved,
+            },
+            store
+          )
+        ).rejects.toThrow();
+      }
+    );
+
+    // ...but an image from a base that genuinely uses the shared slot still recalls, which is the whole
+    // reason the null-base case is allowed through at all.
+    it('parses an SDXL image when no main model is selected', async () => {
+      currentBase = null;
+      nextResolved = fakeModel('vae', 'sdxl');
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.VAEModel.parse(
+        { model: { key: 'main-key', hash: 'h', name: 'sdxl', base: 'sdxl', type: 'main' }, vae: nextResolved },
+        store
+      );
+
+      expect(parsed.key).toBe('vae-key');
+    });
+
+    // An Anima image must not claim the shared slot while SDXL happens to be selected either.
+    it('rejects an Anima image while SDXL is selected', async () => {
+      currentBase = 'sdxl';
+      nextResolved = fakeModel('vae', 'anima');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.VAEModel.parse(
+          { model: { key: 'main-key', hash: 'h', name: 'anima', base: 'anima', type: 'main' }, vae: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
   });
 
   describe('T5EncoderModel', () => {

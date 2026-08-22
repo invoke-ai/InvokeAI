@@ -187,6 +187,12 @@ const getProperty = (obj: unknown, path: string): unknown => {
   return get(obj, path) as unknown;
 };
 
+const getMetadataModelBase = (metadata: unknown): string | undefined => {
+  const rawModel = getProperty(metadata, 'model');
+  const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
+  return isString(modelBase) ? modelBase : undefined;
+};
+
 const assertMetadataModelBase = (metadata: unknown, expectedBase: string, handlerType: string): void => {
   const rawModel = getProperty(metadata, 'model');
   const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
@@ -1519,6 +1525,16 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
+    // Two axes, because either one alone leaves a hole. The selected base decides which slot is live;
+    // the image's own base decides which handler owns the row. Without the provenance half, an Anima
+    // image viewed with no main model selected (`base` null, startup or after the last model is
+    // uninstalled) falls through to here and offers a recall into the - for Anima dead - `params.vae`
+    // (review 4998711432).
+    const metadataBase = getMetadataModelBase(metadata);
+    assert(
+      !metadataBase || !BASES_WITH_DEDICATED_VAE_HANDLER.has(metadataBase as BaseModelType),
+      `VAEModel handler does not apply to "${metadataBase}" images - that base has a dedicated VAE handler`
+    );
     const base = selectBase(store.getState());
     assert(
       !base || !BASES_WITH_DEDICATED_VAE_HANDLER.has(base),
