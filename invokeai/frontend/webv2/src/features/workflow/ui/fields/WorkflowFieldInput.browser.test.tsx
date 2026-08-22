@@ -4,9 +4,10 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { WorkflowFieldInput } from './WorkflowFieldInput';
 
@@ -25,6 +26,50 @@ vi.mock('@features/gallery', () => ({
     uploadVideo: (...args: unknown[]) => uploadVideoMock(...args),
   },
 }));
+
+const modelSelectState = vi.hoisted(() => ({
+  props: null as null | {
+    excludeKeys?: ReadonlySet<string>;
+    filter?: (model: Record<string, unknown>) => boolean;
+    modelTypes: readonly string[];
+    onChange: (model: unknown) => void;
+    placeholder?: string;
+  },
+}));
+
+// The real picker pulls in the whole model library; the widget's contract with it is the props it
+// passes (scope, exclusions, base filter) and the model it gets back.
+vi.mock('@features/models/react', () => ({
+  ModelSelect: (props: NonNullable<typeof modelSelectState.props>) => {
+    modelSelectState.props = props;
+
+    return (
+      <button type="button" onClick={() => props.onChange(ADDABLE_LORA)}>
+        {props.placeholder}
+      </button>
+    );
+  },
+}));
+
+const SD_LORA = {
+  base: 'sd-1',
+  default_settings: { weight: 0.4 },
+  hash: 'hash-sd',
+  key: 'sd-lora',
+  name: 'Detail Tweaker',
+  type: 'lora',
+};
+const SDXL_LORA = { base: 'sdxl', hash: 'hash-sdxl', key: 'sdxl-lora', name: 'Pixel Art XL', type: 'lora' };
+// What the real picker would hand back for this template: an sd-1 LoRA carrying a model default
+// weight, so "adds at the model default" cannot pass by coincidence.
+const ADDABLE_LORA = {
+  base: 'sd-1',
+  default_settings: { weight: 0.4 },
+  hash: 'hash-add',
+  key: 'add-lora',
+  name: 'Add Me',
+  type: 'lora',
+};
 
 const galleryValues: Record<string, unknown> = {};
 const graphNodes: unknown[] = [];
@@ -68,6 +113,20 @@ const makeFrameNode = (videoValue: { video_name: string } | undefined) => ({
   type: 'invocation',
 });
 
+const LORA_COLLECTION_TEMPLATE = {
+  name: 'loras',
+  title: 'LoRAs',
+  type: { cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' },
+  uiModelBase: ['sd-1', 'sd-2'],
+  uiModelType: ['lora'],
+} as unknown as FieldInputTemplate;
+
+const loraEntry = (overrides: Record<string, unknown> = {}) => ({
+  lora: { base: 'sd-1', hash: 'hash-sd', key: 'sd-lora', name: 'Detail Tweaker', type: 'lora' },
+  weight: 0.75,
+  ...overrides,
+});
+
 const SELECTED_GALLERY_VIDEO = {
   boardId: 'none',
   category: 'general',
@@ -94,6 +153,9 @@ beforeEach(() => {
   uploadVideoMock.mockReset();
   resolveItemMock.mockReset();
   resolveItemMock.mockResolvedValue(SELECTED_GALLERY_VIDEO);
+  // Module-level capture: without this the next test's wait is satisfied by the previous test's
+  // props and asserts against a picker that is no longer mounted.
+  modelSelectState.props = null;
   queryClient.clear();
   delete galleryValues.selectedImage;
   graphNodes.length = 0;
@@ -123,6 +185,30 @@ const renderField = async (
         </QueryClientProvider>
       </ChakraProvider>
     );
+  });
+};
+
+/**
+ * Real keystrokes, not a synthetic `input` event: the weight control is a zag-js number input that
+ * ignores a value written straight onto the DOM node, and the defect being guarded against here is
+ * specifically what happens between keystrokes.
+ */
+const typeWeight = async (input: HTMLInputElement, keys: string) => {
+  await act(async () => {
+    await userEvent.click(input);
+    await userEvent.keyboard(`{Control>}a{/Control}${keys}`);
+  });
+};
+
+const pressKey = async (key: string) => {
+  await act(async () => {
+    await userEvent.keyboard(key);
+  });
+};
+
+const blurWeight = async (input: HTMLInputElement) => {
+  await act(() => {
+    input.blur();
   });
 };
 
@@ -383,5 +469,184 @@ describe('WorkflowFieldInput media inputs', () => {
       expect(onChange).toHaveBeenCalledWith({ image_name: 'uploaded.png' });
     });
     expect(uploadVideoMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A parent that actually owns the value, the way the node editor does. The static `renderField`
+ * harness never feeds a committed value back, which hides every defect that only shows up on the
+ * re-render after a keystroke — the snap-back and the clamp-on-blur are exactly those.
+ */
+const StatefulLoRAField = ({ initial, onCommit }: { initial: unknown; onCommit: (value: unknown) => void }) => {
+  const [value, setValue] = useState(initial);
+  const onChange = useCallback(
+    (next: unknown) => {
+      setValue(next);
+      onCommit(next);
+    },
+    [onCommit]
+  );
+
+  return <WorkflowFieldInput template={LORA_COLLECTION_TEMPLATE} value={value} onChange={onChange} />;
+};
+
+describe('WorkflowFieldInput LoRA collection', () => {
+  const renderStatefulLoras = async (initial: unknown, onCommit: (value: unknown) => void) => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <StatefulLoRAField initial={initial} onCommit={onCommit} />
+            </DndContext>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+    await vi.waitFor(() => {
+      expect(modelSelectState.props).not.toBeNull();
+    });
+  };
+
+  const renderLoras = async (value: unknown, onChange: (value: unknown) => void) => {
+    await renderField(LORA_COLLECTION_TEMPLATE, value, onChange);
+    // The picker is lazy; wait for Suspense to resolve it before asserting on the mounted widget.
+    await vi.waitFor(() => {
+      expect(modelSelectState.props).not.toBeNull();
+    });
+  };
+
+  it('scopes the picker to the LoRAs the node can apply and hides the ones already added', async () => {
+    await renderLoras([loraEntry()], vi.fn());
+
+    const props = modelSelectState.props!;
+
+    expect(props.modelTypes).toEqual(['lora']);
+    expect(Array.from(props.excludeKeys ?? [])).toEqual(['sd-lora']);
+    expect(props.filter?.(SD_LORA)).toBe(true);
+    expect(props.filter?.(SDXL_LORA)).toBe(false);
+  });
+
+  it("appends a picked LoRA at the model's own default weight", async () => {
+    const onChange = vi.fn();
+
+    await renderLoras([loraEntry()], onChange);
+    await act(() => findButton('Add LoRA…').click());
+
+    // 0.4 comes from ADDABLE_LORA.default_settings, not from DEFAULT_LORA_WEIGHT_CONFIG.initial.
+    expect(onChange).toHaveBeenCalledWith([
+      loraEntry(),
+      { lora: { base: 'sd-1', hash: 'hash-add', key: 'add-lora', name: 'Add Me', type: 'lora' }, weight: 0.4 },
+    ]);
+  });
+
+  it('edits one weight and removes one entry without disturbing the rest', async () => {
+    const onChange = vi.fn();
+    const other = loraEntry({
+      lora: { base: 'sd-1', hash: 'hash-other', key: 'other-lora', name: 'Other', type: 'lora' },
+      weight: 1,
+    });
+
+    await renderLoras([loraEntry(), other], onChange);
+
+    const weightInputs = Array.from(host.querySelectorAll<HTMLInputElement>('input'));
+
+    expect(weightInputs).toHaveLength(2);
+    expect(host.textContent).toContain('Detail Tweaker');
+    expect(host.textContent).toContain('Other');
+
+    await typeWeight(weightInputs[0]!, '0.5');
+    expect(onChange).toHaveBeenCalledWith([loraEntry({ weight: 0.5 }), other]);
+
+    const removeOther = host.querySelector<HTMLButtonElement>('button[aria-label="Remove Other"]')!;
+
+    await act(() => removeOther.click());
+    expect(onChange).toHaveBeenLastCalledWith([loraEntry()]);
+  });
+
+  it('edits the right row when the same LoRA appears twice in an imported workflow', async () => {
+    const onChange = vi.fn();
+
+    await renderLoras([loraEntry(), loraEntry({ weight: 1 })], onChange);
+
+    const removeButtons = host.querySelectorAll<HTMLButtonElement>('button[aria-label="Remove Detail Tweaker"]');
+
+    expect(removeButtons).toHaveLength(2);
+    await act(() => removeButtons[1]!.click());
+    expect(onChange).toHaveBeenCalledWith([loraEntry()]);
+  });
+
+  it('keeps a half-typed decimal instead of snapping back to the last committed number', async () => {
+    const onChange = vi.fn();
+
+    await renderStatefulLoras([loraEntry()], onChange);
+
+    const weight = host.querySelector<HTMLInputElement>('input')!;
+
+    // One keystroke at a time, because the defect lives between them: `<input type="number">`
+    // reports "" for a trailing ".", so the commit is dropped, the box is restored to "0", and the
+    // next keystroke lands as "05" = 5 — a 10x weight from a completely ordinary typing sequence.
+    await typeWeight(weight, '0');
+    await pressKey('.');
+
+    expect(weight.value).toBe('0.');
+
+    await pressKey('5');
+
+    expect(weight.value).toBe('0.5');
+    expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 0.5 })]);
+    // Nothing on the way there was ever an order of magnitude out.
+    expect(onChange.mock.calls.every(([value]) => (value as { weight: number }[])[0]!.weight <= 0.5)).toBe(true);
+  });
+
+  it('clamps a typed weight to the configured range on blur', async () => {
+    const onChange = vi.fn();
+
+    await renderStatefulLoras([loraEntry()], onChange);
+
+    const weight = host.querySelector<HTMLInputElement>('input')!;
+
+    await typeWeight(weight, '999');
+    await blurWeight(weight);
+
+    await vi.waitFor(() => {
+      expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 10 })]);
+    });
+  });
+
+  it('keeps an unreadable entry in the list and lets the user remove it', async () => {
+    const onChange = vi.fn();
+    // A key-only identifier is not renderable and the backend would reject it.
+    const broken = { lora: { key: 'ghost' }, weight: 1 };
+
+    await renderLoras([loraEntry(), broken], onChange);
+
+    expect(host.textContent).toContain('Unreadable entry');
+    // Only the readable row gets a weight control.
+    expect(host.querySelectorAll('input')).toHaveLength(1);
+
+    // Editing the good row must not drop the bad one.
+    await typeWeight(host.querySelector<HTMLInputElement>('input')!, '0.5');
+    expect(onChange).toHaveBeenLastCalledWith([loraEntry({ weight: 0.5 }), broken]);
+
+    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Remove Unreadable entry"]')!.click());
+    expect(onChange).toHaveBeenLastCalledWith([loraEntry()]);
+  });
+
+  it('clears the field back to its default when the last entry is removed', async () => {
+    const onChange = vi.fn();
+
+    await renderLoras([loraEntry()], onChange);
+    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Remove Detail Tweaker"]')!.click());
+
+    // `undefined`, not `[]`: the loaders default to no LoRAs, so the node returns to its default.
+    expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it('renders a single stored LoRAField as a one-row list rather than falling back', async () => {
+    await renderLoras(loraEntry(), vi.fn());
+
+    expect(host.textContent).not.toContain('Connection only');
+    expect(host.querySelectorAll('input')).toHaveLength(1);
   });
 });
