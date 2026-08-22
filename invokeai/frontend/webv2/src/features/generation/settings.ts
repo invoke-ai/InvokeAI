@@ -21,6 +21,7 @@ export {
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeModelConfig,
+  isWanLoraTargetingMain,
   MAX_HIDIFFUSION_RATIO,
   MAX_NEGATIVE_PROMPT_HEIGHT_PX,
   MAX_POSITIVE_PROMPT_HEIGHT_PX,
@@ -58,7 +59,12 @@ export {
   type ResolvedGenerateWidgetValues,
   type ResolveGenerateWidgetValuesInput,
 } from './core/resolveGenerateWidgetValues';
-export { isVaeCompatibleWithGenerateModel } from './core/componentCompatibility';
+export {
+  getCompatibleDiffusersComponentSource,
+  isDiffusersMainForBase,
+  isVaeCompatibleWithGenerateModel,
+  isVaeForBases,
+} from './core/componentCompatibility';
 export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
