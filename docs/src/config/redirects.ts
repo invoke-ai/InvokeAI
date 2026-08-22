@@ -16,6 +16,7 @@ const redirects: RedirectsConfig = {
   '/features/low-vram/': '/configuration/low-vram-mode/',
   '/features/lasso-tool': '/features/canvas/lasso-tool',
   '/features/shapes-tool': '/features/canvas/shapes-tool',
+  '/features/video-generation': '/concepts/video-generation',
   '/faq': '/troubleshooting/faq',
   '/help/SAMPLER_CONVERGENCE': '/concepts/parameters',
   '/help/diffusion': '/concepts/diffusion',
