@@ -14,6 +14,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { Field } from '@platform/ui';
 import { Button } from '@platform/ui/Button';
+import { DropTargetOverlay } from '@platform/ui/DropTargetOverlay';
 import { DropZone } from '@platform/ui/DropZone';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
@@ -356,6 +357,7 @@ export const VideoSourceClipField = memo(
               </Text>
             </Stack>
           )}
+          <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={t('widgets.video.dropInitialVideo')} />
         </DropZone>
         {sourceVideo && previewSrc ? (
           <HStack gap="2">
