@@ -2,15 +2,28 @@ import { describe, expect, it } from 'vitest';
 
 import type { FieldInputTemplate, FieldType } from './types';
 
-import { getWorkflowFieldInvalidReason, isModelFieldType, isWorkflowFieldValueValid } from './fields';
+import {
+  getWorkflowFieldInvalidReason,
+  isDirectInputField,
+  isLoraFieldCollectionEntry,
+  isModelFieldType,
+  isWorkflowFieldValueValid,
+  toLoraFieldCollectionList,
+} from './fields';
 
 const single = (name: string): FieldType => ({ batch: false, cardinality: 'SINGLE', name });
+
+const LORA_ENTRY = {
+  lora: { base: 'sd-1', hash: 'hash', key: 'lora-key', name: 'LoRA', type: 'lora' },
+  weight: 0.75,
+};
 
 const input = (overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate => ({
   default: undefined,
   description: '',
   exclusiveMaximum: null,
   exclusiveMinimum: null,
+  fieldKind: 'input',
   input: 'any',
   maximum: null,
   minimum: null,
@@ -24,6 +37,7 @@ const input = (overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate 
   uiComponent: null,
   uiHidden: false,
   uiModelBase: null,
+  uiModelFormat: null,
   uiModelType: null,
   uiOrder: null,
   ...overrides,
@@ -98,10 +112,64 @@ describe('workflow field validation', () => {
     expect(isWorkflowFieldValueValid(images, [{ image_name: 'a.png' }])).toBe(true);
   });
 
+  it('accepts a LoRA collection as a list, a bare entry, or an empty list', () => {
+    const loras = input({
+      required: false,
+      type: { batch: false, cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' },
+    });
+
+    expect(isWorkflowFieldValueValid(loras, [])).toBe(true);
+    expect(isWorkflowFieldValueValid(loras, [LORA_ENTRY])).toBe(true);
+    expect(isWorkflowFieldValueValid(loras, LORA_ENTRY)).toBe(true);
+    expect(isWorkflowFieldValueValid(loras, [{ ...LORA_ENTRY, weight: 'heavy' }])).toBe(false);
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template: loras, value: [] })).toBe(null);
+  });
+
+  it('rejects a LoRA identifier missing the fields the backend requires, rather than enqueuing a 422', () => {
+    const loras = input({
+      required: false,
+      type: { batch: false, cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' },
+    });
+
+    // A key alone would render a nameless row and be rejected at enqueue time.
+    expect(isWorkflowFieldValueValid(loras, [{ lora: { key: 'lora-key' }, weight: 0.75 }])).toBe(false);
+    expect(isWorkflowFieldValueValid(loras, [{ ...LORA_ENTRY, lora: { ...LORA_ENTRY.lora, hash: '' } }])).toBe(false);
+    expect(getWorkflowFieldInvalidReason({ isConnected: false, template: loras, value: [{ weight: 1 }] })).toBe(
+      'Invalid value.'
+    );
+  });
+
   it('treats empty board values as the Auto sentinel', () => {
     expect(isWorkflowFieldValueValid(input({ type: single('BoardField') }), undefined)).toBe(true);
     expect(isWorkflowFieldValueValid(input({ type: single('BoardField') }), { board_id: 'board-id' })).toBe(true);
     expect(isWorkflowFieldValueValid(input({ type: single('BoardField') }), {})).toBe(false);
+  });
+});
+
+describe('LoRA collection values', () => {
+  const loras = input({
+    required: false,
+    type: { batch: false, cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' },
+  });
+
+  it('gives the collection loaders an inline widget instead of a connection-only handle', () => {
+    expect(isDirectInputField(loras)).toBe(true);
+  });
+
+  it('normalizes the `LoRAField | list[LoRAField]` union', () => {
+    expect(toLoraFieldCollectionList([LORA_ENTRY])).toEqual([LORA_ENTRY]);
+    expect(toLoraFieldCollectionList(LORA_ENTRY)).toEqual([LORA_ENTRY]);
+    expect(toLoraFieldCollectionList(undefined)).toEqual([]);
+    expect(toLoraFieldCollectionList(null)).toEqual([]);
+  });
+
+  it('preserves unreadable items verbatim so an edit cannot silently delete them', () => {
+    // The widget writes back the list it is given; dropping or blanking these here would make one
+    // click on an unrelated row destroy a hand-authored entry.
+    const items = [LORA_ENTRY, { lora: { key: 'ghost' }, weight: 1 }, null, 'lora'];
+
+    expect(toLoraFieldCollectionList(items)).toEqual(items);
+    expect(items.filter(isLoraFieldCollectionEntry)).toEqual([LORA_ENTRY]);
   });
 });
 

@@ -7,6 +7,7 @@ import type { MouseEvent } from 'react';
 
 import { Box, Portal, Stack, Text } from '@chakra-ui/react';
 import { groupPromptTriggerOptions } from '@features/generation/ui/promptFields/promptTriggerOptions';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -149,11 +150,10 @@ const AutocompleteOption = ({
       py="1"
       role="option"
       tabIndex={-1}
-      truncate
       _hover={OPTION_HOVER_CSS}
       onMouseDown={handleMouseDown}
     >
-      {option.label}
+      <MiddleTruncate as="span" text={option.label} />
     </Box>
   );
 };

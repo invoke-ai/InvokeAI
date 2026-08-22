@@ -11,32 +11,20 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfigWithExternal, isNonCommercialMainModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  isNonCommercialMainModelConfig,
+  selectPrimaryMainModelOptions,
+} from 'services/api/types';
 
 export const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
   const [allModelConfigs] = useMainModels();
-  // Low-noise Wan GGUFs belong in the Transformer (Low Noise) slot of the
-  // Wan advanced section, not as a primary main. Filter them out of the main
-  // model dropdown so users can't accidentally wire them backwards.
-  const modelConfigs = useMemo(
-    () =>
-      allModelConfigs.filter((c) => {
-        if (
-          c.type === 'main' &&
-          c.base === 'wan' &&
-          c.format === 'gguf_quantized' &&
-          'expert' in c &&
-          c.expert === 'low'
-        ) {
-          return false;
-        }
-        return true;
-      }),
-    [allModelConfigs]
-  );
+  // Shared with the other primary-main entry points so transformer-only models are
+  // offered only in their dedicated advanced slots.
+  const modelConfigs = useMemo(() => selectPrimaryMainModelOptions(allModelConfigs), [allModelConfigs]);
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

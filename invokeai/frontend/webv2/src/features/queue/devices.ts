@@ -9,12 +9,14 @@
 export {
   getDeviceLabel,
   getDeviceNameLabels,
+  resolveRandDeviceMetadata,
   type DeviceLabel,
   type GenerationDeviceOption,
 } from './core/deviceLabels';
 export {
   type GenerationDevicesSetting,
   type GenerationDevicesSnapshot,
+  getGenerationDevicesSnapshot,
   refreshGenerationDevices,
   updateGenerationDevices,
   useGenerationDevices,

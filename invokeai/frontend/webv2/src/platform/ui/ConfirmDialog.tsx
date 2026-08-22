@@ -80,9 +80,7 @@ export const ConfirmDialog = ({
         <Dialog.Positioner>
           <Dialog.Content bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" color="fg">
             <Dialog.Header>
-              <Dialog.Title fontSize="sm" fontWeight="700">
-                {title}
-              </Dialog.Title>
+              <Dialog.Title>{title}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="2">{typeof body === 'string' ? <Text fontSize="xs">{body}</Text> : body}</Stack>

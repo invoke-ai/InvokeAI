@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } from 'react';
 
+import type { DeferredResource, DeferredResourceStatus } from './deferredResource';
 import type { DeveloperLogNamespace } from './diagnostics/contracts';
 import type { GraphId } from './graphContracts';
 import type { InvocationSourceId } from './invocationContracts';
@@ -13,11 +14,13 @@ export type FirstPartyWidgetTypeId =
   | 'gallery'
   | 'generate'
   | 'history-controls'
+  | 'image-map'
   | 'layers'
   | 'notifications'
   | 'preview'
   | 'project'
   | 'queue'
+  | 'queue-status'
   | 'server-status'
   | 'upscale'
   | 'users'
@@ -30,7 +33,7 @@ export type WidgetInstanceId = string;
 
 export type WidgetId = WidgetTypeId;
 
-export type WorkbenchRegion = 'left' | 'right' | 'center' | 'bottom' | 'dialog' | 'popover';
+export type WorkbenchRegion = 'left' | 'right' | 'center' | 'bottom' | 'dialog' | 'popover' | 'floating';
 
 export interface WidgetStateContract {
   id: WidgetTypeId;
@@ -90,22 +93,16 @@ export type WidgetHost = ComponentType;
 /** Deferred render implementation shared by every slot for one widget type. */
 export interface WidgetImplementation {
   view: WidgetView;
-  host?: WidgetHost;
   headerActions?: WidgetHeaderActions;
   headerLabel?: WidgetHeaderLabel;
   headerMenu?: WidgetHeaderMenu;
   footer?: WidgetFooter;
 }
 
-export type WidgetImplementationLoadStatus = 'idle' | 'loading' | 'loaded' | 'failed';
+export type WidgetImplementationLoadStatus = DeferredResourceStatus;
 
 /** Registry-owned, single-flight resource for a deferred widget implementation. */
-export interface WidgetImplementationResource {
-  getStatus: () => WidgetImplementationLoadStatus;
-  load: () => Promise<WidgetImplementation>;
-  preload: () => void;
-  retry: () => Promise<WidgetImplementation>;
-}
+export type WidgetImplementationResource = DeferredResource<WidgetImplementation>;
 
 export interface WidgetLabelProps {
   region: WorkbenchRegion;
@@ -299,6 +296,8 @@ export interface WidgetManifest {
   icon: WidgetIconComponent;
   bottomPanel?: 'expandable' | 'tooltip';
   centerPlacement?: 'toolbar' | 'view';
+  /** Opt-in: the widget can be detached into a movable floating window. */
+  allowFloating?: boolean;
   /** Only offered while an admin is signed in to a multi-user backend. */
   requiresAdmin?: boolean;
   chrome?: {
@@ -309,8 +308,16 @@ export interface WidgetManifest {
    * failure state, and retry; callers never invoke this directly.
    */
   load: () => Promise<WidgetImplementation>;
-  /** The deferred implementation contains a singleton host mounted at editor boot. */
-  hasHost?: boolean;
+  /**
+   * A singleton runtime the editor mounts once at boot, in its own chunk.
+   *
+   * Deliberately separate from `load`: hosts are data runtimes and dialog
+   * shells that must run whether or not the widget is on screen, so sharing a
+   * module with the view meant every boot paid for the view. Splitting the
+   * loader makes it impossible to declare an always-on part without giving it
+   * its own chunk.
+   */
+  loadHost?: () => Promise<WidgetHost>;
   /** When set, the frame header shows a gear that opens this settings dialog section. */
   settingsSection?: SettingsSectionId;
   state?: WidgetStateRegistration;
@@ -335,6 +342,7 @@ export interface RegisteredWidget {
   manifest: NormalizedWidgetManifest;
   status: 'enabled' | 'disabled' | 'hidden';
   failure?: WidgetFailure;
+  host?: DeferredResource<WidgetHost>;
 }
 
 export interface WidgetFailure {

@@ -15,7 +15,9 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 import { recordDiagnosticEntry } from './diagnostics/logger';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
+import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { getWorkbenchPreferences } from './settings/store';
+import { areWidgetsLoaded } from './widgetRegistry';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
@@ -383,6 +385,9 @@ const createCommands = (
       setStatus: command('setQueueItemStatus'),
     },
     widgets: {
+      dockFloating: command('dockFloatingWidget', (instanceId: string) => ({ instanceId })),
+      float: command('floatWidget', (instanceId: string) => ({ instanceId })),
+      focusFloating: command('focusFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
       patchInstanceValues: command(
@@ -409,6 +414,17 @@ const createCommands = (
       ),
       reorder: command('reorderWidgetInstances'),
       select: command('selectRegionWidget'),
+      setFloatingGeometry: command(
+        'setFloatingWidgetGeometry',
+        (instanceId: string, geometry: { x: number; y: number; widthPx: number; heightPx: number }) => ({
+          instanceId,
+          ...geometry,
+        })
+      ),
+      setFloatingMode: command(
+        'setFloatingWidgetMode',
+        (instanceId: string, mode: ActionPayload<'setFloatingWidgetMode'>['mode']) => ({ instanceId, mode })
+      ),
       setInstanceValues: command(
         'setWidgetInstanceValues',
         (instanceId: string, values: Record<string, unknown>, projectId?: string) => ({
@@ -512,6 +528,7 @@ export interface WorkbenchInternalStore {
 }
 
 export interface WorkbenchStoreOptions {
+  isLoaded?: (preset: LayoutPreset) => boolean;
   loadLayoutPresetWidgets?: (preset: LayoutPreset) => Promise<unknown>;
 }
 
@@ -652,6 +669,7 @@ export const createWorkbenchStore = (
 
       return current.id === preset.id && current.snapshot === preset.snapshot;
     },
+    isLoaded: options.isLoaded ?? ((preset) => areWidgetsLoaded(getLayoutWidgetTypeIds(preset.snapshot))),
     load: options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets,
   });
   invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;

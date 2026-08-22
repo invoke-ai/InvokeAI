@@ -32,6 +32,8 @@ const flux2Klein9bModel: MainModelConfig = {
   type: 'main',
   variant: 'klein_9b',
 };
+const completeSdnqPipeline = { text_encoder: {}, tokenizer: {}, transformer: {}, vae: {} };
+const completeFlux1SdnqPipeline = { ...completeSdnqPipeline, text_encoder_2: {}, tokenizer_2: {} };
 const flux2DevModel: MainModelConfig = {
   base: 'flux2',
   format: 'diffusers',
@@ -183,6 +185,18 @@ describe('compileGenerateGraph', () => {
     expect(getEdge(graph, 'canvas_output', 'vae')?.source.node_id).toBe('model_loader');
     expect(graph.nodes.canvas_output?.fp32).toBe(true);
     expect(graph.nodes.canvas_output?.color_compensation).toBe('None');
+  });
+
+  it('records the accelerator supplied by the orchestration boundary in metadata', () => {
+    const graph = compileGenerateGraph(
+      createSettings(sd1Model),
+      sd1Model,
+      'gallery',
+      { useCpuNoise: false },
+      'xpu'
+    ).backendGraph;
+
+    expect(getNodeByType(graph, 'core_metadata')?.rand_device).toBe('xpu');
   });
 
   it('passes SDXL color compensation to the VAE decode node when enabled', () => {
@@ -379,6 +393,32 @@ describe('compileGenerateGraph', () => {
     expect(compile(zImageModel).nodes.model_loader?.type).toBe('z_image_model_loader');
   });
 
+  it('builds complete SDNQ pipeline graphs without standalone component overrides', () => {
+    const flux = compile({
+      ...fluxModel,
+      format: 'sdnq_quantized',
+      submodels: completeFlux1SdnqPipeline,
+    });
+    const flux2 = compile({
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      submodels: completeSdnqPipeline,
+    });
+    const zImage = compile({
+      ...zImageModel,
+      format: 'sdnq_quantized',
+      submodels: completeSdnqPipeline,
+    });
+
+    expect(flux.nodes.model_loader).toMatchObject({
+      clip_embed_model: undefined,
+      t5_encoder_model: undefined,
+      vae_model: undefined,
+    });
+    expect(flux2.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
+    expect(zImage.nodes.model_loader).toMatchObject({ qwen3_encoder_model: undefined, vae_model: undefined });
+  });
+
   it('builds FLUX.2 [dev] graphs with standalone components and dev LoRAs', () => {
     const graph = compile(flux2DevGgufModel, {
       loras: [{ isEnabled: true, model: flux2DevLora, weight: 0.75 }],
@@ -409,6 +449,35 @@ describe('compileGenerateGraph', () => {
     });
     expect(graph.nodes.model_loader?.mistral_encoder_model).toBeUndefined();
     expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
+  });
+
+  it('uses a complete FLUX.2 SDNQ component source without standalone overrides', () => {
+    const source: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-sdnq-source',
+      submodels: completeSdnqPipeline,
+    };
+    const graph = compile(flux2Klein9bModel, { componentSourceModel: source });
+
+    expect(graph.nodes.model_loader).toMatchObject({
+      qwen3_encoder_model: undefined,
+      qwen3_source_model: source,
+      vae_model: undefined,
+    });
+  });
+
+  it('rejects a partial FLUX.2 SDNQ component source during graph compilation', () => {
+    const source: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-partial-sdnq-source',
+      submodels: { text_encoder: {}, transformer: {}, vae: {} },
+    };
+
+    expect(() => compile(flux2Klein9bModel, { componentSourceModel: source })).toThrow(
+      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+    );
   });
 
   it('does not enable FLUX.2 CFG without negative conditioning', () => {

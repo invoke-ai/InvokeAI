@@ -13,6 +13,7 @@ const BASES_WITHOUT_STANDARD_SCHEDULER = new Set<BaseModelType>([
   'krea-2',
   'wan',
   'ideogram-4',
+  'minimax-h3',
 ]);
 
 export const shouldShowStandardScheduler = (base: BaseModelType | null | undefined): boolean =>

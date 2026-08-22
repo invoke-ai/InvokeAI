@@ -156,6 +156,9 @@ const groupRank = (group: string): number => {
  */
 const PALETTE_HIDDEN_COMMANDS = new Set([
   'app.openCommandPalette',
+  // Both palettes already ship `buildOpenSettingsEntry` under this id, and it
+  // carries search keywords and an empty-state slot the catalog entry lacks.
+  'app.openSettings',
   'app.promptWeightDown',
   'app.promptWeightUp',
   'canvas.nextEntity',
@@ -212,11 +215,15 @@ const WIDGET_CATEGORY_GROUPS: Record<string, { group: string; typeId: string }> 
   workflows: { group: 'Workflows', typeId: 'workflow' },
 };
 
-const getEntryKeys = (
-  definition: HotkeyDefinition,
+export const getEntryKeys = (
+  definition: HotkeyDefinition | undefined,
   customHotkeys: CustomHotkeys,
   formatHotkey: (key: string) => string[]
 ): string[] | undefined => {
+  if (!definition) {
+    return undefined;
+  }
+
   const keys = customHotkeys[definition.id] ?? definition.defaultKeys;
 
   return keys[0] ? formatHotkey(keys[0]) : undefined;
@@ -313,12 +320,17 @@ export interface SettingsEntryDeps {
   themes: ReadonlyArray<{ id: WorkbenchPreferences['themeId']; label: string }>;
 }
 
-/** The "Open Settings" entry shared verbatim by both palette hosts. */
-export const buildOpenSettingsEntry = (t: TFunction, openSettings: () => void): PaletteEntry => ({
+/**
+ * The "Open Settings" entry shared verbatim by both palette hosts. `keys` is
+ * the resolved `app.openSettings` shortcut, which only the editor binds — the
+ * Launchpad has no hotkey catalog, so it omits the hint.
+ */
+export const buildOpenSettingsEntry = (t: TFunction, openSettings: () => void, keys?: string[]): PaletteEntry => ({
   group: 'App',
   groupLabel: t('commandPalette.groups.app'),
   id: 'app.openSettings',
   isPersistentRecent: true,
+  keys,
   keywords: 'preferences options',
   run: openSettings,
   showInEmptyState: true,

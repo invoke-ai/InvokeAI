@@ -5,7 +5,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDndMonitor, useSensor, useSensors, type DragStartEvent } from '@dnd-kit/core';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act, createRef, type Ref } from 'react';
+import { act, Activity, createRef, type Ref } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,7 +106,6 @@ const VideoHarness = ({
           frameHeight={1080}
           frameWidth={1920}
           isLive={false}
-          liveBadgeLabel="Generating"
           shouldAntialiasLiveImage
           source={source}
           variant="framed"
@@ -160,6 +159,35 @@ describe('PreviewFrame native video arm', () => {
     expect(video?.getAttribute('src')).toBe(videoSource.src);
     expect(video?.getAttribute('aria-label')).toBe(videoSource.label);
     expect(host?.querySelector('img[alt="Video clip.mp4"]')).toBeNull();
+  });
+
+  it("seeks past the poster to the video's own first frame once metadata lands", async () => {
+    await renderVideo();
+    const video = getVideo();
+    const position = stubPlaybackPosition(video);
+
+    await interact(() => video.dispatchEvent(new Event('loadedmetadata')));
+
+    // `preload="metadata"` alone leaves the 256px poster on screen, upscaled to the whole
+    // stage. The nudge makes the decoder paint frame 0 at the video's native resolution.
+    expect(position.get()).toBeGreaterThan(0);
+    expect(position.get()).toBeLessThan(0.001);
+    // The poster is still the placeholder for the moment before that frame lands, and the
+    // still behind the failure state — the seek supersedes it, it is not removed.
+    expect(video.getAttribute('poster')).toBe(videoSource.poster);
+  });
+
+  it('leaves the playhead alone when the user started playback before metadata arrived', async () => {
+    await renderVideo();
+    const video = getVideo();
+    // The one interleaving where `loadedmetadata` observes a non-paused element: `load()`
+    // resets position and pause state before it fires, so a viewer mid-playback is already
+    // back at zero by then and there is no playhead left for the guard to protect.
+    const position = stubPlaybackPosition(video, { paused: false });
+
+    await interact(() => video.dispatchEvent(new Event('loadedmetadata')));
+
+    expect(position.get()).toBe(0);
   });
 
   it('does not arm a drag or cancel wheel events from the video surface and native controls', async () => {
@@ -525,6 +553,48 @@ describe('PreviewFrame native video arm', () => {
   });
 });
 
+describe('PreviewFrame video keep-alive', () => {
+  it('stops playback when the shell hides the widget instead of unmounting it', async () => {
+    await renderKeptVideo('visible');
+    const video = getVideo();
+    const pause = vi.spyOn(video, 'pause');
+
+    await renderKeptVideo('hidden');
+
+    // The element survives — this is the keep-alive path, not an unmount — but
+    // `display: none` does not stop media, so the frame has to pause it itself.
+    expect(getVideo()).toBe(video);
+    expect(video.checkVisibility()).toBe(false);
+    expect(pause).toHaveBeenCalledOnce();
+    expect(video.paused).toBe(true);
+  });
+
+  it('leaves playback alone while the widget stays visible', async () => {
+    await renderKeptVideo('visible');
+    const video = getVideo();
+    const pause = vi.spyOn(video, 'pause');
+
+    await renderKeptVideo('visible');
+
+    expect(getVideo()).toBe(video);
+    expect(pause).not.toHaveBeenCalled();
+  });
+});
+
+const renderKeptVideo = async (mode: 'hidden' | 'visible'): Promise<void> => {
+  await interact(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <Activity mode={mode}>
+            <VideoHarness />
+          </Activity>
+        </ChakraProvider>
+      </I18nextProvider>
+    );
+  });
+};
+
 const renderVideo = async (
   isItemCurrent?: (itemKey: GalleryItemKey) => boolean,
   source: VideoSource = videoSource,
@@ -604,6 +674,26 @@ const installClipboardSupport = () => {
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { write } });
 
   return { clipboardItems, write };
+};
+
+const stubPlaybackPosition = (video: HTMLVideoElement, state: { paused?: boolean } = {}): { get: () => number } => {
+  // A `data:` audio source has no seekable range, so a real assignment to `currentTime`
+  // clamps straight back to 0. Standing in for the accessor is what makes the nudge
+  // observable at all.
+  let currentTime = 0;
+
+  Object.defineProperties(video, {
+    currentTime: {
+      configurable: true,
+      get: () => currentTime,
+      set: (value: number) => {
+        currentTime = value;
+      },
+    },
+    paused: { configurable: true, value: state.paused ?? true },
+  });
+
+  return { get: () => currentTime };
 };
 
 const setVideoFrameState = (

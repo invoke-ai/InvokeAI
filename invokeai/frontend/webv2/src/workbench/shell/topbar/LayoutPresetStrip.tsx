@@ -1,7 +1,7 @@
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 
 import { Box, HStack, Icon, Menu, Portal, Text, VisuallyHidden } from '@chakra-ui/react';
 import {
@@ -23,6 +23,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
@@ -48,7 +49,7 @@ import { LayoutPresetDialog } from './LayoutPresetDialog';
 import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
-import { useLayoutDrift } from './useLayoutDrift';
+import { useActiveLayoutPresetId, useLayoutDrift } from './useLayoutDrift';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
@@ -73,7 +74,6 @@ const selectPlacedGraphWidgetSources = (project: Project) => {
 
 export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
-  const { activePreset, hasDrifted } = useLayoutDrift();
   const { layout } = useWorkbenchCommands();
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
   const [menuTarget, setMenuTarget] = useState<{ anchor: DOMRect; preset: LayoutPreset } | null>(null);
@@ -83,6 +83,20 @@ export const LayoutPresetStrip = () => {
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
   const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
+  const { hasDrifted } = useLayoutDrift();
+  const activePresetId = useActiveLayoutPresetId();
+  const [pendingPresetId, setPendingPresetId] = useState<LayoutPresetId | null>(null);
+
+  // The store caught up; stop overriding it.
+  if (pendingPresetId !== null && pendingPresetId === activePresetId) {
+    setPendingPresetId(null);
+  }
+
+  const selectedPresetId = pendingPresetId ?? activePresetId;
+  const activePreset = useMemo(
+    () => presets.find(({ id }) => id === selectedPresetId) ?? presets[0]!,
+    [presets, selectedPresetId]
+  );
   const dndAccessibility = useMemo(
     () => ({ screenReaderInstructions: { draggable: t('topbar.presets.reorderInstructions') } }),
     [t]
@@ -96,13 +110,36 @@ export const LayoutPresetStrip = () => {
     () => ({ destination: invocation.destination, sourceId: invocation.sourceId }),
     [invocation.destination, invocation.sourceId]
   );
+  /**
+   * Desktop semantics: the control acknowledges the press on its own frame,
+   * then the workspace rearranges. Activating inside the handler put a
+   * ~100ms blocking React commit between the click and any pixel changing,
+   * and the tab itself did not repaint for ~330ms.
+   */
+  const requestPreset = useCallback(
+    (presetId: LayoutPresetId) => {
+      setPendingPresetId(presetId);
+      requestAnimationFrame(() => {
+        void layout.activatePreset(presetId).then((appliedPresetId) => {
+          // An activation can be dropped — superseded, overtaken by a project
+          // switch, or aimed at a preset the account has since replaced. Give
+          // the tab back to the store rather than leave it painting a preset
+          // nothing ever applied. Guarded so a newer request keeps its own.
+          if (appliedPresetId !== presetId) {
+            setPendingPresetId((pending) => (pending === presetId ? null : pending));
+          }
+        });
+      });
+    },
+    [layout]
+  );
   const applyPreset = useCallback(
     (preset: LayoutPreset) => {
-      if (preset.id !== activePreset.id) {
-        void layout.activatePreset(preset.id);
+      if (preset.id !== selectedPresetId) {
+        requestPreset(preset.id);
       }
     },
-    [activePreset.id, layout]
+    [requestPreset, selectedPresetId]
   );
   const handleValueChange = useCallback(
     (event: { value: string }) => {
@@ -150,7 +187,7 @@ export const LayoutPresetStrip = () => {
             <Tabs.Root
               minW="max-content"
               size="xs"
-              value={activePreset.id}
+              value={selectedPresetId}
               variant="subtle"
               onValueChange={handleValueChange}
             >
@@ -162,9 +199,10 @@ export const LayoutPresetStrip = () => {
                     <PresetTab
                       key={preset.id}
                       hasDrifted={hasDrifted}
-                      isActive={preset.id === activePreset.id}
+                      isActive={preset.id === selectedPresetId}
                       preset={preset}
                       onOpenMenu={setMenuTarget}
+                      onRequest={requestPreset}
                     />
                   ))}
                 </Tabs.List>
@@ -195,7 +233,7 @@ export const LayoutPresetStrip = () => {
       </HStack>
 
       <PresetMenu
-        isActive={menuTarget?.preset.id === activePreset.id}
+        isActive={menuTarget?.preset.id === selectedPresetId}
         hasDrifted={hasDrifted}
         target={menuTarget}
         onApply={applyPreset}
@@ -224,12 +262,14 @@ const PresetTab = ({
   hasDrifted,
   isActive,
   onOpenMenu,
+  onRequest,
   preset,
 }: {
   hasDrifted: boolean;
   isActive: boolean;
   preset: LayoutPreset;
   onOpenMenu: (target: { anchor: DOMRect; preset: LayoutPreset }) => void;
+  onRequest: (presetId: LayoutPresetId) => void;
 }) => {
   const { t } = useTranslation();
   const icon = resolveLayoutPresetIcon(preset.iconId);
@@ -265,6 +305,27 @@ const PresetTab = ({
       }
     },
     [onOpenMenu, preset]
+  );
+
+  // The press, not the click, is what the user is waiting on: the tabs machine
+  // lands the selection correctly either way, but only once the button is
+  // released. Primary button only — `pointerdown` fires for the secondary
+  // button too, ahead of `contextmenu`, and right-clicking an inactive preset
+  // to reach its menu must not switch to it first and strip the menu of the
+  // very item it was opened for. dnd-kit's own `MouseSensor` bails the same way.
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLButtonElement>) => {
+      // dnd-kit owns the drag gesture; chain rather than replace. Inert today —
+      // the strip's sensors activate on `onMouseDown`/`onTouchStart`/`onKeyDown`
+      // and only the unused `PointerSensor` would put a listener here — kept so
+      // a future sensor swap does not silently lose its activator.
+      (listeners as { onPointerDown?: (value: unknown) => void } | undefined)?.onPointerDown?.(event);
+
+      if (event.button === 0 && event.pointerType !== 'touch' && !isActive) {
+        onRequest(preset.id);
+      }
+    },
+    [isActive, listeners, onRequest, preset.id]
   );
 
   const handleContextMenu = useCallback(
@@ -317,6 +378,7 @@ const PresetTab = ({
       onContextMenu={handleContextMenu}
       onFocus={handlePreload}
       onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
       onPointerEnter={handlePreload}
     >
       <Icon as={icon} boxSize="3.5" flexShrink={0} />
@@ -421,9 +483,7 @@ const PresetMenu = ({
           {preset ? (
             <MenuContent minW="16rem">
               <HStack justify="space-between" px="3" py="2">
-                <Text fontSize="xs" fontWeight="700" truncate>
-                  {preset.label}
-                </Text>
+                <MiddleTruncate fontSize="xs" fontWeight="700" text={preset.label} />
                 {showDrift ? (
                   <Text color="fg.muted" fontSize="2xs" flexShrink={0}>
                     {t('topbar.presets.unsaved')}

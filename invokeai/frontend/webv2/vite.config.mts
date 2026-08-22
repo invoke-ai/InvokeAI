@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
 import { chunkSourceManifest } from './scripts/chunk-source-manifest.mjs';
+import { serviceWorkerPlugin } from './scripts/service-worker-plugin.mjs';
 
 // Override with e.g. INVOKEAI_DEV_BACKEND=http://127.0.0.1:9091 when the
 // backend dev server runs on a non-default port.
@@ -25,11 +26,26 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  // Brand marks. The Launchpad's help menu and the editor's app menu both link
+  // to Discord, and without grouping that one shared module the editor pulls
+  // the whole Launchpad chunk in after it — the same regression the
+  // `launchpad/intents.ts` note below describes.
+  '/platform/ui/BrandIcon.tsx',
   '/platform/core/concurrency.ts',
   '/platform/query/client.ts',
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
+  // Both routes confirm destructive actions (deleting a project, discarding
+  // an import) with the same dialog. Splitting the widget hosts out of their
+  // view chunks gave it a second, editor-only consumer alongside the
+  // Launchpad's — without grouping it crosses the automatic chunking
+  // algorithm's single-consumer threshold and gets extracted into its own
+  // file on both routes, in place of the free inline copies each had before.
+  '/platform/ui/ConfirmDialog.tsx',
+  // Name/identifier truncation used eagerly by Launchpad project cards and
+  // editor widget chrome alike.
+  '/platform/ui/MiddleTruncate.tsx',
   '/platform/ui/theme/applyTheme.ts',
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',
@@ -61,10 +77,44 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/settings/SettingsDialogHost.tsx',
 ] as const;
 
-const WORKBENCH_TOPBAR_MODULES = [
+// Everything the editor route fetches on every boot, folded into one chunk:
+// the topbar UI (project switcher, layout preset admin) and the realtime
+// runtime the boot-time `widget-hosts` chunk shares with it (queue's live
+// progress/device stores, workflow's validation). Named for what it is —
+// "always fetched on every editor boot" — rather than for the topbar alone,
+// so it stays accurate as more editor-eager modules land here; a name tied
+// to one UI feature would send whoever reads a network panel or a chunk
+// budget chasing that feature instead of the runtime code actually there.
+//
+// The runtime modules are here because splitting the widget hosts out of
+// their view chunks (see `WIDGET_HOST_MODULES`) gave each a second,
+// independent consumer alongside the always-static editor shell; without
+// grouping, that crosses the automatic chunking algorithm's single-consumer
+// threshold and each gets extracted into its own file — several extra
+// editor-only requests for code that was previously duplicated inline for
+// free. Folding them into the chunk the editor shell already pays for once
+// costs it bytes, not a request — the same trade `route-shared` makes for
+// both routes above, scoped here to the editor alone because none of this
+// is reachable from the Launchpad.
+const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
+] as const;
+
+// The singleton widget hosts the editor mounts once at boot: workflow's
+// dialog shell, queue's data runtime, image-map's data runtime. Each is
+// fetched together with the other two on every editor boot, all three are
+// always needed, and none is ever needed without the others — splitting
+// them into three separate chunks (one per widget's `loadHost`) traded a
+// shared-chunk request for a per-widget one three times over. Grouping them
+// back into a single chunk keeps the per-host code-splitting boundary (so a
+// host still never drags its widget's view chunk along) while paying for
+// that boundary once instead of three times.
+const WIDGET_HOST_MODULES = [
+  '/features/queue/ui/QueueDataRuntime.tsx',
+  '/features/workflow/ui/WorkflowWidgetChrome.tsx',
+  '/workbench/widgets/image-map/ImageMapDataRuntime.tsx',
 ] as const;
 
 const matchesAnySuffix = (id: string, suffixes: readonly string[]) => suffixes.some((suffix) => id.endsWith(suffix));
@@ -119,10 +169,6 @@ const getLegacyChunkName = (id: string): string | null => {
     return 'fflate';
   }
 
-  if (id.includes('/node_modules/react-icons/')) {
-    return 'react-icons';
-  }
-
   if (id.includes('/node_modules/@xyflow/') || /\/node_modules\/d3-[^/]+\//.test(id)) {
     return 'workflow-vendor';
   }
@@ -154,9 +200,22 @@ export default defineConfig({
             },
             {
               includeDependenciesRecursively: false,
-              name: 'workbench-topbar',
+              name: 'editor-boot-shared',
               priority: 30,
-              test: (id) => matchesAnySuffix(id, WORKBENCH_TOPBAR_MODULES),
+              test: (id) => matchesAnySuffix(id, EDITOR_BOOT_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'widget-hosts',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WIDGET_HOST_MODULES),
+            },
+            {
+              // Plotly is large (~1MB min) and only used by the lazy-loaded
+              // Image Map plot; keep it out of the eager vendor chunk.
+              name: 'plotly',
+              priority: 30,
+              test: (id) => id.includes('plotly') && id.includes('node_modules'),
             },
             {
               name: getLegacyChunkName,
@@ -173,6 +232,7 @@ export default defineConfig({
       presets: [reactCompilerPreset()],
     }),
     chunkSourceManifest({ projectRoot: PROJECT_ROOT }),
+    serviceWorkerPlugin({ projectRoot: PROJECT_ROOT }),
   ],
   resolve: {
     alias: {

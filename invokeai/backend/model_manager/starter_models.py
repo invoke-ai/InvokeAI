@@ -81,7 +81,7 @@ clip_vit_l_image_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
     source="InvokeAI/clip-vit-large-patch14",
-    description="CLIP ViT-L Image Encoder",
+    description="CLIP VIT-L Image Encoder (used by the imagemap index) ~1.7GB",
     type=ModelType.CLIPVision,
 )
 # endregion
@@ -291,6 +291,15 @@ flux_dev = StarterModel(
     description="FLUX dev transformer in bfloat16. Total size with dependencies: ~33GB",
     type=ModelType.Main,
     dependencies=[t5_base_encoder, flux_vae, clip_l_encoder],
+)
+flux_schnell_sdnq = StarterModel(
+    name="FLUX.1 schnell (SDNQ uint4 + SVD)",
+    base=BaseModelType.Flux,
+    source="Disty0/FLUX.1-schnell-SDNQ-uint4-svd-r32",
+    description="FLUX.1 schnell quantized via SDNQ to uint4 + SVD rank 32. Full self-contained "
+    "Flux pipeline (transformer + T5 + CLIP + VAE). ~15GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
 )
 flux_kontext = StarterModel(
     name="FLUX.1 Kontext dev",
@@ -1112,6 +1121,26 @@ flux2_klein_9b_fp8 = StarterModel(
     dependencies=[flux2_vae, flux2_klein_qwen3_8b_encoder],
 )
 
+flux2_klein_4b_sdnq = StarterModel(
+    name="FLUX.2 Klein 4B (SDNQ dynamic 4-bit)",
+    base=BaseModelType.Flux2,
+    source="Disty0/FLUX.2-klein-4B-SDNQ-4bit-dynamic",
+    description="FLUX.2 Klein 4B quantized via SDNQ to dynamic uint4/int5 mixed precision. "
+    "Full self-contained Flux2KleinPipeline (transformer + Qwen3 4B + AutoencoderKLFlux2). ~5GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
+)
+
+flux2_klein_9b_sdnq = StarterModel(
+    name="FLUX.2 Klein 9B (SDNQ dynamic 4-bit + SVD)",
+    base=BaseModelType.Flux2,
+    source="Disty0/FLUX.2-klein-9B-SDNQ-4bit-dynamic-svd-r32",
+    description="FLUX.2 Klein 9B quantized via SDNQ to dynamic uint4/int5 + SVD rank 32. "
+    "Full self-contained Flux2KleinPipeline. ~13GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
+)
+
 flux2_klein_4b_gguf_q4 = StarterModel(
     name="FLUX.2 Klein 4B (GGUF Q4)",
     base=BaseModelType.Flux2,
@@ -1344,6 +1373,16 @@ z_image_turbo_q8 = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     dependencies=[z_image_qwen3_encoder_quantized, flux_vae],
+)
+
+z_image_turbo_sdnq = StarterModel(
+    name="Z-Image Turbo (SDNQ uint4 + SVD)",
+    base=BaseModelType.ZImage,
+    source="Disty0/Z-Image-Turbo-SDNQ-uint4-svd-r32",
+    description="Z-Image Turbo quantized via SDNQ to uint4 + SVD rank 32. Full self-contained "
+    "ZImagePipeline (transformer + Qwen3 + VAE). ~5GB",
+    type=ModelType.Main,
+    format=ModelFormat.SDNQQuantized,
 )
 
 z_image_controlnet_union = StarterModel(
@@ -1886,6 +1925,82 @@ wan_22_ti2v_5b_gguf_q8_0 = StarterModel(
 )
 # endregion
 
+# region MiniMax H3 (local)
+# License note: the MiniMax H3 Community License requires prominent "MiniMax H3" attribution
+# (keep it verbatim in every name/description below) and restricts use by territory (excludes
+# the US, EU, UK and South Korea, extending to outputs). These entries live in their own
+# droppable commit so a release can exclude them without touching anything else.
+#
+# The full huggingface.co/MiniMaxAI/MiniMax-H3 repo is ~498 GB (it also carries the Ref2VA
+# transformer and the original remote-code checkpoints). The slim main below downloads only the
+# shared components (tokenizer, processor, video/audio VAEs) plus the two config JSONs that
+# identification needs (~11 GB); the transformer and text encoder come from Comfy-Org's int8
+# single-file repacks, selected in the MiniMax H3 Model Loader. Total ~59 GB.
+
+minimax_h3_components = StarterModel(
+    name="MiniMax H3 Components",
+    base=BaseModelType.MiniMaxH3,
+    source="MiniMaxAI/MiniMax-H3::modular_model_index.json+transformer/config.json+tokenizer+processor+vae+audio_vae",
+    description="MiniMax H3 shared components: tokenizer, processor and video/audio VAEs, without "
+    "transformer or text-encoder weights (~11 GB). Pair with the MiniMax H3 single-file transformer "
+    "and text encoder. NOTE: This model is distributed under a restrictive license that forbids its "
+    "use in certain territories. Please see https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+)
+
+minimax_h3_int8_text_encoder = StarterModel(
+    name="MiniMax H3 Text Encoder (int8)",
+    base=BaseModelType.MiniMaxH3,
+    source="Comfy-Org/MiniMax-H3::text_encoders/qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+    description="Truncated Qwen3-VL-32B conditioning encoder for MiniMax H3, int8 quantized (~27 GB). "
+    "Select it in the MiniMax H3 Model Loader's text encoder field. NOTE: This model is distributed "
+    "under a restrictive license that forbids its use in certain territories. Please see "
+    "https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
+minimax_h3_int8_transformer = StarterModel(
+    name="MiniMax H3 FL2VA Transformer (int8, pruned)",
+    base=BaseModelType.MiniMaxH3,
+    source="Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+    description="MiniMax H3 video+audio generation. AdaLN-pruned int8 single-file transformer (~21 GB); "
+    "select it in the MiniMax H3 Model Loader's transformer field. Total size with dependencies: ~59 GB. "
+    "NOTE: This model is distributed under a restrictive license that forbids its use in certain "
+    "territories. Please see https://huggingface.co/MiniMaxAI/MiniMax-H3 for details.",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[minimax_h3_components, minimax_h3_int8_text_encoder],
+)
+
+minimax_h3_turbo_lora = StarterModel(
+    name="MiniMax H3 Turbo LoRA",
+    base=BaseModelType.MiniMaxH3,
+    source="larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors",
+    description="Step-distillation LoRA for MiniMax H3 (Apache 2.0): renders video+audio in 4-8 "
+    "denoising steps instead of ~50. Apply at strength 1.0 and lower Steps to 6-8. Works with the "
+    "full and the pruned int8 transformers.",
+    type=ModelType.LoRA,
+    format=ModelFormat.LyCORIS,
+)
+
+# Only the *_comfyui_* files in the LightX2V repo are installable: they carry the native
+# fused-key layout (diffusion_model.blocks.N.attn.qkv_proj) that the H3 LoRA probe accepts.
+# The non-comfyui files use already-diffusers keys (transformer_blocks.N.attn.to_q with
+# PEFT ".default" adapter names), which the probe rejects as a different architecture.
+minimax_h3_lightx2v_turbo_lora = StarterModel(
+    name="MiniMax H3 LightX2V Turbo LoRA",
+    base=BaseModelType.MiniMaxH3,
+    source="lightx2v/Minimax-h3-Turbo::minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors",
+    description="LightX2V step-distillation LoRA for MiniMax H3 (Apache 2.0), 8-step v1.0 (~2 GB): "
+    "renders video+audio in ~8 denoising steps instead of ~50. Apply at strength 1.0 and lower "
+    "Steps to 8. Works with the full and the pruned int8 transformers.",
+    type=ModelType.LoRA,
+    format=ModelFormat.LyCORIS,
+)
+# endregion
+
 alibabacloud_wan26_t2i = StarterModel(
     name="Wan 2.6 Text-to-Image",
     base=BaseModelType.External,
@@ -2247,6 +2362,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux_dev_quantized,
     flux_schnell,
     flux_dev,
+    flux_schnell_sdnq,
     sd35_medium,
     sd35_large,
     ideogram_4_nf4,
@@ -2327,6 +2443,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_4b_fp8,
     flux2_klein_9b,
     flux2_klein_9b_fp8,
+    flux2_klein_4b_sdnq,
+    flux2_klein_9b_sdnq,
     flux2_klein_4b_gguf_q4,
     flux2_klein_4b_gguf_q8,
     flux2_klein_9b_gguf_q4,
@@ -2369,6 +2487,7 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_turbo,
     z_image_turbo_quantized,
     z_image_turbo_q8,
+    z_image_turbo_sdnq,
     z_image_qwen3_encoder,
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
@@ -2400,6 +2519,11 @@ STARTER_MODELS: list[StarterModel] = [
     wan_22_ti2v_5b_diffusers,
     wan_22_ti2v_5b_gguf_q4_k_m,
     wan_22_ti2v_5b_gguf_q8_0,
+    minimax_h3_int8_transformer,
+    minimax_h3_int8_text_encoder,
+    minimax_h3_components,
+    minimax_h3_turbo_lora,
+    minimax_h3_lightx2v_turbo_lora,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
@@ -2571,6 +2695,18 @@ ideogram_bundle: list[StarterModel] = [
     ideogram_4_nf4,
 ]
 
+# The working set for MiniMax H3 video+audio generation (~62 GB): shared components from
+# the official repo plus Comfy-Org's int8 single-file transformer and text encoder, and the
+# two turbo (step-distillation) LoRAs for fast low-step rendering. See the license note in
+# the MiniMax H3 region above.
+minimax_h3_bundle: list[StarterModel] = [
+    minimax_h3_components,
+    minimax_h3_int8_text_encoder,
+    minimax_h3_int8_transformer,
+    minimax_h3_turbo_lora,
+    minimax_h3_lightx2v_turbo_lora,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
@@ -2583,6 +2719,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.Krea2: StarterModelBundle(name="Krea-2", models=krea2_bundle),
     "wan_t2v": StarterModelBundle(name="Wan 2.2 Text-to-Video", models=wan_t2v_bundle),
     "wan_i2v": StarterModelBundle(name="Wan 2.2 Image-to-Video", models=wan_i2v_bundle),
+    BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
     BaseModelType.Ideogram4: StarterModelBundle(name="Ideogram 4", models=ideogram_bundle),
 }
 

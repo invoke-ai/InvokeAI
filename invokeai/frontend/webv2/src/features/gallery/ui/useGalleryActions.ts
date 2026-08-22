@@ -8,7 +8,7 @@ import {
   downloadGalleryArchive,
   updateGalleryBoard,
 } from '@features/gallery/data/backend';
-import { invalidateGallery } from '@features/gallery/data/queryCache';
+import { invalidateGallery, patchGalleryBoardCaches } from '@features/gallery/data/queryCache';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import {
   assertAccountScopeCurrent,
@@ -37,7 +37,7 @@ export const useGalleryActions = ({
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { exportProject, gallery, notifications } = useGalleryUi();
+  const { exportProject, gallery, notifications, widgets } = useGalleryUi();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
   const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
@@ -59,6 +59,14 @@ export const useGalleryActions = ({
     return {
       archiveBoard: async (boardId, archived) => {
         const owner = captureAccountScope();
+        // Optimistic: the board moves between sections immediately, and
+        // archiving the board being viewed steps off it right away.
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
+        const movedSelectionAway = archived && boardId === selectedBoardId;
+
+        if (movedSelectionAway) {
+          gallery.selectBoard('none');
+        }
 
         try {
           await updateGalleryBoard(boardId, { archived }, owner.signal);
@@ -69,15 +77,16 @@ export const useGalleryActions = ({
               name: getBoardName(boardId),
             })
           );
-
-          if (archived && boardId === selectedBoardId) {
-            gallery.selectBoard('none');
-          }
-
           refresh();
         } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
+          }
+
+          rollback();
+
+          if (movedSelectionAway && getCurrentGalleryLocation().selectedBoardId === 'none') {
+            gallery.selectBoard(boardId);
           }
 
           recordError(error);
@@ -172,6 +181,9 @@ export const useGalleryActions = ({
       refresh,
       renameBoard: async (boardId, boardName) => {
         const owner = captureAccountScope();
+        // Optimistic: the new name paints everywhere at once; the refresh
+        // re-sorts name-ordered lists once the backend confirms.
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { name: boardName });
 
         try {
           await updateGalleryBoard(boardId, { name: boardName }, owner.signal);
@@ -184,6 +196,7 @@ export const useGalleryActions = ({
             return;
           }
 
+          rollback();
           recordError(error);
         }
       },
@@ -192,10 +205,32 @@ export const useGalleryActions = ({
       selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
       setCompareItem: gallery.setCompareItem,
       setSearchTerm: gallery.setSearchTerm,
+      // The similarity reference is widget state rather than a workbench
+      // command: it patches the gallery widget's persisted values, the same
+      // surface the parsed query is read back from. Changing the query resets
+      // pagination (mirroring setGallerySearchTerm) and clears the text term
+      // the chip visually replaces — left behind, a stale term would keep
+      // filtering invisibly and poison the preview widget's navigation query.
+      // Filmstrip/preview navigation under semantic ranking still follows
+      // board chronology, not similarity rank — an inherited limitation.
+      setSemanticImageQuery: (reference) =>
+        widgets.patchGalleryValues({ galleryPage: 0, searchTerm: '', semanticImageQuery: reference }),
       setView: gallery.setView,
       toggleItemInSelection: gallery.toggleItemSelection,
       updateSettings: gallery.updateSettings,
       uploadFiles,
     };
-  }, [boards, exportProject, gallery, loadMore, notifications, queryClient, selectedBoardId, t, uploadFiles]);
+  }, [
+    boards,
+    exportProject,
+    gallery,
+    getCurrentGalleryLocation,
+    loadMore,
+    notifications,
+    queryClient,
+    selectedBoardId,
+    t,
+    uploadFiles,
+    widgets,
+  ]);
 };

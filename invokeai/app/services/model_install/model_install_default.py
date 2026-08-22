@@ -387,7 +387,8 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
         self._clear_pending_jobs()
-        self._download_cache.clear()
+        with self._lock:
+            self._download_cache.clear()
         assert self._install_thread is not None
         self._install_thread.join()
         self._running = False
@@ -579,7 +580,14 @@ class ModelInstallService(ModelInstallServiceBase):
         if not self._wait_for_restore_complete(timeout=restore_timeout):
             raise TimeoutError("Timeout exceeded")
 
-        while len(self._download_cache) > 0:
+        while True:
+            # The completion callback removes a download from this cache while holding
+            # the same lock it uses to enqueue the install. Do not observe the cache
+            # between those two operations.
+            with self._lock:
+                downloads_pending = bool(self._download_cache)
+            if not downloads_pending:
+                break
             if self._downloads_changed_event.wait(timeout=0.25):  # in case we miss an event
                 self._downloads_changed_event.clear()
             if timeout > 0 and time.time() - start > timeout:
@@ -1125,6 +1133,14 @@ class ModelInstallService(ModelInstallServiceBase):
             except DuplicateModelException:
                 # In case a duplicate models sneaks by, we will ignore this error - we "found" the model
                 pass
+            except InvalidModelConfigException as e:
+                # A file we cannot register at all - unidentifiable with allow_unknown_models off, or
+                # recognised and rejected as unusable (e.g. a truncated checkpoint). ModelSearch already
+                # contains anything this callback raises, so startup survives either way; handling it
+                # here makes that a property of the scan rather than of the caller, and says which file
+                # was skipped and why.
+                self._logger.warning(f"Skipping {model_path.name}: {e}")
+                return False
             return True
 
         self._logger.info(f"Scanning {self._app_config.models_path} for orphaned models")
@@ -1145,8 +1161,15 @@ class ModelInstallService(ModelInstallServiceBase):
         )
 
         if result.config is None:
-            self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
-            raise InvalidModelConfigException(f"Could not identify model for {model_path}")
+            # A model that was recognised and then rejected as unusable (e.g. a truncated checkpoint)
+            # comes with a specific reason. Report that instead of "could not identify", which would be
+            # both wrong and useless to whoever has to work out why the install failed.
+            if invalid := result.invalid_matches:
+                reason = f"Model at {model_path} cannot be used: {invalid[0]}"
+            else:
+                reason = f"Could not identify model for {model_path}"
+            self._logger.error(f"{reason}, detailed results: {result.details}")
+            raise InvalidModelConfigException(reason)
         elif isinstance(result.config, Unknown_Config):
             self._logger.error(f"Could not identify model for {model_path}, detailed results: {result.details}")
 
@@ -1339,7 +1362,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 part.final_url = meta.get("final_url") or part.final_url
                 if meta.get("download_path"):
                     part.download_path = Path(meta.get("download_path"))
-        self._download_cache[multifile_job.id] = job
+        with self._lock:
+            self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
 
         self._write_install_marker(job, status=InstallStatus.WAITING)
@@ -1377,9 +1401,13 @@ class ModelInstallService(ModelInstallServiceBase):
         # subdirectory within the model folder.
 
         if subfolders and len(subfolders) > 1:
-            # Multiple subfolders: create combined name and keep subfolder structure
+            # Multiple subfolders: create combined name and keep subfolder structure. Entries may
+            # also be explicit files (e.g. "modular_model_index.json" or "transformer/config.json");
+            # use their stems in the combined name so it stays a sane directory name.
             top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
-            subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
+            subfolder_names = [
+                (sf.stem if sf.suffix else sf.name).replace("/", "_").replace("\\", "_") for sf in subfolders
+            ]
             combined_name = "_".join(subfolder_names)
             path_to_add = Path(f"{top}_{combined_name}")
 
@@ -1390,6 +1418,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 file_path = model_file.path
                 new_path: Optional[Path] = None
                 for sf in subfolders:
+                    if file_path == top / sf:
+                        # An explicit file entry: keep its repo-relative path so e.g.
+                        # transformer/config.json stays inside transformer/. (relative_to() below
+                        # would return "." here and flatten the file to the model root.)
+                        new_path = path_to_add / sf
+                        break
                     try:
                         # Try to get relative path from this subfolder
                         relative = file_path.relative_to(top / sf)

@@ -1,5 +1,3 @@
-import type { GraphContract } from '@workbench/graphContracts';
-import type { Project } from '@workbench/projectContracts';
 import type {
   GraphBearingSurfaceContract,
   WidgetInstanceRuntimeMeta,
@@ -14,8 +12,11 @@ import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { IconButton } from '@platform/ui';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { shallowEqual, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
+import { getEnabledCenterViewCount } from '@workbench/widgetPlacementCommands';
+import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { GitBranchIcon, MoreHorizontalIcon, PictureInPicture2Icon, TargetIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,36 +27,7 @@ import { useTranslation } from 'react-i18next';
  * widgets extend the frame instead of stacking their own menus and toolbars.
  */
 
-const GraphPreviewDialog = lazy(() =>
-  import('@features/workflow/preview').then((module) => ({ default: module.GraphPreviewDialog }))
-);
-
-const getPreviewGraph = async (
-  project: Project,
-  surface: GraphBearingSurfaceContract
-): Promise<GraphContract | null> => {
-  // The project graph compiles fresh for preview so `View Graph` always shows
-  // what Invoke would run right now; widget graphs keep their last compile.
-  if (surface.sourceId === 'workflow') {
-    const [{ compileProjectGraph }, { getInvocationTemplatesSnapshot }] = await Promise.all([
-      import('@features/workflow/graph'),
-      import('@features/workflow/react'),
-    ]);
-    const templatesSnapshot = getInvocationTemplatesSnapshot();
-
-    if (templatesSnapshot.status !== 'loaded') {
-      return null;
-    }
-
-    try {
-      return compileProjectGraph(project.projectGraph, templatesSnapshot.templates);
-    } catch {
-      return null;
-    }
-  }
-
-  return project.widgetGraphs[surface.widgetId] ?? null;
-};
+const GraphPreviewHost = lazy(() => import('./GraphPreviewHost'));
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 const DISABLED_PROPS = { opacity: 0.4 };
@@ -114,37 +86,51 @@ export const WidgetActionsMenu = ({
   runtime: WidgetRuntimeApi;
 }) => {
   const { t } = useTranslation();
-  const activeProject = useActiveProjectSelector(
-    (project) => ({ projectGraph: project.projectGraph, widgetGraphs: project.widgetGraphs }),
-    shallowEqual
-  ) as Project;
+  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const { getWidgetById } = useWorkbenchWidgetRegistry();
+  const { widgets } = useWorkbenchCommands();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [previewGraph, setPreviewGraph] = useState<GraphContract | null>(null);
+  // Mount outlives `isPreviewOpen`: dropping the host the moment the dialog
+  // closes cancels its exit transition, so the preview blinked out of
+  // existence. The host reports when the transition is done instead.
+  const [isPreviewMounted, setIsPreviewMounted] = useState(false);
   const label = resolveWidgetLabel(manifest, t);
   const surface = useMemo(
     () =>
       manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region, label) : null,
     [label, manifest, region]
   );
-  const surfaceSourceId = surface?.sourceId;
-  const handlePreview = useCallback(async () => {
+  // Floating is offered only from dockable regions; the floating window's own
+  // chrome carries the dock control. The last center *view* is not offered it
+  // either — floating it out would leave the work surface with nothing to
+  // show, which is why `closeWidgetPlacement` refuses the same removal.
+  const canFloat =
+    Boolean(manifest.allowFloating) &&
+    region !== 'floating' &&
+    !(region === 'center' && getEnabledCenterViewCount(placementProject, getWidgetById) === 1);
+  // Floating unmounts the docked subtree; the draft registry's cleanup only
+  // deregisters the flusher, so an uncommitted edit is lost without this.
+  const handleFloat = useCallback(() => {
     flushWorkbenchDrafts();
-    if (surface) {
-      setPreviewGraph(await getPreviewGraph(activeProject, surface));
-    }
+    widgets.float(instance.id);
+  }, [instance.id, widgets]);
+  const handlePreview = useCallback(() => {
+    flushWorkbenchDrafts();
+    setIsPreviewMounted(true);
     setIsPreviewOpen(true);
-  }, [activeProject, surface]);
-  const positionHints =
-    isPreviewOpen && surfaceSourceId === 'workflow'
-      ? Object.fromEntries(activeProject.projectGraph.nodes.map((node) => [node.id, node.position]))
-      : undefined;
+  }, []);
+  // Guarded on `isPreviewOpen`: re-opening the preview while it is still
+  // animating out must not have the late exit report drop its mount.
+  const handlePreviewExitComplete = useCallback(() => {
+    if (!isPreviewOpen) {
+      setIsPreviewMounted(false);
+    }
+  }, [isPreviewOpen]);
 
-  if (!surface && !HeaderMenu) {
+  if (!surface && !HeaderMenu && !canFloat) {
     return null;
   }
 
-  // The project graph mirrors the editable document, so the preview can reuse
-  // the editor's node positions instead of auto-layouting.
   return (
     <>
       <Menu.Root positioning={MENU_POSITIONING}>
@@ -157,7 +143,14 @@ export const WidgetActionsMenu = ({
           <Menu.Positioner>
             <Menu.Content minW="13rem">
               {surface ? <GraphSurfaceMenuItems surface={surface} onPreview={handlePreview} /> : null}
-              {surface && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
+              {surface && (HeaderMenu || canFloat) ? <Menu.Separator borderColor="border.subtle" /> : null}
+              {canFloat ? (
+                <Menu.Item value="float-window" onClick={handleFloat}>
+                  <Icon as={PictureInPicture2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('widgets.floating.floatWindow')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+              {canFloat && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
               {HeaderMenu ? (
                 <HeaderMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
               ) : null}
@@ -165,15 +158,12 @@ export const WidgetActionsMenu = ({
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      {surface && isPreviewOpen ? (
+      {surface && isPreviewMounted ? (
         <Suspense fallback={null}>
-          <GraphPreviewDialog
-            graph={previewGraph}
-            graphId={surface.graphId}
+          <GraphPreviewHost
             isOpen={isPreviewOpen}
-            positionHints={positionHints}
-            sourceId={surface.sourceId}
-            title={surface.label}
+            surface={surface}
+            onExitComplete={handlePreviewExitComplete}
             onOpenChange={setIsPreviewOpen}
           />
         </Suspense>

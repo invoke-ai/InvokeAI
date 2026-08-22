@@ -66,6 +66,9 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
     Wan = "wan"
     """Indicates the model is associated with the Wan 2.2 model architecture (T2V-A14B / TI2V-5B), used for image generation at num_frames=1."""
+    MiniMaxH3 = "minimax-h3"
+    """Indicates the model is associated with the MiniMax H3 (Hailuo 3.0) omni-modal architecture, which
+    generates video with jointly-denoised stereo audio."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -114,11 +117,13 @@ class SubModelType(str, Enum):
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
+    Processor = "processor"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"
     VAE = "vae"
     VAEDecoder = "vae_decoder"
     VAEEncoder = "vae_encoder"
+    AudioVAE = "audio_vae"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
 
@@ -252,6 +257,14 @@ class Qwen3VariantType(str, Enum):
     """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
+class MiniMaxH3VariantType(str, Enum):
+    """MiniMax H3 model variants (task-specific transformer checkpoints sharing every other component)."""
+
+    FL2VA = "fl2va"
+    """First/last-frame + text to audio-video: text-to-video and first/last-frame image-to-video
+    (HF repo subfolder ``transformer``)."""
+
+
 class MistralVariantType(str, Enum):
     """Mistral text encoder variants used by FLUX.2 [dev]."""
 
@@ -312,6 +325,7 @@ class ModelFormat(str, Enum):
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     ExternalApi = "external_api"
+    SDNQQuantized = "sdnq_quantized"
     Unknown = "unknown"
 
 
@@ -367,6 +381,7 @@ AnyVariant: TypeAlias = Union[
     WanLoRAVariantType,
     Qwen3VariantType,
     Krea2VariantType,
+    MiniMaxH3VariantType,
     MistralVariantType,
     PiDDecoderVariantType,
 ]
@@ -381,6 +396,7 @@ variant_type_adapter = TypeAdapter[
     | WanLoRAVariantType
     | Qwen3VariantType
     | Krea2VariantType
+    | MiniMaxH3VariantType
     | MistralVariantType
     | PiDDecoderVariantType
 ](
@@ -394,6 +410,7 @@ variant_type_adapter = TypeAdapter[
     | WanLoRAVariantType
     | Qwen3VariantType
     | Krea2VariantType
+    | MiniMaxH3VariantType
     | MistralVariantType
     | PiDDecoderVariantType
 )

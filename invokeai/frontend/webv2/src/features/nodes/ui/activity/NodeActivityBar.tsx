@@ -3,6 +3,7 @@ import { Badge, Box, Collapsible, Flex, HStack, Icon, Spinner, Text } from '@cha
 import { clearCustomNodeInstallLog, useCustomNodeInstallLog } from '@features/nodes/data/installLogStore';
 import { setNodeActivityExpanded, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
 import { Button } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ChevronUpIcon, ListOrderedIcon, Trash2Icon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -66,9 +67,7 @@ export const NodeActivityBar = () => {
           ) : (
             <Icon as={ListOrderedIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
           )}
-          <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
-            {summary}
-          </Text>
+          <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={summary} />
           {installingCount > 0 ? (
             <Badge colorPalette="accent" flexShrink={0} fontSize="2xs" size="sm" variant="solid">
               {installingCount}

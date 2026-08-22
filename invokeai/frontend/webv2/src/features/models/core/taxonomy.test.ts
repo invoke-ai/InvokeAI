@@ -39,6 +39,7 @@ describe('label fallbacks', () => {
     expect(getModelTypeLabel('gemma2_encoder')).toBe('Gemma 2 Encoder');
     expect(getModelTypeLabel('pid_decoder')).toBe('PiD Decoder');
     expect(getModelFormatLabel('gguf_quantized')).toBe('GGUF');
+    expect(getModelFormatLabel('sdnq_quantized')).toBe('SDNQ');
   });
 });
 

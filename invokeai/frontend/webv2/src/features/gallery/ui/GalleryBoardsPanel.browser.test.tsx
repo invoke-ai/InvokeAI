@@ -79,6 +79,7 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     projectBoardId: null,
     searchTerm: '',
     selectedBoardId: 'dogs',
+    semanticImageQuery: null,
     selectedItemKey: null,
     selectedItemKeys: [],
     settings: { ...DEFAULT_GALLERY_SETTINGS, showArchivedBoards: true, showDateBoards: true, ...settings },
@@ -271,17 +272,28 @@ describe('GalleryBoardsPanel', () => {
     expect(actions.updateSettings).toHaveBeenCalledWith({ collapsedBoardSections: ['boards'] });
   });
 
-  it('toggles the date and archived board queries from the filter row', async () => {
+  it('toggles every board group from the visibility menu', async () => {
     await renderPanel();
 
-    const dateToggle = host?.querySelector<HTMLElement>('button[aria-label="widgets.gallery.hideDateBoards"]');
+    const openMenu = async () => {
+      const trigger = host?.querySelector<HTMLElement>('button[aria-label="widgets.gallery.boardVisibility"]');
 
-    await click(dateToggle!);
+      await click(trigger!);
+    };
+
+    // Each row stays a checkbox rather than closing the menu, so the three
+    // groups can be set in one visit.
+    await openMenu();
+
+    const row = (value: string) => document.querySelector<HTMLElement>(`[data-scope="menu"] [data-value="${value}"]`);
+
+    await click(row('date-boards')!);
     expect(actions.updateSettings).toHaveBeenCalledWith({ showDateBoards: false });
 
-    const archiveToggle = host?.querySelector<HTMLElement>('button[aria-label="widgets.gallery.hideArchivedBoards"]');
-
-    await click(archiveToggle!);
+    await click(row('archived-boards')!);
     expect(actions.updateSettings).toHaveBeenCalledWith({ showArchivedBoards: false });
+
+    await click(row('other-project-boards')!);
+    expect(actions.updateSettings).toHaveBeenCalledWith({ showOtherProjectBoards: false });
   });
 });

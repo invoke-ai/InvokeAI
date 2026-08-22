@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     state_dict_has_any_keys_ending_with,
     state_dict_has_any_keys_starting_with,
 )
+from invokeai.backend.model_manager.configs.main import _detect_wan_expert
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
@@ -46,6 +47,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
+    has_minimax_h3_lora_keys,
+    has_non_minimax_h3_architecture_keys,
+    has_unsupported_minimax_h3_lora_variant_keys,
+)
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     detect_wan_lora_variant,
     has_non_wan_architecture_keys,
@@ -954,6 +960,16 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
     "diffusion_model.tproj.",
     "diffusion_model.txtmlp.",
     "diffusion_model.last.linear.",
+    # kohya/LyCORIS flattens that same native layout into `lora_unet_<path>` (see
+    # krea2_lora_conversion_utils._maybe_convert_kohya_krea2_state_dict). Spelled out per top-level module
+    # rather than as a bare `lora_unet_`, which would match every other architecture's kohya LoRA too.
+    "lora_unet_blocks_",
+    "lora_unet_txtfusion_",
+    "lora_unet_first.",
+    "lora_unet_tmlp_",
+    "lora_unet_tproj_",
+    "lora_unet_txtmlp_",
+    "lora_unet_last_linear.",
     "base_model.model.transformer.transformer_blocks.",
     "text_encoder.",
     "base_model.model.text_encoder.",
@@ -1141,22 +1157,95 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # Run the base-class probe (file-check, lora-suffix, base detection).
         instance = super().from_model_on_disk(mod, override_fields)
 
-        # Auto-detect the expert tag from the filename if the user didn't
-        # override it. ``high_noise`` / ``low_noise`` / hyphenated / concatenated
-        # variants — mirrors the GGUF transformer probe's heuristic.
-        if instance.expert is None:
-            name = mod.path.stem.lower()
-            if any(s in name for s in ("high_noise", "high-noise", "highnoise")):
-                instance.expert = "high"
-            elif any(s in name for s in ("low_noise", "low-noise", "lownoise")):
-                instance.expert = "low"
-
         # Auto-detect the model-family variant from inner_dim in the state
         # dict. The override field skips this if the user has set it.
+        #
+        # Resolved *before* the expert tag because the expert is only meaningful for
+        # A14B — see below.
         if instance.variant is None:
             instance.variant = detect_wan_lora_variant(mod.load_state_dict())
 
+        # Auto-detect the expert tag from the filename if the user didn't override
+        # it, using the same helper as the transformer probes so the two can't drift
+        # apart. That also picks up the bare ``HIGH``/``LOW`` convention, which
+        # matters here: an expert-specific LoRA left untagged is applied to *both*
+        # experts by the Wan LoRA loader, which is wrong for the high/low pairs the
+        # Lightning-style distills ship in.
+        #
+        # TI2V-5B is single-transformer, so it has no experts and the denoise path
+        # reads only the primary LoRA list. Tagging a 5B LoRA would route it through
+        # ``_resolve_target("auto", ...)`` into ``loras_low_noise`` alone, where it is
+        # silently inert. The bare-token convention makes that reachable on ordinary
+        # names — ``Wan2.2_TI2V_5B_low_light_v2`` has ``low`` as a standalone token —
+        # so pin the field the same way ``_resolve_wan_expert`` pins the main-model
+        # probe. Only A14B (or an inconclusive variant) gets a tag.
+        #
+        # Note 'none' vs None: this config uses None for "untagged, apply to both",
+        # so a 'none' result must leave the field alone.
+        if instance.expert is None and instance.variant != WanLoRAVariantType.Wan5B:
+            detected = _detect_wan_expert(mod.path.stem)
+            if detected != "none":
+                instance.expert = detected
+
         return instance
+
+
+class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+
+    H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
+    ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+    Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
+    under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
+    carrying another architecture's signature — see
+    ``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``
+    alone would not be safe.
+    """
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_h3_keys = has_minimax_h3_lora_keys(str_keys)
+        # LyCORIS variants (LoKR/LoHA/DoRA) cannot be applied across H3's fused qkv/SwiGLU
+        # tensors; admitting them here would only defer the failure to generation time (or,
+        # for DoRA's per-output-row magnitudes, silently mis-apply them). Reject at install.
+        if has_h3_keys and has_unsupported_minimax_h3_lora_variant_keys(str_keys):
+            raise NotAMatchError(
+                "MiniMax H3 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants "
+                "are not supported on H3's fused transformer layers"
+            )
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+            },
+        )
+
+        if has_h3_keys and has_lora_suffix and not has_non_minimax_h3_architecture_keys(str_keys):
+            return
+
+        raise NotAMatchError("model does not match MiniMax H3 LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if (
+            has_minimax_h3_lora_keys(str_keys)
+            and not has_non_minimax_h3_architecture_keys(str_keys)
+            and not has_unsupported_minimax_h3_lora_variant_keys(str_keys)
+        ):
+            return BaseModelType.MiniMaxH3
+
+        raise NotAMatchError("model does not look like a MiniMax H3 LoRA")
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):

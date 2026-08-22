@@ -1,7 +1,7 @@
 import type { ProjectGraphAction } from '@features/workflow/core/document';
-import type { ProjectGraphState } from '@features/workflow/core/types';
+import type { ProjectGraphState, XYPosition } from '@features/workflow/core/types';
 
-export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover';
+export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover' | 'floating';
 
 /**
  * Panel regions workflow surfaces may open/select widgets in. Structural
@@ -88,6 +88,44 @@ export interface WorkflowPreviewGraph {
     targetField: string;
   }>;
   backendGraph?: unknown;
+}
+
+export interface GraphPreviewNotice {
+  id: string;
+  message: string;
+  nodeId?: string;
+}
+
+export interface GraphPreviewSummaryRow {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export interface GraphPreviewProvenance {
+  label: string;
+}
+
+/**
+ * The preview dialog's data source, built fresh per render by
+ * `workbench/widget-frame/graphPreviewSource.ts` from the active surface's
+ * `sourceId`. `isLive` drives the dialog's "Updates as you change settings."
+ * subtitle — true for sources that recompile from live project state
+ * (`generate`, `workflow`), false for sources that only replay their last
+ * compiled widget graph (`upscale`, `canvas`).
+ */
+export interface GraphPreviewSourceState {
+  graph: WorkflowPreviewGraph | null;
+  /** Human-readable result destination (e.g. "Gallery"), set for every source by the builder. */
+  destinationLabel: string | null;
+  invalidReasons: string[];
+  isLive: boolean;
+  notices: GraphPreviewNotice[];
+  positionHints?: Record<string, XYPosition>;
+  /** nodeId → field → display text, for fields whose real value the preview can't show verbatim (e.g. a randomized seed). */
+  resolvedInputOverrides?: Record<string, Record<string, string>>;
+  summaryRows: GraphPreviewSummaryRow[];
+  getProvenance?: (nodeId: string, fieldName: string) => GraphPreviewProvenance | null;
 }
 
 export interface WorkflowPerfSource {

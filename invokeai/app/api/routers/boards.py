@@ -54,7 +54,7 @@ class DeleteBoardResult(BaseModel):
     status_code=201,
     response_model=BoardDTO,
 )
-async def create_board(
+def create_board(
     current_user: CurrentUserOrDefault,
     board_name: str = Query(description="The name of the board to create", max_length=300),
 ) -> BoardDTO:
@@ -67,7 +67,7 @@ async def create_board(
 
 
 @boards_router.get("/{board_id}", operation_id="get_board", response_model=BoardDTO)
-async def get_board(
+def get_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to get"),
 ) -> BoardDTO:
@@ -92,7 +92,7 @@ async def get_board(
     status_code=201,
     response_model=BoardDTO,
 )
-async def update_board(
+def update_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to update"),
     changes: BoardChanges = Body(description="The changes to apply to the board"),
@@ -242,7 +242,7 @@ def delete_board(
     operation_id="list_boards",
     response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
-async def list_boards(
+def list_boards(
     current_user: CurrentUserOrDefault,
     order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
@@ -272,7 +272,7 @@ async def list_boards(
     operation_id="list_all_board_image_names",
     response_model=list[str],
 )
-async def list_all_board_image_names(
+def list_all_board_image_names(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of the board or 'none' for uncategorized images"),
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of image to include."),

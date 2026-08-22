@@ -19,6 +19,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { getErrorMessage, useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ChevronUpIcon, ListOrderedIcon, PauseIcon, PlayIcon, RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -184,9 +185,7 @@ export const InstallQueueBar = () => {
           ) : (
             <Icon as={ListOrderedIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
           )}
-          <Text flex="1" fontSize="xs" fontWeight="600" minW="0" truncate>
-            {summary}
-          </Text>
+          <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={summary} />
 
           {activeJobs.length > 0 ? (
             <Badge colorPalette="accent" flexShrink={0} fontSize="2xs" size="sm" variant="solid">

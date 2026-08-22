@@ -370,7 +370,7 @@ def test_production_upload_authentication(
 ) -> None:
     set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
     token_data = TokenData(user_id="user", email="user@example.com", is_admin=False)
-    user = SimpleNamespace(is_active=user_active)
+    user = SimpleNamespace(user_id="user", is_active=user_active, token_epoch=0)
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=multiuser),
@@ -399,7 +399,7 @@ async def test_upload_authentication_does_not_block_the_event_loop(monkeypatch: 
     monkeypatch.setattr(api_app, "run_in_threadpool", run_in_threadpool)
 
     def slow_get(_user_id: str) -> SimpleNamespace:
-        return SimpleNamespace(is_active=True)
+        return SimpleNamespace(user_id="user", is_active=True, token_epoch=0)
 
     invoker = SimpleNamespace(
         services=SimpleNamespace(

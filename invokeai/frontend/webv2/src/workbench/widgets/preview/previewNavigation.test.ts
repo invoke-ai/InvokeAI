@@ -37,7 +37,6 @@ const buildSequence = (overrides: Partial<Parameters<typeof getPreviewNavigation
     boardImages: [item('image', 'newest'), item('video', 'middle'), item('image', 'oldest')],
     galleryView: 'images',
     imageOrderDir: 'DESC',
-    starredFirst: false,
     ...overrides,
   });
 
@@ -65,7 +64,6 @@ describe('getPreviewNavigationSequence', () => {
             item('image', 'newest'),
             item('video', 'oldest'),
           ],
-          starredFirst: true,
         })
       )
     ).toEqual(['video:starred-a', 'image:starred-b', 'placeholder', 'image:newest', 'video:oldest']);
@@ -76,7 +74,6 @@ describe('getPreviewNavigationSequence', () => {
       keys(
         buildSequence({
           boardImages: [item('image', 'starred-a', true), item('video', 'starred-b', true)],
-          starredFirst: true,
         })
       )
     ).toEqual(['image:starred-a', 'video:starred-b', 'placeholder']);
@@ -88,7 +85,6 @@ describe('getPreviewNavigationSequence', () => {
         buildSequence({
           boardImages: [item('video', 'starred-a', true), item('image', 'newest')],
           imageOrderDir: 'ASC',
-          starredFirst: true,
         })
       )
     ).toEqual(['video:starred-a', 'image:newest', 'placeholder']);

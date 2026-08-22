@@ -35,6 +35,10 @@
       "targetOwner": "workbench",
       "targetPath": "workbench/image-actions"
     },
+    "image-map": {
+      "targetOwner": "workbench",
+      "targetPath": "workbench/image-map"
+    },
     "launchpad": {
       "targetOwner": "workbench",
       "targetPath": "workbench/launchpad"
@@ -82,6 +86,7 @@
     "WorkbenchWidgetRegistryContext.tsx": "workbench",
     "activeInvocationSubmission.ts": "workbench",
     "autoRoutePolicy.ts": "workbench",
+    "bootWidgetPreload.ts": "workbench",
     "canvasDimsSync.ts": "workbench",
     "canvasLayerContent.ts": "workbench",
     "canvasLayerOps.ts": "workbench",
@@ -91,6 +96,8 @@
     "canvasStagingView.ts": "workbench",
     "controlAdapters.ts": "workbench",
     "controlLayerChecks.ts": "workbench",
+    "deferredResource.ts": "workbench",
+    "floatingWindows.ts": "workbench",
     "focusRegions.tsx": "workbench",
     "generationSettingsOrchestration.ts": "workbench",
     "graphContracts.ts": "workbench",
@@ -107,6 +114,7 @@
     "layoutPresetRouting.ts": "workbench",
     "layoutPresetSnapshots.ts": "workbench",
     "layoutPresets.ts": "workbench",
+    "layoutWidgetSet.ts": "workbench",
     "panZoom.ts": "workbench",
     "performanceMarks.ts": "workbench",
     "persistence.ts": "workbench",

@@ -1,70 +1,44 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type {
-  FieldInputTemplate,
-  FieldOutputTemplate,
-  FieldType,
-  WorkflowInvocationNode,
-} from '@features/workflow/contracts';
+import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowNodeExecutionState as NodeExecutionState } from '@features/workflow/ui/contracts';
 
 import { Box, Checkbox, Field, Flex, HStack, Icon, IconButton, Image, Input, Stack, Text } from '@chakra-ui/react';
 import { FieldDescriptionPopover } from '@features/workflow/ui/fields/FieldDescriptionPopover';
 import { WorkflowFieldInput } from '@features/workflow/ui/fields/WorkflowFieldInput';
+import {
+  getWorkflowNodeBodyProps,
+  getWorkflowNodeHandleStyle,
+  getWorkflowNodeHeaderProps,
+  getWorkflowNodeShellProps,
+  WORKFLOW_NODE_DENSITY,
+  WorkflowNodeInfoIcon,
+} from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNodeExecutionState } from '@features/workflow/ui/WorkflowUiContext';
 import {
   cloneWorkflowFieldDefault,
-  getFieldTypeColor,
   getFieldTypeLabel,
   getWorkflowFieldInvalidReason,
   isDirectInputField,
   isExposableField,
   isWorkflowFieldValueDefault,
-  isModelFieldType,
 } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  InfoIcon,
-  PinIcon,
-  PinOffIcon,
-  RotateCcwIcon,
-  TriangleAlertIcon,
-} from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
 import { memo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
-import { getWorkflowNodeChromeProps } from './nodeChrome';
 
 const NODE_WIDTH = '18rem';
-const HANDLE_SIZE = 12;
-type HandleSide = 'left' | 'right';
 /** Row padding-x in px; inline handles sit in the label rows, so they pull back out past it. */
 const ROW_PADDING_X = 12;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 const CONTENT_VISIBILITY_ZOOM = 0.4;
-
-const handleStyle = (type: FieldType, side: HandleSide): React.CSSProperties => {
-  const color = getFieldTypeColor(type);
-  const isFilled = type.cardinality === 'SINGLE';
-  const isAngular = isModelFieldType(type) || type.batch;
-  const centeredDiamondTransform = `translate(${side === 'left' ? '-' : ''}50%, -50%) rotate(45deg)`;
-
-  return {
-    background: isFilled ? color : 'var(--xy-background-color)',
-    border: isFilled ? 'none' : `3px solid ${color}`,
-    borderRadius: isAngular ? 3 : '50%',
-    boxShadow: '0 0 0 1.5px var(--xy-background-color)',
-    height: HANDLE_SIZE,
-    transform: type.batch ? centeredDiamondTransform : undefined,
-    width: HANDLE_SIZE,
-  };
-};
 
 /** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => useStore((state) => state.transform[2] < CONTENT_VISIBILITY_ZOOM);
@@ -102,13 +76,7 @@ const NodeShell = ({
   const isInvalid = isMissing || hasMissingRequiredInput;
 
   return (
-    <Box
-      bg="bg"
-      fontSize="xs"
-      rounded="lg"
-      w={NODE_WIDTH}
-      {...getWorkflowNodeChromeProps({ invalid: isInvalid, running: isRunning, selected })}
-    >
+    <Box w={NODE_WIDTH} {...getWorkflowNodeShellProps({ invalid: isInvalid, running: isRunning, selected })}>
       {children}
     </Box>
   );
@@ -166,17 +134,15 @@ const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: strin
   }
 
   return (
-    <Text
+    <MiddleTruncate
       fontWeight="700"
       minW="0"
+      text={title}
       title="Double-click to rename"
-      truncate
       // Editing always starts from the displayed title: an unset label
       // prefills with the template title rather than an empty input.
       onDoubleClick={() => setDraftLabel(title)}
-    >
-      {title}
-    </Text>
+    />
   );
 };
 
@@ -257,27 +223,17 @@ const NodeInfoTooltipContent = ({
   );
 };
 
-const NodeInfoButton = ({
+const NodeInfoIcon = ({
   node,
   template,
 }: {
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => (
-  <Tooltip
+  <WorkflowNodeInfoIcon
     content={<NodeInfoTooltipContent node={node} template={template} />}
-    positioning={{ placement: 'top-end' }}
-    showArrow
-  >
-    <IconButton
-      aria-label={`Show details for ${node.data.label || template.title}`}
-      className="nodrag"
-      size="2xs"
-      variant="ghost"
-    >
-      <Icon as={InfoIcon} boxSize="3.5" />
-    </IconButton>
-  </Tooltip>
+    label={`Show details for ${node.data.label || template.title}`}
+  />
 );
 
 const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: WorkflowInvocationNode }) => {
@@ -295,7 +251,7 @@ const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: Workflo
       justify="space-between"
       minH="8"
       px="2.5"
-      py="1"
+      py={WORKFLOW_NODE_DENSITY.rowPaddingY}
     >
       <HStack gap="4">
         {canUseCache ? (
@@ -358,14 +314,14 @@ const InputFieldRow = ({
 
   if (isSkeleton) {
     return (
-      <Box px="3" py="1.5">
+      <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
         <HStack gap="1.5" h="5" position="relative">
           {template.input !== 'direct' ? (
             <Tooltip content={handleTooltip} showArrow>
               <Handle
                 id={template.name}
                 position={Position.Left}
-                style={{ ...handleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
+                style={{ ...getWorkflowNodeHandleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
                 type="target"
               />
             </Tooltip>
@@ -378,7 +334,7 @@ const InputFieldRow = ({
   }
 
   return (
-    <Box px="3" py="1.5" w="full">
+    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY} w="full">
       <Field.Root gap="0" invalid={isInvalid} minW="0" w="full">
         {/* The handle lives inside the label row so it stays centered on the
             label even when the value control below grows the row. */}
@@ -388,7 +344,7 @@ const InputFieldRow = ({
               <Handle
                 id={template.name}
                 position={Position.Left}
-                style={{ ...handleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
+                style={{ ...getWorkflowNodeHandleStyle(template.type, 'left'), left: -ROW_PADDING_X, top: '50%' }}
                 type="target"
               />
             </Tooltip>
@@ -488,13 +444,13 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
   const handleTooltip = getHandleTypeTooltip(template.type);
 
   return (
-    <Box px="3" py="1">
+    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
       <Flex align="center" h="5" justify="flex-end" position="relative">
         <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
           <Handle
             id={template.name}
             position={Position.Right}
-            style={{ ...handleStyle(template.type, 'right'), right: -ROW_PADDING_X, top: '50%' }}
+            style={{ ...getWorkflowNodeHandleStyle(template.type, 'right'), right: -ROW_PADDING_X, top: '50%' }}
             type="source"
           />
         </Tooltip>
@@ -505,18 +461,15 @@ const OutputFieldRow = ({ isSkeleton, template }: { isSkeleton: boolean; templat
         ) : (
           <Box textAlign="end">
             <Tooltip content={<OutputFieldTooltip template={template} />} positioning={{ placement: 'top-end' }}>
-              <Text
+              <MiddleTruncate
                 as="span"
                 color="fg.muted"
-                display="inline-block"
                 fontSize="2xs"
+                justifyContent="flex-end"
                 lineHeight="shorter"
                 maxW="full"
-                textAlign="end"
-                truncate
-              >
-                {template.title}
-              </Text>
+                text={template.title}
+              />
             </Tooltip>
           </Box>
         )}
@@ -539,7 +492,7 @@ const HiddenHandles = ({
         key={outputTemplate.name}
         id={outputTemplate.name}
         position={Position.Right}
-        style={{ ...handleStyle(outputTemplate.type, 'right'), opacity: 0, right: 0, top: -14 }}
+        style={{ ...getWorkflowNodeHandleStyle(outputTemplate.type, 'right'), opacity: 0, right: 0, top: -14 }}
         type="source"
       />
     ))}
@@ -549,7 +502,7 @@ const HiddenHandles = ({
           key={inputTemplate.name}
           id={inputTemplate.name}
           position={Position.Left}
-          style={{ ...handleStyle(inputTemplate.type, 'left'), left: 0, opacity: 0, top: -14 }}
+          style={{ ...getWorkflowNodeHandleStyle(inputTemplate.type, 'left'), left: 0, opacity: 0, top: -14 }}
           type="target"
         />
       ) : null
@@ -582,15 +535,11 @@ const CompactHiddenHandles = ({
 const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outputCount: number }) => (
   <Flex
     align="center"
-    bg="bg.muted"
-    borderBottomRadius="lg"
-    borderTopWidth="1px"
-    borderColor="border.subtle"
     color="fg.muted"
     fontSize="2xs"
     gap="2"
-    px="3"
-    py="2"
+    px={WORKFLOW_NODE_DENSITY.rowPaddingX}
+    {...getWorkflowNodeBodyProps()}
   >
     <Text>
       {inputCount} input{inputCount === 1 ? '' : 's'}
@@ -612,24 +561,13 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
 
   return (
     <NodeShell isMissing={!templateView} selected={selected ?? false}>
-      <Flex
-        align="center"
-        bg="bg.subtle"
-        borderBottomWidth="1px"
-        borderColor="border.subtle"
-        borderTopRadius="lg"
-        gap="1"
-        px="3"
-        py="2"
-      >
-        <Text fontSize="sm" fontWeight="700" minW="0" title={title} truncate>
-          {title}
-        </Text>
+      <Flex {...getWorkflowNodeHeaderProps()}>
+        <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={title} />
       </Flex>
       {templateView ? (
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
       ) : (
-        <Text bg="bg.muted" borderBottomRadius="lg" color="fg.subtle" fontSize="2xs" px="3" py="2">
+        <Text color="fg.subtle" fontSize="2xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
           Unknown node type. Select for details.
         </Text>
       )}
@@ -680,37 +618,24 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
 
   return (
     <NodeShell hasMissingRequiredInput={isMissingRequiredInput} isRunning={isRunning} selected={selected ?? false}>
-      <Flex
-        align="center"
-        bg="bg.subtle"
-        borderBottomWidth={isOpen ? '1px' : '0'}
-        borderColor="border.subtle"
-        borderTopRadius="lg"
-        borderBottomRadius={isOpen ? 'none' : 'lg'}
-        gap="1"
-        ps="1.5"
-        pe="2"
-        py="1.5"
-      >
+      {/* The collapse chevron carries its own hit padding, so the header pulls its start padding in. */}
+      <Flex {...getWorkflowNodeHeaderProps({ roundedBottom: !isOpen })} gap="1" ps="1">
         <IconButton
           aria-label={isOpen ? 'Collapse node' : 'Expand node'}
           className="nodrag"
-          ms="2"
-          size="xs"
+          size="2xs"
           variant="ghost"
           onClick={() => editGraph({ isOpen: !isOpen, nodeId: node.id, type: 'setNodeIsOpen' })}
         >
           <Icon as={isOpen ? ChevronDownIcon : ChevronRightIcon} boxSize="3.5" />
         </IconButton>
         {isZoomedOut ? (
-          <Text fontSize="sm" fontWeight="700" minW="0" truncate>
-            {node.data.label || template.title}
-          </Text>
+          <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={node.data.label || template.title} />
         ) : (
           <>
             <NodeTitle node={node} title={node.data.label || template.title} />
             <Box flex="1" />
-            <NodeInfoButton node={node} template={template} />
+            <NodeInfoIcon node={node} template={template} />
           </>
         )}
       </Flex>
@@ -721,7 +646,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
         </>
       ) : isOpen ? (
-        <Box bg="bg.muted" borderBottomRadius={withFooter || withOutputPreview ? 'none' : 'lg'} py="1">
+        <Box {...getWorkflowNodeBodyProps({ roundedBottom: !withFooter && !withOutputPreview })}>
           {outputTemplates.map((outputTemplate) => (
             <OutputFieldRow key={outputTemplate.name} isSkeleton={isZoomedOut} template={outputTemplate} />
           ))}

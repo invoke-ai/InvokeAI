@@ -1,7 +1,21 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
+import type { LoraFieldCollectionEntry } from '@features/workflow/utility';
 
-import { Badge, Box, createListCollection, Flex, HStack, Icon, Image, Input, Switch, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  createListCollection,
+  Flex,
+  HStack,
+  Icon,
+  Image,
+  Input,
+  NumberInput,
+  Stack,
+  Switch,
+  Text,
+} from '@chakra-ui/react';
 import { useDndContext, useDndMonitor, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import {
   formatGalleryVideoDuration,
@@ -14,7 +28,7 @@ import {
 import { getSelectedGalleryImageFromValues, getSelectedGalleryItemFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
-import { SCHEDULER_OPTIONS } from '@features/generation/settings';
+import { DEFAULT_LORA_WEIGHT_CONFIG, SCHEDULER_OPTIONS } from '@features/generation/settings';
 import { isInvocationNode } from '@features/workflow/contracts';
 import {
   getWorkflowMediaFieldDropId,
@@ -22,7 +36,11 @@ import {
   type WorkflowMediaKind,
 } from '@features/workflow/ui/fields/mediaFieldDnd';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
-import { getResolvedWorkflowEdges } from '@features/workflow/utility';
+import {
+  getResolvedWorkflowEdges,
+  isLoraFieldCollectionEntry,
+  toLoraFieldCollectionList,
+} from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -36,14 +54,17 @@ import {
   Combobox,
   DropZone,
   formatHexColor,
+  IconButton,
   parseHexColor,
   ResizableTextarea,
   Select,
   Slider,
   toaster,
+  Tooltip,
 } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FilmIcon, ImageIcon } from 'lucide-react';
+import { FilmIcon, ImageIcon, Trash2Icon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
@@ -274,9 +295,16 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
     typeof (value as { key?: unknown } | null)?.key === 'string' ? (value as { key: string }).key : null;
   const modelTypes = (template.uiModelType ?? DEFAULT_MODEL_TYPES) as ModelTaxonomyType[];
   const allowedBases = template.uiModelBase;
+  // ui_model_format narrows further within a base/type — e.g. a loader's main-model field
+  // that accepts only diffusers-folder installs while its override fields take the
+  // single-file checkpoints. Offering the wrong format here would enqueue a graph that
+  // fails deep inside the model loader instead of at selection time.
+  const allowedFormats = template.uiModelFormat;
   const filter = useCallback(
-    (model: ModelConfig) => (allowedBases ? allowedBases.includes(model.base) : true),
-    [allowedBases]
+    (model: ModelConfig) =>
+      (allowedBases ? allowedBases.includes(model.base) : true) &&
+      (allowedFormats ? allowedFormats.includes(model.format) : true),
+    [allowedBases, allowedFormats]
   );
   const onModelChange = useCallback(
     (model: ModelConfig | null) =>
@@ -290,7 +318,7 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
     <Suspense fallback={MODEL_SELECT_FALLBACK}>
       <ModelSelect
         className="nodrag nowheel"
-        filter={allowedBases ? filter : undefined}
+        filter={allowedBases || allowedFormats ? filter : undefined}
         id={id ? `${id}-model-combobox` : undefined}
         invalid={invalid}
         isClearable={false}
@@ -928,6 +956,183 @@ const ColorInput = ({ invalid, onChange, value }: WorkflowFieldInputProps) => {
   );
 };
 
+const LORA_MODEL_TYPES: ModelTaxonomyType[] = ['lora'];
+
+/**
+ * The `Apply LoRA Collection` loaders take `LoRAField | list[LoRAField]`. Rather than making the
+ * user wire up one `Select LoRA` node per LoRA and collect them, this edits the list in place: pick
+ * a LoRA from the model picker to append it, then tune each weight on its own row.
+ *
+ * Rows address entries by index, not by model key. The picker keeps the user from adding a
+ * duplicate, but an imported workflow can already contain one, and a key-based edit would hit every
+ * copy at once. Indexing also keeps entries this widget cannot read (`null` holes from
+ * `normalizeLoraFieldCollectionValue`) in place instead of dropping them on the next edit.
+ */
+const LoRACollectionInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInputProps) => {
+  // The raw list, unreadable items included — see `toLoraFieldCollectionList`.
+  const entries = useMemo(() => toLoraFieldCollectionList(value), [value]);
+  const selectedKeys = useMemo(
+    () => new Set(entries.filter(isLoraFieldCollectionEntry).map((entry) => entry.lora.key)),
+    [entries]
+  );
+  // The loaders stamp `ui_model_base`, so each node offers only the LoRAs it can actually apply.
+  const allowedBases = template.uiModelBase;
+  const filter = useCallback(
+    (model: ModelConfig) => (allowedBases ? allowedBases.includes(model.base) : true),
+    [allowedBases]
+  );
+  // An emptied list is written back as `undefined` rather than `[]`: it is the loaders' own default,
+  // so the node returns to "no LoRAs" instead of sitting on a value that is equal in effect but
+  // different from its default.
+  const commit = useCallback((next: unknown[]) => onChange(next.length === 0 ? undefined : next), [onChange]);
+  const onAdd = useCallback(
+    (model: ModelConfig | null) => {
+      // The picker already excludes what is in the list; the guard covers a stale selection.
+      if (!model || selectedKeys.has(model.key)) {
+        return;
+      }
+
+      const defaultWeight = model.default_settings?.weight;
+      const entry: LoraFieldCollectionEntry = {
+        lora: { base: model.base, hash: model.hash, key: model.key, name: model.name, type: model.type },
+        weight:
+          typeof defaultWeight === 'number' && Number.isFinite(defaultWeight)
+            ? defaultWeight
+            : DEFAULT_LORA_WEIGHT_CONFIG.initial,
+      };
+
+      commit([...entries, entry]);
+    },
+    [commit, entries, selectedKeys]
+  );
+  const onRemove = useCallback(
+    (index: number) => commit(entries.filter((_, entryIndex) => entryIndex !== index)),
+    [commit, entries]
+  );
+  const onWeightChange = useCallback(
+    (index: number, weight: number) =>
+      commit(
+        entries.map((entry, entryIndex) =>
+          entryIndex === index && isLoraFieldCollectionEntry(entry) ? { ...entry, weight } : entry
+        )
+      ),
+    [commit, entries]
+  );
+
+  return (
+    <Stack gap="1" w="full">
+      <Suspense fallback={MODEL_SELECT_FALLBACK}>
+        <ModelSelect
+          className="nodrag nowheel"
+          excludeKeys={selectedKeys}
+          filter={allowedBases ? filter : undefined}
+          id={id ? `${id}-lora-combobox` : undefined}
+          invalid={invalid}
+          modelTypes={(template.uiModelType as ModelTaxonomyType[] | null) ?? LORA_MODEL_TYPES}
+          placeholder="Add LoRA…"
+          size="xs"
+          value={null}
+          onChange={onAdd}
+        />
+      </Suspense>
+      {entries.length > 0 ? (
+        <Stack className="nowheel" gap="1" maxH="40" overflowY="auto" w="full">
+          {entries.map((item, index) => (
+            <LoRACollectionRow
+              key={isLoraFieldCollectionEntry(item) ? `${item.lora.key}-${index}` : `unreadable-${index}`}
+              entry={isLoraFieldCollectionEntry(item) ? item : null}
+              id={id}
+              index={index}
+              onRemove={onRemove}
+              onWeightChange={onWeightChange}
+            />
+          ))}
+        </Stack>
+      ) : null}
+    </Stack>
+  );
+};
+
+const LoRACollectionRow = ({
+  entry,
+  id,
+  index,
+  onRemove,
+  onWeightChange,
+}: {
+  entry: LoraFieldCollectionEntry | null;
+  id?: string;
+  index: number;
+  onRemove: (index: number) => void;
+  onWeightChange: (index: number, weight: number) => void;
+}) => {
+  const label = entry ? entry.lora.name : 'Unreadable entry';
+  // The committed value is a number, so re-rendering from it alone would rewrite a half-typed
+  // "0." to "0" mid-keystroke and turn the next digit into "05" — a 10x wrong weight from a
+  // plausible typing sequence. The draft holds the raw text until the field is left; blur drops
+  // it so the row picks up the committed (and range-clamped) value again.
+  const [draft, setDraft] = useState<string | null>(null);
+  const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
+  const onValueChange = useCallback(
+    ({ value: valueAsText, valueAsNumber }: NumberInput.ValueChangeDetails) => {
+      setDraft(valueAsText);
+
+      if (Number.isFinite(valueAsNumber)) {
+        onWeightChange(index, valueAsNumber);
+      }
+    },
+    [index, onWeightChange]
+  );
+  const onFocusChange = useCallback(({ focused }: NumberInput.FocusChangeDetails) => {
+    if (!focused) {
+      setDraft(null);
+    }
+  }, []);
+
+  return (
+    <HStack gap="1" minW="0" w="full">
+      <Tooltip content={entry ? label : 'This entry is not a readable LoRA and will block invoking.'}>
+        <MiddleTruncate color={entry ? undefined : 'fg.error'} flex="1" fontSize="2xs" minW="0" text={label} />
+      </Tooltip>
+      {entry ? (
+        <NumberInput.Root
+          className="nodrag"
+          // Stated rather than left to the default: `min`/`max` are otherwise advisory here, and a
+          // mistyped 999 would run — the backend takes an unbounded float and nothing downstream
+          // rejects it.
+          clampValueOnBlur
+          flexShrink="0"
+          max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
+          min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
+          size="xs"
+          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+          value={draft ?? String(entry.weight)}
+          w="16"
+          onFocusChange={onFocusChange}
+          onValueChange={onValueChange}
+        >
+          <NumberInput.Input
+            aria-label={`${label} weight`}
+            fontVariantNumeric="tabular-nums"
+            id={id ? `${id}-lora-${index}-weight` : undefined}
+          />
+        </NumberInput.Root>
+      ) : null}
+      <IconButton
+        aria-label={`Remove ${label}`}
+        className="nodrag"
+        color="fg.muted"
+        flexShrink="0"
+        size="2xs"
+        variant="ghost"
+        onClick={onRemoveClick}
+      >
+        <Trash2Icon />
+      </IconButton>
+    </HStack>
+  );
+};
+
 const CONNECTION_ONLY_FALLBACK = (
   <Text color="fg.subtle" fontSize="2xs">
     Connection only
@@ -961,6 +1166,8 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
       return <BooleanInput {...props} />;
     case 'EnumField':
       return <EnumInput {...props} />;
+    case 'LoRAField':
+      return <LoRACollectionInput {...props} />;
     case 'ModelIdentifierField':
       return <ModelIdentifierInput {...props} />;
     case 'SchedulerField':

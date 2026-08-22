@@ -31,6 +31,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueCountsByDestination,
     SessionQueueItem,
     SessionQueueItemNotFoundError,
+    SessionQueueItemSummary,
     SessionQueueStatus,
     TooManySessionsError,
     ValueToInsertTuple,
@@ -41,6 +42,11 @@ from invokeai.app.services.shared.graph import GraphExecutionState
 from invokeai.app.services.shared.pagination import CursorPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+
+# Maximum number of ids bound into a single `IN (...)` clause. SQLite's compile-time bind limit is
+# 999 on builds older than 3.32 and 32766 on newer ones; staying under the lower figure (leaving
+# room for the other bind params in the statement) keeps the queries portable across both.
+SQLITE_MAX_BIND_PARAMS_PER_CHUNK = 900
 
 # Round-robin dequeue (multiuser fairness): pick the next pending item from the user who was
 # least-recently served.
@@ -263,6 +269,13 @@ class SqliteSessionQueue(SessionQueueBase):
     async def enqueue_batch(
         self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
     ) -> EnqueueBatchResult:
+        # The route awaits this method, but every operation below is synchronous SQLite/CPU
+        # work. Keep the complete transaction in one worker operation; otherwise the queue-size
+        # check before the first await and the insert/event work after later awaits execute on the
+        # event loop.
+        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id)
+
+    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool, user_id: str) -> EnqueueBatchResult:
         current_queue_size = self._get_current_queue_size(queue_id)
         max_queue_size = self.__invoker.services.configuration.max_queue_size
         max_new_queue_items = max_queue_size - current_queue_size
@@ -271,12 +284,8 @@ class SqliteSessionQueue(SessionQueueBase):
         if prepend:
             priority = self._get_highest_priority(queue_id) + 1
 
-        requested_count = await asyncio.to_thread(
-            calc_session_count,
-            batch=batch,
-        )
-        values_to_insert = await asyncio.to_thread(
-            prepare_values_to_insert,
+        requested_count = calc_session_count(batch=batch)
+        values_to_insert = prepare_values_to_insert(
             queue_id=queue_id,
             batch=batch,
             priority=priority,
@@ -484,6 +493,38 @@ class SqliteSessionQueue(SessionQueueBase):
         device: Optional[str] = None,
         queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
+        return self._transition_queue_item_status(
+            item_id=item_id,
+            status=status,
+            error_type=error_type,
+            error_message=error_message,
+            error_traceback=error_traceback,
+            device=device,
+            queue_item=queue_item,
+        )[0]
+
+    def _transition_queue_item_status(
+        self,
+        item_id: int,
+        status: QUEUE_ITEM_STATUS,
+        error_type: Optional[str] = None,
+        error_message: Optional[str] = None,
+        error_traceback: Optional[str] = None,
+        device: Optional[str] = None,
+        queue_item: Optional[SessionQueueItem] = None,
+    ) -> tuple[SessionQueueItem, bool]:
+        """Move a queue item to `status` unless it is already finished (completed, failed or
+        canceled), returning the item and whether THIS call performed the transition.
+
+        The terminal guard and the UPDATE run in one transaction, so two callers racing to cancel
+        the same row cannot both observe themselves as the one that canceled it — exactly one sees
+        `transitioned=True` (the bulk-cancel counters rely on this). Note the atomicity comes from
+        SqliteDatabase.transaction() holding its process-wide lock for the whole block, not from
+        the SQL: the guard is a Python check between the SELECT and the UPDATE, valid only while
+        every writer goes through that lock. When no transition happens, the item is returned
+        unchanged and no status-changed event is emitted; a vanished row raises
+        SessionQueueItemNotFoundError.
+        """
         if queue_item is not None and queue_item.item_id != item_id:
             raise ValueError(f"Queue item {queue_item.item_id} does not match requested item {item_id}")
 
@@ -531,7 +572,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 updated_status_row = cast(sqlite3.Row, cursor.fetchone())
 
         if updated_status_row is None:
-            return self.get_queue_item(item_id)
+            # Already finished (return it unchanged) or deleted (get_queue_item raises).
+            return self.get_queue_item(item_id), False
 
         if queue_item is None:
             queue_item = self.get_queue_item(item_id)
@@ -555,7 +597,7 @@ class SqliteSessionQueue(SessionQueueBase):
         )
 
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
-        return queue_item
+        return queue_item, True
 
     def _get_workflow_call_child_ids(self, item_id: int) -> list[int]:
         with self._db.transaction() as cursor:
@@ -840,12 +882,15 @@ class SqliteSessionQueue(SessionQueueBase):
 
         canceled: list[int] = []
         for item_id in item_ids:
-            # _set_queue_item_status no-ops (and returns the existing item) if the item finished
-            # between the SELECT and now, so count only the ones we actually moved to 'canceled'.
-            # It raises if the row vanished entirely (a concurrent clear/delete); such an item
-            # needs no cancellation, so skip it rather than failing the whole bulk operation.
+            # Count only the items THIS call actually moved to 'canceled'. An item that finished
+            # between the SELECT and now — including one canceled by a concurrent bulk request
+            # that selected the same row — is a no-op transition and must not be counted again.
+            # The transition raises if the row vanished entirely (a concurrent clear/delete);
+            # such an item needs no cancellation, so skip it rather than failing the whole bulk
+            # operation.
             try:
-                if self._set_queue_item_status(item_id, "canceled").status == "canceled":
+                _, transitioned = self._transition_queue_item_status(item_id, "canceled")
+                if transitioned:
                     canceled.append(item_id)
             except SessionQueueItemNotFoundError:
                 continue
@@ -1377,6 +1422,48 @@ class SqliteSessionQueue(SessionQueueBase):
         item_ids = [row[0] for row in result]
 
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
+
+    def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
+        if not item_ids:
+            return []
+
+        rows: list[sqlite3.Row] = []
+        with self._db.transaction() as cursor:
+            # Each id becomes one bind parameter, so a single IN (...) would blow past SQLite's
+            # per-statement variable limit for large id lists. Query in chunks instead - callers
+            # are bounded at the API layer, but this keeps any caller from hitting that ceiling.
+            for chunk_start in range(0, len(item_ids), SQLITE_MAX_BIND_PARAMS_PER_CHUNK):
+                chunk = item_ids[chunk_start : chunk_start + SQLITE_MAX_BIND_PARAMS_PER_CHUNK]
+                placeholders = ", ".join("?" for _ in chunk)
+                cursor.execute(
+                    f"""--sql
+                    SELECT
+                        sq.item_id,
+                        sq.created_at,
+                        sq.status,
+                        sq.device,
+                        sq.started_at,
+                        sq.completed_at,
+                        sq.origin,
+                        sq.destination,
+                        sq.batch_id,
+                        sq.user_id,
+                        u.display_name AS user_display_name,
+                        u.email AS user_email,
+                        sq.field_values,
+                        sq.parent_item_id
+                    FROM session_queue sq
+                    LEFT JOIN users u ON sq.user_id = u.user_id
+                    WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
+                    """,
+                    (queue_id, *chunk),
+                )
+                rows.extend(cast(list[sqlite3.Row], cursor.fetchall()))
+
+        summaries_by_id = {
+            row["item_id"]: SessionQueueItemSummary.queue_item_summary_from_dict(dict(row)) for row in rows
+        }
+        return [summaries_by_id[item_id] for item_id in item_ids if item_id in summaries_by_id]
 
     def get_queue_status(
         self,

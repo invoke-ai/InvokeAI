@@ -438,6 +438,15 @@ const zWanReferenceImageConfig = z.object({
 });
 export type WanReferenceImageConfig = z.infer<typeof zWanReferenceImageConfig>;
 
+// MiniMax H3 first-frame conditioning uses the model's own VAE + vision
+// context - no separate adapter model needed. Consumed only in video output
+// mode (the first enabled ref image becomes the video's first frame).
+const zMiniMaxH3ReferenceImageConfig = z.object({
+  type: z.literal('minimax_h3_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type MiniMaxH3ReferenceImageConfig = z.infer<typeof zMiniMaxH3ReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -455,6 +464,7 @@ export const zRefImageState = z.object({
     zFlux2ReferenceImageConfig,
     zQwenImageReferenceImageConfig,
     zWanReferenceImageConfig,
+    zMiniMaxH3ReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -478,6 +488,10 @@ export const isQwenImageReferenceImageConfig = (
 
 export const isWanReferenceImageConfig = (config: RefImageState['config']): config is WanReferenceImageConfig =>
   config.type === 'wan_reference_image';
+
+export const isMiniMaxH3ReferenceImageConfig = (
+  config: RefImageState['config']
+): config is MiniMaxH3ReferenceImageConfig => config.type === 'minimax_h3_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -817,7 +831,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(5),
+  _version: z.literal(8),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -832,11 +846,15 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
-  hiDiffusionEnabled: z.boolean(),
-  hiDiffusionRauNetEnabled: z.boolean(),
-  hiDiffusionWindowAttnEnabled: z.boolean(),
-  hiDiffusionT1Ratio: z.number(),
-  hiDiffusionT2Ratio: z.number(),
+  // Added after the `_version` 3 -> 4 bump, so while 4 was current no migration step could seed them
+  // — a blob already at v4 matched no branch in the chain. Without defaults they are required, and
+  // every persisted blob in existence fails the parse in `migrate()`, wiping the user's whole params
+  // slice on upgrade. The defaults are still what covers the current tier, which has no step either.
+  hiDiffusionEnabled: z.boolean().default(false),
+  hiDiffusionRauNetEnabled: z.boolean().default(true),
+  hiDiffusionWindowAttnEnabled: z.boolean().default(true),
+  hiDiffusionT1Ratio: z.number().default(0.4),
+  hiDiffusionT2Ratio: z.number().default(0.0),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -908,10 +926,16 @@ export const zParamsState = z.object({
   // - 'off':    regular VAE decode
   // - 'fit':    PiD decodes 4x internally, then downscales back to the bbox (compositing-safe; works in canvas/inpaint)
   // - 'native': PiD's full 4x output IS the result; the user-facing dimensions are the target, generation runs at target / 4
-  pidMode: zPidMode,
-  pidDecoderModel: zModelIdentifierField.nullable(), // PiD decoder checkpoint (matched to the main model's base)
-  gemma2EncoderModel: zModelIdentifierField.nullable(), // Gemma-2 caption encoder required by PiD
-  pidSteps: z.number().int().min(1).max(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
+  // These four landed *after* the `_version` 3 -> 4 bump, so for as long as 4 was the current
+  // version no migration step could reach them: a blob already at v4 (dev builds from that window)
+  // matched no branch in the chain. They carry zod defaults for the same reason the ERNIE-Image
+  // fields above do — without one they would be required, and their absence would fail the parse in
+  // `migrate()` and wipe the whole slice. That is the rule for any field added after the last bump,
+  // which is why it still applies now that the v4 -> v5 step also seeds these.
+  pidMode: zPidMode.default('off'),
+  pidDecoderModel: zModelIdentifierField.nullable().default(null), // PiD decoder checkpoint (matched to the main model's base)
+  gemma2EncoderModel: zModelIdentifierField.nullable().default(null), // Gemma-2 caption encoder required by PiD
+  pidSteps: z.number().int().min(1).max(4).default(4), // PiD distill steps: student schedule has only 4 transitions, so 1-4
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
   qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
@@ -925,6 +949,12 @@ export const zParamsState = z.object({
   wanVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Wan VAE checkpoint
   wanT5EncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone UMT5-XXL encoder
   wanGuidanceScaleLowNoise: z.number().nullable(), // Optional: separate CFG for low-noise expert (A14B). null = same as primary
+  // MiniMax H3 joint audio-video generation (fixed 24 fps; frame counts snap to the 17n+5 grid,
+  // so the effective duration ceiling is 345 frames = 14.375 s).
+  minimaxH3DurationSeconds: z.number().int().min(5).max(14),
+  minimaxH3OutputMode: z.enum(['video', 'image']),
+  minimaxH3TransformerModel: zParameterModel.nullable(), // Optional: single-file transformer override (e.g. pruned int8)
+  minimaxH3TextEncoderModel: zParameterModel.nullable(), // Optional: single-file truncated Qwen3-VL encoder override (e.g. int8)
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -955,7 +985,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 5,
+  _version: 8,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -1044,6 +1074,10 @@ export const getInitialParamsState = (): ParamsState => ({
   wanVaeModel: null,
   wanT5EncoderModel: null,
   wanGuidanceScaleLowNoise: null,
+  minimaxH3DurationSeconds: 5,
+  minimaxH3OutputMode: 'video',
+  minimaxH3TransformerModel: null,
+  minimaxH3TextEncoderModel: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

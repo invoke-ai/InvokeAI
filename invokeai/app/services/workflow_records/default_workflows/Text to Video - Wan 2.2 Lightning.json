@@ -28,30 +28,6 @@
       "fieldName": "wan_t5_encoder_model"
     },
     {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "3466ad11-a931-4adc-b394-9ec287f0c23b",
-      "fieldName": "target"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "lora"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "weight"
-    },
-    {
-      "nodeId": "9b4cde65-699f-42c1-8889-76ac91fcb62f",
-      "fieldName": "target"
-    },
-    {
       "nodeId": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
       "fieldName": "prompt"
     },

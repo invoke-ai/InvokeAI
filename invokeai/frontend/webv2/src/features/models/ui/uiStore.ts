@@ -28,8 +28,24 @@ export interface HFLookupState {
 
 export interface ModelsUiSnapshot {
   activeTab: ModelManagerTab;
+  /**
+   * A pending Add Models search, handed over by a surface outside the manager
+   * (see {@link requestAddModelsSearch}). Strictly one-shot: the view takes it
+   * at mount and {@link clearAddModelsSeed} empties it, so the box keeps its own
+   * local state and still resets when the view unmounts. `null` = nothing
+   * pending, which is not the same as a seeded empty string.
+   */
+  addModelsSeed: string | null;
   /** Model focused in the manager library's detail pane. */
   activeModelKey: string | null;
+  /**
+   * Provider whose key card should be revealed on the next render of the Keys
+   * tab, set when the user asked to configure one specific provider. One-shot
+   * like {@link ModelsUiSnapshot.addModelsSeed}: the card consumes it, so
+   * returning to the tab later lands on a quiet grid rather than replaying a
+   * highlight the user did not ask for.
+   */
+  highlightProviderId: string | null;
   selectedKeys: ReadonlySet<string>;
   filters: ModelLibraryFilters;
   /** Last folder-scan query and its results, kept across tab switches. */
@@ -49,8 +65,10 @@ export interface ModelsUiSnapshot {
 const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   activeModelKey: null,
   activeTab: 'add',
+  addModelsSeed: null,
   filters: { ...DEFAULT_LIBRARY_FILTERS },
   hfLookup: null,
+  highlightProviderId: null,
   libraryScrollOffsets: {},
   pickerCompactViews: {},
   queueExpanded: false,
@@ -104,6 +122,22 @@ export const openModelDetail = (modelKey: string): void => {
 };
 
 /**
+ * Open the Keys tab pointed at one provider's card.
+ *
+ * The tab alone is not the answer to "configure this provider" — it is a grid
+ * of cards, and the one the user came for may be off-screen. Naming the
+ * provider lets the card reveal itself.
+ */
+export const openExternalProviderKeys = (providerId: string): void => {
+  updateModelsUi({ activeTab: 'keys', highlightProviderId: providerId });
+};
+
+/** Consumes the pending highlight so it fires once per request. */
+export const clearHighlightedProvider = (): void => {
+  updateModelsUi({ highlightProviderId: null });
+};
+
+/**
  * Jump to Add Models with a starter bundle preselected (e.g. from the
  * Launchpad notice). Scan and HF lookup results are cleared because Add
  * Models hides the bundle strip whenever either has results — the user asked
@@ -111,6 +145,43 @@ export const openModelDetail = (modelKey: string): void => {
  */
 export const openAddModelsWithBundle = (bundleName: string): void => {
   updateModelsUi({ activeTab: 'add', hfLookup: null, scan: null, selectedBundleName: bundleName });
+};
+
+/**
+ * Open Add Models searching for one model. Called just before navigating to the
+ * manager from elsewhere in the app (e.g. a model a workflow needs but the
+ * account does not have), so the page the user lands on is already offering the
+ * thing they clicked — the installed-models list would only confirm its absence.
+ *
+ * Scan and HuggingFace results are cleared for the same reason
+ * {@link openAddModelsWithBundle} clears them: Add Models hides the starter
+ * catalog whenever either has results, and the catalog is what this search is
+ * for.
+ */
+export const requestAddModelsSearch = (query: string): void => {
+  updateModelsUi({
+    activeTab: 'add',
+    addModelsSeed: query,
+    hfLookup: null,
+    scan: null,
+    selectedBundleName: null,
+  });
+};
+
+/** Reads a pending seed without consuming it — safe to call from a `useState` initializer, which StrictMode double-invokes. */
+export const getAddModelsSeed = (): string => store.getSnapshot().addModelsSeed ?? '';
+
+/**
+ * Consumes the pending seed. Silent because the only reader took it in the same
+ * commit and nothing subscribes to it: a notify here would be a store write
+ * whose only effect is re-rendering the view that just read it.
+ */
+export const clearAddModelsSeed = (): void => {
+  const snapshot = store.getSnapshot();
+
+  if (snapshot.addModelsSeed !== null) {
+    store.setSnapshotSilently({ ...snapshot, addModelsSeed: null });
+  }
 };
 
 /** Expand the always-visible install queue footer (e.g. from a "View queue" link). */

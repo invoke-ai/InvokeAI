@@ -199,6 +199,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   external: 'orange',
   anima: 'invokePurple',
   wan: 'cyan',
+  'minimax-h3': 'yellow',
   unknown: 'red',
 };
 
@@ -256,6 +257,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   external: 'External',
   anima: 'Anima',
   wan: 'Wan 2.2',
+  'minimax-h3': 'MiniMax H3',
   unknown: 'Unknown',
 };
 
@@ -280,6 +282,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   external: 'External',
   anima: 'Anima',
   wan: 'Wan',
+  'minimax-h3': 'MiniMax H3',
   unknown: 'Unknown',
 };
 
@@ -302,6 +305,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   gigantic: 'CLIP G',
   generate: 'Qwen Image',
   edit: 'Qwen Image Edit',
+  fl2va: 'MiniMax H3 FL2VA',
   t2v_a14b: 'Wan 2.2 T2V A14B',
   i2v_a14b: 'Wan 2.2 I2V A14B',
   ti2v_5b: 'Wan 2.2 TI2V 5B',
@@ -337,12 +341,21 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   bnb_quantized_int8b: 'BNB Quantized (int8b)',
   bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
   gguf_quantized: 'GGUF Quantized',
+  sdnq_quantized: 'SDNQ Quantized',
   unknown: 'Unknown',
 };
 
 export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
 
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image', 'wan'];
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sdxl',
+  'flux',
+  'flux2',
+  'qwen-image',
+  'wan',
+  'minimax-h3',
+];
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',

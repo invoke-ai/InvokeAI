@@ -7,6 +7,7 @@ import { GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   getWorkbenchPreferences,
@@ -32,6 +33,13 @@ const GenerateCanvasCompositingSection = lazy(() =>
  * Workbench, Models, and Gallery state. No second adapter is expected.
  */
 export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode }) => {
+  // The generate widget needs its model picker as soon as it renders. Left to
+  // Suspense, `ModelSelect` was fetched in a second wave after the boot
+  // widget wave had already finished. `GenerateCanvasCompositingSection` is
+  // canvas-only and stays lazy — warming it would add bytes to every boot.
+  useMountEffect(() => {
+    void import('@features/models/react');
+  });
   const projectState = useActiveProjectSelector((activeProject) => ({
     activeProjectId: activeProject.id,
     generateValues: getProjectWidgetValues(activeProject, 'generate'),

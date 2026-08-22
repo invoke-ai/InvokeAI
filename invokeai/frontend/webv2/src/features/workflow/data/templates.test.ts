@@ -32,6 +32,7 @@ const openApiFixture = {
             type: 'integer',
             ui_component: 'video-frame-index',
             ui_hidden: false,
+            ui_model_format: ['diffusers'],
           },
           id: { field_kind: 'internal', title: 'Id', type: 'string' },
           is_intermediate: { default: false, field_kind: 'internal', type: 'boolean' },
@@ -91,6 +92,62 @@ const openApiFixture = {
         },
         type: 'object',
       },
+      LoRACollectionLoaderInvocation: {
+        class: 'invocation',
+        output: { $ref: '#/components/schemas/IntegerOutput' },
+        properties: {
+          loras: {
+            anyOf: [
+              { $ref: '#/components/schemas/LoRAField' },
+              { items: { $ref: '#/components/schemas/LoRAField' }, type: 'array' },
+              { type: 'null' },
+            ],
+            default: null,
+            field_kind: 'input',
+            input: 'any',
+            orig_required: false,
+            title: 'LoRAs',
+            ui_model_base: ['sd-1', 'sd-2'],
+            ui_model_type: ['lora'],
+          },
+          type: { const: 'lora_collection_loader', default: 'lora_collection_loader', title: 'type' },
+        },
+        title: 'Apply LoRA Collection - SD1.5',
+        type: 'object',
+      },
+      SaveVideoInvocation: {
+        class: 'invocation',
+        output: { $ref: '#/components/schemas/IntegerOutput' },
+        properties: {
+          board: {
+            anyOf: [{ $ref: '#/components/schemas/BoardField' }, { type: 'null' }],
+            field_kind: 'internal',
+            input: 'direct',
+            orig_required: false,
+            title: 'Board',
+          },
+          id: { field_kind: 'node_attribute', title: 'Id', type: 'string' },
+          is_intermediate: { default: false, field_kind: 'node_attribute', type: 'boolean' },
+          latents: {
+            anyOf: [{ $ref: '#/components/schemas/LatentsField' }, { type: 'null' }],
+            field_kind: 'input',
+            input: 'connection',
+            orig_required: true,
+            title: 'Latents',
+          },
+          metadata: {
+            anyOf: [{ $ref: '#/components/schemas/MetadataField' }, { type: 'null' }],
+            field_kind: 'internal',
+            input: 'connection',
+            orig_required: false,
+            title: 'Metadata',
+          },
+          type: { const: 'save_video', default: 'save_video', title: 'type' },
+          use_cache: { default: true, field_kind: 'node_attribute', type: 'boolean' },
+        },
+        title: 'Save Video',
+        type: 'object',
+      },
       LatentsOutput: {
         class: 'output',
         properties: {
@@ -111,7 +168,7 @@ describe('parseOpenApiToTemplates', () => {
   const templates = parseOpenApiToTemplates(openApiFixture);
 
   it('parses invocation schemas into templates, skipping the denylist', () => {
-    expect(Object.keys(templates).sort()).toEqual(['add', 'denoise']);
+    expect(Object.keys(templates).sort()).toEqual(['add', 'denoise', 'lora_collection_loader', 'save_video']);
 
     const add = templates.add;
 
@@ -130,6 +187,9 @@ describe('parseOpenApiToTemplates', () => {
     // Unknown ui_component values collapse to null; known ones pass through.
     expect(add?.inputs.a?.uiComponent).toBeNull();
     expect(add?.inputs.b?.uiComponent).toBe('video-frame-index');
+    // ui_model_format passes through so model pickers can filter by install format.
+    expect(add?.inputs.a?.uiModelFormat).toBeNull();
+    expect(add?.inputs.b?.uiModelFormat).toEqual(['diffusers']);
   });
 
   it('parses ref, nullable-anyOf, single-or-collection, and enum field types', () => {
@@ -145,6 +205,33 @@ describe('parseOpenApiToTemplates', () => {
     });
     expect(denoise?.inputs.scheduler?.type.name).toBe('EnumField');
     expect(denoise?.inputs.scheduler?.options).toEqual(['euler', 'ddim']);
+  });
+
+  it('parses the LoRA collection loader input as an inline-editable model collection', () => {
+    // `LoRAField | list[LoRAField] | None`: the null variant drops out, leaving the union the
+    // widget edits as a list. `default: null` must not become the field's value.
+    const loras = templates.lora_collection_loader?.inputs.loras;
+
+    expect(loras?.type).toEqual({ batch: false, cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' });
+    expect(loras?.input).toBe('any');
+    expect(loras?.default).toBeUndefined();
+    expect(loras?.uiModelBase).toEqual(['sd-1', 'sd-2']);
+    expect(loras?.uiModelType).toEqual(['lora']);
+  });
+
+  it('keeps internal-kind metadata and board inputs, but drops node attributes', () => {
+    // `metadata` and `board` are the only two internal-kind properties in the schema, and
+    // both are real inputs. Without `metadata` a bundled workflow's Core Metadata edge has
+    // no handle to land on and is dropped on re-save; without `board` the seven bundled
+    // workflows that expose it get an error in place of a Linear-tab control.
+    const saveVideo = templates.save_video;
+
+    expect(Object.keys(saveVideo?.inputs ?? {}).sort()).toEqual(['board', 'latents', 'metadata']);
+    expect(saveVideo?.inputs.metadata?.type.name).toBe('MetadataField');
+    expect(saveVideo?.inputs.board?.type.name).toBe('BoardField');
+    expect(saveVideo?.inputs.metadata?.fieldKind).toBe('internal');
+    expect(saveVideo?.inputs.board?.fieldKind).toBe('internal');
+    expect(saveVideo?.inputs.latents?.fieldKind).toBe('input');
   });
 
   it('parses output templates', () => {

@@ -34,7 +34,7 @@ export const StarterList = ({
   isInstallable: boolean;
   loadError: string | null;
   models: StarterModel[];
-  onConfigureExternalProvider: () => void;
+  onConfigureExternalProvider: (providerId: string) => void;
   onInstall: (model: StarterModel) => void;
   pendingSources: ReadonlySet<string>;
   response: StartersSnapshot['response'];
@@ -91,7 +91,7 @@ export const StarterList = ({
               variant="outline"
               onClick={(event) => {
                 event.stopPropagation();
-                onConfigureExternalProvider();
+                onConfigureExternalProvider(externalProviderId);
               }}
             >
               <Icon as={KeyRoundIcon} boxSize="3" />
@@ -121,7 +121,7 @@ export const StarterList = ({
                 >
                   {getModelBaseLabel(model.base)}
                 </Badge>
-                <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="outline">
+                <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
                   {getModelTypeLabel(model.type)}
                 </Badge>
               </>

@@ -13,6 +13,7 @@ import { MissingFileBadge, ModelBaseBadge, ModelFormatBadge } from '@features/mo
 import { getLibraryScrollOffset, openModelManagerTab, saveLibraryScrollOffset } from '@features/models/ui/uiStore';
 import { Button, Row } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ArrowRightIcon, BoxIcon, CircleAlert } from 'lucide-react';
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
@@ -137,7 +138,10 @@ export const ModelLibraryList = ({
     );
   }
 
-  const firstVisibleIndex = virtualizer.virtualItems[0]?.index ?? 0;
+  // The visible range, not `virtualItems[0]`: the virtual window starts
+  // `overscan` rows above the fold, which held the previous group's header
+  // pinned ~450px past its last row.
+  const firstVisibleIndex = virtualizer.range?.startIndex ?? 0;
   const pinnedHeaderIndex = headerIndexes.reduce<number | null>(
     (pinnedIndex, index) => (firstVisibleIndex >= index ? index : pinnedIndex),
     headerIndexes[0] ?? null
@@ -194,7 +198,18 @@ export const ModelLibraryList = ({
       {/* Pinned copy of the current group's header, above the viewport.
           aria-hidden: it duplicates a header already in the list. */}
       {pinnedRow?.kind === 'header' ? (
-        <Box aria-hidden bg="bg" left="0" pointerEvents="none" position="absolute" right="0" top="0" zIndex={1} px="3">
+        <Box
+          aria-hidden
+          bg="bg"
+          data-pinned-group-header=""
+          left="0"
+          pointerEvents="none"
+          position="absolute"
+          right="0"
+          top="0"
+          zIndex={1}
+          px="3"
+        >
           <GroupHeader count={pinnedRow.group.models.length} label={pinnedRow.group.label} />
         </Box>
       ) : null}
@@ -315,9 +330,7 @@ const ModelRow = memo(function ModelRow({
             modelKey={modelKey}
           />
           <Stack flex="1" gap="0.5" minW="0">
-            <Text fontSize="xs" fontWeight="600" truncate>
-              {name}
-            </Text>
+            <MiddleTruncate fontSize="xs" fontWeight="600" text={name} />
             <HStack gap="1" minW="0" wrap="wrap">
               <ModelBaseBadge base={base} />
               <ModelFormatBadge format={format} />

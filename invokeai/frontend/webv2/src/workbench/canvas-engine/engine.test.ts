@@ -13822,6 +13822,37 @@ describe('fitToView: content ∪ bbox', () => {
     expect(engine.viewport.getViewport().getZoom()).toBeCloseTo(0.304, 2);
     engine.lifecycle.dispose();
   });
+
+  it('fits on the first show only, so a re-shown canvas keeps its zoom and pan', () => {
+    const { store } = createReactiveStore(noLayerDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    engine.surface.resize(400, 400, 1);
+
+    engine.viewport.fitToViewOnFirstShow();
+    const fittedZoom = engine.viewport.getViewport().getZoom();
+    engine.viewport.getViewport().zoomAtPoint(2, { x: 200, y: 200 });
+    engine.viewport.getViewport().panBy({ x: 30, y: -20 });
+    const pannedView = engine.viewport.getViewport().getState();
+
+    // A surface attaches again every time the shell re-shows a kept widget.
+    engine.viewport.fitToViewOnFirstShow();
+
+    expect(fittedZoom).not.toBeCloseTo(2, 2);
+    expect(engine.viewport.getViewport().getZoom()).toBeCloseTo(2, 2);
+    expect(engine.viewport.getViewport().getState()).toEqual(pannedView);
+
+    // The explicit control still fits unconditionally.
+    engine.viewport.fitToView();
+
+    expect(engine.viewport.getViewport().getZoom()).toBeCloseTo(fittedZoom, 2);
+    engine.lifecycle.dispose();
+  });
 });
 
 // ---- transform session: param commit (image) + pixel bake (paint) ----------

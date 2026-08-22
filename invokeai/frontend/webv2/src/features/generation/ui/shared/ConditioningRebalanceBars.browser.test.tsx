@@ -4,6 +4,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { ConditioningRebalanceBars } from './ConditioningRebalanceBars';
 
@@ -45,7 +46,7 @@ const renderBars = async (weights: readonly number[] = FLAT_WEIGHTS) => {
     throw new Error('rebalance bars did not render');
   }
 
-  return { bars, rect: track.getBoundingClientRect(), track };
+  return { bars, track };
 };
 
 const interact = async (run: () => void) => {
@@ -56,14 +57,45 @@ const interact = async (run: () => void) => {
 };
 
 /** Pointer coordinates that land on `index`'s column at `weight` on the track. */
-const pointAt = (rect: DOMRect, index: number, weight: number) => ({
-  clientX: rect.left + (index + 0.5) * (rect.width / TAP_COUNT),
-  clientY: rect.top + (1 - weight / SCALE) * rect.height,
-});
+const pointAt = (track: HTMLElement, index: number, weight: number) => {
+  const rect = track.getBoundingClientRect();
+
+  return {
+    clientX: rect.left + (index + 0.5) * (rect.width / TAP_COUNT),
+    clientY: rect.top + (1 - weight / SCALE) * rect.height,
+  };
+};
 
 const lastPreview = (): number[] => (onPreview.mock.calls.at(-1)?.[0] as number[] | null) ?? [];
 
 const lastCommit = (): number[] => (onCommit.mock.calls.at(-1)?.[0] as number[] | undefined) ?? [];
+
+/**
+ * Puts the pointer somewhere harmless and undoes any scroll a previous test
+ * left behind.
+ *
+ * Every tap here is a synthetic PointerEvent at a computed coordinate, but the
+ * *real* cursor keeps whatever position the last test gave it. Left over the
+ * track, it emits its own pointer events at its own location, and the component
+ * dutifully reports that index — an instrumented failure showed the intended
+ * `7` arriving and then a spurious `6` after it, which is what breaks
+ * `toHaveBeenLastCalledWith`. The same run showed the track's `left` at -393
+ * rather than 0, i.e. the document had been scrolled sideways by another test,
+ * which moves which bar the stationary cursor is over.
+ */
+const resetPointerAndScroll = async (): Promise<void> => {
+  const parking = document.createElement('div');
+
+  parking.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;z-index:2147483647';
+  document.body.append(parking);
+
+  await act(async () => {
+    await userEvent.hover(parking);
+  });
+
+  parking.remove();
+  window.scrollTo(0, 0);
+};
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -79,6 +111,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  await resetPointerAndScroll();
 });
 
 describe('ConditioningRebalanceBars', () => {
@@ -109,8 +142,8 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('drags one bar to the pointed-at weight and commits once on release', async () => {
-    const { rect, track } = await renderBars();
-    const target = pointAt(rect, 3, 6);
+    const { track } = await renderBars();
+    const target = pointAt(track, 3, 6);
 
     await interact(() => {
       track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...target }));
@@ -135,14 +168,14 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('paints across every column a sweep passes, including ones it skipped', async () => {
-    const { rect, track } = await renderBars();
+    const { track } = await renderBars();
 
     await interact(() => {
-      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(rect, 0, 0) }));
+      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 0, 0) }));
     });
     // One large move from the first column to the last: the columns in between get
     // no pointer sample of their own and must still be filled in.
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', pointAt(rect, 11, 8))));
+    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', pointAt(track, 11, 8))));
 
     const painted = lastPreview();
 
@@ -157,12 +190,12 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('clamps a drag that leaves the track instead of reporting an impossible weight', async () => {
-    const { rect, track } = await renderBars();
+    const { track } = await renderBars();
     // Stay in column 5's x band throughout, so this measures vertical clamping only.
-    const { clientX } = pointAt(rect, 5, 4);
+    const { clientX } = pointAt(track, 5, 4);
 
     await interact(() => {
-      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(rect, 5, 4) }));
+      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 5, 4) }));
     });
 
     await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX, clientY: -9000 })));
@@ -218,11 +251,15 @@ describe('ConditioningRebalanceBars', () => {
   });
 
   it('reports the tap under the pointer so the parent can read it out', async () => {
-    const { rect, track } = await renderBars();
+    const { track } = await renderBars();
+    const rect = track.getBoundingClientRect();
+    const settledRect = new DOMRect(rect.left, rect.top, rect.width * 1.5, rect.height);
+    const rectSpy = vi.spyOn(track, 'getBoundingClientRect').mockReturnValue(settledRect);
 
     await interact(() => {
-      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(rect, 7, 3) }));
+      track.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, ...pointAt(track, 7, 3) }));
     });
+    rectSpy.mockRestore();
 
     expect(onActiveIndexChange).toHaveBeenLastCalledWith(7);
   });

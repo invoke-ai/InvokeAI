@@ -141,7 +141,7 @@ const SettingsDialogContent = ({ onClose }: { onClose: () => void }) => {
             <Flex alignItems="start" gap="2">
               <Icon as={SettingsIcon} boxSize="5" />
               <Stack gap="1">
-                <Dialog.Title fontSize="md" fontWeight="700" mt="0.5" lineHeight={1}>
+                <Dialog.Title lineHeight={1} mt="0.5">
                   {t('settings.title')}
                 </Dialog.Title>
                 <Text color="fg.subtle" fontSize="xs">
@@ -382,6 +382,7 @@ const BehaviorSection = () => {
     confirmImageDeletion,
     enableInformationalPopovers,
     enableModelDescriptions,
+    notifyOnEnqueue,
     preferNumericAttentionStyle,
     showPromptSyntaxHighlighting,
   } = useWorkbenchPreferences();
@@ -396,6 +397,9 @@ const BehaviorSection = () => {
   }, []);
   const updateEnableModelDescriptions = useCallback((checked: boolean) => {
     updatePreferences({ enableModelDescriptions: checked });
+  }, []);
+  const updateNotifyOnEnqueue = useCallback((checked: boolean) => {
+    updatePreferences({ notifyOnEnqueue: checked });
   }, []);
   const updatePreferNumericAttentionStyle = useCallback((checked: boolean) => {
     updatePreferences({ preferNumericAttentionStyle: checked });
@@ -429,6 +433,12 @@ const BehaviorSection = () => {
         description="Include model descriptions in model dropdowns where available."
         label="Enable model descriptions in dropdowns"
         onChange={updateEnableModelDescriptions}
+      />
+      <SettingToggle
+        checked={notifyOnEnqueue}
+        description="Show a toast for every successful enqueue. Off, enqueues are still recorded in the notification center."
+        label="Notify when queued"
+        onChange={updateNotifyOnEnqueue}
       />
       <SettingToggle
         checked={preferNumericAttentionStyle}
@@ -577,7 +587,7 @@ const QueueSection = () => {
         />
       </SettingsSection>
       <SettingsSection
-        description="GPUs used for generation. With more than one selected, InvokeAI runs a session on each at the same time. This is a server-wide setting."
+        description="Accelerators used for generation. With more than one selected, InvokeAI runs a session on each at the same time. This is a server-wide setting."
         title="Generation Devices"
       >
         <GenerationDevicesSettings />

@@ -11,15 +11,18 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { clampPanelSize, getPanelSizeBounds, shouldSnapPanelShut } from '@workbench/workbenchState';
 import { SettingsIcon } from 'lucide-react';
 import {
   useCallback,
   useMemo,
+  useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -32,26 +35,15 @@ import { WidgetIdentityIcon } from './WidgetIdentityIcon';
 import { WidgetSourceLockBadge } from './WidgetSourceLockBadge';
 
 const PANEL_SIZE_STEP_PX = 16;
-const MIN_PANEL_SIZE_PX = 180;
-const MAX_PANEL_SIZE_PX = 520;
-const MIN_BOTTOM_PANEL_SIZE_PX = 96;
-const MAX_BOTTOM_PANEL_SIZE_PX = 420;
+
+/** `sizePx` is the floored tracked size; `isSnappedShut` survives the flooring. */
+interface PanelResizeDrag {
+  isSnappedShut: boolean;
+  sizePx: number;
+}
+
 const RESIZE_HANDLE_HOVER_PROPS = { bg: 'accent.solid', opacity: 0.45 };
 const RESIZE_HANDLE_FOCUS_PROPS = { bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' };
-
-const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: number } => {
-  if (region === 'bottom') {
-    return { max: MAX_BOTTOM_PANEL_SIZE_PX, min: MIN_BOTTOM_PANEL_SIZE_PX };
-  }
-
-  return { max: MAX_PANEL_SIZE_PX, min: MIN_PANEL_SIZE_PX };
-};
-
-const clampSize = (region: WidgetRegion, sizePx: number): number => {
-  const { max, min } = getPanelSizeBounds(region);
-
-  return Math.min(max, Math.max(min, sizePx));
-};
 
 export const WidgetPanelFrame = ({
   children,
@@ -67,16 +59,27 @@ export const WidgetPanelFrame = ({
   const { t } = useTranslation();
   const regionState = useActiveProjectSelector((project) => project.widgetRegions[region]);
   const { layout } = useWorkbenchCommands();
-  const [dragSizePx, setDragSizePx] = useState<number | null>(null);
+  const [drag, setDrag] = useState<PanelResizeDrag | null>(null);
+  // A frame unmounting mid-gesture would otherwise leave window listeners
+  // behind and commit a size to a region no longer on screen.
+  const pointerSessionRef = useRef<AbortController | null>(null);
+
+  useMountEffect(() => () => pointerSessionRef.current?.abort());
   const isLeft = region === 'left';
   const isBottom = region === 'bottom';
-  const displaySizePx = dragSizePx ?? regionState.sizePx;
+  // Clamped at render, not just on commit, so a persisted size from before a
+  // bounds change heals on screen immediately instead of on the next resize.
+  const displaySizePx = clampPanelSize(region, drag?.sizePx ?? regionState.sizePx);
+  // Mid-drag past the threshold the panel snaps shut on screen, dockview-style;
+  // the store's collapse is only committed on release.
+  const isSnappedShut = drag?.isSnappedShut ?? false;
+  const renderSizePx = isSnappedShut ? 0 : displaySizePx;
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
 
   const commitSize = useCallback(
     (sizePx: number) => {
-      const nextSizePx = clampSize(region, sizePx);
+      const nextSizePx = clampPanelSize(region, sizePx);
 
       if (nextSizePx !== regionState.sizePx) {
         layout.setRegionSize(region, nextSizePx);
@@ -92,35 +95,72 @@ export const WidgetPanelFrame = ({
       const startX = event.clientX;
       const startY = event.clientY;
       const startSizePx = regionState.sizePx;
-      let nextSizePx = startSizePx;
       const direction = isLeft ? 1 : -1;
       const pointerSession = new AbortController();
 
+      pointerSessionRef.current = pointerSession;
+
+      let nextDrag: PanelResizeDrag = { isSnappedShut: false, sizePx: clampPanelSize(region, startSizePx) };
+
+      // Keeps the gesture alive when the pointer leaves the window, which is
+      // where it goes when dragging the bottom strip shut. Throws if the
+      // pointer is already gone; the window listeners still carry the drag.
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } catch {
+        // No capture available — fall through to the window listeners.
+      }
+
       const handlePointerMove = (moveEvent: PointerEvent) => {
         const deltaPx = isBottom ? startY - moveEvent.clientY : (moveEvent.clientX - startX) * direction;
+        const rawSizePx = startSizePx + deltaPx;
 
-        nextSizePx = clampSize(region, startSizePx + deltaPx);
-        setDragSizePx(nextSizePx);
+        nextDrag = {
+          isSnappedShut: shouldSnapPanelShut(region, rawSizePx, nextDrag.isSnappedShut),
+          sizePx: clampPanelSize(region, rawSizePx),
+        };
+        setDrag(nextDrag);
       };
 
       const handlePointerUp = () => {
         pointerSession.abort();
-        setDragSizePx(null);
-        commitSize(nextSizePx);
+        setDrag(null);
+
+        if (nextDrag.isSnappedShut) {
+          // Visibility change, not a resize — `sizePx` keeps the width the user
+          // chose so the rail button reopens the panel where they left it.
+          layout.setRegionCollapsed(region, true);
+
+          return;
+        }
+
+        commitSize(nextDrag.sizePx);
+      };
+
+      // An interruption, not an instruction: keeps the size, never collapses.
+      const handlePointerCancel = () => {
+        pointerSession.abort();
+        setDrag(null);
+        commitSize(nextDrag.sizePx);
       };
 
       window.addEventListener('pointermove', handlePointerMove, { signal: pointerSession.signal });
       window.addEventListener('pointerup', handlePointerUp, { signal: pointerSession.signal });
-      window.addEventListener('pointercancel', handlePointerUp, { signal: pointerSession.signal });
+      window.addEventListener('pointercancel', handlePointerCancel, { signal: pointerSession.signal });
     },
-    [commitSize, isBottom, isLeft, region, regionState.sizePx]
+    [commitSize, isBottom, isLeft, layout, region, regionState.sizePx]
   );
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const step = event.shiftKey ? PANEL_SIZE_STEP_PX * 2 : PANEL_SIZE_STEP_PX;
       const sizeChanges: Partial<Record<string, number>> = isBottom
-        ? { ArrowDown: -step, ArrowUp: step, End: maxPanelSizePx - displaySizePx, Home: minPanelSizePx - displaySizePx }
+        ? {
+            ArrowDown: -step,
+            ArrowUp: step,
+            End: maxPanelSizePx - displaySizePx,
+            Home: minPanelSizePx - displaySizePx,
+          }
         : {
             ArrowLeft: isLeft ? -step : step,
             ArrowRight: isLeft ? step : -step,
@@ -134,20 +174,32 @@ export const WidgetPanelFrame = ({
       }
 
       event.preventDefault();
+
+      // Keyboard parity with the drag: a further collapse-ward step at the
+      // floor collapses, instead of silently clamping forever.
+      if (sizeChange < 0 && displaySizePx <= minPanelSizePx) {
+        layout.setRegionCollapsed(region, true);
+
+        return;
+      }
+
       commitSize(displaySizePx + sizeChange);
     },
-    [commitSize, displaySizePx, isBottom, isLeft, maxPanelSizePx, minPanelSizePx]
+    [commitSize, displaySizePx, isBottom, isLeft, layout, maxPanelSizePx, minPanelSizePx, region]
   );
   const panelSizeProps = useMemo(
-    () => (isBottom ? { h: `${displaySizePx}px`, w: 'full' } : { h: 'full', w: `${displaySizePx}px` }),
-    [displaySizePx, isBottom]
+    () => (isBottom ? { h: `${renderSizePx}px`, w: 'full' } : { h: 'full', w: `${renderSizePx}px` }),
+    [renderSizePx, isBottom]
   );
+  // Inside the panel's box, never straddling its edge: the frame clips its
+  // overflow, so a handle hung outside loses that half and leaves a ~4px
+  // target sitting behind the border people actually aim at.
   const resizeOrientationProps = useMemo(
-    () => (isBottom ? { h: '2', left: '0', right: '0', top: '-1' } : { bottom: '0', top: '0', w: '2' }),
+    () => (isBottom ? { h: '2', left: '0', right: '0', top: '0' } : { bottom: '0', top: '0', w: '2' }),
     [isBottom]
   );
   const resizeSideProps = useMemo(
-    () => (!isBottom ? (isLeft ? { right: '-1' } : { left: '-1' }) : {}),
+    () => (!isBottom ? (isLeft ? { right: '0' } : { left: '0' }) : {}),
     [isBottom, isLeft]
   );
 
@@ -157,9 +209,9 @@ export const WidgetPanelFrame = ({
       as="aside"
       bg="bg.subtle"
       borderColor="border.subtle"
-      borderRightWidth={isLeft ? '1px' : '0'}
-      borderLeftWidth={!isLeft && !isBottom ? '1px' : '0'}
-      borderTopWidth={isBottom ? '1px' : '0'}
+      borderRightWidth={isLeft && !isSnappedShut ? '1px' : '0'}
+      borderLeftWidth={!isLeft && !isBottom && !isSnappedShut ? '1px' : '0'}
+      borderTopWidth={isBottom && !isSnappedShut ? '1px' : '0'}
       direction="column"
       flexShrink={0}
       overflow="hidden"
@@ -179,10 +231,11 @@ export const WidgetPanelFrame = ({
         aria-valuenow={displaySizePx}
         as="div"
         cursor={isBottom ? 'ns-resize' : 'ew-resize'}
-        opacity="0"
         position="absolute"
         role="separator"
         tabIndex={0}
+        data-collapse-armed={isSnappedShut ? '' : undefined}
+        opacity="0"
         transition="opacity var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
         zIndex="1"
         {...resizeOrientationProps}

@@ -12,15 +12,16 @@ import {
 import { refreshInstalls } from '@features/models/data/installsStore';
 import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
 import { KeyCardShell } from '@features/models/ui/credentials/KeyCardShell';
+import { clearHighlightedProvider, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui';
+import { AlibabaCloudIcon, ByteDanceIcon, GoogleGeminiIcon } from '@platform/ui/BrandIcon';
 import { BotIcon, HexagonIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiAlibabacloud, SiBytedance, SiGooglegemini } from 'react-icons/si';
 
 interface ProviderPresentation {
   icon: ElementType;
@@ -31,16 +32,17 @@ interface ProviderPresentation {
 }
 
 const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
-  alibabacloud: { icon: SiAlibabacloud, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
-  gemini: { icon: SiGooglegemini, placeholder: 'AIza…', title: 'Google Gemini' },
+  alibabacloud: { icon: AlibabaCloudIcon, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
+  gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
   openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
-  seedream: { icon: SiBytedance, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
+  seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
 };
 
 /** One key card per provider the backend reports, from the shared store. */
 export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, message: string) => void }) => {
   const { t } = useTranslation();
   const configs = useExternalProvidersSelector((snapshot) => snapshot.configs);
+  const highlightProviderId = useModelsUiSelector((snapshot) => snapshot.highlightProviderId);
   const loadError = useExternalProvidersSelector((snapshot) => snapshot.error);
   const status = useExternalProvidersSelector((snapshot) => snapshot.status);
 
@@ -87,6 +89,7 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
             key={config.provider_id}
             description={t('models.externalProviderKeyDescription')}
             icon={presentation.icon}
+            isHighlighted={config.provider_id === highlightProviderId}
             placeholder={placeholder}
             title={presentation.title}
             onError={(message) => onError(presentation.title, message)}
@@ -101,6 +104,7 @@ const ExternalProviderKeyCard = ({
   config,
   description,
   icon,
+  isHighlighted,
   onError,
   placeholder,
   title,
@@ -108,11 +112,33 @@ const ExternalProviderKeyCard = ({
   config: ExternalProviderConfig;
   description: string;
   icon: ElementType;
+  isHighlighted: boolean;
   onError: (message: string) => void;
   placeholder: string;
   title: string;
 }) => {
   const { t } = useTranslation();
+  // The request is consumed once; the outline it produces is local so it
+  // survives that clearing and stays up while the user works in the card.
+  // Its lifetime is the tab's — `DetailPane` renders the Keys body only while
+  // the tab is active, so leaving and returning lands on a quiet grid without
+  // anyone having to schedule the fade.
+  const [isRevealed, setIsRevealed] = useState(false);
+  // A callback ref rather than an effect: the provider list loads async, so
+  // the card can mount well after the request, and this fires exactly when the
+  // node to scroll finally exists.
+  const revealRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || !isHighlighted) {
+        return;
+      }
+
+      node.scrollIntoView({ block: 'nearest' });
+      setIsRevealed(true);
+      clearHighlightedProvider();
+    },
+    [isHighlighted]
+  );
   const [apiKeyDraft, setApiKeyDraft] = useState('');
   const [baseUrlDraft, setBaseUrlDraft] = useState(config.base_url ?? '');
   const [overrideBaseUrl, setOverrideBaseUrl] = useState(config.base_url !== null);
@@ -177,8 +203,10 @@ const ExternalProviderKeyCard = ({
 
   return (
     <KeyCardShell
+      ref={revealRef}
       description={description}
       icon={icon}
+      isHighlighted={isRevealed}
       status={{
         label: config.api_key_configured ? t('models.keyStatus.configured') : t('models.keyStatus.unknown'),
         palette: config.api_key_configured ? 'green' : 'gray',

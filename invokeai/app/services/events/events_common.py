@@ -32,21 +32,29 @@ class EventBase(BaseModel):
     All other attributes should be defined as normal for a pydantic model.
 
     A timestamp is automatically added to the event when it is created.
+
+    Events that are dispatched only within the server and never reach clients should set
+    `__server_internal__ = True` to keep themselves out of the generated API schema.
     """
 
     __event_name__: ClassVar[str]
+    __server_internal__: ClassVar[bool] = False
     timestamp: int = Field(description="The timestamp of the event", default_factory=get_timestamp)
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     @classmethod
     def get_events(cls) -> set[type["EventBase"]]:
-        """Get a set of all event models."""
+        """Get a set of all client-facing event models.
+
+        Consumed by the OpenAPI generator, so server-internal events are excluded — they
+        are not part of the client API surface.
+        """
 
         event_subclasses: set[type["EventBase"]] = set()
         for subclass in cls.__subclasses__():
             # We only want to include subclasses that are event models, not intermediary classes
-            if hasattr(subclass, "__event_name__"):
+            if hasattr(subclass, "__event_name__") and not subclass.__server_internal__:
                 event_subclasses.add(subclass)
             event_subclasses.update(subclass.get_events())
 
@@ -140,7 +148,7 @@ class InvocationProgressEvent(InvocationEventBase):
     )
     device: str | None = Field(
         default=None,
-        description="The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+        description="The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)",
     )
 
     @classmethod
@@ -156,14 +164,18 @@ class InvocationProgressEvent(InvocationEventBase):
         # thread-local session device is temporarily re-pinned to a borrowed idle GPU during
         # offloaded encoder nodes, and using it here would make the UI's device badge jump to the
         # borrowed GPU and back within a single queue item.
-        device: str | None = queue_item.device if queue_item.device and queue_item.device.startswith("cuda") else None
+        device: str | None = (
+            queue_item.device if queue_item.device and queue_item.device.startswith(("cuda", "xpu")) else None
+        )
         if device is None:
             # Legacy single-device mode tags queue items with device=None; fall back to the worker
             # thread's pinned device (set via TorchDevice.set_session_device()).
             from invokeai.backend.util.devices import TorchDevice
 
             session_device = TorchDevice.get_session_device()
-            device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
+            device = (
+                str(session_device) if session_device is not None and session_device.type in ("cuda", "xpu") else None
+            )
 
         return cls(
             queue_id=queue_item.queue_id,
@@ -915,3 +927,45 @@ class ImageIndexUpdatedEvent(ImageIndexEventBase):
     @classmethod
     def build(cls, user_id: str) -> "ImageIndexUpdatedEvent":
         return cls(user_id=user_id)
+
+
+@payload_schema.register
+class ImageMapProjectionReadyEvent(ImageIndexEventBase):
+    """Event model for image_map_projection_ready"""
+
+    __event_name__ = "image_map_projection_ready"
+
+    user_id: str = Field(description="The user whose image map projection was recomputed")
+    point_count: int = Field(description="Number of points in the recomputed projection")
+
+    @classmethod
+    def build(cls, user_id: str, point_count: int) -> "ImageMapProjectionReadyEvent":
+        return cls(user_id=user_id, point_count=point_count)
+
+
+class UserAccessChangedEvent(EventBase):
+    """Event model for user_access_changed.
+
+    Emitted when a user's authorization state changes (role change, deactivation,
+    or deletion) so that live connections — e.g. open sockets — can be re-authorized
+    immediately instead of trusting connect-time claims until reconnect.
+
+    This event is server-internal: it is deliberately NOT registered with
+    `payload_schema`, is excluded from the generated API schema, and is never
+    emitted to clients.
+    """
+
+    __event_name__ = "user_access_changed"
+    __server_internal__ = True
+
+    user_id: str = Field(description="The ID of the affected user")
+    is_admin: bool = Field(description="Whether the user currently has admin privileges")
+    is_active: bool = Field(description="Whether the user account is currently active (False for deleted users)")
+    token_epoch: int = Field(
+        default=0,
+        description="The user's current token revocation epoch; sockets that authenticated under an older one are dropped",
+    )
+
+    @classmethod
+    def build(cls, user_id: str, is_admin: bool, is_active: bool, token_epoch: int = 0) -> "UserAccessChangedEvent":
+        return cls(user_id=user_id, is_admin=is_admin, is_active=is_active, token_epoch=token_epoch)

@@ -1,4 +1,5 @@
 import type { LaunchpadIntentId } from '@workbench/launchpad/intents';
+import type { BuiltInLayoutPresetId } from '@workbench/layoutContracts';
 import type { AccountState, WorkbenchState } from '@workbench/projectContracts';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
@@ -18,12 +19,15 @@ export const SESSION_STATE_KEY = 'webv2:workbench-account';
 /**
  * Search params understood by the /app route: `project` deep-links a library
  * project into the session; `new` opens the editor with a fresh draft, and
- * `intent` says how that draft should be arranged (see `launchpad/intents`).
+ * `intent` or `preset` says how that draft should be arranged (see
+ * `launchpad/intents`). `preset` names the arrangement outright and wins over
+ * the one an intent implies.
  */
 export interface WorkbenchSearch {
   new?: true;
   project?: string;
   intent?: LaunchpadIntentId;
+  preset?: BuiltInLayoutPresetId;
 }
 
 export interface WorkbenchSessionBlob {

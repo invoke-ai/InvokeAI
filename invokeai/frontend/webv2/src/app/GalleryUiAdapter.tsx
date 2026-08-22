@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 
 import { GalleryUiProvider } from '@features/gallery/react';
 import { useActiveProgressTarget } from '@features/queue/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
@@ -38,6 +39,13 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
   const liveProgressTarget = useActiveProgressTarget();
   const { account, gallery, notifications, widgets } = useWorkbenchCommands();
   const exportProject = useExportLibraryProject();
+  // These are `lazy()` children of an adapter that only ever mounts in the
+  // editor, and the gallery widget needs them as soon as it renders a row.
+  // Left to Suspense they were fetched at ~476ms — a full round trip after the
+  // boot widget wave had already finished.
+  useMountEffect(() => {
+    void import('./GalleryImageActionsBridge');
+  });
   const adapter = useMemo<GalleryUiAdapter>(
     () => ({
       account: {

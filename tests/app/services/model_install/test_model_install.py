@@ -9,6 +9,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, Dict
 
 import pytest
@@ -322,6 +323,56 @@ def test_simple_download(mm2_installer: ModelInstallServiceBase, mm2_app_config:
     assert isinstance(bus.events[2], ModelInstallDownloadsCompleteEvent)  # download completed
     assert isinstance(bus.events[3], ModelInstallStartedEvent)  # install started
     assert isinstance(bus.events[4], ModelInstallCompleteEvent)  # install completed
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_wait_for_installs_waits_for_download_completion_to_enqueue_install(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Do not report all installs done between download-cache removal and install enqueue."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    job = ModelInstallJob(
+        id=123,
+        source=URLModelSource(url=Url("https://www.test.foo/download/test_embedding.safetensors")),
+        local_path=tmp_path,
+    )
+    with mm2_installer._lock:
+        mm2_installer._download_cache[job.id] = job
+    monkeypatch.setattr(mm2_installer, "_signal_job_downloads_done", lambda install_job: None)
+    assert mm2_installer._wait_for_restore_complete(timeout=2)
+
+    wait_finished = threading.Event()
+
+    def wait_for_installs() -> None:
+        mm2_installer.wait_for_installs(timeout=2)
+        wait_finished.set()
+
+    wait_thread = threading.Thread(target=wait_for_installs)
+    wait_thread.start()
+
+    enqueue_started = threading.Event()
+    release_enqueue = threading.Event()
+
+    def blocked_enqueue(install_job: ModelInstallJob) -> None:
+        assert install_job is job
+        enqueue_started.set()
+        assert release_enqueue.wait(timeout=2)
+
+    monkeypatch.setattr(mm2_installer, "_put_in_queue", blocked_enqueue)
+    callback_thread = threading.Thread(
+        target=mm2_installer._download_complete_callback,
+        args=(SimpleNamespace(id=job.id),),
+    )
+    callback_thread.start()
+    assert enqueue_started.wait(timeout=2)
+    assert not wait_finished.wait(timeout=0.5)
+
+    release_enqueue.set()
+    callback_thread.join(timeout=2)
+    wait_thread.join(timeout=2)
+    assert not callback_thread.is_alive()
+    assert not wait_thread.is_alive()
+    assert wait_finished.is_set()
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
@@ -1027,3 +1078,33 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_multifile_download_layout_with_explicit_files(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+    """Explicit file entries in a multi-subfolder source keep their repo-relative paths: the root
+    pipeline index lands at the model root and transformer/config.json stays inside transformer/
+    (naive relative_to() matching would flatten it to the root), while plain subfolder entries keep
+    the pre-existing one-directory-per-subfolder layout."""
+    from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
+
+    remote_files = [
+        RemoteModelFile(url="https://example.com/root_index", path=Path("MiniMax-H3/modular_model_index.json")),
+        RemoteModelFile(url="https://example.com/transformer_config", path=Path("MiniMax-H3/transformer/config.json")),
+        RemoteModelFile(url="https://example.com/vae_config", path=Path("MiniMax-H3/vae/config.json")),
+        RemoteModelFile(
+            url="https://example.com/vae_weights", path=Path("MiniMax-H3/vae/diffusion_pytorch_model.safetensors")
+        ),
+    ]
+    job = mm2_installer._multifile_download(  # pyright: ignore[reportAttributeAccessIssue]
+        remote_files=remote_files,
+        dest=tmp_path,
+        subfolders=[Path("modular_model_index.json"), Path("transformer/config.json"), Path("vae")],
+        submit_job=False,
+    )
+    top = Path("MiniMax-H3_modular_model_index_config_vae")
+    assert {part.dest.relative_to(tmp_path.resolve()) for part in job.download_parts} == {
+        top / "modular_model_index.json",
+        top / "transformer" / "config.json",
+        top / "vae" / "config.json",
+        top / "vae" / "diffusion_pytorch_model.safetensors",
+    }

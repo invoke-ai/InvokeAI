@@ -25,6 +25,8 @@ export type {
   QueueSourceId,
   QueueStatusReadModel,
   QueueSubmissionPresentation,
+  QueueWorkflowRunCompletedEvent,
+  QueueWorkflowRunSink,
   TerminalQueueItemStatus,
 } from './core/types';
 export {
@@ -43,6 +45,14 @@ export {
   type QueueProgressBarState,
   type QueueSummary,
 } from './core/historySummary';
+export {
+  getDeterminateProgressFraction,
+  getDeterminateProgressPercent,
+  getProgressRailModel,
+  getProgressRailSegmentValue,
+  selectProjectProgressItemIds,
+  type ProgressRailModel,
+} from './core/progressRail';
 export {
   BACKEND_SUBMITTABLE_SOURCE_IDS,
   isBackendSubmittableSourceId,

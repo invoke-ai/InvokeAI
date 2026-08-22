@@ -1,3 +1,4 @@
+import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type {
   PlacedWidgetRegionItem,
   WidgetPlacementInstanceMeta,
@@ -5,20 +6,18 @@ import type {
 } from '@workbench/widgetRegionViewModel';
 
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { useModelLoads } from '@features/models';
-import { getProjectQueueIndicatorState, type QueueProgressBarState } from '@features/queue/contracts';
-import { useQueueItemProgress } from '@features/queue/react';
 import { IconButton, MenuContent } from '@platform/ui';
-import { QueueTabBackgroundProgress } from '@workbench/components/QueueProgressIndicator';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
   WidgetChromeSlotById,
+  WidgetIdentityIcon,
   WidgetRendererById,
   WidgetSourceLockBadge,
   useWidgetIntentPreloadProps,
   type WidgetEnableMenuItem,
 } from '@workbench/widget-frame';
+import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
@@ -28,10 +27,17 @@ import {
   isRequiredCenterView,
 } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Suspense, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { Activity, Suspense, use, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import {
+  areInstanceIdListsEqual,
+  getActiveInstanceIdsOutside,
+  useMountedInstanceIds,
+  withoutInstancesShownElsewhere,
+} from './useMountedInstanceIds';
 
 type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
 
@@ -44,10 +50,6 @@ export const CenterArea = () => {
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
-  const invocation = useActiveProjectSelector((project) => project.invocation);
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const backendConnectionStatus = useWorkbenchSelector((snapshot) => snapshot.backendConnection.status);
-  const modelLoads = useModelLoads();
   const { widgets } = useWorkbenchCommands();
   const getWidgetLabel = useCallback(
     (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
@@ -83,6 +85,16 @@ export const CenterArea = () => {
     ? centerRegion.activeInstanceId
     : centerViewItems[0]?.id;
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
+  const projectId = useActiveProjectId();
+  const activeIdsElsewhere = useActiveProjectSelector(
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center', project.floatingWidgets),
+    areInstanceIdListsEqual
+  );
+  const mountedCenterIds = withoutInstancesShownElsewhere(
+    useMountedInstanceIds(activeCenterViewId, projectId),
+    activeCenterViewId,
+    activeIdsElsewhere
+  );
   const focusRegionProps = useFocusRegionProps('center');
 
   const openCenterWidget = useCallback(
@@ -131,23 +143,6 @@ export const CenterArea = () => {
     [centerWidgetMenuItems]
   );
 
-  const baseIndicatorState = getProjectQueueIndicatorState({
-    isConnected: backendConnectionStatus === 'connected',
-    loadingModelsCount: modelLoads.length,
-    progress: null,
-    queueItems,
-  });
-
-  const progress = useQueueItemProgress(baseIndicatorState.runningQueueItemId ?? '');
-
-  const indicatorState = getProjectQueueIndicatorState({
-    isConnected: backendConnectionStatus === 'connected',
-    loadingModelsCount: modelLoads.length,
-    progress,
-    queueItems,
-  });
-  const showProgress = indicatorState.hasOpenQueueWork && activeItem?.typeId === invocation.sourceId;
-
   return (
     <Flex
       as="section"
@@ -161,7 +156,15 @@ export const CenterArea = () => {
     >
       <Box flex="1" minH="0" position="relative">
         <Box aria-label={t('widgets.centerRegion')} h="full" role="region">
-          {activeItem ? <CenterViewSlot item={activeItem} /> : <FallbackCenterView label="Center widget unavailable" />}
+          {activeCenterViewId !== undefined && mountedCenterIds.length > 0 ? (
+            mountedCenterIds.map((instanceId) => (
+              <Activity key={instanceId} mode={instanceId === activeCenterViewId ? 'visible' : 'hidden'}>
+                <KeptCenterViewSlot instanceId={instanceId} />
+              </Activity>
+            ))
+          ) : (
+            <FallbackCenterView label="Center widget unavailable" />
+          )}
         </Box>
 
         <Flex
@@ -182,8 +185,6 @@ export const CenterArea = () => {
               availableItems={availableCenterItems}
               isCloseDisabled={isActiveViewRequired}
               items={centerViewItems}
-              progressState={indicatorState.progressState}
-              showProgress={showProgress}
               onClose={closeActiveCenterView}
               onOpen={openCenterWidget}
               onSelect={selectCenterView}
@@ -199,7 +200,7 @@ export const CenterArea = () => {
           </ChromeIsland>
 
           {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
-            <ChromeIsland>
+            <ChromeIsland flexShrink={0}>
               {centerToolbarItems.map((toolbarItem) => (
                 <WidgetRendererById
                   key={toolbarItem.id}
@@ -220,11 +221,12 @@ export const CenterArea = () => {
   );
 };
 
-const ChromeIsland = ({ children }: { children: ReactNode }) => (
+const ChromeIsland = ({ children, flexShrink = 1 }: { children: ReactNode; flexShrink?: 0 | 1 }) => (
   <HStack
     bg="bg.subtle"
     borderColor="border.subtle"
     borderWidth="1px"
+    flexShrink={flexShrink}
     gap="0.5"
     h="8"
     minW="0"
@@ -246,8 +248,6 @@ const CenterViewMenu = ({
   onClose,
   onOpen,
   onSelect,
-  progressState,
-  showProgress,
 }: {
   activeItem?: CenterWidgetItem;
   availableItems: WidgetEnableMenuItem[];
@@ -256,8 +256,6 @@ const CenterViewMenu = ({
   onClose: () => void;
   onOpen: (item: WidgetEnableMenuItem) => void;
   onSelect: (instanceId: string) => void;
-  progressState: QueueProgressBarState;
-  showProgress: boolean;
 }) => {
   const { t } = useTranslation();
   const label = activeItem?.label ?? t('widgets.centerViewEmpty');
@@ -286,9 +284,8 @@ const CenterViewMenu = ({
           size="2xs"
           variant="ghost"
         >
-          {showProgress ? <QueueTabBackgroundProgress state={progressState} zIndex="-1" /> : null}
           <HStack gap="2" minW="0" position="relative" zIndex="1">
-            {activeItem ? <WidgetIcon icon={activeItem.widget.manifest.icon} boxSize="3.5" /> : null}
+            {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
             <Text fontSize="xs" fontWeight="700" truncate>
               {label}
             </Text>
@@ -345,6 +342,36 @@ const CenterViewMenu = ({
   );
 };
 
+/**
+ * The active center view's icon, showing a spinner while its implementation
+ * chunk is still downloading.
+ *
+ * Panel widgets get this from their frame header; the center has no header —
+ * `CenterArea` owns its chrome — so the identity slot in this trigger was the
+ * one place a cold widget looked fully loaded while it was not. Suspense is
+ * the mechanism because `DeferredResource` exposes a status but nothing to
+ * subscribe to; the same `use()`/fallback pair already drives the chrome slots
+ * in `WidgetRenderer`.
+ */
+const CenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  const fallback = useMemo(
+    () => <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} isLoading />,
+    [widget.manifest.icon]
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <LoadedCenterViewIcon widget={widget} />
+    </Suspense>
+  );
+};
+
+const LoadedCenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  use(widget.implementation.load());
+
+  return <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} />;
+};
+
 const CenterViewMenuRow = ({
   isActive,
   item,
@@ -378,14 +405,25 @@ const CenterViewMenuRow = ({
   );
 };
 
-const CenterViewSlot = ({ item }: { item: CenterWidgetItem }) => {
-  if (item.widget.status !== 'enabled') {
+/**
+ * One kept center view. It resolves its own instance and widget rather than
+ * taking a region view-model item: a kept instance is by definition no longer
+ * in the region's item list, because applying a preset replaces `instanceIds`
+ * wholesale. `applyLayoutPresetToProject` merges `widgetInstances`, so the
+ * instance itself survives and can still be resolved here.
+ */
+const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
+  const instance = useActiveProjectSelector(
+    (project) => project.widgetInstances[instanceId],
+    areWidgetRenderInstancesEqual
+  );
+  const widget = instance ? getWidgetById(instance.typeId) : undefined;
+
+  if (!instance || !widget || widget.status !== 'enabled') {
     return <FallbackCenterView label="Center widget unavailable" />;
   }
 
-  return (
-    <WidgetRendererById key={item.instance.id} instanceId={item.instance.id} widget={item.widget} region="center" />
-  );
+  return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

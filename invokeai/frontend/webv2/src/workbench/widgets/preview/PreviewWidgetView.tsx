@@ -11,7 +11,6 @@ import {
   type GalleryItem,
   type GalleryItemKey,
   type GalleryItemRef,
-  type GalleryView,
 } from '@features/gallery';
 import {
   getGalleryCompareImage,
@@ -21,24 +20,17 @@ import {
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
-  compareGalleryItems,
   galleryImageItemToGalleryImage,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
   toGalleryItemKey,
   toGalleryItemRef,
-  type GalleryItemsPage,
   type GalleryQueuePlaceholder,
 } from '@features/gallery/contracts';
-import {
-  flattenGalleryItemsData,
-  GALLERY_MAX_ROWS,
-  GALLERY_PAGE_SIZE,
-  galleryBoardsOptions,
-  galleryItemsInfiniteOptions,
-} from '@features/gallery/queries';
+import { galleryBoardsOptions } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
+import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useDeviceLabel } from '@features/queue/devices';
 import {
   useActiveProgressTarget,
@@ -48,13 +40,12 @@ import {
   useQueueItemProgressImage,
   type LatestProgressImageSnapshot,
 } from '@features/queue/react';
-import { parseDateTokens } from '@platform/search/dateTokens';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
-import { useInfiniteQuery, useQuery, type InfiniteData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   ImageContextMenu,
   useDeletionConfirmation,
@@ -70,7 +61,7 @@ import {
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type KeyboardEvent, type Ref } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, type ReactNode, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -79,7 +70,7 @@ import { PreviewCompare } from './PreviewCompare';
 import { resolvePreviewCompareDrop } from './previewCompareDnd';
 import { usePreviewDensity, type PreviewDensity } from './previewDensity';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
-import { PreviewFooter } from './PreviewFooter';
+import { PreviewFooter, type PreviewFooterMedia, PreviewTileFooter } from './PreviewFooter';
 import {
   PreviewFrame,
   type PreviewMediaSource,
@@ -88,18 +79,15 @@ import {
 } from './PreviewFrame';
 import { previewHeaderStore } from './previewHeaderStore';
 import {
-  getPreviewNavigationCursor,
-  getPreviewNavigationSequence,
-  getPreviewNavigationTarget,
-} from './previewNavigation';
-import {
   getPreviewComparisonMode,
   getPreviewFilmstripVisible,
   getPreviewMetadataOpen,
   type PreviewComparisonMode,
 } from './previewSettings';
+import { usePreviewNavigation } from './usePreviewNavigation';
 
-const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
+/** For the live footer's Details slot, which renders disabled and never fires. */
+const noop = (): void => {};
 
 const VIDEO_FRAME_COPY_FAILURE_KEYS = {
   'clipboard-failed': 'widgets.preview.copyCurrentFrameWriteFailed',
@@ -150,80 +138,6 @@ const getSelectedItem = (values: Record<string, unknown>, localItems: GalleryIma
   return localItems[0] ?? null;
 };
 
-const flattenPreviewItems = (data: InfiniteData<GalleryItemsPage, number> | undefined): GalleryItem[] =>
-  flattenGalleryItemsData(data);
-
-const getOrderedPreviewItems = (
-  items: GalleryItem[],
-  imageOrderDir: 'ASC' | 'DESC',
-  starredFirst: boolean,
-  inputOrder: 'display' | 'newest-first'
-): GalleryItem[] =>
-  items
-    .map((item, index) => ({ index, item }))
-    .sort((a, b) => {
-      const canonicalOrder = compareGalleryItems(a.item, b.item, { orderDir: imageOrderDir, starredFirst });
-
-      if (canonicalOrder !== 0) {
-        return canonicalOrder;
-      }
-
-      return inputOrder === 'newest-first' && imageOrderDir === 'ASC' ? b.index - a.index : a.index - b.index;
-    })
-    .map(({ item }) => item);
-
-const getOrderedLocalItems = ({
-  boardId,
-  galleryView,
-  items,
-  imageOrderDir,
-  starredFirst,
-}: {
-  boardId: string;
-  galleryView: GalleryView;
-  items: GalleryItem[];
-  imageOrderDir: 'ASC' | 'DESC';
-  starredFirst: boolean;
-}): GalleryItem[] =>
-  getOrderedPreviewItems(
-    items.filter((item) => item.boardId === boardId && getItemGalleryView(item) === galleryView),
-    imageOrderDir,
-    starredFirst,
-    'newest-first'
-  );
-
-export const mergePreviewBoardItems = (
-  backendItems: GalleryItem[],
-  localItems: GalleryItem[],
-  imageOrderDir: 'ASC' | 'DESC',
-  starredFirst: boolean
-): GalleryItem[] => {
-  const backendKeys = new Set(backendItems.map(toGalleryItemKey));
-  const missingLocalItems = localItems.filter((item) => !backendKeys.has(toGalleryItemKey(item)));
-
-  if (missingLocalItems.length === 0) {
-    return backendItems.slice(0, GALLERY_MAX_ROWS);
-  }
-
-  return getOrderedPreviewItems([...backendItems, ...missingLocalItems], imageOrderDir, starredFirst, 'display').slice(
-    0,
-    GALLERY_MAX_ROWS
-  );
-};
-
-/**
- * The board used for the "N of M" index comes from the image itself, never
- * from the gallery's currently selected board — switching boards or changing
- * the board list sort must not reshuffle the preview. Freshly generated local
- * images (no boardId yet) fall back to the gallery selection for display only.
- */
-/**
- * Which gallery tab an item belongs to. Mirrors the category split the
- * gallery filters on: `general` is a gallery image, everything else (canvas
- * pixels, control layers, uploads) is an asset.
- */
-const getItemGalleryView = (item: GalleryItem): GalleryView => (item.category === 'general' ? 'images' : 'assets');
-
 const getBoardName = (
   boards: GalleryBoard[],
   boardId: string,
@@ -251,18 +165,22 @@ export const getMatchingProgressImage = (
 const selectGenerateRecallValues = createGenerateFormValuesSelector();
 
 /**
- * Bottom padding the grid surface reserves for the overlaid filmstrip and
- * details island — their collapsed heights plus the 2-unit inset and gap. An
- * expanded Details panel grows over the grid on purpose; it is self-capped at
- * `40cqh` and closes back down.
+ * Bottom padding the grid surface reserves for the overlaid details island —
+ * its collapsed height plus the 2-unit inset and gap. The filmstrip
+ * deliberately reserves nothing: it is a floating overlay above the media's
+ * lower edge, so toggling it never reflows the fitted image. An expanded
+ * Details panel grows over the grid on purpose; it is self-capped at `40cqh`
+ * and closes back down.
  */
-const getPreviewOverlayReserve = (density: PreviewDensity, hasFilmstrip: boolean): string => {
-  if (!hasFilmstrip) {
-    return '5.5rem';
-  }
+const PREVIEW_OVERLAY_RESERVE = '5.5rem';
 
-  return density === 'full' ? '9.75rem' : '8.75rem';
-};
+/**
+ * A tile carries a footer but never a filmstrip, so it reserves the one island
+ * instead of the pair. Its stage padding stays compact for the same reason the
+ * grid exists at all: at four sessions each cell is a quarter of the widget.
+ */
+const PREVIEW_TILE_OVERLAY_RESERVE = '3.25rem';
+const PREVIEW_TILE_STAGE_PADDING = '3';
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
@@ -285,12 +203,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const comparisonMode = getPreviewComparisonMode(previewValues);
   const displayBoardId = selectedItem?.boardId ?? 'none';
   const hasSelectedItem = selectedItem !== null;
-  const { imageOrderDir, starredFirst } = getGallerySettings(galleryValues);
+  const { imageOrderDir } = getGallerySettings(galleryValues);
   const selectedImageQuery = getGallerySelectedImageQuery(galleryValues);
-  const selectedImageSearch = useMemo(
-    () => parseDateTokens(selectedImageQuery.searchTerm),
-    [selectedImageQuery.searchTerm]
-  );
   const selectedItemKey = selectedItem ? toGalleryItemKey(selectedItem) : null;
   const isComparing =
     selectedItem?.kind === 'image' &&
@@ -309,287 +223,53 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
   const matchingProgressImage = getMatchingProgressImage(progressImage, activeGalleryPlaceholder);
   const shouldFollowLive = showProgressImagesInViewer && activeGalleryPlaceholder !== null && !isComparing;
-  const navigationBoardId = shouldFollowLive ? activeGalleryPlaceholder.boardId : selectedImageQuery.boardId;
-  const navigationGalleryView = shouldFollowLive ? 'images' : selectedImageQuery.galleryView;
-  const navigationOrderDir = shouldFollowLive ? imageOrderDir : selectedImageQuery.imageOrderDir;
-  const navigationStarredFirst = shouldFollowLive ? starredFirst : selectedImageQuery.starredFirst;
-  const hasNavigationContext = shouldFollowLive || hasSelectedItem;
   const { t } = useTranslation();
   const loupeControlsRef = useRef<PreviewLoupeControls | null>(null);
   const videoControllerRef = useRef<PreviewVideoFrameController | null>(null);
   const [copyAvailableItemKey, setCopyAvailableItemKey] = useState<GalleryItemKey | null>(null);
-  const navigationContextKey = `${shouldFollowLive}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.page}:${selectedImageQuery.searchTerm}`;
-  const navigationQueryKey = `${shouldFollowLive}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationStarredFirst}:${selectedImageQuery.paginationMode}:${selectedImageQuery.searchTerm}`;
-
-  // Lets a boundary fetch that resolves after the user has moved on compare the
-  // context it started in against the one now on screen, and drop its stale
-  // result. Written from an effect rather than during render: the compiler
-  // rejects render-phase ref writes, and an effect event cannot be called from
-  // a promise continuation.
-  const navigationContextKeyRef = useRef(navigationContextKey);
-
-  useEffect(() => {
-    navigationContextKeyRef.current = navigationContextKey;
-  }, [navigationContextKey]);
-
-  // A paginated navigation stays anchored to the page the preview opened on,
-  // and re-anchors only when the underlying query identity changes. Derived
-  // state rather than a ref so the compiler can see the dependency.
-  const [navigationAnchor, setNavigationAnchor] = useState({
-    page: selectedImageQuery.page,
-    queryKey: navigationQueryKey,
-  });
-  const hasStaleNavigationAnchor = navigationAnchor.queryKey !== navigationQueryKey;
-
-  if (hasStaleNavigationAnchor) {
-    setNavigationAnchor({ page: selectedImageQuery.page, queryKey: navigationQueryKey });
-  }
-
-  const navigationAnchorPage = hasStaleNavigationAnchor ? selectedImageQuery.page : navigationAnchor.page;
 
   const boardsQuery = useQuery({
     ...galleryBoardsOptions(),
     enabled: hasSelectedItem,
   });
-  const {
-    data: boardItemsData,
-    fetchNextPage: fetchNextBoardItemsPage,
-    fetchPreviousPage: fetchPreviousBoardItemsPage,
-    hasNextPage: hasNextBoardItemsPage,
-    hasPreviousPage: hasPreviousBoardItemsPage,
-    isFetching: isFetchingBoardItems,
-    isFetchingNextPage: isFetchingNextBoardItemsPage,
-    isFetchingPreviousPage: isFetchingPreviousBoardItemsPage,
-  } = useInfiniteQuery({
-    ...galleryItemsInfiniteOptions(
-      {
-        boardId: navigationBoardId,
-        createdFrom: shouldFollowLive ? undefined : selectedImageSearch.range?.from,
-        createdTo: shouldFollowLive ? undefined : selectedImageSearch.range?.to,
-        galleryView: navigationGalleryView,
-        orderDir: navigationOrderDir,
-        searchTerm: shouldFollowLive ? '' : selectedImageSearch.text,
-        starredFirst: navigationStarredFirst,
-      },
-      !shouldFollowLive && selectedImageQuery.paginationMode === 'paginated'
-        ? { kind: 'anchor', offset: navigationAnchorPage * GALLERY_PAGE_SIZE }
-        : { kind: 'infinite' }
-    ),
-    enabled: hasNavigationContext,
-  });
-  const selectPreviewItem = useCallback(
-    (item: GalleryItem) => {
-      const itemKey = toGalleryItemKey(item);
-      const pageIndex = boardItemsData?.pages.findIndex((page) =>
-        page.items.some((candidate) => toGalleryItemKey(candidate) === itemKey)
-      );
-      const pageParam = pageIndex === undefined || pageIndex < 0 ? undefined : boardItemsData?.pageParams[pageIndex];
-      const selectionPage =
-        typeof pageParam === 'number' ? Math.floor(pageParam / GALLERY_PAGE_SIZE) : selectedImageQuery.page;
-
-      gallery.selectItem(item, undefined, selectionPage, true);
-    },
-    [boardItemsData, gallery, selectedImageQuery.page]
-  );
   const boards = boardsQuery.data ?? fallbackBoards;
-  const optimisticQueueItemIds = useMemo(
-    () =>
-      new Set(
-        queueItems.filter((item) => item.status === 'pending' || item.status === 'running').map((item) => item.id)
-      ),
-    [queueItems]
-  );
-  const navigationLocalItems = useMemo(() => {
-    const refreshingSelectedSourceId =
-      !shouldFollowLive && isFetchingBoardItems && selectedItem?.kind === 'image'
-        ? selectedItem.sourceQueueItemId
-        : null;
-
-    return localItems.filter(
-      (item) =>
-        (item.sourceQueueItemId !== undefined && optimisticQueueItemIds.has(item.sourceQueueItemId)) ||
-        item.sourceQueueItemId === refreshingSelectedSourceId
-    );
-  }, [isFetchingBoardItems, localItems, optimisticQueueItemIds, selectedItem, shouldFollowLive]);
-  const localBoardItems = useMemo(
-    () =>
-      getOrderedLocalItems({
-        boardId: navigationBoardId,
-        galleryView: navigationGalleryView,
-        items: navigationLocalItems,
-        imageOrderDir: navigationOrderDir,
-        starredFirst: navigationStarredFirst,
-      }),
-    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir, navigationStarredFirst]
-  );
-  const previewLocalBoardItems = useMemo(() => {
-    if (
-      shouldFollowLive ||
-      !selectedItem ||
-      localBoardItems.some((item) => toGalleryItemKey(item) === selectedItemKey)
-    ) {
-      return localBoardItems;
-    }
-
-    return [selectedItem, ...localBoardItems];
-  }, [localBoardItems, selectedItem, selectedItemKey, shouldFollowLive]);
-  const backendBoardItems = useMemo(() => flattenPreviewItems(boardItemsData), [boardItemsData]);
-  const boardItems = useMemo(
-    () =>
-      !hasNavigationContext
-        ? EMPTY_PREVIEW_ITEMS
-        : mergePreviewBoardItems(backendBoardItems, previewLocalBoardItems, navigationOrderDir, navigationStarredFirst),
-    [backendBoardItems, hasNavigationContext, navigationOrderDir, navigationStarredFirst, previewLocalBoardItems]
-  );
-  const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const boardName = getBoardName(
     boards,
     displayBoardId,
     t('widgets.gallery.uncategorized'),
     t('widgets.gallery.unknownBoard')
   );
-  const navigationSequence = useMemo(
-    () =>
-      getPreviewNavigationSequence({
-        activePlaceholder: activeGalleryPlaceholder,
-        boardId: navigationBoardId,
-        boardImages: boardItems,
-        galleryView: navigationGalleryView,
-        imageOrderDir: navigationOrderDir,
-        starredFirst: navigationStarredFirst,
-      }),
-    [
-      activeGalleryPlaceholder,
-      boardItems,
-      navigationBoardId,
-      navigationGalleryView,
-      navigationOrderDir,
-      navigationStarredFirst,
-    ]
+
+  const enableLiveFollow = useCallback(
+    () => account.updateProjectPreferences({ showProgressImagesInViewer: true }),
+    [account]
   );
-  const navigationCursor = getPreviewNavigationCursor(navigationSequence, {
-    isFollowingLive: shouldFollowLive,
+  const selectGalleryItemAtPage = useCallback(
+    (item: GalleryItem, selectionPage: number) => gallery.selectItem(item, undefined, selectionPage, true),
+    [gallery]
+  );
+  const {
+    boardItems,
+    handleNavigationKeyDown,
+    isLoadingBoard,
+    navigate,
+    navigationCursor,
+    navigationQueryKey,
+    navigationSequence,
+    selectPreviewItem,
+  } = usePreviewNavigation({
+    activePlaceholder: activeGalleryPlaceholder,
+    enableLiveFollow,
+    imageOrderDir,
+    isComparing,
+    localItems,
+    queueItems,
+    selectGalleryItem: selectGalleryItemAtPage,
+    selectedImageQuery,
+    selectedItem,
     selectedItemKey,
+    shouldFollowLive,
   });
-
-  // One navigation action shared by the arrow keys and the footer buttons.
-  // Compare mode stays inert and never exposes the placeholder.
-  const navigate = useCallback(
-    (offset: -1 | 1) => {
-      if (isComparing) {
-        return;
-      }
-
-      const target = getPreviewNavigationTarget(navigationSequence, navigationCursor, offset);
-      const isAtLoadedBackendBoundary =
-        selectedItemKey !== null &&
-        (offset === 1
-          ? backendBoardItems.at(-1) !== undefined &&
-            toGalleryItemKey(backendBoardItems.at(-1)!) === selectedItemKey &&
-            hasNextBoardItemsPage
-          : backendBoardItems[0] !== undefined &&
-            toGalleryItemKey(backendBoardItems[0]) === selectedItemKey &&
-            hasPreviousBoardItemsPage);
-
-      if (!isAtLoadedBackendBoundary) {
-        if (!target) {
-          return;
-        }
-
-        if (target.kind === 'item') {
-          selectPreviewItem(target.item);
-        } else {
-          account.updateProjectPreferences({ showProgressImagesInViewer: true });
-        }
-        return;
-      }
-
-      if (offset === 1 ? isFetchingNextBoardItemsPage : isFetchingPreviousBoardItemsPage) {
-        return;
-      }
-
-      const fetchBoundaryPage = offset === 1 ? fetchNextBoardItemsPage : fetchPreviousBoardItemsPage;
-
-      void fetchBoundaryPage().then((result) => {
-        if (result.isError || navigationContextKeyRef.current !== navigationContextKey) {
-          return;
-        }
-
-        const nextBackendBoardItems = flattenPreviewItems(result.data);
-        const nextBoardItems = mergePreviewBoardItems(
-          nextBackendBoardItems,
-          previewLocalBoardItems,
-          navigationOrderDir,
-          navigationStarredFirst
-        );
-        const nextNavigationSequence = getPreviewNavigationSequence({
-          activePlaceholder: activeGalleryPlaceholder,
-          boardId: navigationBoardId,
-          boardImages: nextBoardItems,
-          galleryView: navigationGalleryView,
-          imageOrderDir: navigationOrderDir,
-          starredFirst: navigationStarredFirst,
-        });
-        const nextNavigationCursor = getPreviewNavigationCursor(nextNavigationSequence, {
-          isFollowingLive: shouldFollowLive,
-          selectedItemKey,
-        });
-        const nextTarget = getPreviewNavigationTarget(nextNavigationSequence, nextNavigationCursor, offset);
-
-        if (nextTarget?.kind === 'item') {
-          selectPreviewItem(nextTarget.item);
-        } else if (nextTarget?.kind === 'placeholder') {
-          account.updateProjectPreferences({ showProgressImagesInViewer: true });
-        }
-      });
-    },
-    [
-      account,
-      activeGalleryPlaceholder,
-      backendBoardItems,
-      fetchNextBoardItemsPage,
-      fetchPreviousBoardItemsPage,
-      hasNextBoardItemsPage,
-      hasPreviousBoardItemsPage,
-      isComparing,
-      isFetchingNextBoardItemsPage,
-      isFetchingPreviousBoardItemsPage,
-      navigationBoardId,
-      navigationContextKey,
-      navigationCursor,
-      navigationGalleryView,
-      navigationOrderDir,
-      navigationSequence,
-      navigationStarredFirst,
-      previewLocalBoardItems,
-      selectedItemKey,
-      selectPreviewItem,
-      shouldFollowLive,
-    ]
-  );
-
-  const handleNavigationKeyDown = useCallback(
-    (event: KeyboardEvent<HTMLDivElement>) => {
-      if (event.target instanceof Element && event.target.closest('video')) {
-        return;
-      }
-
-      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
-        return;
-      }
-
-      if (isComparing) {
-        return;
-      }
-
-      // stopPropagation keeps the widget hotkey runtime from handling the same
-      // arrow press a second time.
-      event.preventDefault();
-      event.stopPropagation();
-      navigate(event.key === 'ArrowLeft' ? -1 : 1);
-    },
-    [isComparing, navigate]
-  );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
   const getItemActionContext = useCallback(
@@ -785,22 +465,6 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
 
   useEffect(() => () => previewHeaderStore.clear(), []);
 
-  // Warm the browser cache for the sequence neighbors so arrow-key navigation
-  // swaps without a decode flash.
-  const previousNeighbor = navigationSequence[navigationCursor - 1];
-  const nextNeighbor = navigationSequence[navigationCursor + 1];
-  const previousNeighborUrl =
-    previousNeighbor?.kind === 'item' && previousNeighbor.item.kind === 'image' ? previousNeighbor.item.fullUrl : null;
-  const nextNeighborUrl =
-    nextNeighbor?.kind === 'item' && nextNeighbor.item.kind === 'image' ? nextNeighbor.item.fullUrl : null;
-
-  useEffect(() => {
-    [previousNeighborUrl, nextNeighborUrl].forEach((url) => {
-      if (url) {
-        new Image().src = url;
-      }
-    });
-  }, [nextNeighborUrl, previousNeighborUrl]);
   const executeViewerHotkey = useEffectEvent((commandId: string) => {
     if (commandId === 'viewer.toggleViewer') {
       runtime.workbench.closeWidgetInstance(runtime.instanceId);
@@ -882,9 +546,17 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
           />
         ) : shouldFollowLive && activeGalleryPlaceholder ? (
           <LivePreview
+            boardItemCount={navigationSequence.length}
+            density={density}
+            filmstripItems={isFilmstripVisible && density !== 'minimal' ? boardItems : null}
+            isLoadingBoard={isLoadingBoard}
             placeholder={activeGalleryPlaceholder}
             progressImage={matchingProgressImage}
+            selectedIndex={navigationCursor}
             shouldAntialiasProgressImage={antialiasProgressImages}
+            onNext={selectNextItem}
+            onPrevious={selectPreviousItem}
+            onSelectItem={selectPreviewItem}
           />
         ) : selectedItem ? (
           <>
@@ -1025,6 +697,30 @@ interface SelectedMediaPreviewProps {
   videoControllerRef?: Ref<PreviewVideoFrameController>;
 }
 
+/**
+ * The one media arrangement, shared by selected items and the live preview:
+ * the stage fills, and the filmstrip + footer float above its lower edge in a
+ * single island stack. The stage reserves bottom padding for the footer island
+ * only, so the fitted media is never tucked under it; the filmstrip floats
+ * over the media itself and steals no height. Live and finished renders MUST
+ * pass through the same scaffold — the denoise→done boundary may change only
+ * the pixels inside the frame, never the geometry around it.
+ */
+const PreviewMediaScaffold = ({ children }: { children: ReactNode }) => (
+  <Flex direction="column" h="full" minH="0" position="relative" w="full">
+    {children}
+  </Flex>
+);
+
+/** The floating island column the filmstrip and footer share. */
+const PreviewOverlayStack = ({ children }: { children: ReactNode }) => (
+  <Stack bottom="2" gap="2" insetX="2" position="absolute" zIndex="1">
+    {children}
+  </Stack>
+);
+
+const getMediaStagePadding = (density: PreviewDensity): string => (density === 'full' ? '6' : '3');
+
 const SelectedMediaPreview = ({
   actionImage,
   actions,
@@ -1054,32 +750,30 @@ const SelectedMediaPreview = ({
   frameWidth: number;
   source: Parameters<typeof PreviewFrame>[0]['source'];
 }) => {
-  const { t } = useTranslation();
-  const overlayReserve = getPreviewOverlayReserve(density, filmstripItems !== null);
+  const media = useMemo<PreviewFooterMedia>(
+    () => ({ actionImage, actions, item, kind: 'item' }),
+    [actionImage, actions, item]
+  );
 
-  // The grid surface fills; the filmstrip and details float above its lower
-  // edge. The surface reserves matching bottom padding so the fitted media is
-  // never tucked under them — only the dot grid passes behind.
   return (
-    <Flex direction="column" h="full" minH="0" position="relative" w="full">
+    <PreviewMediaScaffold>
       <PreviewFrame
         dragItem={dragItem}
         frameHeight={frameHeight}
         frameWidth={frameWidth}
         isItemCurrent={isItemCurrent}
         isLive={false}
-        liveBadgeLabel={t('common.generating')}
         loupeControlsRef={loupeControlsRef}
         onVideoCopyAvailabilityChange={onCopyAvailabilityChange}
-        padding={density === 'full' ? '6' : '3'}
-        paddingBottom={overlayReserve}
+        padding={getMediaStagePadding(density)}
+        paddingBottom={PREVIEW_OVERLAY_RESERVE}
         shouldAntialiasLiveImage
         source={source}
         variant="framed"
         videoControllerRef={videoControllerRef}
         onContextMenu={onContextMenu}
       />
-      <Stack bottom="2" gap="2" insetX="2" position="absolute" zIndex="1">
+      <PreviewOverlayStack>
         {filmstripItems ? (
           <PreviewFilmstrip
             density={density}
@@ -1089,32 +783,52 @@ const SelectedMediaPreview = ({
           />
         ) : null}
         <PreviewFooter
-          actionImage={actionImage}
-          actions={actions}
           boardItemCount={boardItemCount}
-          item={item}
           isLoadingBoard={isLoadingBoard}
           isMetadataOpen={isMetadataOpen}
+          media={media}
           selectedIndex={selectedIndex}
           onNext={onNext}
           onPrevious={onPrevious}
           onToggleMetadata={onToggleMetadata}
         />
-      </Stack>
-    </Flex>
+      </PreviewOverlayStack>
+    </PreviewMediaScaffold>
   );
 };
 
+/**
+ * The single-session live preview: the denoise stream rendered exactly like a
+ * finished item — same scaffold, same frame chrome, no badge — so the moment
+ * generation completes, only the pixels change. The footer stays up
+ * throughout, fed by queue data: the slot's position in the same navigation
+ * sequence the arrow keys walk, and its requested output size.
+ */
 const LivePreview = ({
+  boardItemCount,
+  density,
+  filmstripItems,
+  isLoadingBoard,
   placeholder,
   progressImage,
+  selectedIndex,
   shouldAntialiasProgressImage,
+  onNext,
+  onPrevious,
+  onSelectItem,
 }: {
+  boardItemCount: number;
+  density: PreviewDensity;
+  filmstripItems: GalleryItem[] | null;
+  isLoadingBoard: boolean;
   placeholder: GalleryQueuePlaceholder;
   progressImage: LatestProgressImageSnapshot | null;
+  selectedIndex: number;
   shouldAntialiasProgressImage: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  onSelectItem: (item: GalleryItem) => void;
 }) => {
-  const { t } = useTranslation();
   const previewImage = useStreamingImageSource({
     liveImage: progressImageToStreamingSource(progressImage),
   });
@@ -1130,17 +844,39 @@ const LivePreview = ({
     [placeholder.id, previewImage]
   );
 
+  const media = useMemo<PreviewFooterMedia>(
+    () => ({ height: placeholder.height, kind: 'live', width: placeholder.width }),
+    [placeholder.height, placeholder.width]
+  );
+
   return (
-    <PreviewFrame
-      frameHeight={previewImage?.height ?? placeholder.height}
-      frameWidth={previewImage?.width ?? placeholder.width}
-      isLive
-      liveBadgeLabel={t('common.generating')}
-      liveQueueItemId={placeholder.queueItemId}
-      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
-      source={source}
-      variant="inset"
-    />
+    <PreviewMediaScaffold>
+      <PreviewFrame
+        frameHeight={previewImage?.height ?? placeholder.height}
+        frameWidth={previewImage?.width ?? placeholder.width}
+        isLive
+        padding={getMediaStagePadding(density)}
+        paddingBottom={PREVIEW_OVERLAY_RESERVE}
+        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        source={source}
+        variant="framed"
+      />
+      <PreviewOverlayStack>
+        {filmstripItems ? (
+          <PreviewFilmstrip density={density} items={filmstripItems} selectedItemKey={null} onSelect={onSelectItem} />
+        ) : null}
+        <PreviewFooter
+          boardItemCount={boardItemCount}
+          isLoadingBoard={isLoadingBoard}
+          isMetadataOpen={false}
+          media={media}
+          selectedIndex={selectedIndex}
+          onNext={onNext}
+          onPrevious={onPrevious}
+          onToggleMetadata={noop}
+        />
+      </PreviewOverlayStack>
+    </PreviewMediaScaffold>
   );
 };
 
@@ -1150,7 +886,7 @@ const LivePreview = ({
  * Subscribes to its own slot's progress image rather than receiving it from the
  * parent, so a frame from one GPU's session re-renders only that tile.
  */
-const LivePreviewTile = ({
+export const LivePreviewTile = ({
   placeholder,
   shouldAntialiasProgressImage,
 }: {
@@ -1178,19 +914,28 @@ const LivePreviewTile = ({
     [placeholder.id, previewImage]
   );
 
+  const percent = getDeterminateProgressPercent(itemProgress?.percentage);
+  // Device identity and progress read from the footer, not from a badge over
+  // the image: a tile is the same media card as any other preview surface, and
+  // the one thing that must never differ between them is the frame itself.
+  const tileDeviceLabel = deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null;
+
   return (
-    <PreviewFrame
-      frameHeight={previewImage?.height ?? placeholder.height}
-      frameWidth={previewImage?.width ?? placeholder.width}
-      isLive
-      liveBadgeLabel={
-        deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : t('common.generating')
-      }
-      liveQueueItemId={placeholder.queueItemId}
-      shouldAntialiasLiveImage={shouldAntialiasProgressImage}
-      source={source}
-      variant="inset"
-    />
+    <PreviewMediaScaffold>
+      <PreviewFrame
+        frameHeight={previewImage?.height ?? placeholder.height}
+        frameWidth={previewImage?.width ?? placeholder.width}
+        isLive
+        padding={PREVIEW_TILE_STAGE_PADDING}
+        paddingBottom={PREVIEW_TILE_OVERLAY_RESERVE}
+        shouldAntialiasLiveImage={shouldAntialiasProgressImage}
+        source={source}
+        variant="framed"
+      />
+      <PreviewOverlayStack>
+        <PreviewTileFooter deviceLabel={tileDeviceLabel} percent={percent} />
+      </PreviewOverlayStack>
+    </PreviewMediaScaffold>
   );
 };
 
@@ -1201,7 +946,7 @@ const LivePreviewTile = ({
  * single-frame preview so nothing changes on a single-GPU install. The grid is a
  * plain auto-fit so two GPUs sit side by side and four wrap to a 2×2.
  */
-const LivePreviewTiles = ({
+export const LivePreviewTiles = ({
   placeholders,
   shouldAntialiasProgressImage,
 }: {
@@ -1223,15 +968,7 @@ const EmptyPreview = () => {
   const { t } = useTranslation();
 
   return (
-    <PreviewFrame
-      frameHeight={1}
-      frameWidth={1}
-      isLive={false}
-      liveBadgeLabel={t('common.generating')}
-      shouldAntialiasLiveImage
-      source={null}
-      variant="inset"
-    >
+    <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
       <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
         <Text fontSize="sm" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}

@@ -140,3 +140,23 @@ def test_model_search_handles_diffusers_model_dirs(model_search: tuple[ModelSear
     assert on_model_found_called_with == expected
     assert search.stats.models_found == 2
     assert search.stats.models_filtered == 2
+
+
+def test_model_search_handles_modular_diffusers_model_dirs(model_search: tuple[ModelSearch, Path]):
+    """A Modular Diffusers folder (e.g. MiniMax H3) has modular_model_index.json at its root and
+    config.json files inside its submodel folders. The walker must stop at the root instead of
+    descending and offering each submodel folder as a separate model."""
+    search, tmp_path = model_search
+
+    modular_dir = tmp_path / "modular_dir"
+    modular_dir.mkdir()
+    with open(modular_dir / "modular_model_index.json", "w") as f:
+        f.write("")
+    submodel_dir = modular_dir / "transformer"
+    submodel_dir.mkdir()
+    with open(submodel_dir / "config.json", "w") as f:
+        f.write("")
+
+    found = search.search(tmp_path)
+
+    assert found == {modular_dir}

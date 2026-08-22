@@ -7,6 +7,8 @@ import {
   fluxVAESelected,
   krea2Qwen3VlEncoderModelSelected,
   krea2VaeModelSelected,
+  minimaxH3TextEncoderModelSelected,
+  minimaxH3TransformerModelSelected,
   modelChanged,
   refinerModelChanged,
   t5EncoderModelSelected,
@@ -45,14 +47,15 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
+  isKrea2Qwen3VLEncoderModelConfig,
   isLoRAModelConfig,
   isNonFluxVAEModelConfig,
   isNonRefinerMainModelConfig,
-  isQwen3VLEncoderModelConfig,
   isQwenImageVAEModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
@@ -84,6 +87,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
 
       handleMainModels(models, state, dispatch, log);
       handleKrea2Components(models, state, dispatch, log);
+      handleMiniMaxH3Overrides(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
@@ -115,13 +119,26 @@ export const handleKrea2Components: ModelHandler = (models, state, dispatch) => 
     selectedEncoder: state.params.krea2Qwen3VlEncoderModel,
     availableQwenImageVaes: models.filter((model) => isQwenImageVAEModelConfig(model)),
     availableAnimaVaes: models.filter((model) => isAnimaVAEModelConfig(model)),
-    availableEncoders: models.filter(isQwen3VLEncoderModelConfig),
+    availableEncoders: models.filter(isKrea2Qwen3VLEncoderModelConfig),
   });
   if ('vae' in updates) {
     dispatch(krea2VaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
   }
   if ('encoder' in updates) {
     dispatch(krea2Qwen3VlEncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null));
+  }
+};
+
+const handleMiniMaxH3Overrides: ModelHandler = (models, state, dispatch) => {
+  // The MiniMax H3 single-file transformer / text-encoder overrides are optional (null = use the
+  // main folder's submodels), so never auto-select - but a selection whose model was uninstalled
+  // must be cleared, or it passes the components-only readiness gate and fails at invoke time.
+  const { minimaxH3TransformerModel, minimaxH3TextEncoderModel } = state.params;
+  if (minimaxH3TransformerModel && !models.some((m) => m.key === minimaxH3TransformerModel.key)) {
+    dispatch(minimaxH3TransformerModelSelected(null));
+  }
+  if (minimaxH3TextEncoderModel && !models.some((m) => m.key === minimaxH3TextEncoderModel.key)) {
+    dispatch(minimaxH3TextEncoderModelSelected(null));
   }
 };
 
@@ -132,11 +149,12 @@ type ModelHandler = (
   log: Logger<JsonObject>
 ) => undefined;
 
-const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
+export const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedMainModel = state.params.model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
-  const firstModel = allMainModels[0];
+  const selectableModels = selectPrimaryMainModelOptions(allMainModels);
+  const firstModel = selectableModels[0];
 
   // If we have no models, we may need to clear the selected model
   if (!firstModel) {
@@ -148,8 +166,14 @@ const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
     return;
   }
 
-  // If the current model is available, we don't need to do anything
-  if (allMainModels.some((m) => m.key === selectedMainModel?.key)) {
+  const availableSelectedModel = allMainModels.find((model) => model.key === selectedMainModel?.key);
+
+  // Preserve an available selection when it is intrinsically eligible as a primary.
+  // Passing the model alone distinguishes that from a contextually hidden Wan low-noise
+  // expert: it is eligible without its partner and must not be silently replaced merely
+  // because installing that partner hides it from new selections. MiniMax H3 checkpoint
+  // overrides remain ineligible even alone, so they are cleared or replaced here.
+  if (availableSelectedModel && selectPrimaryMainModelOptions([availableSelectedModel]).length === 1) {
     return;
   }
 

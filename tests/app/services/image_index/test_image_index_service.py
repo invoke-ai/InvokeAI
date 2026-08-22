@@ -1,8 +1,12 @@
 """Tests for the image index worker service, using an injected fake encoder (no models/GPU)."""
 
+import inspect
+import threading
 import time
+import weakref
 from types import SimpleNamespace
 from typing import Callable
+from unittest.mock import patch
 
 import numpy as np
 import pytest
@@ -11,6 +15,8 @@ from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import ImageIndexStatusEvent, ImageIndexUpdatedEvent
+from invokeai.app.services.image_index import image_index_default
+from invokeai.app.services.image_index.image_index_common import EMBEDDING_DTYPE
 from invokeai.app.services.image_index.image_index_default import (
     _MAX_ATTEMPTS,
     _MAX_BACKOFF_SECONDS,
@@ -39,6 +45,17 @@ def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
             return
         time.sleep(0.02)
     raise AssertionError("Condition not met within timeout")
+
+
+def _wait_for_spent_retry(service: "ImageIndexService", user_id: str, scope: str) -> None:
+    """Wait until the worker has actually charged a failed scope's retry.
+
+    The budget is spent only once the failed result is durably cached, which is
+    strictly after the fit runs and after the job leaves the request map — so
+    waiting on the fit count or on an empty `_projection_requests` and then
+    asserting the refusal races the worker, and loses on a slow runner.
+    """
+    _wait_until(lambda: service._failed_projection_scopes.get(user_id) == scope, timeout=15)
 
 
 def _unit_vec() -> np.ndarray:
@@ -604,6 +621,91 @@ def test_generation_wait_does_not_block_shutdown(
     assert service._worker is not None and not service._worker.is_alive()
 
 
+def test_projection_does_not_wait_for_an_in_progress_generation(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    accelerator_host: None,
+) -> None:
+    """A projection reads stored embeddings only — no encoder, no GPU — so it has no
+    reason to queue behind a generation the way an embed does.
+
+    The worker parks in _wait_for_idle_generation as soon as ONE image is pending, and
+    that wait is unbounded, so ordering the projection after it made /points report
+    "computing" for the entire length of a run. Every other projection test builds its
+    invoker with device='cpu'/session_queue=None, where the wait returns immediately —
+    which is why this was invisible to the suite.
+    """
+    session_queue = SimpleNamespace(get_queue_status=lambda queue_id: SimpleNamespace(in_progress=1))
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        # One image already embedded (so the projection has input) and one that cannot
+        # be embedded while the generation holds the GPU (so the worker parks).
+        _save_image(image_records, "done.png")
+        index_records.upsert_embedding("done.png", MODEL_ID, _unit_vec())
+        _save_image(image_records, "waiting.png")
+
+        service.start(_make_invoker(images_service, index_records, device=None, session_queue=session_queue))
+        assert service.request_projection("system") is True
+
+        # The generation never ends; the projection must land anyway.
+        _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=20.0)
+        record = index_records.get_projection("system", MODEL_ID)
+        assert record is not None
+        assert record.image_names == ["done.png"]
+        # And the embed really is still parked behind the generation.
+        assert index_records.get_embeddings(["waiting.png"], MODEL_ID)[0] == []
+    finally:
+        service.stop()
+
+
+def test_a_partially_stored_batch_does_not_escalate_the_backoff(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """A batch that stores ANYTHING resets the systemic-failure counter, even though the
+    batch also failed.
+
+    The counter exists to stop a hot retry loop when NO progress is possible. A batch that
+    stored an image is making progress: the backlog drains and quiescence arrives on its
+    own, so escalating is wrong. Counting these instead — reachable by moving the reset off
+    the `finally` — leaves no reset path at all while every batch partially fails, which
+    walks the wait up to its 60s ceiling while the index is still working. That is worse
+    under mild write contention than the flat 1Hz retry it would be correcting.
+    """
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for name in ("stored.png", "locked.png"):
+            _save_image(image_records, name)
+
+        real_upsert = index_records.upsert_embedding
+
+        def flaky_upsert(image_name, model_id, embedding):
+            if image_name == "stored.png":
+                return real_upsert(image_name, model_id, embedding)
+            raise RuntimeError("database is locked")
+
+        index_records.upsert_embedding = flaky_upsert  # type: ignore[method-assign]
+        service._invoker = _make_invoker(images_service, index_records)
+        service._model_id = MODEL_ID
+        service._encode_fn = _fake_encode
+
+        # Several rounds: the escalation this guards against is cumulative.
+        for _ in range(8):
+            assert service._process_batch(["stored.png", "locked.png"]) is False
+
+        assert service._systemic_failures == 0, "progress must clear the outage counter"
+        assert service._backoff_seconds() == _POLL_SECONDS, "a draining index must not back off"
+        # The half that stored is stored, and no image was charged an attempt.
+        assert index_records.get_embeddings(["stored.png"], MODEL_ID)[0] == ["stored.png"]
+        assert service._failed == set()
+        assert service._attempts == {}
+    finally:
+        service.stop()
+
+
 def test_unparseable_device_is_ignored_rather_than_wedging_the_worker(
     image_records: SqliteImageRecordStorage,
     images_service: ImageService,
@@ -906,3 +1008,1037 @@ def test_stop_joins_worker(
     service.stop()
 
     assert not service._worker.is_alive()
+
+
+# --- Projection jobs ---
+
+
+def test_projection_job_computes_and_caches(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    from invokeai.app.services.events.events_common import ImageMapProjectionReadyEvent
+
+    # Three images stay on compute_umap's deterministic PCA fallback: the
+    # first real UMAP fit JIT-compiles numba, which blows CI timeouts on slow
+    # (Windows/macOS) runners. The worker pipeline under test is identical.
+    for i in range(3):
+        _save_image(image_records, f"img-{i}.png")
+    invoker = _make_invoker(images_service, index_records)
+    service.start(invoker)
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    assert service.request_projection("system") is True
+
+    _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30)
+    record = index_records.get_projection("system", MODEL_ID)
+    assert record is not None
+    assert record.point_count == 3
+    assert sorted(record.image_names) == [f"img-{i}.png" for i in range(3)]
+    assert record.coords.shape == (3, 2)
+    _wait_until(
+        lambda: any(
+            isinstance(e, ImageMapProjectionReadyEvent) and e.point_count == 3 for e in invoker.services.events.events
+        )
+    )
+
+
+def test_projection_failure_caches_empty_result_instead_of_looping(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    from invokeai.app.services.image_index.projection import scope_hash
+
+    def broken_umap(embeddings, seed=42):
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    service.request_projection("system")
+
+    _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=15)
+    record = index_records.get_projection("system", MODEL_ID)
+    assert record is not None
+    assert record.point_count == 0
+    # The empty cache claims the scope it failed against, so it is NOT stale —
+    # clients see "empty" rather than re-enqueueing a doomed recompute forever.
+    accessible = index_records.list_accessible_embedded_images(None, MODEL_ID)
+    assert record.scope_hash == scope_hash(MODEL_ID, accessible)
+
+    # ...but "not stale" must not mean "never again". Asserting only the state
+    # above is what let the failure become terminal: the stamped hash plus the
+    # unchanged-scope short-circuit meant no later request could ever displace
+    # the empty row, so one transient fit failure blanked the map until the
+    # gallery changed — across restarts, since the row is in SQLite.
+    monkeypatch.setattr(image_index_default, "compute_umap", lambda matrix, seed=42: np.zeros((matrix.shape[0], 2)))
+    service.request_projection("system")
+
+    _wait_until(lambda: (r := index_records.get_projection("system", MODEL_ID)) is not None and r.point_count == 1)
+
+
+def test_a_permanently_failing_projection_is_retried_once_not_every_request(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """The other half of the bargain: recovering from a transient failure must not
+    turn a permanent one into a fit per request, which is what the empty-cache
+    stamp was protecting against in the first place."""
+    fits = {"n": 0}
+
+    def broken_umap(embeddings, seed=42):
+        fits["n"] += 1
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    service.request_projection("system")
+    _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=15)
+    assert fits["n"] == 1
+
+    # The retry is spent on the second request; every request after it must
+    # short-circuit rather than re-enter the doomed fit.
+    for _ in range(4):
+        service.request_projection("system")
+        _wait_until(lambda: not service._projection_requests, timeout=15)
+
+    _wait_until(lambda: fits["n"] == 2, timeout=15)
+    time.sleep(0.5)
+    assert fits["n"] == 2, "a permanently failing scope must be retried once per process, not per request"
+
+
+def test_a_cached_row_with_no_finite_points_is_a_failed_fit_not_a_result(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """A row with point_count > 0 and every coordinate non-finite.
+
+    /points drops non-finite rows before serving, so this row is empty to every
+    client while looking populated to the service. Deciding "failed" on the
+    cached count meant /points asked for a retry on this row's behalf, the
+    service granted the request without ever entering the retry branch, the
+    worker short-circuited and emitted projection_ready anyway, and the client —
+    which refetches on that event — asked again. The budget could never be spent,
+    so the refusal that is supposed to break the cycle never fired: a permanent
+    request/emit loop at the worker's poll rate, and a permanent spinner.
+
+    The router's fake service cannot show this: it decides the refusal itself,
+    from the argument alone, with no view of the cached row.
+    """
+    from invokeai.app.services.image_index.projection import projection_params, scope_hash
+
+    fits = {"n": 0}
+
+    def broken_umap(embeddings, seed=42):
+        fits["n"] += 1
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    names = index_records.list_accessible_embedded_images(None, MODEL_ID)
+    current_hash = scope_hash(MODEL_ID, names)
+    index_records.set_projection(
+        "system",
+        MODEL_ID,
+        current_hash,
+        projection_params(n_points=len(names)),
+        names,
+        np.full((len(names), 2), np.nan, dtype=np.float32),
+    )
+
+    # The first request on this row's behalf is granted and spends the budget.
+    assert service.request_projection("system", failed_scope=current_hash) is True
+    _wait_until(lambda: fits["n"] == 1, timeout=15)
+    _wait_for_spent_retry(service, "system", current_hash)
+
+    # And every one after it is refused, so /points settles into "empty".
+    for _ in range(5):
+        assert service.request_projection("system", failed_scope=current_hash) is False
+    time.sleep(0.5)
+    assert fits["n"] == 1, "a row with nothing servable must be retried once, not on every poll"
+
+
+def test_a_lost_projection_write_does_not_burn_the_retry(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """The budget bounds failed fits, so only a failed fit that reached the cache may spend it.
+
+    Spending it before the fit looked safe — nothing between the spend and the
+    fit can return — but it ignored the write. A fit that SUCCEEDS and then loses
+    its set_projection to a locked database re-queues, and the re-queued job finds
+    the old empty row with the budget already gone: minutes of correct work
+    discarded and the map blank for good, without a single failed fit anywhere.
+    """
+    from invokeai.app.services.image_index.projection import projection_params, scope_hash
+
+    monkeypatch.setattr(image_index_default, "compute_umap", lambda matrix, seed=42: np.zeros((matrix.shape[0], 2)))
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    # The empty row a failed fit leaves behind, stamped with the current scope:
+    # what the retry is granted against.
+    names = index_records.list_accessible_embedded_images(None, MODEL_ID)
+    current_hash = scope_hash(MODEL_ID, names)
+    index_records.set_projection(
+        "system",
+        MODEL_ID,
+        current_hash,
+        projection_params(n_points=0),
+        [],
+        np.empty((0, 2), dtype=np.float32),
+    )
+
+    writes = {"n": 0}
+    real_set_projection = index_records.set_projection
+
+    def failing_set_projection(*args, **kwargs):
+        writes["n"] += 1
+        if writes["n"] == 1:
+            raise RuntimeError("database is locked")
+        return real_set_projection(*args, **kwargs)
+
+    monkeypatch.setattr(index_records, "set_projection", failing_set_projection)
+
+    # The fit succeeds; its write is lost. The re-queued job must still be
+    # allowed to run, which means the budget must not have moved.
+    assert service.request_projection("system", failed_scope=current_hash) is True
+    _wait_until(
+        lambda: (r := index_records.get_projection("system", MODEL_ID)) is not None and r.point_count == 1,
+        timeout=20,
+    )
+    assert writes["n"] == 2, "the lost write must be retried, not dropped"
+
+
+def test_an_explicit_refresh_restores_a_spent_retry(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    monkeypatch,
+) -> None:
+    """Otherwise a spent budget is unrecoverable while the server runs.
+
+    /refresh answered `enqueued: true` while the worker was guaranteed to
+    short-circuit — the API reporting that it had accepted work it could not do,
+    with no way back short of a restart.
+    """
+    from invokeai.app.services.image_index.projection import scope_hash
+
+    fits = {"n": 0}
+
+    def broken_umap(embeddings, seed=42):
+        fits["n"] += 1
+        raise RuntimeError("synthetic UMAP failure")
+
+    monkeypatch.setattr(image_index_default, "compute_umap", broken_umap)
+    _save_image(image_records, "a.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    service.request_projection("system")
+    _wait_until(lambda: fits["n"] == 1, timeout=15)
+    current_hash = scope_hash(MODEL_ID, index_records.list_accessible_embedded_images(None, MODEL_ID))
+    assert service.request_projection("system", failed_scope=current_hash) is True
+    _wait_until(lambda: fits["n"] == 2, timeout=15)
+    _wait_for_spent_retry(service, "system", current_hash)
+    assert service.request_projection("system", failed_scope=current_hash) is False, "the budget is spent"
+
+    # A person pressing Refresh gets a real fit, not a short-circuit...
+    assert service.request_projection("system", user_initiated=True) is True
+    _wait_until(lambda: fits["n"] == 3, timeout=15)
+
+    # ...while a poller still cannot, so the loop stays closed.
+    _wait_for_spent_retry(service, "system", current_hash)
+    assert service.request_projection("system", failed_scope=current_hash) is False
+
+
+def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService) -> None:
+    # Not started: requests are refused outright.
+    assert service.request_projection("system") is False
+
+    # Simulate a running worker to exercise the dedup map directly.
+    service._model_id = MODEL_ID
+    service._worker = threading.Thread(target=lambda: time.sleep(0.2), daemon=True)
+    service._worker.start()
+
+    assert service.request_projection("system", all_images=True) is True
+    assert service.request_projection("system", all_images=False) is True
+    assert service._projection_requests == {"system": False}
+
+
+def test_systemic_embedding_outage_does_not_starve_projections(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The emergent interaction between "never retire on a systemic failure" and
+    "projections only at quiescence".
+
+    A systemic failure charges no image, by design, so the same batch is returned on every
+    pass and quiescence never arrives. If projections only ran in the quiescent branch, an
+    outage would make the image map report "computing" forever over images that ARE embedded —
+    and the projection needs no encoder, so there is no reason for it to wait.
+    """
+    embedded_ok = _unit_vec()
+
+    def broken_encode(images: list[Image.Image]) -> np.ndarray:
+        raise RuntimeError("model is gone")
+
+    service = ImageIndexService(encode_fn=broken_encode, model_id=MODEL_ID)
+    try:
+        # One image already embedded (the projection has something to work with) and one that
+        # can never embed while the encoder is down.
+        _save_image(image_records, "done.png")
+        _save_image(image_records, "stuck.png")
+        index_records.upsert_embedding("done.png", MODEL_ID, embedded_ok)
+
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: service._systemic_failures >= 1, timeout=20.0)
+
+        assert service.request_projection("system") is True
+
+        # The projection must land despite embedding being permanently stalled.
+        _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+        record = index_records.get_projection("system", MODEL_ID)
+        assert record is not None
+        assert record.image_names == ["done.png"]
+        # And the outage is still an outage: no image was retired to make this happen.
+        assert service._failed == set()
+        assert service._systemic_failures >= 1
+    finally:
+        service.stop()
+
+
+# --- Semantic search ---
+
+
+def test_search_similar_ranks_by_cosine_and_respects_scope(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    # Overwrite with hand-built vectors so the ranking is deterministic.
+    def unit(index: int, mix: float = 0.0) -> np.ndarray:
+        v = np.zeros(DIM, dtype=np.float32)
+        v[index] = 1.0
+        v[0] += mix
+        return v / np.linalg.norm(v)
+
+    for name, vec in [("a.png", unit(0)), ("close.png", unit(1, mix=0.9)), ("far.png", unit(2))]:
+        _save_image(image_records, name)
+        index_records.upsert_embedding(name, MODEL_ID, vec)
+
+    results = service.search_similar(None, unit(0), limit=2)
+
+    assert [name for name, _ in results] == ["a.png", "close.png"]
+    assert results[0][1] > results[1][1] > 0.0
+
+    # limit caps the result count; scores are descending.
+    assert len(service.search_similar(None, unit(0), limit=1)) == 1
+
+
+def test_embed_image_normalizes_and_requires_running_service(
+    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+) -> None:
+    probe = Image.new("RGB", (4, 4))
+
+    with pytest.raises(RuntimeError):
+        service.embed_image(probe)  # not started yet
+
+    service.start(_make_invoker(images_service, index_records))
+    vector = service.embed_image(probe)
+
+    assert vector.shape == (DIM,)
+    assert np.isclose(float(np.linalg.norm(vector)), 1.0)
+
+
+def test_embed_image_retries_once_after_a_failed_encode(
+    images_service: ImageService, index_records: ImageIndexRecordsSqlite
+) -> None:
+    # A failed load evicts the model from the RAM cache so the next attempt
+    # rebuilds it from disk; embed_image must make that second attempt itself.
+    calls = {"count": 0}
+
+    def flaky_encode(images):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("model cache entry was left in a bad state")
+        return _fake_encode(images)
+
+    service = ImageIndexService(encode_fn=flaky_encode, model_id=MODEL_ID)
+    service.start(_make_invoker(images_service, index_records))
+
+    vector = service.embed_image(Image.new("RGB", (4, 4)))
+
+    try:
+        assert calls["count"] == 2
+        assert vector.shape == (DIM,)
+
+        # A second consecutive failure propagates.
+        def always_failing(images):
+            raise RuntimeError("still broken")
+
+        service._encode_fn = always_failing
+        with pytest.raises(RuntimeError, match="still broken"):
+            service.embed_image(Image.new("RGB", (4, 4)))
+    finally:
+        service.stop()
+
+
+def test_projection_request_is_requeued_when_the_database_read_fails(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """The job is popped from the dedup map before the work runs.
+
+    A raise outside the fit's own try unwinds to the generic worker handler, which knows
+    nothing about projections — so the request would be dropped after /refresh had already
+    answered `enqueued: true`, and an event-driven client would wait forever.
+    """
+    calls = {"n": 0}
+    real_list = index_records.list_accessible_embedded_images
+
+    def flaky_list(user_id, model_id):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("database is locked")
+        return real_list(user_id, model_id)
+
+    index_records.list_accessible_embedded_images = flaky_list  # type: ignore[method-assign]
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        service.request_projection("system")
+
+        # Retried rather than dropped: the projection still lands.
+        _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+        assert calls["n"] >= 2
+    finally:
+        service.stop()
+
+
+def test_unchanged_scope_does_not_recompute_the_projection(
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+) -> None:
+    """Repeat requests over an unchanged gallery must not re-run the fit.
+
+    The fit is seeded, so recomputing burns minutes of single-threaded worker CPU to produce
+    identical coordinates — and a client that refetches on `projection_ready` would drive it
+    in a loop.
+    """
+    fits = {"n": 0}
+
+    def counting_umap(matrix: np.ndarray) -> np.ndarray:
+        # A stub, not the real fit: phase two runs at 4 points, past compute_umap's
+        # small-N PCA fallback, and the first real UMAP fit JIT-compiles numba —
+        # which can outlive stop()'s 10s join. The abandoned worker then fits
+        # concurrently with a later test's own fit, which aborts the process
+        # (SIGABRT on macOS). This test's claim is about WHETHER the fit runs,
+        # never about its output.
+        fits["n"] += 1
+        return np.zeros((matrix.shape[0], 2), dtype=np.float32)
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    try:
+        for i in range(3):
+            _save_image(image_records, f"img-{i}.png")
+        service.start(_make_invoker(images_service, index_records))
+        _wait_until(lambda: not service._backfill_pending.is_set())
+
+        with patch.object(image_index_default, "compute_umap", counting_umap):
+            service.request_projection("system")
+            _wait_until(lambda: index_records.get_projection("system", MODEL_ID) is not None, timeout=30.0)
+            assert fits["n"] == 1
+
+            for _ in range(3):
+                service.request_projection("system")
+                _wait_until(lambda: not service._projection_requests, timeout=30.0)
+
+            assert fits["n"] == 1, "unchanged scope must reuse the cached projection"
+
+        # A real scope change still recomputes. The callback is what enqueues work — writing
+        # the row alone leaves the backfill unarmed, so the worker would never see it.
+        _save_image(image_records, "new.png")
+        images_service._on_changed(_dto_for(image_records, "new.png"))
+        _wait_until(lambda: index_records.get_embeddings(["new.png"], MODEL_ID)[0] == ["new.png"], timeout=30.0)
+        with patch.object(image_index_default, "compute_umap", counting_umap):
+            service.request_projection("system")
+            _wait_until(lambda: fits["n"] == 2, timeout=30.0)
+            # The fit-entry count races the store; wait for the stored row so
+            # stop() joins an idle worker instead of abandoning a live one.
+            _wait_until(
+                lambda: (r := index_records.get_projection("system", MODEL_ID)) is not None and r.point_count == 4,
+                timeout=30.0,
+            )
+    finally:
+        service.stop()
+
+
+def test_failed_batch_uses_the_escalating_backoff(service: ImageIndexService) -> None:
+    """Pin the CALL SITE, not just the helper.
+
+    `_backoff_seconds()` is unit-tested on its own, but reverting the worker's failed-batch
+    wait to a fixed `_POLL_SECONDS` — the single most plausible way to lose this in a
+    hand-resolved rebase conflict — was previously invisible to the suite.
+    """
+    source = inspect.getsource(ImageIndexService._worker_loop)
+    assert "self._stop_event.wait(self._backoff_seconds())" in source
+    assert "self._stop_event.wait(_POLL_SECONDS)" not in source.split("except Exception")[0]
+
+
+def test_projection_job_is_popped_before_running(service: ImageIndexService) -> None:
+    """A job left in the dedup map turns the worker into an infinite recompute loop.
+
+    Nothing else stops it: with the scope-hash short-circuit the fit is skipped, but the
+    `projection_ready` emit would still fire on every pass.
+    """
+    service._model_id = MODEL_ID
+    with service._projection_lock:
+        service._projection_requests["u1"] = False
+
+    job = service._next_projection_job()
+
+    assert job == ("u1", False)
+    assert service._projection_requests == {}, "the job must be removed when it is taken"
+    assert service._next_projection_job() is None
+
+
+def test_embed_text_unavailable_without_model_config(
+    images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service.start(_make_invoker(images_service, index_records))
+
+    # Test mode injects encode_fn without a real model config: the text tower
+    # cannot exist, and the error must be the typed one the router maps to 409.
+    with pytest.raises(TextSearchUnavailableError):
+        service.embed_text("a query")
+
+
+def test_embed_text_unavailable_when_tokenizer_files_missing(tmp_path) -> None:
+    # The InvokeAI-published CLIP model dir ships a full-CLIP config.json but no
+    # tokenizer files: AutoTokenizer resolves a tokenizer class from the config
+    # and then fails with TypeError (not OSError) on the absent vocab file. The
+    # failure must still surface as the typed error the router maps to 409.
+    import json
+
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    (tmp_path / "config.json").write_text(
+        json.dumps({"model_type": "clip", "architectures": ["CLIPModel"], "text_config": {}, "vision_config": {}})
+    )
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(services=SimpleNamespace(configuration=SimpleNamespace(models_path=tmp_path)))  # type: ignore[assignment]
+    service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
+
+    with pytest.raises(TextSearchUnavailableError):
+        service.embed_text("a query")
+
+
+class _FakeTokenizer:
+    """Stands in for a transformers tokenizer: only the call shape matters here."""
+
+    def __init__(self, distinct: bool) -> None:
+        self._distinct = distinct
+
+    def __call__(self, texts, padding=True, return_tensors="pt", truncation=True):
+        # A vocabulary-less tokenizer emits the same unknown token for every
+        # word, so two unrelated phrases differ in nothing but length.
+        rows = [[0, 2, 2, 2] if not self._distinct else [0, index + 3, index + 9, 1] for index in range(len(texts))]
+        return {"input_ids": torch.tensor(rows, dtype=torch.long)}
+
+
+class _FakeTextModel:
+    """Returns rows straight from a fixture matrix, keyed by batch size."""
+
+    def __init__(self, matrix: torch.Tensor) -> None:
+        self._matrix = matrix
+
+    def eval(self) -> "_FakeTextModel":
+        return self
+
+    def __call__(self, **inputs):
+        count = inputs["input_ids"].shape[0]
+        return SimpleNamespace(text_embeds=self._matrix[:count], pooler_output=self._matrix[:count])
+
+
+def test_a_text_encoder_that_discriminates_reports_no_defect() -> None:
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    matrix = torch.tensor([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+
+    assert _text_encoder_defect(_FakeTokenizer(distinct=True), _FakeTextModel(matrix), False) is None
+
+
+@pytest.mark.parametrize(
+    "matrix, expected",
+    [
+        (torch.tensor([[0.5, 0.25, 0.0, 0.0], [0.5, 0.25, 0.0, 0.0]]), "same embedding"),
+        (torch.zeros((2, 4)), "all-zero"),
+        (torch.tensor([[float("nan"), 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]]), "non-finite"),
+    ],
+)
+def test_a_degenerate_text_encoder_is_detected(matrix: torch.Tensor, expected: str) -> None:
+    # The failure this exists for: a model directory with no tokenizer files
+    # still loads, because transformers builds a tokenizer with an empty
+    # vocabulary that maps every word to the same unknown token. Every phrase
+    # then embeds identically, and both cluster labels and text search go on
+    # returning confident nonsense — labels chosen by float noise among equal
+    # scores — with nothing downstream able to tell.
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    defect = _text_encoder_defect(_FakeTokenizer(distinct=False), _FakeTextModel(matrix), False)
+
+    assert defect is not None
+    assert expected in defect
+
+
+def test_a_degenerate_text_encoder_is_detected_even_when_its_norms_overflow_float32() -> None:
+    # Identical rows are the failure this guard exists for, but in float32 a
+    # large enough pair overflows the sum of squares: the norms come back inf,
+    # the cosine NaN, and `NaN >= threshold` is False — so the guard used to wave
+    # this through as healthy. The matrix itself is finite, so the non-finite
+    # branch above does not catch it either. Reachable whenever the tower's
+    # weights are garbage rather than absent (see skip_torch_weight_init in
+    # _get_text_encoder, whose monkey-patch can leak process-wide).
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    matrix = torch.full((2, 4), 1e20)
+    assert torch.equal(matrix[0], matrix[1])
+    assert torch.isfinite(matrix).all()
+
+    defect = _text_encoder_defect(_FakeTokenizer(distinct=False), _FakeTextModel(matrix), False)
+
+    assert defect is not None
+    assert "same embedding" in defect
+
+
+def test_a_probe_that_raises_is_reported_as_a_defect_rather_than_escaping() -> None:
+    # A probe that cannot complete has not cleared the encoder. Left to escape it
+    # reaches the router untyped and becomes a 500 instead of the 409 this path
+    # exists to produce. The trigger is a real broken install: a tokenizer whose
+    # ids overrun the tower's vocabulary raises IndexError inside nn.Embedding.
+    from invokeai.app.services.image_index.image_index_default import _text_encoder_defect
+
+    class _ExplodingModel:
+        def eval(self) -> "_ExplodingModel":
+            return self
+
+        def __call__(self, **inputs):
+            raise IndexError("index out of range in self")
+
+    defect = _text_encoder_defect(_FakeTokenizer(distinct=True), _ExplodingModel(), False)
+
+    assert defect is not None
+    assert "could not be exercised" in defect
+    assert "IndexError" in defect
+
+
+def test_embed_text_refuses_a_text_encoder_that_cannot_tell_phrases_apart(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # End to end through the lazy loader: the typed error is what the router
+    # maps to a 409, so labels and search report unavailable rather than
+    # serving results computed from identical vectors.
+    import gc
+    import json
+
+    import transformers
+
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    (tmp_path / "config.json").write_text(json.dumps({"model_type": "clip", "architectures": ["CLIPModel"]}))
+    constant = torch.ones((2, DIM))
+    loads: list[weakref.ReferenceType] = []
+
+    def _load_model(cls, *args, **kwargs):
+        model = _FakeTextModel(constant)
+        loads.append(weakref.ref(model))
+        return model
+
+    monkeypatch.setattr(
+        transformers.AutoTokenizer, "from_pretrained", classmethod(lambda cls, *a, **k: _FakeTokenizer(distinct=False))
+    )
+    monkeypatch.setattr(transformers.CLIPTextModelWithProjection, "from_pretrained", classmethod(_load_model))
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(services=SimpleNamespace(configuration=SimpleNamespace(models_path=tmp_path)))  # type: ignore[assignment]
+    service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+
+    for _ in range(3):
+        with pytest.raises(TextSearchUnavailableError, match="same embedding"):
+            service.embed_text("a query")
+
+    # The rejected encoder is not served...
+    assert service._text_encoder is None
+    # ...and not reloaded either. Reloading cannot change the verdict, and every
+    # attempt drags the whole text tower through MODEL_LOAD_LOCK, contending with
+    # generation's model loads — once per search keystroke on a broken install.
+    assert len(loads) == 1
+    # What is remembered is the message. A remembered *exception* would keep the
+    # rejected tower alive through the frames its traceback captured — the leak
+    # test below covers that end; here it is enough that nothing holds a tower.
+    assert isinstance(service._text_encoder_failure, str)
+    gc.collect()
+    assert loads[0]() is None
+
+
+def test_a_failed_vocabulary_build_does_not_pin_the_rejected_text_encoder(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The vocabulary build remembers its failure so a broken install answers the
+    # next request from memory. It must not remember the traceback with it: the
+    # probe rejects the encoder *after* loading it, so those frames hold the
+    # loaded tower — hundreds of MB kept alive for the life of the process.
+    import gc
+    import json
+
+    import transformers
+
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    (tmp_path / "config.json").write_text(json.dumps({"model_type": "clip", "architectures": ["CLIPModel"]}))
+    towers: list[weakref.ReferenceType] = []
+
+    def _load_model(cls, *args, **kwargs):
+        model = _FakeTextModel(torch.ones((2, DIM)))
+        towers.append(weakref.ref(model))
+        return model
+
+    monkeypatch.setattr(
+        transformers.AutoTokenizer, "from_pretrained", classmethod(lambda cls, *a, **k: _FakeTokenizer(distinct=False))
+    )
+    monkeypatch.setattr(transformers.CLIPTextModelWithProjection, "from_pretrained", classmethod(_load_model))
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(  # type: ignore[assignment]
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(models_path=tmp_path, db_path=tmp_path / "db.sqlite"),
+            # Not a real Logger: pytest's logging plugin retains every LogRecord
+            # for the test, and a record carrying exc_info holds the very
+            # traceback whose release is being asserted.
+            logger=SimpleNamespace(warning=lambda *args, **kwargs: None),
+        )
+    )
+    service._model_config = SimpleNamespace(type=ModelType.CLIPVision, path=str(tmp_path))  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+
+    service._build_vocab_embeddings()
+
+    assert service._vocab_failure is not None
+    assert service._vocab_failure.__traceback__ is None
+    assert service._vocab_failure.__cause__ is None
+    gc.collect()
+    assert towers and towers[0]() is None
+
+    # And it does not regrow. Re-raising a persistent exception re-attaches a
+    # traceback to it, so a stored failure cleared only once accumulates a frame
+    # set per labels request, each holding that request's caller frame.
+    holders: list[weakref.ReferenceType] = []
+
+    def one_labels_request() -> None:
+        # Stands in for the router frame, whose `record` is the whole projection.
+        record = np.zeros((50_000, 2), dtype=np.float32)
+        holders.append(weakref.ref(record))
+        with pytest.raises(TextSearchUnavailableError):
+            service.get_vocab_embeddings()
+
+    def frame_count() -> int:
+        count, traceback = 0, service._vocab_failure.__traceback__
+        while traceback is not None:
+            count, traceback = count + 1, traceback.tb_next
+        return count
+
+    one_labels_request()
+    after_one = frame_count()
+    for _ in range(9):
+        one_labels_request()
+
+    # Bounded at the one propagation in flight rather than growing with traffic,
+    # so every caller frame but the current one is released.
+    assert frame_count() == after_one
+    gc.collect()
+    assert [index for index, ref in enumerate(holders) if ref() is not None] == [len(holders) - 1]
+
+
+def test_search_similar_returns_empty_when_not_running(service: ImageIndexService) -> None:
+    assert service.search_similar(None, np.ones(DIM, dtype=np.float32), limit=5) == []
+
+
+def test_search_similar_scopes_to_the_requesting_user(
+    db: SqliteDatabase,
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+) -> None:
+    from invokeai.app.services.users.users_common import UserCreateRequest
+    from invokeai.app.services.users.users_default import UserService
+
+    other_user = UserService(db=db).create(
+        UserCreateRequest(email="scoped@example.com", display_name="Scoped", password="TestPass123", is_admin=False)
+    )
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: not service._backfill_pending.is_set())
+
+    def unit(index: int) -> np.ndarray:
+        v = np.zeros(DIM, dtype=np.float32)
+        v[index] = 1.0
+        return v
+
+    # system owns mine.png; the other user owns theirs.png (both unboarded).
+    _save_image(image_records, "mine.png")
+    index_records.upsert_embedding("mine.png", MODEL_ID, unit(0))
+    image_records.save(
+        image_name="theirs.png",
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=16,
+        height=16,
+        has_workflow=False,
+        user_id=other_user.user_id,
+    )
+    index_records.upsert_embedding("theirs.png", MODEL_ID, unit(0))
+
+    # The other user's scope must exclude the system user's private image
+    # even though it scores identically.
+    names = [name for name, _ in service.search_similar(other_user.user_id, unit(0), limit=10)]
+    assert names == ["theirs.png"]
+
+    # Admin scope (None) sees both.
+    admin_names = {name for name, _ in service.search_similar(None, unit(0), limit=10)}
+    assert admin_names == {"mine.png", "theirs.png"}
+
+
+def test_query_vectors_reject_a_non_finite_embedding(service: ImageIndexService) -> None:
+    # The indexer drops rows whose norm is non-finite because they poison every
+    # similarity they take part in. A query has nothing to drop: dividing anyway
+    # gives an all-NaN vector, then all-NaN scores, arbitrary argpartition
+    # results, and a response body containing bare `NaN` — which is not valid
+    # JSON, so the browser fails to parse it rather than showing no matches.
+    from invokeai.app.services.image_index.image_index_default import _normalize_query_vector
+
+    for bad in (np.inf, np.nan):
+        vector = np.ones(DIM, dtype=np.float32)
+        vector[0] = bad
+
+        with pytest.raises(RuntimeError, match="degenerate"):
+            _normalize_query_vector(vector)
+
+    with pytest.raises(RuntimeError, match="degenerate"):
+        _normalize_query_vector(np.zeros(DIM, dtype=np.float32))
+
+
+def test_query_vectors_normalize_in_float64(service: ImageIndexService) -> None:
+    from invokeai.app.services.image_index.image_index_default import _normalize_query_vector
+
+    # A float32 sum of squares overflows to inf well inside the range these
+    # encoders produce; float64 carries it, so this must normalize rather than
+    # trip the guard above.
+    vector = np.full(DIM, 3.0e19, dtype=np.float32)
+    normalized = _normalize_query_vector(vector)
+
+    assert np.isfinite(normalized).all()
+    assert float(np.linalg.norm(normalized.astype(np.float64))) == pytest.approx(1.0, rel=1e-3)
+
+
+def test_lazy_model_construction_takes_the_process_global_load_lock() -> None:
+    # skip_torch_weight_init monkey-patches torch.nn.*.reset_parameters process-wide
+    # and restores whatever it saw on entry. Two threads inside it at once means the
+    # second saves the no-op, and whoever leaves last restores the no-op forever —
+    # every layer built afterwards silently skips weight init. MODEL_LOAD_LOCK is
+    # what makes it safe, so both lazy loaders must hold it.
+    import inspect
+
+    from invokeai.app.services.image_index import image_index_default
+
+    loaders = (
+        image_index_default.ImageIndexService._get_text_encoder,
+        image_index_default.ImageIndexService._encode_with_model,
+    )
+
+    for fn in loaders:
+        source = inspect.getsource(fn)
+
+        if "skip_torch_weight_init" in source:
+            assert "MODEL_LOAD_LOCK.write_lock()" in source, (
+                f"{fn.__qualname__} patches torch globally without the process-global load lock"
+            )
+
+
+def test_vocab_embeddings_are_never_built_on_the_caller(service: ImageIndexService) -> None:
+    # The build is minutes of encoder work and callers reach it through
+    # asyncio.to_thread on the loop's shared executor. Blocking there — worse,
+    # blocking there under _vocab_lock — starves every other to_thread in the
+    # app, /points and image search included. The request only asks the worker.
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._invoker = SimpleNamespace()  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+
+    with pytest.raises(TextSearchUnavailableError, match="still being prepared"):
+        service.get_vocab_embeddings()
+
+    assert service._vocab_build_requested.is_set()
+
+
+def test_a_failed_vocabulary_build_is_not_retried_on_every_request(service: ImageIndexService) -> None:
+    # A vision-only install has no text tower. Without remembering the failure,
+    # every points refresh retries from_pretrained inside MODEL_LOAD_LOCK,
+    # contending with generation's model loads for as long as the app runs.
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._vocab_failure = TextSearchUnavailableError("no text encoder")  # type: ignore[assignment]
+
+    with pytest.raises(TextSearchUnavailableError, match="no text encoder"):
+        service.get_vocab_embeddings()
+
+    # Not even queued: there is nothing for the worker to retry.
+    assert not service._vocab_build_requested.is_set()
+
+
+def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.ndarray) -> ImageIndexService:
+    """A service wired for `_build_vocab_embeddings` over a three-phrase vocabulary."""
+    from invokeai.app.services.image_index import cluster_labels
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat", "a dog", "a car"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", lambda embed_fn, vocabulary: matrix)
+
+    svc = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    svc._invoker = SimpleNamespace(  # type: ignore[assignment]
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(db_path=tmp_path / "invokeai.db"),
+            logger=InvokeAILogger.get_logger(),
+        )
+    )
+    svc._model_id = MODEL_ID
+
+    return svc
+
+
+def test_the_vocabulary_cache_reaches_disk_under_its_final_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # np.savez appends `.npz` to a path that lacks it, so a staging name ending
+    # in `.tmp` produced `.tmp.npz` on disk and the rename that followed looked
+    # for a file that was never written. The handler swallowed the error, which
+    # left the in-memory cache working and hid the fact that nothing persisted:
+    # every restart re-embedded ~1700 phrases (minutes, with no cluster labels
+    # until it finished) and leaked one staging file per run.
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+
+    service._build_vocab_embeddings()
+
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    assert cache_path.exists()
+    # Nothing else: a leftover staging file means the rename did not happen.
+    assert [path.name for path in sorted(tmp_path.iterdir())] == [cache_path.name]
+
+
+def test_a_cached_vocabulary_is_reused_instead_of_re_embedded(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The point of persisting it: the next process reads the file rather than
+    # spending minutes in the text tower before it can serve a single label.
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    _vocab_build_service(tmp_path, monkeypatch, matrix)._build_vocab_embeddings()
+
+    from invokeai.app.services.image_index import cluster_labels
+
+    def _refuse(embed_fn: Callable[[list[str]], np.ndarray], vocabulary: list[str]) -> np.ndarray:
+        raise AssertionError("re-embedded a vocabulary that was already cached")
+
+    restarted = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _refuse)
+
+    restarted._build_vocab_embeddings()
+
+    assert restarted._vocab_cache is not None
+    vocabulary, cached = restarted._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(cached, matrix)
+
+
+def test_a_failed_cache_write_says_what_went_wrong(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Nothing else reports this failure: the in-memory cache below the handler
+    # is assigned either way, so labelling keeps working and the only symptom
+    # is a slow startup nobody attributes to it. The `.tmp` staging-name bug
+    # survived for exactly that reason — the warning named the cache path but
+    # never the FileNotFoundError that would have identified it outright.
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    recorded: list[tuple[str, object]] = []
+    service._invoker.services.logger = SimpleNamespace(  # type: ignore[union-attr]
+        warning=lambda message, exc_info=False: recorded.append((str(message), exc_info))
+    )
+
+    def _refuse(src: object, dst: object) -> None:
+        raise PermissionError("simulated: another instance holds the cache open")
+
+    monkeypatch.setattr(image_index_default.os, "replace", _refuse)
+
+    service._build_vocab_embeddings()
+
+    assert len(recorded) == 1
+    message, exc_info = recorded[0]
+    assert "Could not write cluster vocabulary cache" in message
+    assert exc_info is True
+    # The run itself is unaffected — which is why the warning has to carry it.
+    assert service._vocab_cache is not None
+
+
+def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:
+    # One bad row out of ~11,700 must not discard the whole vocabulary build:
+    # that raises past the endpoint's handling as a 500 and, nothing having been
+    # cached, repeats the full embed on the next request. A zeroed row scores 0
+    # against everything, so the phrase simply never wins a label.
+    from invokeai.app.services.image_index.image_index_default import _normalize_batch
+
+    matrix = np.ones((3, DIM), dtype=np.float32)
+    matrix[1] = 0.0
+    matrix[2, 0] = np.inf
+
+    normalized = _normalize_batch(matrix)
+
+    assert np.isfinite(normalized).all()
+    assert float(np.linalg.norm(normalized[0])) == pytest.approx(1.0, rel=1e-5)
+    assert not normalized[1].any()
+    assert not normalized[2].any()

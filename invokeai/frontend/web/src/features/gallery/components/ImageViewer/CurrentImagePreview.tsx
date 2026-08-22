@@ -19,7 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-import { useImageViewerContext } from './context';
+import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
@@ -38,6 +38,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
+    lastRenderedItemNameRef,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
@@ -45,7 +46,6 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const isProgressImageResolving = useStore($isProgressImageResolving);
   const isTemporarilyShowingSelectedImage = useStore($isTemporarilyShowingSelectedImage);
   const [imageToRender, setImageToRender] = useState<ImageDTO | null>(null);
-  const previousRenderedImageNameRef = useRef<string | null>(null);
   const selectedImageRevealTimeoutId = useRef(0);
 
   useEffect(() => {
@@ -93,8 +93,16 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   useEffect(() => {
     const renderedImageName = imageToRender?.image_name ?? null;
-    const previousRenderedImageName = previousRenderedImageNameRef.current;
-    previousRenderedImageNameRef.current = renderedImageName;
+    // The previous-item ref is shared with CurrentVideoPreview (via the viewer context) so a click
+    // that switches media type still reads as a selection change here. While a selection exists
+    // but its preload hasn't landed yet (renderedImageName still null on the mount run after a
+    // video -> image swap), the ref must NOT be overwritten — nulling it here would erase the
+    // "previous item was the video" fact and swallow the reveal this run's successor would fire.
+    // A genuinely empty selection does reset it, preserving the no-reveal-on-first-selection rule.
+    const previousRenderedItemName = lastRenderedItemNameRef.current;
+    if (renderedImageName !== null || !selectedImageName) {
+      lastRenderedItemNameRef.current = renderedImageName;
+    }
 
     window.clearTimeout(selectedImageRevealTimeoutId.current);
 
@@ -109,14 +117,14 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       return;
     }
 
-    if (previousRenderedImageName === null || previousRenderedImageName === renderedImageName) {
+    if (previousRenderedItemName === null || previousRenderedItemName === renderedImageName) {
       return;
     }
 
     $isTemporarilyShowingSelectedImage.set(true);
     selectedImageRevealTimeoutId.current = window.setTimeout(() => {
       $isTemporarilyShowingSelectedImage.set(false);
-    }, SELECTED_IMAGE_REVEAL_DURATION_MS);
+    }, SELECTED_ITEM_REVEAL_DURATION_MS);
 
     return () => {
       window.clearTimeout(selectedImageRevealTimeoutId.current);
@@ -126,6 +134,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     hasProgressImage,
     imageToRender?.image_name,
     isProgressImageResolving,
+    lastRenderedItemNameRef,
     selectedImageName,
     shouldShowProgressInViewer,
   ]);
@@ -193,6 +202,12 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     dependencies: [onHotkeyNextImage],
   });
 
+  // The loaded image identifies its session so the viewer can tell a late load from an earlier
+  // session apart from the one whose preview is currently retained (see onLoadImage).
+  const onLoadRenderedImage = useCallback(() => {
+    onLoadImage(imageToRender?.session_id ?? null);
+  }, [imageToRender?.session_id, onLoadImage]);
+
   const withProgress = shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage;
   // When more than one session is generating concurrently (multi-GPU), tile their previews instead of
   // showing only the most recent one.
@@ -210,7 +225,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     >
       {imageToRender && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center">
-          <DndImage imageDTO={imageToRender} onLoad={onLoadImage} borderRadius="base" />
+          <DndImage imageDTO={imageToRender} onLoad={onLoadRenderedImage} borderRadius="base" />
         </Flex>
       )}
       {!imageToRender && <NoContentForViewer />}
@@ -271,5 +286,3 @@ const exit: AnimationProps['exit'] = {
   opacity: 0,
   transition: { duration: 0.07 },
 };
-
-const SELECTED_IMAGE_REVEAL_DURATION_MS = 2000;

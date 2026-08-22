@@ -122,6 +122,9 @@ class WorkflowRecordDTOBase(BaseModel):
     opened_at: Optional[Union[datetime.datetime, str]] = Field(
         default=None, description="The opened timestamp of the workflow."
     )
+    last_run_at: Optional[Union[datetime.datetime, str]] = Field(
+        default=None, description="The timestamp of the last completed run of this workflow."
+    )
     user_id: str = Field(description="The id of the user who owns this workflow.")
     is_public: bool = Field(description="Whether this workflow is shared with all users.")
 

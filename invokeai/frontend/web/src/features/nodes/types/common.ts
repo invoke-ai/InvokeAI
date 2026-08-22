@@ -120,6 +120,7 @@ export const zBaseModelType = z.enum([
   'external',
   'anima',
   'wan',
+  'minimax-h3',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
@@ -138,6 +139,7 @@ export const zMainModelBase = z.enum([
   'ideogram-4',
   'anima',
   'wan',
+  'minimax-h3',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
@@ -181,11 +183,13 @@ export const zSubModelType = z.enum([
   'tokenizer',
   'tokenizer_2',
   'tokenizer_3',
+  'processor',
   'pe',
   'pe_tokenizer',
   'vae',
   'vae_decoder',
   'vae_encoder',
+  'audio_vae',
   'scheduler',
   'safety_checker',
 ]);
@@ -202,6 +206,7 @@ const zWanVariantType = z.enum(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
  *  targets. A14B = inner_dim 5120 (both T2V and I2V), 5B = inner_dim 3072. */
 const zWanLoRAVariantType = z.enum(['a14b', '5b']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
+const zMiniMaxH3VariantType = z.enum(['fl2va']);
 const zMistralVariantType = z.enum(['cow_mistral3_small', 'mistral3_24b']);
 const zPiDDecoderVariantType = z.enum(['res2k_sr4x', 'res2kto4k_sr4x']);
 export const zAnyModelVariant = z.union([
@@ -215,6 +220,7 @@ export const zAnyModelVariant = z.union([
   zWanVariantType,
   zWanLoRAVariantType,
   zQwen3VariantType,
+  zMiniMaxH3VariantType,
   zMistralVariantType,
   zPiDDecoderVariantType,
 ]);
@@ -239,6 +245,7 @@ export const zModelFormat = z.enum([
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
+  'sdnq_quantized',
   'external_api',
   'unknown',
 ]);

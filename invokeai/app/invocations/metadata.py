@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
     MetadataField,
     OutputField,
     UIType,
+    VideoField,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
@@ -185,6 +186,12 @@ GENERATION_MODES = Literal[
     "wan_inpaint",
     "wan_outpaint",
     "wan_i2v",
+    "minimax_h3_t2v",
+    "minimax_h3_i2v",
+    "minimax_h3_lf2v",
+    "minimax_h3_flf2v",
+    "minimax_h3_extend_video",
+    "minimax_h3_txt2img",
 ]
 
 
@@ -193,7 +200,7 @@ GENERATION_MODES = Literal[
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.2.0",
+    version="2.3.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -260,6 +267,34 @@ class CoreMetadataInvocation(BaseInvocation):
     ideogram4_caption: Optional[str] = InputField(
         default=None,
         description="The structured JSON caption encoded for Ideogram 4 inference",
+    )
+
+    # Video generation. Frame count and keyframes have no home among the image fields, and
+    # the two MiniMax H3 single-file overrides are separate models from the main install, so
+    # `model` alone would not identify what actually ran.
+    num_frames: Optional[int] = InputField(
+        default=None,
+        description="The number of video frames generated",
+    )
+    first_frame_image: Optional[ImageField] = InputField(
+        default=None,
+        description="The image used as the video's first frame",
+    )
+    last_frame_image: Optional[ImageField] = InputField(
+        default=None,
+        description="The image used as the video's last frame",
+    )
+    source_video: Optional[VideoField] = InputField(
+        default=None,
+        description="The video this generation was derived from, e.g. the clip an extend workflow continues",
+    )
+    minimax_h3_transformer_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The single-file MiniMax H3 transformer used in place of the main model's transformer",
+    )
+    minimax_h3_text_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The single-file MiniMax H3 Qwen3-VL text encoder used in place of the main model's",
     )
 
     # High resolution fix metadata.

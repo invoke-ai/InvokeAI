@@ -33,13 +33,18 @@ export const addTextToImage = ({
   | 'ernie_image_vae_decode'
   | 'anima_l2i'
   | 'wan_l2i'
+  | 'minimax_h3_latents_to_image'
 > => {
-  denoise.denoising_start = 0;
-  denoise.denoising_end = 1;
+  if (denoise.type !== 'minimax_h3_denoise') {
+    // MiniMax H3's denoise node has no denoising_start/end fields (txt2img/t2v only).
+    denoise.denoising_start = 0;
+    denoise.denoising_end = 1;
+  }
 
   const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
 
   if (
+    denoise.type === 'minimax_h3_denoise' ||
     denoise.type === 'cogview4_denoise' ||
     denoise.type === 'qwen_image_denoise' ||
     denoise.type === 'flux_denoise' ||

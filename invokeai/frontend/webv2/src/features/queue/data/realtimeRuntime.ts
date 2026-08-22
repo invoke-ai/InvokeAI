@@ -14,7 +14,7 @@ export interface QueueItemProgressPort {
   set(
     itemId: number,
     progress: {
-      /** The GPU running this session, e.g. `cuda:1`; null on non-CUDA and single-device installs. */
+      /** The accelerator running this session, e.g. `cuda:1` or `xpu:1`; null on unindexed and single-device installs. */
       device?: string | null;
       image?: { dataUrl: string; height: number; width: number };
       message: string;

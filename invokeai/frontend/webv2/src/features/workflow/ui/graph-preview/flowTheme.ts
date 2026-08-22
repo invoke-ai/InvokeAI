@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type { WorkbenchThemeId } from '@theme/themes';
 
+import { WORKFLOW_NODE_SURFACE_TOKEN } from '@features/workflow/ui/nodeChrome';
 import { THEMES_BY_ID } from '@theme/themes';
 
 /**
@@ -8,10 +9,12 @@ import { THEMES_BY_ID } from '@theme/themes';
  * so every flow renderer (workflow editor, graph preview) applies these
  * Chakra-token-backed `--xy-*` override vars on its wrapper — they inherit
  * into `.react-flow` and outrank the colorMode defaults. `--wb-flow-grid` is
- * ours, consumed by `<Background color>` and preview handles.
+ * ours, consumed by `<Background color>` and preview handles; `--wb-node-surface`
+ * feeds the node-body token to inline-styled field handles.
  */
 export const flowThemeCss: SystemStyleObject = {
   '--wb-flow-grid': '{colors.fg.grid}',
+  '--wb-node-surface': `{colors.${WORKFLOW_NODE_SURFACE_TOKEN}}`,
   '--xy-attribution-background-color': 'transparent',
   '--xy-background-color': '{colors.bg}',
   '--xy-connectionline-stroke': '{colors.accent.solid}',

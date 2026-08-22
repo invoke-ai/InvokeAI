@@ -14,7 +14,12 @@ export type GalleryLayoutMode = 'stacked' | 'wide';
 /** Below this the board column's ~240px leaves too little grid to scan. */
 export const GALLERY_WIDE_MIN_WIDTH_PX = 560;
 
-/** Side panels are capped well under the threshold, so they skip measuring. */
+/**
+ * Side panels are always stacked, whatever they measure: a docked inspector
+ * keeps one arrangement so it does not reflow as the user drags its edge.
+ * (Their maximum is 720px, so the threshold below is reachable there — the
+ * branch is the reason they never take it, not the width.)
+ */
 export const getGalleryLayout = ({
   region,
   widthPx,

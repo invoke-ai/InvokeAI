@@ -11,6 +11,7 @@ import {
   getGalleryLiveSlots,
   getGalleryQueuePlaceholders,
   getGallerySelectedBoardId,
+  getGallerySemanticImageQuery,
   getGalleryStateView,
 } from './galleryStateView';
 
@@ -179,7 +180,7 @@ describe('gallery state view', () => {
     });
   });
 
-  it('parses persisted gallery settings with safe defaults', () => {
+  it('parses persisted gallery settings with safe defaults and keeps the starred section complete', () => {
     const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredFirst: false }, boards, [], false);
 
     expect(gallery.settings).toEqual({
@@ -195,8 +196,9 @@ describe('gallery state view', () => {
       showArchivedBoards: false,
       showDateBoards: false,
       showImageDimensions: false,
+      showOtherProjectBoards: true,
       showPendingItems: true,
-      starredFirst: false,
+      starredFirst: true,
       thumbnailFit: 'square',
     });
   });
@@ -259,6 +261,40 @@ describe('gallery state view', () => {
     expect(gallery.selectedItemKey).toBe('video:shared');
     expect(gallery.selectedItemKeys).toEqual(['image:shared', 'video:shared']);
     expect(gallery.compareImageKey).toBe('image:shared');
+  });
+
+  it('parses a persisted semantic reference for the gallery view', () => {
+    const values = { semanticImageQuery: { kind: 'url', url: 'https://x.test/i.png' } };
+    const first = getGallerySemanticImageQuery(values);
+    const second = getGallerySemanticImageQuery({ ...values });
+
+    expect(first).toEqual({ kind: 'url', url: 'https://x.test/i.png' });
+    expect(second).toEqual(first);
+    expect(getGallerySemanticImageQuery({ semanticImageQuery: 'other.png' })).toEqual({
+      imageName: 'other.png',
+      kind: 'image',
+    });
+  });
+
+  it('threads the parsed semantic reference into the view and hides pending placeholders while ranked', () => {
+    const queueItems = [createQueueItem({ batchCount: 2, boardId: 'board-1', status: 'pending' })];
+    const withSemantic = getGalleryStateView(
+      { selectedBoardId: 'board-1', semanticImageQuery: 'ref.png' },
+      boards,
+      [],
+      false,
+      queueItems
+    );
+
+    // Legacy persisted shape: a bare image name.
+    expect(withSemantic.semanticImageQuery).toEqual({ imageName: 'ref.png', kind: 'image' });
+    // A ranked result has no chronological insertion point for images-to-come.
+    expect(withSemantic.pendingPlaceholders).toEqual([]);
+
+    const withoutSemantic = getGalleryStateView({ selectedBoardId: 'board-1' }, boards, [], false, queueItems);
+
+    expect(withoutSemantic.semanticImageQuery).toBe(null);
+    expect(withoutSemantic.pendingPlaceholders.length).toBeGreaterThan(0);
   });
 
   it('creates placeholders for in-flight gallery queue items on the viewed board', () => {

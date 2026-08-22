@@ -74,6 +74,12 @@ export type QueueCompiledSubmission =
       batchCount: number;
       graph: QueueBackendGraph;
       kind: 'workflow';
+      /**
+       * The library record this run's workflow was loaded from, when the project
+       * graph is bound to one. Stamped at compile time so a completed run can be
+       * attributed back to the library record even after the editor moved on.
+       */
+      libraryWorkflowId?: string;
     }
   | {
       batchCount: number;
@@ -113,6 +119,24 @@ export interface QueueResultImage {
   width: number;
 }
 
+/** A settled run of a library-bound workflow, reported once its results are routed. */
+export interface QueueWorkflowRunCompletedEvent {
+  /** Result images in run order; the last one is the run's final output. */
+  imageNames: readonly string[];
+  libraryWorkflowId: string;
+  projectId: string;
+  queueItemId: string;
+}
+
+/**
+ * Optional observer for completed library-bound workflow runs. The Queue owns
+ * neither the workflow library nor the gallery, so the App composition root
+ * supplies the implementation; a missing sink simply disables the notification.
+ */
+export interface QueueWorkflowRunSink {
+  onWorkflowRunCompleted(event: QueueWorkflowRunCompletedEvent): void;
+}
+
 export type QueueItemStatus = 'pending' | 'in_progress' | 'waiting' | 'completed' | 'failed' | 'canceled';
 export type TerminalQueueItemStatus = Extract<QueueItemStatus, 'completed' | 'failed' | 'canceled'>;
 export type QueueConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -133,7 +157,7 @@ export interface QueueItemReadModel {
   completedAt?: string | null;
   createdAt: string;
   destination?: string | null;
-  /** The GPU that processed this item, e.g. `cuda:1`. Null on non-CUDA and single-device installs. */
+  /** The accelerator that processed this item, e.g. `cuda:1` or `xpu:1`. Null on unindexed and single-device installs. */
   device?: string | null;
   errorMessage?: string | null;
   errorTraceback?: string | null;
@@ -221,6 +245,11 @@ export interface QueueResultImageOptions {
   resultNodeIds?: readonly string[];
 }
 
+export interface QueueResultVideoOptions extends QueueResultImageOptions {
+  /** Drop videos whose DTO reports is_intermediate — the video analogue of filterIntermediateResults. */
+  excludeIntermediate?: boolean;
+}
+
 /** User-facing Queue commands; transport and adapter details stay private. */
 export interface QueueFeatureCommands {
   cancelCurrentItem(): Promise<void>;
@@ -248,6 +277,8 @@ export interface QueueBackendPort extends QueueFeatureCommands {
     queuedAt: string,
     options?: QueueResultImageOptions
   ): Promise<QueueResultImage[]>;
+  /** Names of the videos a completed backend item produced (no DTO hydration needed). */
+  getResultVideoNames(itemId: number, options?: QueueResultVideoOptions): Promise<string[]>;
   listItems(): Promise<QueueBackendItem[]>;
   readCurrent(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;

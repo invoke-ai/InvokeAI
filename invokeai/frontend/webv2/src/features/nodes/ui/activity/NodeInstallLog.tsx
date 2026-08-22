@@ -6,6 +6,7 @@ import { Badge, Icon, Table, Text } from '@chakra-ui/react';
 import { useCustomNodeInstallLog } from '@features/nodes/data/installLogStore';
 import { Scrollable } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { InboxIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -70,9 +71,7 @@ const InstallLogRow = ({ entry }: { entry: CustomNodeInstallLogEntry }) => {
   return (
     <Table.Row>
       <Table.Cell borderColor="border.subtle" ps="3">
-        <Text fontSize="xs" title={entry.name} truncate>
-          {entry.name}
-        </Text>
+        <MiddleTruncate fontSize="xs" text={entry.name} />
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
         <Badge colorPalette={badge.palette} fontSize="2xs" variant="surface">

@@ -25,6 +25,12 @@ export interface FieldInputTemplate {
   description: string;
   type: FieldType;
   required: boolean;
+  /**
+   * `internal` marks a field the backend provides rather than the node author declaring it
+   * (`metadata`). It is a real, connectable input, but it is not part of the node's authored
+   * signature, so heuristics that pick "the" input for a node must skip it.
+   */
+  fieldKind: 'input' | 'internal';
   /** How the field receives data: only via edge, only direct value, or either. */
   input: 'connection' | 'direct' | 'any';
   default?: unknown;
@@ -40,6 +46,7 @@ export interface FieldInputTemplate {
   exclusiveMaximum: number | null;
   multipleOf: number | null;
   uiModelBase: string[] | null;
+  uiModelFormat: string[] | null;
   uiModelType: string[] | null;
 }
 

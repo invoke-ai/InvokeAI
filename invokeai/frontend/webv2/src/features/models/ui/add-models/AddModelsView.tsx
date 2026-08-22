@@ -15,7 +15,14 @@ import {
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
-import { updateModelsUi, useModelsUiSelector } from '@features/models/ui/uiStore';
+import {
+  clearAddModelsSeed,
+  getAddModelsSeed,
+  openExternalProviderKeys,
+  openModelManagerTab,
+  updateModelsUi,
+  useModelsUiSelector,
+} from '@features/models/ui/uiStore';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
@@ -26,10 +33,10 @@ import {
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Scrollable, Tooltip } from '@platform/ui';
+import { HuggingFaceIcon } from '@platform/ui/BrandIcon';
 import { DownloadIcon, FileIcon, FolderIcon, FolderSearchIcon, LinkIcon, SearchIcon } from 'lucide-react';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SiHuggingface } from 'react-icons/si';
 
 import { AccessTokenPopover } from './AccessTokenPopover';
 import { BundleChips } from './BundleChips';
@@ -46,7 +53,7 @@ import { useInstallActions } from './useInstallActions';
 const SOURCE_KIND_ICONS: Record<string, ElementType> = {
   'models.sourceKind.filePath': FileIcon,
   'models.sourceKind.folderPath': FolderIcon,
-  'models.sourceKind.hfRepo': SiHuggingface,
+  'models.sourceKind.hfRepo': HuggingFaceIcon,
   'models.sourceKind.url': LinkIcon,
 };
 
@@ -75,7 +82,11 @@ export const AddModelsView = () => {
       left.selectedBundleName === right.selectedBundleName
   );
 
-  const [query, setQuery] = useState('');
+  // Local state, so the box empties when the view unmounts (a tab switch) — but
+  // seeded once from whatever asked to search here on the way in. The read is
+  // pure, because StrictMode double-invokes this initializer; the consuming
+  // clear is the mount effect below.
+  const [query, setQuery] = useState(getAddModelsSeed);
   const [accessToken, setAccessToken] = useState('');
   const [inplace, setInplace] = useState(true);
   const { isBusy: isPulling, run: runPull } = useScopedAction();
@@ -92,6 +103,8 @@ export const AddModelsView = () => {
   const [starterFilters, setStarterFilters] = useState<StarterModelFilters>(DEFAULT_STARTER_MODEL_FILTERS);
 
   useMountEffect(() => {
+    // One-shot: a seed only ever fills the box the view was opened with.
+    clearAddModelsSeed();
     ensureStartersLoaded();
 
     const owner = captureAccountScope();
@@ -294,7 +307,7 @@ export const AddModelsView = () => {
             <AccessTokenPopover
               value={accessToken}
               onChange={setAccessToken}
-              onManageKeys={() => updateModelsUi({ activeTab: 'keys' })}
+              onManageKeys={() => openModelManagerTab('keys')}
             />
           ) : null}
 
@@ -416,7 +429,7 @@ export const AddModelsView = () => {
                 response={response}
                 selectedBundleSources={selectedBundleSources}
                 status={status}
-                onConfigureExternalProvider={() => updateModelsUi({ activeTab: 'keys' })}
+                onConfigureExternalProvider={openExternalProviderKeys}
                 onInstall={(model) => void installStarter(model)}
               />
             ) : null}

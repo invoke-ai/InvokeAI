@@ -1,2 +1,10 @@
 export { documentToPreviewGraph, GraphPreviewDialog, GraphPreviewFlow } from './ui/graph-preview';
-export { getWorkflowNodeChromeProps } from './ui/editor/nodeChrome';
+export {
+  getWorkflowNodeBodyProps,
+  getWorkflowNodeChromeProps,
+  getWorkflowNodeHeaderProps,
+  getWorkflowNodeShellProps,
+  WORKFLOW_NODE_DENSITY,
+  WorkflowNodeHandleDot,
+  WorkflowNodeInfoIcon,
+} from './ui/nodeChrome';

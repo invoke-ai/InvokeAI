@@ -8,6 +8,7 @@ import { AddNodesView } from '@features/nodes/ui/add-nodes/AddNodesView';
 import { NodePackDetail } from '@features/nodes/ui/detail/NodePackDetail';
 import { updateNodesUi, useNodesUiSelector, type NodesManagerTab } from '@features/nodes/ui/nodesUiStore';
 import { Scrollable, Tabs } from '@platform/ui';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -36,9 +37,7 @@ export const DetailPane = () => {
           <Tabs.List mb="-1px">
             <Tabs.Trigger value="details">
               <Icon as={BlocksIcon} boxSize="3" />
-              <Text maxW="14rem" truncate>
-                {detailLabel}
-              </Text>
+              <MiddleTruncate maxW="14rem" text={detailLabel} />
             </Tabs.Trigger>
             <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />

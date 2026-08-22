@@ -2,6 +2,7 @@ import { invalidateGallery } from '@features/gallery/queries';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime } from '@features/queue';
+import { createWorkflowRunCaptureSink } from '@features/workflow/queries';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
@@ -27,6 +28,33 @@ export const QueueRuntimeAdapter = () => {
           await galleryOrganization.addToBoard(boardId, imageNames, owner.signal);
           assertAccountScopeCurrent(owner);
         },
+        addVideosToGalleryBoard: async (boardId, videoNames) => {
+          assertAccountScopeCurrent(owner);
+          const { galleryItemOrganization, isGalleryBoardAttachable } = await import('@features/gallery');
+
+          // Virtual destinations (date buckets, `generated`/`assets`) cannot hold
+          // attachments: the transport no-ops for them, which would otherwise read
+          // back as every video failing. The image path ignores this the same way.
+          if (!isGalleryBoardAttachable(boardId)) {
+            return;
+          }
+
+          assertAccountScopeCurrent(owner);
+          const result = await galleryItemOrganization.moveToBoard(
+            videoNames.map((name) => ({ kind: 'video' as const, name })),
+            boardId,
+            owner.signal
+          );
+          assertAccountScopeCurrent(owner);
+          // The video transport confirms per item and never throws on non-fatal errors;
+          // surface unconfirmed refs so the queue runtime can record the failure instead
+          // of leaving the videos silently in Uncategorized (e.g. board deleted mid-run).
+          if (result.failed.length > 0) {
+            throw new Error(
+              `${result.failed.length} of ${videoNames.length} video(s) could not be added to the board.`
+            );
+          }
+        },
       },
       ensureTemplatesLoaded: ensureInvocationTemplatesLoaded,
       history: {
@@ -48,6 +76,9 @@ export const QueueRuntimeAdapter = () => {
       },
       modelLoads: modelLoadActivitySink,
       nodeExecution: nodeExecutionStore,
+      // Closes the loop on a library-bound run: its final output becomes the
+      // workflow's cover image and stamps `last_run_at` on the record.
+      workflowRuns: createWorkflowRunCaptureSink(),
     });
 
     runtime.start();

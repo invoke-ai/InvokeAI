@@ -4,6 +4,7 @@ import {
   buttonRecipe,
   colorPickerSlotRecipe,
   comboboxSlotRecipe,
+  dataListSlotRecipe,
   dialogSlotRecipe,
   hoverCardSlotRecipe,
   inputRecipe,
@@ -22,28 +23,20 @@ import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDe
 /**
  * Workbench design system.
  *
- * Each theme (`themes.ts`) is authored as one neutral ramp (`neutral.50…neutral.950`,
- * lightest → darkest) plus a few seeds (brand, accent, status) and four off-ramp
- * neutrals (`inset`, `fill`, `grid`, `control`). This module turns that into two
- * token layers:
+ * Each theme is one neutral ramp (`neutral.50…950`) plus seeds and four
+ * off-ramp neutrals, turned into two token layers:
  *
- *   1. The **ramp** is emitted verbatim as conditional semantic tokens
- *      (`neutral.*`), one value per theme keyed on a custom `[data-theme=<id>]`
- *      condition. Chakra base `tokens.colors` only hold plain strings, so anything
- *      that varies per theme must live in `semanticTokens`.
- *   2. The **semantic contract** (`bg`, `fg.muted`, `border.emphasized`, the
- *      `gray`/`brand`/`accent` palettes, …) is theme-agnostic: it references ramp
- *      steps and flips by light/dark mode only. `bg` is `neutral.950` in dark mode and
- *      `neutral.200` in light — the light ramp is not a mirror of the dark one, because
- *      light panels go *whiter* than the app background.
+ *   1. The **ramp** emits as conditional semantic tokens keyed on
+ *      `[data-theme=<id>]`. Chakra's base `tokens.colors` hold plain strings, so
+ *      anything varying per theme must live in `semanticTokens`.
+ *   2. The **semantic contract** (`bg`, `fg.muted`, …) is theme-agnostic and
+ *      flips by light/dark only. Light is not a mirror of dark — light panels go
+ *      *whiter* than the app background.
  *
- * `ThemeController` sets `data-theme` (and the `.dark`/`.light` class) on `<html>`,
- * so switching themes is a single attribute change with zero React re-render.
- * Components reference only the semantic tokens — never the ramp or a theme.
- *
- * Re-pointing Chakra's neutral `gray` palette at the ramp makes every built-in
- * component (Dialog, Menu, Input, Button, Tooltip, Badge) follow the active theme
- * with no per-component overrides.
+ * `ThemeController` sets `data-theme` on `<html>`, so switching is one attribute
+ * change with zero re-render. Components reference only semantic tokens.
+ * Re-pointing Chakra's `gray` at the ramp makes every built-in component follow
+ * the theme without per-component overrides.
  */
 
 const NON_DEFAULT_THEMES = THEMES.filter((theme) => theme.id !== DEFAULT_THEME_ID);
@@ -107,6 +100,24 @@ const danger: Compute = (theme) => theme.colors.danger;
 const success: Compute = (theme) => theme.colors.success;
 const warning: Compute = (theme) => theme.colors.warning;
 const brandSolid: Compute = (theme) => theme.colors.brand.solid;
+
+/**
+ * Brand as a *foreground* colour rather than a fill.
+ *
+ * The seed is a bright lime picked to carry on the dark themes' near-black
+ * surfaces, where it measures 14.5:1. On the light theme the same value sits at
+ * L≈92% against a 99% white panel and measures 1.20:1 — invisible, which is why
+ * the Invoke mark all but disappeared there. Darkening it halfway into the text
+ * ramp brings it to 4.2:1 on the panel and 4.1:1 on `brand.subtle`: still
+ * unmistakably the brand hue, now actually a colour you can put something in.
+ *
+ * `brand.solid` is untouched — fills keep the bright seed and pair it with
+ * `brand.contrast`.
+ */
+const brandFg: Compute = (theme) =>
+  theme.colorScheme === 'light'
+    ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
+    : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
 
 /** The neutral ramp, emitted as `neutral.50…neutral.950`, one value per theme. */
@@ -179,14 +190,15 @@ const semanticColors = {
   },
   /**
    * Invoke identity palette (lime). Authored from two seeds (`solid` + `contrast`),
-   * like `accent`; the rest derive. NOTE: `brand.fg` is the bright `solid` fill, so
-   * `brand.fg` on `brand.subtle` reads well on the dark themes but is low-contrast in
-   * the light theme — brand is meant for emphasis fills, not body text.
+   * like `accent`; the rest derive. `brand.fg` is the seed on the dark themes and a
+   * darkened mix on the light one (see {@link brandFg}), so it is safe to put text
+   * and icons in on any theme; `brand.solid` stays the bright fill and wants
+   * `brand.contrast` on top of it.
    */
   brand: {
     solid: colorToken(brandSolid),
     contrast: colorToken((theme) => theme.colors.brand.contrast),
-    fg: colorToken(brandSolid),
+    fg: colorToken(brandFg),
     subtle: mix(brandSolid, 16, surface),
     muted: mix(brandSolid, 26, surface),
     emphasized: mix(brandSolid, 36, surface),
@@ -248,6 +260,14 @@ const config = defineConfig({
     ':root[data-reduce-motion="true"] .chakra-skeleton': {
       animation: 'none !important',
     },
+    // A loading spinner is essential status, not decoration — frozen, its arc
+    // reads as a broken icon. It slows to a crawl instead of stopping; WCAG
+    // 2.3.3 targets non-essential motion only. (Chakra's indeterminate
+    // progress circle already behaves this way: its raw `spin 2s` shorthand
+    // bypasses the animation tokens the reduce-motion condition nulls out.)
+    ':root[data-reduce-motion="true"] .chakra-spinner': {
+      animation: 'spin 2s linear infinite !important',
+    },
   },
   theme: {
     tokens: {
@@ -288,6 +308,7 @@ const config = defineConfig({
     slotRecipes: {
       colorPicker: colorPickerSlotRecipe,
       combobox: comboboxSlotRecipe,
+      dataList: dataListSlotRecipe,
       dialog: dialogSlotRecipe,
       hoverCard: hoverCardSlotRecipe,
       menu: menuSlotRecipe,

@@ -115,6 +115,7 @@ class ModelSearch:
             for x in [
                 "config.json",
                 "model_index.json",
+                "modular_model_index.json",
                 "learned_embeds.bin",
                 "pytorch_lora_weights.bin",
                 "image_encoder.txt",

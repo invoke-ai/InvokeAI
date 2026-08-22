@@ -293,9 +293,13 @@ class LayerPatcher:
         dtype: torch.dtype,
     ):
         """Apply a single LoRA wrapper patch to a module."""
-        # Move the LoRA layer to the same device/dtype as the orig module.
-        first_param = next(module_to_patch.parameters())
-        device = first_param.device
+        # Move the LoRA layer to the same device/dtype as the orig module. Quantized modules
+        # that register their weights as buffers (e.g. MiniMax H3's Int8ConvrotLinear) have no
+        # parameters at all — fall back to the first buffer for the device reference.
+        first_tensor = next(module_to_patch.parameters(), None)
+        if first_tensor is None:
+            first_tensor = next(module_to_patch.buffers())
+        device = first_tensor.device
         patch.to(device=device, dtype=dtype)
 
         if module_to_patch_key not in original_modules:

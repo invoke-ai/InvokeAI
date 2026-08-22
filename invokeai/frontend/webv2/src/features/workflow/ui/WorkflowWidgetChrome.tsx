@@ -1,6 +1,7 @@
 import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
 
-import { HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { updateLibraryWorkflow } from '@features/workflow/queries';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
   buildConnectorNode,
@@ -14,9 +15,24 @@ import {
   getCompatibleInputTemplate,
   getCompatibleOutputTemplate,
   parseWorkflowJson,
+  serializeWorkflowJson,
 } from '@features/workflow/utility';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog, Tooltip } from '@platform/ui';
-import { HistoryIcon, LibraryIcon, PlusIcon } from 'lucide-react';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import {
+  CloudAlertIcon,
+  CloudCheckIcon,
+  CloudUploadIcon,
+  HistoryIcon,
+  LibraryIcon,
+  PlusIcon,
+  RefreshCwIcon,
+} from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -24,7 +40,11 @@ import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contra
 
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
+import { createLibraryAutosaver, type LibrarySyncStatus } from './library/libraryAutosave';
+import { registerLibraryGraphSyncedHandler, releaseLibraryGraphSyncedHandler } from './library/librarySyncBridge';
+import { useSaveWorkflowToLibrary } from './library/useSaveWorkflowToLibrary';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
+import { setWorkflowLibrarySyncStatus, workflowLibrarySyncStore } from './library/workflowLibrarySyncStore';
 import { PendingLibraryWorkflowLoader } from './PendingLibraryWorkflowLoader';
 import { copyWorkflowJson, downloadWorkflowJson } from './workflowTransfer';
 import {
@@ -48,6 +68,15 @@ import {
  * shared widget actions menu via the manifest's `headerMenu`. Dialogs live here
  * (always mounted) and are driven through `workflowUiStore`.
  */
+
+/** Icon + tooltip for each library sync status, shared by the sync control's error and non-error presentations. */
+const SYNC_STATUS_VIEW: Record<LibrarySyncStatus, { icon: typeof CloudCheckIcon; tooltipKey: string }> = {
+  dirty: { icon: RefreshCwIcon, tooltipKey: 'widgets.workflow.librarySyncSaving' },
+  error: { icon: CloudAlertIcon, tooltipKey: 'widgets.workflow.librarySyncError' },
+  idle: { icon: CloudCheckIcon, tooltipKey: 'widgets.workflow.librarySyncSaved' },
+  saved: { icon: CloudCheckIcon, tooltipKey: 'widgets.workflow.librarySyncSaved' },
+  saving: { icon: RefreshCwIcon, tooltipKey: 'widgets.workflow.librarySyncSaving' },
+};
 
 export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   const { t } = useTranslation();
@@ -83,10 +112,8 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
           variant="ghost"
           onClick={openWorkflowLibrary}
         >
-          <Icon as={LibraryIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-          <Text color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" truncate>
-            {displayName}
-          </Text>
+          <Icon as={LibraryIcon} boxSize="3.5" flexShrink={0} />
+          <MiddleTruncate color={workflowName ? undefined : 'fg.subtle'} fontWeight="600" minW="0" text={displayName} />
         </Button>
       </Tooltip>
     </HStack>
@@ -143,11 +170,15 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
 export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
   const { t } = useTranslation();
   const graphHistory = useWorkflowProjectSelector((project) => project.graphHistory);
+  const libraryWorkflowId = useWorkflowProjectSelector((project) => project.projectGraph.libraryWorkflowId);
+  const syncStatus = workflowLibrarySyncStore.useSelector((snapshot) => snapshot.status);
   const { restoreSnapshot } = useProjectGraphCommands();
+  const { saveToLibrary } = useSaveWorkflowToLibrary();
   const restorableHistory = graphHistory.filter((entry) => entry.document);
   const historyTriggerId = useId();
   const openAddNode = useCallback(() => setAddNodeOpen(true), []);
   const openWorkflowLibrary = useCallback(() => setWorkflowLibraryOpen(true), []);
+  const handleSaveToLibrary = useCallback(() => void saveToLibrary(), [saveToLibrary]);
   const historyIds = useMemo(() => ({ trigger: historyTriggerId }), [historyTriggerId]);
   const historyPositioning = useMemo(() => ({ placement: 'bottom-end' as const }), []);
   const restoreHistoryEntry = useCallback(
@@ -187,6 +218,45 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
           </IconButton>
         </Tooltip>
       )}
+      {libraryWorkflowId ? (
+        <Tooltip content={t(SYNC_STATUS_VIEW[syncStatus].tooltipKey)}>
+          {syncStatus === 'error' ? (
+            <IconButton
+              aria-label={t('widgets.workflow.librarySyncState')}
+              color="fg.error"
+              size="2xs"
+              variant="ghost"
+              onClick={handleSaveToLibrary}
+            >
+              <Icon as={SYNC_STATUS_VIEW.error.icon} boxSize="3.5" />
+            </IconButton>
+          ) : (
+            <Box
+              alignItems="center"
+              aria-label={t(SYNC_STATUS_VIEW[syncStatus].tooltipKey)}
+              boxSize="6"
+              color="fg.subtle"
+              display="flex"
+              justifyContent="center"
+              role="status"
+            >
+              <Icon as={SYNC_STATUS_VIEW[syncStatus].icon} boxSize="3.5" />
+            </Box>
+          )}
+        </Tooltip>
+      ) : (
+        <Tooltip content={t('widgets.workflow.saveToLibrary')}>
+          <IconButton
+            aria-label={t('widgets.workflow.saveToLibrary')}
+            color="fg.muted"
+            size="2xs"
+            variant="ghost"
+            onClick={handleSaveToLibrary}
+          >
+            <Icon as={CloudUploadIcon} boxSize="3.5" />
+          </IconButton>
+        </Tooltip>
+      )}
       <Menu.Root ids={historyIds} positioning={historyPositioning} onSelect={restoreHistoryEntry}>
         <Tooltip content={t('widgets.workflow.graphHistorySnapshots')} ids={historyIds}>
           <Menu.Trigger asChild>
@@ -211,8 +281,8 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
                 {restorableHistory.map((entry) => (
                   <Menu.Item key={entry.id} value={entry.id}>
                     <Stack gap="0" minW="0">
-                      <Menu.ItemText fontSize="xs" truncate>
-                        {entry.label}
+                      <Menu.ItemText fontSize="xs">
+                        <MiddleTruncate as="span" text={entry.label} />
                       </Menu.ItemText>
                       <Text color="fg.subtle" fontSize="2xs">
                         {new Date(entry.createdAt).toLocaleString()}
@@ -231,6 +301,7 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
 
 export const WorkflowDialogHost = () => {
   const { editGraph, replace } = useProjectGraphCommands();
+  const { project: projectStore } = useWorkflowUi();
   const notify = useWorkflowNotifications();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const addNodeConnection = workflowUiStore.useSelector((snapshot) => snapshot.addNodeConnection);
@@ -240,6 +311,72 @@ export const WorkflowDialogHost = () => {
   const isLibraryOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
   const isNewWorkflowConfirmOpen = workflowUiStore.useSelector((snapshot) => snapshot.isNewWorkflowConfirmOpen);
   const lastImportRequestRef = useRef(importRequestCount);
+
+  // Library autosave: bound graphs save themselves back after edits settle.
+  //
+  // The autosaver is created AND disposed inside one mount effect, held in a
+  // ref. A `useState` initializer runs once per fiber while its disposal lived
+  // in a separate effect's cleanup, so StrictMode's mount→cleanup→mount
+  // simulation disposed the one live instance without recreating it — autosave
+  // silently no-oped for the rest of the session.
+  //
+  // `read()` pulls from `projectStore.getSnapshot()` rather than a
+  // component-owned ref, so it is current whenever the debounce or `flush()`
+  // calls it. The same effect subscribes to the store to poke the autosaver
+  // (skipping the initial snapshot, so loading is not an edit) — a plain
+  // subscription, since nothing here re-renders on graph edits.
+  //
+  // `hostScope` guards `onStatus`: account rotation aborts the in-flight
+  // save's signal and synchronously resets the (account-owned)
+  // `workflowLibrarySyncStore` back to 'idle', but the aborted write's
+  // rejection lands a tick later, after that reset. Without this guard,
+  // `runSave()`'s `.catch` would still write 'error' into the *next*
+  // account's store — `save()`'s own `assertAccountScopeCurrent` throw stops
+  // the write from being trusted, but does not by itself stop that throw's
+  // `onStatus('error')` from landing. `hostScope` is captured once per mount
+  // — safe because this host remounts every account epoch (keyed by
+  // `session.accountEpoch` above it in the tree), so a mount-captured scope
+  // never outlives the account it was captured for.
+  useEffect(() => {
+    const hostScope = captureAccountScope();
+    const autosaver = createLibraryAutosaver({
+      onStatus: (status) => {
+        if (isAccountScopeCurrent(hostScope)) {
+          setWorkflowLibrarySyncStatus(status);
+        }
+      },
+      read: () => {
+        const graph = projectStore.getSnapshot().projectGraph;
+        return { libraryWorkflowId: graph.libraryWorkflowId, serialized: serializeWorkflowJson(graph) };
+      },
+      save: async (workflowId, serialized) => {
+        // Same scope discipline as the manual save paths: never let a
+        // debounced write land in the next account's library.
+        const owner = captureAccountScope();
+        await updateLibraryWorkflow(workflowId, serialized, owner.signal);
+        assertAccountScopeCurrent(owner);
+      },
+    });
+
+    let lastGraph = projectStore.getSnapshot().projectGraph;
+    const unsubscribe = projectStore.subscribe(() => {
+      const graph = projectStore.getSnapshot().projectGraph;
+      if (graph !== lastGraph) {
+        lastGraph = graph;
+        autosaver.notifyGraphChanged();
+      }
+    });
+
+    const handler = (serialized: Record<string, unknown>) => autosaver.markSynced(serialized);
+
+    registerLibraryGraphSyncedHandler(handler);
+
+    return () => {
+      unsubscribe();
+      releaseLibraryGraphSyncedHandler(handler);
+      autosaver.dispose();
+    };
+  }, [projectStore]);
 
   useEffect(() => {
     if (importRequestCount > lastImportRequestRef.current) {

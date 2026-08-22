@@ -13,6 +13,10 @@ import {
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
 } from '@features/gallery/core/selection';
+import {
+  parseGallerySemanticReference,
+  type GallerySemanticReference,
+} from '@features/gallery/core/semanticImageQuery';
 import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
@@ -80,6 +84,8 @@ export interface GalleryStateView {
   selectedBoardId: string;
   selectedItemKey: GalleryItemKey | null;
   selectedItemKeys: GalleryItemKey[];
+  /** Active image-similarity query, rendered as a chip in place of the search text. */
+  semanticImageQuery: GallerySemanticReference | null;
   settings: GallerySettings;
 }
 
@@ -93,17 +99,15 @@ interface GalleryOrderImage {
   starred?: boolean;
 }
 
+// Starred-first placement is pinned in gallery/core/settings.ts, so this
+// always inserts after the leading starred block rather than branching on a
+// flag that no longer varies.
 export const getGalleryPlaceholderInsertionIndex = (
   images: GalleryOrderImage[],
-  imageOrderDir: GalleryOrderDir,
-  starredFirst: boolean
+  imageOrderDir: GalleryOrderDir
 ): number => {
   if (imageOrderDir !== 'DESC') {
     return images.length;
-  }
-
-  if (!starredFirst) {
-    return 0;
   }
 
   const firstUnstarredIndex = images.findIndex((image) => !image.starred);
@@ -226,20 +230,18 @@ export const getGalleryView = (values: Record<string, unknown>): GalleryView =>
 export const getGallerySearchTerm = (values: Record<string, unknown>): string =>
   typeof values.searchTerm === 'string' ? values.searchTerm : '';
 
+export const getGallerySemanticImageQuery = (values: Record<string, unknown>): GallerySemanticReference | null =>
+  parseGallerySemanticReference(values.semanticImageQuery);
+
 /**
  * Where new results land, resolved against the boards this install actually has.
  *
- * A saved selection survives whenever it still resolves — it is a deliberate choice, and a project
- * opened where its destination still exists should keep using it. When it does not resolve the
- * project's own board is the better answer than Uncategorized: a project arriving from another
- * install, or one whose pre-migration board was rejected as ambiguous, names a board id that means
- * nothing here, and dropping it to Uncategorized would quietly scatter that project's output.
+ * A saved selection survives whenever it still resolves, since it is a deliberate choice. When it
+ * does not — a project from another install, or one whose pre-migration board was ambiguous — the
+ * project's own board beats Uncategorized, which would quietly scatter that project's output. No
+ * saved selection at all is the same case rather than a choice of Uncategorized.
  *
- * No saved selection at all is the same case, not a choice of Uncategorized. A project saved before
- * it owned a board — or by a build that never wrote a destination — should still work on its own
- * board, which is where everything else it has made already lives.
- *
- * An empty board list means "still loading", not "no such board", so nothing is resolved yet.
+ * An empty board list means "still loading", not "no such board", so nothing resolves yet.
  */
 export const getGallerySelectedBoardId = (values: Record<string, unknown>, backendBoards: GalleryBoard[]): string => {
   const selectedBoardId = typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
@@ -278,7 +280,6 @@ export interface GallerySelectedImageQuery {
   page: number;
   paginationMode: 'infinite' | 'paginated';
   searchTerm: string;
-  starredFirst: boolean;
 }
 
 export const getGallerySelectedImageQuery = (values: Record<string, unknown>): GallerySelectedImageQuery => {
@@ -312,7 +313,6 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
         ? query.paginationMode
         : settings.paginationMode,
     searchTerm: query && typeof query.searchTerm === 'string' ? query.searchTerm : String(values.searchTerm ?? ''),
-    starredFirst: typeof query?.starredFirst === 'boolean' ? query.starredFirst : settings.starredFirst,
   };
 };
 
@@ -410,8 +410,12 @@ export const getGalleryStateView = (
     compareImageKey !== null &&
     compareImageKey !== visibleSelectedItemKey;
   const generationSequence = getGalleryGenerationSequence(queueItems, liveTarget);
+  // A ranked similarity result has no chronological insertion point, so
+  // pending placeholders (which stand in for images-to-come) are hidden while
+  // a semantic query is active — exactly as they are for a text search.
+  const semanticImageQuery = getGallerySemanticImageQuery(values);
   const visibleActivePlaceholder =
-    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === ''
+    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === '' && semanticImageQuery === null
       ? generationSequence.liveSlot?.boardId === selectedBoardId
         ? generationSequence.liveSlot
         : null
@@ -430,14 +434,15 @@ export const getGalleryStateView = (
     galleryView,
     items,
     isLoading,
-    pendingPlaceholders: settings.showPendingItems
-      ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
-          galleryView,
-          imageOrderDir: settings.imageOrderDir,
-          searchTerm,
-          selectedBoardId,
-        })
-      : [],
+    pendingPlaceholders:
+      settings.showPendingItems && semanticImageQuery === null
+        ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
+            galleryView,
+            imageOrderDir: settings.imageOrderDir,
+            searchTerm,
+            selectedBoardId,
+          })
+        : [],
     projectBoardId: getGalleryProjectBoardId(values),
     searchTerm,
     selectedBoardId,
@@ -446,6 +451,7 @@ export const getGalleryStateView = (
       visibleSelectedItemKey && !selectedItemKeys.includes(visibleSelectedItemKey)
         ? [visibleSelectedItemKey, ...selectedItemKeys]
         : selectedItemKeys,
+    semanticImageQuery,
     settings,
   };
 };

@@ -114,6 +114,7 @@ const templates: InvocationTemplates = {
         description: '',
         exclusiveMaximum: null,
         exclusiveMinimum: null,
+        fieldKind: 'input',
         input: 'connection',
         maximum: null,
         minimum: null,
@@ -127,6 +128,7 @@ const templates: InvocationTemplates = {
         uiComponent: null,
         uiHidden: false,
         uiModelBase: null,
+        uiModelFormat: null,
         uiModelType: null,
         uiOrder: null,
       },
@@ -150,6 +152,7 @@ const templates: InvocationTemplates = {
         description: '',
         exclusiveMaximum: null,
         exclusiveMinimum: null,
+        fieldKind: 'input',
         input: 'any',
         maximum: null,
         minimum: null,
@@ -163,6 +166,7 @@ const templates: InvocationTemplates = {
         uiComponent: null,
         uiHidden: false,
         uiModelBase: null,
+        uiModelFormat: null,
         uiModelType: null,
         uiOrder: null,
       },
@@ -201,6 +205,48 @@ describe('getCompatibleInputTemplate', () => {
     expect(getCompatibleInputTemplate(template, single('IntegerField'))?.name).toBe('early');
     expect(getCompatibleInputTemplate(template, single('ImageField'))).toBeNull();
     expect(getCompatibleInputTemplate(template, null)?.name).toBe('early');
+  });
+
+  it('skips internal-kind inputs when the source type is unresolved', () => {
+    // `metadata` has no `ui_order` and precedes the authored fields in the schema, so it
+    // sorts first on every WithMetadata node. With an unresolved source the type check is
+    // skipped entirely, so without the guard it would bury the node's real input.
+    const baseInput = templates.number.inputs.value;
+    const metadata = {
+      ...baseInput,
+      fieldKind: 'internal' as const,
+      input: 'connection' as const,
+      name: 'metadata',
+      type: { batch: false, cardinality: 'SINGLE' as const, name: 'MetadataField' },
+    };
+    const template = {
+      ...templates.number,
+      inputs: { metadata, value: { ...baseInput, name: 'value' } },
+    };
+
+    expect(getCompatibleInputTemplate(template, null)?.name).toBe('value');
+  });
+
+  it('still offers an internal-kind input to a source that genuinely matches it', () => {
+    // Dragging a real MetadataField output onto a save node must land on `metadata` -- and
+    // this function also decides which nodes the Add Node dialog offers for that drag, so
+    // excluding internal fields outright would make every WithMetadata node unreachable.
+    const baseInput = templates.number.inputs.value;
+    const metadataType = { batch: false, cardinality: 'SINGLE' as const, name: 'MetadataField' };
+    const template = {
+      ...templates.number,
+      inputs: {
+        metadata: {
+          ...baseInput,
+          fieldKind: 'internal' as const,
+          input: 'connection' as const,
+          name: 'metadata',
+          type: metadataType,
+        },
+      },
+    };
+
+    expect(getCompatibleInputTemplate(template, metadataType)?.name).toBe('metadata');
   });
 });
 
