@@ -123,17 +123,23 @@ const WanExpertWiringNotice = memo(function WanExpertWiringNotice({
     [values.model, values.wanLowNoiseModel]
   );
   // Only offer the swap when exchanging roles actually clears the warning: a
-  // high+high or low+low pair would just re-warn about the other file.
+  // high+high or low+low pair would just re-warn about the other file. Both
+  // configs must also still exist in the catalog — "models loaded" alone
+  // would happily relocate a just-uninstalled config into the main slot.
+  const bothExpertsInstalled =
+    Boolean(values.model && models.some((candidate) => candidate.key === values.model?.key)) &&
+    Boolean(values.wanLowNoiseModel && models.some((candidate) => candidate.key === values.wanLowNoiseModel?.key));
   const swapResolves =
     warning !== null &&
     warning.kind !== 'single-low' &&
+    bothExpertsInstalled &&
     values.wanLowNoiseModel?.format !== 'diffusers' &&
     getWanExpertWiringWarning(values.wanLowNoiseModel, values.model) === null;
   const swapExperts = useCallback(() => {
     const previousMain = values.model;
     const nextMain = values.wanLowNoiseModel;
 
-    if (!previousMain || !nextMain) {
+    if (!previousMain || !nextMain || !models.some((candidate) => candidate.key === nextMain.key)) {
       return;
     }
 
