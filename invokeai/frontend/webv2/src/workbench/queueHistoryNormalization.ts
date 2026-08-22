@@ -11,6 +11,7 @@ import type { WidgetInstanceContract, WidgetInstanceId, WidgetStateMap } from '@
 
 import { getEffectivePrompts, normalizeGenerateSettings, sanitizeBatchCount } from '@features/generation/settings';
 import { getUpscaleOutputDimensions, normalizeUpscaleWidgetValues } from '@features/upscale';
+import { normalizeVideoWidgetValues } from '@features/video';
 
 import type { WorkbenchQueueItem, WorkbenchQueueState } from './queueHistoryContracts';
 
@@ -85,7 +86,9 @@ const normalizeSourceId = (value: unknown): QueueSourceId | null => {
   if (value === 'canvas-fill') {
     return 'canvas';
   }
-  return value === 'canvas' || value === 'generate' || value === 'upscale' || value === 'workflow' ? value : null;
+  return value === 'canvas' || value === 'generate' || value === 'upscale' || value === 'video' || value === 'workflow'
+    ? value
+    : null;
 };
 
 const isBackendGraph = (value: unknown): value is QueueBackendGraph =>
@@ -204,9 +207,11 @@ const getBackendSubmission = (
   const sourceSettings =
     sourceId === 'upscale'
       ? normalizeUpscaleWidgetValues(getWidgetValues(widgetStates, 'upscale'))
-      : sourceId === 'canvas'
-        ? normalizeGenerateSettings(generateCapture?.values ?? generateValues)
-        : normalizeGenerateSettings(generateValues);
+      : sourceId === 'video'
+        ? normalizeVideoWidgetValues(getWidgetValues(widgetStates, 'video'))
+        : sourceId === 'canvas'
+          ? normalizeGenerateSettings(generateCapture?.values ?? generateValues)
+          : normalizeGenerateSettings(generateValues);
 
   if (!sourceSettings) {
     return {
@@ -224,7 +229,7 @@ const getBackendSubmission = (
     // The merged source computed above, not the raw settings: the row is written
     // at submit time from the merged prompt, so returning the authored text here
     // made a rehydrated item's prompt change under the user on reload.
-    presentationSource: sourceId === 'upscale' ? null : presentationSource,
+    presentationSource: sourceId === 'upscale' || sourceId === 'video' ? null : presentationSource,
     submission: {
       batchCount: sourceSettings.batchCount,
       graph: backendGraph,
@@ -303,7 +308,9 @@ const normalizeLegacyQueueItem = (
         ? { resultNodeIds: ['canvas_output'] }
         : safeSourceId === 'upscale'
           ? { resultNodeIds: ['upscale_output'] }
-          : {}),
+          : safeSourceId === 'video'
+            ? { resultNodeIds: ['video_output'] }
+            : {}),
       sourceId: safeSourceId,
       submittedAt: typeof snapshot.submittedAt === 'string' ? snapshot.submittedAt : new Date(0).toISOString(),
       widgetInstances: stripGalleryRecentImagesFromWidgetInstances(

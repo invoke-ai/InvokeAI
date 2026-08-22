@@ -1,4 +1,4 @@
-export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'canvas';
+export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
 
 export type InvocationMode = 'global' | 'dialog';
 

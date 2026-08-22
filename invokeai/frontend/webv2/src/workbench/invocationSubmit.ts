@@ -66,7 +66,7 @@ export interface SubmitResolvedInvocationDeps {
  * expander could mistake it for a one-option group.
  */
 const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
-  if (route.sourceId === 'upscale' || route.sourceId === 'workflow') {
+  if (route.sourceId === 'upscale' || route.sourceId === 'video' || route.sourceId === 'workflow') {
     return null;
   }
 

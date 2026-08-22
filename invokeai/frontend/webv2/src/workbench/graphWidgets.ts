@@ -5,7 +5,7 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { autoSwitchDestinations } from './autoRoutePolicy';
 import { getDestinationLabel, getSourceLabel, isInvocationSourceAvailable } from './invocation';
 
-const graphWidgetTypeIds = ['generate', 'canvas', 'upscale', 'workflow'] as const;
+const graphWidgetTypeIds = ['generate', 'canvas', 'upscale', 'video', 'workflow'] as const;
 
 export type GraphWidgetTypeId = (typeof graphWidgetTypeIds)[number];
 
@@ -13,6 +13,7 @@ const sourceIdsByWidgetTypeId: Record<GraphWidgetTypeId, InvocationSourceId> = {
   canvas: 'canvas',
   generate: 'generate',
   upscale: 'upscale',
+  video: 'video',
   workflow: 'workflow',
 };
 
@@ -20,6 +21,7 @@ const widgetTypeIdsBySourceId: Record<InvocationSourceId, GraphWidgetTypeId> = {
   canvas: 'canvas',
   generate: 'generate',
   upscale: 'upscale',
+  video: 'video',
   workflow: 'workflow',
 };
 

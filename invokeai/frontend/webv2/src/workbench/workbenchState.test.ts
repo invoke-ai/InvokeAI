@@ -459,7 +459,7 @@ describe('workbench widget region defaults', () => {
     const state = createInitialWorkbenchState();
     const project = getActiveProject(state);
 
-    expect(project.widgetRegions.left.instanceIds).toEqual(['generate', 'upscale']);
+    expect(project.widgetRegions.left.instanceIds).toEqual(['generate', 'upscale', 'video']);
     expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
     expect(project.widgetRegions.bottom.instanceIds).toEqual([
       'server-status',
@@ -565,7 +565,12 @@ describe('workbench widget region defaults', () => {
       type: 'hydrateWorkbench',
     });
 
-    expect(getActiveProject(migrated).widgetRegions.left.instanceIds).toEqual(['generate', 'workflow', 'upscale']);
+    expect(getActiveProject(migrated).widgetRegions.left.instanceIds).toEqual([
+      'generate',
+      'workflow',
+      'upscale',
+      'video',
+    ]);
     expect(getActiveProject(migrated).widgetInstances.upscale?.typeId).toBe('upscale');
     expect(getActiveProject(customized).widgetRegions.left.instanceIds).toEqual(['generate', 'gallery']);
   });
@@ -1070,7 +1075,7 @@ describe('workbench layout presets', () => {
     expect(project.layout.panels).toEqual({ isBottomOpen: false, isLeftOpen: true, isRightOpen: true });
     expect(project.widgetRegions.left).toMatchObject({
       activeInstanceId: 'generate',
-      instanceIds: ['generate', 'upscale'],
+      instanceIds: ['generate', 'upscale', 'video'],
       isCollapsed: false,
       sizePx: 450,
     });

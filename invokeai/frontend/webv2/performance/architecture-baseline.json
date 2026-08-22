@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 836632,
+        "brotliBytes": 836868,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 836584,
+        "gzipBytes": 835711,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1945255,
+        "initialRawBytes": 1945680,
         "largestAssetRawBytes": 746569,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 68878,
+        "ownedRawBytes": 68956,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -286,15 +286,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 844999,
+        "brotliBytes": 845237,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 844950,
+        "gzipBytes": 844069,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1964708,
+        "initialRawBytes": 1965137,
         "largestAssetRawBytes": 754035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 68878,
+        "ownedRawBytes": 68956,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -304,17 +304,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1037061,
+        "brotliBytes": 1046664,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1034691,
+        "gzipBytes": 1042511,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2544068,
+        "initialRawBytes": 2575364,
         "largestAssetRawBytes": 746569,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112220,
-        "requestCount": 91,
-        "scriptRequestCount": 75,
+        "ownedRawBytes": 113636,
+        "requestCount": 93,
+        "scriptRequestCount": 77,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -433,6 +433,7 @@
           "source:src/app/QueueRuntimeAdapter.tsx",
           "source:src/app/QueueUiAdapter.tsx",
           "source:src/app/UpscaleUiAdapter.tsx",
+          "source:src/app/VideoUiAdapter.tsx",
           "source:src/app/WorkbenchApp.tsx",
           "source:src/app/WorkflowUiAdapter.tsx",
           "source:src/app/workbenchPorts.tsx",
@@ -588,6 +589,13 @@
           "source:src/features/upscale/core/settings.ts",
           "source:src/features/upscale/index.ts",
           "source:src/features/upscale/ui/UpscaleUiContext.tsx",
+          "source:src/features/video/core/dimensions.ts",
+          "source:src/features/video/core/graph.ts",
+          "source:src/features/video/core/settings.ts",
+          "source:src/features/video/core/videoPolicies.ts",
+          "source:src/features/video/core/widgetValues.ts",
+          "source:src/features/video/index.ts",
+          "source:src/features/video/ui/VideoUiContext.tsx",
           "source:src/features/workflow/core/buildGraph.ts",
           "source:src/features/workflow/core/connectors.ts",
           "source:src/features/workflow/core/document.ts",
@@ -845,36 +853,37 @@
           "source:src/workbench/widgets/server-status/manifest.ts",
           "source:src/workbench/widgets/upscale/manifest.ts",
           "source:src/workbench/widgets/version-status/manifest.ts",
+          "source:src/workbench/widgets/video/manifest.ts",
           "source:src/workbench/widgets/workflow/manifest.ts",
           "source:src/workbench/workbenchState.ts",
           "source:src/workbench/workbenchStore.ts"
         ]
       },
       "limits": {
-        "brotliBytes": 1047432,
+        "brotliBytes": 1057131,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1045038,
+        "gzipBytes": 1052937,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2569509,
+        "initialRawBytes": 2601118,
         "largestAssetRawBytes": 754035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 112220,
-        "requestCount": 91,
-        "scriptRequestCount": 75
+        "ownedRawBytes": 113636,
+        "requestCount": 93,
+        "scriptRequestCount": 77
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-20",
+  "capturedAt": "2026-08-21",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
       "owner": "platform-ui",
       "remediationTicket": "return-contracts-to-owners",
-      "maxDirectImporters": 156
+      "maxDirectImporters": 157
     },
     "retiredWorkbenchTypeHub": {
       "specifier": "@workbench/types",
