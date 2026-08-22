@@ -268,4 +268,23 @@ describe('clearDeletedVideoMedia', () => {
 
     expect(clipCleared.sourceVideo).toBeNull();
   });
+
+  it('clears a reference the exclusion masking would hide from a normalized snapshot', () => {
+    // A raw store can hold BOTH slots (a rollback race); normalization would
+    // mask the source video, so the sweep must run on the raw values or the
+    // masked reference dangles past the delete.
+    const rawBoth = { ...createSettings({ firstFrameImage: FIRST_FRAME }), sourceVideo: SOURCE_VIDEO } as Record<
+      string,
+      unknown
+    >;
+    const cleared = clearDeletedVideoMedia(rawBoth, new Set(), new Set(['clip.mp4']));
+
+    expect(cleared.sourceVideo).toBeNull();
+    expect(cleared.firstFrameImage).toEqual(FIRST_FRAME);
+
+    // Junk in a slot never throws — the guards ignore non-media shapes.
+    const junk = { firstFrameImage: 'nonsense', lastFrameImage: 7, sourceVideo: {} } as Record<string, unknown>;
+
+    expect(clearDeletedVideoMedia(junk, new Set(['nonsense']), new Set())).toBe(junk);
+  });
 });

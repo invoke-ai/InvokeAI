@@ -523,3 +523,30 @@ describe('submitResolvedInvocation', () => {
     expect(submitResolved).not.toHaveBeenCalled();
   });
 });
+
+describe('resolveInvocationRoute — video destination compatibility', () => {
+  it('blocks the canvas destination for a video source and allows the gallery', () => {
+    const state = createInitialWorkbenchState();
+    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
+    const input = getInvocationRouteInput(project);
+    const canvasRoute: InvocationRoute = {
+      destination: 'canvas',
+      destinationLocked: false,
+      sourceId: 'video',
+      sourceLocked: false,
+    };
+
+    // A canvas-routed video run would complete with the output appearing
+    // nowhere (staging is image-based; only gallery-destined videos board).
+    const blocked = resolveInvocationRouteInput(input, 'global', canvasRoute);
+
+    expect(blocked.destinationValid).toBe(false);
+    expect(blocked.validationReasons).toContain(
+      'Video results can only be sent to the Gallery. Switch the destination to Gallery.'
+    );
+
+    expect(
+      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, destination: 'gallery' }).destinationValid
+    ).toBe(true);
+  });
+});
