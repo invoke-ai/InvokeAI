@@ -122,7 +122,6 @@ import {
   compileVideoGraph,
   getVideoDimensions,
   getVideoWidgetValidationReasons,
-  normalizeVideoSettings,
   normalizeVideoWidgetValues,
   resolveVideoSeed,
   syncVideoWidgetValuesWithModels,
@@ -2629,28 +2628,12 @@ const removeGalleryItemsFromAllProjects = (
       return { ...clearDeletedUpscaleInput(values, removedImageNames) };
     });
 
-    const withoutVideoMedia = updateProjectWidgetValues(withoutUpscaleInput, 'video', (rawValues) => {
-      const values = normalizeVideoSettings(rawValues);
-
-      if (!values) {
-        return rawValues;
-      }
-
-      const cleared = clearDeletedVideoMedia(values, removedImageNames, removedVideoNames);
-
-      if (cleared === values) {
-        return rawValues;
-      }
-
-      // Patch only the cleared media slots: spreading the whole normalized
-      // settings would rewrite every other key to its normalized form.
-      return {
-        ...rawValues,
-        ...(cleared.firstFrameImage !== values.firstFrameImage ? { firstFrameImage: null } : {}),
-        ...(cleared.lastFrameImage !== values.lastFrameImage ? { lastFrameImage: null } : {}),
-        ...(cleared.sourceVideo !== values.sourceVideo ? { sourceVideo: null } : {}),
-      };
-    });
+    // The sweep runs against the RAW slots: normalizing first would let a
+    // reference masked by the first-frame/initial-video exclusion survive the
+    // deletion and resurface later as a dangling media name.
+    const withoutVideoMedia = updateProjectWidgetValues(withoutUpscaleInput, 'video', (rawValues) =>
+      clearDeletedVideoMedia(rawValues, removedImageNames, removedVideoNames)
+    );
 
     didChange ||= withoutVideoMedia !== project;
     return withoutVideoMedia;

@@ -12,6 +12,7 @@ import {
   getDefaultVideoSettings,
   getVideoComponentSectionPolicy,
   getVideoModelAvailabilityReasons,
+  getVideoModelPolicy,
   getVideoModelSelectionResult,
   getVideoValidationReasons,
   isSupportedVideoModel,
@@ -99,9 +100,23 @@ export const syncVideoWidgetValuesWithModels = (
   // Reuse the stored array whenever the content is unchanged — the identity
   // guarantee below depends on it.
   const acceleratorLoraKeys = acceleratorAlive || base.acceleratorLoraKeys.length === 0 ? base.acceleratorLoraKeys : [];
+  // Losing a pair member through the catalog (uninstalled, dropped as
+  // incompatible) tears the fast path down the same way the Concepts setter
+  // does: flag off AND the model's own sampling defaults restored. Clearing
+  // only the flag would leave steps 4 / CFG 1 with no distillation pair — a
+  // silent run that reads as a broken model.
+  const samplingDefaults =
+    base.acceleratorEnabled && !acceleratorAlive && model ? getVideoModelPolicy(model, base).defaults : null;
 
   const next: VideoWidgetValues = {
     ...base,
+    ...(samplingDefaults
+      ? {
+          cfgScale: samplingDefaults.cfgScale,
+          cfgScaleLowNoise: samplingDefaults.cfgScaleLowNoise,
+          steps: samplingDefaults.steps,
+        }
+      : {}),
     acceleratorEnabled: acceleratorAlive,
     acceleratorLoraKeys,
     componentSourceModel: syncComponent('componentSourceModel', base.componentSourceModel),
