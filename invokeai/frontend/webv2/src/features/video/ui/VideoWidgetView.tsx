@@ -4,7 +4,7 @@ import type { VideoSourceClip, VideoWidgetValues } from '@features/video/core/ty
 
 import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { GenerationSettingsSection } from '@features/generation/components';
-import { isMainModelConfig, SEED_MAX } from '@features/generation/settings';
+import { isMainModelConfig, sanitizeBatchCount, SEED_MAX } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import { getVideoDurationSeconds, invertVideoAspectRatioId } from '@features/video/core/dimensions';
@@ -93,7 +93,13 @@ const VideoModelReconciler = ({
       return;
     }
 
-    patchValues({ ...values }, 'system');
+    // When the store fails normalization wholesale (first open: the topbar
+    // Iterations field may already have patched `batchCount` into an
+    // otherwise-empty widget store), seeding the defaults must not wipe that
+    // one pre-open edit.
+    const batchCount = normalized ? values.batchCount : sanitizeBatchCount(rawValues.batchCount ?? values.batchCount);
+
+    patchValues({ ...values, batchCount }, 'system');
   });
 
   return null;
@@ -454,7 +460,7 @@ export const VideoWidgetView = () => {
             <SliderNumberField
               ariaLabel={t('widgets.video.steps')}
               max={100}
-              min={1}
+              min={policy.minSteps}
               numberInputMax={500}
               step={1}
               value={values.steps}

@@ -372,6 +372,8 @@ export interface VideoModelPolicy {
   isSupported: boolean;
   modes: readonly VideoGenerationMode[];
   pixelMultiple: number;
+  /** The family's floor for the steps control (validation enforces it too). */
+  minSteps: number;
   aspectRatioOptions: readonly VideoAspectRatioId[];
   targetResolutions: readonly VideoTargetResolutionOption[];
   frames: VideoFramesPolicy;
@@ -406,6 +408,7 @@ export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings
     fps: config.fps,
     frames: config.frames,
     isSupported: model ? isSupportedVideoModel(model) : false,
+    minSteps: config.minSteps,
     modes: config.modes,
     pixelMultiple: config.pixelMultiple,
     prompt: getVideoPromptPolicy(model, settings),

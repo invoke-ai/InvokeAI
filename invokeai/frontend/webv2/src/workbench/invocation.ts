@@ -261,10 +261,18 @@ export const resolveInvocationRouteInput = (
   }
 
   const sourceValid = validationReasons.length === 0;
-  const destinationValid = isResultDestinationAvailable(destination);
+  // A video result is structurally undeliverable to the Canvas: staging is
+  // image-based and the queue runtime only boards gallery-destined videos, so
+  // a canvas-routed video run would complete with the output appearing
+  // nowhere. Block it instead of letting the result vanish.
+  const destinationCompatible = !(sourceId === 'video' && destination === 'canvas');
+  const destinationAvailable = isResultDestinationAvailable(destination);
+  const destinationValid = destinationAvailable && destinationCompatible;
 
-  if (!destinationValid) {
+  if (!destinationAvailable) {
     validationReasons.push(`${getDestinationLabel(destination)} is not an available result destination.`);
+  } else if (!destinationCompatible) {
+    validationReasons.push('Video results can only be sent to the Gallery. Switch the destination to Gallery.');
   }
 
   return {
