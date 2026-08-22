@@ -7,13 +7,19 @@ import type {
   VideoComponentValueKey,
 } from '@features/video/core/videoPolicies';
 
-import { Stack } from '@chakra-ui/react';
+import { HStack, Stack, Text } from '@chakra-ui/react';
 import { GenerationSettingsSection } from '@features/generation/components';
 import { isMainModelConfig, isModelIdentifierConfig, isVaeModelConfig } from '@features/generation/settings';
+import { useModelsSelector } from '@features/models';
 import { ModelSelect } from '@features/models/react';
-import { getVideoComponentSectionPolicy } from '@features/video/core/videoPolicies';
+import {
+  getVideoComponentSectionPolicy,
+  getVideoModelSelectionResult,
+  getWanExpertWiringWarning,
+} from '@features/video/core/videoPolicies';
 import { Field } from '@platform/ui';
-import { memo, useMemo } from 'react';
+import { Button } from '@platform/ui/Button';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -84,6 +90,89 @@ const ComponentSlotRow = memo(function ComponentSlotRow({
   );
 });
 
+/**
+ * Advisory badge for suspicious Wan A14B expert wiring (a low-tagged file in
+ * the main slot, a high-tagged one in the low-noise slot). The tags are a
+ * filename heuristic and explicit wiring stays authoritative — mirroring the
+ * backend loader — so this never blocks; it offers a one-click swap instead,
+ * keeping deliberate cross-wiring expressible.
+ */
+// Spelled out rather than interpolated, so the translation-key scan can see
+// them and fail the build if a string goes missing.
+const EXPERT_WIRING_MESSAGE_KEYS = {
+  'high-as-low': 'widgets.video.expertWiring.highAsLow',
+  'low-as-main': 'widgets.video.expertWiring.lowAsMain',
+  'single-low': 'widgets.video.expertWiring.singleLow',
+  swapped: 'widgets.video.expertWiring.swapped',
+} as const;
+
+const WanExpertWiringNotice = memo(function WanExpertWiringNotice({
+  onPatch,
+  values,
+}: {
+  onPatch: (patch: Partial<VideoWidgetValues>) => void;
+  values: VideoWidgetValues;
+}) {
+  const { t } = useTranslation();
+  const models = useModelsSelector((snapshot) => snapshot.models);
+  // A selection transition computed against an unloaded catalog would judge
+  // the Lightning pair "not installed" and silently strip the accelerator.
+  const modelsLoaded = useModelsSelector((snapshot) => snapshot.status) === 'loaded';
+  const warning = useMemo(
+    () => getWanExpertWiringWarning(values.model, values.wanLowNoiseModel),
+    [values.model, values.wanLowNoiseModel]
+  );
+  // Only offer the swap when exchanging roles actually clears the warning: a
+  // high+high or low+low pair would just re-warn about the other file. Both
+  // configs must also still exist in the catalog — "models loaded" alone
+  // would happily relocate a just-uninstalled config into the main slot.
+  const bothExpertsInstalled =
+    Boolean(values.model && models.some((candidate) => candidate.key === values.model?.key)) &&
+    Boolean(values.wanLowNoiseModel && models.some((candidate) => candidate.key === values.wanLowNoiseModel?.key));
+  const swapResolves =
+    warning !== null &&
+    warning.kind !== 'single-low' &&
+    bothExpertsInstalled &&
+    values.wanLowNoiseModel?.format !== 'diffusers' &&
+    getWanExpertWiringWarning(values.wanLowNoiseModel, values.model) === null;
+  const swapExperts = useCallback(() => {
+    const previousMain = values.model;
+    const nextMain = values.wanLowNoiseModel;
+
+    if (!previousMain || !nextMain || !models.some((candidate) => candidate.key === nextMain.key)) {
+      return;
+    }
+
+    // Same variant and both single-file (the slot filter guarantees it), so
+    // the canonical transition is a same-family no-op apart from the swap.
+    const result = getVideoModelSelectionResult({ currentSettings: values, model: nextMain, models });
+
+    onPatch({ ...result.settings, model: nextMain, wanLowNoiseModel: previousMain });
+  }, [models, onPatch, values]);
+
+  if (!warning) {
+    return null;
+  }
+
+  const message = t(EXPERT_WIRING_MESSAGE_KEYS[warning.kind], {
+    lowName: values.wanLowNoiseModel?.name ?? '',
+    mainName: values.model?.name ?? '',
+  });
+
+  return (
+    <HStack bg="bg.subtle" borderColor="fg.warning" borderWidth="1px" gap="2" p="2" rounded="md">
+      <Text color="fg.warning" flex="1" fontSize="2xs" textWrap="pretty">
+        {message}
+      </Text>
+      {swapResolves && modelsLoaded ? (
+        <Button flexShrink="0" size="2xs" variant="outline" onClick={swapExperts}>
+          {t('widgets.video.expertWiring.swap')}
+        </Button>
+      ) : null}
+    </HStack>
+  );
+});
+
 export const VideoComponentsSection = memo(function VideoComponentsSection({
   onPatch,
   values,
@@ -118,6 +207,7 @@ export const VideoComponentsSection = memo(function VideoComponentsSection({
             onPatch={onPatch}
           />
         ))}
+        <WanExpertWiringNotice values={values} onPatch={onPatch} />
       </Stack>
     </GenerationSettingsSection>
   );
