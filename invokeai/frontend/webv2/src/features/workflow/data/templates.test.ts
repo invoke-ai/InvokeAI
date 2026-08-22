@@ -92,6 +92,29 @@ const openApiFixture = {
         },
         type: 'object',
       },
+      LoRACollectionLoaderInvocation: {
+        class: 'invocation',
+        output: { $ref: '#/components/schemas/IntegerOutput' },
+        properties: {
+          loras: {
+            anyOf: [
+              { $ref: '#/components/schemas/LoRAField' },
+              { items: { $ref: '#/components/schemas/LoRAField' }, type: 'array' },
+              { type: 'null' },
+            ],
+            default: null,
+            field_kind: 'input',
+            input: 'any',
+            orig_required: false,
+            title: 'LoRAs',
+            ui_model_base: ['sd-1', 'sd-2'],
+            ui_model_type: ['lora'],
+          },
+          type: { const: 'lora_collection_loader', default: 'lora_collection_loader', title: 'type' },
+        },
+        title: 'Apply LoRA Collection - SD1.5',
+        type: 'object',
+      },
       SaveVideoInvocation: {
         class: 'invocation',
         output: { $ref: '#/components/schemas/IntegerOutput' },
@@ -145,7 +168,7 @@ describe('parseOpenApiToTemplates', () => {
   const templates = parseOpenApiToTemplates(openApiFixture);
 
   it('parses invocation schemas into templates, skipping the denylist', () => {
-    expect(Object.keys(templates).sort()).toEqual(['add', 'denoise', 'save_video']);
+    expect(Object.keys(templates).sort()).toEqual(['add', 'denoise', 'lora_collection_loader', 'save_video']);
 
     const add = templates.add;
 
@@ -182,6 +205,18 @@ describe('parseOpenApiToTemplates', () => {
     });
     expect(denoise?.inputs.scheduler?.type.name).toBe('EnumField');
     expect(denoise?.inputs.scheduler?.options).toEqual(['euler', 'ddim']);
+  });
+
+  it('parses the LoRA collection loader input as an inline-editable model collection', () => {
+    // `LoRAField | list[LoRAField] | None`: the null variant drops out, leaving the union the
+    // widget edits as a list. `default: null` must not become the field's value.
+    const loras = templates.lora_collection_loader?.inputs.loras;
+
+    expect(loras?.type).toEqual({ batch: false, cardinality: 'SINGLE_OR_COLLECTION', name: 'LoRAField' });
+    expect(loras?.input).toBe('any');
+    expect(loras?.default).toBeUndefined();
+    expect(loras?.uiModelBase).toEqual(['sd-1', 'sd-2']);
+    expect(loras?.uiModelType).toEqual(['lora']);
   });
 
   it('keeps internal-kind metadata and board inputs, but drops node attributes', () => {
