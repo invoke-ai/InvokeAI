@@ -11,6 +11,7 @@ import {
   imagesApi,
   mergeImageBatchResults,
   reportImageBatchOutcome,
+  sessionMismatchError,
   toastFailedImageBatch,
 } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -112,6 +113,22 @@ describe('toastFailedImageBatch', () => {
       title: 'toast.imagesFailedToUpdate',
       status: 'warning',
     });
+  });
+});
+
+describe('sessionMismatchError', () => {
+  // Tested directly because no loop-level test can reach the pre-request takeover arm: a
+  // takeover staged inside a mocked baseQuery is always caught by the post-response check
+  // first, and same-tab nothing can interleave between one chunk's post-check and the next's
+  // pre-check. Cross-tab it is the guard that stops the next chunk going out as the new user.
+  it('classifies a takeover as the hard abort', () => {
+    login('user-b');
+    expect(sessionMismatchError()).toMatchObject({ error: expect.stringContaining('session changed') });
+  });
+
+  it('classifies a bare expiry as the soft stop', () => {
+    localStorage.removeItem('auth_token');
+    expect(sessionMismatchError()).toMatchObject({ error: expect.stringContaining('session ended') });
   });
 });
 
@@ -577,6 +594,30 @@ describe('bulkDownloadQueryFn', () => {
     expect(baseQuery).toHaveBeenCalledTimes(2);
     // Not `item-1.zip`: that zip belongs to the previous session. Do not expose its item name or
     // toast the new session about work it did not request.
+    expect(result).toEqual({ data: undefined });
+    expect(toast).not.toHaveBeenCalled();
+    expect(i18n.t).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing when the session merely expires mid-run', async () => {
+    // Broader silence than the mutating loops, which let expiry through to the partial path:
+    // they have pruning to do off the payload, a download has none, and both of this route's
+    // outputs are wrong for a session that is ending. The count would toast at the login
+    // screen, and returning the item name would raise the permanent `duration: null`
+    // "preparing" toast there -- dismissed only by a socket event this session never receives.
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        localStorage.removeItem('auth_token');
+      }
+      return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ data: undefined });
     expect(toast).not.toHaveBeenCalled();
     expect(i18n.t).not.toHaveBeenCalled();

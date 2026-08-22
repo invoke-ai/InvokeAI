@@ -104,13 +104,26 @@ const SESSION_ENDED_ERROR: FetchBaseQueryError = {
 const isAuthChangedError = (error: FetchBaseQueryError | undefined): boolean =>
   error?.status === AUTH_CHANGED_ERROR.status && error.error === AUTH_CHANGED_ERROR.error;
 
+/** Either flavor of session mismatch — the "consume nothing from this run" superset. */
+const isSessionMismatchError = (error: FetchBaseQueryError | undefined): boolean =>
+  isAuthChangedError(error) ||
+  (error?.status === SESSION_ENDED_ERROR.status && error.error === SESSION_ENDED_ERROR.error);
+
 /**
  * Which of the two a failed session check means. The distinction is the whole ballgame: expiry
  * must degrade into an ordinary failure so committed work is still reported, while a takeover
  * must abort hard so the new user consumes nothing. Collapsing them in either direction is a
  * bug this file has now had both ways.
+ *
+ * Exported for its unit test, and the test exists because no loop-level test can reach the
+ * takeover arm at the pre-request check: same-tab, everything from one chunk's post-response
+ * check to the next chunk's pre-request check is a single synchronous drain no dispatch can
+ * interleave with, so a takeover staged inside a mocked baseQuery is always caught by the
+ * post-response check first. The pre-request arm is live only cross-tab — another tab's
+ * login-as-B writes localStorage between chunks — which is real concurrency a same-thread test
+ * cannot stage, and it is the guard that stops the next chunk going out under B's token.
  */
-const sessionMismatchError = (): FetchBaseQueryError =>
+export const sessionMismatchError = (): FetchBaseQueryError =>
   localStorage.getItem('auth_token') === null ? SESSION_ENDED_ERROR : AUTH_CHANGED_ERROR;
 
 /**
@@ -344,8 +357,10 @@ export const toastFailedImageBatch = (image_names: string[]) => {
  * deliberately, so the new session cannot consume the old one's aggregate — and the check below
  * is why that does not surface as the previous user's count. An *expiry* mid-run resolves with
  * partial data instead (see `SESSION_ENDED_ERROR`), so it lands on the fulfilled branch, where
- * the same check keeps the count off the login screen while the queryFn's own invalidation and
- * `handleDeletions` still do the state work. And the queryFn can *throw* on the mid-run path
+ * the same check keeps the count off the login screen while `handleDeletions` still does the
+ * state work off the partial payload. (The queryFn's own `invalidateTags` also runs, but under
+ * a same-tab expiry `resetApiState` has already emptied the store by then, so it is a no-op —
+ * the pruning is the part that matters.) And the queryFn can *throw* on the mid-run path
  * (`getTags(merged)` and `merged.failed_images.concat(...)` both read keys straight off a
  * server payload), which would over-count; that needs a response missing a documented key, so
  * it is left as an over-report rather than a silence.
@@ -438,9 +453,15 @@ export const bulkDownloadQueryFn = async (
       body: { image_names: chunk, board_id },
     });
     if (response.error) {
-      if (isAuthChangedError(response.error)) {
-        // A previous request may already be building a zip for the old session. Do not return its
-        // item name or raise a rejection toast in the new session.
+      if (isSessionMismatchError(response.error)) {
+        // Either mismatch flavor reports nothing here — broader than the mutating loops, which
+        // let expiry through to the partial path. They have state work to salvage
+        // (`handleDeletions` pruning off the partial payload); a download has none, and its two
+        // outputs are both wrong for a session that is ending. The failure count would toast at
+        // the login screen, and returning `first` drives `matchFulfilled` into raising the
+        // keyless-be-damned "preparing" toast with `duration: null` — dismissed only by a
+        // socket event this session will never receive. A takeover must stay silent for the
+        // new user's sake; an expiry, for the login screen's.
         return { data: undefined as unknown as components['schemas']['ImagesDownloaded'] };
       }
       if (!scheduled) {
