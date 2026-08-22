@@ -109,12 +109,17 @@ describe('syncVideoWidgetValuesWithModels', () => {
     const enabled = getAcceleratorToggleResult(createDefaultVideoWidgetValues([model]), model, catalog, true).settings;
     const values = { ...enabled, model };
 
-    // The pair vanishes from the catalog: entries drop, flag clears with them.
+    // The pair vanishes from the catalog: entries drop, flag clears with them,
+    // and the sampling params Lightning wrote (steps 4 / CFG 1) are restored
+    // to the model's own defaults — clearing only the flag would leave a
+    // silent 4-step non-distilled setup.
     const synced = syncVideoWidgetValuesWithModels(values, [model]);
 
     expect(synced.loras).toEqual([]);
     expect(synced.acceleratorEnabled).toBe(false);
     expect(synced.acceleratorLoraKeys).toEqual([]);
+    expect(synced.steps).toBe(40);
+    expect(synced.cfgScale).toBe(5);
   });
 });
 
