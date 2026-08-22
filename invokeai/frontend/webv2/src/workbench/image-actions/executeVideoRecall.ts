@@ -7,6 +7,7 @@ import { galleryImages, galleryItems, galleryVideos } from '@features/gallery';
 import {
   createDefaultVideoWidgetValues,
   createVideoSourceClip,
+  getVideoModelPolicy,
   normalizeVideoWidgetValues,
   syncVideoWidgetValuesWithModels,
 } from '@features/video';
@@ -151,16 +152,28 @@ export const executeVideoRecall = async ({
 
           assertAccountScopeCurrent(owner);
           if (sourceItem?.kind === 'video') {
+            const rebuiltClip = createVideoSourceClip({
+              durationSeconds: sourceItem.durationSeconds,
+              fps: sourceItem.fps,
+              height: sourceItem.height,
+              name: sourceItem.name,
+              width: sourceItem.width,
+            });
+            // Restore the recorded trim, clamped to the fresh estimate (which
+            // can differ from the run's own) — the default trim would extend
+            // from a completely different frame than the run did.
+            const trim = rebuiltClip.numFrames >= 2 ? result.mediaNames.sourceVideoTrim : null;
+            const startFrame = trim
+              ? Math.min(Math.max(trim.startFrame, 0), rebuiltClip.numFrames - 2)
+              : rebuiltClip.startFrame;
+            const endFrame = trim
+              ? Math.min(Math.max(trim.endFrame, startFrame + 1), rebuiltClip.numFrames - 1)
+              : rebuiltClip.endFrame;
+
             result.values = {
               ...result.values,
               firstFrameImage: null,
-              sourceVideo: createVideoSourceClip({
-                durationSeconds: sourceItem.durationSeconds,
-                fps: sourceItem.fps,
-                height: sourceItem.height,
-                name: sourceItem.name,
-                width: sourceItem.width,
-              }),
+              sourceVideo: { ...rebuiltClip, endFrame, startFrame },
             };
             recalledMedia = true;
           }
@@ -172,6 +185,42 @@ export const executeVideoRecall = async ({
 
       if (!recalledMedia) {
         result.fields = result.fields.filter((field) => field !== 'media');
+      }
+
+      // What survived hydration can imply a mode the effective model rejects
+      // — a deleted first frame leaves an interpolate recall holding only its
+      // last frame (no Wan mode), and an uninstalled recorded model leaves
+      // i2v media on whatever main the panel kept. Reconcile with the same
+      // rules the model-selection transition applies, so the recall never
+      // assembles an un-generatable panel behind a success toast.
+      const effectiveModel = result.values.model;
+
+      if (effectiveModel) {
+        const modes = getVideoModelPolicy(effectiveModel, result.values).modes;
+        let { firstFrameImage, lastFrameImage, sourceVideo } = result.values;
+
+        if (sourceVideo && !modes.includes('extend')) {
+          sourceVideo = null;
+        }
+        if (firstFrameImage && !modes.includes('first-frame') && !modes.includes('first-last')) {
+          firstFrameImage = null;
+        }
+        if (lastFrameImage) {
+          const lastFrameSupported =
+            firstFrameImage || sourceVideo ? modes.includes('first-last') : modes.includes('last-frame');
+
+          if (!lastFrameSupported) {
+            lastFrameImage = null;
+          }
+        }
+
+        if (
+          firstFrameImage !== result.values.firstFrameImage ||
+          lastFrameImage !== result.values.lastFrameImage ||
+          sourceVideo !== result.values.sourceVideo
+        ) {
+          result.values = { ...result.values, firstFrameImage, lastFrameImage, sourceVideo };
+        }
       }
     }
 
@@ -189,8 +238,10 @@ export const executeVideoRecall = async ({
       commands.generation.patchPromptDraft(result.promptPatch, 'video', projectId);
     }
     // A prompts-only recall changes no widget values — skip the whole-values
-    // write (and the lost-update window it would widen).
-    if (result.values !== currentValues || result.fields.some((field) => field !== 'prompts')) {
+    // write (and the lost-update window it would widen). The builder always
+    // returns a fresh copy, so the fields list, not object identity, is the
+    // signal.
+    if (result.fields.some((field) => field !== 'prompts')) {
       commands.widgets.patchValues('video', { ...result.values }, projectId);
     }
     commands.notifications.add({

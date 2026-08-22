@@ -66,6 +66,7 @@ export type VideoRecalledField =
   | 'seed'
   | 'size'
   | 'frames'
+  | 'fps'
   | 'steps'
   | 'cfg'
   | 'loras'
@@ -335,6 +336,12 @@ export interface VideoRecallMediaNames {
   firstFrameName: string | null;
   lastFrameName: string | null;
   sourceVideoName: string | null;
+  /**
+   * The recorded trim bounds (metadata extras), so the executor can restore
+   * the clip's actual trim instead of `createVideoSourceClip`'s default —
+   * without them a recalled extension would start from the wrong frame.
+   */
+  sourceVideoTrim: { endFrame: number; startFrame: number } | null;
 }
 
 export const buildVideoRecallSettings = ({
@@ -355,7 +362,12 @@ export const buildVideoRecallSettings = ({
   const fields: VideoRecalledField[] = [];
   let values: VideoWidgetValues = { ...currentValues };
   let promptPatch: ProjectPromptDraftPatch | null = null;
-  const mediaNames: VideoRecallMediaNames = { firstFrameName: null, lastFrameName: null, sourceVideoName: null };
+  const mediaNames: VideoRecallMediaNames = {
+    firstFrameName: null,
+    lastFrameName: null,
+    sourceVideoName: null,
+    sourceVideoTrim: null,
+  };
 
   if (kind === 'all' || kind === 'prompts' || kind === 'remix') {
     const { negativePrompt, positivePrompt } = getMetadataPrompts(metadata);
@@ -450,6 +462,18 @@ export const buildVideoRecallSettings = ({
     fields.push('cfg');
   }
 
+  const fps = getInteger(metadata, 'fps');
+
+  // Wan records the delivered frame rate (H3 is fixed at 24 and records
+  // none). Recalling it into an extend-mode panel is harmless: the fps field
+  // is display-only there and the compiled graph re-inherits the clip's rate.
+  if (policy.fps.editable && fps !== null && fps >= 1 && fps <= 120) {
+    if (fps !== values.fps) {
+      values = { ...values, fps };
+    }
+    fields.push('fps');
+  }
+
   const sizeRecall = getVideoSizeRecall(model, getInteger(metadata, 'width'), getInteger(metadata, 'height'));
 
   if (sizeRecall) {
@@ -516,6 +540,12 @@ export const buildVideoRecallSettings = ({
     mediaNames.firstFrameName = media.firstFrameName;
     mediaNames.lastFrameName = media.lastFrameName;
     mediaNames.sourceVideoName = media.sourceVideoName;
+    if (media.sourceVideoName) {
+      const startFrame = getInteger(metadata, 'source_video_start_frame');
+      const endFrame = getInteger(metadata, 'source_video_end_frame');
+
+      mediaNames.sourceVideoTrim = startFrame !== null && endFrame !== null ? { endFrame, startFrame } : null;
+    }
     fields.push('media');
   } else if (hadMedia) {
     fields.push('media');
@@ -537,6 +567,7 @@ const VIDEO_FIELD_LABELS: Record<VideoRecalledField, string> = {
   cfg: 'CFG',
   steps: 'steps',
   components: 'components',
+  fps: 'FPS',
   frames: 'frames',
   loras: 'concepts',
   media: 'conditioning media',
