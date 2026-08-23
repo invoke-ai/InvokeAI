@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   gallerySemanticReferenceKey,
   getExternalImageFile,
+  getImageCluster,
   parseGallerySemanticReference,
   registerExternalImageFile,
+  registerImageCluster,
   semanticReferenceFromDataTransfer,
   toGallerySemanticQuery,
 } from './semanticImageQuery';
@@ -20,6 +22,20 @@ describe('external image registry', () => {
     expect(secondId).not.toBe(firstId);
     expect(getExternalImageFile(firstId)).toBe(null);
     expect(getExternalImageFile(secondId)).toMatchObject({ label: 'second.png' });
+  });
+});
+
+describe('image cluster registry', () => {
+  it('holds a single slot: registering a new cluster evicts the previous one', () => {
+    const firstId = registerImageCluster(['a.png', 'b.png'], 'first cluster');
+
+    expect(getImageCluster(firstId)).toEqual({ imageNames: ['a.png', 'b.png'], label: 'first cluster' });
+
+    const secondId = registerImageCluster(['c.png'], 'second cluster');
+
+    expect(secondId).not.toBe(firstId);
+    expect(getImageCluster(firstId)).toBe(null);
+    expect(getImageCluster(secondId)).toEqual({ imageNames: ['c.png'], label: 'second cluster' });
   });
 });
 
@@ -88,6 +104,27 @@ describe('parseGallerySemanticReference', () => {
     expect(parseGallerySemanticReference({ kind: 'nonsense' })).toBe(null);
     expect(parseGallerySemanticReference('')).toBe(null);
   });
+
+  it('parses cluster references while registered and drops dangling cluster keys', () => {
+    const clusterId = registerImageCluster(['a.png', 'b.png'], 'beaches');
+
+    expect(parseGallerySemanticReference({ clusterId, kind: 'cluster', label: 'beaches' })).toEqual({
+      clusterId,
+      kind: 'cluster',
+      label: 'beaches',
+    });
+    // A missing label falls back to the registered one rather than dropping
+    // the reference.
+    expect(parseGallerySemanticReference({ clusterId, kind: 'cluster' })).toEqual({
+      clusterId,
+      kind: 'cluster',
+      label: 'beaches',
+    });
+    // Registering evicts prior entries, so a stale key reads as no search —
+    // exactly how a reload behaves.
+    registerImageCluster(['c.png'], 'newer');
+    expect(parseGallerySemanticReference({ clusterId, kind: 'cluster', label: 'beaches' })).toBe(null);
+  });
 });
 
 describe('semantic reference identity', () => {
@@ -101,6 +138,12 @@ describe('semantic reference identity', () => {
     );
     expect(gallerySemanticReferenceKey({ fileId: 'external-1', kind: 'file', label: 'a' })).toBe(
       gallerySemanticReferenceKey({ fileId: 'external-1', kind: 'file', label: 'b' })
+    );
+    expect(gallerySemanticReferenceKey({ clusterId: 'cluster-1', kind: 'cluster', label: 'a' })).toBe(
+      gallerySemanticReferenceKey({ clusterId: 'cluster-1', kind: 'cluster', label: 'b' })
+    );
+    expect(gallerySemanticReferenceKey({ clusterId: 'external-1', kind: 'cluster', label: 'a' })).not.toBe(
+      gallerySemanticReferenceKey({ fileId: 'external-1', kind: 'file', label: 'a' })
     );
   });
 
@@ -120,6 +163,10 @@ describe('semantic reference identity', () => {
     expect(toGallerySemanticQuery({ kind: 'text', query: 'a sunset' })).toEqual({
       kind: 'text',
       query: 'a sunset',
+    });
+    expect(toGallerySemanticQuery({ clusterId: 'cluster-7', kind: 'cluster', label: 'beaches' })).toEqual({
+      clusterId: 'cluster-7',
+      kind: 'cluster',
     });
   });
 });

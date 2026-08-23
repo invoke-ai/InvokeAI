@@ -19,7 +19,7 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
-import { getExternalImageFile } from '@features/gallery/core/semanticImageQuery';
+import { getExternalImageFile, getImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import {
   AccountScopeExpiredError,
@@ -801,7 +801,7 @@ const toSemanticResults = (body: SemanticSearchBody): GallerySemanticResult[] =>
  * registry).
  */
 export const searchGallerySemantic = async (
-  query: GallerySemanticQuery,
+  query: Exclude<GallerySemanticQuery, { kind: 'cluster' }>,
   { limit = SEMANTIC_SEARCH_MAX_RESULTS, signal }: { limit?: number; signal?: AbortSignal } = {}
 ): Promise<GallerySemanticResult[]> => {
   if (query.kind === 'url') {
@@ -855,6 +855,19 @@ export const listSemanticGalleryItemNames = async ({
   query: GallerySemanticQuery;
   signal?: AbortSignal;
 }): Promise<GalleryItemNames> => {
+  // A cluster query is an explicit member list held client-side (in proximity
+  // order from the clicked map point); there is nothing to ask the server.
+  if (query.kind === 'cluster') {
+    const cluster = getImageCluster(query.clusterId);
+    const imageNames = cluster?.imageNames ?? [];
+
+    return {
+      items: imageNames.map((name) => ({ kind: 'image', name })),
+      starredCount: 0,
+      total: imageNames.length,
+    };
+  }
+
   const results = await searchGallerySemantic(query, { signal });
 
   return {

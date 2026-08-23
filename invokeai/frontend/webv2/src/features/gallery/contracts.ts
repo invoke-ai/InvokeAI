@@ -35,6 +35,12 @@ export {
 } from './core/items';
 export { GALLERY_RECENT_IMAGE_LIMIT, getBoundedRecentImages } from './core/recentImages';
 export {
+  getImageCluster,
+  parseGallerySemanticReference,
+  registerImageCluster,
+  type GallerySemanticReference,
+} from './core/semanticImageQuery';
+export {
   DEFAULT_GALLERY_SETTINGS,
   getGallerySettings,
   type GalleryPaginationMode,

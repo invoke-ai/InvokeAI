@@ -1,19 +1,25 @@
 /**
  * Identity of a semantic gallery search: a text prompt, a gallery image, a
- * web image URL, or a dropped file held in the external-image registry.
+ * web image URL, a dropped file held in the external-image registry, or an
+ * image-map cluster held in the cluster registry.
  */
 export type GallerySemanticQuery =
   | { kind: 'text'; query: string }
   | { kind: 'image'; imageName: string }
   | { kind: 'url'; url: string }
-  | { kind: 'file'; fileId: string };
+  | { kind: 'file'; fileId: string }
+  | { kind: 'cluster'; clusterId: string };
 
-/** A persisted semantic search: a text prompt, a gallery image, a web URL, or a dropped file. */
+/**
+ * A persisted semantic search: a text prompt, a gallery image, a web URL, a
+ * dropped file, or an image-map cluster.
+ */
 export type GallerySemanticReference =
   | { kind: 'text'; query: string }
   | { kind: 'image'; imageName: string }
   | { kind: 'url'; url: string }
-  | { kind: 'file'; fileId: string; label: string };
+  | { kind: 'file'; fileId: string; label: string }
+  | { kind: 'cluster'; clusterId: string; label: string };
 
 /**
  * Stable identity for equality checks and fetch keys. A file reference is
@@ -34,6 +40,8 @@ export const gallerySemanticReferenceKey = (reference: GallerySemanticReference 
       return `url:${reference.url}`;
     case 'file':
       return `file:${reference.fileId}`;
+    case 'cluster':
+      return `cluster:${reference.clusterId}`;
   }
 };
 
@@ -48,6 +56,8 @@ export const toGallerySemanticQuery = (reference: GallerySemanticReference): Gal
       return { kind: 'url', url: reference.url };
     case 'file':
       return { fileId: reference.fileId, kind: 'file' };
+    case 'cluster':
+      return { clusterId: reference.clusterId, kind: 'cluster' };
   }
 };
 
@@ -77,6 +87,35 @@ export const registerExternalImageFile = (blob: Blob, label: string): string => 
 };
 
 export const getExternalImageFile = (fileId: string): { blob: Blob; label: string } | null => files.get(fileId) ?? null;
+
+/*
+ * In-memory registry for image-map cluster queries, mirroring the file
+ * registry above: a cluster's member list (which can run to thousands of
+ * names) cannot live in persisted widget values, so the persisted value keeps
+ * a registry key, and a key that no longer resolves (e.g. after a reload)
+ * reads as a cleared search. Only one cluster query is active at a time, so
+ * registering a new cluster evicts the previous one.
+ */
+
+let nextClusterId = 0;
+
+const clusters = new Map<string, { imageNames: string[]; label: string }>();
+
+export const registerImageCluster = (imageNames: string[], label: string): string => {
+  nextClusterId += 1;
+  // Same shape as file ids: the random token keeps a persisted id from a
+  // previous JS realm (another tab, a reload) from resolving to this realm's
+  // unrelated cluster.
+  const clusterId = `cluster-${String(nextClusterId)}-${Math.random().toString(36).slice(2, 10)}`;
+
+  clusters.clear();
+  clusters.set(clusterId, { imageNames, label });
+
+  return clusterId;
+};
+
+export const getImageCluster = (clusterId: string): { imageNames: string[]; label: string } | null =>
+  clusters.get(clusterId) ?? null;
 
 /**
  * Parses a persisted widget value into a semantic reference. Tolerates the
@@ -115,6 +154,22 @@ export const parseGallerySemanticReference = (value: unknown): GallerySemanticRe
         fileId: record.fileId,
         kind: 'file',
         label: typeof record.label === 'string' && record.label ? record.label : 'dropped image',
+      };
+    }
+
+    if (record.kind === 'cluster' && typeof record.clusterId === 'string' && record.clusterId) {
+      // Cluster members live in an in-memory registry; a persisted key that
+      // no longer resolves (e.g. after a reload) reads as no search at all.
+      const cluster = getImageCluster(record.clusterId);
+
+      if (cluster === null) {
+        return null;
+      }
+
+      return {
+        clusterId: record.clusterId,
+        kind: 'cluster',
+        label: typeof record.label === 'string' && record.label ? record.label : cluster.label,
       };
     }
   }

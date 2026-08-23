@@ -975,6 +975,41 @@ describe('GalleryImageGrid upload drop zone', () => {
   });
 });
 
+describe('GalleryImageGrid selection reveal', () => {
+  it('scrolls a changed selection into view once, not again on equivalent re-renders', async () => {
+    const gallery = createGallery();
+
+    // The mount's persisted selection counts as a change from nothing.
+    await renderGallery(gallery);
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+
+    // A refetch that keeps the selection must not yank the user back to it.
+    await renderGallery({ ...gallery });
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+
+    // An external selection (image-map reveal, palette) scrolls to its row.
+    await renderGallery({ ...gallery, selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] });
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
+  });
+
+  it('scrolls when a pending selection materializes with its late-loading page', async () => {
+    const items = [createItem('image', 'first.png')];
+
+    // The selection's page has not loaded yet, so the visible selection key
+    // is still null — nothing to scroll to.
+    await renderGallery(createGallery({ items, selectedItemKey: null, selectedItemKeys: [] }));
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    // The page lands and the selected item appears: scroll exactly then.
+    const loadedItems = [...items, createItem('image', 'deep.png')];
+
+    await renderGallery(
+      createGallery({ items: loadedItems, selectedItemKey: 'image:deep.png', selectedItemKeys: ['image:deep.png'] })
+    );
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('GalleryImageGrid virtualization', () => {
   it('keeps external-store option callbacks stable across equivalent renders', async () => {
     const gallery = createGallery({ items: [createItem('video', 'clip.mp4')] });

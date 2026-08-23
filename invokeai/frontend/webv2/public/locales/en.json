@@ -2875,6 +2875,7 @@
         "selectAllOnPage": "Select all gallery images on page",
         "toggleStarImage": "Toggle gallery image star"
       },
+      "clearClusterSearch": "Clear cluster filter",
       "clearImageSearch": "Clear image similarity search",
       "clearSemanticSearch": "Clear semantic search",
       "createBoard": "Create board",
@@ -2979,6 +2980,7 @@
       "searchOrCreateBoards": "Search or create boards",
       "searchSemantically": "Search semantically",
       "selectedBoardFallback": "selected board",
+      "semanticCluster": "Cluster: {{name}}",
       "semanticSimilarTo": "Similar to {{name}}",
       "semanticTextSearch": "Semantic search: {{name}}",
       "semanticWebImage": "web image",

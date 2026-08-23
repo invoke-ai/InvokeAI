@@ -208,6 +208,31 @@ export const GalleryImageGrid = () => {
 
   useGalleryGridHotkeys({ actionSelectionRefs, columnCount, scrollToItemIndex });
 
+  // Selections made outside the grid (the image map's reveal, the command
+  // palette) must land in view. The trigger is the *visible* selection key, so
+  // a selection whose page is still loading scrolls exactly when the item
+  // materializes; a selection already on screen is a no-op (`scrollToIndex`
+  // only moves when the row is out of view). Keyed on the selection rather
+  // than the row model: refetches that keep the selection must not yank the
+  // user back to it after they scroll away.
+  const lastScrolledSelectionRef = useRef<string | null>(null);
+  const scrollSelectionIntoView = useEffectEvent((selectedItemKey: string) => {
+    const itemIndex = gallery.items.findIndex((item) => toGalleryItemKey(item) === selectedItemKey);
+
+    if (itemIndex >= 0) {
+      scrollToItemIndex(itemIndex);
+    }
+  });
+
+  useEffect(() => {
+    const selectedItemKey = gallery.selectedItemKey;
+
+    if (selectedItemKey && selectedItemKey !== lastScrolledSelectionRef.current) {
+      lastScrolledSelectionRef.current = selectedItemKey;
+      scrollSelectionIntoView(selectedItemKey);
+    }
+  }, [gallery.selectedItemKey]);
+
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
 
