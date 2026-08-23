@@ -8,7 +8,7 @@ import type {
 import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDebounce';
 import type { ChangeEvent } from 'react';
 
-import { Badge, HStack, Input, Stack, Text } from '@chakra-ui/react';
+import { HStack, Input, Stack, Text } from '@chakra-ui/react';
 import { useDndMonitor } from '@dnd-kit/core';
 import { galleryImages, galleryTransfers } from '@features/gallery';
 import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
@@ -22,7 +22,6 @@ import {
 import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { clampDimension, deriveAspectRatioId } from '@features/generation/core/settings';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
-import { GenerateCollapsibleSection } from '@features/generation/ui/shared/GenerateCollapsibleSection';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -30,14 +29,14 @@ import {
 } from '@platform/state/accountLifecycle';
 import { Button, DropZone } from '@platform/ui';
 import { UploadIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ReferenceImageCard } from './ReferenceImageCard';
 
 const UPLOAD_ZONE_HOVER_STYLES = { bg: 'bg.muted', color: 'fg' };
 
-interface GenerateReferenceImagesSectionProps {
+interface GenerateReferenceImagesContentProps {
   models: readonly ModelConfig[];
   selectedModel: GenerateModelConfig | undefined;
   settings: GenerateSettings;
@@ -45,13 +44,17 @@ interface GenerateReferenceImagesSectionProps {
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
-export const GenerateReferenceImagesSection = ({
+/**
+ * Reference-image conditioning, rendered inside the Guidance section (the
+ * section chrome and combined badges live in `GenerateGuidanceSection`).
+ */
+export const GenerateReferenceImagesContent = ({
   models,
   onCommit,
   onCommitImmediate,
   selectedModel,
   settings,
-}: GenerateReferenceImagesSectionProps) => {
+}: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
   const { gallery, notifications } = useGenerationUi();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -64,7 +67,6 @@ export const GenerateReferenceImagesSection = ({
     disabled: !canAdd,
     id: 'generate-reference-images',
   });
-  const activeCount = referenceImages.filter((image) => image.isEnabled).length;
   const referenceImageCount = referenceImages.length;
 
   const appendReferenceImages = useCallback(
@@ -206,30 +208,6 @@ export const GenerateReferenceImagesSection = ({
     },
   });
 
-  const badges = useMemo(() => {
-    if (!isSupported) {
-      return referenceImageCount > 0 ? (
-        <Badge colorPalette="orange" size="xs" variant="surface">
-          {t('widgets.generate.incompatible')}
-        </Badge>
-      ) : null;
-    }
-
-    if (activeCount > 0) {
-      return (
-        <Badge size="xs" variant="surface">
-          {t('widgets.generate.activeCount', { count: activeCount })}
-        </Badge>
-      );
-    }
-
-    return referenceImageCount > 0 ? (
-      <Badge size="xs" variant="surface">
-        {t('widgets.generate.offCount', { count: referenceImageCount })}
-      </Badge>
-    ) : null;
-  }, [activeCount, isSupported, referenceImageCount, t]);
-
   if (!isSupported && referenceImageCount === 0) {
     return null;
   }
@@ -238,80 +216,59 @@ export const GenerateReferenceImagesSection = ({
   // project). No editable cards, no add paths — just the way out.
   if (!isSupported) {
     return (
-      <GenerateCollapsibleSection
-        label={t('widgets.generate.referenceImages')}
-        defaultOpen
-        badges={badges}
-        sectionId="reference-images"
-      >
-        <HStack gap="2" justify="space-between" p="2">
-          <Text color="fg.muted" fontSize="2xs" minW="0">
-            {t('widgets.generate.referenceImagesUnsupported')}
-          </Text>
-          <Button colorPalette="red" flexShrink="0" size="xs" variant="outline" onClick={clearReferenceImages}>
-            {t('widgets.generate.clearReferenceImages')}
-          </Button>
-        </HStack>
-      </GenerateCollapsibleSection>
+      <HStack gap="2" justify="space-between">
+        <Text color="fg.muted" fontSize="2xs" minW="0">
+          {t('widgets.generate.referenceImagesUnsupported')}
+        </Text>
+        <Button colorPalette="red" flexShrink="0" size="xs" variant="outline" onClick={clearReferenceImages}>
+          {t('widgets.generate.clearReferenceImages')}
+        </Button>
+      </HStack>
     );
   }
 
   return (
-    <GenerateCollapsibleSection
-      label={t('widgets.generate.referenceImages')}
-      defaultOpen
-      badges={badges}
-      sectionId="reference-images"
-    >
-      <Stack ref={setNodeRef} gap="2" p="2">
-        <HStack align="stretch" gap="2">
-          <DropZone
-            as="button"
-            alignItems="center"
-            cursor={canAdd ? 'pointer' : 'not-allowed'}
-            display="flex"
-            flex="1"
-            fontSize="2xs"
-            gap="2"
-            isOver={isOver}
-            justifyContent="center"
-            minH="12"
-            minW="0"
-            opacity={canAdd ? 1 : 0.6}
-            px="3"
-            _hover={canAdd ? UPLOAD_ZONE_HOVER_STYLES : undefined}
-            onClick={handleUploadZoneClick}
-          >
-            <UploadIcon size="14" />
-            {t('widgets.generate.referenceImagesHelp')}
-          </DropZone>
-        </HStack>
+    <Stack ref={setNodeRef} gap="2">
+      <HStack align="stretch" gap="2">
+        <DropZone
+          as="button"
+          alignItems="center"
+          cursor={canAdd ? 'pointer' : 'not-allowed'}
+          display="flex"
+          flex="1"
+          fontSize="2xs"
+          gap="2"
+          isOver={isOver}
+          justifyContent="center"
+          minH="12"
+          minW="0"
+          opacity={canAdd ? 1 : 0.6}
+          px="3"
+          _hover={canAdd ? UPLOAD_ZONE_HOVER_STYLES : undefined}
+          onClick={handleUploadZoneClick}
+        >
+          <UploadIcon size="14" />
+          {t('widgets.generate.referenceImagesHelp')}
+        </DropZone>
+      </HStack>
 
-        {referenceImageCount > 0 ? (
-          <Stack gap="2">
-            {referenceImages.map((referenceImage, index) => (
-              <ReferenceImageCard
-                key={referenceImage.id}
-                index={index}
-                referenceImage={referenceImage}
-                selectedModel={selectedModel}
-                onPatch={patchReferenceImage}
-                onRemove={removeReferenceImage}
-                onUseSize={applyReferenceImageSize}
-              />
-            ))}
-          </Stack>
-        ) : null}
+      {referenceImageCount > 0 ? (
+        <Stack gap="2">
+          {referenceImages.map((referenceImage, index) => (
+            <ReferenceImageCard
+              key={referenceImage.id}
+              index={index}
+              referenceImage={referenceImage}
+              selectedModel={selectedModel}
+              onPatch={patchReferenceImage}
+              onRemove={removeReferenceImage}
+              onUseSize={applyReferenceImageSize}
+            />
+          ))}
+        </Stack>
+      ) : null}
 
-        <Input
-          ref={fileInputRef}
-          accept="image/*"
-          display="none"
-          multiple
-          type="file"
-          onChange={handleFileInputChange}
-        />
-      </Stack>
-    </GenerateCollapsibleSection>
+      <Input ref={fileInputRef} accept="image/*" display="none" multiple type="file" onChange={handleFileInputChange} />
+    </Stack>
   );
 };
