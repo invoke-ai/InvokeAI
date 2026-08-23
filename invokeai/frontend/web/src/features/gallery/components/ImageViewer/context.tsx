@@ -11,8 +11,8 @@ import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
 import { type Atom, atom, computed, map, type MapStore, type WritableAtom } from 'nanostores';
-import type { PropsWithChildren } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { MutableRefObject, PropsWithChildren } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { S } from 'services/api/types';
 import { getEventScope } from 'services/events/eventScope';
 import { $socket } from 'services/events/stores';
@@ -31,12 +31,25 @@ type ImageViewerContextValue = {
   $activeProgressData: Atom<ViewerProgressDatum[]>;
   $isProgressImageResolving: Atom<boolean>;
   $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
+  /** Name of the item most recently rendered by either preview component (image or video). Shared
+   * across the two components so a click that switches media type (image -> video or back) still
+   * reads as a selection change to the temporary-reveal logic — a per-component ref resets on the
+   * swap and would silently swallow the first reveal after every type switch. */
+  lastRenderedItemNameRef: MutableRefObject<string | null>;
   /**
    * The viewer finished loading the final image/video for the given session (its DTO's
    * `session_id`, or null when it has none). Ends the completed session's "resolve" illusion.
    */
   onLoadImage: (sessionId: string | null) => void;
 };
+
+/** How long a mid-generation gallery click shows the clicked item before the live preview returns. */
+export const SELECTED_ITEM_REVEAL_DURATION_MS = 2000;
+
+/** How long a reveal waits for the selected item's first frame before showing it anyway. Long
+ * enough for a decode on a slow connection, short enough that a click on media that will never
+ * load still lands well inside the reveal it was promised. */
+export const SELECTED_ITEM_MEDIA_GRACE_MS = 1000;
 
 const ImageViewerContext = createContext<ImageViewerContextValue | null>(null);
 
@@ -60,6 +73,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   )[0];
   const $isProgressImageResolving = useState(() => atom(false))[0];
   const $isTemporarilyShowingSelectedImage = useState(() => atom(false))[0];
+  const lastRenderedItemNameRef = useRef<string | null>(null);
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
@@ -202,6 +216,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       $activeProgressData,
       $isProgressImageResolving,
       $isTemporarilyShowingSelectedImage,
+      lastRenderedItemNameRef,
       onLoadImage,
     }),
     [
