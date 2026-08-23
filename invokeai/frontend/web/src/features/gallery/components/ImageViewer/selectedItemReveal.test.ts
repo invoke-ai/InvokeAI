@@ -98,6 +98,49 @@ describe('createSelectedItemRevealMachine', () => {
     expect(h.isRevealed()).toBe(true);
   });
 
+  it('does not run the grace against an item that has not rendered yet', () => {
+    // A slow DTO fetch leaves the component rendering the previous item. Counting the grace from
+    // the click would lift the overlay onto that stale content at the deadline — and then leave
+    // the real item covered when it finally arrived, the reveal already spent.
+    const h = createHarness();
+    h.select('slow.png');
+    h.sync({ renderedItemName: 'previous.png', isMediaReady: true });
+    expect(h.pendingTimerCount(), 'no deadline while the item has nothing to show').toBe(0);
+    h.fireTimers();
+    expect(h.isRevealed()).toBe(false);
+
+    // The item lands long after any selection-anchored deadline would have expired.
+    h.syncRendered('slow.png');
+    expect(h.isRevealed(), 'the claim is still owed when the item finally renders').toBe(true);
+  });
+
+  it('starts the media grace only once the item is rendered, and only once', () => {
+    const h = createHarness();
+    h.select('b.mp4');
+    h.sync();
+    expect(h.pendingTimerCount()).toBe(0);
+
+    h.sync({ renderedItemName: 'b.mp4', isMediaReady: false });
+    h.sync({ renderedItemName: 'b.mp4', isMediaReady: false });
+    expect(h.pendingTimerCount()).toBe(1);
+    h.fireTimers();
+    expect(h.isRevealed(), 'a frame that never paints still cannot swallow the click').toBe(true);
+  });
+
+  it('re-arms the grace when a hand-off interrupts the wait for a frame', () => {
+    const h = createHarness();
+    h.select('b.mp4');
+    h.sync({ renderedItemName: 'b.mp4', isMediaReady: false });
+    expect(h.pendingTimerCount()).toBe(1);
+
+    h.sync({ renderedItemName: 'b.mp4', isMediaReady: false, isProgressImageResolving: true });
+    expect(h.pendingTimerCount(), 'the hand-off owns the viewer; the deadline pauses with it').toBe(0);
+
+    h.sync({ renderedItemName: 'b.mp4', isMediaReady: false });
+    h.fireTimers();
+    expect(h.isRevealed()).toBe(true);
+  });
+
   it('never reveals an auto-switch', () => {
     const h = createHarness();
     h.select('finished.png', { isAutoSwitch: true });

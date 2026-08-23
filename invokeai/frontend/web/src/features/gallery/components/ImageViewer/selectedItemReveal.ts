@@ -17,9 +17,12 @@ import type { GallerySelectionDescriptor } from 'features/gallery/store/galleryS
  *
  * A reveal is owed from the moment the selection lands, but it is only *shown* once that item's
  * media can actually be seen. Lifting the overlay onto an element that has not decoded a frame yet
- * shows the user a black rectangle where their click should be — so the machine waits for
- * `isMediaReady`, bounded by `mediaGraceMs` so that media which never becomes ready (a failed load,
- * a codec the browser will not decode) still makes the click land rather than swallowing it.
+ * shows the user a black rectangle where their click should be — so the machine waits for the item
+ * to be rendered and for `isMediaReady`. Once the item is rendered, the wait for its media is
+ * bounded by `mediaGraceMs`, so that media which never becomes ready (a failed load, a codec the
+ * browser will not decode) still makes the click land rather than swallowing it. Until the item
+ * renders there is nothing sensible to lift the overlay onto — only the previous item or a blank
+ * element — so the claim stays outstanding instead of running against a deadline.
  */
 type SelectedItemRevealInputs = {
   /** Who selected what, and which selection it is (see gallerySelectionSource). */
@@ -43,7 +46,8 @@ type MachineState =
   /** Owed a reveal, but a finished generation is resolving into its final frame and owns the
    * viewer for the moment. Resumes when that window ends. */
   | { kind: 'deferred'; generation: number; itemName: string }
-  /** Owed a reveal, waiting for the item's media to paint (or for the grace deadline). */
+  /** Owed a reveal, waiting for the item to render and its media to paint. The grace deadline
+   * runs only while the item is rendered. */
   | { kind: 'awaiting-media'; generation: number; itemName: string }
   /** Showing the selected item; the duration timer is running. */
   | { kind: 'revealing'; generation: number; itemName: string };
@@ -73,7 +77,7 @@ export type SelectedItemRevealMachine = {
 export const createSelectedItemRevealMachine = (deps: {
   setRevealed: (revealed: boolean) => void;
   durationMs: number;
-  /** How long a reveal waits for its media before showing anyway. */
+  /** How long a reveal waits for its rendered item's media before showing anyway. */
   mediaGraceMs: number;
   schedule?: (fn: () => void, ms: number) => number;
   cancel?: (id: number) => void;
@@ -122,16 +126,6 @@ export const createSelectedItemRevealMachine = (deps: {
   const startAwaitingMedia = (generation: number, itemName: string) => {
     clearTimer();
     enter({ kind: 'awaiting-media', generation, itemName });
-    timerId = schedule(() => {
-      timerId = 0;
-      // The media never became ready. Show the item anyway: an empty frame for a moment is a
-      // smaller failure than a click that looks dead for the rest of the render. No generation
-      // check is needed — every transition clears this timer first, so it can only run while this
-      // exact claim is still the one outstanding.
-      if (state.kind === 'awaiting-media') {
-        startRevealing(generation, itemName);
-      }
-    }, mediaGraceMs);
   };
 
   const sync: SelectedItemRevealMachine['sync'] = (inputs) => {
@@ -168,8 +162,27 @@ export const createSelectedItemRevealMachine = (deps: {
 
     // Show it the moment the owed item's media is actually on screen. Evaluated in the same pass
     // that entered the state, so a click on an item already rendered and decoded reveals at once.
-    if (state.kind === 'awaiting-media' && renderedItemName === state.itemName && isMediaReady) {
-      startRevealing(state.generation, state.itemName);
+    if (state.kind === 'awaiting-media' && renderedItemName === state.itemName) {
+      if (isMediaReady) {
+        startRevealing(state.generation, state.itemName);
+      } else if (timerId === 0) {
+        // The item is rendered but has not painted a frame. Media that never will (a failed load,
+        // a codec the browser cannot decode) must not swallow the click, so the wait is bounded —
+        // but the deadline starts here, not at the selection: counted from the click, it would
+        // lift the overlay onto whatever was still showing while the item itself was slow to
+        // arrive, and then leave the real item covered once it landed. No generation check is
+        // needed in the callback — every transition clears this timer first, so it can only fire
+        // while this exact claim is still the one outstanding. It is deliberately not cancelled
+        // if `renderedItemName` later disagrees: with both previews mounted mid-swap, the stale
+        // component's sync must not kill the deadline the matching one armed.
+        const { generation, itemName } = state;
+        timerId = schedule(() => {
+          timerId = 0;
+          if (state.kind === 'awaiting-media') {
+            startRevealing(generation, itemName);
+          }
+        }, mediaGraceMs);
+      }
     }
 
     // A reveal already granted runs out its timer even if a hand-off starts under it: that would

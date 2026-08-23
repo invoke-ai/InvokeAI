@@ -3,12 +3,7 @@ import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import { recordGallerySelection } from 'features/gallery/store/gallerySelectionSource';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
-import {
-  boardIdSelected,
-  comparedImagesSwapped,
-  imageSelected,
-  selectionChanged,
-} from 'features/gallery/store/gallerySlice';
+import { boardIdSelected, comparedImagesSwapped, imageSelected } from 'features/gallery/store/gallerySlice';
 
 /**
  * The actions through which a user (or the auto-switch) picks something.
@@ -16,9 +11,17 @@ import {
  * `boardIdSelected` only counts when it carries a selection: clicking a board in the boards list
  * dispatches it bare, leaves the selection alone, and must not read as the user picking the item
  * that happens to still be selected — the viewer would reveal an item they never clicked.
+ *
+ * `selectionChanged` is deliberately absent: it is the multi-selection *mutation* action
+ * (ctrl/shift-clicks, bulk operations), and a mutation that leaves the active item in place —
+ * ctrl-clicking a non-active item off the selection, say — is bookkeeping, not the user asking to
+ * see the item that stays active; counting it would flash the progress overlay off for a gesture
+ * aimed at a different item. A mutation that *moves* the active item is caught by the
+ * change-of-active-item clause below, and a plain click dispatches `imageSelected`, so the
+ * deliberate re-pick of the already-active item still lands here.
  */
 const isSelectionDispatch = (action: UnknownAction): boolean =>
-  isAnyOf(imageSelected, selectionChanged, comparedImagesSwapped)(action) ||
+  isAnyOf(imageSelected, comparedImagesSwapped)(action) ||
   (boardIdSelected.match(action) && action.payload.select !== undefined);
 
 /**

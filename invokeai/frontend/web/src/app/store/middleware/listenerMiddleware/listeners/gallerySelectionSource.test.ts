@@ -31,8 +31,30 @@ describe('addGallerySelectionSourceListener', () => {
 
   it('publishes a click made through the gallery grid', () => {
     const store = buildStore();
-    store.dispatch(selectionChanged(['clicked.png']));
+    store.dispatch(imageSelected('clicked.png'));
     expect($gallerySelection.get()).toMatchObject({ name: 'clicked.png', isAutoSwitch: false });
+  });
+
+  it('does not publish a multi-select mutation that leaves the active item in place', () => {
+    // Active item b, selection [a, b]: ctrl-clicking `a` off the selection dispatches
+    // selectionChanged([b]). Nothing the viewer shows changes — publishing it would flash the
+    // progress overlay off for bookkeeping aimed at a different item.
+    const store = buildStore();
+    store.dispatch(selectionChanged(['a.png', 'b.png']));
+    const beforeDeselect = $gallerySelection.get().generation;
+
+    store.dispatch(selectionChanged(['b.png']));
+
+    expect($gallerySelection.get().generation).toBe(beforeDeselect);
+  });
+
+  it('publishes a multi-select mutation that moves the active item', () => {
+    // Ctrl-clicking an unselected item appends it and makes it active. selectionChanged is not in
+    // the pick list, so this relies on the change-of-active-item clause.
+    const store = buildStore();
+    store.dispatch(imageSelected('a.png'));
+    store.dispatch(selectionChanged(['a.png', 'b.png']));
+    expect($gallerySelection.get()).toMatchObject({ name: 'b.png', isAutoSwitch: false });
   });
 
   it('publishes a re-selection of the item already active as a new selection', () => {
