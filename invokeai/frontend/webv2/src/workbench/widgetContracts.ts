@@ -282,6 +282,7 @@ export type SettingsSectionId =
   | 'project'
   | 'queue'
   | 'workflow'
+  | 'imageMap'
   | 'developer'
   | 'workspace';
 

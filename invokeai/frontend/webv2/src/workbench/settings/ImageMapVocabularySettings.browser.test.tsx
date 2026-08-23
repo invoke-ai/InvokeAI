@@ -1,0 +1,213 @@
+import type { ImageMapVocab } from '@workbench/image-map/vocabulary';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { system } from '@theme/system';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
+
+const mocks = vi.hoisted(() => ({
+  canManage: true,
+  refetchClusterLabels: vi.fn(),
+  updateImageMapVocab: vi.fn((_terms: string[]) => Promise.resolve(null as unknown as ImageMapVocab)),
+  vocab: null as ImageMapVocab | null,
+}));
+
+vi.mock('@features/identity', () => ({
+  useCapabilities: () => ({ canManageImageMapVocabulary: mocks.canManage }),
+}));
+
+vi.mock('@workbench/image-map/imageMapStore', () => ({
+  refetchClusterLabels: () => mocks.refetchClusterLabels(),
+}));
+
+vi.mock('@workbench/image-map/vocabulary', () => ({
+  imageMapVocabKeys: { all: ['image-map', 'vocab'] },
+  imageMapVocabQueryOptions: () => ({
+    queryFn: () => Promise.resolve(mocks.vocab),
+    queryKey: ['image-map', 'vocab'],
+    staleTime: Infinity,
+  }),
+  updateImageMapVocab: (terms: string[]) => mocks.updateImageMapVocab(terms),
+}));
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, options?: Record<string, unknown>) =>
+      ({
+        'common.add': 'Add',
+        'common.retry': 'Retry',
+        'settings.imageMapVocabulary.addHelp': 'Terms are lowercased and applied the next time labels are computed.',
+        'settings.imageMapVocabulary.addLabel': 'Add terms',
+        'settings.imageMapVocabulary.addPlaceholder': 'Add terms (comma or newline separated)',
+        'settings.imageMapVocabulary.adminOnly': 'Only an administrator can change the vocabulary.',
+        'settings.imageMapVocabulary.alreadyInList': 'Every entered term is already in the list.',
+        'settings.imageMapVocabulary.buildFailed': `The vocabulary could not be prepared: ${String(options?.message)}`,
+        'settings.imageMapVocabulary.count': `${String(options?.count)} of ${String(options?.max)} supplementary terms`,
+        'settings.imageMapVocabulary.indexOff': 'The image index is not running.',
+        'settings.imageMapVocabulary.loadFailed': 'Could not load the vocabulary.',
+        'settings.imageMapVocabulary.noTermsYet': 'No supplementary terms yet.',
+        'settings.imageMapVocabulary.rebuilding': 'Updating cluster labels with the new vocabulary…',
+        'settings.imageMapVocabulary.removeTerm': `Remove ${String(options?.term)}`,
+        'settings.imageMapVocabulary.saveFailed': 'Could not save the vocabulary.',
+        'settings.imageMapVocabulary.termTooLong': `Terms must be ${String(options?.max)} characters or fewer.`,
+        'settings.imageMapVocabulary.tooManyTerms': `The list is limited to ${String(options?.max)} terms.`,
+      })[key] ?? key,
+  }),
+}));
+
+import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
+
+const BASE_VOCAB: ImageMapVocab = {
+  error: null,
+  maxTerms: 500,
+  maxTermLength: 64,
+  state: 'ready',
+  terms: [],
+};
+
+let host: HTMLDivElement | null = null;
+let root: Root | null = null;
+let queryClient: QueryClient | null = null;
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const flushQueries = async (): Promise<void> => {
+  // The query resolves in a microtask; let effects and state settle.
+  await act(async () => {
+    await Promise.resolve();
+  });
+};
+
+const render = async (vocab: Partial<ImageMapVocab>): Promise<void> => {
+  mocks.vocab = { ...BASE_VOCAB, ...vocab };
+
+  await act(() => {
+    root?.render(
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient!}>
+          <ImageMapVocabularySettings />
+        </QueryClientProvider>
+      </ChakraProvider>
+    );
+  });
+  await flushQueries();
+};
+
+const input = (): HTMLInputElement | null =>
+  host!.querySelector<HTMLInputElement>('input[type="text"], input:not([type])');
+
+const chipCloseTriggers = (): HTMLElement[] =>
+  Array.from(host!.querySelectorAll<HTMLElement>('[aria-label^="Remove "]'));
+
+beforeEach(() => {
+  mocks.canManage = true;
+  mocks.refetchClusterLabels.mockClear();
+  mocks.updateImageMapVocab.mockClear();
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+});
+
+afterEach(async () => {
+  await act(() => root?.unmount());
+  queryClient?.clear();
+  queryClient = null;
+  host?.remove();
+  host = null;
+  root = null;
+});
+
+describe('ImageMapVocabularySettings', () => {
+  it('lists the stored terms as chips with the count line', async () => {
+    await render({ terms: ['aardvark', 'zebra'] });
+
+    expect(host?.textContent).toContain('aardvark');
+    expect(host?.textContent).toContain('zebra');
+    expect(host?.textContent).toContain('2 of 500 supplementary terms');
+  });
+
+  it('splits a pasted list, normalizes it, and saves the merged terms', async () => {
+    mocks.updateImageMapVocab.mockImplementation((terms: string[]) =>
+      Promise.resolve({ ...BASE_VOCAB, state: 'building' as const, terms })
+    );
+    await render({ terms: ['zebra'] });
+
+    await userEvent.fill(input()!, '  Golden   Retriever, OKAPI, zebra');
+    await userEvent.keyboard('{Enter}');
+    await flushQueries();
+
+    // "zebra" is already stored and drops out; the rest arrive normalized.
+    expect(mocks.updateImageMapVocab).toHaveBeenCalledWith(['zebra', 'golden retriever', 'okapi']);
+    // The draft clears only after a successful save.
+    expect(input()?.value).toBe('');
+    // The save's response reports the background rebuild.
+    expect(host?.textContent).toContain('Updating cluster labels with the new vocabulary…');
+  });
+
+  it('refuses a draft that adds nothing new without calling the server', async () => {
+    await render({ terms: ['zebra'] });
+
+    await userEvent.fill(input()!, 'ZEBRA');
+    await userEvent.keyboard('{Enter}');
+    await flushQueries();
+
+    expect(mocks.updateImageMapVocab).not.toHaveBeenCalled();
+    expect(host?.textContent).toContain('Every entered term is already in the list.');
+    expect(input()?.value).toBe('ZEBRA');
+  });
+
+  it('refuses an overlong term locally', async () => {
+    await render({ maxTermLength: 8, terms: [] });
+
+    await userEvent.fill(input()!, 'a far too long term');
+    await userEvent.keyboard('{Enter}');
+    await flushQueries();
+
+    expect(mocks.updateImageMapVocab).not.toHaveBeenCalled();
+    expect(host?.textContent).toContain('Terms must be 8 characters or fewer.');
+  });
+
+  it('removes a chip by saving the list without it', async () => {
+    mocks.updateImageMapVocab.mockImplementation((terms: string[]) =>
+      Promise.resolve({ ...BASE_VOCAB, state: 'building' as const, terms })
+    );
+    await render({ terms: ['aardvark', 'zebra'] });
+
+    await userEvent.click(chipCloseTriggers()[0]!);
+    await flushQueries();
+
+    expect(mocks.updateImageMapVocab).toHaveBeenCalledWith(['zebra']);
+  });
+
+  it('shows a read-only list to a non-admin', async () => {
+    mocks.canManage = false;
+    await render({ terms: ['zebra'] });
+
+    expect(host?.textContent).toContain('zebra');
+    expect(host?.textContent).toContain('Only an administrator can change the vocabulary.');
+    expect(input()).toBeNull();
+    expect(chipCloseTriggers()).toHaveLength(0);
+  });
+
+  it('re-fetches any open map labels when the rebuild lands', async () => {
+    await render({ state: 'building', terms: ['zebra'] });
+
+    expect(mocks.refetchClusterLabels).not.toHaveBeenCalled();
+
+    await act(async () => {
+      queryClient!.setQueryData(['image-map', 'vocab'], { ...BASE_VOCAB, state: 'ready', terms: ['zebra'] });
+      await Promise.resolve();
+    });
+
+    expect(mocks.refetchClusterLabels).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces a failed embedding build with its message', async () => {
+    await render({ error: 'no text encoder installed', state: 'error' });
+
+    expect(host?.textContent).toContain('The vocabulary could not be prepared: no text encoder installed');
+  });
+});
