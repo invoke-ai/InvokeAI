@@ -1,14 +1,22 @@
 import type { GenerationUiAdapter } from '@features/generation/react';
+import type { QueueItemReadModel, QueueReadModel } from '@features/queue/contracts';
 import type { ReactNode } from 'react';
 
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
+import { galleryImageUrls } from '@features/gallery/utility';
 import { GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
+import {
+  buildProjectQueueItemOriginPrefix,
+  extractGenerationMeta,
+  getResultImageName,
+} from '@features/queue/contracts';
+import { getQueueReadModelOptions } from '@features/queue/queries';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getWorkbenchPreferences,
   patchWorkbenchPreferences,
@@ -27,6 +35,74 @@ const GenerateCanvasCompositingSection = lazy(() =>
     default: module.GenerateCanvasCompositingSection,
   }))
 );
+
+const RECENT_RUN_WINDOW = 10;
+const SEED_HISTORY_LIMIT = 6;
+
+const selectQueueItems = (model: QueueReadModel): QueueItemReadModel[] => model.items;
+
+/**
+ * Seeds and durations of recent completed Generate runs, derived from the
+ * project-scoped backend queue read model. Backend items map to a local queue
+ * item to prove they came from the Generate source (canvas, workflow, and
+ * upscale runs share the same backend queue); the executed seed comes from the
+ * backend item's session meta, which is authoritative for randomized runs.
+ */
+const useGenerationQueueInsights = (projectId: string): GenerationUiAdapter['queueInsights'] => {
+  const localQueueItems = useActiveProjectSelector((activeProject) => activeProject.queue.items);
+  const scope = useMemo(() => ({ originPrefix: buildProjectQueueItemOriginPrefix(projectId) }), [projectId]);
+  const backendItems = useQuery({ ...getQueueReadModelOptions(scope), select: selectQueueItems }).data;
+
+  return useMemo(() => {
+    if (!backendItems) {
+      return { secondsPerRun: null, seedHistory: [] };
+    }
+
+    const generateBackendIds = new Set<number>();
+
+    for (const item of localQueueItems) {
+      if (item.snapshot.sourceId === 'generate') {
+        for (const backendId of item.backendItemIds ?? []) {
+          generateBackendIds.add(backendId);
+        }
+      }
+    }
+
+    const completed = backendItems
+      .filter((item) => item.status === 'completed' && generateBackendIds.has(item.id))
+      .sort((a, b) => (b.completedAt ?? b.updatedAt).localeCompare(a.completedAt ?? a.updatedAt));
+
+    const seenSeeds = new Set<number>();
+    const seedHistory: GenerationUiAdapter['queueInsights']['seedHistory'][number][] = [];
+
+    for (const item of completed) {
+      const seed = extractGenerationMeta(item).seed;
+
+      if (seed === undefined || seenSeeds.has(seed)) {
+        continue;
+      }
+
+      seenSeeds.add(seed);
+      const imageName = getResultImageName(item);
+      seedHistory.push({ seed, thumbnailUrl: imageName ? galleryImageUrls.thumbnail(imageName) : null });
+
+      if (seedHistory.length >= SEED_HISTORY_LIMIT) {
+        break;
+      }
+    }
+
+    const durations = completed
+      .slice(0, RECENT_RUN_WINDOW)
+      .map((item) =>
+        item.startedAt && item.completedAt ? (Date.parse(item.completedAt) - Date.parse(item.startedAt)) / 1000 : null
+      )
+      .filter((seconds): seconds is number => seconds !== null && Number.isFinite(seconds) && seconds > 0);
+    const secondsPerRun =
+      durations.length === 0 ? null : durations.reduce((total, seconds) => total + seconds, 0) / durations.length;
+
+    return { secondsPerRun, seedHistory };
+  }, [backendItems, localQueueItems]);
+};
 
 /**
  * Production binding of Generation's UI port: builds each sub-port from
@@ -152,6 +228,37 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     }),
     [krea2RebalancePresets]
   );
+  const generatePresets = useWorkbenchPreferenceSelector((preferences) => preferences.generatePresets);
+  const presetsGroup = useMemo<GenerationUiAdapter['presets']>(
+    () => ({
+      // Settings persists these shape-checked only; the feature re-normalizes the
+      // snapshot against the current model catalog when a preset is applied.
+      presets: generatePresets,
+      remove: (presetId) => {
+        void patchWorkbenchPreferences({
+          generatePresets: getWorkbenchPreferences().generatePresets.filter((preset) => preset.id !== presetId),
+        });
+      },
+      rename: (presetId, label) => {
+        void patchWorkbenchPreferences({
+          generatePresets: getWorkbenchPreferences().generatePresets.map((preset) =>
+            preset.id === presetId ? { ...preset, label } : preset
+          ),
+        });
+      },
+      save: (label, values) => {
+        const preset = { id: crypto.randomUUID(), label, values };
+
+        void patchWorkbenchPreferences({
+          generatePresets: [...getWorkbenchPreferences().generatePresets, preset],
+        });
+
+        return preset;
+      },
+    }),
+    [generatePresets]
+  );
+  const queueInsightsGroup = useGenerationQueueInsights(project.activeProjectId);
   const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(
     () => ({
@@ -173,8 +280,10 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       gallery: galleryGroup,
       models: modelsGroup,
       notifications: notificationsGroup,
+      presets: presetsGroup,
       project,
       promptHistory: promptHistoryGroup,
+      queueInsights: queueInsightsGroup,
       rebalancePresets: rebalancePresetsGroup,
       sectionPreferences: sectionPreferencesGroup,
       settings: settingsGroup,
@@ -185,8 +294,10 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       galleryGroup,
       modelsGroup,
       notificationsGroup,
+      presetsGroup,
       project,
       promptHistoryGroup,
+      queueInsightsGroup,
       rebalancePresetsGroup,
       sectionPreferencesGroup,
       settingsGroup,
