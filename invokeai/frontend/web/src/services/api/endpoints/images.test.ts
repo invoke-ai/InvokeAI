@@ -352,6 +352,38 @@ describe('buildChunkedImageBatchQueryFn', () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
+  it('aborts an errored chunk that returns into a taken-over session, consuming nothing', async () => {
+    // The error path consumes state too — since the indeterminate-error reconciliation it
+    // dispatches as-if-committed invalidations, and the partial path returns an aggregate the
+    // UI applies. A takeover discovered when the chunk comes back must therefore hard-abort
+    // BEFORE that handling runs, exactly as it does for a successful payload. Staged with an
+    // indeterminate 500, the worst case: without the triage it would both invalidate and
+    // return user A's partial result into user B's session.
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        switchUser('user-b');
+        return Promise.resolve({ error: { status: 500, data: 'boom' } });
+      }
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
+    });
+
+    const { dispatch, result } = run(baseQuery, { image_names: names(1500) });
+
+    expect(await result).toEqual({
+      error: {
+        status: 'CUSTOM_ERROR',
+        error: 'Aborted: the authenticated session changed while the operation was running',
+      },
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
   it('invalidates the failing chunk as if it had landed when the error cannot prove otherwise', async () => {
     // A transport error can strike after the server committed the chunk -- the response is
     // what was lost, not necessarily the request. The names are still reported failed, which

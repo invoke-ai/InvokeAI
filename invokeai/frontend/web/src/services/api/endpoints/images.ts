@@ -168,11 +168,18 @@ const fetchChunk = async (
     return { error: sessionMismatchError() };
   }
   const response = await baseQuery(args);
-  // An error passes through untriaged: it carries nothing the next session could consume, and
-  // rewriting it loses what it was. This chunk's own expired-session 401 is the everyday case —
-  // `dynamicBaseQuery` dispatches `sessionExpiredLogout` before returning it, so the token is
-  // already gone by this line, and a rewrite would turn the ordinary failure into an abort.
+  // An error is triaged like a success, but only for takeover. Mere expiry passes through
+  // untriaged: this chunk's own expired-session 401 is the everyday case — `dynamicBaseQuery`
+  // dispatches `sessionExpiredLogout` before returning it, so the token is already gone by
+  // this line, and a rewrite would turn the ordinary failure into an abort that discards the
+  // committed chunks' report. A takeover, though, must not reach the loops' error handling at
+  // all: that handling *consumes* — it dispatches as-if-committed invalidations and returns
+  // partial aggregates the UI applies — and everything it would consume belongs to the
+  // session that started the run, not to whoever owns the tab now.
   if (response.error) {
+    if (localStorage.getItem('auth_token') !== null && !isSameAuthContext(authContext)) {
+      return { error: AUTH_CHANGED_ERROR };
+    }
     return response;
   }
   // A *successful* payload is consumed unless another user has taken over. Mere expiry keeps

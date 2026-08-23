@@ -1248,6 +1248,53 @@ class TestImageMutationAuth:
         assert body["failed_images"] == []
         assert mock_invoker.services.image_records.get("user1-star-blocked").starred is False
 
+    @pytest.mark.parametrize("route", ["star", "unstar"])
+    def test_star_reports_a_name_whose_board_lookup_hit_a_storage_error(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        user1_token: str,
+        user2_token: str,
+        route: str,
+    ):
+        """A database error during the board-ownership fallback must land in failed_images.
+
+        `assert_image_owner` used to catch every exception from the board lookup and fall
+        through to the 403, and the batch loops treat a 403 as a silent auth skip -- so a
+        locked database made the star quietly vanish from the response: not applied, not
+        reported, and nothing for the client to toast. Only a board positively known to be
+        gone may still answer 403; a lookup that cannot be decided must propagate into the
+        loop's storage-failure arm.
+        """
+        import sqlite3
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, f"User1 Public {route} Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        name = f"user1-{route}-undecidable"
+        _save_image(mock_invoker, name, user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
+
+        # Patched only after the setup above used the real store. user2 is neither admin nor
+        # direct owner, so the decision reaches the board lookup and cannot complete.
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        r = client.post(
+            f"/api/v1/images/{route}",
+            json={"image_names": [name]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        assert body[f"{route}red_images"] == []
+        assert body["failed_images"] == [name]
+
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
