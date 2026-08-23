@@ -23,6 +23,7 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import {
+  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -33,7 +34,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { WidgetRendererById } from './WidgetRenderer';
+import { WidgetChromeSlotById, WidgetRendererById } from './WidgetRenderer';
 import { areWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
 /** Below Chakra dialogs/popovers/toasts; above the docked shell. */
@@ -315,6 +316,14 @@ export const FloatingWidgetWindow = ({
           </Text>
         </HStack>
         <HStack flexShrink={0} gap="1">
+          {/* The widget's own header toggles: floated content renders bare, so
+              without this the docked header's controls would simply vanish on
+              float. Frame-level actions stay out — this bar carries its own. */}
+          {isEnabled && widget ? (
+            <Suspense fallback={null}>
+              <WidgetChromeSlotById instanceId={instanceId} region="floating" slot="viewActions" widget={widget} />
+            </Suspense>
+          ) : null}
           <Tooltip content={isShaded ? t('widgets.floating.unshade') : t('widgets.floating.shade')}>
             <IconButton
               aria-label={isShaded ? t('widgets.floating.unshade') : t('widgets.floating.shade')}

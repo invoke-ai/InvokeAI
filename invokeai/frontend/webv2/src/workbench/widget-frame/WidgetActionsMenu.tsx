@@ -12,11 +12,8 @@ import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { IconButton } from '@platform/ui';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
-import { getEnabledCenterViewCount } from '@workbench/widgetPlacementCommands';
-import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { GitBranchIcon, MoreHorizontalIcon, PictureInPicture2Icon, TargetIcon } from 'lucide-react';
+import { GitBranchIcon, MoreHorizontalIcon, TargetIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +22,10 @@ import { useTranslation } from 'react-i18next';
  * graph-bearing actions (`Set Source`, `View Graph`) and any extra entries the
  * widget's manifest contributes via `headerMenu` — one menu per widget, so
  * widgets extend the frame instead of stacking their own menus and toolbars.
+ *
+ * Floating is not among them: it is a mode toggle, so it renders as its own
+ * header icon ({@link WidgetFloatButton}) opposite the floating window's dock
+ * control rather than as a menu item.
  */
 
 const GraphPreviewHost = lazy(() => import('./GraphPreviewHost'));
@@ -86,9 +87,6 @@ export const WidgetActionsMenu = ({
   runtime: WidgetRuntimeApi;
 }) => {
   const { t } = useTranslation();
-  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
-  const { getWidgetById } = useWorkbenchWidgetRegistry();
-  const { widgets } = useWorkbenchCommands();
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   // Mount outlives `isPreviewOpen`: dropping the host the moment the dialog
   // closes cancels its exit transition, so the preview blinked out of
@@ -100,20 +98,6 @@ export const WidgetActionsMenu = ({
       manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region, label) : null,
     [label, manifest, region]
   );
-  // Floating is offered only from dockable regions; the floating window's own
-  // chrome carries the dock control. The last center *view* is not offered it
-  // either — floating it out would leave the work surface with nothing to
-  // show, which is why `closeWidgetPlacement` refuses the same removal.
-  const canFloat =
-    Boolean(manifest.allowFloating) &&
-    region !== 'floating' &&
-    !(region === 'center' && getEnabledCenterViewCount(placementProject, getWidgetById) === 1);
-  // Floating unmounts the docked subtree; the draft registry's cleanup only
-  // deregisters the flusher, so an uncommitted edit is lost without this.
-  const handleFloat = useCallback(() => {
-    flushWorkbenchDrafts();
-    widgets.float(instance.id);
-  }, [instance.id, widgets]);
   const handlePreview = useCallback(() => {
     flushWorkbenchDrafts();
     setIsPreviewMounted(true);
@@ -127,7 +111,7 @@ export const WidgetActionsMenu = ({
     }
   }, [isPreviewOpen]);
 
-  if (!surface && !HeaderMenu && !canFloat) {
+  if (!surface && !HeaderMenu) {
     return null;
   }
 
@@ -143,14 +127,7 @@ export const WidgetActionsMenu = ({
           <Menu.Positioner>
             <Menu.Content minW="13rem">
               {surface ? <GraphSurfaceMenuItems surface={surface} onPreview={handlePreview} /> : null}
-              {surface && (HeaderMenu || canFloat) ? <Menu.Separator borderColor="border.subtle" /> : null}
-              {canFloat ? (
-                <Menu.Item value="float-window" onClick={handleFloat}>
-                  <Icon as={PictureInPicture2Icon} boxSize="3.5" />
-                  <Menu.ItemText>{t('widgets.floating.floatWindow')}</Menu.ItemText>
-                </Menu.Item>
-              ) : null}
-              {canFloat && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
+              {surface && HeaderMenu ? <Menu.Separator borderColor="border.subtle" /> : null}
               {HeaderMenu ? (
                 <HeaderMenu instance={instance} manifest={manifest} region={region} runtime={runtime} />
               ) : null}
