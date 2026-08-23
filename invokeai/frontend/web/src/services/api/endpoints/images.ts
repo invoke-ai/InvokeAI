@@ -270,9 +270,19 @@ export const buildChunkedImageBatchQueryFn =
           // either way. `assumeCommitted` builds the result this chunk would have returned on
           // success, so the tags come from the same `getTags` the endpoint publishes and the
           // two cannot drift. A lost chunk's affected boards are unknowable, so callers
-          // assume none: the board-affecting tag helper still returns the global gallery-list
-          // tags, which is what makes the visible views refetch.
-          dispatch(api.util.invalidateTags(getTags(assumeCommitted(image_names, arg))));
+          // assume none — which reaches the global gallery-list tags but none of the
+          // board-keyed ones (`Board`, `BoardImagesTotal`, ..., all keyed by id). Those are
+          // appended type-wide instead: every board's sidebar count refetching once beats a
+          // count that stays wrong until something unrelated bumps it.
+          dispatch(
+            api.util.invalidateTags([
+              ...getTags(assumeCommitted(image_names, arg)),
+              'ImageList',
+              'Board',
+              'BoardImagesTotal',
+              'BoardVideosTotal',
+            ])
+          );
         }
         if (results.length === 0) {
           // Nothing was applied, so this is an ordinary failed request — report it as one.
@@ -328,6 +338,10 @@ const getRemoveImagesFromBoardTags = (
   result: components['schemas']['RemoveImagesFromBoardResult']
 ): InvalidateTagsArg => [
   ...getTagsToInvalidateForImageMutation(result.removed_images),
+  // A name the zero-row classification reports as failed sits on a board this client did not
+  // expect — refetching its DTO is what shows where it actually went. Names folded in
+  // client-side for unreached chunks ride along; their refetch merely confirms the cache.
+  ...getTagsToInvalidateForImageMutation(result.failed_images),
   ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
 ];
 

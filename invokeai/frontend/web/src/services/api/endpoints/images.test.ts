@@ -379,8 +379,17 @@ describe('buildChunkedImageBatchQueryFn', () => {
     const result = await queryFn({ image_names: names(1500) }, { dispatch } as any, undefined, baseQuery as any);
     /* eslint-enable @typescript-eslint/no-explicit-any */
 
-    // The assumed-committed invalidation is keyed by the failing chunk's own names...
-    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags([{ type: 'Image', id: 'image-1000.png' }]));
+    // The assumed-committed invalidation is keyed by the failing chunk's own names, with the
+    // board-keyed tag types appended type-wide, since the lost chunk's boards are unknowable.
+    expect(dispatch).toHaveBeenCalledWith(
+      api.util.invalidateTags([
+        { type: 'Image', id: 'image-1000.png' },
+        'ImageList',
+        'Board',
+        'BoardImagesTotal',
+        'BoardVideosTotal',
+      ])
+    );
     // ...and the merged invalidation for the chunks that did land still happens.
     expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags([{ type: 'Image', id: 'chunk-1.png' }]));
     expect(result).toEqual({
@@ -429,7 +438,9 @@ describe('buildChunkedImageBatchQueryFn', () => {
 
     expect(await result).toEqual({ error: { status: 'TIMEOUT_ERROR', data: 'slow' } });
     expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags(getTags()));
+    expect(dispatch).toHaveBeenCalledWith(
+      api.util.invalidateTags([...getTags(), 'ImageList', 'Board', 'BoardImagesTotal', 'BoardVideosTotal'])
+    );
     expect(toast).not.toHaveBeenCalled();
   });
 
