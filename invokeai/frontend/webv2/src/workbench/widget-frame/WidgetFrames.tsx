@@ -11,14 +11,18 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { Box, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
+import { getEnabledCenterViewCount } from '@workbench/widgetPlacementCommands';
+import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { clampPanelSize, getPanelSizeBounds, shouldSnapPanelShut } from '@workbench/workbenchState';
-import { SettingsIcon } from 'lucide-react';
+import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
+import { PictureInPicture2Icon, SettingsIcon } from 'lucide-react';
 import {
   useCallback,
   useMemo,
@@ -250,10 +254,65 @@ export const WidgetPanelFrame = ({
 };
 
 /**
+ * The docked half of the float/dock pair: one icon in the widget's header
+ * actions that detaches it into a floating window. Its opposite — the dock
+ * control — sits in the same corner of `FloatingWidgetWindow`'s title bar, so
+ * the mode is one click away either way instead of a menu item in one mode and
+ * a button in the other.
+ */
+export const WidgetFloatButton = ({
+  instanceId,
+  manifest,
+  region,
+}: {
+  instanceId: WidgetInstanceId;
+  manifest: WidgetManifest;
+  region: WorkbenchRegion;
+}) => {
+  const { t } = useTranslation();
+  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const { getWidgetById } = useWorkbenchWidgetRegistry();
+  const { widgets } = useWorkbenchCommands();
+  // Floating unmounts the docked subtree; the draft registry's cleanup only
+  // deregisters the flusher, so an uncommitted edit is lost without this.
+  const handleFloat = useCallback(() => {
+    flushWorkbenchDrafts();
+    widgets.float(instanceId);
+  }, [instanceId, widgets]);
+  // Floating is offered only from dockable regions; the floating window's own
+  // chrome carries the dock control. The last center *view* is not offered it
+  // either — floating it out would leave the work surface with nothing to
+  // show, which is why `closeWidgetPlacement` refuses the same removal.
+  const canFloat =
+    Boolean(manifest.allowFloating) &&
+    region !== 'floating' &&
+    !(region === 'center' && getEnabledCenterViewCount(placementProject, getWidgetById) === 1);
+
+  if (!canFloat) {
+    return null;
+  }
+
+  return (
+    <Tooltip content={t('widgets.floating.floatWindow')}>
+      <IconButton
+        aria-label={t('widgets.floating.floatWindow')}
+        color="fg.muted"
+        size="2xs"
+        variant="ghost"
+        onClick={handleFloat}
+      >
+        <Icon as={PictureInPicture2Icon} boxSize="3.5" />
+      </IconButton>
+    </Tooltip>
+  );
+};
+
+/**
  * The trailing action cluster of a widget's chrome: the manifest's own
- * `headerActions`, the settings gear, and the shared overflow menu. Panels
- * render it inside {@link WidgetHeader}; the center region renders it on its
- * own, floating over the work surface, so it lives apart from the header row.
+ * `headerActions`, the settings gear, the float control, and the shared
+ * overflow menu. Panels render it inside {@link WidgetHeader}; the center
+ * region renders it on its own, floating over the work surface, so it lives
+ * apart from the header row.
  */
 export const WidgetHeaderActionsGroup = ({
   actions,
@@ -293,6 +352,7 @@ export const WidgetHeaderActionsGroup = ({
           </IconButton>
         </Tooltip>
       ) : null}
+      <WidgetFloatButton instanceId={instance.id} manifest={manifest} region={region} />
       <WidgetActionsMenu
         HeaderMenu={HeaderMenu}
         instance={instance}

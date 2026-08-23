@@ -5,6 +5,7 @@ import type {
   WidgetInstanceRuntimeMeta,
   WidgetRuntimeApi,
   WidgetViewProps,
+  WorkbenchRegion,
 } from '@workbench/widgetContracts';
 
 import { Box, Flex, Text } from '@chakra-ui/react';
@@ -32,11 +33,24 @@ interface WidgetRendererByIdProps extends Omit<WidgetViewProps, 'instance' | 'ma
   widget: RegisteredWidget;
 }
 
-/** The chrome slots the center region hoists out of the widget frame. */
-type WidgetChromeSlotName = 'actions' | 'label';
+/**
+ * The chrome slots a region can hoist out of the widget frame. `actions` is the
+ * full trailing cluster (widget actions, settings, float, overflow menu);
+ * `viewActions` is the widget's own `headerActions` alone, for chrome that
+ * already carries its own frame controls.
+ */
+type WidgetChromeSlotName = 'actions' | 'label' | 'viewActions';
 
 interface WidgetChromeSlotByIdProps {
   instanceId: string;
+  /**
+   * The region the hoisted chrome acts for; the center region, which hoists
+   * its chrome for every widget it shows, is the default. It becomes the
+   * runtime's region, which is what `closeWidgetInstance` and
+   * `revealWidgetInstance` act on — a caller hoisting chrome for some other
+   * region must say so, or those act on the center's placement instead.
+   */
+  region?: WorkbenchRegion;
   slot: WidgetChromeSlotName;
   widget: RegisteredWidget;
 }
@@ -52,28 +66,33 @@ export const WidgetRendererById = ({ instanceId, widget, ...props }: WidgetRende
 
 /**
  * Renders one chrome slot of a widget outside its own frame. The center region
- * floats its chrome over the work surface, so the label and action slots are
- * mounted by `CenterArea` rather than by the widget's frame — this resolves the
+ * floats its chrome over the work surface and a floating window owns its title
+ * bar, so their label and action slots are mounted by `CenterArea` and
+ * `FloatingWidgetWindow` rather than by the widget's frame — this resolves the
  * same implementation and runtime the view would get.
  *
  * Suspends on first load of the implementation chunk; callers wrap it in their
  * own `Suspense` so the rest of the chrome paints immediately.
  */
-export const WidgetChromeSlotById = ({ instanceId, slot, widget }: WidgetChromeSlotByIdProps) => {
+export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widget }: WidgetChromeSlotByIdProps) => {
   const selection = useActiveProjectSelector(
     (project) => ({ instance: project.widgetInstances[instanceId], projectId: project.id }),
     areProjectWidgetRenderInstancesEqual
   );
 
-  return selection.instance ? <WidgetChromeSlot instance={selection.instance} slot={slot} widget={widget} /> : null;
+  return selection.instance ? (
+    <WidgetChromeSlot instance={selection.instance} region={region} slot={slot} widget={widget} />
+  ) : null;
 };
 
 const WidgetChromeSlot = ({
   instance,
+  region,
   slot,
   widget,
 }: {
   instance: WidgetInstanceContract;
+  region: WorkbenchRegion;
   slot: WidgetChromeSlotName;
   widget: RegisteredWidget;
 }) => {
@@ -94,16 +113,16 @@ const WidgetChromeSlot = ({
     getWidgetsForRegion,
     instance: instanceMeta,
     project,
-    region: 'center',
+    region,
   });
   const HeaderActions = implementation.headerActions;
   const HeaderLabel = implementation.headerLabel;
   const actions = useMemo(
     () =>
       HeaderActions ? (
-        <HeaderActions instance={instanceMeta} manifest={widget.manifest} region="center" runtime={runtime} />
+        <HeaderActions instance={instanceMeta} manifest={widget.manifest} region={region} runtime={runtime} />
       ) : null,
-    [HeaderActions, instanceMeta, runtime, widget.manifest]
+    [HeaderActions, instanceMeta, region, runtime, widget.manifest]
   );
 
   if (widget.manifest.chrome?.header === 'hidden') {
@@ -113,7 +132,14 @@ const WidgetChromeSlot = ({
   // A widget-supplied label only replaces the standard title, which the center
   // view selector already shows — a renamed instance keeps the selector's text.
   if (slot === 'label') {
-    return HeaderLabel && !instanceMeta.title ? <HeaderLabel region="center" /> : null;
+    return HeaderLabel && !instanceMeta.title ? <HeaderLabel region={region} /> : null;
+  }
+
+  // The window chrome around a floating widget already carries the frame's own
+  // controls (shade, maximize, dock), so it takes the widget's actions alone —
+  // a floated widget keeps the toggles its docked header shows.
+  if (slot === 'viewActions') {
+    return actions;
   }
 
   return (
@@ -122,7 +148,7 @@ const WidgetChromeSlot = ({
       actions={actions}
       instance={instanceMeta}
       manifest={widget.manifest}
-      region="center"
+      region={region}
       runtime={runtime}
     />
   );
