@@ -44,8 +44,46 @@ export const getModelDefaultsPatch = (
   return patch;
 };
 
+/**
+ * The model-governed keys grouped into user-level decisions, so the override
+ * count reads as "3 overrides" the way a person made them: changing the size
+ * touches five keys but is one decision.
+ */
+const MODEL_DEFAULT_DECISION_GROUPS: readonly (readonly (typeof MODEL_DEFAULT_VALUE_KEYS)[number][])[] = [
+  ['aspectRatioId', 'aspectRatioIsLocked', 'aspectRatioValue', 'height', 'width'],
+  ['steps'],
+  ['cfgScale'],
+  ['cfgRescaleMultiplier'],
+  ['scheduler'],
+  ['vaePrecision'],
+];
+
+/**
+ * How many model-governed decisions deviate from the model's defaults. The VAE
+ * override and the LoRA set each count once.
+ */
+export const countModelDefaultOverrides = (
+  settings: GenerateSettings,
+  modelDefaultSettings: GenerateSettings
+): number => {
+  let count = MODEL_DEFAULT_DECISION_GROUPS.filter((group) =>
+    group.some((key) => !Object.is(settings[key], modelDefaultSettings[key]))
+  ).length;
+
+  if (settings.vae?.key !== modelDefaultSettings.vae?.key) {
+    count += 1;
+  }
+
+  const lorasMatch =
+    settings.loras.length === modelDefaultSettings.loras.length &&
+    settings.loras.every((lora, index) => lora.isEnabled === modelDefaultSettings.loras[index]?.isEnabled);
+
+  if (!lorasMatch) {
+    count += 1;
+  }
+
+  return count;
+};
+
 export const settingsMatchModelDefaults = (settings: GenerateSettings, modelDefaultSettings: GenerateSettings) =>
-  MODEL_DEFAULT_VALUE_KEYS.every((key) => Object.is(settings[key], modelDefaultSettings[key])) &&
-  settings.vae?.key === modelDefaultSettings.vae?.key &&
-  settings.loras.length === modelDefaultSettings.loras.length &&
-  settings.loras.every((lora, index) => lora.isEnabled === modelDefaultSettings.loras[index]?.isEnabled);
+  countModelDefaultOverrides(settings, modelDefaultSettings) === 0;
