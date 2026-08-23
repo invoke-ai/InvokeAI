@@ -100,6 +100,27 @@ class ImageIndexRecordsBase(ABC):
         pass
 
     @abstractmethod
+    def get_custom_vocab_terms(self) -> list[str]:
+        """List the supplementary cluster-labeling vocabulary terms, sorted by term.
+
+        The list is server-wide (see the vocabulary table's migration) and is
+        merged with the bundled vocabulary at embedding-build time. The sorted
+        order feeds the vocabulary fingerprint, so it must stay stable.
+        """
+        pass
+
+    @abstractmethod
+    def set_custom_vocab_terms(self, terms: list[str]) -> None:
+        """Replace the supplementary vocabulary with the given terms, atomically.
+
+        Callers pass normalized terms (`normalize_custom_vocab_terms`); this
+        stores what it is given. Replacement rather than per-term mutation:
+        the vocabulary is a single small list edited as a whole, and replace
+        semantics make the API idempotent.
+        """
+        pass
+
+    @abstractmethod
     def get_projection(self, user_id: str, model_id: str) -> ProjectionRecord | None:
         """Get the user's cached projection, or None if one was never computed."""
         pass

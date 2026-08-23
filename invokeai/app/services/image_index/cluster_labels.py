@@ -28,6 +28,41 @@ PROMPT_TEMPLATES: tuple[str, ...] = (
 
 _VOCAB_PATH = Path(__file__).parent / "cluster_vocab.txt"
 
+# Bounds on the admin-maintained supplementary vocabulary. The term cap keeps a
+# rebuild after an edit to seconds (each term costs len(PROMPT_TEMPLATES)
+# encoder strings); the length cap keeps every templated phrase well inside
+# CLIP's 77-token context so no term is silently truncated by the tokenizer.
+MAX_CUSTOM_VOCAB_TERMS = 500
+MAX_CUSTOM_VOCAB_TERM_LENGTH = 64
+
+
+def normalize_custom_vocab_terms(raw: list[str]) -> list[str]:
+    """Normalize user-supplied vocabulary terms for storage and embedding.
+
+    Whitespace is collapsed, terms are lowercased to match the bundled
+    vocabulary's convention, empties are dropped, and duplicates are removed
+    (first occurrence wins, order preserved).
+
+    Raises:
+        ValueError: A term exceeds MAX_CUSTOM_VOCAB_TERM_LENGTH after
+            normalization. Raised (naming the term) rather than truncated:
+            a silently shortened phrase would embed as something the user
+            never wrote.
+    """
+    terms: list[str] = []
+    seen: set[str] = set()
+    for entry in raw:
+        term = " ".join(entry.split()).lower()
+        if not term:
+            continue
+        if len(term) > MAX_CUSTOM_VOCAB_TERM_LENGTH:
+            raise ValueError(f"Vocabulary term is longer than {MAX_CUSTOM_VOCAB_TERM_LENGTH} characters: '{term[:80]}'")
+        if term in seen:
+            continue
+        seen.add(term)
+        terms.append(term)
+    return terms
+
 
 def load_vocabulary() -> list[str]:
     """Load the bundled labeling vocabulary (deduplicated, order-preserving)."""

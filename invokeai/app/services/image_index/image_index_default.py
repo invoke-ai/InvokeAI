@@ -8,7 +8,11 @@ import numpy as np
 import torch
 from PIL import Image
 
-from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase, TextSearchUnavailableError
+from invokeai.app.services.image_index.image_index_base import (
+    ImageIndexServiceBase,
+    TextSearchUnavailableError,
+    VocabBuildState,
+)
 from invokeai.app.services.image_index.image_index_common import EMBEDDING_DTYPE, ImageIndexStatus
 from invokeai.app.services.image_index.projection import compute_umap, projection_params, scope_hash
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -274,6 +278,12 @@ class ImageIndexService(ImageIndexServiceBase):
         # Set by a labels request, serviced on the worker: the build is minutes
         # of encoder work and must never run on a request thread.
         self._vocab_build_requested = threading.Event()
+        # Set by invalidate_vocab (the supplementary vocabulary changed, or a
+        # failed build should be retried). The worker clears the RAM cache and
+        # the memoized failure before rebuilding. A flag rather than clearing
+        # them inline: invalidation runs on request threads, and _vocab_lock
+        # is held by the worker for the whole of a minutes-long build.
+        self._vocab_invalidate_requested = threading.Event()
         # Guards the lazy _processor/_cpu_model init: embed_image runs on
         # request threads concurrently with the indexer worker.
         self._vision_init_lock = threading.Lock()
@@ -363,13 +373,45 @@ class ImageIndexService(ImageIndexServiceBase):
 
         raise TextSearchUnavailableError("Cluster labels are still being prepared; try again shortly")
 
+    def invalidate_vocab(self) -> None:
+        # Flags only — never _vocab_lock, which the worker holds for the whole
+        # of a build; taking it here would park a request thread for minutes.
+        #
+        # The invalidation flag is set BEFORE the build-request flag. The
+        # worker reads them in the opposite order (clears the build request,
+        # then checks for invalidation), so whichever flag the worker's pass
+        # misses is still set for its next pass; set the other way around, an
+        # invalidation could slip between the worker's two reads and leave a
+        # stale cache standing with no rebuild queued.
+        self._vocab_invalidate_requested.set()
+        self._vocab_build_requested.set()
+
+    def get_vocab_build_state(self) -> tuple[VocabBuildState, Optional[str]]:
+        if self._invoker is None or self._model_id is None:
+            return "unavailable", None
+        # Flags first: a pending invalidation means the current cache (or
+        # failure) is about to be discarded, so reporting it would be a lie.
+        if self._vocab_invalidate_requested.is_set() or self._vocab_build_requested.is_set():
+            return "building", None
+        # The worker holds _vocab_lock for the whole of a build; a failed
+        # non-blocking acquire IS the "in progress" signal. The only other
+        # holders (get_vocab_embeddings, and this method on another request
+        # thread) hold it for microseconds, so a false "building" is a
+        # transient a client's next poll corrects.
+        if not self._vocab_lock.acquire(blocking=False):
+            return "building", None
+        try:
+            if self._vocab_failure is not None:
+                return "error", str(self._vocab_failure)
+            if self._vocab_cache is not None:
+                return "ready", None
+            return "idle", None
+        finally:
+            self._vocab_lock.release()
+
     def _build_vocab_embeddings(self) -> None:
         """Build and cache the phrase embeddings. Index-worker thread only."""
-        from invokeai.app.services.image_index.cluster_labels import (
-            ensemble_phrase_embeddings,
-            load_vocabulary,
-            vocab_fingerprint,
-        )
+        from invokeai.app.services.image_index.cluster_labels import load_vocabulary
 
         with self._vocab_lock:
             if self._vocab_cache is not None or self._vocab_failure is not None:
@@ -377,31 +419,35 @@ class ImageIndexService(ImageIndexServiceBase):
             if self._invoker is None or self._model_id is None:
                 return
 
-            vocabulary = load_vocabulary()
-            fingerprint = vocab_fingerprint(vocabulary)
+            bundled = load_vocabulary()
+            # Read inside the lock, and only after the worker cleared the
+            # invalidation flags: a replacement committed after this read sets
+            # the flags again, which forces another pass over the new rows.
+            custom = self._invoker.services.image_index_records.get_custom_vocab_terms()
+            # The bundled phrase wins a collision: it keeps the bundled cache
+            # file's fingerprint independent of the custom list, and the label
+            # the user would get is the same phrase either way.
+            bundled_keys = {phrase.casefold() for phrase in bundled}
+            custom = [term for term in custom if term.casefold() not in bundled_keys]
+
             # The model hash contains ':' (e.g. 'blake3:...'), illegal in
             # Windows filenames.
             model_tag = self._model_id.replace(":", "_")[:24]
-            cache_path = self._invoker.services.configuration.db_path.parent / f"cluster_vocab_{model_tag}.npz"
+            cache_dir = self._invoker.services.configuration.db_path.parent
 
-            if cache_path.exists():
-                try:
-                    # Closed explicitly: np.load returns a lazily-read NpzFile
-                    # holding the zip handle open, and the rewrite below
-                    # truncates this very file on a fingerprint mismatch.
-                    with np.load(cache_path, allow_pickle=False) as cached:
-                        if str(cached["fingerprint"]) == fingerprint:
-                            self._vocab_cache = (vocabulary, cached["embeddings"].astype(EMBEDDING_DTYPE))
-
-                    if self._vocab_cache is not None:
-                        return
-                except Exception:
-                    self._invoker.services.logger.warning("Discarding unreadable cluster vocabulary cache")
-
-            # First run for this model: embedding ~1700 phrases x 7 templates
-            # takes minutes — hence the disk cache.
+            # Two cache tiers: the bundled vocabulary (~1700 phrases, minutes
+            # to embed, effectively immutable) and the custom terms (a few
+            # hundred at most, seconds). Caching them separately means an edit
+            # to the custom list never pays the bundled tier's build again.
             try:
-                embeddings = ensemble_phrase_embeddings(self._embed_texts, vocabulary)
+                bundled_matrix = self._load_or_embed_phrases(bundled, cache_dir / f"cluster_vocab_{model_tag}.npz")
+                if custom:
+                    custom_matrix = self._load_or_embed_phrases(
+                        custom, cache_dir / f"cluster_vocab_custom_{model_tag}.npz"
+                    )
+                    self._vocab_cache = (bundled + custom, np.concatenate([bundled_matrix, custom_matrix]))
+                else:
+                    self._vocab_cache = (bundled, bundled_matrix)
             except Exception as e:
                 self._invoker.services.logger.warning("Could not build the cluster vocabulary", exc_info=True)
                 # Remembered, so a vision-only install answers the next request
@@ -421,37 +467,61 @@ class ImageIndexService(ImageIndexServiceBase):
                 e.__context__ = None
                 self._vocab_failure = e.with_traceback(None)
 
-                return
+    def _load_or_embed_phrases(self, phrases: list[str], cache_path: Path) -> np.ndarray:
+        """One vocabulary tier's embedding matrix, from its disk cache or the encoder.
 
+        Index-worker thread only, under `_vocab_lock`. Raises on encoder
+        failure (the caller memoizes it); a cache-write failure only warns.
+        """
+        from invokeai.app.services.image_index.cluster_labels import ensemble_phrase_embeddings, vocab_fingerprint
+
+        assert self._invoker is not None
+        fingerprint = vocab_fingerprint(phrases)
+
+        if cache_path.exists():
             try:
-                cache_path.parent.mkdir(parents=True, exist_ok=True)
-                # Written aside and renamed: two processes sharing a db_dir can
-                # first-run at once, and a kill mid-write would otherwise leave
-                # a truncated archive that costs another full re-embed.
-                #
-                # The staging name has to end in `.npz` because np.savez appends
-                # that extension to any path that lacks it: written as `.tmp`,
-                # the archive landed at `.tmp.npz` and the rename below then
-                # failed on the `.tmp` that was never created. The failure was
-                # swallowed by the handler, so the cache never reached disk and
-                # every restart re-embedded the whole vocabulary (minutes,
-                # during which cluster labels are unavailable) while leaking one
-                # orphaned staging file per run.
-                staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
-                np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
-                os.replace(staging_path, cache_path)
+                # Closed explicitly: np.load returns a lazily-read NpzFile
+                # holding the zip handle open, and the rewrite below
+                # truncates this very file on a fingerprint mismatch.
+                with np.load(cache_path, allow_pickle=False) as cached:
+                    if str(cached["fingerprint"]) == fingerprint:
+                        return cached["embeddings"].astype(EMBEDDING_DTYPE)
             except Exception:
-                # With the exception, not just the path. The in-memory cache
-                # below is assigned either way, so a write failure costs
-                # nothing until the next restart and is invisible until someone
-                # goes looking at startup times. The `.tmp` bug above survived
-                # because this line said only that something had gone wrong,
-                # never what — the FileNotFoundError it swallowed names the
-                # missing staging file outright.
-                self._invoker.services.logger.warning(
-                    f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
-                )
-            self._vocab_cache = (vocabulary, embeddings)
+                self._invoker.services.logger.warning("Discarding unreadable cluster vocabulary cache")
+
+        # First run for this tier: embedding ~1700 phrases x 7 templates
+        # takes minutes for the bundled vocabulary — hence the disk cache.
+        embeddings = ensemble_phrase_embeddings(self._embed_texts, phrases)
+
+        try:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            # Written aside and renamed: two processes sharing a db_dir can
+            # first-run at once, and a kill mid-write would otherwise leave
+            # a truncated archive that costs another full re-embed.
+            #
+            # The staging name has to end in `.npz` because np.savez appends
+            # that extension to any path that lacks it: written as `.tmp`,
+            # the archive landed at `.tmp.npz` and the rename below then
+            # failed on the `.tmp` that was never created. The failure was
+            # swallowed by the handler, so the cache never reached disk and
+            # every restart re-embedded the whole vocabulary (minutes,
+            # during which cluster labels are unavailable) while leaking one
+            # orphaned staging file per run.
+            staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
+            np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
+            os.replace(staging_path, cache_path)
+        except Exception:
+            # With the exception, not just the path. The caller caches the
+            # matrix in RAM either way, so a write failure costs
+            # nothing until the next restart and is invisible until someone
+            # goes looking at startup times. The `.tmp` bug above survived
+            # because this line said only that something had gone wrong,
+            # never what — the FileNotFoundError it swallowed names the
+            # missing staging file outright.
+            self._invoker.services.logger.warning(
+                f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
+            )
+        return embeddings
 
     def _get_text_encoder(self) -> tuple[Any, Any, bool]:
         with self._text_encoder_lock:
@@ -772,6 +842,17 @@ class ImageIndexService(ImageIndexServiceBase):
                     # result of a build that is already covering it, and
                     # _build_vocab_embeddings is a no-op once one has landed.
                     self._vocab_build_requested.clear()
+                    if self._vocab_invalidate_requested.is_set():
+                        # Cleared before the caches are dropped: an
+                        # invalidation arriving after this clear re-sets both
+                        # flags (in that order — see invalidate_vocab), so it
+                        # is picked up on the next pass rather than lost.
+                        # Dropping the memoized failure here makes
+                        # invalidate_vocab the retry path for a failed build.
+                        self._vocab_invalidate_requested.clear()
+                        with self._vocab_lock:
+                            self._vocab_cache = None
+                            self._vocab_failure = None
                     self._build_vocab_embeddings()
                     continue
                 projection_job = self._next_projection_job()
