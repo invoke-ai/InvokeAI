@@ -436,7 +436,7 @@ export const UpscaleWidgetView = () => {
   );
 
   return (
-    <Stack gap="1" minW="0" p="1">
+    <Stack gap={1} minW={0} p="1">
       <UpscaleModelReconciler
         key={`${projectId}:${modelsStatus}:${modelsFingerprint}`}
         rawValues={rawValues}
