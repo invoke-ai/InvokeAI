@@ -332,6 +332,15 @@ def remove_images_from_board(
                     failed_images.add(image_name)
                     continue
 
+            # No board_images row ever carries board_id="none" — uncategorized is the absence
+            # of a row — so for a name already off every board the scoped DELETE cannot match
+            # and the zero-row classification below would spend two reads confirming what the
+            # DTO already said. Same report the classification would produce, minus the reads.
+            if old_board_id == "none":
+                removed_images.add(image_name)
+                affected_boards.add("none")
+                continue
+
             try:
                 deleted_rows = ApiDependencies.invoker.services.board_images.remove_image_from_board(
                     image_name=image_name, board_id=old_board_id
@@ -350,18 +359,29 @@ def remove_images_from_board(
                         # satisfied, and a retry will re-read and re-authorize against the
                         # board it actually sits on now.
                         failed_images.add(image_name)
-                    elif _image_record_exists(image_name):
-                        # Concurrently uncategorized by someone else: the postcondition the
-                        # caller asked for holds, so report it as removed — the invalidation
-                        # is what lets this client's view of the old board catch up. Safe to
-                        # put in removed_images, unlike a deleted name: the DTO still exists,
-                        # so the tag-driven refetches succeed.
-                        removed_images.add(image_name)
-                        affected_boards.add("none")
-                        affected_boards.add(old_board_id)
-                    # Else: deleted concurrently — a skip, exactly as the gone-block above
-                    # treats a name that vanished before the loop reached it. Reporting it
-                    # removed would drive a getImageDTO refetch straight into a 404.
+                        continue
+                    # Probed directly rather than through _image_record_exists: that helper
+                    # answers True on a storage error, which is the conservative bias where
+                    # True means "report as failed" (the add loop) — here True means "report
+                    # as removed", and a transient storage error must not manufacture a
+                    # success whose tag-driven getImageDTO refetch then 404s. A storage error
+                    # propagates to the arm below instead: a name whose state cannot be
+                    # decided is reported as failed, never as done.
+                    try:
+                        ApiDependencies.invoker.services.image_records.get(image_name)
+                    except ImageRecordNotFoundException:
+                        # Deleted concurrently — a skip, exactly as the gone-block above
+                        # treats a name that vanished before the loop reached it. Reporting
+                        # it removed would drive a getImageDTO refetch straight into a 404.
+                        continue
+                    # Concurrently uncategorized by someone else: the postcondition the
+                    # caller asked for holds, so report it as removed — the invalidation is
+                    # what lets this client's view of the old board catch up. Safe in
+                    # removed_images, unlike a deleted name: the DTO exists, so the
+                    # tag-driven refetches succeed.
+                    removed_images.add(image_name)
+                    affected_boards.add("none")
+                    affected_boards.add(old_board_id)
                     continue
                 removed_images.add(image_name)
                 affected_boards.add("none")

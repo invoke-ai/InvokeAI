@@ -100,6 +100,48 @@ def test_remove_classifies_a_zero_row_scoped_delete_by_where_the_image_went(
     assert set(body["affected_boards"]) == set(expect_boards)
 
 
+def test_remove_reports_a_zero_row_name_whose_existence_cannot_be_decided_as_failed(
+    monkeypatch: pytest.MonkeyPatch, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """A transient storage error during the existence probe must not manufacture a success:
+    reported removed, the client's tag-driven getImageDTO refetch 404s if the image was in
+    fact deleted. A name whose state cannot be decided is reported as failed, never as done."""
+    import sqlite3
+
+    _install(monkeypatch, mock_invoker)
+    dto = MagicMock()
+    dto.board_id = "board-p"
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", MagicMock(return_value=dto))
+    monkeypatch.setattr(mock_invoker.services.board_images, "remove_image_from_board", MagicMock(return_value=0))
+    monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
+    monkeypatch.setattr(
+        mock_invoker.services.image_records,
+        "get",
+        MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+    )
+
+    response = client.post("/api/v1/board_images/batch/delete", json={"image_names": ["undecidable.png"]})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["removed_images"] == []
+    assert body["failed_images"] == ["undecidable.png"]
+
+
+def test_facade_passes_the_row_count_through() -> None:
+    """The middle layer: CI has no type checker, so a dropped `return` here silently restores
+    report-a-removal-that-did-not-happen at the route (`None == 0` is False), while the route
+    tests mock this service and the sqlite test pins the layer below it."""
+    from invokeai.app.services.board_images.board_images_default import BoardImagesService
+
+    service = BoardImagesService.__new__(BoardImagesService)
+    invoker = MagicMock()
+    invoker.services.board_image_records.remove_image_from_board = MagicMock(return_value=0)
+    service._BoardImagesService__invoker = invoker  # pyright: ignore[reportAttributeAccessIssue]
+
+    assert service.remove_image_from_board("raced.png", "board-p") == 0
+
+
 def test_remove_still_reports_a_nonzero_scoped_delete_as_removed(
     monkeypatch: pytest.MonkeyPatch, mock_invoker: Invoker, client: TestClient
 ) -> None:

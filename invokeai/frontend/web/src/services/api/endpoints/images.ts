@@ -453,26 +453,29 @@ export const bulkDownloadQueryFn = async (
       body: { image_names: chunk, board_id },
     });
     if (response.error) {
-      if (isSessionMismatchError(response.error)) {
-        // Either mismatch flavor withholds the payload — broader than the mutating loops, which
-        // let expiry through to the partial path. They have state work to salvage
-        // (`handleDeletions` pruning off the partial payload); a download has none, and its
-        // usual outputs are both wrong for a session that is ending: the failure count is a
-        // miscount at the login screen, and returning `first` drives `matchFulfilled` into
-        // raising the "preparing" toast with `duration: null` — dismissed only by a socket
-        // event this session will never receive.
-        //
+      // The mismatch errors from the pre/post-request checks, AND any error response that came
+      // back into a session that is no longer the one that asked — which is how this chunk's
+      // OWN expired-session 401 arrives: `dynamicBaseQuery` dispatches `sessionExpiredLogout`
+      // before returning it, so the token is already gone. The mutating loops deliberately do
+      // NOT reclassify that 401 — they need it on the partial path, where the payload feeds
+      // `handleDeletions` — but a download has no state work to salvage, and its usual outputs
+      // are both wrong for a session that is ending: the failure count is a miscount at the
+      // login screen, and returning `first` drives `matchFulfilled` into raising the
+      // "preparing" toast with `duration: null` — dismissed only by a socket event this
+      // session will never receive.
+      if (isSessionMismatchError(response.error) || !isSameAuthContext(authContext)) {
         // One thing IS lost on expiry and deserves saying so: zips already scheduled keep
         // building server-side, but their completion events fire into a socket this session is
         // tearing down, so nothing will ever offer them. Until scheduled downloads are queued
         // per account and replayed after re-authentication (follow-up), the honest move is a
         // plain, finite toast telling the user to re-run — not silence they will read as a
-        // download that never came. A takeover stays fully silent: the interruption belongs to
-        // whoever started the download, never to the user who takes the tab over.
-        if (!isAuthChangedError(response.error) && scheduled) {
+        // download that never came. A takeover (someone else's token in localStorage) stays
+        // fully silent: the interruption belongs to whoever started the download, never to the
+        // user who takes the tab over. And an expiry with nothing scheduled has lost nothing.
+        if (localStorage.getItem('auth_token') === null && scheduled) {
           toast({
             id: 'DOWNLOADS_INTERRUPTED',
-            title: i18n.t('gallery.downloadsInterrupted'),
+            title: i18n.t('toast.downloadsInterrupted'),
             status: 'warning',
           });
         }

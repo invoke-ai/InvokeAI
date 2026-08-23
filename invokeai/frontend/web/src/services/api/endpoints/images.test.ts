@@ -653,18 +653,50 @@ describe('bulkDownloadQueryFn', () => {
     expect(baseQuery).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ data: undefined });
     expect(toast).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(toast).mock.calls[0]?.[0]).toMatchObject({ id: 'DOWNLOADS_INTERRUPTED', status: 'warning' });
+    // The title pins the full key path. The i18n mock echoes the key, so a reference into the
+    // wrong section -- the first cut said `gallery.` while the key lives under `toast.` --
+    // renders the raw key string in production while an id-only assertion stays green.
+    expect(vi.mocked(toast).mock.calls[0]?.[0]).toMatchObject({
+      id: 'DOWNLOADS_INTERRUPTED',
+      title: 'toast.downloadsInterrupted',
+      status: 'warning',
+    });
     // No per-name failure count: that toast id belongs to genuine chunk failures, and its
     // number would be wrong here anyway.
     expect(i18n.t).not.toHaveBeenCalledWith('toast.imagesFailedToDownload', expect.anything());
   });
 
-  it('reports a first-chunk 401 as an ordinary failed request, not an interruption', async () => {
-    // Nothing was scheduled, so nothing is lost — no zip exists or ever will, and the user
-    // re-runs after signing in. The 401 passes through untriaged (an error carries nothing the
-    // next session could consume) and rejects the mutation, so the `matchRejected` listener
-    // raises its own failure toast; the interruption toast is reserved for the case where
-    // scheduled work is actually being lost.
+  it("treats the chunk's own expired-session 401 as an interruption, not a partial failure", async () => {
+    // The everyday expiry vector: the 401 arrives on the download's own chunk, and
+    // dynamicBaseQuery has already cleared the token by the time it returns. The mutating
+    // loops keep that 401 on the partial path on purpose -- the payload feeds handleDeletions
+    // -- but here the partial path produces exactly the two wrong toasts: a failure count at
+    // the login screen and, via the returned item name, the permanent "preparing" toast.
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        localStorage.removeItem('auth_token');
+        return Promise.resolve({ error: { status: 401, data: 'expired' } });
+      }
+      return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ data: undefined });
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0]?.[0]).toMatchObject({ id: 'DOWNLOADS_INTERRUPTED' });
+    expect(i18n.t).not.toHaveBeenCalledWith('toast.imagesFailedToDownload', expect.anything());
+  });
+
+  it('stays silent on a first-chunk expired-session 401, which loses nothing', async () => {
+    // Nothing was scheduled: no zip exists or ever will, and the user re-runs after signing
+    // in. Withheld like every other session-ending outcome rather than rejected -- a rejection
+    // would toast "Problem Preparing Download" at the login screen for a download that simply
+    // needs re-running.
     login('user-a');
     const baseQuery = vi.fn((_args: Request): Promise<Response> => {
       localStorage.removeItem('auth_token');
@@ -674,7 +706,7 @@ describe('bulkDownloadQueryFn', () => {
     const result = await run(baseQuery, { image_names: names(2500) });
 
     expect(baseQuery).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ error: { status: 401, data: 'expired' } });
+    expect(result).toEqual({ data: undefined });
     expect(toast).not.toHaveBeenCalled();
   });
 
