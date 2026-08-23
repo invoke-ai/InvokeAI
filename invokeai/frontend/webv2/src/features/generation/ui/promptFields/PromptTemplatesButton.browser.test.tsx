@@ -112,20 +112,26 @@ describe('the prompt templates button', () => {
     expect(getComputedStyle(name!).opacity).toBe('0.5');
   });
 
-  it('stays square with nothing applied, and widens only to carry a name', async () => {
-    // `px={undefined}` looks like "leave the default" but is spread over
-    // Chakra's own `px: '0'`, clobbering it — the icon-only button used to be
-    // 8px wider than the square buttons beside it.
+  it('is a labeled primary at rest, swapping the label for the applied name', async () => {
+    // A labeled button rather than a bare icon: "Templates" until a template is
+    // applied, then the applied template's name in its place.
     await render(null);
-    const bare = host!.querySelector('button')!.getBoundingClientRect();
+    const restLabel = [...host!.querySelectorAll('span')].find(
+      (span) => span.textContent === 'widgets.generate.templatesButton'
+    );
 
-    expect(bare.width).toBeCloseTo(bare.height, 1);
+    expect(restLabel).toBeDefined();
 
     await act(() => root?.unmount());
     host?.remove();
     await render(applied);
 
-    expect(host!.querySelector('button')!.getBoundingClientRect().width).toBeGreaterThan(bare.width);
+    const name = [...host!.querySelectorAll('span')].find((span) => span.textContent === 'Cinematic');
+
+    expect(name).toBeDefined();
+    expect(
+      [...host!.querySelectorAll('span')].find((span) => span.textContent === 'widgets.generate.templatesButton')
+    ).toBeUndefined();
   });
 
   it('says nothing while the catalog is unread', async () => {
