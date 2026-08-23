@@ -43,7 +43,13 @@ type WidgetChromeSlotName = 'actions' | 'label' | 'viewActions';
 
 interface WidgetChromeSlotByIdProps {
   instanceId: string;
-  /** The region the hoisted chrome acts for. Defaults to the center region. */
+  /**
+   * The region the hoisted chrome acts for; the center region, which hoists
+   * its chrome for every widget it shows, is the default. It becomes the
+   * runtime's region, which is what `closeWidgetInstance` and
+   * `revealWidgetInstance` act on — a caller hoisting chrome for some other
+   * region must say so, or those act on the center's placement instead.
+   */
   region?: WorkbenchRegion;
   slot: WidgetChromeSlotName;
   widget: RegisteredWidget;

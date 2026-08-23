@@ -23,6 +23,7 @@ import {
   TriangleAlertIcon,
 } from 'lucide-react';
 import {
+  Component,
   Suspense,
   useCallback,
   useEffect,
@@ -31,6 +32,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -41,6 +43,43 @@ import { areWidgetRenderInstancesEqual } from './widgetRenderInstance';
 const FLOATING_BASE_Z_INDEX = 800;
 /** Keyboard step for moving and resizing, matching the panel resize handles. */
 const FLOATING_STEP_PX = 16;
+
+/**
+ * The title bar is a drag handle first and a control strip second: a
+ * `pointerdown` anywhere on it that is not inside a `<button>` starts a window
+ * drag, and a double-click shades it. Widget-supplied chrome is arbitrary —
+ * a switch, a slider, a menu trigger rendered as a div — so it is isolated
+ * from both gestures rather than trusted to be a button.
+ */
+const stopChromeEvent = (event: ReactPointerEvent<HTMLDivElement> | ReactMouseEvent<HTMLDivElement>): void =>
+  event.stopPropagation();
+
+/**
+ * Drops the widget's title-bar chrome if it throws, keeping the window itself
+ * alive. The chunk carrying a widget's implementation can fail to load — a
+ * deploy replaced the hashed file, or the tab is offline — and the deferred
+ * resource then hands `use()` the same rejected thenable on every render.
+ * Inside the body that throw lands in `WidgetFailureBoundary`, which offers a
+ * retry; up here there is no boundary between this bar and the app root, so an
+ * unguarded throw would take the whole workbench down — and with it the dock
+ * control that is a floated widget's only way back to the rail.
+ *
+ * Recovery is deliberately one-way: a retry from the body's failure card
+ * reloads the implementation but does not reset this boundary, so the chrome
+ * returns on the window's next mount. Chrome that stays missing is a far
+ * cheaper failure than chrome that cannot be reached at all.
+ */
+class FloatingChromeBoundary extends Component<{ children: ReactNode }, { hasFailed: boolean }> {
+  state = { hasFailed: false };
+
+  static getDerivedStateFromError(): { hasFailed: boolean } {
+    return { hasFailed: true };
+  }
+
+  render() {
+    return this.state.hasFailed ? null : this.props.children;
+  }
+}
 
 /**
  * One detached widget window: fixed-position chrome with a draggable title
@@ -172,7 +211,12 @@ export const FloatingWidgetWindow = ({
       };
       const offset = offsets[event.key];
 
-      if (!offset || state.mode === 'maximized') {
+      // Only the bar itself moves the window. It hosts real controls — its own
+      // shade/maximize/dock buttons and the widget's header actions — and
+      // React sees their keystrokes bubble up here: without this, an arrow key
+      // pressed on a focused toggle moved the window 16px and wrote the new
+      // geometry to the reducer.
+      if (!offset || state.mode === 'maximized' || event.target !== event.currentTarget) {
         return;
       }
 
@@ -320,9 +364,13 @@ export const FloatingWidgetWindow = ({
               without this the docked header's controls would simply vanish on
               float. Frame-level actions stay out — this bar carries its own. */}
           {isEnabled && widget ? (
-            <Suspense fallback={null}>
-              <WidgetChromeSlotById instanceId={instanceId} region="floating" slot="viewActions" widget={widget} />
-            </Suspense>
+            <FloatingChromeBoundary>
+              <Suspense fallback={null}>
+                <Box onDoubleClick={stopChromeEvent} onPointerDown={stopChromeEvent}>
+                  <WidgetChromeSlotById instanceId={instanceId} region="floating" slot="viewActions" widget={widget} />
+                </Box>
+              </Suspense>
+            </FloatingChromeBoundary>
           ) : null}
           <Tooltip content={isShaded ? t('widgets.floating.unshade') : t('widgets.floating.shade')}>
             <IconButton

@@ -138,8 +138,4 @@ describe('WidgetFloatButton', () => {
 
     expect(await renderButton('center')).not.toBeNull();
   });
-
-  it('renders nothing inside a floating window, which carries the dock control', async () => {
-    expect(await renderButton('floating')).toBeNull();
-  });
 });

@@ -1,6 +1,11 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { FloatingWidgetState } from '@workbench/layoutContracts';
-import type { RegisteredWidget, WidgetImplementation, WidgetManifest } from '@workbench/widgetContracts';
+import type {
+  RegisteredWidget,
+  WidgetImplementation,
+  WidgetManifest,
+  WidgetViewProps,
+} from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -20,7 +25,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const windowMocks = vi.hoisted(() => ({
+  actionsRegion: null as string | null,
   dockFloating: vi.fn(),
+  useFailingWidget: false,
   focusFloating: vi.fn(),
   setFloatingGeometry: vi.fn(),
   setFloatingMode: vi.fn(),
@@ -45,7 +52,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 
 vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
   useWorkbenchWidgetRegistry: () => ({
-    getWidgetById: () => registeredWidget,
+    getWidgetById: () => (windowMocks.useFailingWidget ? failingWidget : registeredWidget),
     getWidgetsForRegion: () => [],
   }),
 }));
@@ -56,6 +63,9 @@ vi.mock('./createWidgetRuntime', () => ({ useWidgetRuntime: () => ({}) }));
 
 import { FloatingWidgetWindow } from './FloatingWidgetWindow';
 
+// `settingsSection` and `headerMenu` are what separate the widget's own
+// actions from the full header cluster: were the window to mount the `actions`
+// slot instead, the settings gear and the overflow trigger would appear here.
 const manifest = {
   allowFloating: true,
   allowedRegions: ['center', 'left', 'right'],
@@ -63,15 +73,21 @@ const manifest = {
   icon: MapIcon,
   id: 'image-map',
   label: () => 'Image Map',
+  settingsSection: 'image-map',
   version: 1,
 } as unknown as WidgetManifest;
 
 const implementation: WidgetImplementation = {
-  headerActions: () => (
-    <button aria-label="Toggle cluster labels" type="button">
-      <TagsIcon />
-    </button>
-  ),
+  headerActions: ({ region }: WidgetViewProps) => {
+    windowMocks.actionsRegion = region;
+
+    return (
+      <button aria-label="Toggle cluster labels" type="button">
+        <TagsIcon />
+      </button>
+    );
+  },
+  headerMenu: () => <div data-testid="header-menu" />,
   view: () => <div data-testid="map-body" />,
 };
 
@@ -79,6 +95,18 @@ const implementationPromise = Promise.resolve(implementation);
 const registeredWidget = {
   implementation: { load: () => implementationPromise, retry: () => {} },
   manifest,
+  status: 'enabled',
+} as unknown as RegisteredWidget;
+
+const failedLoad = Promise.reject(new Error('chunk unavailable'));
+// Nothing awaits this before the render that consumes it; an unhandled
+// rejection would fail the run on its own.
+failedLoad.catch(() => undefined);
+const failingWidget = {
+  implementation: { load: () => failedLoad, retry: () => {} },
+  // The body isolates its own failure, so only the title bar's containment is
+  // under test here.
+  manifest: { ...manifest, failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' } },
   status: 'enabled',
 } as unknown as RegisteredWidget;
 
@@ -131,7 +159,10 @@ const renderWindow = async (floatingState: FloatingWidgetState = state) => {
 };
 
 beforeEach(() => {
+  windowMocks.actionsRegion = null;
+  windowMocks.useFailingWidget = false;
   windowMocks.dockFloating.mockClear();
+  windowMocks.setFloatingGeometry.mockClear();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -145,11 +176,62 @@ afterEach(async () => {
 });
 
 describe('FloatingWidgetWindow chrome', () => {
-  it("mounts the widget's own header actions in the title bar", async () => {
+  it("mounts the widget's own header actions in the title bar, for the floating region", async () => {
     await renderWindow();
 
     expect(host?.querySelector('button[aria-label="Toggle cluster labels"]')).not.toBeNull();
     expect(host?.querySelector('[data-testid="map-body"]')).not.toBeNull();
+    expect(windowMocks.actionsRegion).toBe('floating');
+  });
+
+  it('leaves the frame-level chrome to the window, which carries its own', async () => {
+    await renderWindow();
+
+    // The manifest has a settings section and the implementation a header
+    // menu, so the full actions cluster would put both in this bar.
+    expect(host?.querySelector('button[aria-label*="settings"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label*="actions"]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Float Window"]')).toBeNull();
+    expect(host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to panel"]')).not.toBeNull();
+  });
+
+  it('keeps the window usable when the widget implementation fails to load', async () => {
+    windowMocks.useFailingWidget = true;
+
+    await renderWindow();
+
+    // The chrome slot's `use()` rethrows the rejected load on every render.
+    // Nothing between this bar and the app root catches it, so the window has
+    // to contain it — dropping the widget's actions, keeping the dock control
+    // that is the only way back to the rail.
+    expect(host?.querySelector('button[aria-label="Toggle cluster labels"]')).toBeNull();
+    expect(host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to panel"]')).not.toBeNull();
+  });
+
+  it('does not move the window when an arrow key is pressed on a widget action', async () => {
+    await renderWindow();
+
+    const toggle = host?.querySelector<HTMLButtonElement>('button[aria-label="Toggle cluster labels"]');
+
+    await act(async () => {
+      toggle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+      await Promise.resolve();
+    });
+
+    expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+  });
+
+  it('still moves the window when an arrow key is pressed on the title bar itself', async () => {
+    await renderWindow();
+
+    const titleBar = host?.querySelector<HTMLElement>('[aria-label="Move Image Map window"]');
+
+    await act(async () => {
+      titleBar?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+      await Promise.resolve();
+    });
+
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalled();
   });
 
   it('keeps the widget actions reachable while the window is shaded', async () => {
