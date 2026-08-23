@@ -3,7 +3,7 @@ import type { AspectRatioId } from '@features/generation/core/types';
 
 import { Flex, Text } from '@chakra-ui/react';
 import { ASPECT_RATIO_MAP, ASPECT_RATIO_OPTIONS } from '@features/generation/core/settings';
-import { Button } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { useTranslation } from 'react-i18next';
 
 import { AspectRatioPreview } from './AspectRatioPreview';

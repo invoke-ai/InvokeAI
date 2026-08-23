@@ -19,9 +19,13 @@ import {
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
   SEED_MAX,
 } from '@features/generation/core/settings';
-import { Combobox, Field, IconButton, Select, Tooltip } from '@platform/ui';
+import { IconButton } from '@platform/ui/Button';
+import { Combobox } from '@platform/ui/Combobox';
+import { Field } from '@platform/ui/Field';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
+import { Select } from '@platform/ui/Select';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { DicesIcon, ShuffleIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 

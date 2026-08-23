@@ -12,7 +12,9 @@ import {
   isReferenceImageSupported,
 } from '@features/generation/core/baseGenerationPolicies';
 import { isGenerateModelConfig, isVaeModelConfig } from '@features/generation/core/settings';
-import { Button, ConfirmDialog, Field } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Field } from '@platform/ui/Field';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

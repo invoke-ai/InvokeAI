@@ -1,5 +1,6 @@
 import type { GenerationUiAdapter } from '@features/generation/react';
 import type { QueueItemReadModel, QueueReadModel } from '@features/queue/contracts';
+import type { getQueueReadModelOptions } from '@features/queue/queries';
 import type { ReactNode } from 'react';
 
 import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
@@ -14,9 +15,8 @@ import {
   extractGenerationMeta,
   getResultImageName,
 } from '@features/queue/contracts';
-import { getQueueReadModelOptions } from '@features/queue/queries';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getWorkbenchPreferences,
   patchWorkbenchPreferences,
@@ -25,7 +25,7 @@ import {
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { lazy, useMemo } from 'react';
+import { lazy, useMemo, useState } from 'react';
 
 export const getGenerationSelectedGalleryImage = getSelectedGalleryImageFromValues;
 
@@ -39,6 +39,34 @@ const GenerateCanvasCompositingSection = lazy(() =>
 const RECENT_RUN_WINDOW = 10;
 const SEED_HISTORY_LIMIT = 6;
 
+/**
+ * The queue query surface loads on demand: a static import would pull it into
+ * the editor route's initial graph, which the architecture performance gate
+ * budgets (the queue widget itself is lazy, so nothing else loads it eagerly).
+ */
+type QueueQueriesModule = { getQueueReadModelOptions: typeof getQueueReadModelOptions };
+
+let loadedQueueQueries: QueueQueriesModule | null = null;
+
+const useQueueQueriesModule = (): QueueQueriesModule | null => {
+  const [module, setModule] = useState(loadedQueueQueries);
+
+  useMountEffect(() => {
+    if (loadedQueueQueries === null) {
+      void import('@features/queue/queries').then((loaded) => {
+        loadedQueueQueries = loaded;
+        setModule(loaded);
+      });
+    }
+  });
+
+  return module;
+};
+
+// Same key shape and select as the real query so both useQuery branches
+// share one option type; skipToken means it never fetches.
+const QUEUE_INSIGHTS_PENDING_QUERY_KEY = ['queue', 'read-model', 'module-pending'] as const;
+
 const selectQueueItems = (model: QueueReadModel): QueueItemReadModel[] => model.items;
 
 /**
@@ -51,7 +79,12 @@ const selectQueueItems = (model: QueueReadModel): QueueItemReadModel[] => model.
 const useGenerationQueueInsights = (projectId: string): GenerationUiAdapter['queueInsights'] => {
   const localQueueItems = useActiveProjectSelector((activeProject) => activeProject.queue.items);
   const scope = useMemo(() => ({ originPrefix: buildProjectQueueItemOriginPrefix(projectId) }), [projectId]);
-  const backendItems = useQuery({ ...getQueueReadModelOptions(scope), select: selectQueueItems }).data;
+  const queueQueries = useQueueQueriesModule();
+  const backendItems = useQuery(
+    queueQueries === null
+      ? { queryFn: skipToken, queryKey: QUEUE_INSIGHTS_PENDING_QUERY_KEY, select: selectQueueItems }
+      : { ...queueQueries.getQueueReadModelOptions(scope), select: selectQueueItems }
+  ).data;
 
   return useMemo(() => {
     if (!backendItems) {
