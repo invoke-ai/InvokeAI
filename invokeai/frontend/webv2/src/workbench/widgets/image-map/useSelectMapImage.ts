@@ -1,10 +1,13 @@
 import type { GalleryView } from '@features/gallery';
+import type { GalleryItemsFilter } from '@features/gallery/queries';
+import type { QueryClient } from '@tanstack/react-query';
 
-import { galleryImages, legacyGeneratedImageToGalleryItem } from '@features/gallery';
-import { getGallerySettings, registerImageCluster } from '@features/gallery/contracts';
+import { galleryImages, legacyGeneratedImageToGalleryItem, toGalleryItemKey } from '@features/gallery';
+import { getGallerySettings, registerImageCluster, requestGalleryItemReveal } from '@features/gallery/contracts';
 import {
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
+  galleryBoardsOptions,
   galleryItemNamesOptions,
   galleryItemsInfiniteOptions,
 } from '@features/gallery/queries';
@@ -28,6 +31,32 @@ export interface MapSelectionActions {
  * dead ref, still passes, and overwrites the newer mount's selection.
  */
 let selectionSequence = 0;
+
+/**
+ * Extends the infinite window until it covers `pagesNeeded` pages. This must
+ * NOT be a plain prefetch: the mounted gallery keeps the query fresh, and
+ * `fetchQuery` returns fresh cache without honoring the `pages` option — the
+ * reveal has to force the fetch (staleTime 0) or the window never grows. Two
+ * passes because a concurrent fetch already in flight (a second rapid click)
+ * absorbs the call without extending; the retry runs after it settles.
+ */
+const ensureGalleryPagesLoaded = async (
+  queryClient: QueryClient,
+  listingFilter: GalleryItemsFilter,
+  pagesNeeded: number
+): Promise<void> => {
+  const options = galleryItemsInfiniteOptions(listingFilter, { kind: 'infinite' });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const data = queryClient.getQueryData<{ pages: unknown[] }>(options.queryKey);
+
+    if ((data?.pages.length ?? 0) >= pagesNeeded) {
+      return;
+    }
+
+    await queryClient.fetchInfiniteQuery({ ...options, pages: pagesNeeded, staleTime: 0 });
+  }
+};
 
 /**
  * Turns map clicks into gallery navigation. The map only knows names; the
@@ -83,14 +112,36 @@ export const useMapSelection = (): MapSelectionActions => {
           };
           // The image's position within its board's ordering, which is what
           // lets the gallery land on the right page rather than page 0. A
-          // failure here only costs the scroll, not the selection.
+          // failure here only costs the scroll, not the selection. The boards
+          // list rides along because the gallery falls back to Uncategorized
+          // when the target board is not listable (archived with "show
+          // archived" off) — landing on the hidden board's page number there
+          // would jump to an unrelated page of the wrong board.
           let boardIndex: number | null = null;
 
           try {
+            const boardsPromise = queryClient
+              .fetchQuery(
+                galleryBoardsOptions({
+                  includeArchived: settings.showArchivedBoards,
+                  includeDateBoards: settings.showDateBoards,
+                  orderBy: settings.boardOrderBy,
+                  orderDir: settings.boardOrderDir,
+                })
+              )
+              // Unknown beats blocked: without the boards list the reveal
+              // proceeds as if the board were listable.
+              .catch(() => null);
             const names = await queryClient.fetchQuery(galleryItemNamesOptions(listingFilter));
+            const boards = await boardsPromise;
             const index = names.items.findIndex((ref) => ref.kind === 'image' && ref.name === imageName);
+            const isBoardListable =
+              image.boardId === 'none' ||
+              boards === null ||
+              boards.length === 0 ||
+              boards.some((board) => board.id === image.boardId);
 
-            boardIndex = index >= 0 ? index : null;
+            boardIndex = index >= 0 && isBoardListable ? index : null;
           } catch {
             boardIndex = null;
           }
@@ -100,6 +151,18 @@ export const useMapSelection = (): MapSelectionActions => {
           }
 
           const values = getGalleryValues();
+          const settingsNow = getGallerySettings(values);
+
+          // The listing's ordering may have changed while the name list was
+          // in flight (sort direction, starred-first); the computed index
+          // describes the old ordering, so the page landing is dropped.
+          if (
+            settingsNow.imageOrderDir !== settings.imageOrderDir ||
+            settingsNow.starredFirst !== settings.starredFirst
+          ) {
+            boardIndex = null;
+          }
+
           const currentView: GalleryView = values.galleryView === 'assets' ? 'assets' : 'images';
           const hasSearch = typeof values.searchTerm === 'string' && values.searchTerm !== '';
 
@@ -122,27 +185,25 @@ export const useMapSelection = (): MapSelectionActions => {
 
           const page = boardIndex !== null ? Math.floor(boardIndex / GALLERY_PAGE_SIZE) : null;
 
-          if (page !== null && settings.paginationMode === 'paginated') {
+          if (page !== null && settingsNow.paginationMode === 'paginated') {
             commands.gallery.setPage(page);
           }
 
           if (
             boardIndex !== null &&
             page !== null &&
-            settings.paginationMode === 'infinite' &&
+            settingsNow.paginationMode === 'infinite' &&
             boardIndex < GALLERY_MAX_ROWS
           ) {
             // Load every page down to the image so the grid can scroll to it;
             // past the window cap the grid cannot reach it either way. Fire
             // and forget: the selection must not wait on page hydration, and
-            // the grid scrolls whenever the item appears.
-            void queryClient.prefetchInfiniteQuery({
-              ...galleryItemsInfiniteOptions(listingFilter, { kind: 'infinite' }),
-              pages: page + 1,
-            });
+            // the grid's pending reveal settles whenever the item appears.
+            void ensureGalleryPagesLoaded(queryClient, listingFilter, page + 1).catch(() => {});
           }
 
           commands.gallery.selectItem(legacyGeneratedImageToGalleryItem(image), undefined, page ?? undefined);
+          requestGalleryItemReveal(toGalleryItemKey({ kind: 'image', name: imageName }));
         })
         .catch(() => {
           // A click on a just-deleted image, or a blip mid-backend-restart,
@@ -181,8 +242,11 @@ export const useMapSelection = (): MapSelectionActions => {
             semanticImageQuery: { clusterId, kind: 'cluster', label },
           });
           // The clicked image is the proximity ordering's first entry, so it
-          // is selected at the top of the cluster view; Preview follows.
+          // is selected at the top of the cluster view; Preview follows. The
+          // reveal brings the grid back to it even when this exact selection
+          // is already current (re-clicking the cluster after scrolling away).
           commands.gallery.selectItem(legacyGeneratedImageToGalleryItem(image));
+          requestGalleryItemReveal(toGalleryItemKey({ kind: 'image', name: primaryImageName }));
         })
         .catch(() => {
           // Selection is simply left unchanged on hydrate failure.

@@ -118,6 +118,40 @@ export const getImageCluster = (clusterId: string): { imageNames: string[]; labe
   clusters.get(clusterId) ?? null;
 
 /**
+ * Drops deleted images from the registered cluster, in step with the gallery's
+ * optimistic cache patch: the member list is client-owned, so without this the
+ * cluster view's total (and its trailing page) would keep counting images that
+ * no longer exist. Returns a rollback that restores the previous member list —
+ * unless a different registration has since replaced the entry, in which case
+ * the rollback is a no-op (the newer cluster owns the slot).
+ */
+export const pruneImageClusterMembers = (imageNames: readonly string[]): (() => void) => {
+  const entry = [...clusters.entries()].at(0);
+
+  if (!entry || imageNames.length === 0) {
+    return () => undefined;
+  }
+
+  const [clusterId, cluster] = entry;
+  const removed = new Set(imageNames);
+  const prunedNames = cluster.imageNames.filter((name) => !removed.has(name));
+
+  if (prunedNames.length === cluster.imageNames.length) {
+    return () => undefined;
+  }
+
+  clusters.set(clusterId, { imageNames: prunedNames, label: cluster.label });
+
+  return () => {
+    const current = clusters.get(clusterId);
+
+    if (current && current.imageNames === prunedNames) {
+      clusters.set(clusterId, { imageNames: cluster.imageNames, label: current.label });
+    }
+  };
+};
+
+/**
  * Parses a persisted widget value into a semantic reference. Tolerates the
  * legacy bare-image-name shape, and reads a file key that no longer resolves
  * in the registry as no search at all.

@@ -5,6 +5,7 @@ import {
   getExternalImageFile,
   getImageCluster,
   parseGallerySemanticReference,
+  pruneImageClusterMembers,
   registerExternalImageFile,
   registerImageCluster,
   semanticReferenceFromDataTransfer,
@@ -36,6 +37,33 @@ describe('image cluster registry', () => {
     expect(secondId).not.toBe(firstId);
     expect(getImageCluster(firstId)).toBe(null);
     expect(getImageCluster(secondId)).toEqual({ imageNames: ['c.png'], label: 'second cluster' });
+  });
+
+  it('prunes deleted members with a rollback, preserving order', () => {
+    const clusterId = registerImageCluster(['a.png', 'b.png', 'c.png'], 'beaches');
+    const rollback = pruneImageClusterMembers(['b.png', 'unrelated.png']);
+
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'c.png']);
+
+    rollback();
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'b.png', 'c.png']);
+  });
+
+  it('makes pruning a no-op when nothing matches, and rollback a no-op once superseded', () => {
+    const clusterId = registerImageCluster(['a.png'], 'beaches');
+
+    // Nothing to prune: the entry is untouched.
+    pruneImageClusterMembers(['other.png']);
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png']);
+
+    // A rollback captured before a newer registration must not resurrect the
+    // old list into the newer cluster's slot.
+    const rollback = pruneImageClusterMembers(['a.png']);
+    const newerId = registerImageCluster(['x.png'], 'newer');
+
+    rollback();
+    expect(getImageCluster(clusterId)).toBe(null);
+    expect(getImageCluster(newerId)?.imageNames).toEqual(['x.png']);
   });
 });
 

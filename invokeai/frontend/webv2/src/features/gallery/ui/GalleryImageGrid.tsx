@@ -1,6 +1,11 @@
 import { Box, chakra, Flex, HStack, Icon, ScrollArea, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey, type GalleryItem } from '@features/gallery/core/items';
+import {
+  getGalleryRevealRequest,
+  subscribeGalleryRevealRequests,
+  type GalleryRevealRequest,
+} from '@features/gallery/core/revealRequest';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { DropZone } from '@platform/ui';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
@@ -12,6 +17,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type DragEvent,
   type KeyboardEvent,
 } from 'react';
@@ -208,30 +214,49 @@ export const GalleryImageGrid = () => {
 
   useGalleryGridHotkeys({ actionSelectionRefs, columnCount, scrollToItemIndex });
 
-  // Selections made outside the grid (the image map's reveal, the command
-  // palette) must land in view. The trigger is the *visible* selection key, so
-  // a selection whose page is still loading scrolls exactly when the item
-  // materializes; a selection already on screen is a no-op (`scrollToIndex`
-  // only moves when the row is out of view). Keyed on the selection rather
-  // than the row model: refetches that keep the selection must not yank the
-  // user back to it after they scroll away.
-  const lastScrolledSelectionRef = useRef<string | null>(null);
-  const scrollSelectionIntoView = useEffectEvent((selectedItemKey: string) => {
-    const itemIndex = gallery.items.findIndex((item) => toGalleryItemKey(item) === selectedItemKey);
+  // Reveals from outside the grid (the image map's click-to-reveal) must land
+  // in view. This listens to the explicit reveal channel, NOT the selection:
+  // the selection also changes when a finished generation auto-selects its
+  // image, and scrolling on that would yank the grid out from under a
+  // browsing user — while re-clicking the already-selected map point changes
+  // no selection at all yet must still reveal. A reveal whose page is still
+  // loading stays pending until the item materializes (each row-model change
+  // retries), and is dropped as soon as some other selection supersedes it.
+  const revealRequest = useSyncExternalStore(subscribeGalleryRevealRequests, getGalleryRevealRequest);
+  const pendingRevealRef = useRef<GalleryRevealRequest | null>(null);
+  const consumedRevealTokenRef = useRef(revealRequest?.token ?? 0);
+  const settlePendingReveal = useEffectEvent(() => {
+    const pending = pendingRevealRef.current;
+
+    if (!pending) {
+      return;
+    }
+
+    // A different selection landing after the reveal (the user clicked
+    // something else) retires it — a late page load must not scroll away
+    // from what they chose.
+    if (gallery.selectedItemKey !== null && gallery.selectedItemKey !== pending.itemKey) {
+      pendingRevealRef.current = null;
+
+      return;
+    }
+
+    const itemIndex = gallery.items.findIndex((item) => toGalleryItemKey(item) === pending.itemKey);
 
     if (itemIndex >= 0) {
+      pendingRevealRef.current = null;
       scrollToItemIndex(itemIndex);
     }
   });
 
   useEffect(() => {
-    const selectedItemKey = gallery.selectedItemKey;
-
-    if (selectedItemKey && selectedItemKey !== lastScrolledSelectionRef.current) {
-      lastScrolledSelectionRef.current = selectedItemKey;
-      scrollSelectionIntoView(selectedItemKey);
+    if (revealRequest && revealRequest.token !== consumedRevealTokenRef.current) {
+      consumedRevealTokenRef.current = revealRequest.token;
+      pendingRevealRef.current = revealRequest;
     }
-  }, [gallery.selectedItemKey]);
+
+    settlePendingReveal();
+  }, [revealRequest, rows]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
