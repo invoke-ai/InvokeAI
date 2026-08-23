@@ -169,6 +169,10 @@ export interface ClusterAnnotation {
  * zoom never lands the label on the points it names). White-on-dark pill
  * styling is theme-independent — it reads on every map background.
  * Pure so placement math is testable; plotly consumes the array via layout.
+ *
+ * Ordered by cluster size (largest first, cluster id as the tiebreak): array
+ * order is the keep-priority for declutterAnnotations, so when two labels
+ * collide the one naming more images survives.
  */
 export const buildClusterAnnotations = (
   points: ImageMapPoint[],
@@ -192,17 +196,86 @@ export const buildClusterAnnotations = (
     sums.set(point.cluster, entry);
   }
 
-  return [...sums.entries()].map(([cluster, { count, x, maxY }]) => ({
-    bgcolor: 'rgba(0,0,0,0.65)',
-    borderpad: 2,
-    font: { color: '#FFFFFF', size: 10 },
-    opacity: 1,
-    showarrow: false,
-    text: labelsByCluster[String(cluster)],
-    x: x / count,
-    xanchor: 'center',
-    y: maxY,
-    yanchor: 'bottom',
-    yshift: 8,
-  }));
+  return [...sums.entries()]
+    .sort(([clusterA, a], [clusterB, b]) => b.count - a.count || clusterA - clusterB)
+    .map(([cluster, { count, x, maxY }]) => ({
+      bgcolor: 'rgba(0,0,0,0.65)',
+      borderpad: 2,
+      font: { color: '#FFFFFF', size: 10 },
+      opacity: 1,
+      showarrow: false,
+      text: labelsByCluster[String(cluster)],
+      x: x / count,
+      xanchor: 'center',
+      y: maxY,
+      yanchor: 'bottom',
+      yshift: 8,
+    }));
+};
+
+// Label extent estimates for collision testing. Annotations render in an SVG
+// layer we cannot measure before drawing, so the pill's footprint is
+// approximated from its text length at the fixed 10px font.
+const LABEL_CHAR_WIDTH_PX = 6;
+const LABEL_HEIGHT_PX = 18;
+/** Two labels closer than this (edge to edge) count as colliding. */
+const LABEL_GAP_PX = 4;
+
+interface LabelRect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+const rectsCollide = (a: LabelRect, b: LabelRect): boolean =>
+  a.left < b.right + LABEL_GAP_PX &&
+  a.right > b.left - LABEL_GAP_PX &&
+  a.top < b.bottom + LABEL_GAP_PX &&
+  a.bottom > b.top - LABEL_GAP_PX;
+
+/**
+ * Zoomed far out, every cluster label converges on the same few pixels and
+ * the map disappears under a pile of pills. Greedily keep labels in array
+ * order (buildClusterAnnotations puts larger clusters first), dropping any
+ * whose estimated pixel footprint collides with one already kept — fully
+ * deterministic for a given annotation set and view. Zooming back in spreads
+ * the anchors apart and the dropped labels reappear.
+ */
+export const declutterAnnotations = (
+  annotations: ClusterAnnotation[],
+  ranges: AxisRanges,
+  widthPx: number,
+  heightPx: number
+): ClusterAnnotation[] => {
+  const spanX = ranges.x[1] - ranges.x[0];
+  const spanY = ranges.y[1] - ranges.y[0];
+
+  if (spanX <= 0 || spanY <= 0 || widthPx <= 0 || heightPx <= 0) {
+    return annotations;
+  }
+
+  const kept: ClusterAnnotation[] = [];
+  const keptRects: LabelRect[] = [];
+
+  for (const annotation of annotations) {
+    const centerX = ((annotation.x - ranges.x[0]) / spanX) * widthPx;
+    // Screen y grows downward; yanchor 'bottom' + positive yshift puts the
+    // pill's bottom edge yshift pixels above the anchor point.
+    const bottom = ((ranges.y[1] - annotation.y) / spanY) * heightPx - annotation.yshift;
+    const halfWidth = (annotation.text.length * LABEL_CHAR_WIDTH_PX) / 2 + annotation.borderpad;
+    const rect: LabelRect = {
+      bottom,
+      left: centerX - halfWidth,
+      right: centerX + halfWidth,
+      top: bottom - LABEL_HEIGHT_PX,
+    };
+
+    if (!keptRects.some((other) => rectsCollide(rect, other))) {
+      kept.push(annotation);
+      keptRects.push(rect);
+    }
+  }
+
+  return kept;
 };

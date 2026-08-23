@@ -1,4 +1,5 @@
 import type { ImageMapPoint } from '@workbench/image-map/api';
+import type { ClusterAnnotation } from '@workbench/image-map/imageMapTraces';
 import type { AxisRanges } from '@workbench/image-map/imageMapViewport';
 import type { PlotlyHTMLElement } from 'plotly.js';
 
@@ -18,6 +19,7 @@ import {
   buildHighlightedPointsTrace,
   buildMapLayout,
   CURRENT_IMAGE_TRACE,
+  declutterAnnotations,
   HIGHLIGHTED_POINTS_TRACE,
 } from '@workbench/image-map/imageMapTraces';
 import {
@@ -29,7 +31,7 @@ import {
 import { getThumbnailUrl } from '@workbench/image-map/thumbnailCache';
 import { shallowEqual, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import Plotly from 'plotly.js-gl2d-dist-min';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useMapSelection } from './useSelectMapImage';
 
@@ -164,6 +166,33 @@ const ImageMapPlot = ({
     selectedImageNameRef.current = selectedImageName;
     clusterModeRef.current = clickSelectsCluster;
   }, [clickSelectsCluster, points, selectedImageName]);
+  // The full annotation set for the current data; which of them actually show
+  // is view-dependent (see applyDeclutteredAnnotations), so the source list
+  // lives in a ref the relayout listener can re-filter without re-rendering.
+  const fullAnnotationsRef = useRef<ClusterAnnotation[]>([]);
+  const appliedAnnotationsKeyRef = useRef<string | null>(null);
+
+  // Zoomed far out, cluster labels pile onto the same few pixels; declutter
+  // against the CURRENT view so only labels with room to breathe render, and
+  // zooming back in restores the rest. The applied-key check makes the common
+  // case (a pan/zoom that changes no label's visibility) a no-op — it also
+  // keeps this from feeding back into itself through the plotly_relayout
+  // event its own relayout fires.
+  const applyDeclutteredAnnotations = useCallback((container: PlotElement) => {
+    const ranges = readRanges(container);
+    const annotations =
+      ranges && container.offsetWidth > 0 && container.offsetHeight > 0
+        ? declutterAnnotations(fullAnnotationsRef.current, ranges, container.offsetWidth, container.offsetHeight)
+        : fullAnnotationsRef.current;
+    const key = annotations.map((annotation) => `${annotation.text}@${annotation.x},${annotation.y}`).join('\n');
+
+    if (key === appliedAnnotationsKeyRef.current) {
+      return;
+    }
+
+    appliedAnnotationsKeyRef.current = key;
+    swallow(Plotly.relayout(container, { annotations }));
+  }, []);
   const [pendingHoverPreview, setHoverPreview] = useState<HoverPreview | null>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Monotonic hover session: a resolution from a previous hover (even of the
@@ -219,6 +248,9 @@ const ImageMapPlot = ({
     // Annotations are deliberately absent here: they are a layout concern, and
     // rebuilding the scene for them is what made labels arriving a second after
     // the points re-materialize every trace. See the relayout effect below.
+    // Since the rebuilt layout carries no annotations, the applied-key must be
+    // forgotten or the label effect would skip re-adding an identical set.
+    appliedAnnotationsKeyRef.current = null;
     const layout = buildMapLayout(initialRanges);
 
     void Plotly.react(container, traces as Plotly.Data[], layout, {
@@ -288,6 +320,19 @@ const ImageMapPlot = ({
         plot.on('plotly_unhover', () => {
           clearHover();
         });
+        plot.removeAllListeners?.('plotly_relayout');
+        plot.on('plotly_relayout', (event) => {
+          // Every zoom, pan, and resize changes which labels have room; the
+          // annotation-only relayouts this triggers carry no axis keys, so
+          // they fall through without recursing.
+          const viewChanged = Object.keys(event ?? {}).some(
+            (key) => key.startsWith('xaxis.') || key.startsWith('yaxis.') || key === 'autosize'
+          );
+
+          if (viewChanged) {
+            applyDeclutteredAnnotations(container as unknown as PlotElement);
+          }
+        });
         setPlotRevision((revision) => revision + 1);
       })
       .catch(() => {
@@ -309,7 +354,7 @@ const ImageMapPlot = ({
     return () => {
       disposed = true;
     };
-  }, [points, selectCluster, selectImage]);
+  }, [applyDeclutteredAnnotations, points, selectCluster, selectImage]);
 
   // Highlight overlay: the gallery's multi-selection, restyled in place.
   useEffect(() => {
@@ -411,12 +456,9 @@ const ImageMapPlot = ({
       return;
     }
 
-    swallow(
-      Plotly.relayout(container, {
-        annotations: buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null),
-      })
-    );
-  }, [clusterLabels, plotRevision, points, showClusterLabels]);
+    fullAnnotationsRef.current = buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null);
+    applyDeclutteredAnnotations(container);
+  }, [applyDeclutteredAnnotations, clusterLabels, plotRevision, points, showClusterLabels]);
 
   // Custom zoom handlers + container size tracking, attached once for the
   // plot's lifetime; plotly does not observe its container.
