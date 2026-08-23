@@ -1,85 +1,84 @@
+import type { GallerySelectionDescriptor } from 'features/gallery/store/gallerySelectionSource';
+
 /**
- * The viewer's "reveal selected item" mechanism, extracted from the preview components so its
- * sequencing is testable without rendering.
+ * The viewer's "reveal the selected item" mechanism, as one item-owned state machine.
  *
  * A generation covers the viewer with an opaque progress overlay, which would otherwise swallow
  * every gallery click for the whole render: the selection changes underneath, but nothing visibly
- * happens. The reveal lifts the overlay for `durationMs` when the rendered item changes because
- * the *user* picked a new one, then drops back to the live preview.
+ * happens. The reveal lifts the overlay for `durationMs` when the *user* picks something, then
+ * drops back to the live preview.
  *
- * CurrentImagePreview and CurrentVideoPreview each own one controller and call `run` from the
- * effect that reacts to their rendered item; `lastRenderedItemNameRef` is shared between them via
- * the viewer context so a click that switches media type still reads as a selection change.
+ * The machine is owned by the viewer context, so both preview components drive one instance and a
+ * click that switches media type is just another selection. What used to carry that across the
+ * component swap — a shared mutable ref holding the previously rendered name, a sentinel value for
+ * "the selection was cleared", and one controller per component — is gone: a selection is identified
+ * by `generation`, so "the user picked X", "X has been on screen for a while" and "the user picked X
+ * again" are three distinguishable events rather than three readings of one string comparison.
  *
- * Sequencing rules the controller encodes (each one has a failure mode without it):
- *
- * - The previous-item ref is NOT advanced, and the auto-switch marker NOT consumed, while a
- *   finished render's preview is resolving into its final frame. A click landing inside that
- *   window keeps its identity until the window ends, so the next run can still classify it —
- *   revealing a user click that resumes progress would otherwise be impossible, and an
- *   auto-switch would consume its marker on a run that can never reveal, then read as a user
- *   click afterwards.
- * - The marker IS consumed on every other change of the rendered item, even when no progress is
- *   showing: it must not outlive the render it was recorded for.
- * - Clearing the selection moves the ref to a sentinel rather than null: null means "nothing has
- *   rendered since the viewer opened" and suppresses the reveal (that first render is not a
- *   click), but the selection made after a clear IS a click and must reveal — including a
- *   re-selection of the very item that was cleared.
- * - A run that finds the rendered item unchanged while this controller's own reveal is the one
- *   in flight re-arms it instead of killing it. React StrictMode double-invokes a mount's
- *   effects (run → cleanup → run), so without this every cross-media first reveal dies in
- *   development: the second run sees the name the first run wrote into the shared ref.
- * - Every other path lowers the reveal. `run` cancels the running reveal's timer before
- *   deciding, so an outcome that left the flag raised would have nothing left to lower it.
+ * A reveal is owed from the moment the selection lands, but it is only *shown* once that item's
+ * media can actually be seen. Lifting the overlay onto an element that has not decoded a frame yet
+ * shows the user a black rectangle where their click should be — so the machine waits for
+ * `isMediaReady`, bounded by `mediaGraceMs` so that media which never becomes ready (a failed load,
+ * a codec the browser will not decode) still makes the click land rather than swallowing it.
  */
-
 type SelectedItemRevealInputs = {
+  /** Who selected what, and which selection it is (see gallerySelectionSource). */
+  selection: GallerySelectionDescriptor;
+  /** The item the component is rendering right now, or null when it has nothing to show. */
+  renderedItemName: string | null;
   /** Whether the rendered item has a frame on screen: an image decoded, a video's first frame
-   * painted. A <video> mounts instantly and stays black until it decodes, so mounting is not the
-   * same as being visible. */
+   * painted. False while the element is still black. */
   isMediaReady: boolean;
   /** The user's "show progress in viewer" setting. */
   shouldShowProgressInViewer: boolean;
-  /** Whether a live progress preview exists to be covering the viewer at all. */
+  /** Whether a live progress preview is covering the viewer at all. */
   hasProgressImage: boolean;
   /** Whether a finished generation's preview is mid-handoff to its final frame. */
   isProgressImageResolving: boolean;
-  /** The item the component is rendering right now, or null when it has nothing to show. */
-  renderedItemName: string | null;
-  /** The item the gallery selection points at, or null when the selection is empty. */
-  selectedItemName: string | null;
 };
 
-type SelectedItemRevealController = {
-  /** Decide and apply the reveal state for the current render. Call from the effect body. */
-  run: (inputs: SelectedItemRevealInputs) => void;
-  /** Cancel the running reveal's timer without changing the revealed state. Call from the
-   * effect's cleanup — the next `run` (or the component's unmount handler) owns the state. */
-  clearTimer: () => void;
+type MachineState =
+  /** Nothing revealed, and nothing owed: this selection has had its turn, or never earned one. */
+  | { kind: 'idle'; generation: number }
+  /** Owed a reveal, but a finished generation is resolving into its final frame and owns the
+   * viewer for the moment. Resumes when that window ends. */
+  | { kind: 'deferred'; generation: number; itemName: string }
+  /** Owed a reveal, waiting for the item's media to paint (or for the grace deadline). */
+  | { kind: 'awaiting-media'; generation: number; itemName: string }
+  /** Showing the selected item; the duration timer is running. */
+  | { kind: 'revealing'; generation: number; itemName: string };
+
+export type SelectedItemRevealMachine = {
+  /** Fold the current inputs in. Called from the preview components' effects. */
+  sync: (inputs: SelectedItemRevealInputs) => void;
+  /**
+   * Registers a mounted preview component; the returned function unregisters it. While none is
+   * registered nothing calls `sync`, so selections have to be settled through `noteSelection`
+   * instead.
+   */
+  attach: () => () => void;
+  /**
+   * A selection landed. Ignored while a preview is attached — its next `sync` carries the same
+   * descriptor and decides properly, with the progress state this cannot see. While none is
+   * attached (the viewer is in comparison mode, say) this settles the generation, so returning to
+   * the viewer does not fire a reveal for a click made when no overlay was covering anything.
+   */
+  noteSelection: (selection: GallerySelectionDescriptor) => void;
+  /** Drop any reveal and cancel timers. For provider teardown. */
+  reset: () => void;
+  /** The current state's kind, for tests and debugging. */
+  peek: () => MachineState['kind'];
 };
 
-// Written into the shared ref when the selection is cleared after something had rendered. Never
-// equals a real item name (names are filenames), never equals null (the nothing-rendered-yet
-// state), so the next rendered item compares as a change and gets its reveal.
-const SELECTION_CLEARED = '';
-
-export const createSelectedItemRevealController = (deps: {
-  /** Shared with the other preview component via the viewer context. */
-  lastRenderedItemNameRef: { current: string | null };
-  /** The auto-switch marker (see features/gallery/store/autoSwitchedImages). */
-  marker: { consume: (itemName: string) => boolean };
-  /** Writes the shared "temporarily showing selected item" flag. */
+export const createSelectedItemRevealMachine = (deps: {
   setRevealed: (revealed: boolean) => void;
   durationMs: number;
-  /** How long a reveal waits for the item to paint before showing it anyway: media that will never
-   * become ready must still make the click land rather than swallowing it. */
+  /** How long a reveal waits for its media before showing anyway. */
   mediaGraceMs: number;
   schedule?: (fn: () => void, ms: number) => number;
   cancel?: (id: number) => void;
-}): SelectedItemRevealController => {
+}): SelectedItemRevealMachine => {
   const {
-    lastRenderedItemNameRef,
-    marker,
     setRevealed,
     durationMs,
     mediaGraceMs,
@@ -87,165 +86,114 @@ export const createSelectedItemRevealController = (deps: {
     cancel = (id) => window.clearTimeout(id),
   } = deps;
 
-  // The item this controller's currently-armed reveal is showing, null when none is in flight.
-  // This is what lets a StrictMode re-run tell "my own reveal, restarted" from "nothing changed".
-  let activeRevealItemName: string | null = null;
-  // The item owed a reveal that is waiting for its media to paint. Held rather than shown, so the
-  // two seconds are spent on a visible frame instead of running out over a black element.
-  let awaitingMediaItemName: string | null = null;
+  let state: MachineState = { kind: 'idle', generation: 0 };
   let timerId = 0;
+  let attachedPreviews = 0;
 
-  const lower = () => {
-    activeRevealItemName = null;
-    awaitingMediaItemName = null;
-    setRevealed(false);
+  const clearTimer = () => {
+    cancel(timerId);
+    timerId = 0;
   };
 
-  const reveal = (itemName: string) => {
-    cancel(timerId);
-    awaitingMediaItemName = null;
-    activeRevealItemName = itemName;
-    setRevealed(true);
-    timerId = schedule(lower, durationMs);
+  const enter = (next: MachineState) => {
+    state = next;
+    setRevealed(next.kind === 'revealing');
   };
 
-  /** Owed a reveal, but the item has not painted yet. Bounded, so media that never loads still
-   * makes the click land. */
-  const awaitMedia = (itemName: string) => {
-    cancel(timerId);
-    awaitingMediaItemName = itemName;
-    activeRevealItemName = null;
-    setRevealed(false);
+  const goIdle = (generation: number) => {
+    clearTimer();
+    enter({ kind: 'idle', generation });
+  };
+
+  const goDeferred = (generation: number, itemName: string) => {
+    clearTimer();
+    enter({ kind: 'deferred', generation, itemName });
+  };
+
+  const startRevealing = (generation: number, itemName: string) => {
+    clearTimer();
+    enter({ kind: 'revealing', generation, itemName });
     timerId = schedule(() => {
-      if (awaitingMediaItemName !== null) {
-        reveal(awaitingMediaItemName);
+      timerId = 0;
+      goIdle(generation);
+    }, durationMs);
+  };
+
+  const startAwaitingMedia = (generation: number, itemName: string) => {
+    clearTimer();
+    enter({ kind: 'awaiting-media', generation, itemName });
+    timerId = schedule(() => {
+      timerId = 0;
+      // The media never became ready. Show the item anyway: an empty frame for a moment is a
+      // smaller failure than a click that looks dead for the rest of the render. No generation
+      // check is needed — every transition clears this timer first, so it can only run while this
+      // exact claim is still the one outstanding.
+      if (state.kind === 'awaiting-media') {
+        startRevealing(generation, itemName);
       }
     }, mediaGraceMs);
   };
 
-  const run: SelectedItemRevealController['run'] = ({
-    shouldShowProgressInViewer,
-    hasProgressImage,
-    isProgressImageResolving,
-    renderedItemName,
-    selectedItemName,
-    isMediaReady,
-  }) => {
-    cancel(timerId);
+  const sync: SelectedItemRevealMachine['sync'] = (inputs) => {
+    const { selection, renderedItemName, isMediaReady } = inputs;
+    const { shouldShowProgressInViewer, hasProgressImage, isProgressImageResolving } = inputs;
 
-    const previousRenderedItemName = lastRenderedItemNameRef.current;
-
-    // A cleared selection is recorded even while resolving. The deferral below exists to preserve
-    // the identity of something that landed but has not been classified yet; a clear has no such
-    // identity to keep — it *is* the event — and leaving the ref on the item that was cleared makes
-    // re-selecting that same item read as "nothing changed" once the window ends, so the re-click
-    // stays hidden under the overlay.
-    // Written whether or not anything had rendered before. `null` means "the viewer has not shown
-    // the user anything yet", which suppresses the reveal — right for the render that happens when
-    // the viewer opens onto an existing selection, wrong for a viewer sitting empty while a
-    // generation runs: the user's first click there is a click like any other, and suppressing it
-    // left their pick behind the overlay. An empty selection is a state the viewer *has* shown, so
-    // it gets the sentinel and the next selection reveals.
-    if (renderedItemName === null && selectedItemName === null) {
-      lastRenderedItemNameRef.current = SELECTION_CLEARED;
-    }
-
-    // Resolve window: leave the ref and the marker otherwise exactly as they are (see the module
-    // docblock) so whatever lands during it can still be classified — and revealed — when it ends.
-    if (isProgressImageResolving) {
-      if (awaitingMediaItemName !== null && awaitingMediaItemName === renderedItemName) {
-        // Owed but not yet shown: keep the claim, the hand-off owns the viewer for now.
-        timerId = schedule(() => {
-          if (awaitingMediaItemName !== null) {
-            reveal(awaitingMediaItemName);
-          }
-        }, mediaGraceMs);
-        return;
-      }
-      if (activeRevealItemName !== null && activeRevealItemName === renderedItemName) {
-        // A reveal the user already earned is in flight over this very item. A generation
-        // finishing elsewhere is no reason to slam the overlay back over their click, so re-arm
-        // (the timer was cancelled above) instead of lowering.
-        timerId = schedule(lower, durationMs);
-        return;
-      }
-      lower();
+    // Nothing is covering the viewer, so there is nothing to reveal from under — and no reveal to
+    // keep alive. Settling the generation here is what keeps a selection made while the overlay was
+    // down from firing a reveal when the next generation raises it.
+    if (!shouldShowProgressInViewer || !hasProgressImage) {
+      goIdle(selection.generation);
       return;
     }
 
-    // While a selection exists but its render hasn't landed yet (preload or DTO fetch pending), the
-    // ref must keep the previous item — nulling it would erase the "previous item" fact and swallow
-    // the reveal the successor run would fire. The cleared-selection case is handled above.
-    if (renderedItemName !== null) {
-      lastRenderedItemNameRef.current = renderedItemName;
-    }
-
-    // Consumed before the visibility guards below: in the common case the auto-switched item
-    // renders with no progress showing, and the marker must not outlive the render it was
-    // recorded for.
-    const wasAutoSwitchedTo =
-      renderedItemName !== null && renderedItemName !== previousRenderedItemName && marker.consume(renderedItemName);
-
-    if (
-      !shouldShowProgressInViewer ||
-      !hasProgressImage ||
-      renderedItemName === null ||
-      // Render lagging the selection: whatever is on screen is not what the user picked, so
-      // showing it would not make their click land.
-      renderedItemName !== selectedItemName
-    ) {
-      lower();
-      return;
-    }
-
-    if (previousRenderedItemName === null || previousRenderedItemName === renderedItemName) {
-      if (awaitingMediaItemName === renderedItemName) {
-        // Already owed a reveal for this item, waiting on its first frame. If that frame has since
-        // arrived, show it; otherwise keep holding rather than restarting the wait.
-        if (isMediaReady) {
-          reveal(renderedItemName);
-        } else {
-          timerId = schedule(() => {
-            if (awaitingMediaItemName !== null) {
-              reveal(awaitingMediaItemName);
-            }
-          }, mediaGraceMs);
-        }
-        return;
+    if (selection.generation !== state.generation) {
+      // A selection landed.
+      if (selection.name === null || selection.isAutoSwitch) {
+        // An auto-switch is the gallery handing over a finished item, not the user asking to see
+        // something: revealing it would flash that item over the next render's live preview.
+        goIdle(selection.generation);
+      } else if (isProgressImageResolving) {
+        goDeferred(selection.generation, selection.name);
+      } else {
+        startAwaitingMedia(selection.generation, selection.name);
       }
-      if (activeRevealItemName !== renderedItemName) {
-        // Not a change of displayed item — nothing happened that needs to be made visible. The
-        // first render after the viewer opens is not a click either.
-        lower();
-        return;
-      }
-      // This controller's own reveal of this exact item is in flight: a StrictMode re-run of the
-      // mount effect (its cleanup already cancelled the timer, and the unmount handler lowered
-      // the flag). Fall through and re-arm rather than killing the reveal the user just earned.
-    } else if (wasAutoSwitchedTo) {
-      // The reveal exists for *user* selections. The auto-switch selection lands after an async
-      // DTO fetch, so the next render's first progress event can slot in ahead of it and reset
-      // the resolving flag — by the time it reaches this effect, timing cannot tell it from a
-      // click, but the marker can. Revealing it would flash the finished item over the new
-      // render's live preview.
-      lower();
-      return;
+    } else if (state.kind === 'deferred' && !isProgressImageResolving) {
+      // The hand-off finished; the reveal this selection is owed can start.
+      startAwaitingMedia(state.generation, state.itemName);
+    } else if (state.kind === 'awaiting-media' && isProgressImageResolving) {
+      // A hand-off began while we were waiting for the media. Hold the claim — dropping it would
+      // lose a click that has not been shown yet.
+      goDeferred(state.generation, state.itemName);
     }
 
-    if (!isMediaReady) {
-      // Spending the two seconds on an element that has not decoded a frame shows the user a black
-      // rectangle where their click should be, then puts the overlay back.
-      awaitMedia(renderedItemName);
-      return;
+    // Show it the moment the owed item's media is actually on screen. Evaluated in the same pass
+    // that entered the state, so a click on an item already rendered and decoded reveals at once.
+    if (state.kind === 'awaiting-media' && renderedItemName === state.itemName && isMediaReady) {
+      startRevealing(state.generation, state.itemName);
     }
 
-    reveal(renderedItemName);
+    // A reveal already granted runs out its timer even if a hand-off starts under it: that would
+    // slam the overlay back over a click the user has already earned.
   };
 
   return {
-    run,
-    clearTimer: () => {
-      cancel(timerId);
+    sync,
+    attach: () => {
+      attachedPreviews += 1;
+      return () => {
+        attachedPreviews -= 1;
+      };
     },
+    noteSelection: (selection) => {
+      if (attachedPreviews > 0) {
+        return;
+      }
+      goIdle(selection.generation);
+    },
+    reset: () => {
+      clearTimer();
+      enter({ kind: 'idle', generation: state.generation });
+    },
+    peek: () => state.kind,
   };
 };
