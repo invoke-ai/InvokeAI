@@ -1,7 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Badge, createListCollection, HStack, Stack, Switch } from '@chakra-ui/react';
+import { Badge, createListCollection, HStack, Stack } from '@chakra-ui/react';
 import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { isPidMode, MAX_PID_STEPS, MIN_PID_STEPS } from '@features/generation/core/pid';
 import {
@@ -12,14 +12,14 @@ import {
   MIN_HIDIFFUSION_T1_RATIO,
 } from '@features/generation/core/settings';
 import { Field, Select } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
-import { useId, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateAdvancedFieldsProps {
   settings: GenerateSettings;
@@ -34,61 +34,6 @@ const VAE_PRECISION_COLLECTION = createListCollection({
     { label: 'FP32', value: 'fp32' },
   ] as const,
 });
-
-const SeamlessSwitch = ({
-  checked,
-  label,
-  onCheckedChange,
-}: {
-  checked: boolean;
-  label: string;
-  onCheckedChange: (checked: boolean) => void;
-}) => {
-  // Both axis switches share one Field.Root, which would hand them the same
-  // hidden-input id — explicit ids keep each label bound to its own input.
-  const id = useId();
-
-  return (
-    <Switch.Root
-      checked={checked}
-      flex="1"
-      ids={{ hiddenInput: id, label: `${id}-label` }}
-      size="sm"
-      onCheckedChange={(event) => onCheckedChange(event.checked)}
-    >
-      <Switch.HiddenInput />
-      <Switch.Control _checked={{ bg: 'accent.solid' }}>
-        <Switch.Thumb />
-      </Switch.Control>
-      <Switch.Label fontSize="xs">{label}</Switch.Label>
-    </Switch.Root>
-  );
-};
-
-const AdvancedSwitch = ({
-  checked,
-  disabled = false,
-  label,
-  onCheckedChange,
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  label: string;
-  onCheckedChange: (checked: boolean) => void;
-}) => (
-  <Switch.Root
-    checked={checked}
-    disabled={disabled}
-    size="sm"
-    onCheckedChange={(event) => onCheckedChange(event.checked)}
-  >
-    <Switch.HiddenInput />
-    <Switch.Control _checked={{ bg: 'accent.solid' }}>
-      <Switch.Thumb />
-    </Switch.Control>
-    <Switch.Label srOnly>{label}</Switch.Label>
-  </Switch.Root>
-);
 
 export const GenerateAdvancedFields = ({
   onCommit,
@@ -147,19 +92,23 @@ export const GenerateAdvancedFields = ({
     return null;
   }
 
-  const badges = (
-    <>
-      {settings.seamlessXAxis && <Badge size="xs">{t('widgets.generate.tileX')}</Badge>}
-      {settings.seamlessYAxis && <Badge size="xs">{t('widgets.generate.tileY')}</Badge>}
-      {settings.colorCompensation && <Badge size="xs">{t('widgets.generate.colorCompensation')}</Badge>}
-      {settings.hiDiffusionEnabled && <Badge size="xs">{t('widgets.generate.hiDiffusion')}</Badge>}
-      {customVae && (
-        <Badge maxW="32" size="xs">
-          <MiddleTruncate as="span" minW="0" text={settings.vae?.name ?? ''} />
-        </Badge>
-      )}
-    </>
-  );
+  // The closed section reports deviation, not detail: each user-level decision
+  // that is off its default counts once.
+  const overrideCount = [
+    customVae,
+    modelDefaults !== null && settings.vaePrecision !== modelDefaults.vaePrecision,
+    clipSkipMax > 0 && settings.clipSkip !== (modelDefaults?.clipSkip ?? 0),
+    policy.cfgRescaleVisible && settings.cfgRescaleMultiplier !== (modelDefaults?.cfgRescaleMultiplier ?? 0),
+    policy.seamlessVisible && (settings.seamlessXAxis || settings.seamlessYAxis),
+    policy.colorCompensationVisible && settings.colorCompensation,
+    policy.hiDiffusionVisible && settings.hiDiffusionEnabled,
+    policy.pidVisible && settings.pidMode !== 'off',
+  ].filter(Boolean).length;
+
+  const badges =
+    overrideCount > 0 ? (
+      <Badge size="xs">{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge>
+    ) : null;
 
   return (
     <GenerateCollapsibleSection
@@ -260,7 +209,7 @@ export const GenerateAdvancedFields = ({
       {policy.hiDiffusionVisible ? (
         <Stack gap="2" p="2">
           <Field hint="hidiffusion" label={t('widgets.generate.hiDiffusion')}>
-            <AdvancedSwitch
+            <GenerateToggleSwitch
               checked={settings.hiDiffusionEnabled}
               label={t('widgets.generate.hiDiffusion')}
               onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
@@ -268,7 +217,7 @@ export const GenerateAdvancedFields = ({
           </Field>
           <HStack alignItems="flex-start" gap="2">
             <Field flex="1" hint="hidiffusionRauNet" label={t('widgets.generate.hiDiffusionRauNet')}>
-              <AdvancedSwitch
+              <GenerateToggleSwitch
                 checked={settings.hiDiffusionRauNetEnabled}
                 disabled={!settings.hiDiffusionEnabled}
                 label={t('widgets.generate.hiDiffusionRauNet')}
@@ -276,7 +225,7 @@ export const GenerateAdvancedFields = ({
               />
             </Field>
             <Field flex="1" hint="hidiffusionWindowAttn" label={t('widgets.generate.hiDiffusionWindowAttn')}>
-              <AdvancedSwitch
+              <GenerateToggleSwitch
                 checked={settings.hiDiffusionWindowAttentionEnabled}
                 disabled={!settings.hiDiffusionEnabled}
                 label={t('widgets.generate.hiDiffusionWindowAttn')}
@@ -315,16 +264,11 @@ export const GenerateAdvancedFields = ({
 
       {policy.colorCompensationVisible ? (
         <Field hint="colorCompensation" label={t('widgets.generate.colorCompensation')} p="2">
-          <Switch.Root
+          <GenerateToggleSwitch
             checked={settings.colorCompensation}
-            size="sm"
-            onCheckedChange={(event) => onCommit({ colorCompensation: event.checked })}
-          >
-            <Switch.HiddenInput />
-            <Switch.Control _checked={{ bg: 'accent.solid' }}>
-              <Switch.Thumb />
-            </Switch.Control>
-          </Switch.Root>
+            label={t('widgets.generate.colorCompensation')}
+            onCheckedChange={(checked) => onCommit({ colorCompensation: checked })}
+          />
         </Field>
       ) : null}
 
@@ -365,14 +309,16 @@ export const GenerateAdvancedFields = ({
       {policy.seamlessVisible ? (
         <Field hint="seamlessTiling" label={t('widgets.generate.seamlessTiling')} p="2">
           <HStack gap="4">
-            <SeamlessSwitch
+            <GenerateToggleSwitch
               checked={settings.seamlessXAxis}
               label={t('widgets.generate.xAxis')}
+              labelVisible
               onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
             />
-            <SeamlessSwitch
+            <GenerateToggleSwitch
               checked={settings.seamlessYAxis}
               label={t('widgets.generate.yAxis')}
+              labelVisible
               onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
             />
           </HStack>

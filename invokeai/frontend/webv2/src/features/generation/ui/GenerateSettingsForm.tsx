@@ -2,13 +2,12 @@ import type { GenerationModelCatalogItem as ModelConfig } from '@features/genera
 /* eslint-disable react/react-compiler */
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
-import { Stack, Text } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 import { GenerateCanvasCompositingSection } from './GenerateCanvasCompositingSection';
 import { GenerateComponentsSection } from './GenerateComponentsSection';
-import { GenerateConceptsSection } from './GenerateConceptsSection';
 import {
   applyGenerateSettingsPatch,
   applyGenerateSettingsUpdate,
@@ -20,10 +19,10 @@ import {
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { getSettingsWithLatestPromptFields } from './generateFormViewModel';
-import { GenerateModelFamilyFields } from './GenerateModelFamilyFields';
-import { GenerateModelFields } from './GenerateModelFields';
+import { GenerateGuidanceSection } from './GenerateGuidanceSection';
+import { GenerateModelCard } from './GenerateModelCard';
+import { GenerateRenderSection } from './GenerateRenderSection';
 import { GeneratePromptFields } from './promptFields';
-import { GenerateReferenceImagesSection } from './reference-images/GenerateReferenceImagesSection';
 
 const GENERATE_INPUT_DEBOUNCE_MS = 250;
 
@@ -224,8 +223,21 @@ export const GenerateSettingsForm = ({
     onPatchSettingsRef.current(getChangedGenerateSettingsPatch(previousSettings, nextSettings));
   }, []);
 
+  // Zone order is dependency order: the model governs everything below it, the
+  // prompt is the primary creative input, conditioning and output shape follow,
+  // and sampling internals sit last before the contextual canvas block.
   return (
-    <Stack gap="1" px={1}>
+    <Stack gap={1} p={1}>
+      <GenerateModelCard
+        isLoadingModels={isLoadingModels}
+        loadError={loadError}
+        models={models}
+        selectedModel={selectedModel}
+        settings={draftSettings}
+        supportedModels={supportedModels}
+        onCommitSettings={commitSettingsImmediately}
+      />
+
       <GeneratePromptFields
         projectId={projectId}
         selectedModel={selectedModel}
@@ -234,12 +246,15 @@ export const GenerateSettingsForm = ({
         onCommitImmediate={commitPatchImmediately}
       />
 
-      <GenerateReferenceImagesSection
+      <GenerateGuidanceSection
+        loraModels={loraModels}
         models={models}
+        projectId={projectId}
         selectedModel={selectedModel}
         settings={draftSettings}
-        onCommit={commit}
         onCommitImmediate={commitPatchImmediately}
+        onConceptCommit={commitDebouncedDraftUpdate}
+        onReferenceCommit={commit}
       />
 
       <GenerateDimensionFields
@@ -249,33 +264,14 @@ export const GenerateSettingsForm = ({
         onCommit={commit}
       />
 
-      <GenerateCanvasCompositingSection />
-
-      <GenerateModelFields
-        models={models}
+      <GenerateRenderSection
         selectedModel={selectedModel}
         settings={draftSettings}
         onCommit={commit}
         onCommitImmediate={commitPatchImmediately}
-        onCommitSettings={commitSettingsImmediately}
-      />
-
-      <GenerateConceptsSection
-        loraModels={loraModels}
-        projectId={projectId}
-        selectedModel={selectedModel}
-        settings={draftSettings}
-        onCommit={commitDebouncedDraftUpdate}
-        onCommitImmediate={commitPatchImmediately}
       />
 
       <GenerateComponentsSection
-        selectedModel={selectedModel}
-        settings={draftSettings}
-        onCommit={commitPatchImmediately}
-      />
-
-      <GenerateModelFamilyFields
         selectedModel={selectedModel}
         settings={draftSettings}
         onCommit={commitPatchImmediately}
@@ -288,23 +284,7 @@ export const GenerateSettingsForm = ({
         onCommitImmediate={commitPatchImmediately}
       />
 
-      {isLoadingModels ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          Loading backend models...
-        </Text>
-      ) : loadError ? (
-        <Text color="fg.error" fontSize="2xs">
-          {loadError}
-        </Text>
-      ) : supportedModels.length === 0 ? (
-        <Text color="fg.subtle" fontSize="2xs">
-          No supported generation models were found on the backend.
-        </Text>
-      ) : selectedModel ? null : (
-        <Text color="fg.error" fontSize="2xs">
-          Select a model to enable invocation.
-        </Text>
-      )}
+      <GenerateCanvasCompositingSection />
     </Stack>
   );
 };
