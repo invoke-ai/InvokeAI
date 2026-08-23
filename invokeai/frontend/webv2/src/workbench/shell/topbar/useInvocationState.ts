@@ -83,7 +83,12 @@ export const useInvocationState = (): InvocationState => {
 
   const resolvedRoute = resolveInvocationRouteInput(routeInput, 'global', invocation, availabilityModels);
   const isConnected = backendConnectionStatus === 'connected';
-  const sourceValues = invocation.sourceId === 'upscale' ? routeInput.upscaleValues : routeInput.generateValues;
+  const sourceValues =
+    invocation.sourceId === 'upscale'
+      ? routeInput.upscaleValues
+      : invocation.sourceId === 'video'
+        ? routeInput.videoValues
+        : routeInput.generateValues;
 
   const promptExpansion = useDynamicPrompts(
     readEffectivePositivePrompt(routeInput.generateValues),

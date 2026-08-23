@@ -27,7 +27,7 @@ import {
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { Button, DropZone } from '@platform/ui';
+import { Button, DropTargetOverlay, DropZone } from '@platform/ui';
 import { UploadIcon } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -62,7 +62,7 @@ export const GenerateReferenceImagesContent = ({
   const isSupported = isReferenceImageSupported(selectedModel);
   const maxReferenceImages = getMaxReferenceImages(selectedModel);
   const canAdd = referenceImages.length < maxReferenceImages;
-  const { isOver, setNodeRef } = useGalleryImageDroppable({
+  const { acceptsActiveDrag, isOver, setNodeRef } = useGalleryImageDroppable({
     data: { kind: 'generate-reference-images' },
     disabled: !canAdd,
     id: 'generate-reference-images',
@@ -228,7 +228,14 @@ export const GenerateReferenceImagesContent = ({
   }
 
   return (
-    <Stack ref={setNodeRef} gap="2">
+    <Stack ref={setNodeRef} gap="2" position="relative">
+      {/* The droppable is this whole content block (drops land anywhere on
+          it), so the in-flight affordance covers the same rect. */}
+      <DropTargetOverlay
+        isActive={acceptsActiveDrag}
+        isOver={isOver}
+        label={t('widgets.generate.dropReferenceImages')}
+      />
       <HStack align="stretch" gap="2">
         <DropZone
           as="button"

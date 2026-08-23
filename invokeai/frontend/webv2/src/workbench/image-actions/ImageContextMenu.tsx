@@ -10,11 +10,13 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
+import { createVideoSourceClip } from '@features/video';
 import { MenuContent, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
+  ClapperboardIcon,
   AsteriskIcon,
   ChevronRightIcon,
   CopyIcon,
@@ -45,6 +47,7 @@ import { useTranslation } from 'react-i18next';
 import type { ImageActions } from './useImageActions';
 
 import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
+import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
 export interface LegacyImageContextMenuTarget {
   /** Right-clicked image first; more entries switch the menu into bulk mode. */
@@ -316,6 +319,81 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
+  const { generation, widgets } = useWorkbenchCommands();
+  const openWidget = useOpenWorkbenchWidget();
+  // Video recall availability, fetched from the item's recorded core_metadata
+  // when the menu opens on a video — the video twin of the image menu's flow.
+  const [videoRecallCapabilities, setVideoRecallCapabilities] = useState<VideoRecallCapabilities>(
+    EMPTY_VIDEO_RECALL_CAPABILITIES
+  );
+  const [isLoadingVideoRecall, setIsLoadingVideoRecall] = useState(false);
+  const videoItemName = item.kind === 'video' ? item.name : null;
+  const getVideoRecallCapabilities = actions.getVideoRecallCapabilities;
+
+  useEffect(() => {
+    if (!videoItemName || item.kind !== 'video') {
+      return;
+    }
+
+    let isCancelled = false;
+    const videoItem = item;
+
+    setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
+    setIsLoadingVideoRecall(true);
+    getVideoRecallCapabilities(videoItem)
+      .then((capabilities) => {
+        if (!isCancelled) {
+          setVideoRecallCapabilities(capabilities);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setVideoRecallCapabilities(EMPTY_VIDEO_RECALL_CAPABILITIES);
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingVideoRecall(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by name; the item identity churns per render
+  }, [getVideoRecallCapabilities, videoItemName]);
+
+  const makeVideoRecallHandler = useCallback(
+    (kind: VideoRecallKind) => () => {
+      if (item.kind === 'video') {
+        void actions.recallVideoData(item, kind);
+      }
+    },
+    [actions, item]
+  );
+  const handleVideoRecallAll = useMemo(() => makeVideoRecallHandler('all'), [makeVideoRecallHandler]);
+  const handleVideoRecallRemix = useMemo(() => makeVideoRecallHandler('remix'), [makeVideoRecallHandler]);
+  const handleVideoRecallPrompts = useMemo(() => makeVideoRecallHandler('prompts'), [makeVideoRecallHandler]);
+  const handleVideoRecallSeed = useMemo(() => makeVideoRecallHandler('seed'), [makeVideoRecallHandler]);
+  const handleExtendInVideo = useCallback(() => {
+    if (item.kind !== 'video') {
+      return;
+    }
+
+    openWidget('video', { preferredRegions: ['left'] });
+    // An initial video and a first frame are mutually exclusive in the panel.
+    widgets.patchValues('video', {
+      firstFrameImage: null,
+      sourceVideo: createVideoSourceClip({
+        durationSeconds: item.durationSeconds,
+        fps: item.fps,
+        height: item.height,
+        name: item.name,
+        width: item.width,
+      }),
+    });
+    generation.setSource('video');
+  }, [generation, item, openWidget, widgets]);
 
   return (
     <>
@@ -342,6 +420,46 @@ const SingleItemMenuItems = ({
         />
       </HStack>
       <Menu.Separator borderColor="border.subtle" />
+      {item.kind === 'video' ? (
+        <>
+          <ContextSubMenu icon={AsteriskIcon} label="Recall Metadata">
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
+              icon={AsteriskIcon}
+              label="Recall All"
+              value="video-recall-all"
+              onClick={handleVideoRecallAll}
+            />
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.remix}
+              icon={ShuffleIcon}
+              label="Remix Video"
+              value="video-remix"
+              onClick={handleVideoRecallRemix}
+            />
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.prompts}
+              icon={QuoteIcon}
+              label="Use Prompt"
+              value="video-use-prompt"
+              onClick={handleVideoRecallPrompts}
+            />
+            <ContextMenuItem
+              disabled={isLoadingVideoRecall || !videoRecallCapabilities.seed}
+              icon={SproutIcon}
+              label="Use Seed"
+              value="video-use-seed"
+              onClick={handleVideoRecallSeed}
+            />
+          </ContextSubMenu>
+          <ContextMenuItem
+            icon={ClapperboardIcon}
+            label="Extend in Video"
+            value="extend-in-video"
+            onClick={handleExtendInVideo}
+          />
+        </>
+      ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
         <>
           <ContextMenuItem
@@ -610,6 +728,15 @@ const SingleImageMenuItems = ({
     });
     generation.setSource('upscale');
   }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
+  const handleSendToVideo = useCallback(() => {
+    openWidget('video', { preferredRegions: ['left'] });
+    // The first frame and an initial video are mutually exclusive in the panel.
+    widgets.patchValues('video', {
+      firstFrameImage: { height: image.height, image_name: image.imageName, width: image.width },
+      sourceVideo: null,
+    });
+    generation.setSource('video');
+  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
 
   return (
     <>
@@ -668,6 +795,12 @@ const SingleImageMenuItems = ({
       </ContextSubMenu>
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem icon={ScanIcon} label="Send to Upscale" value="send-to-upscale" onClick={handleSendToUpscale} />
+      <ContextMenuItem
+        icon={ClapperboardIcon}
+        label="Send to Video"
+        value="send-to-video"
+        onClick={handleSendToVideo}
+      />
       <ContextMenuItem
         disabled={!actions.canUseAsReferenceImage}
         icon={ImageIcon}

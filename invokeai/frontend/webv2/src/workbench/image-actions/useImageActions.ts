@@ -15,6 +15,8 @@ import {
   type GalleryItemKey,
   type GalleryItemMutationResult,
   type GalleryItemRef,
+  galleryVideos,
+  type GalleryVideoItem,
 } from '@features/gallery';
 import { getGalleryBoardLabel } from '@features/gallery/contracts';
 import {
@@ -52,6 +54,7 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, getCurrentGenerateValues } from './executeImageRecall';
+import { executeVideoRecall } from './executeVideoRecall';
 import {
   captureGalleryWidgetKeyValues,
   collectGalleryStoreKnownItemFields,
@@ -67,6 +70,12 @@ import {
   type ImageRecallCapabilities,
   type ImageRecallKind,
 } from './imageRecall';
+import {
+  EMPTY_VIDEO_RECALL_CAPABILITIES,
+  getVideoRecallCapabilities as deriveVideoRecallCapabilitiesFromMetadata,
+  type VideoRecallCapabilities,
+  type VideoRecallKind,
+} from './videoRecall';
 
 /**
  * Image operations shared by every surface that shows backend images (gallery
@@ -86,9 +95,13 @@ export interface ImageActions extends GalleryItemActions {
   downloadImage: (image: GalleryImage) => Promise<void>;
   downloadImages: (imageNames: string[]) => Promise<void>;
   getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
+  /** Recall availability for a gallery video, from its recorded core_metadata. */
+  getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
   openImageInPreview: (image: GalleryImage) => void;
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
+  /** Applies a gallery video's recorded parameters to the Video panel. */
+  recallVideoData: (item: GalleryVideoItem, kind: VideoRecallKind) => Promise<void>;
   /** Opens the generate widget's template editor prefilled from this image's prompts. */
   savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
@@ -170,6 +183,14 @@ export const useImageActions = ({
         : snapshot.activeProject;
 
       return project ? getProjectWidgetValues(project, 'generate') : {};
+    };
+    const getLatestVideoValues = () => {
+      const snapshot = queries.getSnapshot();
+      const project = projectId
+        ? snapshot.projects.find((candidate) => candidate.id === projectId)
+        : snapshot.activeProject;
+
+      return project ? getProjectWidgetValues(project, 'video') : {};
     };
     // A deleted item can be visible only through widget values — the
     // `recentImages` overlay, or upscale's locked input — which the cache patch
@@ -814,6 +835,36 @@ export const useImageActions = ({
             dimensions:
               Number.isFinite(image.width) && image.width >= 64 && Number.isFinite(image.height) && image.height >= 64,
           };
+        }
+      },
+      getVideoRecallCapabilities: async (item, signal) => {
+        const owner = captureAccountScope();
+
+        try {
+          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+          const metadata = await galleryVideos.metadata(item.name, requestSignal);
+
+          assertAccountScopeCurrent(owner);
+          return deriveVideoRecallCapabilitiesFromMetadata(metadata);
+        } catch {
+          return EMPTY_VIDEO_RECALL_CAPABILITIES;
+        }
+      },
+      recallVideoData: async (item, kind) => {
+        const owner = captureAccountScope();
+        const didRecall = await executeVideoRecall({
+          commands,
+          getVideoValues: getLatestVideoValues,
+          item,
+          kind,
+          models,
+          projectId,
+        });
+
+        // The value patch auto-routes the invoke source (media/settings are
+        // intent-bearing keys); surfacing the widget is the caller-side touch.
+        if (isAccountScopeCurrent(owner) && didRecall && (!projectId || queries.isActiveProject(projectId))) {
+          openWorkbenchWidget('video', { preferredRegions: ['left'] });
         }
       },
       savePromptAsTemplate: async (image) => {

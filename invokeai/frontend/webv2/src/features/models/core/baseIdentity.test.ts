@@ -44,6 +44,7 @@ describe('MODEL_BASES', () => {
     });
     expect(getModelBaseInfo('flux2')).toMatchObject({ label: 'FLUX.2', colorPalette: 'cyan' });
     expect(getModelBaseInfo('qwen-image')).toMatchObject({ label: 'Qwen Image', colorPalette: 'cyan' });
+    expect(getModelBaseInfo('minimax-h3')).toMatchObject({ label: 'MiniMax H3', colorPalette: 'orange' });
     expect(isConvertibleToDiffusers(createModel({ base: 'sdxl', format: 'checkpoint', type: 'main' }))).toBe(true);
     expect(isConvertibleToDiffusers(createModel({ base: 'flux', format: 'checkpoint', type: 'main' }))).toBe(false);
   });
@@ -81,6 +82,7 @@ describe('MODEL_BASES', () => {
       'krea-2',
       'anima',
       'wan',
+      'minimax-h3',
       'any',
       'external',
       'unknown',

@@ -49,6 +49,7 @@ describe('variant options', () => {
     expect(getVariantOptionsFor('sd-2', 'main')).toEqual(['normal', 'inpaint', 'depth']);
     expect(getVariantOptionsFor('flux', 'main')).toEqual(['schnell', 'dev', 'dev_fill']);
     expect(getVariantOptionsFor('wan', 'main')).toEqual(['t2v_a14b', 'i2v_a14b', 'ti2v_5b']);
+    expect(getVariantOptionsFor('minimax-h3', 'main')).toEqual(['fl2va']);
   });
 
   it('distinguishes wan main and wan lora variants', () => {
@@ -68,6 +69,7 @@ describe('variant options', () => {
 
   it('labels known variants and title-cases unknown ones', () => {
     expect(getModelVariantLabel('dev_fill')).toBe('FLUX Dev - Fill');
+    expect(getModelVariantLabel('fl2va')).toBe('MiniMax H3 FL2VA');
     expect(getModelVariantLabel('some_new_variant')).toBe('Some New Variant');
   });
 

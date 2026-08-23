@@ -23,6 +23,7 @@ export type FirstPartyWidgetTypeId =
   | 'queue-status'
   | 'server-status'
   | 'upscale'
+  | 'video'
   | 'users'
   | 'version-status'
   | 'workflow';

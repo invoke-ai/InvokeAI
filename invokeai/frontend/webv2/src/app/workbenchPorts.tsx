@@ -7,6 +7,7 @@ import { GenerationUiAdapterProvider } from './GenerationUiAdapter';
 import { ModelsUiAdapterProvider } from './ModelsUiAdapter';
 import { QueueUiAdapterProvider } from './QueueUiAdapter';
 import { UpscaleUiAdapterProvider } from './UpscaleUiAdapter';
+import { VideoUiAdapterProvider } from './VideoUiAdapter';
 import { WorkflowUiAdapterProvider } from './WorkflowUiAdapter';
 
 export const workbenchUiPortProviders: ReadonlyArray<ProviderComponent> = [
@@ -15,8 +16,9 @@ export const workbenchUiPortProviders: ReadonlyArray<ProviderComponent> = [
   GalleryUiAdapterProvider,
   GenerationUiAdapterProvider,
   UpscaleUiAdapterProvider,
+  VideoUiAdapterProvider,
   WorkflowUiAdapterProvider,
 ];
 
-/** All six feature UI ports, composed once at module scope (identity must be render-stable). */
+/** All seven feature UI ports, composed once at module scope (identity must be render-stable). */
 export const WorkbenchUiPorts = composeProviders(workbenchUiPortProviders);

@@ -148,6 +148,7 @@ export const buildGraphPreviewSource = ({
     case 'generate':
       return { ...buildGenerateSource(project, models, t), destinationLabel };
     case 'upscale':
+    case 'video':
     case 'canvas':
       return { ...buildWidgetGraphSource(project, surface), destinationLabel };
   }

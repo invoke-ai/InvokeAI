@@ -242,6 +242,13 @@ const config = defineConfig({
       minWidth: '960px',
       overflow: 'hidden',
     },
+    // While a gallery-item drag is in flight (body flag set by
+    // GalleryDragCursor) the closed-hand cursor applies everywhere: without
+    // the descendant rule, every element that sets its own cursor (buttons,
+    // textareas, grab handles) would flicker it back mid-drag.
+    'body[data-gallery-drag], body[data-gallery-drag] *': {
+      cursor: 'grabbing !important',
+    },
     ':root': {
       '--wb-motion-duration-fast': '0.12s',
       '--wb-motion-duration-medium': '0.15s',

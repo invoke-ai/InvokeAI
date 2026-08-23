@@ -185,7 +185,10 @@ GENERATION_MODES = Literal[
     "wan_img2img",
     "wan_inpaint",
     "wan_outpaint",
+    "wan_t2v",
     "wan_i2v",
+    "wan_interpolate",
+    "wan_extend_video",
     "minimax_h3_t2v",
     "minimax_h3_i2v",
     "minimax_h3_lf2v",
@@ -200,7 +203,7 @@ GENERATION_MODES = Literal[
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.3.0",
+    version="2.4.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):

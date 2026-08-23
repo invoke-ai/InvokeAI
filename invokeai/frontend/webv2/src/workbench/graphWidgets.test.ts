@@ -35,7 +35,13 @@ describe('graph widget sources', () => {
   // be showing turns the menu into a dead end: the user can see that Workflow
   // exists but has no way to route to it without rearranging the dock first.
   it('offers every graph widget as a source', () => {
-    expect(graphWidgetSources.map((source) => source.sourceId)).toEqual(['generate', 'canvas', 'upscale', 'workflow']);
+    expect(graphWidgetSources.map((source) => source.sourceId)).toEqual([
+      'generate',
+      'canvas',
+      'upscale',
+      'video',
+      'workflow',
+    ]);
   });
 
   it('separates active widgets from placed secondary widgets', () => {

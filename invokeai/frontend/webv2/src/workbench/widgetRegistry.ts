@@ -26,12 +26,14 @@ import { queueWidgetManifest } from './widgets/queue/manifest';
 import { serverStatusWidgetManifest } from './widgets/server-status/manifest';
 import { upscaleWidgetManifest } from './widgets/upscale/manifest';
 import { versionStatusWidgetManifest } from './widgets/version-status/manifest';
+import { videoWidgetManifest } from './widgets/video/manifest';
 import { workflowWidgetManifest } from './widgets/workflow/manifest';
 
 export const firstPartyWidgetManifests: WidgetManifest[] = [
   generateWidgetManifest,
   workflowWidgetManifest,
   upscaleWidgetManifest,
+  videoWidgetManifest,
   canvasWidgetManifest,
   diagnosticsWidgetManifest,
   galleryWidgetManifest,
