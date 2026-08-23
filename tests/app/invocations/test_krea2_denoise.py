@@ -1,13 +1,21 @@
 import math
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
 import torch
 
-from invokeai.app.invocations.fields import DenoiseMaskField, Krea2ConditioningField, LatentsField, TensorField
+from invokeai.app.invocations.fields import (
+    DenoiseMaskField,
+    Krea2ConditioningField,
+    Krea2StyleReferenceField,
+    LatentsField,
+    TensorField,
+)
 from invokeai.app.invocations.krea2_denoise import KREA2_LATENT_CHANNELS, Krea2DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
+from invokeai.backend.krea2.style_reference import Krea2StyleReferenceMode, capture_style_reference
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
 
@@ -309,6 +317,8 @@ class _Transformer:
         self.conditioning_values: list[float] = []
         self.regional_attention_masks: list[torch.Tensor | None] = []
         self.combined_sequence_lengths: list[int] = []
+        self.style_modes: list[object | None] = []
+        self.position_id_lengths: list[int] = []
         self.attn_processors = {
             "text_fusion.layerwise_blocks.0.attn.processor": object(),
             "transformer_blocks.0.attn.processor": object(),
@@ -325,9 +335,19 @@ class _Transformer:
         # The real transformer concatenates [text, image] before attention, so this is the sequence length a
         # regional mask has to match.
         self.combined_sequence_lengths.append(encoder_hidden_states.shape[1] + hidden_states.shape[1])
-        regional_processor = self.installed_processors["transformer_blocks.0.attn.processor"]
-        attention_mask = regional_processor.regional_prompting_state.attention_mask
+        processor = self.installed_processors["transformer_blocks.0.attn.processor"]
+        attention_mask = processor.regional_prompting_state.attention_mask
         self.regional_attention_masks.append(attention_mask.clone() if attention_mask is not None else None)
+        style_state = processor.style_reference_state
+        self.style_modes.append(style_state.mode if style_state is not None else None)
+        if style_state is not None and style_state.mode is Krea2StyleReferenceMode.CAPTURE:
+            # Stand in for the styled block: the real processor stashes the reference's image-token K/V
+            # here, and the injection pass refuses to run without it.
+            sequence_length = encoder_hidden_states.shape[1] + hidden_states.shape[1]
+            captured = torch.zeros(1, 2, sequence_length, 8)
+            capture_style_reference(style_state, 0, captured, captured, captured)
+        if "position_ids" in _kwargs and _kwargs["position_ids"] is not None:
+            self.position_id_lengths.append(int(_kwargs["position_ids"].shape[0]))
         return (torch.zeros_like(hidden_states),)
 
 
@@ -381,12 +401,18 @@ def _runtime_context(tmp_path, transformer: _Transformer, *, negative_text_seq_l
         "negative": ConditioningFieldData(
             conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, negative_text_seq_len, 12, 8))]
         ),
+        "style-prompt": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.full((1, 5, 12, 8), 0.5))]
+        ),
     }
     tensors = {
         "init": torch.zeros(1, KREA2_LATENT_CHANNELS, 2, 2),
         "mask": torch.zeros(1, 1, 16, 16),
         "positive-region": torch.ones(1, 16, 16),
         "negative-region": torch.zeros(1, 16, 16),
+        # width=height=16 -> a 2x2 latent; the Qwen-Image VAE emits a frame dim.
+        "style-ref": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 2, 2),
+        "style-ref-wrong-size": torch.zeros(1, KREA2_LATENT_CHANNELS, 1, 4, 4),
     }
     config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
     return SimpleNamespace(
@@ -748,6 +774,277 @@ def test_estimate_working_memory_accounts_for_regional_attention_masks() -> None
     )
 
     assert with_regional_masks == without_regional_masks + 1234
+
+
+def _style_reference_field(
+    *, latents_name: str = "style-ref", width: int = 16, height: int = 16, **overrides
+) -> Krea2StyleReferenceField:
+    # blocks="0-1" because the stub transformer only exposes two main blocks.
+    return Krea2StyleReferenceField(
+        reference_latents_name=latents_name,
+        width=width,
+        height=height,
+        blocks="0-1",
+        **overrides,
+    )
+
+
+def test_run_diffusion_runs_a_reference_pass_before_each_target_pass(monkeypatch, tmp_path) -> None:
+    # Two passes per step: the reference is captured, then spliced into the target. The reference pass must
+    # never carry a regional mask -- it has its own, different sequence length.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field()
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert transformer.style_modes == [
+        Krea2StyleReferenceMode.CAPTURE,
+        Krea2StyleReferenceMode.INJECT,
+        Krea2StyleReferenceMode.CAPTURE,
+        Krea2StyleReferenceMode.INJECT,
+    ]
+
+
+def test_run_diffusion_injects_style_into_both_cfg_passes(monkeypatch, tmp_path) -> None:
+    # Styling only the conditional pass would make CFG amplify (styled_cond - plain_uncond). One reference
+    # pass is shared by both, so this is three forwards per step and not four.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.style_reference = _style_reference_field()
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert (
+        transformer.style_modes
+        == [
+            Krea2StyleReferenceMode.CAPTURE,
+            Krea2StyleReferenceMode.INJECT,
+            Krea2StyleReferenceMode.INJECT,
+        ]
+        * 2
+    )
+
+
+def test_run_diffusion_reuses_the_positive_prompt_for_the_reference_pass_by_default(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field()
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    # The positive conditioning is all ones; the reference pass sees the same embeddings.
+    assert transformer.conditioning_values == [1.0, 1.0, 1.0, 1.0]
+
+
+def test_run_diffusion_uses_reference_specific_position_ids(monkeypatch, tmp_path) -> None:
+    # The style prompt can tokenize to a different length than the positive prompt. The reference pass needs
+    # its own rotary position ids or the real transformer's apply_rotary_emb sees a mismatched length.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field()
+    invocation.style_reference_conditioning = Krea2ConditioningField(conditioning_name="style-prompt")
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    image_seq_len = 1  # width=height=16 -> 2x2 latent -> a single 2x2 patch
+    # Reference prompt is 5 tokens, positive is 2.
+    assert transformer.position_id_lengths == [5 + image_seq_len, 2 + image_seq_len] * 2
+
+
+def test_run_diffusion_clears_the_style_cache_when_the_transformer_raises(monkeypatch, tmp_path) -> None:
+    # The processors stay installed on the *cached* transformer, so a retained cache leaks up to ~1.7 GiB
+    # of VRAM until the app restarts.
+    _patch_runtime(monkeypatch)
+
+    class _FailingTransformer(_Transformer):
+        def __call__(self, **kwargs):
+            super().__call__(**kwargs)
+            raise RuntimeError("transformer failure")
+
+    transformer = _FailingTransformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field()
+
+    with pytest.raises(RuntimeError, match="transformer failure"):
+        invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    style_state = transformer.installed_processors["transformer_blocks.0.attn.processor"].style_reference_state
+    assert style_state is not None
+    assert style_state._cache == {}
+    assert style_state.mode is Krea2StyleReferenceMode.OFF
+
+
+def test_run_diffusion_rejects_a_style_reference_encoded_at_a_different_size(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field(width=32, height=32)
+
+    with pytest.raises(ValueError, match="encoded at 32x32 but denoise is set to 16x16"):
+        invocation._run_diffusion(_runtime_context(tmp_path, _Transformer()))
+
+
+def test_run_diffusion_rejects_style_reference_latents_of_the_wrong_shape(monkeypatch, tmp_path) -> None:
+    # The recorded dims agree but the tensor itself does not -- catch it before it reaches attention.
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field(latents_name="style-ref-wrong-size")
+
+    with pytest.raises(ValueError, match=r"latents are \(4, 4\) but denoise expects \(2, 2\)"):
+        invocation._run_diffusion(_runtime_context(tmp_path, _Transformer()))
+
+
+class _SubclassWithOwnProcessors(Krea2DenoiseInvocation):
+    """Stands in for the prompt-weighting node pack, which overrides the attention-processor seam."""
+
+    installed: ClassVar[bool] = False
+
+    def _install_attention_processors(self, transformer, exit_stack):
+        type(self).installed = True
+        return super()._install_attention_processors(transformer, exit_stack)
+
+
+def test_a_subclass_overriding_the_attention_seam_still_runs_without_style_reference(monkeypatch, tmp_path) -> None:
+    # Regression: style reference must not widen _install_attention_processors' signature. Custom node
+    # packs override that seam with the documented two-argument form, and a third positional argument
+    # broke every generation they ran - style reference connected or not.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _SubclassWithOwnProcessors.model_construct(**_runtime_invocation(cfg_scale=1.0).__dict__)
+    _SubclassWithOwnProcessors.installed = False
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert _SubclassWithOwnProcessors.installed is True
+
+
+def test_style_reference_refuses_a_subclass_that_installs_its_own_processors(monkeypatch, tmp_path) -> None:
+    # Re-installing would silently discard the subclass's processors, so say so instead.
+    _patch_runtime(monkeypatch)
+    invocation = _SubclassWithOwnProcessors.model_construct(**_runtime_invocation(cfg_scale=1.0).__dict__)
+    invocation.style_reference = _style_reference_field()
+
+    with pytest.raises(ValueError, match="installs its own Krea-2 attention processors"):
+        invocation._run_diffusion(_runtime_context(tmp_path, _Transformer()))
+
+
+def test_run_diffusion_without_a_style_reference_runs_no_extra_passes(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    _runtime_invocation(cfg_scale=1.0)._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert transformer.style_modes == [None, None]
+    assert transformer.installed_processors["transformer_blocks.0.attn.processor"].style_reference_state is None
+
+
+def test_run_diffusion_ignores_a_style_reference_at_strength_zero(monkeypatch, tmp_path) -> None:
+    # 0 is documented as disabling the reference. Running the machinery anyway would cost a capture pass per
+    # step (~2x runtime) and a retained K/V cache, all for an attention mix of 0.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field(style_strength=0.0)
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert transformer.style_modes == [None, None]
+    assert transformer.installed_processors["transformer_blocks.0.attn.processor"].style_reference_state is None
+
+
+def test_run_diffusion_still_runs_a_style_reference_at_a_small_strength(monkeypatch, tmp_path) -> None:
+    # Only an exact 0 is the bypass; anything above it still styles.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field(style_strength=0.01)
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert Krea2StyleReferenceMode.CAPTURE in transformer.style_modes
+
+
+def test_estimate_working_memory_accounts_for_the_style_reference_kv_cache() -> None:
+    inv = Krea2DenoiseInvocation.model_construct()
+    kwargs = {
+        "image_seq_len": 3600,
+        "positive_text_seq_len": 64,
+        "negative_text_seq_len": None,
+        "do_cfg": False,
+        "num_loras": 0,
+    }
+    baseline = inv._estimate_working_memory(**kwargs)
+    with_style = inv._estimate_working_memory(**kwargs, style_reference_kv_bytes=1_000_000)
+
+    # The cache is an exact, known size, so it is added after the activation multiplier, not scaled by it.
+    assert with_style == int(baseline * 1.35) + 1_000_000
+
+
+def test_estimate_working_memory_covers_the_measured_style_reference_overhead() -> None:
+    # Measured at 1024x1024 / 8 steps / cfg 1.0: peak VRAM rose ~1.6 GiB over the unstyled run. The
+    # estimate has to stay above that, or the model cache offloads the transformer to RAM and the forward
+    # crawls over PCIe instead of failing outright.
+    inv = Krea2DenoiseInvocation.model_construct()
+    kwargs = {
+        "image_seq_len": 4096,
+        "positive_text_seq_len": 512,
+        "negative_text_seq_len": None,
+        "do_cfg": False,
+        "num_loras": 0,
+    }
+    style_bytes = 21 * 2 * 12 * 4096 * 128 * 2
+    delta = inv._estimate_working_memory(**kwargs, style_reference_kv_bytes=style_bytes) - inv._estimate_working_memory(
+        **kwargs
+    )
+
+    assert delta > int(1.6 * 1024**3)
+
+
+def test_estimate_working_memory_with_style_reference_stays_within_a_24gb_card_at_1024() -> None:
+    # 1024x1024 with the default 7-27 band: 4096 image tokens and ~0.5 GiB of retained reference K/V on
+    # top of a ~12B bf16 model. This is the resolution style reference is expected to be used at.
+    inv = Krea2DenoiseInvocation.model_construct()
+    style_bytes = 21 * 2 * 12 * 4096 * 128 * 2
+    assert style_bytes < int(0.55 * 1024**3)
+
+    estimated = inv._estimate_working_memory(
+        image_seq_len=4096,
+        positive_text_seq_len=512,
+        negative_text_seq_len=None,
+        do_cfg=False,
+        num_loras=0,
+        style_reference_kv_bytes=style_bytes,
+    )
+
+    model_bytes = 12 * 1024**3
+    assert estimated + model_bytes < 24 * 1024**3
+
+
+def test_estimate_working_memory_reports_that_style_reference_does_not_fit_24gb_at_1440p() -> None:
+    """Documents a real limit rather than papering over it.
+
+    At 2560x1440 the baseline activation estimate is already ~10 GiB; the reference pass and its ~1.7 GiB
+    of retained K/V push the total past what a 24 GB card can hold alongside a ~12B bf16 model. The
+    estimate must say so honestly -- under-reporting would make the model cache offload the transformer to
+    RAM and run the forward over PCIe, which looks like a hang rather than an error.
+    """
+    inv = Krea2DenoiseInvocation.model_construct()
+    style_bytes = 21 * 2 * 12 * 14400 * 128 * 2
+
+    estimated = inv._estimate_working_memory(
+        image_seq_len=14400,
+        positive_text_seq_len=512,
+        negative_text_seq_len=512,
+        do_cfg=True,
+        num_loras=0,
+        style_reference_kv_bytes=style_bytes,
+    )
+
+    assert estimated + 12 * 1024**3 > 24 * 1024**3
 
 
 def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_attention_bias() -> None:

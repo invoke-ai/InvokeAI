@@ -2854,6 +2854,7 @@
         }
     },
     "controlLayers": {
+        "krea2StyleStrength": "Style Strength",
         "regional": "Regional",
         "global": "Global",
         "canvas": "Canvas",
@@ -3137,6 +3138,7 @@
             "rgNoPromptsOrIPAdapters": "no text prompts or Reference Images",
             "rgNegativePromptNotSupported": "Negative Prompt not supported for selected base model",
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
+            "krea2OnlyOneReferenceImage": "Krea-2 style reference uses only one image — this one is ignored",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
             "ideogram4Txt2ImgOnly": "Ideogram 4 is text-to-image only; raster layers and inpaint masks are not supported",
