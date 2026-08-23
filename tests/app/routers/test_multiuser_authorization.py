@@ -1295,6 +1295,42 @@ class TestImageMutationAuth:
         assert body[f"{route}red_images"] == []
         assert body["failed_images"] == [name]
 
+    def test_star_still_skips_a_name_whose_board_is_positively_gone(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """The narrowed catch must stay exactly that narrow, in both directions.
+
+        A board positively known to be gone (a dangling board_image row) is the one lookup
+        outcome that may still answer the ordinary 403 -- an auth skip, absent from both
+        lists. An implementation that let BoardRecordNotFoundException propagate alongside
+        the storage errors would report it in failed_images and toast a failure for a name
+        whose only problem is that its board vanished mid-request.
+        """
+        from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Vanishing Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        _save_image(mock_invoker, "user1-board-gone", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-board-gone")
+
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=BoardRecordNotFoundException),
+        )
+
+        r = client.post(
+            "/api/v1/images/star",
+            json={"image_names": ["user1-board-gone"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        assert body["starred_images"] == []
+        assert body["failed_images"] == []
+
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
