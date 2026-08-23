@@ -1,3 +1,5 @@
+from enum import Enum, auto
+
 from fastapi import Body, HTTPException
 from fastapi.routing import APIRouter
 
@@ -62,6 +64,58 @@ def _image_record_exists(image_name: str) -> bool:
         return False
     except Exception:
         return True
+
+
+class _ScopedRemoveOutcome(Enum):
+    """What a scoped board-image DELETE turned out to have done, judged by its row count."""
+
+    REMOVED = auto()
+    """The row was deleted -- or the image was concurrently uncategorized by someone else, in
+    which case the postcondition the caller asked for (off every board) holds, and reporting it
+    removed is what lets the client's stale view of the old board catch up. Safe to report,
+    unlike a deleted name: the DTO exists, so the tag-driven refetches succeed."""
+
+    MOVED = auto()
+    """Now on another board: the ask is not satisfied, and a retry will re-read and
+    re-authorize against the board the image actually sits on now. Report as failed."""
+
+    GONE = auto()
+    """Image deleted concurrently: a skip, never a success -- reporting it removed would drive
+    the client's tag-driven getImageDTO refetch straight into a 404."""
+
+
+def _remove_from_board_and_classify(image_name: str, old_board_id: str) -> _ScopedRemoveOutcome:
+    """Runs the scoped DELETE for a name read as sitting on `old_board_id`, then classifies.
+
+    The scoped DELETE misses when the image leaves `old_board_id` between the caller's read
+    and this write. The row count is the only signal the scope held: ignore it and the route
+    reports a removal that did not happen, invalidating the wrong boards while the client
+    counts the name as done. A zero-row miss is classified by where the image is now.
+
+    The existence probe is direct rather than through `_image_record_exists`: that helper
+    answers True on a storage error, which is the conservative bias where True means "report
+    as failed" (the add loop) -- here True means "report as removed", and a transient storage
+    error must not manufacture a success. Storage errors -- the DELETE's own and the
+    classification reads' -- propagate instead: a name whose state cannot be decided must be
+    reported by the caller as failed, never as done.
+
+    `old_board_id` must be a real board id: uncategorized is the absence of a row, so a scoped
+    DELETE for "none" cannot match and the classification would spend two reads confirming
+    what the caller's DTO read already said.
+    """
+    deleted_rows = ApiDependencies.invoker.services.board_images.remove_image_from_board(
+        image_name=image_name, board_id=old_board_id
+    )
+    if deleted_rows > 0:
+        return _ScopedRemoveOutcome.REMOVED
+    current_board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
+    if current_board_id is not None:
+        return _ScopedRemoveOutcome.MOVED
+    try:
+        ApiDependencies.invoker.services.image_records.get(image_name)
+    except ImageRecordNotFoundException:
+        return _ScopedRemoveOutcome.GONE
+    return _ScopedRemoveOutcome.REMOVED
 
 
 def _assert_image_direct_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -138,17 +192,31 @@ def remove_image_from_board(
             _assert_board_write_access(old_board_id, current_user)
         assert_image_move_maintenance_inactive()
         removed_images: set[str] = set()
+        failed_images: set[str] = set()
         affected_boards: set[str] = set()
-        ApiDependencies.invoker.services.board_images.remove_image_from_board(
-            image_name=image_name, board_id=old_board_id
-        )
-        removed_images.add(image_name)
-        affected_boards.add("none")
-        affected_boards.add(old_board_id)
+        if old_board_id == "none":
+            # Already off every board — the postcondition holds without a write. No
+            # board_images row ever carries board_id="none", so a scoped DELETE could not
+            # match anyway; see the identical shortcut in the batch loop below.
+            removed_images.add(image_name)
+            affected_boards.add("none")
+        else:
+            # The same row-count classification the batch loop uses. This route used to
+            # ignore the count, so an image that left old_board_id between the read above and
+            # the write was reported removed anyway — a false success that invalidated the
+            # wrong boards and told the client the name was done.
+            outcome = _remove_from_board_and_classify(image_name, old_board_id)
+            if outcome is _ScopedRemoveOutcome.REMOVED:
+                removed_images.add(image_name)
+                affected_boards.add("none")
+                affected_boards.add(old_board_id)
+            elif outcome is _ScopedRemoveOutcome.MOVED:
+                failed_images.add(image_name)
+            # GONE lands in neither list, matching the batch route's treatment of a name that
+            # vanished mid-flight; the client's refetches surface the deletion.
         return RemoveImagesFromBoardResult(
             removed_images=list(removed_images),
-            # Single-image route: a failure here is a 500, never a partial success.
-            failed_images=[],
+            failed_images=list(failed_images),
             affected_boards=list(affected_boards),
         )
 
@@ -342,50 +410,15 @@ def remove_images_from_board(
                 continue
 
             try:
-                deleted_rows = ApiDependencies.invoker.services.board_images.remove_image_from_board(
-                    image_name=image_name, board_id=old_board_id
-                )
-                if deleted_rows == 0:
-                    # The scoped DELETE missed: the image left old_board_id between the read
-                    # above and this write, so the decision taken about that board no longer
-                    # applies — and reporting a removal that did not happen invalidates the
-                    # wrong boards while the client counts the name as done. Classified by
-                    # where the image is now:
-                    current_board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(
-                        image_name
-                    )
-                    if current_board_id is not None:
-                        # Moved to another board: the caller's ask — off every board — is not
-                        # satisfied, and a retry will re-read and re-authorize against the
-                        # board it actually sits on now.
-                        failed_images.add(image_name)
-                        continue
-                    # Probed directly rather than through _image_record_exists: that helper
-                    # answers True on a storage error, which is the conservative bias where
-                    # True means "report as failed" (the add loop) — here True means "report
-                    # as removed", and a transient storage error must not manufacture a
-                    # success whose tag-driven getImageDTO refetch then 404s. A storage error
-                    # propagates to the arm below instead: a name whose state cannot be
-                    # decided is reported as failed, never as done.
-                    try:
-                        ApiDependencies.invoker.services.image_records.get(image_name)
-                    except ImageRecordNotFoundException:
-                        # Deleted concurrently — a skip, exactly as the gone-block above
-                        # treats a name that vanished before the loop reached it. Reporting
-                        # it removed would drive a getImageDTO refetch straight into a 404.
-                        continue
-                    # Concurrently uncategorized by someone else: the postcondition the
-                    # caller asked for holds, so report it as removed — the invalidation is
-                    # what lets this client's view of the old board catch up. Safe in
-                    # removed_images, unlike a deleted name: the DTO exists, so the
-                    # tag-driven refetches succeed.
+                outcome = _remove_from_board_and_classify(image_name, old_board_id)
+                if outcome is _ScopedRemoveOutcome.REMOVED:
                     removed_images.add(image_name)
                     affected_boards.add("none")
                     affected_boards.add(old_board_id)
-                    continue
-                removed_images.add(image_name)
-                affected_boards.add("none")
-                affected_boards.add(old_board_id)
+                elif outcome is _ScopedRemoveOutcome.MOVED:
+                    failed_images.add(image_name)
+                # GONE: a skip, exactly as the gone-block above treats a name that vanished
+                # before the loop reached it.
             except Exception:
                 # A genuine storage failure, not an auth/404 skip — see add_images_to_board.
                 # The zero-row classification's own reads land here too: a name whose state

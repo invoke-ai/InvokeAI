@@ -110,6 +110,20 @@ const isSessionMismatchError = (error: FetchBaseQueryError | undefined): boolean
   (error?.status === SESSION_ENDED_ERROR.status && error.error === SESSION_ENDED_ERROR.error);
 
 /**
+ * Errors that leave a chunk's outcome unknown. A transport failure or timeout can strike after
+ * the request reached the server -- fetch loses the response, not necessarily the request -- a
+ * parsing error means a response arrived for work that was already done, and a 5xx says the
+ * route died somewhere in a loop whose per-name writes had each already committed. In all of
+ * these the server may have applied the chunk with only the report lost. A 4xx is the server
+ * itself saying it refused, which is the one shape that proves the chunk did nothing.
+ */
+const isIndeterminateError = (error: FetchBaseQueryError): boolean =>
+  error.status === 'FETCH_ERROR' ||
+  error.status === 'TIMEOUT_ERROR' ||
+  error.status === 'PARSING_ERROR' ||
+  (typeof error.status === 'number' && error.status >= 500);
+
+/**
  * Which of the two a failed session check means. The distinction is the whole ballgame: expiry
  * must degrade into an ordinary failure so committed work is still reported, while a takeover
  * must abort hard so the new user consumes nothing. Collapsing them in either direction is a
@@ -226,7 +240,8 @@ export const mergeImageBatchResults = <TResult extends ImageBatchResult>(results
 export const buildChunkedImageBatchQueryFn =
   <TResult extends ImageBatchResult, TArg extends { image_names: string[] }>(
     request: (body: TArg) => { url: string; method: string },
-    getTags: (result: TResult) => InvalidateTagsArg
+    getTags: (result: TResult) => InvalidateTagsArg,
+    assumeCommitted: (image_names: string[], arg: TArg) => TResult
   ) =>
   async (
     arg: TArg,
@@ -244,6 +259,20 @@ export const buildChunkedImageBatchQueryFn =
           // A prior chunk may have committed, but its result belongs to the old session. Do not
           // invalidate the new session or return partial data that its UI can apply.
           return { error: response.error };
+        }
+        if (isIndeterminateError(response.error)) {
+          // A transport-shaped failure proves only that the report was lost: the server may
+          // have committed this chunk with nothing coming back to say so. The names still go
+          // to failed_images below -- the honest reading, and retrying a name the server
+          // already satisfied is safe on every batch route -- but the caches this chunk may
+          // have touched must not keep serving the pre-request state until the user notices,
+          // so they are invalidated as if the chunk had landed: the refetch shows the truth
+          // either way. `assumeCommitted` builds the result this chunk would have returned on
+          // success, so the tags come from the same `getTags` the endpoint publishes and the
+          // two cannot drift. A lost chunk's affected boards are unknowable, so callers
+          // assume none: the board-affecting tag helper still returns the global gallery-list
+          // tags, which is what makes the visible views refetch.
+          dispatch(api.util.invalidateTags(getTags(assumeCommitted(image_names, arg))));
         }
         if (results.length === 0) {
           // Nothing was applied, so this is an ordinary failed request — report it as one.
@@ -501,6 +530,24 @@ export const bulkDownloadQueryFn = async (
     scheduled = true;
     first ??= response.data as components['schemas']['ImagesDownloaded'];
   }
+  // The final chunk has no next iteration to catch an expiry for it. `fetchChunk`'s own
+  // post-response check deliberately passes a mere expiry through -- the mutating loops need
+  // that -- so a token cleared during the last chunk's await (a 401 on any concurrent request
+  // does it) would otherwise sail into the return below, and `matchFulfilled` would raise the
+  // `duration: null` "preparing" toast into a session whose socket will never deliver the
+  // dismissal -- or the zips. Same triage as the in-loop expiry arm: say what was lost, and
+  // hand `matchFulfilled` nothing to toast on. Synchronous from here to the return, so there
+  // is no later window this check misses.
+  if (!isSameAuthContext(authContext)) {
+    if (localStorage.getItem('auth_token') === null && scheduled) {
+      toast({
+        id: 'DOWNLOADS_INTERRUPTED',
+        title: i18n.t('toast.downloadsInterrupted'),
+        status: 'warning',
+      });
+    }
+    return { data: undefined as unknown as components['schemas']['ImagesDownloaded'] };
+  }
   return { data: first as components['schemas']['ImagesDownloaded'] };
 };
 
@@ -642,7 +689,8 @@ export const imagesApi = api.injectEndpoints({
     >({
       queryFn: buildChunkedImageBatchQueryFn(
         () => ({ url: buildImagesUrl('delete'), method: 'POST' }),
-        getDeleteImagesTags
+        getDeleteImagesTags,
+        (image_names) => ({ deleted_images: image_names, failed_images: [], affected_boards: [] })
       ),
       onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getDeleteImagesTags(result) : []),
@@ -697,7 +745,8 @@ export const imagesApi = api.injectEndpoints({
     >({
       queryFn: buildChunkedImageBatchQueryFn(
         () => ({ url: buildImagesUrl('star'), method: 'POST' }),
-        getStarImagesTags
+        getStarImagesTags,
+        (image_names) => ({ starred_images: image_names, failed_images: [], affected_boards: [] })
       ),
       onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getStarImagesTags(result) : []),
@@ -711,7 +760,8 @@ export const imagesApi = api.injectEndpoints({
     >({
       queryFn: buildChunkedImageBatchQueryFn(
         () => ({ url: buildImagesUrl('unstar'), method: 'POST' }),
-        getUnstarImagesTags
+        getUnstarImagesTags,
+        (image_names) => ({ unstarred_images: image_names, failed_images: [], affected_boards: [] })
       ),
       onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getUnstarImagesTags(result) : []),
@@ -866,6 +916,9 @@ export const imagesApi = api.injectEndpoints({
         }
         return [
           ...getTagsToInvalidateForImageMutation(result.removed_images),
+          // A name the zero-row classification reported as failed sits on a board this client
+          // did not expect; refetching its DTO is what shows where it actually went.
+          ...getTagsToInvalidateForImageMutation(result.failed_images),
           ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
         ];
       },
@@ -876,7 +929,8 @@ export const imagesApi = api.injectEndpoints({
     >({
       queryFn: buildChunkedImageBatchQueryFn(
         () => ({ url: buildBoardImagesUrl('batch'), method: 'POST' }),
-        getAddImagesToBoardTags
+        getAddImagesToBoardTags,
+        (image_names, arg) => ({ added_images: image_names, failed_images: [], affected_boards: [arg.board_id] })
       ),
       onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getAddImagesToBoardTags(result) : []),
@@ -887,7 +941,8 @@ export const imagesApi = api.injectEndpoints({
     >({
       queryFn: buildChunkedImageBatchQueryFn(
         () => ({ url: buildBoardImagesUrl('batch/delete'), method: 'POST' }),
-        getRemoveImagesFromBoardTags
+        getRemoveImagesFromBoardTags,
+        (image_names) => ({ removed_images: image_names, failed_images: [], affected_boards: [] })
       ),
       onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getRemoveImagesFromBoardTags(result) : []),

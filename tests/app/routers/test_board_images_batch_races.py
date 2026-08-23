@@ -223,3 +223,92 @@ def test_sqlite_remove_returns_the_row_count() -> None:
     assert storage.remove_image_from_board("raced.png", "board-p") == 0
     _Cursor.rowcount = 1
     assert storage.remove_image_from_board("ok.png", "board-p") == 1
+
+
+@pytest.mark.parametrize(
+    ("now_on_board", "record_exists", "expect_removed", "expect_failed", "expect_boards"),
+    [
+        # Same three classifications as the batch loop above -- the single-image route runs
+        # the identical read-then-scoped-DELETE sequence, so it loses the identical race. It
+        # used to ignore the row count entirely and answer removed_images=[name] for all three
+        # of these, a false success the client had no way to see through.
+        ("board-q", True, [], ["raced.png"], []),
+        (None, True, ["raced.png"], [], ["none", "board-p"]),
+        (None, False, [], [], []),
+    ],
+)
+def test_single_remove_classifies_a_zero_row_scoped_delete_like_the_batch_route(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_invoker: Invoker,
+    client: TestClient,
+    now_on_board: str | None,
+    record_exists: bool,
+    expect_removed: list[str],
+    expect_failed: list[str],
+    expect_boards: list[str],
+) -> None:
+    _install(monkeypatch, mock_invoker)
+    dto = MagicMock()
+    dto.board_id = "board-p"
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", MagicMock(return_value=dto))
+    monkeypatch.setattr(mock_invoker.services.board_images, "remove_image_from_board", MagicMock(return_value=0))
+    monkeypatch.setattr(
+        mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=now_on_board)
+    )
+    if record_exists:
+        monkeypatch.setattr(mock_invoker.services.image_records, "get", MagicMock(return_value=MagicMock()))
+    else:
+        from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+
+        monkeypatch.setattr(
+            mock_invoker.services.image_records, "get", MagicMock(side_effect=ImageRecordNotFoundException)
+        )
+
+    response = client.request("DELETE", "/api/v1/board_images/", json={"image_name": "raced.png"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["removed_images"] == expect_removed
+    assert body["failed_images"] == expect_failed
+    assert set(body["affected_boards"]) == set(expect_boards)
+
+
+def test_single_remove_of_an_uncategorized_image_reports_removed_without_a_write(
+    monkeypatch: pytest.MonkeyPatch, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """No board_images row ever carries board_id="none", so the scoped DELETE could not match:
+    issuing it and then classifying the guaranteed zero-row miss would spend reads confirming
+    what the DTO already said. The postcondition holds, so it is removed, with no write at all."""
+    _install(monkeypatch, mock_invoker)
+    dto = MagicMock()
+    dto.board_id = None
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", MagicMock(return_value=dto))
+    remove = MagicMock(return_value=1)
+    monkeypatch.setattr(mock_invoker.services.board_images, "remove_image_from_board", remove)
+
+    response = client.request("DELETE", "/api/v1/board_images/", json={"image_name": "loose.png"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["removed_images"] == ["loose.png"]
+    assert body["failed_images"] == []
+    assert body["affected_boards"] == ["none"]
+    remove.assert_not_called()
+
+
+def test_single_remove_still_reports_a_nonzero_scoped_delete_as_removed(
+    monkeypatch: pytest.MonkeyPatch, mock_invoker: Invoker, client: TestClient
+) -> None:
+    _install(monkeypatch, mock_invoker)
+    dto = MagicMock()
+    dto.board_id = "board-p"
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", MagicMock(return_value=dto))
+    monkeypatch.setattr(mock_invoker.services.board_images, "remove_image_from_board", MagicMock(return_value=1))
+
+    response = client.request("DELETE", "/api/v1/board_images/", json={"image_name": "ok.png"})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["removed_images"] == ["ok.png"]
+    assert body["failed_images"] == []
+    assert set(body["affected_boards"]) == {"none", "board-p"}

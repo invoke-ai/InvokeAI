@@ -186,6 +186,11 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
 
     mock_board_images = MagicMock()
     mock_board_images.get_all_board_image_names_for_board.return_value = []
+    # The real facade returns the scoped DELETE's row count, and the routes classify a zero-row
+    # miss as not-removed. A bare MagicMock return only passed the old `== 0` check by accident;
+    # under `> 0` it is a TypeError. One row deleted is the honest default for a mock whose
+    # remove is expected to succeed; tests that stage the miss override this per-call.
+    mock_board_images.remove_image_from_board.return_value = 1
     mock_invoker.services.board_images = mock_board_images
 
     mock_workflow_thumbnails = MagicMock()
@@ -568,8 +573,11 @@ class TestBoardImageMutationAuth:
             _save_image(mock_invoker, name, user1.user_id)
             mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
 
-        def _revoke_after_first_removal(image_name: str, board_id: str) -> None:
+        def _revoke_after_first_removal(image_name: str, board_id: str) -> int:
             mock_invoker.services.board_records.update(board_id, BoardChanges(board_visibility=BoardVisibility.Private))
+            # One row removed: a side_effect's return value overrides the mock's return_value,
+            # and the route classifies anything else as a miss.
+            return 1
 
         mock_invoker.services.board_images.remove_image_from_board.reset_mock()
         mock_invoker.services.board_images.remove_image_from_board.side_effect = _revoke_after_first_removal

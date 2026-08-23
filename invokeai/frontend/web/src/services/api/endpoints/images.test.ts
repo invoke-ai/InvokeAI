@@ -255,7 +255,7 @@ describe('buildChunkedImageBatchQueryFn', () => {
   type Arg = { image_names: string[]; board_id?: string };
   type Result = { added_images: string[]; failed_images: string[]; affected_boards: string[] };
   type Request = { url: string; method: string; body: Arg };
-  type Response = { data: Result } | { error: { status: number; data: string } };
+  type Response = { data: Result } | { error: { status: number | string; data: string } };
 
   const getTags = () => ['ImageCollectionCounts' as const];
 
@@ -267,7 +267,8 @@ describe('buildChunkedImageBatchQueryFn', () => {
     const dispatch = vi.fn();
     const queryFn = buildChunkedImageBatchQueryFn<Result, Arg>(
       () => ({ url: '/api/v1/board_images/batch', method: 'POST' }),
-      getTags
+      getTags,
+      (image_names) => ({ added_images: image_names, failed_images: [], affected_boards: [] })
     );
     /* eslint-disable @typescript-eslint/no-explicit-any */
     return { dispatch, result: queryFn(arg, { dispatch } as any, undefined, baseQuery as any) };
@@ -348,6 +349,87 @@ describe('buildChunkedImageBatchQueryFn', () => {
 
     expect(await result).toEqual({ error: { status: 403, data: 'nope' } });
     expect(dispatch).not.toHaveBeenCalled();
+    expect(toast).not.toHaveBeenCalled();
+  });
+
+  it('invalidates the failing chunk as if it had landed when the error cannot prove otherwise', async () => {
+    // A transport error can strike after the server committed the chunk -- the response is
+    // what was lost, not necessarily the request. The names are still reported failed, which
+    // is the honest reading and safe to retry, but the caches the chunk may have touched are
+    // invalidated as if it had landed, so the refetch shows the truth either way.
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        return Promise.resolve({ error: { status: 'FETCH_ERROR', data: 'network' } });
+      }
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
+    });
+    const dispatch = vi.fn();
+    // Result-sensitive tags, so the two invalidations are distinguishable in the assertions.
+    const resultTags = (result: Result) => [{ type: 'Image' as const, id: result.added_images[0] ?? 'none' }];
+    const queryFn = buildChunkedImageBatchQueryFn<Result, Arg>(
+      () => ({ url: '/api/v1/board_images/batch', method: 'POST' }),
+      resultTags,
+      (image_names) => ({ added_images: image_names, failed_images: [], affected_boards: [] })
+    );
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const result = await queryFn({ image_names: names(1500) }, { dispatch } as any, undefined, baseQuery as any);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    // The assumed-committed invalidation is keyed by the failing chunk's own names...
+    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags([{ type: 'Image', id: 'image-1000.png' }]));
+    // ...and the merged invalidation for the chunks that did land still happens.
+    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags([{ type: 'Image', id: 'chunk-1.png' }]));
+    expect(result).toEqual({
+      data: { added_images: ['chunk-1.png'], failed_images: names(1500).slice(1000), affected_boards: ['board-1'] },
+    });
+  });
+
+  it('does not second-guess a chunk the server itself refused', async () => {
+    // A 4xx is the server saying it did nothing, so the failing chunk's caches hold no lie to
+    // reconcile -- only the merged invalidation for the landed chunks fires.
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 2) {
+        return Promise.resolve({ error: { status: 403, data: 'nope' } });
+      }
+      return Promise.resolve({
+        data: { added_images: [`chunk-${call}.png`], failed_images: [], affected_boards: ['board-1'] },
+      });
+    });
+    const assumeCommitted = vi.fn((image_names: string[]): Result => {
+      return { added_images: image_names, failed_images: [], affected_boards: [] };
+    });
+    const dispatch = vi.fn();
+    const queryFn = buildChunkedImageBatchQueryFn<Result, Arg>(
+      () => ({ url: '/api/v1/board_images/batch', method: 'POST' }),
+      getTags,
+      assumeCommitted
+    );
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    await queryFn({ image_names: names(1500) }, { dispatch } as any, undefined, baseQuery as any);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    expect(assumeCommitted).not.toHaveBeenCalled();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a first-chunk transport failure as an error, but still reconciles its caches', async () => {
+    // Nothing is known to have landed, so the run is reported as the failure it probably was
+    // -- but "probably" is the point: the chunk may have committed, so its tags are
+    // invalidated before the error goes back.
+    const baseQuery = vi.fn(
+      (_args: Request): Promise<Response> => Promise.resolve({ error: { status: 'TIMEOUT_ERROR', data: 'slow' } })
+    );
+    const { dispatch, result } = run(baseQuery, { image_names: names(1500) });
+
+    expect(await result).toEqual({ error: { status: 'TIMEOUT_ERROR', data: 'slow' } });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(api.util.invalidateTags(getTags()));
     expect(toast).not.toHaveBeenCalled();
   });
 
@@ -664,6 +746,34 @@ describe('bulkDownloadQueryFn', () => {
     // No per-name failure count: that toast id belongs to genuine chunk failures, and its
     // number would be wrong here anyway.
     expect(i18n.t).not.toHaveBeenCalledWith('toast.imagesFailedToDownload', expect.anything());
+  });
+
+  it('warns and withholds the payload when the session expires during the final chunk', async () => {
+    // Mid-loop expiry is caught by the next chunk's pre-request check, but the final chunk has
+    // no next iteration -- and fetchChunk's post-response check deliberately lets a mere
+    // expiry through. Without a post-loop check the run returns `first`, and matchFulfilled
+    // raises the `duration: null` "preparing" toast into a session whose socket will never
+    // deliver the dismissal -- while the zips, all scheduled, are lost silently.
+    login('user-a');
+    let call = 0;
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      call += 1;
+      if (call === 3) {
+        localStorage.removeItem('auth_token');
+      }
+      return Promise.resolve({ data: { bulk_download_item_name: `item-${call}.zip` } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({ data: undefined });
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0]?.[0]).toMatchObject({
+      id: 'DOWNLOADS_INTERRUPTED',
+      title: 'toast.downloadsInterrupted',
+      status: 'warning',
+    });
   });
 
   it("treats the chunk's own expired-session 401 as an interruption, not a partial failure", async () => {
