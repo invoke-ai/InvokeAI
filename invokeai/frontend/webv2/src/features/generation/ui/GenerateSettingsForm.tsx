@@ -223,9 +223,6 @@ export const GenerateSettingsForm = ({
     onPatchSettingsRef.current(getChangedGenerateSettingsPatch(previousSettings, nextSettings));
   }, []);
 
-  // Zone order is dependency order: the model governs everything below it, the
-  // prompt is the primary creative input, conditioning and output shape follow,
-  // and sampling internals sit last before the contextual canvas block.
   return (
     <Stack gap={1} p={1}>
       <GenerateModelCard
@@ -246,6 +243,13 @@ export const GenerateSettingsForm = ({
         onCommitImmediate={commitPatchImmediately}
       />
 
+      <GenerateDimensionFields
+        projectId={projectId}
+        selectedModel={selectedModel}
+        settings={draftSettings}
+        onCommit={commit}
+      />
+
       <GenerateGuidanceSection
         loraModels={loraModels}
         models={models}
@@ -255,13 +259,6 @@ export const GenerateSettingsForm = ({
         onCommitImmediate={commitPatchImmediately}
         onConceptCommit={commitDebouncedDraftUpdate}
         onReferenceCommit={commit}
-      />
-
-      <GenerateDimensionFields
-        projectId={projectId}
-        selectedModel={selectedModel}
-        settings={draftSettings}
-        onCommit={commit}
       />
 
       <GenerateRenderSection
