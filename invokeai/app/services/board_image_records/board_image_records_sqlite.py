@@ -37,7 +37,7 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
         self,
         image_name: str,
         board_id: str,
-    ) -> None:
+    ) -> int:
         with self._db.transaction() as cursor:
             # Scoped to the board the caller was authorized against, not just the image. The
             # routes read the image's board, authorize against *that* board, and only then
@@ -50,6 +50,10 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 """,
                 (image_name, board_id),
             )
+            # The row count is the only signal that the scope held. Zero rows means the image
+            # left this board between the caller's read and this write — swallowing that lets
+            # the route report a removal that did not happen.
+            return cursor.rowcount
 
     def get_images_for_board(
         self,

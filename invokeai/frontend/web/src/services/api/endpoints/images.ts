@@ -454,14 +454,28 @@ export const bulkDownloadQueryFn = async (
     });
     if (response.error) {
       if (isSessionMismatchError(response.error)) {
-        // Either mismatch flavor reports nothing here — broader than the mutating loops, which
+        // Either mismatch flavor withholds the payload — broader than the mutating loops, which
         // let expiry through to the partial path. They have state work to salvage
-        // (`handleDeletions` pruning off the partial payload); a download has none, and its two
-        // outputs are both wrong for a session that is ending. The failure count would toast at
-        // the login screen, and returning `first` drives `matchFulfilled` into raising the
-        // keyless-be-damned "preparing" toast with `duration: null` — dismissed only by a
-        // socket event this session will never receive. A takeover must stay silent for the
-        // new user's sake; an expiry, for the login screen's.
+        // (`handleDeletions` pruning off the partial payload); a download has none, and its
+        // usual outputs are both wrong for a session that is ending: the failure count is a
+        // miscount at the login screen, and returning `first` drives `matchFulfilled` into
+        // raising the "preparing" toast with `duration: null` — dismissed only by a socket
+        // event this session will never receive.
+        //
+        // One thing IS lost on expiry and deserves saying so: zips already scheduled keep
+        // building server-side, but their completion events fire into a socket this session is
+        // tearing down, so nothing will ever offer them. Until scheduled downloads are queued
+        // per account and replayed after re-authentication (follow-up), the honest move is a
+        // plain, finite toast telling the user to re-run — not silence they will read as a
+        // download that never came. A takeover stays fully silent: the interruption belongs to
+        // whoever started the download, never to the user who takes the tab over.
+        if (!isAuthChangedError(response.error) && scheduled) {
+          toast({
+            id: 'DOWNLOADS_INTERRUPTED',
+            title: i18n.t('gallery.downloadsInterrupted'),
+            status: 'warning',
+          });
+        }
         return { data: undefined as unknown as components['schemas']['ImagesDownloaded'] };
       }
       if (!scheduled) {

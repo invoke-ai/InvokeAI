@@ -22,8 +22,8 @@ class BoardImagesService(BoardImagesServiceABC):
         self,
         image_name: str,
         board_id: str,
-    ) -> None:
-        self.__invoker.services.board_image_records.remove_image_from_board(image_name, board_id)
+    ) -> int:
+        return self.__invoker.services.board_image_records.remove_image_from_board(image_name, board_id)
 
     def get_all_board_image_names_for_board(
         self,

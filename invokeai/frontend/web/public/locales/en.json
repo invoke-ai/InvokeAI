@@ -2054,6 +2054,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "downloadsInterrupted": "Your session ended while downloads were being prepared. Run the download again after signing in.",
         "imagesFailedToDownload": "{{count}} image could not be prepared for download.",
         "imagesFailedToDownload_other": "{{count}} images could not be prepared for download.",
         "imagesFailedToUpdate": "{{count}} image could not be updated.",

@@ -631,12 +631,13 @@ describe('bulkDownloadQueryFn', () => {
     expect(i18n.t).not.toHaveBeenCalled();
   });
 
-  it('reports nothing when the session merely expires mid-run', async () => {
-    // Broader silence than the mutating loops, which let expiry through to the partial path:
-    // they have pruning to do off the payload, a download has none, and both of this route's
-    // outputs are wrong for a session that is ending. The count would toast at the login
-    // screen, and returning the item name would raise the permanent `duration: null`
-    // "preparing" toast there -- dismissed only by a socket event this session never receives.
+  it('withholds the payload but says so when the session expires with zips scheduled', async () => {
+    // The payload is withheld like the takeover case -- the count is a miscount at the login
+    // screen, and the item name would raise the permanent `duration: null` "preparing" toast
+    // there. But expiry with zips already scheduled loses real work: they finish server-side
+    // and their completion events fire into a dying socket, so nothing will ever offer them.
+    // Until scheduled downloads are replayed after re-auth, the user is told to re-run rather
+    // than left reading silence as a download that never came.
     login('user-a');
     let call = 0;
     const baseQuery = vi.fn((_args: Request): Promise<Response> => {
@@ -651,8 +652,30 @@ describe('bulkDownloadQueryFn', () => {
 
     expect(baseQuery).toHaveBeenCalledTimes(2);
     expect(result).toEqual({ data: undefined });
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(toast).mock.calls[0]?.[0]).toMatchObject({ id: 'DOWNLOADS_INTERRUPTED', status: 'warning' });
+    // No per-name failure count: that toast id belongs to genuine chunk failures, and its
+    // number would be wrong here anyway.
+    expect(i18n.t).not.toHaveBeenCalledWith('toast.imagesFailedToDownload', expect.anything());
+  });
+
+  it('reports a first-chunk 401 as an ordinary failed request, not an interruption', async () => {
+    // Nothing was scheduled, so nothing is lost — no zip exists or ever will, and the user
+    // re-runs after signing in. The 401 passes through untriaged (an error carries nothing the
+    // next session could consume) and rejects the mutation, so the `matchRejected` listener
+    // raises its own failure toast; the interruption toast is reserved for the case where
+    // scheduled work is actually being lost.
+    login('user-a');
+    const baseQuery = vi.fn((_args: Request): Promise<Response> => {
+      localStorage.removeItem('auth_token');
+      return Promise.resolve({ error: { status: 401, data: 'expired' } });
+    });
+
+    const result = await run(baseQuery, { image_names: names(2500) });
+
+    expect(baseQuery).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ error: { status: 401, data: 'expired' } });
     expect(toast).not.toHaveBeenCalled();
-    expect(i18n.t).not.toHaveBeenCalled();
   });
 
   it('reports an error when the first chunk fails, since nothing was scheduled', async () => {

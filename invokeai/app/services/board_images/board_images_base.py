@@ -21,8 +21,8 @@ class BoardImagesServiceABC(ABC):
         self,
         image_name: str,
         board_id: str,
-    ) -> None:
-        """Removes an image from the given board."""
+    ) -> int:
+        """Removes an image from the given board. Returns the number of rows removed."""
         pass
 
     @abstractmethod

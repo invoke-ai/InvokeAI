@@ -195,12 +195,29 @@ def add_images_to_board(
         # Dedup while preserving order — a repeated name would otherwise be processed twice
         # and could land in both added_images and failed_images.
         for image_name in dict.fromkeys(image_names):
+            # The destination decision sits in its own arm because its refusal means the
+            # opposite of the per-image one. A foreign or vanished *image* is that name's own
+            # problem — a skip, matching the other batch routes. A revoked or deleted
+            # *destination* is the whole request's problem: every remaining name meets it too,
+            # and treating those as skips answers 201 with empty lists, which the client reads
+            # as success and clears the user's selection over. Still re-decided per name, and
+            # the loop keeps going rather than aborting: access restored mid-batch lets later
+            # names land, and every name refused while it was gone is reported as failed.
             try:
                 # Re-decided per name rather than resting on the check above. Write access to
                 # the target board can be revoked while the batch is running — a board flipped
                 # from Public to Private — and a decision taken once at the top of a 1000-name
                 # request would let a contributor keep writing to it for the rest of the batch.
                 _assert_board_write_access(board_id, current_user)
+            except HTTPException:
+                failed_images.add(image_name)
+                continue
+            except Exception:
+                # The helper propagates storage errors precisely so they are not mistaken for
+                # "no such board"; a name whose destination could not be decided is reported.
+                failed_images.add(image_name)
+                continue
+            try:
                 _assert_image_direct_owner(image_name, current_user)
                 old_board_id = (
                     ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name) or "none"
@@ -316,14 +333,43 @@ def remove_images_from_board(
                     continue
 
             try:
-                ApiDependencies.invoker.services.board_images.remove_image_from_board(
+                deleted_rows = ApiDependencies.invoker.services.board_images.remove_image_from_board(
                     image_name=image_name, board_id=old_board_id
                 )
+                if deleted_rows == 0:
+                    # The scoped DELETE missed: the image left old_board_id between the read
+                    # above and this write, so the decision taken about that board no longer
+                    # applies — and reporting a removal that did not happen invalidates the
+                    # wrong boards while the client counts the name as done. Classified by
+                    # where the image is now:
+                    current_board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(
+                        image_name
+                    )
+                    if current_board_id is not None:
+                        # Moved to another board: the caller's ask — off every board — is not
+                        # satisfied, and a retry will re-read and re-authorize against the
+                        # board it actually sits on now.
+                        failed_images.add(image_name)
+                    elif _image_record_exists(image_name):
+                        # Concurrently uncategorized by someone else: the postcondition the
+                        # caller asked for holds, so report it as removed — the invalidation
+                        # is what lets this client's view of the old board catch up. Safe to
+                        # put in removed_images, unlike a deleted name: the DTO still exists,
+                        # so the tag-driven refetches succeed.
+                        removed_images.add(image_name)
+                        affected_boards.add("none")
+                        affected_boards.add(old_board_id)
+                    # Else: deleted concurrently — a skip, exactly as the gone-block above
+                    # treats a name that vanished before the loop reached it. Reporting it
+                    # removed would drive a getImageDTO refetch straight into a 404.
+                    continue
                 removed_images.add(image_name)
                 affected_boards.add("none")
                 affected_boards.add(old_board_id)
             except Exception:
                 # A genuine storage failure, not an auth/404 skip — see add_images_to_board.
+                # The zero-row classification's own reads land here too: a name whose state
+                # cannot be decided is reported, never dropped.
                 failed_images.add(image_name)
         return RemoveImagesFromBoardResult(
             removed_images=list(removed_images),

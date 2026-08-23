@@ -590,7 +590,13 @@ class TestBoardImageMutationAuth:
     def test_batch_add_stops_when_board_write_access_is_revoked_mid_batch(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
-        """The same window on the add side, where the target board is checked before the loop."""
+        """The same window on the add side, where the target board is checked before the loop.
+
+        The refused names are reported as failed, not skipped: the destination is the whole
+        request's problem, and skipping empties the rest of the batch into a 201 with empty
+        lists, which the client reads as success and clears the user's selection over. The
+        loop must still stop *issuing adds* the moment access is gone.
+        """
         from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
 
         user2 = mock_invoker.services.users.get_by_email("user2@test.com")
@@ -616,7 +622,7 @@ class TestBoardImageMutationAuth:
         assert r.status_code == status.HTTP_201_CREATED
         body = r.json()
         assert body["added_images"] == [names[0]]
-        assert body["failed_images"] == []
+        assert set(body["failed_images"]) == set(names[1:])
         assert mock_invoker.services.board_images.add_image_to_board.call_count == 1
 
     def test_batch_add_skips_an_image_deleted_after_its_ownership_check(
