@@ -15,6 +15,49 @@ type Props = {
 
 const COLLAPSIBLE_INDICATOR_OPEN_STYLES = { transform: 'rotate(90deg)' };
 
+/**
+ * Closed: a quiet hairline row in the list. Open: a card — background, radius,
+ * breathing room — with no separators of its own.
+ *
+ * Three invariants make it feel right:
+ *
+ * - Everything keys off the DOM's `data-state`, not React state: sections
+ *   without a `sectionId` (Upscale passes only `defaultOpen`) run uncontrolled,
+ *   so their openness never reaches this component as a prop — the browser
+ *   always has it.
+ * - The geometry is constant. The hosting Stack keeps a fixed `gap="1"`
+ *   between rows in every state, so opening a section never adds a margin or a
+ *   border — nothing below shifts by even a pixel.
+ * - The separators are pseudo-element overlays, not borders on the box, and
+ *   exactly ONE line is painted per boundary, only BETWEEN rows: a section's
+ *   `::before` (a 1px border-top centered in the gap) shows only when the
+ *   element above it is another section — so nothing renders above the first
+ *   row (even mid-stack, after non-section siblings) or below the last, and
+ *   two overlapping halves never stack the translucent border color into a
+ *   heavier line. Around an open card the touching lines fade out — the
+ *   card's own via `data-state`, the one below it via `A + B`, since no
+ *   section can see its neighbor's state on its own. Only opacity and
+ *   background ever animate.
+ */
+const SECTION_OPEN_STYLES = { bg: 'bg.muted', rounded: 'sm' };
+const SECTION_STYLES = {
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    insetInline: 0,
+    top: 'calc(var(--chakra-spacing-1) / -2)',
+    borderTopWidth: '1px',
+    pointerEvents: 'none',
+    opacity: 0,
+    transition: 'opacity var(--wb-motion-duration-slow) ease',
+  },
+  '.generate-section + &::before': { opacity: 1 },
+  // Order matters against the rule above: at equal specificity, an open
+  // section's own state must win over its predecessor's presence.
+  '&[data-state="open"]::before': { opacity: 0 },
+  '.generate-section[data-state="open"] + &::before': { opacity: 0 },
+} as const;
+
 export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOpen, label, sectionId }: Props) => {
   const { sectionPreferences } = useGenerationUi();
   const persistedOpen = sectionId === undefined ? undefined : sectionPreferences.sectionsOpen[sectionId];
@@ -30,14 +73,16 @@ export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOp
 
   return (
     <Collapsible.Root
-      bg="bg.muted/50"
+      className="generate-section"
+      css={SECTION_STYLES}
+      _open={SECTION_OPEN_STYLES}
       defaultOpen={sectionId === undefined ? defaultOpen : undefined}
       open={resolvedOpen}
-      overflow="hidden"
-      rounded="md"
+      position="relative"
+      transition="background var(--wb-motion-duration-slow) ease, border-radius var(--wb-motion-duration-slow) ease"
       onOpenChange={sectionId === undefined ? undefined : handleOpenChange}
     >
-      <Collapsible.Trigger display="flex" gap={2} w="full" px={2} h="8" alignItems="center">
+      <Collapsible.Trigger display="flex" gap={2} w="full" px={1.5} h="8" alignItems="center">
         <Collapsible.Indicator
           _open={COLLAPSIBLE_INDICATOR_OPEN_STYLES}
           transition="transform var(--wb-motion-duration-slow)"
@@ -61,7 +106,8 @@ export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOp
           {badges}
         </Flex>
       </Collapsible.Trigger>
-      <Collapsible.Content bg="bg.muted">
+
+      <Collapsible.Content>
         <Box borderTopWidth={1} borderColor="bg.subtle">
           {children}
         </Box>

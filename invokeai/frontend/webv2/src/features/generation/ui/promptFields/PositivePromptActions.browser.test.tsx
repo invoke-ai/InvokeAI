@@ -73,7 +73,6 @@ describe('PromptTriggerPopover', () => {
       });
     });
 
-    const region = document.querySelector<HTMLElement>('[aria-label="Prompt trigger options"]');
     const message = [...document.querySelectorAll<HTMLElement>('p')].find(
       (element) => element.textContent === 'No prompt triggers available'
     );
@@ -81,17 +80,19 @@ describe('PromptTriggerPopover', () => {
       (element) => element.textContent === 'Open model manager'
     );
 
-    if (!region || !message || !action) {
+    if (!message || !action) {
       throw new Error('prompt-trigger empty state did not render');
     }
 
-    const regionBounds = region.getBoundingClientRect();
+    // With nothing to search or scroll, the popover hugs its empty state: no
+    // disabled search input, no fixed-height list region holding space open.
+    expect(document.querySelector('[aria-label="Prompt trigger options"]')).toBeNull();
+    expect(document.querySelector('input')).toBeNull();
+
     const messageBounds = message.getBoundingClientRect();
     const actionBounds = action.getBoundingClientRect();
-    const contentCenter = (messageBounds.top + actionBounds.bottom) / 2;
 
     expect(Math.abs(messageBounds.left - actionBounds.left)).toBeLessThanOrEqual(1);
     expect(actionBounds.top - messageBounds.bottom).toBeLessThanOrEqual(8);
-    expect(contentCenter).toBeCloseTo(regionBounds.top + regionBounds.height / 2, -1);
   });
 });
