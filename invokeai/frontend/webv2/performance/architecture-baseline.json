@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 837111,
+        "brotliBytes": 837395,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 836094,
+        "gzipBytes": 836375,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1947053,
+        "initialRawBytes": 1947050,
         "largestAssetRawBytes": 746355,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 69113,
+        "ownedRawBytes": 69114,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -287,15 +287,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 845483,
+        "brotliBytes": 845769,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 844455,
+        "gzipBytes": 844739,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1966524,
+        "initialRawBytes": 1966521,
         "largestAssetRawBytes": 753819,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 69113,
+        "ownedRawBytes": 69114,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -305,15 +305,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1050291,
+        "brotliBytes": 1050685,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1046031,
+        "gzipBytes": 1046295,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2585786,
+        "initialRawBytes": 2585403,
         "largestAssetRawBytes": 746355,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 116130,
+        "ownedRawBytes": 115755,
         "requestCount": 95,
         "scriptRequestCount": 79,
         "sourceOwners": [
@@ -865,15 +865,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1060794,
+        "brotliBytes": 1061192,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1056492,
+        "gzipBytes": 1056758,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2611644,
+        "initialRawBytes": 2611258,
         "largestAssetRawBytes": 753819,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 116130,
+        "ownedRawBytes": 115755,
         "requestCount": 95,
         "scriptRequestCount": 79
       },
@@ -927,9 +927,7 @@
       "src/features/queue/ui/launchpad/QueueStatusBand.tsx",
       "src/workbench/launchpad/home/livePanels.ts"
     ],
-    "editorForbiddenInitialChunkNames": [
-      "ag-psd"
-    ],
+    "editorForbiddenInitialChunkNames": ["ag-psd"],
     "inactiveWidgetGateOwner": "deepen-widget-registry-loading"
   }
 }
