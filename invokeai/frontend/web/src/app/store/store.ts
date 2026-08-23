@@ -12,6 +12,7 @@ import { errorHandler } from 'app/store/enhancers/reduxRemember/errors';
 import { addAdHocPostProcessingRequestedListener } from 'app/store/middleware/listenerMiddleware/listeners/addAdHocPostProcessingRequestedListener';
 import { addAnyEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/anyEnqueued';
 import { addAppStartedListener } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
+import { addAutoSwitchedSelectionListener } from 'app/store/middleware/listenerMiddleware/listeners/autoSwitchedSelection';
 import { addBatchEnqueuedListener } from 'app/store/middleware/listenerMiddleware/listeners/batchEnqueued';
 import { addDeleteBoardAndImagesFulfilledListener } from 'app/store/middleware/listenerMiddleware/listeners/boardAndImagesDeleted';
 import { addBoardIdSelectedListener } from 'app/store/middleware/listenerMiddleware/listeners/boardIdSelected';
@@ -341,6 +342,7 @@ addImageAddedToBoardFulfilledListener(startAppListening);
 addImageRemovedFromBoardFulfilledListener(startAppListening);
 addBoardIdSelectedListener(startAppListening);
 addArchivedOrDeletedBoardListener(startAppListening);
+addAutoSwitchedSelectionListener(startAppListening);
 
 // Node schemas
 addGetOpenAPISchemaListener(startAppListening);
