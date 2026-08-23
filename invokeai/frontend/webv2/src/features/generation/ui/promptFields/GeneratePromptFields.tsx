@@ -3,12 +3,13 @@ import type { DynamicPromptsConfig } from '@features/generation/core/dynamicProm
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Stack } from '@chakra-ui/react';
+import { HStack, Stack, Tag } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { NegativePromptField } from './NegativePromptField';
 import { PositivePromptField } from './PositivePromptField';
@@ -54,6 +55,7 @@ export const GeneratePromptFields = ({
   selectedModel,
   settings,
 }: GeneratePromptFieldsProps) => {
+  const { t } = useTranslation();
   const { generateValues, showPromptSyntaxHighlighting } = useGenerationUi().project;
   const promptValues = getPromptValues(generateValues);
   const promptPolicy = getPromptPolicy(selectedModel, settings);
@@ -155,6 +157,8 @@ export const GeneratePromptFields = ({
     [onCommitImmediate]
   );
 
+  const clearPromptTemplate = useCallback(() => applyPromptTemplate(null), [applyPromptTemplate]);
+
   return (
     <Stack gap="1" py="2">
       <PositivePromptField
@@ -175,6 +179,22 @@ export const GeneratePromptFields = ({
         onTemplateViewModeChange={setTemplateViewMode}
         onUsePrompt={usePromptHistoryItem}
       />
+      {/* Active prompt machinery surfaces as a dismissible chip instead of
+          hidden state that only shows once its panel is opened. */}
+      {settings.promptTemplate ? (
+        <HStack>
+          <Tag.Root size="sm" variant="surface">
+            <Tag.Label>{settings.promptTemplate.name}</Tag.Label>
+            <Tag.EndElement>
+              <Tag.CloseTrigger
+                aria-label={t('widgets.generate.clearPromptTemplate')}
+                title={t('widgets.generate.clearPromptTemplate')}
+                onClick={clearPromptTemplate}
+              />
+            </Tag.EndElement>
+          </Tag.Root>
+        </HStack>
+      ) : null}
       {promptPolicy.negativeVisible ? (
         <NegativePromptField
           heightPx={promptValues.negativePromptHeightPx}

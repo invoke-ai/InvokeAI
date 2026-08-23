@@ -3,6 +3,7 @@ import type {
   ProjectSettings,
   ProjectSortId,
   ProjectsViewId,
+  StoredGeneratePreset,
   StoredRebalancePreset,
   WorkbenchPreferences,
 } from '@workbench/settings/contracts';
@@ -62,6 +63,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
+  generatePresets: [],
   generateSectionsOpen: {},
   krea2RebalancePresets: [],
   language: 'en',
@@ -227,6 +229,42 @@ const normalizeRebalancePresets = (values: unknown): StoredRebalancePreset[] => 
   return presets;
 };
 
+/** Shape-only, like {@link normalizeRebalancePresets}: the generation feature re-normalizes `values` on apply. */
+const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const presets: StoredGeneratePreset[] = [];
+
+  for (const entry of values) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      continue;
+    }
+
+    const { id, label, values: snapshot } = entry as Partial<StoredGeneratePreset>;
+
+    if (
+      typeof id !== 'string' ||
+      id.trim() === '' ||
+      seen.has(id) ||
+      typeof label !== 'string' ||
+      label.trim() === '' ||
+      !snapshot ||
+      typeof snapshot !== 'object' ||
+      Array.isArray(snapshot)
+    ) {
+      continue;
+    }
+
+    seen.add(id);
+    presets.push({ id, label: label.trim(), values: snapshot });
+  }
+
+  return presets;
+};
+
 export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
   antialiasProgressImages:
     typeof settings?.antialiasProgressImages === 'boolean'
@@ -283,6 +321,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
+  generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,

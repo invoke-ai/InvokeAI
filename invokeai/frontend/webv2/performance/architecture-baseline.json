@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 837352,
+        "brotliBytes": 837395,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 836249,
+        "gzipBytes": 836375,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1946177,
-        "largestAssetRawBytes": 746569,
+        "initialRawBytes": 1947050,
+        "largestAssetRawBytes": 746355,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 69051,
+        "ownedRawBytes": 69114,
         "requestCount": 41,
         "scriptRequestCount": 25,
         "sourceOwners": [
@@ -198,6 +198,7 @@
           "source:src/platform/ui/ColorPicker.tsx",
           "source:src/platform/ui/Combobox.tsx",
           "source:src/platform/ui/ConfirmDialog.tsx",
+          "source:src/platform/ui/DropTargetOverlay.tsx",
           "source:src/platform/ui/DropZone.tsx",
           "source:src/platform/ui/EmptyState.tsx",
           "source:src/platform/ui/Field.tsx",
@@ -286,15 +287,15 @@
         ]
       },
       "limits": {
-        "brotliBytes": 845726,
+        "brotliBytes": 845769,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 844612,
+        "gzipBytes": 844739,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1965639,
-        "largestAssetRawBytes": 754035,
+        "initialRawBytes": 1966521,
+        "largestAssetRawBytes": 753819,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 69051,
+        "ownedRawBytes": 69114,
         "requestCount": 41,
         "scriptRequestCount": 25
       },
@@ -304,17 +305,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1047800,
+        "brotliBytes": 1050685,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1043595,
+        "gzipBytes": 1046295,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2578275,
-        "largestAssetRawBytes": 746569,
+        "initialRawBytes": 2585403,
+        "largestAssetRawBytes": 746355,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113745,
-        "requestCount": 93,
-        "scriptRequestCount": 77,
+        "ownedRawBytes": 115755,
+        "requestCount": 95,
+        "scriptRequestCount": 79,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -454,8 +455,11 @@
           "source:src/features/gallery/data/videoUrls.ts",
           "source:src/features/gallery/queries.ts",
           "source:src/features/gallery/react.ts",
+          "source:src/features/gallery/ui/GalleryDragCursor.tsx",
           "source:src/features/gallery/ui/GalleryUiContext.tsx",
+          "source:src/features/gallery/ui/galleryDnd.ts",
           "source:src/features/gallery/ui/galleryStateView.ts",
+          "source:src/features/gallery/utility.ts",
           "source:src/features/generation/core/baseGenerationPolicies.ts",
           "source:src/features/generation/core/batch.ts",
           "source:src/features/generation/core/canvas/addControlLayers.ts",
@@ -645,6 +649,7 @@
           "source:src/platform/ui/ColorPicker.tsx",
           "source:src/platform/ui/Combobox.tsx",
           "source:src/platform/ui/ConfirmDialog.tsx",
+          "source:src/platform/ui/DropTargetOverlay.tsx",
           "source:src/platform/ui/DropZone.tsx",
           "source:src/platform/ui/Field.tsx",
           "source:src/platform/ui/Group.tsx",
@@ -860,24 +865,24 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1058278,
+        "brotliBytes": 1061192,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1054031,
+        "gzipBytes": 1056758,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2604058,
-        "largestAssetRawBytes": 754035,
+        "initialRawBytes": 2611258,
+        "largestAssetRawBytes": 753819,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 113745,
-        "requestCount": 93,
-        "scriptRequestCount": 77
+        "ownedRawBytes": 115755,
+        "requestCount": 95,
+        "scriptRequestCount": 79
       },
       "owner": "workbench",
       "remediationTicket": "deepen-widget-registry-loading",
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-22",
+  "capturedAt": "2026-08-23",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

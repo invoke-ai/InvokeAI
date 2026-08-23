@@ -7,7 +7,7 @@ import type {
   LoraModelConfig,
 } from '@features/generation/core/types';
 
-import { Badge, HStack, Stack, Switch, Text } from '@chakra-ui/react';
+import { Badge, HStack, Stack, Text } from '@chakra-ui/react';
 import {
   DEFAULT_LORA_WEIGHT_CONFIG,
   getDefaultLoraWeight,
@@ -26,10 +26,10 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
-import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 import { useDebouncedDraftValue } from './useDebouncedDraftValue';
 
-interface GenerateConceptsSectionProps {
+interface GenerateConceptsContentProps {
   settings: GenerateSettings;
   loraModels: LoraModelConfig[];
   projectId: string;
@@ -49,21 +49,21 @@ const LORA_WEIGHT_DEBOUNCE_MS = 250;
 const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
   Boolean(selectedModel && isLoraCompatibleWithModel(lora.model, selectedModel));
 
-export const GenerateConceptsSection = ({
+/**
+ * Concept (LoRA) conditioning, rendered inside the Guidance section (the
+ * section chrome and combined badges live in `GenerateGuidanceSection`).
+ */
+export const GenerateConceptsContent = ({
   loraModels,
   onCommit,
   onCommitImmediate,
   projectId,
   selectedModel,
   settings,
-}: GenerateConceptsSectionProps) => {
+}: GenerateConceptsContentProps) => {
   const { t } = useTranslation();
   const loras = useMemo(() => syncGenerateLorasWithModels(settings.loras, loraModels), [loraModels, settings.loras]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
-
-  const activeCount = selectedModel
-    ? loras.filter((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, selectedModel)).length
-    : 0;
 
   const addLora = (model: ModelConfig | null) => {
     if (!isLoraModelConfig(model) || selectedLoraKeys.has(model.key)) {
@@ -95,61 +95,48 @@ export const GenerateConceptsSection = ({
     onCommitImmediate({ loras: loras.filter((lora) => lora.model.key !== modelKey) });
   };
 
-  const badges =
-    activeCount > 0 ? (
-      <Badge size="xs" variant="surface">
-        {t('widgets.generate.activeCount', { count: activeCount })}
-      </Badge>
-    ) : loras.length > 0 ? (
-      <Badge size="xs" variant="surface">
-        {t('widgets.generate.offCount', { count: loras.length })}
-      </Badge>
-    ) : null;
-
   return (
-    <GenerateCollapsibleSection label={t('widgets.generate.concepts')} defaultOpen badges={badges} sectionId="concepts">
-      <Stack gap="2" p="2">
-        <Field
-          hint="concepts"
-          label={t('widgets.generate.addConcept')}
-          helpText={selectedModel ? undefined : t('widgets.generate.selectMainModelBeforeConcepts')}
-        >
-          <ModelSelect
-            excludeKeys={selectedLoraKeys}
-            filter={(model) =>
-              Boolean(selectedModel && isLoraModelConfig(model) && isLoraCompatibleWithModel(model, selectedModel))
-            }
-            modelTypes={['lora']}
-            placeholder={
-              selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
-            }
-            size="xs"
-            value={null}
-            onChange={addLora}
-          />
-        </Field>
+    <Stack gap="2">
+      <Field
+        hint="concepts"
+        label={t('widgets.generate.addConcept')}
+        helpText={selectedModel ? undefined : t('widgets.generate.selectMainModelBeforeConcepts')}
+      >
+        <ModelSelect
+          excludeKeys={selectedLoraKeys}
+          filter={(model) =>
+            Boolean(selectedModel && isLoraModelConfig(model) && isLoraCompatibleWithModel(model, selectedModel))
+          }
+          modelTypes={['lora']}
+          placeholder={
+            selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
+          }
+          size="xs"
+          value={null}
+          onChange={addLora}
+        />
+      </Field>
 
-        {loras.length === 0 ? (
-          <Text color="fg.subtle" fontSize="2xs">
-            {t('widgets.generate.addConceptsHelp')}
-          </Text>
-        ) : (
-          <Stack gap="2">
-            {loras.map((lora) => (
-              <LoraRow
-                key={lora.model.key}
-                isCompatible={isCompatibleLora(lora, selectedModel)}
-                lora={lora}
-                projectId={projectId}
-                onRemove={() => removeLora(lora.model.key)}
-                onToggle={(isEnabled) => updateLora(lora.model.key, { isEnabled })}
-                onWeightChange={(weight) => updateLora(lora.model.key, { weight })}
-              />
-            ))}
-          </Stack>
-        )}
-      </Stack>
-    </GenerateCollapsibleSection>
+      {loras.length === 0 ? (
+        <Text color="fg.subtle" fontSize="2xs">
+          {t('widgets.generate.addConceptsHelp')}
+        </Text>
+      ) : (
+        <Stack gap="2">
+          {loras.map((lora) => (
+            <LoraRow
+              key={lora.model.key}
+              isCompatible={isCompatibleLora(lora, selectedModel)}
+              lora={lora}
+              projectId={projectId}
+              onRemove={() => removeLora(lora.model.key)}
+              onToggle={(isEnabled) => updateLora(lora.model.key, { isEnabled })}
+              onWeightChange={(weight) => updateLora(lora.model.key, { weight })}
+            />
+          ))}
+        </Stack>
+      )}
+    </Stack>
   );
 };
 
@@ -223,22 +210,16 @@ const LoraRow = ({
         </Stack>
 
         <HStack flexShrink="0" gap="1">
-          <Switch.Root
-            aria-label={
+          <GenerateToggleSwitch
+            checked={isActive}
+            disabled={!isCompatible}
+            label={
               isActive
                 ? t('widgets.generate.disableConcept', { name: lora.model.name })
                 : t('widgets.generate.enableConcept', { name: lora.model.name })
             }
-            checked={isActive}
-            disabled={!isCompatible}
-            size="sm"
-            onCheckedChange={(event) => onToggle(event.checked)}
-          >
-            <Switch.HiddenInput />
-            <Switch.Control _checked={{ bg: 'accent.solid' }}>
-              <Switch.Thumb />
-            </Switch.Control>
-          </Switch.Root>
+            onCheckedChange={onToggle}
+          />
 
           <Tooltip content={t('widgets.generate.removeConcept')}>
             <IconButton

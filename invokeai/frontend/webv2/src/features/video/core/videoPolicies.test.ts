@@ -459,6 +459,46 @@ describe('component section policy', () => {
     ).not.toContain('wanLowNoiseModel');
   });
 
+  it('requires both single-file overrides for a components-only MiniMax H3 install', () => {
+    // The slim "MiniMax H3 Components" folder carries tokenizer/processor/VAEs
+    // but no transformer or text-encoder weights (backend `components_only`):
+    // without the gate, Invoke enables and the loader fails mid-generation.
+    const componentsOnly = { ...h3Model(), components_only: true };
+    const bare = settingsFor(componentsOnly);
+
+    expect(getVideoComponentSectionPolicy(componentsOnly, bare).defaultOpen).toBe(true);
+
+    const reasons = getVideoValidationReasons(componentsOnly, bare);
+
+    expect(reasons).toContainEqual(expect.stringContaining('select a single-file Transformer'));
+    expect(reasons).toContainEqual(expect.stringContaining('select a single-file Text encoder'));
+
+    // Both overrides selected → the gate opens.
+    const filled = settingsFor(componentsOnly, {
+      h3TextEncoderModel: { base: 'minimax-h3', key: 'h3-te-int8', name: 'H3 Text Encoder', type: 'qwen3_vl_encoder' },
+      h3TransformerModel: {
+        base: 'minimax-h3',
+        format: 'checkpoint',
+        key: 'h3-tf-int8',
+        name: 'H3 Transformer',
+        type: 'main',
+      },
+    });
+
+    expect(getVideoValidationReasons(componentsOnly, filled)).toEqual([]);
+
+    // One override alone is not enough.
+    expect(getVideoValidationReasons(componentsOnly, { ...filled, h3TextEncoderModel: null })).toContainEqual(
+      expect.stringContaining('select a single-file Text encoder')
+    );
+
+    // A full Diffusers install keeps both slots optional.
+    const full = h3Model();
+
+    expect(getVideoValidationReasons(full, settingsFor(full))).toEqual([]);
+    expect(getVideoComponentSectionPolicy(full, settingsFor(full)).defaultOpen).toBe(false);
+  });
+
   it('offers the component-source slot only for single-file mains, never listing the main itself', () => {
     const diffusers = wanModel('i2v_a14b', 'diffusers');
 

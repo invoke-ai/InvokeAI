@@ -351,6 +351,7 @@ export const VideoWidgetView = () => {
                   disabled={Boolean(values.sourceVideo)}
                   disabledReason={values.sourceVideo ? t('widgets.video.firstFrameBlocked') : undefined}
                   dropId="video-first-frame"
+                  dropLabel={t('widgets.video.dropFirstFrame')}
                   image={values.firstFrameImage}
                   onChange={setFirstFrame}
                 />
@@ -363,7 +364,12 @@ export const VideoWidgetView = () => {
                 }
                 label={t('widgets.video.lastFrame')}
               >
-                <VideoFrameImageField dropId="video-last-frame" image={values.lastFrameImage} onChange={setLastFrame} />
+                <VideoFrameImageField
+                  dropId="video-last-frame"
+                  dropLabel={t('widgets.video.dropLastFrame')}
+                  image={values.lastFrameImage}
+                  onChange={setLastFrame}
+                />
               </Field>
             ) : null}
           </Stack>

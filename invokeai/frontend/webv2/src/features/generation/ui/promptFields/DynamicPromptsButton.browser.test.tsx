@@ -144,14 +144,14 @@ describe('dynamic prompts in the positive prompt field', () => {
     await expectRowInteractionStylesToMatch(expected, row, hoverBackgroundColor);
   });
 
-  it('stays square while it carries no count, and widens only to fit one', async () => {
-    // Passing `px={undefined}` reads as "leave the default", but it is spread
-    // over Chakra's own `px: '0'` and clobbers it, so the icon-only button used
-    // to sit 8px wider than the square buttons either side of it.
+  it('is a labeled primary at rest, and widens only to carry a count', async () => {
+    // A labeled button rather than a bare icon; the expansion count appears
+    // beside the label once the prompt is dynamic.
     await render('a plain cat');
     const plain = findButton().getBoundingClientRect();
 
-    expect(plain.width).toBeCloseTo(plain.height, 1);
+    expect(findButton().textContent).toContain('widgets.generate.dynamicButton');
+    expect(findButton().textContent).not.toMatch(/\d/);
 
     await act(() => root?.unmount());
     host?.remove();

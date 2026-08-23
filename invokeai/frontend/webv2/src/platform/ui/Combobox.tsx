@@ -12,6 +12,11 @@ import { useTranslation } from 'react-i18next';
 
 const COMBOBOX_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 
+const LIST_SCROLL_CSS = {
+  scrollbarColor: 'var(--chakra-colors-border-emphasized) transparent',
+  scrollbarWidth: 'thin',
+} as const;
+
 export interface ComboboxOption extends CollectionItem {
   disabled?: boolean;
   label: string;
@@ -129,7 +134,10 @@ export const Combobox = ({
       <Portal>
         <ChakraCombobox.Positioner>
           <ChakraCombobox.Content>
-            <ChakraCombobox.List maxH="16rem" overflowY="auto">
+            {/* The list is its own scroll container (ark scrolls it to keep the
+                highlighted option in view); a thin always-visible scrollbar
+                makes the overflow legible instead of looking cut off. */}
+            <ChakraCombobox.List css={LIST_SCROLL_CSS} maxH="16rem" overflowY="auto">
               {collection.items.map((item) => (
                 <ChakraCombobox.Item key={item.value} item={item}>
                   <ChakraCombobox.ItemText>{item.label}</ChakraCombobox.ItemText>

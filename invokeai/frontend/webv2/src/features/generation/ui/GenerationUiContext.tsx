@@ -27,6 +27,19 @@ export interface GenerationSelectedImage {
   thumbnailUrl: string;
 }
 
+/** One executed seed from a recent completed Generate run. */
+export interface GenerationSeedHistoryItem {
+  seed: number;
+  thumbnailUrl: string | null;
+}
+
+/** A named Generate settings snapshot; `values` is normalized by the feature on apply. */
+export interface GeneratePresetRecord {
+  id: string;
+  label: string;
+  values: Record<string, unknown>;
+}
+
 /**
  * Generation's UI port, grouped into sub-ports by backing concern. The context
  * is a dependency-direction port (the feature may not import workbench), not a
@@ -72,6 +85,20 @@ export interface GenerationUiAdapter {
     items: readonly PromptHistoryItem[];
     clear(): void;
     remove(prompt: PromptHistoryItem): void;
+  };
+  presets: {
+    /** User-saved Generate settings snapshots ("recipes"), in save order. */
+    presets: readonly GeneratePresetRecord[];
+    /** Adds a snapshot under a new id and returns it. */
+    save(label: string, values: Record<string, unknown>): GeneratePresetRecord;
+    rename(presetId: string, label: string): void;
+    remove(presetId: string): void;
+  };
+  queueInsights: {
+    /** Executed seeds of recent completed Generate runs for this project, newest first. */
+    seedHistory: readonly GenerationSeedHistoryItem[];
+    /** Mean seconds per completed recent Generate run; null with no history to ground it. */
+    secondsPerRun: number | null;
   };
   rebalancePresets: {
     /** User-saved conditioning rebalance curves; built-ins are not included. */

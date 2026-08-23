@@ -52,7 +52,7 @@ import {
   Button,
   ColorPicker,
   Combobox,
-  DropZone,
+  DropTargetOverlay,
   formatHexColor,
   IconButton,
   parseHexColor,
@@ -670,22 +670,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
             </Text>
           </Flex>
         )}
-        {acceptsActiveDrag ? (
-          <DropZone
-            alignItems="center"
-            display="flex"
-            inset="0"
-            isOver={isOver}
-            justifyContent="center"
-            pointerEvents="none"
-            position="absolute"
-            variant="overlay"
-          >
-            <Text fontSize="xs" fontWeight="700">
-              {`Drop ${config.noun}`}
-            </Text>
-          </DropZone>
-        ) : null}
+        <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={`Drop ${config.noun}`} />
       </Box>
       <HStack gap="1.5" mt="1" w="full">
         <Button

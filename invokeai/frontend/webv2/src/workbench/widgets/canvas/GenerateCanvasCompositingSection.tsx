@@ -14,7 +14,7 @@
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasCoherenceMode, CanvasInfillMethod } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 
-import { createListCollection, NumberInput, Stack } from '@chakra-ui/react';
+import { Badge, createListCollection, NumberInput, Stack } from '@chakra-ui/react';
 import { GenerationSettingsSection } from '@features/generation/components';
 import { ColorPicker, Field, formatHexColor, parseHexColor, Select } from '@platform/ui';
 import {
@@ -31,7 +31,9 @@ import { useTranslation } from 'react-i18next';
 const INFILL_METHODS: readonly CanvasInfillMethod[] = ['patchmatch', 'lama', 'cv2', 'color', 'tile'];
 const COHERENCE_MODES: readonly CanvasCoherenceMode[] = ['Gaussian Blur', 'Box Blur', 'Staged'];
 
-const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: false } as const;
+// Full-width form fields: the menu hangs from the trigger's start edge at the
+// trigger's width — `bottom-end`/fit-content is for narrow inline selects.
+const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 
 const selectCanvasValues = (project: Parameters<typeof getProjectWidgetValues>[0]): Record<string, unknown> =>
   getProjectWidgetValues(project, 'canvas');
@@ -134,8 +136,22 @@ export const GenerateCanvasCompositingSection = () => {
 
   const opt = (key: string) => t(`widgets.generate.compositingOptions.${key}`);
 
+  // The collapsed header carries the effective recipe — infill method and mask
+  // blur — so canvas fill reads as a one-line contextual summary until opened.
+  const badges = (
+    <>
+      <Badge size="xs">{t(`widgets.generate.compositingOptions.infillMethods.${settings.infillMethod}`)}</Badge>
+      <Badge size="xs">{settings.maskBlur}px</Badge>
+    </>
+  );
+
   return (
-    <GenerationSettingsSection label={t('widgets.generate.compositing')}>
+    <GenerationSettingsSection
+      badges={badges}
+      defaultOpen={false}
+      label={t('widgets.generate.compositing')}
+      sectionId="canvas-fill"
+    >
       <Stack gap="2" p="2">
         <Field label={opt('infillMethod')}>
           <Select

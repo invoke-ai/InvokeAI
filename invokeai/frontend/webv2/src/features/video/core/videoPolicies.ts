@@ -224,6 +224,18 @@ export const isSupportedVideoModel = <T extends { base: string; type: string; fo
 
 export const isVideoModelSelectable = <T extends ModelConfig>(model: T): boolean => isSupportedVideoModel(model);
 
+/**
+ * A slim MiniMax H3 folder install: tokenizer/processor/VAEs only, no
+ * transformer or text-encoder weights. The backend probe records
+ * `components_only` on the config precisely so the UI can require the
+ * single-file overrides up front instead of failing mid-generation.
+ */
+export const isComponentsOnlyH3Main = (model: MainModelConfig): boolean =>
+  // Demand the full config, not a Pick: a narrowed object would type-check
+  // here but silently read `components_only` as absent — a false negative
+  // that re-opens the fail-mid-generation hole this helper exists to close.
+  model.base === 'minimax-h3' && model.format === 'diffusers' && model.components_only === true;
+
 const getVideoVariantConfig = (
   model: Pick<MainModelConfig, 'base' | 'type' | 'variant' | 'format'> | undefined
 ): VideoVariantConfig | null => {
@@ -761,24 +773,38 @@ export const getVideoComponentSectionPolicy = (
     return createComponentPolicy(model.format !== 'diffusers', slots);
   }
 
-  // MiniMax H3: the Diffusers install bundles everything; both slots are
-  // optional single-file overrides (e.g. the int8 repacks).
-  return createComponentPolicy(false, [
+  // MiniMax H3: a full Diffusers install bundles everything, so both slots
+  // are optional single-file overrides (e.g. the int8 repacks). A slim
+  // "components-only" install (tokenizer/processor/VAEs without transformer
+  // or text-encoder weights — the backend probe records `components_only`)
+  // REQUIRES both overrides: without this gate Invoke enables and the loader
+  // fails minutes into the run.
+  const componentsOnly = isComponentsOnlyH3Main(model);
+
+  return createComponentPolicy(componentsOnly, [
     {
       filter: (candidate) =>
         candidate.type === 'main' && candidate.base === 'minimax-h3' && candidate.format === 'checkpoint',
-      helpText: 'Optional single-file transformer (e.g. pruned int8) used in place of the main model’s transformer.',
+      helpText: componentsOnly
+        ? 'Required: this main model is a components-only install, so the transformer must come from a single-file checkpoint (e.g. pruned int8).'
+        : 'Optional single-file transformer (e.g. pruned int8) used in place of the main model’s transformer.',
       key: 'h3TransformerModel',
       label: 'Transformer (single file)',
+      missingMessage: `${model.name} is a components-only install — select a single-file Transformer.`,
       modelTypes: ['main'],
+      required: componentsOnly ? () => true : undefined,
       valueKind: 'main',
     },
     {
       filter: (candidate) => candidate.type === 'qwen3_vl_encoder' && candidate.base === 'minimax-h3',
-      helpText: 'Optional single-file Qwen3-VL encoder used in place of the main model’s text encoder.',
+      helpText: componentsOnly
+        ? 'Required: this main model is a components-only install, so the text encoder must come from a single-file Qwen3-VL checkpoint.'
+        : 'Optional single-file Qwen3-VL encoder used in place of the main model’s text encoder.',
       key: 'h3TextEncoderModel',
       label: 'Text encoder (single file)',
+      missingMessage: `${model.name} is a components-only install — select a single-file Text encoder.`,
       modelTypes: ['qwen3_vl_encoder'],
+      required: componentsOnly ? () => true : undefined,
       valueKind: 'component',
     },
   ]);

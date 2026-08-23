@@ -3,6 +3,7 @@ export * from './color';
 export * from './ColorPicker';
 export * from './Combobox';
 export * from './ConfirmDialog';
+export * from './DropTargetOverlay';
 export * from './DropZone';
 export * from './Field';
 export * from './Group';

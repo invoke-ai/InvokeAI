@@ -43,7 +43,6 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
-const PROMPT_TRIGGER_EMPTY_SCROLL_CONTENT_PROPS = { h: 'full' } as const;
 const TEXT_LLM_MODEL_TYPES = ['text_llm'];
 const LLAVA_MODEL_TYPES = ['llava_onevision'];
 /**
@@ -289,46 +288,44 @@ export const PromptTriggerPopover = ({
         <Popover.Positioner>
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="22rem">
             <Popover.Body p="2.5">
-              <Stack gap="2" h="18rem">
-                <Input
-                  aria-label={t('widgets.generate.searchPromptTriggers')}
-                  disabled={options.length === 0}
-                  placeholder={t('widgets.generate.searchPromptTriggers')}
-                  size="xs"
-                  value={searchTerm}
-                  onChange={handleSearchChange}
-                />
-                <Separator />
-                <Scrollable
-                  contentProps={options.length === 0 ? PROMPT_TRIGGER_EMPTY_SCROLL_CONTENT_PROPS : undefined}
-                  flex="1"
-                  label={t('widgets.generate.promptTriggerOptions')}
-                  minH="0"
-                >
-                  {options.length === 0 ? (
-                    <PromptTriggerEmptyState />
-                  ) : filteredOptions.length === 0 ? (
-                    <PromptHistoryEmptyText>{t('widgets.generate.noMatchingTriggers')}</PromptHistoryEmptyText>
-                  ) : (
-                    <Stack gap="2">
-                      {groupedOptions.map((group) => (
-                        <Stack key={group.group} gap="0">
-                          <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase">
-                            {group.group}
-                          </Text>
-                          {group.options.map((option, index) => (
-                            <PromptTriggerOptionButton
-                              key={`${option.group}-${option.value}-${index}`}
-                              onSelect={onSelect}
-                              option={option}
-                            />
-                          ))}
-                        </Stack>
-                      ))}
-                    </Stack>
-                  )}
-                </Scrollable>
-              </Stack>
+              {/* With nothing to search or scroll, the popover hugs its empty
+                  state instead of holding the full list height open. */}
+              {options.length === 0 ? (
+                <PromptTriggerEmptyState />
+              ) : (
+                <Stack gap="2" maxH="18rem">
+                  <Input
+                    aria-label={t('widgets.generate.searchPromptTriggers')}
+                    placeholder={t('widgets.generate.searchPromptTriggers')}
+                    size="xs"
+                    value={searchTerm}
+                    onChange={handleSearchChange}
+                  />
+                  <Separator />
+                  <Scrollable flex="1" label={t('widgets.generate.promptTriggerOptions')} minH="0">
+                    {filteredOptions.length === 0 ? (
+                      <PromptHistoryEmptyText>{t('widgets.generate.noMatchingTriggers')}</PromptHistoryEmptyText>
+                    ) : (
+                      <Stack gap="2">
+                        {groupedOptions.map((group) => (
+                          <Stack key={group.group} gap="0">
+                            <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase">
+                              {group.group}
+                            </Text>
+                            {group.options.map((option, index) => (
+                              <PromptTriggerOptionButton
+                                key={`${option.group}-${option.value}-${index}`}
+                                onSelect={onSelect}
+                                option={option}
+                              />
+                            ))}
+                          </Stack>
+                        ))}
+                      </Stack>
+                    )}
+                  </Scrollable>
+                </Stack>
+              )}
             </Popover.Body>
           </Popover.Content>
         </Popover.Positioner>
@@ -341,7 +338,7 @@ const PromptTriggerEmptyState = () => {
   const { t } = useTranslation();
 
   return (
-    <Stack align="start" gap="1" h="full" justify="center" px="2">
+    <Stack align="start" gap="1" px="1">
       <Text color="fg.subtle" fontSize="xs">
         {t('widgets.generate.noPromptTriggersAvailable')}
       </Text>
@@ -762,7 +759,7 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
         <Popover.Positioner>
           <Popover.Content bg="bg.muted" borderColor="border.emphasized" borderWidth="1px" w="24rem">
             <Popover.Body p="2.5">
-              <Stack gap="2" h="18rem">
+              <Stack gap="2" maxH="18rem">
                 <HStack justify="space-between">
                   <Input
                     aria-label={t('widgets.generate.searchPromptHistory')}
