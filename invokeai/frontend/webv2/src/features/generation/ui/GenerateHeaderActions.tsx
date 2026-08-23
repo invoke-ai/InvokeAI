@@ -13,7 +13,7 @@ import { resolveGenerateWidgetValues } from '@features/generation/settings';
 import { IconButton, RenameDialog, Tooltip } from '@platform/ui';
 import { MenuContent } from '@platform/ui/Menu';
 import { BookmarkIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GeneratePresetRecord } from './GenerationUiContext';
@@ -37,6 +37,11 @@ export const GenerateHeaderActions = () => {
   const { i18n, t } = useTranslation();
   const ui = useGenerationUi();
   const [isSavingPreset, setIsSavingPreset] = useState(false);
+  // The Tooltip and the Menu render onto the same trigger element and each
+  // machine wants to own its id; sharing one keeps the menu anchored (without
+  // it the menu opens at the viewport origin). See RoutingControl.tsx.
+  const presetsTriggerId = useId();
+  const presetsTriggerIds = useMemo(() => ({ trigger: presetsTriggerId }), [presetsTriggerId]);
   const models = ui.models.catalog;
   const projectId = ui.project.activeProjectId;
   const settings = normalizeGenerateSettings(ui.project.generateValues);
@@ -122,8 +127,8 @@ export const GenerateHeaderActions = () => {
 
   return (
     <>
-      <Menu.Root>
-        <Tooltip content={presetsLabel}>
+      <Menu.Root ids={presetsTriggerIds}>
+        <Tooltip content={presetsLabel} ids={presetsTriggerIds}>
           <Menu.Trigger asChild>
             <IconButton aria-label={presetsLabel} color="fg.muted" size="2xs" variant="ghost">
               <Icon as={BookmarkIcon} boxSize="3.5" />
