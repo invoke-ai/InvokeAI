@@ -8,10 +8,9 @@ import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { refetchClusterLabels } from '@workbench/image-map/imageMapStore';
 import { imageMapVocabKeys, imageMapVocabQueryOptions, updateImageMapVocab } from '@workbench/image-map/vocabulary';
 import { PlusIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -41,7 +40,9 @@ const parseDraft = (draft: string): string[] => {
  * Editor for the supplementary cluster-label vocabulary. Each add/remove
  * persists immediately (the whole list is replaced server-side); after a save
  * the server rebuilds the label embeddings in the background, so the query
- * polls while that runs and re-fetches any open map's labels when it lands.
+ * polls while that runs to keep the status line honest. Re-fetching an open
+ * map's labels when the rebuild lands is NOT this component's job — the data
+ * module's watcher does it, because the dialog may well be closed by then.
  */
 export const ImageMapVocabularySettings = () => {
   const { t } = useTranslation();
@@ -56,20 +57,6 @@ export const ImageMapVocabularySettings = () => {
   const [saveError, setSaveError] = useState<string | null>(null);
   const { isBusy: isSaving, run } = useScopedAction();
 
-  // A vocabulary edit changes what the labels say without moving a single
-  // point, so nothing in the map's own flow would re-fetch them: do it here,
-  // on the rebuild's building -> ready edge.
-  const buildState = query.data?.state;
-  const previousBuildState = useRef(buildState);
-
-  useEffect(() => {
-    if (previousBuildState.current === 'building' && buildState === 'ready') {
-      refetchClusterLabels();
-    }
-
-    previousBuildState.current = buildState;
-  }, [buildState]);
-
   const persist = (nextTerms: string[]): Promise<boolean> => {
     setSaveError(null);
 
@@ -77,6 +64,13 @@ export const ImageMapVocabularySettings = () => {
       async (owner) => {
         const updated = await updateImageMapVocab(nextTerms);
 
+        assertAccountScopeCurrent(owner);
+        // Cancel first: a poll that was issued before the PUT can resolve
+        // after it, and TanStack Query would write that older list over the
+        // response — resurrecting a removed chip and, worse, overwriting
+        // 'building' with a stale 'ready' so the status line goes quiet while
+        // the server is still rebuilding.
+        await queryClient.cancelQueries({ queryKey: imageMapVocabKeys.all });
         assertAccountScopeCurrent(owner);
         queryClient.setQueryData(imageMapVocabKeys.all, updated);
       },
@@ -217,6 +211,10 @@ export const ImageMapVocabularySettings = () => {
                 <Tag.EndElement>
                   <Tag.CloseTrigger
                     aria-label={t('settings.imageMapVocabulary.removeTerm', { term })}
+                    // Disabled while a save is in flight: the busy guard would
+                    // silently drop a second removal, resurrecting the chip
+                    // with no feedback.
+                    disabled={isSaving}
                     onClick={() => {
                       void persist(vocab.terms.filter((existing) => existing !== term));
                     }}
@@ -231,12 +229,23 @@ export const ImageMapVocabularySettings = () => {
           {t('settings.imageMapVocabulary.noTermsYet')}
         </Text>
       )}
-      <VocabularyStatusLine vocab={vocab} />
+      <VocabularyStatusLine
+        vocab={vocab}
+        onRetry={
+          canManageImageMapVocabulary
+            ? () => {
+                // Re-saving the same list re-triggers the invalidation, which
+                // is the server's retry path for a failed embedding build.
+                void persist(vocab.terms);
+              }
+            : undefined
+        }
+      />
     </Stack>
   );
 };
 
-const VocabularyStatusLine = ({ vocab }: { vocab: ImageMapVocab }) => {
+const VocabularyStatusLine = ({ onRetry, vocab }: { onRetry?: () => void; vocab: ImageMapVocab }) => {
   const { t } = useTranslation();
 
   return (
@@ -253,9 +262,16 @@ const VocabularyStatusLine = ({ vocab }: { vocab: ImageMapVocab }) => {
         </HStack>
       ) : null}
       {vocab.state === 'error' && vocab.error ? (
-        <Text color="fg.error" fontSize="2xs" role="alert">
-          {t('settings.imageMapVocabulary.buildFailed', { message: vocab.error })}
-        </Text>
+        <HStack gap="2">
+          <Text color="fg.error" fontSize="2xs" role="alert">
+            {t('settings.imageMapVocabulary.buildFailed', { message: vocab.error })}
+          </Text>
+          {onRetry ? (
+            <Button size="2xs" variant="outline" onClick={onRetry}>
+              {t('common.retry')}
+            </Button>
+          ) : null}
+        </HStack>
       ) : null}
       {vocab.state === 'unavailable' ? (
         <Text color="fg.subtle" fontSize="2xs">

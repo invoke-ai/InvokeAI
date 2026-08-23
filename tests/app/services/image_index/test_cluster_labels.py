@@ -27,6 +27,14 @@ def test_normalize_custom_vocab_terms_lowercases_collapses_and_dedupes() -> None
     assert normalized == ["golden retriever", "zebra"]
 
 
+def test_normalize_custom_vocab_terms_strips_control_characters() -> None:
+    # A NUL inside a term would make the fingerprint's NUL-joined phrase
+    # stream ambiguous: vocab_fingerprint(["cat", "dog"]) equals
+    # vocab_fingerprint(["cat\x00dog"]), so two different term lists could
+    # serve each other's cached embeddings.
+    assert normalize_custom_vocab_terms(["cat\x00dog", "tab\there"]) == ["catdog", "tab here"]
+
+
 def test_normalize_custom_vocab_terms_rejects_an_overlong_term() -> None:
     # Rejected rather than truncated: a silently shortened phrase would embed
     # as something the user never wrote.

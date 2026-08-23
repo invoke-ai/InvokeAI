@@ -52,7 +52,13 @@ def normalize_custom_vocab_terms(raw: list[str]) -> list[str]:
     terms: list[str] = []
     seen: set[str] = set()
     for entry in raw:
-        term = " ".join(entry.split()).lower()
+        # Control characters are dropped before the whitespace collapse: they
+        # cannot be part of a meaningful label, and NUL specifically would make
+        # the fingerprint's NUL-joined phrase stream ambiguous — two different
+        # term lists could hash identically and serve each other's cached
+        # embeddings.
+        cleaned = "".join(ch for ch in entry if ch.isprintable() or ch.isspace())
+        term = " ".join(cleaned.split()).lower()
         if not term:
             continue
         if len(term) > MAX_CUSTOM_VOCAB_TERM_LENGTH:

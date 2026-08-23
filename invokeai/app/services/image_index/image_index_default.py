@@ -485,7 +485,19 @@ class ImageIndexService(ImageIndexServiceBase):
                 # truncates this very file on a fingerprint mismatch.
                 with np.load(cache_path, allow_pickle=False) as cached:
                     if str(cached["fingerprint"]) == fingerprint:
-                        return cached["embeddings"].astype(EMBEDDING_DTYPE)
+                        embeddings = cached["embeddings"].astype(EMBEDDING_DTYPE)
+
+                        # A row-count mismatch means the file does not describe
+                        # these phrases no matter what its fingerprint claims
+                        # (corruption, or a hash collision) — and it would not
+                        # fail here: it row-misaligns the merged matrix, and
+                        # label_clusters then indexes past the vocabulary on
+                        # every labels request.
+                        if embeddings.shape[0] == len(phrases):
+                            return embeddings
+                        self._invoker.services.logger.warning(
+                            f"Discarding cluster vocabulary cache with mismatched row count at {cache_path}"
+                        )
             except Exception:
                 self._invoker.services.logger.warning("Discarding unreadable cluster vocabulary cache")
 
@@ -853,7 +865,19 @@ class ImageIndexService(ImageIndexServiceBase):
                         with self._vocab_lock:
                             self._vocab_cache = None
                             self._vocab_failure = None
-                    self._build_vocab_embeddings()
+                    try:
+                        self._build_vocab_embeddings()
+                    except Exception:
+                        # The build memoizes encoder failures itself; what
+                        # raises here is its pre-build state read (the bundled
+                        # file, the custom-terms table) — transient-class
+                        # failures. Keep the request queued so the next pass
+                        # retries it: with the flag already cleared and the
+                        # caches dropped, letting it escape would strand the
+                        # rebuild in 'idle' with no spinner, no error, and no
+                        # retry until something next asks for labels.
+                        self._vocab_build_requested.set()
+                        raise
                     continue
                 projection_job = self._next_projection_job()
                 if projection_job is not None:

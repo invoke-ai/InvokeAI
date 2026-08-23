@@ -10,17 +10,12 @@ import { userEvent } from 'vitest/browser';
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
-  refetchClusterLabels: vi.fn(),
   updateImageMapVocab: vi.fn((_terms: string[]) => Promise.resolve(null as unknown as ImageMapVocab)),
   vocab: null as ImageMapVocab | null,
 }));
 
 vi.mock('@features/identity', () => ({
   useCapabilities: () => ({ canManageImageMapVocabulary: mocks.canManage }),
-}));
-
-vi.mock('@workbench/image-map/imageMapStore', () => ({
-  refetchClusterLabels: () => mocks.refetchClusterLabels(),
 }));
 
 vi.mock('@workbench/image-map/vocabulary', () => ({
@@ -103,7 +98,6 @@ const chipCloseTriggers = (): HTMLElement[] =>
 
 beforeEach(() => {
   mocks.canManage = true;
-  mocks.refetchClusterLabels.mockClear();
   mocks.updateImageMapVocab.mockClear();
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
@@ -192,22 +186,31 @@ describe('ImageMapVocabularySettings', () => {
     expect(chipCloseTriggers()).toHaveLength(0);
   });
 
-  it('re-fetches any open map labels when the rebuild lands', async () => {
-    await render({ state: 'building', terms: ['zebra'] });
-
-    expect(mocks.refetchClusterLabels).not.toHaveBeenCalled();
-
-    await act(async () => {
-      queryClient!.setQueryData(['image-map', 'vocab'], { ...BASE_VOCAB, state: 'ready', terms: ['zebra'] });
-      await Promise.resolve();
-    });
-
-    expect(mocks.refetchClusterLabels).toHaveBeenCalledTimes(1);
-  });
-
-  it('surfaces a failed embedding build with its message', async () => {
-    await render({ error: 'no text encoder installed', state: 'error' });
+  it('surfaces a failed embedding build with its message and offers a retry', async () => {
+    mocks.updateImageMapVocab.mockImplementation((terms: string[]) =>
+      Promise.resolve({ ...BASE_VOCAB, state: 'building' as const, terms })
+    );
+    await render({ error: 'no text encoder installed', state: 'error', terms: ['zebra'] });
 
     expect(host?.textContent).toContain('The vocabulary could not be prepared: no text encoder installed');
+
+    const retry = Array.from(host!.querySelectorAll('button')).find((button) => button.textContent === 'Retry');
+
+    await userEvent.click(retry!);
+    await flushQueries();
+
+    // Re-saving the same list is the retry path: it re-triggers the
+    // server-side invalidation that clears the memoized failure.
+    expect(mocks.updateImageMapVocab).toHaveBeenCalledWith(['zebra']);
+  });
+
+  it('hides the retry affordance from a non-admin', async () => {
+    mocks.canManage = false;
+    await render({ error: 'no text encoder installed', state: 'error', terms: ['zebra'] });
+
+    expect(host?.textContent).toContain('The vocabulary could not be prepared: no text encoder installed');
+    expect(
+      Array.from(host!.querySelectorAll('button')).find((button) => button.textContent === 'Retry')
+    ).toBeUndefined();
   });
 });

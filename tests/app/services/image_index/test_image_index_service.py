@@ -2259,3 +2259,66 @@ def test_invalidate_vocab_retries_a_failed_build(
 
     _wait_until(lambda: service.get_vocab_build_state() == ("ready", None))
     assert service.get_vocab_embeddings()[0] == ["a cat"]
+
+
+def test_a_cache_with_a_mismatched_row_count_is_discarded_and_re_embedded(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The fingerprint alone cannot be trusted to prove the file describes these
+    # phrases (corruption, hash collision): a wrong row count would misalign
+    # the merged matrix and break every labels request.
+    from invokeai.app.services.image_index.cluster_labels import vocab_fingerprint
+
+    service = _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["okapi"])
+    tag = MODEL_ID.replace(":", "_")[:24]
+    custom_cache = tmp_path / f"cluster_vocab_custom_{tag}.npz"
+    np.savez(
+        custom_cache,
+        embeddings=np.zeros((2, DIM), dtype=EMBEDDING_DTYPE),
+        fingerprint=np.str_(vocab_fingerprint(["okapi"])),
+    )
+
+    service._build_vocab_embeddings()
+
+    assert service._vocab_cache is not None
+    vocabulary, matrix = service._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car", "okapi"]
+    assert matrix.shape == (4, DIM)
+    # Re-embedded, not served from the bogus file.
+    assert np.array_equal(matrix[3], np.full(DIM, float(len("okapi")), dtype=EMBEDDING_DTYPE))
+
+
+def test_a_transient_custom_terms_read_failure_keeps_the_rebuild_queued(
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The worker clears the request flag and drops the caches before the build
+    # reads its state; a transient DB failure there must not strand the
+    # rebuild in 'idle' — the flag is re-set so the next pass retries.
+    from invokeai.app.services.image_index import cluster_labels
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", lambda embed_fn, phrases: _phrase_matrix(phrases))
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
+    index_records.set_custom_vocab_terms(["dog"])
+
+    calls = {"count": 0}
+    original_read = index_records.get_custom_vocab_terms
+
+    def _flaky() -> list[str]:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("simulated: database is locked")
+        return original_read()
+
+    monkeypatch.setattr(index_records, "get_custom_vocab_terms", _flaky)
+
+    service.start(_make_invoker(images_service, index_records))
+    service.invalidate_vocab()
+
+    _wait_until(lambda: service.get_vocab_build_state() == ("ready", None), timeout=15)
+    assert calls["count"] >= 2
+    assert service.get_vocab_embeddings()[0] == ["a cat", "dog"]
