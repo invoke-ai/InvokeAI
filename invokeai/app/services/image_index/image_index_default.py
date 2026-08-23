@@ -1241,12 +1241,19 @@ class ImageIndexService(ImageIndexServiceBase):
             return (
                 f"Image indexing is enabled, but the installed model named '{model_name}' is of type "
                 f"'{types}', not a CLIP Vision or SigLIP image encoder. Install the image-encoder model of "
-                "the same name (for the default, the 'CLIP ViT-L Image Encoder' starter model from source "
-                "'InvokeAI/clip-vit-large-patch14'). The image index will not be updated."
+                "the same name (for the default, the 'DFN2B CLIP ViT-L Image Encoder' starter model from "
+                "source 'apple/DFN2B-CLIP-ViT-L-14-39B'). The image index will not be updated."
             )
+        # Upgrades hit this branch: installs that never set image_index_model
+        # adopt the new default name, which is not installed yet. Name both
+        # ways out — installing the new starter (full re-index) or pinning the
+        # previous default to keep the embeddings already computed under it.
         return (
             f"Image indexing is enabled but the embedding model '{model_name}' is not installed "
-            "(expected a CLIP Vision or SigLIP model). The image index will not be updated."
+            "(expected a CLIP Vision or SigLIP model). For the default, install the "
+            "'DFN2B CLIP ViT-L Image Encoder' starter model from source 'apple/DFN2B-CLIP-ViT-L-14-39B' "
+            "(the gallery will re-index). To keep embeddings computed under the previous default instead, "
+            "set image_index_model: clip-vit-large-patch14. The image index will not be updated."
         )
 
     def _resolve_model_config(self, model_name: str) -> Optional["AnyModelConfig"]:

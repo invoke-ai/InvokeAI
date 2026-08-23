@@ -81,7 +81,21 @@ clip_vit_l_image_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
     source="InvokeAI/clip-vit-large-patch14",
-    description="CLIP VIT-L Image Encoder (used by the imagemap index) ~1.7GB",
+    description="CLIP VIT-L Image Encoder ~1.7GB",
+    type=ModelType.CLIPVision,
+)
+# Apple's DFN2B CLIP: same ViT-L-14 architecture as the model above, much
+# stronger zero-shot weights (Data Filtering Networks, 39B samples seen). The
+# imagemap index default: raw-cosine cluster labeling needs an encoder whose
+# text/image geometry separates well, and the OpenAI weights let generic "hub"
+# phrases (color words) outscore content phrases. The repo also carries an
+# open_clip copy of the weights, which the HF file filter cannot distinguish
+# from the transformers copy — hence the doubled download size in the blurb.
+dfn2b_clip_vit_l_image_encoder = StarterModel(
+    name="DFN2B-CLIP-ViT-L-14-39B",
+    base=BaseModelType.Any,
+    source="apple/DFN2B-CLIP-ViT-L-14-39B",
+    description="DFN2B CLIP ViT-L Image Encoder (used by the imagemap index) ~3.4GB download",
     type=ModelType.CLIPVision,
 )
 # endregion
@@ -2429,6 +2443,7 @@ STARTER_MODELS: list[StarterModel] = [
     t5_gguf_q6_k_encoder,
     clip_l_encoder,
     clip_vit_l_image_encoder,
+    dfn2b_clip_vit_l_image_encoder,
     siglip,
     flux_redux,
     llava_onevision,
