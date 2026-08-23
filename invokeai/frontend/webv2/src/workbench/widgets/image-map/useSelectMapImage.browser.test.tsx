@@ -273,10 +273,10 @@ describe('useMapSelection', () => {
       expect(mocks.selectItem).toHaveBeenCalledTimes(1);
     });
 
-    it('does not fetch past the infinite window cap', async () => {
-      // The infinite window cannot reach beyond GALLERY_MAX_ROWS, so loading
-      // pages toward an unreachable image would only burn requests. The
-      // selection itself still lands (Preview follows it).
+    it('anchors the infinite window at the page of an image past the base reach', async () => {
+      // The base infinite window cannot load beyond GALLERY_MAX_ROWS, so a
+      // deeper image is revealed by anchoring the window at its page instead
+      // of loading toward it; the mounted gallery query fetches on its own.
       mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'infinite', starredFirst: true };
       mocks.resolveMany.mockResolvedValue([{ boardId: 'board-a', image_name: 'deep.png', imageCategory: 'general' }]);
       mocks.fetchNames.mockResolvedValue(namesWithImageAt('deep.png', 700));
@@ -285,7 +285,9 @@ describe('useMapSelection', () => {
       await flush(() => handle.click?.('deep.png'));
 
       expect(mocks.fetchInfiniteQuery).not.toHaveBeenCalled();
+      expect(mocks.setPage).toHaveBeenCalledWith(11);
       expect(mocks.selectItem).toHaveBeenCalledTimes(1);
+      expect(mocks.selectItem.mock.calls[0]?.[2]).toBe(11);
     });
 
     it('drops the page landing when the ordering settings changed mid-lookup', async () => {

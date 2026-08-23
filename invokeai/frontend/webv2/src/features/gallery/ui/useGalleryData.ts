@@ -188,7 +188,13 @@ export const useGalleryData = ({
   } = useInfiniteQuery(
     galleryItemsInfiniteOptions(
       filter,
-      isPaginated ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE } : { kind: 'infinite' }
+      // In infinite mode `page` anchors where the window starts — 0 in normal
+      // browsing (every board/search/view change resets it). A reveal to an
+      // image deeper than the base window's reach sets it, so the grid can
+      // show that part of the listing at all.
+      isPaginated
+        ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE }
+        : { kind: 'infinite', offset: page * GALLERY_PAGE_SIZE }
     )
   );
   const backendItems = useMemo(() => {
@@ -201,7 +207,10 @@ export const useGalleryData = ({
 
     return pageIndex === -1 ? [] : (queryData?.pages[pageIndex]?.items ?? []).slice(0, GALLERY_PAGE_SIZE);
   }, [isPaginated, page, queryData]);
-  const shouldOverlayRecentItems = !isPaginated;
+  // Recents belong at the top of the listing; overlaying them onto a window
+  // anchored mid-board would sort them into a part of the list they are
+  // nowhere near.
+  const shouldOverlayRecentItems = !isPaginated && page === 0;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
   const items = useMemo(
     () =>

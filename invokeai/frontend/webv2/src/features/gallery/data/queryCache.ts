@@ -367,7 +367,9 @@ const runGalleryInvalidation = async (
     }
 
     const anchorOffset =
-      query.queryKey[5] === 'anchor' && typeof query.queryKey[6] === 'number' ? query.queryKey[6] : 0;
+      (query.queryKey[5] === 'anchor' || query.queryKey[5] === 'infinite') && typeof query.queryKey[6] === 'number'
+        ? query.queryKey[6]
+        : 0;
     const anchorIndex = Math.max(0, data.pageParams.indexOf(anchorOffset));
 
     client.setQueryData<InfiniteData<GalleryItemsPage, number>>(query.queryKey, {

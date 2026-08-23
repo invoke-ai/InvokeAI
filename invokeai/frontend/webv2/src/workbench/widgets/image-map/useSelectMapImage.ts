@@ -189,17 +189,20 @@ export const useMapSelection = (): MapSelectionActions => {
             commands.gallery.setPage(page);
           }
 
-          if (
-            boardIndex !== null &&
-            page !== null &&
-            settingsNow.paginationMode === 'infinite' &&
-            boardIndex < GALLERY_MAX_ROWS
-          ) {
-            // Load every page down to the image so the grid can scroll to it;
-            // past the window cap the grid cannot reach it either way. Fire
-            // and forget: the selection must not wait on page hydration, and
-            // the grid's pending reveal settles whenever the item appears.
-            void ensureGalleryPagesLoaded(queryClient, listingFilter, page + 1).catch(() => {});
+          if (boardIndex !== null && page !== null && settingsNow.paginationMode === 'infinite') {
+            if (boardIndex < GALLERY_MAX_ROWS) {
+              // Within the base window's reach: load every page down to the
+              // image so the grid can scroll to it. Fire and forget — the
+              // selection must not wait on page hydration, and the grid's
+              // pending reveal settles whenever the item appears.
+              void ensureGalleryPagesLoaded(queryClient, listingFilter, page + 1).catch(() => {});
+            } else {
+              // Deeper than the base window can ever load: anchor the
+              // infinite window at the image's page instead (the mounted
+              // gallery query fetches it on its own). Any board, search, or
+              // view change resets the anchor back to the top.
+              commands.gallery.setPage(page);
+            }
           }
 
           commands.gallery.selectItem(legacyGeneratedImageToGalleryItem(image), undefined, page ?? undefined);
