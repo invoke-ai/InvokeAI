@@ -463,11 +463,18 @@ class ImageIndexService(ImageIndexServiceBase):
 
                 from transformers import AutoTokenizer, CLIPTextModelWithProjection, SiglipTextModel
 
+                from invokeai.backend.model_manager.util.clip_tower_config import clip_tower_config_override
+
                 model_path = str(self._model_abs_path())
                 is_siglip = self._model_config.type is ModelType.SigLIP
                 try:
                     tokenizer = AutoTokenizer.from_pretrained(model_path, local_files_only=True)
                     text_cls = SiglipTextModel if is_siglip else CLIPTextModelWithProjection
+                    # Full-CLIP checkpoints may carry a nested projection_dim
+                    # that disagrees with the weights; see
+                    # clip_tower_config_override.
+                    tower_config = None if is_siglip else clip_tower_config_override(model_path, "text")
+                    extra_kwargs = {} if tower_config is None else {"config": tower_config}
                     # skip_torch_weight_init serializes nothing: it monkey-patches
                     # torch.nn.Linear/_ConvNd/Embedding.reset_parameters process-wide
                     # and restores whatever it saw on entry. Two threads inside it at
@@ -478,7 +485,7 @@ class ImageIndexService(ImageIndexServiceBase):
                     # load_state_dict(assign=True) would hijack these parameters onto
                     # the meta device. Same reasoning as ModelLoader._load_and_cache.
                     with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
-                        model = text_cls.from_pretrained(model_path, local_files_only=True)
+                        model = text_cls.from_pretrained(model_path, local_files_only=True, **extra_kwargs)
                 except Exception as e:
                     # Vision-only or partial installs (e.g. the IP-Adapter image
                     # encoder, or a full-CLIP checkpoint shipped without tokenizer
@@ -1355,16 +1362,20 @@ class ImageIndexService(ImageIndexServiceBase):
                 if self._cpu_model is None:
                     from transformers import CLIPVisionModelWithProjection, SiglipVisionModel
 
+                    from invokeai.backend.model_manager.util.clip_tower_config import clip_tower_config_override
+
                     model_path = str(self._model_abs_path())
-                    model_cls = (
-                        SiglipVisionModel
-                        if self._model_config.type is ModelType.SigLIP
-                        else CLIPVisionModelWithProjection
-                    )
+                    is_siglip = self._model_config.type is ModelType.SigLIP
+                    model_cls = SiglipVisionModel if is_siglip else CLIPVisionModelWithProjection
+                    # Full-CLIP checkpoints may carry a nested projection_dim
+                    # that disagrees with the weights; see
+                    # clip_tower_config_override.
+                    tower_config = None if is_siglip else clip_tower_config_override(model_path, "vision")
+                    extra_kwargs = {} if tower_config is None else {"config": tower_config}
                     # Process-global patch, so it needs the process-global lock —
                     # see _get_text_encoder for what goes wrong without it.
                     with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
-                        model = model_cls.from_pretrained(model_path, local_files_only=True)
+                        model = model_cls.from_pretrained(model_path, local_files_only=True, **extra_kwargs)
                     model.eval()
                     self._cpu_model = model
             return self._embed(self._cpu_model, images, torch.device("cpu"))
