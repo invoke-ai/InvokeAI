@@ -1,4 +1,5 @@
 /* eslint-disable react-perf/jsx-no-new-function-as-prop */
+import type { ImageIndexCounts } from '@workbench/image-map/indexProgress';
 import type { ImageMapVocab } from '@workbench/image-map/vocabulary';
 
 import { HStack, Icon, Input, Spinner, Stack, Tag, Text, Wrap } from '@chakra-ui/react';
@@ -8,10 +9,20 @@ import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { imageMapStore, refreshImageIndexStatus } from '@workbench/image-map/imageMapStore';
+import { describeIndexProgress, isIndexing } from '@workbench/image-map/indexProgress';
 import { imageMapVocabKeys, imageMapVocabQueryOptions, updateImageMapVocab } from '@workbench/image-map/vocabulary';
 import { PlusIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+/**
+ * How often the index counts are re-read while a rebuild is queued behind one.
+ * Coarse on purpose: it only feeds a "waiting for indexing" line, and the
+ * backend pushes `image_index_status` per batch anyway — this exists so the
+ * line is right when the panel is opened mid-run with no event due.
+ */
+const INDEX_STATUS_POLL_MS = 5_000;
 
 /**
  * Normalize one draft entry the way the server will, so the chips a save adds
@@ -56,6 +67,22 @@ export const ImageMapVocabularySettings = () => {
   const [inputError, setInputError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const { isBusy: isSaving, run } = useScopedAction();
+  // The rebuild runs on the index worker, which services it only once it has
+  // no images left to embed — so during a backfill the spinner can stand for
+  // as long as the backfill does. The counts turn that into a stated wait.
+  const indexCounts = imageMapStore.useSelector((snapshot) => snapshot.indexCounts);
+  const isBuilding = query.data?.state === 'building';
+
+  useEffect(() => {
+    if (!isBuilding) {
+      return;
+    }
+
+    refreshImageIndexStatus();
+    const timer = setInterval(refreshImageIndexStatus, INDEX_STATUS_POLL_MS);
+
+    return () => clearInterval(timer);
+  }, [isBuilding]);
 
   const persist = (nextTerms: string[]): Promise<boolean> => {
     setSaveError(null);
@@ -230,6 +257,7 @@ export const ImageMapVocabularySettings = () => {
         </Text>
       )}
       <VocabularyStatusLine
+        indexCounts={indexCounts}
         vocab={vocab}
         onRetry={
           canManageImageMapVocabulary
@@ -245,8 +273,25 @@ export const ImageMapVocabularySettings = () => {
   );
 };
 
-const VocabularyStatusLine = ({ onRetry, vocab }: { onRetry?: () => void; vocab: ImageMapVocab }) => {
+const VocabularyStatusLine = ({
+  indexCounts,
+  onRetry,
+  vocab,
+}: {
+  indexCounts: ImageIndexCounts | null;
+  onRetry?: () => void;
+  vocab: ImageMapVocab;
+}) => {
   const { t } = useTranslation();
+  // Embedding a handful of terms takes seconds; a wait longer than that means
+  // the rebuild is queued behind image indexing, not running slowly. Saying
+  // which is the difference between "working" and "hung".
+  //
+  // No age is passed, so no "no progress reported for N" note: that needs a
+  // clock ticking in render, which the compiler rightly refuses, and the whole
+  // stall treatment already exists on the map widget where the counts live. A
+  // stalled index shows up here as a number that stops moving.
+  const progress = isIndexing(indexCounts) ? describeIndexProgress(indexCounts) : null;
 
   return (
     <Stack gap="1">
@@ -257,7 +302,9 @@ const VocabularyStatusLine = ({ onRetry, vocab }: { onRetry?: () => void; vocab:
         <HStack gap="1.5">
           <Spinner size="xs" />
           <Text color="fg.subtle" fontSize="2xs">
-            {t('settings.imageMapVocabulary.rebuilding')}
+            {progress
+              ? t('settings.imageMapVocabulary.rebuildingQueued', { progress: progress.counts })
+              : t('settings.imageMapVocabulary.rebuilding')}
           </Text>
         </HStack>
       ) : null}

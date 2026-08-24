@@ -10,12 +10,22 @@ import { userEvent } from 'vitest/browser';
 
 const mocks = vi.hoisted(() => ({
   canManage: true,
+  indexCounts: null as { total: number; embedded: number; pending: number; failed: number } | null,
+  refreshImageIndexStatus: vi.fn(),
   updateImageMapVocab: vi.fn((_terms: string[]) => Promise.resolve(null as unknown as ImageMapVocab)),
   vocab: null as ImageMapVocab | null,
 }));
 
 vi.mock('@features/identity', () => ({
   useCapabilities: () => ({ canManageImageMapVocabulary: mocks.canManage }),
+}));
+
+vi.mock('@workbench/image-map/imageMapStore', () => ({
+  imageMapStore: {
+    useSelector: (selector: (snapshot: object) => unknown) =>
+      selector({ indexCounts: mocks.indexCounts, indexUpdatedAt: null }),
+  },
+  refreshImageIndexStatus: () => mocks.refreshImageIndexStatus(),
 }));
 
 vi.mock('@workbench/image-map/vocabulary', () => ({
@@ -45,6 +55,7 @@ vi.mock('react-i18next', () => ({
         'settings.imageMapVocabulary.loadFailed': 'Could not load the vocabulary.',
         'settings.imageMapVocabulary.noTermsYet': 'No supplementary terms yet.',
         'settings.imageMapVocabulary.rebuilding': 'Updating cluster labels with the new vocabulary…',
+        'settings.imageMapVocabulary.rebuildingQueued': `Waiting for image indexing to finish (${String(options?.progress)}) before updating cluster labels…`,
         'settings.imageMapVocabulary.removeTerm': `Remove ${String(options?.term)}`,
         'settings.imageMapVocabulary.saveFailed': 'Could not save the vocabulary.',
         'settings.imageMapVocabulary.termTooLong': `Terms must be ${String(options?.max)} characters or fewer.`,
@@ -98,6 +109,8 @@ const chipCloseTriggers = (): HTMLElement[] =>
 
 beforeEach(() => {
   mocks.canManage = true;
+  mocks.indexCounts = null;
+  mocks.refreshImageIndexStatus.mockClear();
   mocks.updateImageMapVocab.mockClear();
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
@@ -174,6 +187,35 @@ describe('ImageMapVocabularySettings', () => {
     await flushQueries();
 
     expect(mocks.updateImageMapVocab).toHaveBeenCalledWith(['zebra']);
+  });
+
+  it('explains that the rebuild is queued behind image indexing', async () => {
+    // The rebuild runs on the index worker only once it has no images left to
+    // embed, so during a backfill the spinner can stand for as long as the
+    // backfill does. Without the counts it reads as a hang.
+    mocks.indexCounts = { embedded: 1204, failed: 0, pending: 16846, total: 18050 };
+    await render({ state: 'building', terms: ['zebra'] });
+
+    expect(host?.textContent).toContain('Waiting for image indexing to finish (1,204 of 18,050 images)');
+    expect(host?.textContent).not.toContain('Updating cluster labels with the new vocabulary…');
+    // The panel may be opened mid-run with no status event due.
+    expect(mocks.refreshImageIndexStatus).toHaveBeenCalled();
+  });
+
+  it('says only that labels are updating when the index is idle', async () => {
+    mocks.indexCounts = { embedded: 18050, failed: 0, pending: 0, total: 18050 };
+    await render({ state: 'building', terms: ['zebra'] });
+
+    expect(host?.textContent).toContain('Updating cluster labels with the new vocabulary…');
+    expect(host?.textContent).not.toContain('Waiting for image indexing');
+  });
+
+  it('does not poll index status when no rebuild is running', async () => {
+    mocks.indexCounts = { embedded: 1204, failed: 0, pending: 16846, total: 18050 };
+    await render({ state: 'ready', terms: ['zebra'] });
+
+    expect(mocks.refreshImageIndexStatus).not.toHaveBeenCalled();
+    expect(host?.textContent).not.toContain('Waiting for image indexing');
   });
 
   it('shows a read-only list to a non-admin', async () => {

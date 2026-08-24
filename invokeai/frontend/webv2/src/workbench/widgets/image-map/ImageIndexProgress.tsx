@@ -1,6 +1,6 @@
 import type { ImageIndexCounts } from '@workbench/image-map/indexProgress';
 
-import { Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
+import { Box, Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
 import { Tooltip } from '@platform/ui';
 import { describeIndexProgress } from '@workbench/image-map/indexProgress';
 import { useEffect, useState } from 'react';
@@ -109,6 +109,68 @@ export const ImageIndexProgressPanel = ({
         {error ? 'Retry' : 'Check again'}
       </Button>
     </Stack>
+  );
+};
+
+/**
+ * The same progress as a badge laid over the map itself.
+ *
+ * The panel above is only reachable when there is nothing to draw, so on a
+ * gallery that already has a map — the case for every re-index, including the
+ * automatic one after the embedding model changes — the view drew the old
+ * points and said nothing at all about the work in flight. The footer's line
+ * is 2xs chrome and renders only once `state === 'ready'`, so it is not that
+ * signal either.
+ *
+ * Overlaid rather than substituted: the stale map is still worth using while
+ * the new one is built, so this must not take the panel over. It also names
+ * the labels, which disappear for the duration whenever the vocabulary
+ * embeddings are being rebuilt (a model change, or a supplementary-vocabulary
+ * edit) — that silence was the other half of the map looking broken.
+ */
+export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgressProps) => {
+  const progress = describeIndexProgress(counts, useCountsAge(updatedAt));
+  const label = progress.stale
+    ? `Indexing ${progress.counts} · ${progress.stale}`
+    : `Indexing ${progress.counts}. The map and its cluster labels update as images finish.`;
+
+  return (
+    // The wrapper spans the plot so the badge can sit in its corner, and passes
+    // every pointer event through: the plot underneath is drag-panned and
+    // wheel-zoomed across its whole area, and a full-width transparent layer
+    // that swallowed those would cost more than the badge is worth. The badge
+    // itself takes its events back so the tooltip still opens.
+    <Box inset="0" pointerEvents="none" position="absolute" zIndex="1">
+      <Tooltip content={label}>
+        <HStack
+          bg="bg.subtle"
+          borderColor="border.subtle"
+          borderRadius="md"
+          borderWidth="1px"
+          color="fg.muted"
+          fontSize="2xs"
+          gap="1.5"
+          insetStart="2"
+          maxW="calc(100% - 1rem)"
+          minW="0"
+          pointerEvents="auto"
+          position="absolute"
+          px="2"
+          py="1"
+          title={label}
+          top="2"
+        >
+          <Progress.Root flexShrink="0" max={100} size="xs" value={progress.percent} w="10">
+            <Progress.Track aria-label={`${PROGRESS_LABEL}: ${label}`} aria-valuenow={progress.percent}>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
+          <Text fontVariantNumeric="tabular-nums" truncate>
+            indexing {progress.compact}
+          </Text>
+        </HStack>
+      </Tooltip>
+    </Box>
   );
 };
 

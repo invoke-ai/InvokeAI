@@ -11,6 +11,10 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWidgetValuesSelector: () => false,
 }));
 
+// The real one pulls the ~1.5MB plotly chunk; the badge under test is its
+// sibling, not its child, so a stand-in is enough.
+vi.mock('./ImageMapPlot', () => ({ default: () => <div data-testid="plot" /> }));
+
 vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => {
   const original = (await importOriginal()) as object;
 
@@ -93,5 +97,87 @@ describe('Image Map unavailable states', () => {
     expect(host?.textContent).toContain('The server could not be reached.');
     expect(host?.querySelector('[role="alert"]')?.textContent).toBe('The server could not be reached.');
     expect(host?.querySelector('button')?.textContent).toBe('Retry');
+  });
+});
+
+describe('Image Map indexing activity', () => {
+  const renderMapWithCounts = async (
+    counts: { total: number; embedded: number; pending: number; failed: number } | null
+  ) => {
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      data: {
+        clusterEps: null,
+        modelName: null,
+        pointCount: 2,
+        points: [
+          { cluster: 0, imageName: 'a.png', x: 0, y: 0 },
+          { cluster: 0, imageName: 'b.png', x: 1, y: 1 },
+        ],
+        stale: false,
+        state: 'ready',
+        updatedAt: '2026-08-24T01:00:00',
+        visibleHash: 'hash',
+      },
+      error: null,
+      indexCounts: counts,
+      indexUpdatedAt: counts ? Date.now() : null,
+      loadState: 'loaded',
+      renderError: null,
+    });
+
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageMapWidgetView {...({} as WidgetViewProps)} />
+        </ChakraProvider>
+      )
+    );
+    // The plot is `lazy()`, so the first render in the file waits on the
+    // dynamic import and then on the re-render Suspense schedules once it
+    // resolves. Polled rather than flushed a fixed number of times: the badge
+    // has to be asserted against the resolved tree, not the fallback.
+    for (let attempt = 0; attempt < 50 && !host?.querySelector('[data-testid="plot"]'); attempt += 1) {
+      await act(async () => {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 10);
+        });
+      });
+    }
+  };
+
+  it('reports an index run over the map instead of drawing it silently', async () => {
+    // The has-points branch preempts the progress panel, which is right — a
+    // usable stale map beats a progress bar — but it used to do so with no
+    // sign that anything was happening, which is what a model-change re-index
+    // looks like from the panel: the old map, no labels, no explanation.
+    await renderMapWithCounts({ embedded: 1204, failed: 0, pending: 16846, total: 18050 });
+
+    expect(host?.querySelector('[data-testid="plot"]')).not.toBeNull();
+    expect(host?.textContent).toContain('indexing 1,204/18,050');
+    // The map stays: the badge must not replace it.
+    expect(host?.textContent).not.toContain('Indexing images');
+  });
+
+  it('names the labels in the badge, since they vanish while the vocabulary rebuilds', async () => {
+    await renderMapWithCounts({ embedded: 1204, failed: 0, pending: 16846, total: 18050 });
+
+    const progressbar = host?.querySelector('[role="progressbar"]');
+
+    expect(progressbar?.getAttribute('aria-label')).toContain('cluster labels update as images finish');
+  });
+
+  it('shows no badge once the index is idle', async () => {
+    await renderMapWithCounts({ embedded: 18050, failed: 0, pending: 0, total: 18050 });
+
+    expect(host?.querySelector('[data-testid="plot"]')).not.toBeNull();
+    expect(host?.textContent).not.toContain('indexing');
+  });
+
+  it('shows no badge when the counts are absent, as for a non-admin', async () => {
+    await renderMapWithCounts(null);
+
+    expect(host?.querySelector('[data-testid="plot"]')).not.toBeNull();
+    expect(host?.textContent).not.toContain('indexing');
   });
 });
