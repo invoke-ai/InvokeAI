@@ -4,7 +4,13 @@ import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } fr
 import { isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
 import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { deleteVideosWithDialog } from 'features/deleteVideoModal/store/state';
-import { autoAddBoardIdChanged, boardIdSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
+import {
+  autoAddBoardIdChanged,
+  boardIdSelected,
+  imageSelected,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { S } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
@@ -114,5 +120,24 @@ describe('auth cache isolation', () => {
     store.dispatch(logOut());
 
     await expect(pending).rejects.toBe('User canceled');
+  });
+});
+
+describe('gallery listener registration', () => {
+  it('settles the auto-switch marker through the real store wiring', () => {
+    // The per-listener tests build their own store, so nothing else fails if the registration in
+    // store.ts is deleted — and without it the marker never settles, every stale marker suppresses
+    // the user's next click on that item, and the exact dead click the marker exists to prevent
+    // comes back. This is the one test that dispatches through createStore()'s own listeners.
+    const store = createStore();
+    autoSwitchedImages.settle(null); // module singleton; start from empty
+
+    autoSwitchedImages.record('auto-switched.png');
+    store.dispatch(imageSelected('auto-switched.png'));
+    store.dispatch(imageSelected('user-clicked-elsewhere.png'));
+
+    expect(autoSwitchedImages.consume('auto-switched.png'), 'the marker must not survive the selection moving on').toBe(
+      false
+    );
   });
 });
