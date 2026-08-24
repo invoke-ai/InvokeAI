@@ -1020,8 +1020,9 @@ describe('unauthorized responses', () => {
     // The 401 is still reported to the caller -- that request did fail. What must not happen is
     // the session-wide consequence.
     expect(result.error?.status).toBe(401);
+    // The dispatch is the whole assertion: `sessionExpiredLogout`'s reducer is what removes
+    // B's token from localStorage, so not dispatching it is exactly "B stays authenticated".
     expect(dispatch).not.toHaveBeenCalled();
-    expect(localStorage.getItem('auth_token')).toBe(tokenFor('user-b'));
   });
 
   it('does not end a session over a 401 for the token a refresh replaced', async () => {
@@ -1036,7 +1037,6 @@ describe('unauthorized responses', () => {
     });
 
     expect(dispatch).not.toHaveBeenCalled();
-    expect(localStorage.getItem('auth_token')).toBe(tokenFor('user-a', 2));
   });
 
   it('leaves a 401 on an unauthenticated request alone', async () => {

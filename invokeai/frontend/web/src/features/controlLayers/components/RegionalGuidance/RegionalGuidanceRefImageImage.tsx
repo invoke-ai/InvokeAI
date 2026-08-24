@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiRulerBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { isImageMissingError } from 'services/api/util/imageErrors';
 import { $isConnected } from 'services/events/stores';
 
 type Props = {
@@ -32,16 +33,19 @@ export const RegionalGuidanceRefImageImage = memo(({ image, onChangeImage, dndTa
   const isConnected = useStore($isConnected);
   const tab = useAppSelector(selectActiveTab);
   const isStaging = useCanvasIsStaging();
-  const { currentData: imageDTO, isError } = useGetImageDTOQuery(image?.image_name ?? skipToken);
+  const { currentData: imageDTO, error } = useGetImageDTOQuery(image?.image_name ?? skipToken);
   const handleResetControlImage = useCallback(() => {
     onChangeImage(null);
   }, [onChangeImage]);
 
   useEffect(() => {
-    if (isConnected && isError) {
+    // Only a 404 clears the reference. Any other error leaves it alone: a 5xx or a dropped
+    // connection says nothing about whether the image exists, and this reset is silent and has
+    // no undo. See `isImageMissingError`.
+    if (isConnected && isImageMissingError(error)) {
       handleResetControlImage();
     }
-  }, [handleResetControlImage, isError, isConnected]);
+  }, [handleResetControlImage, error, isConnected]);
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {

@@ -170,10 +170,11 @@ const fetchChunk = async (
   const response = await baseQuery(args);
   // An error is triaged like a success, but only for takeover. Mere expiry passes through
   // untriaged: this chunk's own expired-session 401 is the everyday case — `dynamicBaseQuery`
-  // dispatches `sessionExpiredLogout` before returning it, so the token is already gone by
-  // this line, and a rewrite would turn the ordinary failure into an abort that discards the
-  // committed chunks' report. A takeover, though, must not reach the loops' error handling at
-  // all: that handling *consumes* — it dispatches as-if-committed invalidations and returns
+  // dispatches `sessionExpiredLogout` before returning it (whenever the token it carried is
+  // still the live one, which for this chunk's own request is the ordinary case), so the token
+  // is already gone by this line, and a rewrite would turn the ordinary failure into an abort
+  // that discards the committed chunks' report. A takeover, though, must not reach the loops'
+  // error handling at all: that handling *consumes* — it dispatches as-if-committed invalidations and returns
   // partial aggregates the UI applies — and everything it would consume belongs to the
   // session that started the run, not to whoever owns the tab now.
   if (response.error) {
@@ -517,7 +518,10 @@ export const bulkDownloadQueryFn = async (
       // The mismatch errors from the pre/post-request checks, AND any error response that came
       // back into a session that is no longer the one that asked — which is how this chunk's
       // OWN expired-session 401 arrives: `dynamicBaseQuery` dispatches `sessionExpiredLogout`
-      // before returning it, so the token is already gone. The mutating loops deliberately do
+      // before returning it, so the token is already gone. (It declines to when the token has
+      // since been replaced — a takeover, caught by the same check here, or a sliding-window
+      // refresh, where the session is alive and this chunk is an ordinary failed request.)
+      // The mutating loops deliberately do
       // NOT reclassify that 401 — they need it on the partial path, where the payload feeds
       // `handleDeletions` — but a download has no state work to salvage, and its usual outputs
       // are both wrong for a session that is ending: the failure count is a miscount at the

@@ -61,11 +61,14 @@ export const shouldAcceptRefreshedToken = (requestToken: string, requestGenerati
  * costs nothing, because the session ending is not a one-shot event to be caught — if it really
  * has ended, the next request carries the live token and its 401 ends it here.
  *
- * A null `requestToken` never qualifies: unauthenticated requests (client_state probes during
- * page load, the setup-status query) 401 routinely and must not log anyone out.
+ * A falsy `requestToken` never qualifies: unauthenticated requests (client_state probes during
+ * page load, the setup-status query) 401 routinely and must not log anyone out. Truthiness
+ * rather than a null check, to match the condition `dynamicBaseQuery` actually sends the header
+ * under — an empty-string token sets no `Authorization` header, so its 401 proves nothing about
+ * any session, yet it is equal to the stored empty string.
  */
 export const shouldEndSessionForUnauthorized = (requestToken: string | null): boolean =>
-  requestToken !== null && localStorage.getItem('auth_token') === requestToken;
+  !!requestToken && localStorage.getItem('auth_token') === requestToken;
 
 /** The session an operation started under. See `isSameAuthContext`. */
 export type AuthContext = {
