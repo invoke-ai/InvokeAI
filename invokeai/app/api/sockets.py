@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import FastAPI
 from pydantic import BaseModel
 from socketio import ASGIApp, AsyncServer
-from starlette.types import Message, Receive, Scope, Send
 from starlette.concurrency import run_in_threadpool
+from starlette.types import Message, Receive, Scope, Send
 
 from invokeai.app.services.auth.token_service import verify_token
 from invokeai.app.services.config.config_default import get_config
