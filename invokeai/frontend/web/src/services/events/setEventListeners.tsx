@@ -51,7 +51,14 @@ import { createWorkflowExecutionCoordinator } from 'services/events/workflowExec
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent, $loadingModelsCount, clearAllProgressEvents, setProgressEvent } from './stores';
+import {
+  $lastProgressEvent,
+  $loadingModelsCount,
+  clearAllProgressEvents,
+  clearLLMTaskState,
+  setLLMTaskState,
+  setProgressEvent,
+} from './stores';
 
 const log = logger('events');
 
@@ -66,8 +73,12 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 /**
  * Sets up event listeners for the socketio client. Some components will set up their own listeners. These are the ones
  * that have app-wide implications.
+ *
+ * Returns a disposer. It must be called when this socket goes away — a reconnect with new auth, a
+ * logout, an account switch — because the completion handler can hold pending refetches for outputs
+ * of *this* session, and they dispatch into whatever store is current when they fire.
  */
-export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
+export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg): (() => void) => {
   const { dispatch, getState } = store;
 
   const completedInvocationKeysByItemId = new Map<number, Set<string>>();
@@ -1015,4 +1026,30 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       duration: null,
     });
   });
+
+  socket.on('llm_task_progress', (data) => {
+    log.trace({ data } as JsonObject, 'LLM task progress');
+    setLLMTaskState(data.task_id, { status: 'progress', payload: data });
+  });
+
+  // Completion/error clear the entry rather than storing a terminal state. Socket
+  // delivery is ordered but independent of the HTTP response, so storing a state here
+  // could re-create an entry after the mutation's finally already cleared it, leaking
+  // one orphan per request. The error text surfaces to the user via the RTK Query toast.
+  socket.on('llm_task_complete', (data) => {
+    log.trace({ data } as JsonObject, 'LLM task complete');
+    clearLLMTaskState(data.task_id);
+  });
+
+  socket.on('llm_task_error', (data) => {
+    log.warn({ data } as JsonObject, 'LLM task error');
+    clearLLMTaskState(data.task_id);
+  });
+
+  return () => {
+    // Ends this socket's session for the completion handler: its queued refetches are dropped, and
+    // anything it already has in flight is barred from dispatching into whatever session replaces
+    // this one.
+    onInvocationComplete.dispose();
+  };
 };

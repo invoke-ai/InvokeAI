@@ -279,7 +279,11 @@ class BaseInvocation(ABC, BaseModel):
     """Whether this node's entire execution may be temporarily re-pinned to an idle GPU when
     `offload_text_encoders_to_idle_gpus` is enabled in multi-GPU mode. Only set this to True on nodes
     that exclusively load encoder model(s), run a forward pass, and store their result on the CPU —
-    i.e. nodes that do no work tied to the session's own GPU. Set via the `@invocation` decorator."""
+    i.e. nodes that do no work tied to the session's own GPU. Set via the `@invocation` decorator.
+
+    Weigh the node's runtime before setting this: the borrow holds the lent GPU's exclusive-use lock
+    for the *whole* node — model load included — and a session dequeued onto that GPU blocks until it
+    is released. See `invokeai/backend/util/device_pool.py`."""
 
     UIConfig: ClassVar[UIConfigBase]
 
@@ -770,8 +774,10 @@ def invocation(
             if isinstance(invoke_return_annotation, str):
                 invoke_return_annotation = getattr(sys.modules[cls.__module__], invoke_return_annotation)
 
-            assert invoke_return_annotation is not BaseInvocationOutput
-            assert issubclass(invoke_return_annotation, BaseInvocationOutput)
+            if invoke_return_annotation is BaseInvocationOutput or not issubclass(
+                invoke_return_annotation, BaseInvocationOutput
+            ):
+                raise TypeError
         except Exception:
             raise ValueError(
                 f'Invocation "{invocation_type}" must have a return annotation of a subclass of BaseInvocationOutput (got "{invoke_return_annotation}")'

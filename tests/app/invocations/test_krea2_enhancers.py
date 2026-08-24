@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from invokeai.app.invocations.fields import Krea2ConditioningField
+from invokeai.app.invocations.fields import Krea2ConditioningField, TensorField
 from invokeai.app.invocations.krea2_conditioning_rebalance import Krea2ConditioningRebalanceInvocation
 from invokeai.app.invocations.krea2_seed_variance import Krea2SeedVarianceInvocation
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
@@ -125,6 +125,19 @@ def test_rebalance_applies_overall_multiplier() -> None:
     assert torch.allclose(_saved_embeds(saved), torch.full((1, 1, 12, 2), 3.0))
 
 
+def test_rebalance_preserves_the_regional_mask() -> None:
+    regional_mask = TensorField(tensor_name="regional-mask")
+    invocation = Krea2ConditioningRebalanceInvocation.model_construct(
+        conditioning=Krea2ConditioningField(conditioning_name="c", mask=regional_mask),
+        per_layer_weights=",".join(["1.0"] * 12),
+        multiplier=1.0,
+    )
+
+    output = invocation.invoke(_make_context(torch.ones(1, 1, 12, 2), {}))
+
+    assert output.conditioning.mask == regional_mask
+
+
 # The noise magnitude is auto-calibrated to the embedding std, so tests must use a non-constant tensor
 # (a constant tensor has std 0 and would produce no noise at all).
 def _ramp_embeds() -> torch.Tensor:
@@ -212,10 +225,11 @@ def test_seed_variance_scales_noise_with_embedding_std() -> None:
 
 def test_seed_variance_is_a_noop_when_disabled() -> None:
     embeds = _ramp_embeds()
+    regional_mask = TensorField(tensor_name="regional-mask")
     for strength, percent in ((0.0, 50.0), (0.5, 0.0)):
         saved: dict = {}
         out = Krea2SeedVarianceInvocation.model_construct(
-            conditioning=Krea2ConditioningField(conditioning_name="c"),
+            conditioning=Krea2ConditioningField(conditioning_name="c", mask=regional_mask),
             strength=strength,
             randomize_percent=percent,
             variance_seed=3,
@@ -223,3 +237,18 @@ def test_seed_variance_is_a_noop_when_disabled() -> None:
         # Nothing saved, and the output points back at the untouched input conditioning.
         assert saved == {}
         assert out.conditioning.conditioning_name == "c"
+        assert out.conditioning.mask == regional_mask
+
+
+def test_seed_variance_preserves_the_regional_mask_when_enabled() -> None:
+    regional_mask = TensorField(tensor_name="regional-mask")
+    invocation = Krea2SeedVarianceInvocation.model_construct(
+        conditioning=Krea2ConditioningField(conditioning_name="c", mask=regional_mask),
+        strength=0.5,
+        randomize_percent=50.0,
+        variance_seed=3,
+    )
+
+    output = invocation.invoke(_make_context(_ramp_embeds(), {}))
+
+    assert output.conditioning.mask == regional_mask

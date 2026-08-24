@@ -58,7 +58,7 @@ def _assert_image_direct_owner(image_name: str, current_user: CurrentUserOrDefau
     status_code=201,
     response_model=AddImagesToBoardResult,
 )
-async def add_image_to_board(
+def add_image_to_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Body(description="The id of the board to add to"),
     image_name: str = Body(description="The name of the image to add"),
@@ -93,7 +93,7 @@ async def add_image_to_board(
     status_code=201,
     response_model=RemoveImagesFromBoardResult,
 )
-async def remove_image_from_board(
+def remove_image_from_board(
     current_user: CurrentUserOrDefault,
     image_name: str = Body(description="The name of the image to remove", embed=True),
 ) -> RemoveImagesFromBoardResult:
@@ -129,7 +129,7 @@ async def remove_image_from_board(
     status_code=201,
     response_model=AddImagesToBoardResult,
 )
-async def add_images_to_board(
+def add_images_to_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Body(description="The id of the board to add to"),
     image_names: list[str] = Body(description="The names of the images to add", embed=True),
@@ -183,7 +183,7 @@ async def add_images_to_board(
     status_code=201,
     response_model=RemoveImagesFromBoardResult,
 )
-async def remove_images_from_board(
+def remove_images_from_board(
     current_user: CurrentUserOrDefault,
     image_names: list[str] = Body(description="The names of the images to remove", embed=True),
 ) -> RemoveImagesFromBoardResult:

@@ -2,10 +2,10 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import {
+  flux2VaeModelSelected,
   kleinQwen3EncoderModelSelected,
-  kleinVaeModelSelected,
+  selectFlux2VaeModel,
   selectKleinQwen3EncoderModel,
-  selectKleinVaeModel,
   selectMainModelConfig,
 } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -22,7 +22,7 @@ import type { Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types
 const ParamFlux2KleinVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const kleinVaeModel = useAppSelector(selectKleinVaeModel);
+  const flux2VaeModel = useAppSelector(selectFlux2VaeModel);
   const mainModelConfig = useAppSelector(selectMainModelConfig);
   const [modelConfigs, { isLoading }] = useFlux2VAEModels();
   const [diffusersModels] = useFlux2DiffusersModels();
@@ -30,9 +30,9 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {
       if (model) {
-        dispatch(kleinVaeModelSelected(zModelIdentifierField.parse(model)));
+        dispatch(flux2VaeModelSelected(zModelIdentifierField.parse(model)));
       } else {
-        dispatch(kleinVaeModelSelected(null));
+        dispatch(flux2VaeModelSelected(null));
       }
     },
     [dispatch]
@@ -41,7 +41,7 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
   const { options, value, onChange, noOptionsMessage } = useModelCombobox({
     modelConfigs,
     onChange: _onChange,
-    selectedModel: kleinVaeModel,
+    selectedModel: flux2VaeModel,
     isLoading,
   });
 

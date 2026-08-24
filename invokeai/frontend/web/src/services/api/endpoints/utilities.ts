@@ -17,10 +17,13 @@ type ExpandPromptRequest = {
   model_key: string;
   max_tokens?: number;
   system_prompt?: string | null;
+  seed?: number | null;
+  task_id?: string | null;
 };
 
 type ExpandPromptResponse = {
   expanded_prompt: string;
+  seed: number;
   error?: string | null;
 };
 
@@ -28,6 +31,7 @@ type ImageToPromptRequest = {
   image_name: string;
   model_key: string;
   instruction?: string;
+  task_id?: string | null;
 };
 
 type ImageToPromptResponse = {

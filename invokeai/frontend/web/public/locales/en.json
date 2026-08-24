@@ -407,7 +407,9 @@
         "noTextLLMInstalledDescription": "Prompt expansion needs a Text LLM (causal language model). We recommend Qwen2.5-1.5B-Instruct (~3 GB) — small, fast, and available as a starter model.",
         "noVisionModelInstalledTitle": "No vision model installed",
         "noVisionModelInstalledDescription": "Image-to-prompt needs a vision-language model (e.g. LLaVA Onevision). The 0.5B starter (~1 GB) is the lightweight default.",
-        "openModelManager": "Open Model Manager"
+        "openModelManager": "Open Model Manager",
+        "llmTaskLoadingModel": "Loading model…",
+        "llmTaskGenerating": "Generating…"
     },
     "queue": {
         "queue": "Queue",
@@ -416,6 +418,7 @@
         "queueActionsMenu": "Queue Actions Menu",
         "queueEmpty": "Queue Empty",
         "queueItem": "Queue Item",
+        "queueItemLoadFailed": "This queue item could not be loaded.",
         "enqueueing": "Queueing Batch",
         "resume": "Resume",
         "resumeTooltip": "Resume Processor",
@@ -741,7 +744,7 @@
             },
             "selectBboxTool": {
                 "title": "Bbox Tool",
-                "desc": "Select the bounding box tool."
+                "desc": "Tap to select the bounding box tool, or hold to use it temporarily."
             },
             "decrementToolWidth": {
                 "title": "Decrement Tool Width",
@@ -1066,6 +1069,11 @@
         "seedreamOptimizePrompt": "Seedream Optimize Prompt",
         "guidance": "Guidance",
         "height": "Height",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
         "imageSize": "Image Size",
@@ -1081,6 +1089,7 @@
         "noRecallParameters": "No parameters to recall found",
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
+        "mistralEncoder": "Mistral Encoder",
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwen3Source": "Qwen3 Source",
@@ -1403,6 +1412,7 @@
         "pidSteps": "PiD Steps",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwenVLEncoder": "Qwen2.5-VL Encoder",
+        "mistralEncoder": "Mistral Encoder",
         "qwen3VLEncoder": "Qwen3-VL Encoder",
         "animaVae": "VAE",
         "animaVaePlaceholder": "Select Anima-compatible VAE",
@@ -1428,6 +1438,12 @@
         "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
+        "flux2DevVae": "FLUX.2 [dev] VAE",
+        "flux2DevVaePlaceholder": "Auto (from Diffusers source)",
+        "flux2DevVaeNoModelPlaceholder": "Select a FLUX.2 VAE model",
+        "flux2DevMistralEncoder": "FLUX.2 [dev] Mistral Encoder",
+        "flux2DevMistralEncoderPlaceholder": "Auto (from Diffusers source)",
+        "flux2DevMistralEncoderNoModelPlaceholder": "Select a Mistral text encoder",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
         "qwenImageComponentSourcePlaceholder": "GGUF models require this unless a standalone VAE & Encoder is installed",
         "qwenImageVae": "VAE",
@@ -1715,6 +1731,11 @@
         "cfgScale": "CFG Scale",
         "cfgRescaleMultiplier": "CFG Rescale Multiplier",
         "clipSkip": "CLIP Skip",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "coherenceMode": "Mode",
         "coherenceEdgeSize": "Edge Size",
         "coherenceMinDenoise": "Min Denoise",
@@ -1769,8 +1790,14 @@
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noFlux2KleinVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 Klein models require a standalone VAE",
             "noFlux2KleinQwen3EncoderModelSelected": "No Qwen3 Encoder selected. Non-diffusers FLUX.2 Klein models require a standalone Qwen3 Encoder",
+            "noFlux2DevVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 [dev] models require a standalone FLUX.2 VAE",
+            "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
-            "noWanComponentSourceSelected": "GGUF Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "noWanComponentSourceSelected": "Single-file Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "incompatibleWanVae": "The selected VAE does not match the Wan transformer. TI2V-5B needs the 48-channel Wan 2.2 VAE; A14B needs the 16-channel Wan 2.1 VAE.",
+            "incompatibleWanComponentSource": "The selected Component Source does not match the Wan transformer. Pick a Diffusers Wan model of the same family (TI2V-5B or A14B).",
+            "incompatibleWanLowNoiseExpert": "The Transformer (Low Noise) model is a different Wan variant from the main transformer. Both experts must be the same variant.",
+            "duplicateWanTransformer": "The same model is selected as both Transformer and Transformer (Low Noise). An A14B expert pair needs two different models.",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",
@@ -1940,8 +1967,8 @@
         "general": "General",
         "generation": "Generation",
         "generationDevices": "Generation Devices",
-        "generationDevicesAuto": "Auto (all GPUs)",
-        "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU.",
+        "generationDevicesAuto": "Auto",
+        "generationDevicesHelp": "Select which devices to use for parallel generation, one session per device. \"Auto\" uses every available GPU — unless the legacy 'device' setting in invokeai.yaml pins a specific device, in which case only that device is used. An explicit selection here overrides 'device'.",
         "generationDevicesRestart": "Restart InvokeAI for changes to take effect.",
         "generationDevicesSaveFailed": "Failed to save Generation Devices",
         "imageSubfolderStrategy": "Image Subfolder Strategy",
@@ -2027,6 +2054,7 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "imageStorageMaintenanceActive": "Image storage maintenance is active. Recover it before retrying the upload.",
         "videoUploaded": "Video Uploaded",
         "videoUploadFailed": "Video Upload Failed",
         "videoPlaybackFailed": "Unable to Play Video",
@@ -2129,6 +2157,41 @@
         "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
+        "hidiffusion": {
+            "heading": "HiDiffusion",
+            "paragraphs": [
+                "Enables HiDiffusion denoising for higher-resolution generation.",
+                "Try at 1536px or higher for the most visible effect."
+            ]
+        },
+        "hidiffusionRauNet": {
+            "heading": "HiDiffusion: RAU-Net",
+            "paragraphs": [
+                "Enables RAU-Net blocks used by HiDiffusion.",
+                "Can improve structure and detail at higher resolutions."
+            ]
+        },
+        "hidiffusionWindowAttn": {
+            "heading": "HiDiffusion: Window Attention",
+            "paragraphs": [
+                "Enables windowed attention used by HiDiffusion.",
+                "Can boost local detail, but may affect global coherence."
+            ]
+        },
+        "hidiffusionT1Ratio": {
+            "heading": "HiDiffusion: T1 Ratio",
+            "paragraphs": [
+                "Controls the early switch point for HiDiffusion (T1).",
+                "Lower values switch earlier; higher values preserve global structure longer."
+            ]
+        },
+        "hidiffusionT2Ratio": {
+            "heading": "HiDiffusion: T2 Ratio",
+            "paragraphs": [
+                "Controls the late switch point for HiDiffusion (T2).",
+                "Higher values keep window attention active longer."
+            ]
+        },
         "clipSkip": {
             "heading": "CLIP Skip",
             "paragraphs": [
@@ -2637,7 +2700,7 @@
             "heading": "FP8 Storage",
             "paragraphs": [
                 "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
-                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs, and on Intel GPUs that support FP8 storage."
             ]
         }
     },
