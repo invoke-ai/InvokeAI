@@ -94,6 +94,7 @@ describe('image map store', () => {
     mocks.apiFetchJson.mockReset();
     imageMapStore.setSnapshot({
       clusterLabels: null,
+      clusterLabelsHash: null,
       data: null,
       error: null,
       indexCounts: null,
@@ -118,7 +119,7 @@ describe('image map store', () => {
     mocks.apiFetchJson.mockImplementation((url: string) => {
       if (url.startsWith('/api/v1/image_map/cluster_labels')) {
         return Promise.resolve({
-          labels: { '0': { label: 'cats' } },
+          labels: { '0': { alternates: ['kittens', 'pets'], label: 'cats' } },
           updated_at: BACKEND_RESPONSE.updated_at,
           visible_hash: BACKEND_RESPONSE.visible_hash,
         });
@@ -133,8 +134,46 @@ describe('image map store', () => {
     // with; the adaptive default could resolve differently on a drifted set.
     await vi.waitFor(() => {
       expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/image_map/cluster_labels?eps=0.42');
-      expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': 'cats' });
+      expect(imageMapStore.getSnapshot().clusterLabels).toEqual({
+        '0': { alternates: ['kittens', 'pets'], label: 'cats' },
+      });
     });
+    // Stamped with the set they were clustered over, so a consumer can tell
+    // they still describe the drawn points.
+    expect(imageMapStore.getSnapshot().clusterLabelsHash).toBe(BACKEND_RESPONSE.visible_hash);
+  });
+
+  it('marks labels stale as soon as a refresh renumbers the clusters', async () => {
+    // L1: points and matching labels land together.
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return Promise.resolve({
+          labels: { '0': { alternates: [], label: 'cats' } },
+          updated_at: BACKEND_RESPONSE.updated_at,
+          visible_hash: BACKEND_RESPONSE.visible_hash,
+        });
+      }
+
+      return Promise.resolve(BACKEND_RESPONSE);
+    });
+    await refreshImageMapPoints();
+    await vi.waitFor(() => {
+      expect(imageMapStore.getSnapshot().clusterLabelsHash).toBe(BACKEND_RESPONSE.visible_hash);
+    });
+
+    // L2: a refresh over a drifted set, whose labels have not come back yet.
+    // DBSCAN may have renumbered every cluster, so the labels still in the
+    // store describe a clustering that is no longer drawn — the hash must say
+    // so for the whole window rather than only once new labels arrive.
+    const drifted = { ...BACKEND_RESPONSE, visible_hash: 'hash-2' };
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/cluster_labels') ? new Promise(() => {}) : Promise.resolve(drifted)
+    );
+    await refreshImageMapPoints();
+
+    const snapshot = imageMapStore.getSnapshot();
+    expect(snapshot.clusterLabels).not.toBeNull();
+    expect(snapshot.clusterLabelsHash).not.toBe(snapshot.data?.visibleHash);
   });
 
   it('discards label responses clustered over a drifted visible set', async () => {
@@ -194,7 +233,7 @@ describe('image map store', () => {
     });
     await refreshImageMapPoints();
     await vi.waitFor(() => {
-      expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': 'cats' });
+      expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': { alternates: [], label: 'cats' } });
     });
 
     // L1's late failure is stale: it must not wipe the labels L2 set.
@@ -202,7 +241,7 @@ describe('image map store', () => {
     await new Promise((resolve) => {
       setTimeout(resolve, 0);
     });
-    expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': 'cats' });
+    expect(imageMapStore.getSnapshot().clusterLabels).toEqual({ '0': { alternates: [], label: 'cats' } });
   });
 
   it('records errors and keeps prior data', async () => {
@@ -320,6 +359,7 @@ describe('snapshot transitions', () => {
     // starts at null; seed a real error first so the clearing is what is tested.
     imageMapStore.setSnapshot({
       clusterLabels: null,
+      clusterLabelsHash: null,
       data: null,
       error: 'boom',
       indexCounts: null,
@@ -348,6 +388,7 @@ describe('snapshot transitions', () => {
     // mounting the plot, and nothing else ever resets renderError.
     imageMapStore.setSnapshot({
       clusterLabels: null,
+      clusterLabelsHash: null,
       data: null,
       error: null,
       indexCounts: null,
@@ -368,6 +409,7 @@ const drainMacrotask = (): Promise<void> =>
 
 const EMPTY_SNAPSHOT = {
   clusterLabels: null,
+  clusterLabelsHash: null,
   data: null,
   error: null,
   indexCounts: null,

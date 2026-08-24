@@ -1,7 +1,8 @@
-import type { ImageMapPoint } from '@workbench/image-map/api';
+import type { ImageMapClusterLabelInfo, ImageMapImageLabels, ImageMapPoint } from '@workbench/image-map/api';
 import type { ClusterAnnotation } from '@workbench/image-map/imageMapTraces';
 import type { AxisRanges } from '@workbench/image-map/imageMapViewport';
 import type { PlotlyHTMLElement } from 'plotly.js';
+import type { CSSProperties } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import {
@@ -10,7 +11,9 @@ import {
   parseGalleryItemKey,
 } from '@features/gallery/contracts';
 import { attachWheelZoom } from '@workbench/image-map/attachWheelZoom';
+import { getClusterColor, isClusterColorLight } from '@workbench/image-map/clusterPalette';
 import { collectClusterSelection } from '@workbench/image-map/clusterSelection';
+import { getImageLabels } from '@workbench/image-map/imageLabelCache';
 import { imageMapStore } from '@workbench/image-map/imageMapStore';
 import {
   buildAllPointsTrace,
@@ -31,7 +34,7 @@ import {
 import { getThumbnailUrl } from '@workbench/image-map/thumbnailCache';
 import { shallowEqual, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import Plotly from 'plotly.js-gl2d-dist-min';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { useMapSelection } from './useSelectMapImage';
 
@@ -50,9 +53,11 @@ const swallow = (promise: Promise<unknown>): void => {
   promise.catch(() => {});
 };
 
-/** Matches the preview's `maxW`/`maxH` (Chakra 40 = 10rem); used to keep it on-screen. */
+/** Bounds the hover card's thumbnail. */
 const HOVER_PREVIEW_MAX_PX = 160;
 const HOVER_PREVIEW_OFFSET_PX = 14;
+/** Keep the hover card at least this clear of the viewport edges. */
+const HOVER_PREVIEW_EDGE_PAD_PX = 10;
 
 interface HoverPreview {
   imageName: string;
@@ -60,6 +65,162 @@ interface HoverPreview {
   clientX: number;
   clientY: number;
 }
+
+/**
+ * Cluster identity for the hovered image, resolved from the CURRENT points.
+ * Deliberately not captured at hover time: a hover survives a live refresh
+ * (see `hoverPreview` below), and a refresh re-runs DBSCAN, which can renumber
+ * every cluster. A frozen id would then be paired with the new clustering's
+ * labels and color — a card describing a cluster the image is not in.
+ */
+interface HoverCluster {
+  /** DBSCAN cluster of the hovered point; -1 means unclustered noise. */
+  cluster: number;
+  /** Points currently on the map in that cluster. */
+  clusterSize: number;
+}
+
+const FIRST_TAG_STYLE: CSSProperties = { fontStyle: 'italic', fontWeight: 'bold' };
+const REST_TAG_STYLE: CSSProperties = { fontStyle: 'italic' };
+const HOVER_IMG_STYLE: CSSProperties = {
+  borderRadius: '6px',
+  display: 'block',
+  margin: '0 auto',
+  maxHeight: `${HOVER_PREVIEW_MAX_PX}px`,
+  maxWidth: `${HOVER_PREVIEW_MAX_PX}px`,
+};
+
+/** "a, b, c" with the first tag emphasized, all on the cluster color. */
+const HoverTagsRow = ({ prefix, tags, style }: { prefix: string; tags: string[]; style: CSSProperties }) => (
+  <Box fontSize="xs" px="2" py="0.5" style={style} textAlign="center">
+    {prefix}
+    {tags.map((tag, index) => (
+      <span key={tag} style={index === 0 ? FIRST_TAG_STYLE : REST_TAG_STYLE}>
+        {index > 0 ? ', ' : ''}
+        {tag}
+      </span>
+    ))}
+  </Box>
+);
+
+/**
+ * The hover card: thumbnail, filename, cluster identity/size, and the top
+ * cluster and image tags — PhotoMapAI's popup. The card is tinted with the
+ * hovered cluster's color, and the text flips dark/light to stay readable on
+ * it. Its size depends on async content (the thumbnail and the lazily
+ * fetched image tags), so it renders invisibly, is measured, and is then
+ * placed beside the cursor — flipped to the other side when it would leave
+ * the viewport. Parents key this by image name so a new hover starts clean.
+ */
+const MapHoverCard = ({
+  preview,
+  hoverCluster,
+  clusterLabel,
+}: {
+  preview: HoverPreview;
+  hoverCluster: HoverCluster;
+  clusterLabel: ImageMapClusterLabelInfo | null;
+}) => {
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const [imageLabels, setImageLabels] = useState<ImageMapImageLabels | null>(null);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
+
+  // Image tags are computed on demand (network round-trip on first hover of
+  // an image; session-cached after). The card renders without the row until
+  // they arrive.
+  useEffect(() => {
+    let cancelled = false;
+
+    void getImageLabels(preview.imageName).then((labels) => {
+      if (!cancelled) {
+        setImageLabels(labels);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [preview.imageName]);
+
+  // Re-measure whenever content that changes the card's size lands.
+  useLayoutEffect(() => {
+    const card = cardRef.current;
+
+    if (!card) {
+      return;
+    }
+
+    const rect = card.getBoundingClientRect();
+    let left = preview.clientX + HOVER_PREVIEW_OFFSET_PX;
+    let top = preview.clientY + HOVER_PREVIEW_OFFSET_PX;
+
+    if (left + rect.width > window.innerWidth - HOVER_PREVIEW_EDGE_PAD_PX) {
+      left = Math.max(0, preview.clientX - rect.width - HOVER_PREVIEW_OFFSET_PX);
+    }
+
+    if (top + rect.height > window.innerHeight - HOVER_PREVIEW_EDGE_PAD_PX) {
+      top = Math.max(0, preview.clientY - rect.height - HOVER_PREVIEW_OFFSET_PX);
+    }
+
+    setPosition({ left, top });
+  }, [preview.clientX, preview.clientY, imageLabels, imageLoaded, clusterLabel, hoverCluster]);
+
+  // The palette color drives every style on the card; memoized so JSX gets
+  // stable objects (and text stays readable via the dark/light flip).
+  const styles = useMemo(() => {
+    const clusterColor = getClusterColor(hoverCluster.cluster);
+    const lightBackground = isClusterColorLight(clusterColor);
+    const color = lightBackground ? '#222222' : '#FFFFFF';
+    const textShadow = lightBackground ? '0 1px 2px #FFFFFF' : '0 1px 2px #000000';
+
+    return {
+      band: { background: 'rgba(0, 0, 0, 0.25)', color, textShadow } satisfies CSSProperties,
+      card: { background: clusterColor, border: `2px solid ${clusterColor}` } satisfies CSSProperties,
+      filename: { color, textShadow, wordBreak: 'break-all' } satisfies CSSProperties,
+      tags: { color, textShadow } satisfies CSSProperties,
+    };
+  }, [hoverCluster.cluster]);
+
+  const clusterTags = clusterLabel ? [clusterLabel.label, ...clusterLabel.alternates].slice(0, 3) : null;
+  const imageTags = imageLabels ? [imageLabels.label, ...imageLabels.alternates].slice(0, 3) : null;
+
+  return (
+    <Box
+      left={`${position?.left ?? 0}px`}
+      maxW="60"
+      p="2"
+      pb="1"
+      pointerEvents="none"
+      position="fixed"
+      ref={cardRef}
+      rounded="lg"
+      shadow="lg"
+      style={styles.card}
+      top={`${position?.top ?? 0}px`}
+      visibility={position ? 'visible' : 'hidden'}
+      zIndex="tooltip"
+    >
+      <img
+        alt={preview.imageName}
+        onError={() => setImageLoaded(true)}
+        onLoad={() => setImageLoaded(true)}
+        src={preview.url}
+        style={HOVER_IMG_STYLE}
+      />
+      <Box fontSize="xs" mt="1" style={styles.filename} textAlign="center">
+        {preview.imageName}
+      </Box>
+      <Box fontSize="xs" fontWeight="bold" mt="1" py="0.5" rounded="sm" style={styles.band} textAlign="center">
+        {hoverCluster.cluster < 0
+          ? 'Unclustered'
+          : `Cluster ${hoverCluster.cluster} (size=${hoverCluster.clusterSize})`}
+      </Box>
+      {clusterTags ? <HoverTagsRow prefix="Cluster tags: " style={styles.tags} tags={clusterTags} /> : null}
+      {imageTags ? <HoverTagsRow prefix="Image tags: " style={styles.tags} tags={imageTags} /> : null}
+    </Box>
+  );
+};
 
 interface PlotElement extends PlotlyHTMLElement {
   _fullLayout?: {
@@ -130,6 +291,14 @@ const ImageMapPlot = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const points = imageMapStore.useSelector((snapshot) => snapshot.data?.points ?? null);
   const clusterLabels = imageMapStore.useSelector((snapshot) => snapshot.clusterLabels);
+  // Whether those labels were computed over the clustering now drawn. The
+  // annotations accept a stale set for the ~1s until fresh ones land (see the
+  // relayout effect below), but the hover card names one specific cluster by
+  // id, and a refresh can renumber every id — so it shows no tags rather than
+  // another cluster's.
+  const clusterLabelsMatchPoints = imageMapStore.useSelector(
+    (snapshot) => snapshot.clusterLabelsHash !== null && snapshot.clusterLabelsHash === snapshot.data?.visibleHash
+  );
   const selectedImageName = useWidgetValuesSelector(
     'gallery',
     (values) => getSelectedGalleryImageFromValues(values)?.imageName ?? null
@@ -449,6 +618,16 @@ const ImageMapPlot = ({
   // re-materializing every coordinate array — and, more visibly, from resetting
   // the highlight and current-image traces to empty, which made the gold marker
   // and the multi-select highlight blink off and back on with every refresh.
+  // The annotation builder wants the display strings only; the full label
+  // info (alternates included) feeds the hover card below.
+  const annotationLabels = useMemo(
+    () =>
+      clusterLabels === null
+        ? null
+        : Object.fromEntries(Object.entries(clusterLabels).map(([clusterId, info]) => [clusterId, info.label])),
+    [clusterLabels]
+  );
+
   useEffect(() => {
     const container = containerRef.current as PlotElement | null;
 
@@ -456,9 +635,9 @@ const ImageMapPlot = ({
       return;
     }
 
-    fullAnnotationsRef.current = buildClusterAnnotations(points, showClusterLabels ? clusterLabels : null);
+    fullAnnotationsRef.current = buildClusterAnnotations(points, showClusterLabels ? annotationLabels : null);
     applyDeclutteredAnnotations(container);
-  }, [applyDeclutteredAnnotations, clusterLabels, plotRevision, points, showClusterLabels]);
+  }, [annotationLabels, applyDeclutteredAnnotations, plotRevision, points, showClusterLabels]);
 
   // Custom zoom handlers + container size tracking, attached once for the
   // plot's lifetime; plotly does not observe its container.
@@ -534,52 +713,42 @@ const ImageMapPlot = ({
   // clearing on it would silently cancel live hovers — they would not come
   // back either, since `Plotly.react` resets hover state and no new
   // `plotly_hover` fires until the pointer moves.
+  // Requires a live point set, not just one that does not contradict the
+  // hover: `points` goes null when the account is invalidated, and the card
+  // must go with it rather than keep the previous account's thumbnail on
+  // screen — with a cluster identity that resolves to the noise sentinel.
   const hoverPreview =
-    pendingHoverPreview && points && !points.some((point) => point.imageName === pendingHoverPreview.imageName)
-      ? null
-      : pendingHoverPreview;
+    pendingHoverPreview && points?.some((point) => point.imageName === pendingHoverPreview.imageName)
+      ? pendingHoverPreview
+      : null;
 
-  // The widget is usually docked in a side rail, so a point near the right or
-  // bottom edge would otherwise put a fixed-position preview off-screen, where
-  // nothing can scroll it into view. Flip to the other side of the cursor when
-  // it does not fit.
-  const previewPosition = hoverPreview
-    ? {
-        left:
-          hoverPreview.clientX + HOVER_PREVIEW_OFFSET_PX + HOVER_PREVIEW_MAX_PX > window.innerWidth
-            ? Math.max(0, hoverPreview.clientX - HOVER_PREVIEW_OFFSET_PX - HOVER_PREVIEW_MAX_PX)
-            : hoverPreview.clientX + HOVER_PREVIEW_OFFSET_PX,
-        top:
-          hoverPreview.clientY + HOVER_PREVIEW_OFFSET_PX + HOVER_PREVIEW_MAX_PX > window.innerHeight
-            ? Math.max(0, hoverPreview.clientY - HOVER_PREVIEW_OFFSET_PX - HOVER_PREVIEW_MAX_PX)
-            : hoverPreview.clientY + HOVER_PREVIEW_OFFSET_PX,
-      }
-    : { left: 0, top: 0 };
+  // Resolved from the live points, so the id, the size and the tint describe
+  // the clustering currently drawn even after a refresh has renumbered it
+  // under a stationary pointer. `hoverPreview` non-null already implies the
+  // image is in `points`, so there is no missing-point fallback to take.
+  const hoverCluster = useMemo((): HoverCluster => {
+    if (!hoverPreview || !points) {
+      return { cluster: -1, clusterSize: 0 };
+    }
+
+    const cluster = points.find((point) => point.imageName === hoverPreview.imageName)?.cluster ?? -1;
+
+    return {
+      cluster,
+      clusterSize: points.reduce((count, point) => (point.cluster === cluster ? count + 1 : count), 0),
+    };
+  }, [hoverPreview, points]);
 
   return (
     <Box h="full" minH="0" position="relative" w="full">
       <Box ref={containerRef} h="full" w="full" />
       {hoverPreview ? (
-        <Box
-          borderColor="border.emphasized"
-          borderWidth="1px"
-          left={`${previewPosition.left}px`}
-          maxH="40"
-          maxW="40"
-          overflow="hidden"
-          pointerEvents="none"
-          position="fixed"
-          rounded="md"
-          shadow="lg"
-          top={`${previewPosition.top}px`}
-          zIndex="tooltip"
-        >
-          <img
-            alt={hoverPreview.imageName}
-            src={hoverPreview.url}
-            style={{ display: 'block', maxHeight: `${HOVER_PREVIEW_MAX_PX}px`, maxWidth: `${HOVER_PREVIEW_MAX_PX}px` }}
-          />
-        </Box>
+        <MapHoverCard
+          clusterLabel={(clusterLabelsMatchPoints ? clusterLabels?.[String(hoverCluster.cluster)] : null) ?? null}
+          hoverCluster={hoverCluster}
+          key={hoverPreview.imageName}
+          preview={hoverPreview}
+        />
       ) : null}
     </Box>
   );

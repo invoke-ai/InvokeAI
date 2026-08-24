@@ -31,3 +31,17 @@ export const getClusterColor = (cluster: number): string => {
 
   return CLUSTER_PALETTE[cluster % CLUSTER_PALETTE.length];
 };
+
+/**
+ * Whether text on this background needs to be dark to stay readable.
+ * Perceived-brightness formula and threshold from PhotoMapAI, so hover cards
+ * flip dark/light at the same point its popups do.
+ */
+export const isClusterColorLight = (hexColor: string): boolean => {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+
+  return (r * 299 + g * 587 + b * 114) / 1000 > 180;
+};
