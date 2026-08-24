@@ -6601,6 +6601,74 @@
         ]
       }
     },
+    "/api/v1/image_map/vocab": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Vocab",
+        "description": "Gets the supplementary cluster-labeling vocabulary.\n\nThe list is server-wide: cluster labels are computed against one shared\nvocabulary. Readable by any user; only admins may change it.",
+        "operationId": "get_image_map_vocab",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapVocabResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "put": {
+        "tags": ["image_map"],
+        "summary": "Update Image Map Vocab",
+        "description": "Replaces the supplementary cluster-labeling vocabulary. Admin-only.\n\nThe stored embeddings are invalidated and rebuilt in the background (the\nresponse's `state` reflects this); labels served in the meantime still use\nthe previous vocabulary. Works while the index is disabled too \u2014 terms\npersist and take effect when indexing next runs.",
+        "operationId": "update_image_map_vocab",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageMapVocabUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapVocabResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/image_map/status": {
       "get": {
         "tags": ["image_map"],
@@ -42455,6 +42523,67 @@
         "required": ["enabled", "projection"],
         "title": "ImageMapStatusResponse",
         "description": "Combined index + projection status for the current user."
+      },
+      "ImageMapVocabResponse": {
+        "properties": {
+          "terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Terms",
+            "description": "The stored supplementary terms, normalized, sorted alphabetically"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["unavailable", "idle", "building", "ready", "error"],
+            "title": "State",
+            "description": "unavailable: the index is not running; idle: embeddings will build when labels are next requested; building: an embedding (re)build is queued or running; ready: embeddings are serving; error: the last build failed (see error)"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Why the last embedding build failed; only set on error"
+          },
+          "max_terms": {
+            "type": "integer",
+            "title": "Max Terms",
+            "description": "Maximum number of supplementary terms the server accepts"
+          },
+          "max_term_length": {
+            "type": "integer",
+            "title": "Max Term Length",
+            "description": "Maximum length of one term, in characters"
+          }
+        },
+        "type": "object",
+        "required": ["terms", "state", "max_terms", "max_term_length"],
+        "title": "ImageMapVocabResponse",
+        "description": "The supplementary cluster-labeling vocabulary and its embedding build state."
+      },
+      "ImageMapVocabUpdate": {
+        "properties": {
+          "terms": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Terms",
+            "description": "The full supplementary term list; replaces what is stored. Terms are normalized (lowercased, whitespace collapsed) and deduplicated server-side."
+          }
+        },
+        "type": "object",
+        "required": ["terms"],
+        "title": "ImageMapVocabUpdate",
+        "description": "Replacement supplementary vocabulary."
       },
       "ImageMaskToTensorInvocation": {
         "category": "mask",

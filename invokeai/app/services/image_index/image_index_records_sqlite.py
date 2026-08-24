@@ -219,6 +219,32 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
             )
             return [row[0] for row in cursor.fetchall()]
 
+    def get_custom_vocab_terms(self) -> list[str]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT term FROM image_index_vocab_terms ORDER BY term ASC;
+                """
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def set_custom_vocab_terms(self, terms: list[str]) -> None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                DELETE FROM image_index_vocab_terms;
+                """
+            )
+            # OR IGNORE: callers normalize away duplicates, but the NOCASE
+            # primary key would otherwise turn a case-variant pair that slipped
+            # through into an IntegrityError that rolls back the whole replace.
+            cursor.executemany(
+                """--sql
+                INSERT OR IGNORE INTO image_index_vocab_terms (term) VALUES (?);
+                """,
+                [(term,) for term in terms],
+            )
+
     def get_projection(self, user_id: str, model_id: str) -> ProjectionRecord | None:
         with self._db.transaction() as cursor:
             cursor.execute(

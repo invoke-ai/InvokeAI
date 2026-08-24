@@ -228,6 +228,21 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
 };
 
 /**
+ * Re-fetch labels for the currently loaded points. For callers outside the
+ * points-refresh flow whose action changes what the labels *say* without
+ * moving a single point — today that is a supplementary-vocabulary edit, once
+ * the server reports its embedding rebuild finished. A no-op while labels are
+ * toggled off or no points are loaded.
+ */
+export const refetchClusterLabels = (): void => {
+  const { data } = imageMapStore.getSnapshot();
+
+  if (data) {
+    refreshClusterLabels(data);
+  }
+};
+
+/**
  * Fold one status report into the snapshot.
  *
  * `measure` marks a socket-delivered report. Only those bump the sequence a

@@ -1409,7 +1409,28 @@
       "project": "Project",
       "queue": "Queue",
       "workflow": "Workflow",
-      "workspace": "Workspace"
+      "workspace": "Workspace",
+      "imageMap": "Image Map"
+    },
+    "imageMapVocabulary": {
+      "title": "Cluster Label Vocabulary",
+      "description": "Supplementary terms the image map can use when labeling clusters, alongside its built-in vocabulary. This is a server-wide list.",
+      "addLabel": "Add terms",
+      "adminOnly": "Only an administrator can change the vocabulary.",
+      "addPlaceholder": "Add terms (comma or newline separated)",
+      "addHelp": "Terms are lowercased and applied the next time labels are computed. Paste a comma- or newline-separated list to add several at once.",
+      "alreadyInList": "Every entered term is already in the list.",
+      "termTooLong": "Terms must be {{max}} characters or fewer.",
+      "tooManyTerms": "The list is limited to {{max}} terms.",
+      "removeTerm": "Remove {{term}}",
+      "noTermsYet": "No supplementary terms yet. The built-in vocabulary is still used.",
+      "count": "{{count}} of {{max}} supplementary terms",
+      "rebuilding": "Updating cluster labels with the new vocabulary…",
+      "rebuildingQueued": "Waiting for image indexing to finish ({{progress}}) before updating cluster labels…",
+      "buildFailed": "The vocabulary could not be prepared: {{message}}",
+      "indexOff": "The image index is not running. Terms are saved and will apply when it is next enabled.",
+      "saveFailed": "Could not save the vocabulary.",
+      "loadFailed": "Could not load the vocabulary."
     }
   },
   "shell": {

@@ -1568,6 +1568,38 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_map/vocab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Map Vocab
+         * @description Gets the supplementary cluster-labeling vocabulary.
+         *
+         *     The list is server-wide: cluster labels are computed against one shared
+         *     vocabulary. Readable by any user; only admins may change it.
+         */
+        get: operations["get_image_map_vocab"];
+        /**
+         * Update Image Map Vocab
+         * @description Replaces the supplementary cluster-labeling vocabulary. Admin-only.
+         *
+         *     The stored embeddings are invalidated and rebuilt in the background (the
+         *     response's `state` reflects this); labels served in the meantime still use
+         *     the previous vocabulary. Works while the index is disabled too — terms
+         *     persist and take effect when indexing next runs.
+         */
+        put: operations["update_image_map_vocab"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/image_map/status": {
         parameters: {
             query?: never;
@@ -17697,6 +17729,49 @@ export type components = {
             index?: components["schemas"]["ImageIndexStatus"] | null;
             /** @description The user's projection cache status */
             projection: components["schemas"]["ImageMapProjectionStatus"];
+        };
+        /**
+         * ImageMapVocabResponse
+         * @description The supplementary cluster-labeling vocabulary and its embedding build state.
+         */
+        ImageMapVocabResponse: {
+            /**
+             * Terms
+             * @description The stored supplementary terms, normalized, sorted alphabetically
+             */
+            terms: string[];
+            /**
+             * State
+             * @description unavailable: the index is not running; idle: embeddings will build when labels are next requested; building: an embedding (re)build is queued or running; ready: embeddings are serving; error: the last build failed (see error)
+             * @enum {string}
+             */
+            state: "unavailable" | "idle" | "building" | "ready" | "error";
+            /**
+             * Error
+             * @description Why the last embedding build failed; only set on error
+             */
+            error?: string | null;
+            /**
+             * Max Terms
+             * @description Maximum number of supplementary terms the server accepts
+             */
+            max_terms: number;
+            /**
+             * Max Term Length
+             * @description Maximum length of one term, in characters
+             */
+            max_term_length: number;
+        };
+        /**
+         * ImageMapVocabUpdate
+         * @description Replacement supplementary vocabulary.
+         */
+        ImageMapVocabUpdate: {
+            /**
+             * Terms
+             * @description The full supplementary term list; replaces what is stored. Terms are normalized (lowercased, whitespace collapsed) and deduplicated server-side.
+             */
+            terms: string[];
         };
         /**
          * Image Mask to Tensor
@@ -47598,6 +47673,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageMapRefreshResponse"];
+                };
+            };
+        };
+    };
+    get_image_map_vocab: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapVocabResponse"];
+                };
+            };
+        };
+    };
+    update_image_map_vocab: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageMapVocabUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapVocabResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

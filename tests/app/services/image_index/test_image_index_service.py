@@ -1755,6 +1755,7 @@ def test_a_failed_vocabulary_build_does_not_pin_the_rejected_text_encoder(
     service._invoker = SimpleNamespace(  # type: ignore[assignment]
         services=SimpleNamespace(
             configuration=SimpleNamespace(models_path=tmp_path, db_path=tmp_path / "db.sqlite"),
+            image_index_records=SimpleNamespace(get_custom_vocab_terms=lambda: []),
             # Not a real Logger: pytest's logging plugin retains every LogRecord
             # for the test, and a record carrying exc_info holds the very
             # traceback whose release is being asserted.
@@ -1950,6 +1951,7 @@ def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.n
         services=SimpleNamespace(
             configuration=SimpleNamespace(db_path=tmp_path / "invokeai.db"),
             logger=InvokeAILogger.get_logger(),
+            image_index_records=SimpleNamespace(get_custom_vocab_terms=lambda: []),
         )
     )
     svc._model_id = MODEL_ID
@@ -2042,3 +2044,281 @@ def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service:
     assert float(np.linalg.norm(normalized[0])) == pytest.approx(1.0, rel=1e-5)
     assert not normalized[1].any()
     assert not normalized[2].any()
+
+
+# --- Custom (supplementary) vocabulary ---
+
+
+def _phrase_matrix(phrases: list[str]) -> np.ndarray:
+    """Deterministic, phrase-distinguishable rows: every value is the phrase's length."""
+    return np.stack([np.full(DIM, float(len(phrase)), dtype=EMBEDDING_DTYPE) for phrase in phrases])
+
+
+def _vocab_service_with_custom_terms(tmp_path, monkeypatch: pytest.MonkeyPatch, custom: list[str]) -> ImageIndexService:
+    """A service wired for `_build_vocab_embeddings` over a three-phrase bundled vocabulary."""
+    from invokeai.app.services.image_index import cluster_labels
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat", "a dog", "a car"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", lambda embed_fn, phrases: _phrase_matrix(phrases))
+
+    svc = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    svc._invoker = SimpleNamespace(  # type: ignore[assignment]
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(db_path=tmp_path / "invokeai.db"),
+            logger=InvokeAILogger.get_logger(),
+            image_index_records=SimpleNamespace(get_custom_vocab_terms=lambda: list(custom)),
+        )
+    )
+    svc._model_id = MODEL_ID
+
+    return svc
+
+
+def test_custom_terms_are_appended_and_bundled_phrases_win_collisions(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # "a dog" collides with the bundled vocabulary and is dropped (the label a
+    # user would get is the same phrase either way); "zebra crossing" extends it.
+    service = _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["zebra crossing", "a dog"])
+
+    service._build_vocab_embeddings()
+
+    assert service._vocab_cache is not None
+    vocabulary, matrix = service._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car", "zebra crossing"]
+    assert matrix.shape == (4, DIM)
+    # Rows stay aligned with the merged phrase list across the concatenation.
+    assert np.array_equal(matrix[3], np.full(DIM, float(len("zebra crossing")), dtype=EMBEDDING_DTYPE))
+    # Both tiers persisted, separately.
+    tag = MODEL_ID.replace(":", "_")[:24]
+    assert (tmp_path / f"cluster_vocab_{tag}.npz").exists()
+    assert (tmp_path / f"cluster_vocab_custom_{tag}.npz").exists()
+
+
+def test_editing_custom_terms_re_embeds_only_the_custom_tier(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The bundled tier is ~1700 phrases and minutes of encoder work; an edit to
+    # the custom list must be answered from the bundled tier's disk cache.
+    from invokeai.app.services.image_index import cluster_labels
+
+    _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["zebra"])._build_vocab_embeddings()
+
+    embedded: list[list[str]] = []
+
+    def _record(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        embedded.append(list(phrases))
+        return _phrase_matrix(phrases)
+
+    second = _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["zebra", "okapi"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _record)
+
+    second._build_vocab_embeddings()
+
+    assert embedded == [["zebra", "okapi"]]
+    assert second._vocab_cache is not None
+    assert second._vocab_cache[0] == ["a cat", "a dog", "a car", "zebra", "okapi"]
+    assert second._vocab_cache[1].shape == (5, DIM)
+
+
+def test_an_unchanged_custom_tier_is_loaded_from_disk(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+
+    _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["zebra"])._build_vocab_embeddings()
+
+    def _refuse(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        raise AssertionError("re-embedded a tier that was already cached")
+
+    second = _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["zebra"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _refuse)
+
+    second._build_vocab_embeddings()
+
+    assert second._vocab_cache is not None
+    assert second._vocab_cache[0] == ["a cat", "a dog", "a car", "zebra"]
+
+
+def test_vocab_build_state_reports_each_phase(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fresh = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    assert fresh.get_vocab_build_state() == ("unavailable", None)
+
+    service = _vocab_service_with_custom_terms(tmp_path, monkeypatch, [])
+    assert service.get_vocab_build_state() == ("idle", None)
+
+    service.invalidate_vocab()
+    assert service.get_vocab_build_state() == ("building", None)
+
+    # The worker's pass: clear the flags, then build.
+    service._vocab_build_requested.clear()
+    service._vocab_invalidate_requested.clear()
+    service._build_vocab_embeddings()
+    assert service.get_vocab_build_state() == ("ready", None)
+
+
+def test_vocab_build_state_reports_error_with_the_failure_message(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+
+    service = _vocab_service_with_custom_terms(tmp_path, monkeypatch, [])
+
+    def _raise(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        raise RuntimeError("simulated: no text tower")
+
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _raise)
+    service._build_vocab_embeddings()
+
+    state, message = service.get_vocab_build_state()
+    assert state == "error"
+    assert message is not None and "no text tower" in message
+
+
+def test_invalidate_vocab_never_blocks_on_an_in_flight_build(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The worker holds _vocab_lock for the whole of a minutes-long build;
+    # invalidation runs on request threads and must return without it.
+    service = _vocab_service_with_custom_terms(tmp_path, monkeypatch, [])
+    assert service._vocab_lock.acquire(blocking=False)
+    try:
+        done = threading.Event()
+
+        def _invalidate() -> None:
+            service.invalidate_vocab()
+            done.set()
+
+        thread = threading.Thread(target=_invalidate)
+        thread.start()
+        thread.join(timeout=2)
+        assert done.is_set(), "invalidate_vocab blocked behind the vocabulary lock"
+        # And an in-flight build reads as building.
+        assert service.get_vocab_build_state() == ("building", None)
+    finally:
+        service._vocab_lock.release()
+
+
+def test_invalidate_vocab_rebuilds_with_the_new_terms_on_the_worker(
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", lambda embed_fn, phrases: _phrase_matrix(phrases))
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
+    index_records.set_custom_vocab_terms(["dog"])
+
+    service.start(_make_invoker(images_service, index_records))
+    with pytest.raises(TextSearchUnavailableError, match="still being prepared"):
+        service.get_vocab_embeddings()
+    _wait_until(lambda: service.get_vocab_build_state() == ("ready", None))
+    assert service.get_vocab_embeddings()[0] == ["a cat", "dog"]
+
+    index_records.set_custom_vocab_terms(["dog", "zebra"])
+    service.invalidate_vocab()
+
+    _wait_until(
+        lambda: service.get_vocab_build_state() == ("ready", None)
+        and service._vocab_cache is not None
+        and "zebra" in service._vocab_cache[0]
+    )
+    vocabulary, matrix = service.get_vocab_embeddings()
+    assert vocabulary == ["a cat", "dog", "zebra"]
+    assert matrix.shape == (3, DIM)
+
+
+def test_invalidate_vocab_retries_a_failed_build(
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A memoized build failure is deliberately never retried on its own (see
+    # test_a_failed_vocabulary_build_is_not_retried_on_every_request);
+    # invalidation is the one path that clears it.
+    from invokeai.app.services.image_index import cluster_labels
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    flaky = {"fail": True}
+
+    def _ensemble(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        if flaky["fail"]:
+            raise RuntimeError("simulated: no text tower")
+        return _phrase_matrix(phrases)
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _ensemble)
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
+
+    service.start(_make_invoker(images_service, index_records))
+    with pytest.raises(TextSearchUnavailableError, match="still being prepared"):
+        service.get_vocab_embeddings()
+    _wait_until(lambda: service.get_vocab_build_state()[0] == "error")
+
+    flaky["fail"] = False
+    service.invalidate_vocab()
+
+    _wait_until(lambda: service.get_vocab_build_state() == ("ready", None))
+    assert service.get_vocab_embeddings()[0] == ["a cat"]
+
+
+def test_a_cache_with_a_mismatched_row_count_is_discarded_and_re_embedded(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The fingerprint alone cannot be trusted to prove the file describes these
+    # phrases (corruption, hash collision): a wrong row count would misalign
+    # the merged matrix and break every labels request.
+    from invokeai.app.services.image_index.cluster_labels import vocab_fingerprint
+
+    service = _vocab_service_with_custom_terms(tmp_path, monkeypatch, ["okapi"])
+    tag = MODEL_ID.replace(":", "_")[:24]
+    custom_cache = tmp_path / f"cluster_vocab_custom_{tag}.npz"
+    np.savez(
+        custom_cache,
+        embeddings=np.zeros((2, DIM), dtype=EMBEDDING_DTYPE),
+        fingerprint=np.str_(vocab_fingerprint(["okapi"])),
+    )
+
+    service._build_vocab_embeddings()
+
+    assert service._vocab_cache is not None
+    vocabulary, matrix = service._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car", "okapi"]
+    assert matrix.shape == (4, DIM)
+    # Re-embedded, not served from the bogus file.
+    assert np.array_equal(matrix[3], np.full(DIM, float(len("okapi")), dtype=EMBEDDING_DTYPE))
+
+
+def test_a_transient_custom_terms_read_failure_keeps_the_rebuild_queued(
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    service: ImageIndexService,
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The worker clears the request flag and drops the caches before the build
+    # reads its state; a transient DB failure there must not strand the
+    # rebuild in 'idle' — the flag is re-set so the next pass retries.
+    from invokeai.app.services.image_index import cluster_labels
+
+    monkeypatch.setattr(cluster_labels, "load_vocabulary", lambda: ["a cat"])
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", lambda embed_fn, phrases: _phrase_matrix(phrases))
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
+    index_records.set_custom_vocab_terms(["dog"])
+
+    calls = {"count": 0}
+    original_read = index_records.get_custom_vocab_terms
+
+    def _flaky() -> list[str]:
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise RuntimeError("simulated: database is locked")
+        return original_read()
+
+    monkeypatch.setattr(index_records, "get_custom_vocab_terms", _flaky)
+
+    service.start(_make_invoker(images_service, index_records))
+    service.invalidate_vocab()
+
+    _wait_until(lambda: service.get_vocab_build_state() == ("ready", None), timeout=15)
+    assert calls["count"] >= 2
+    assert service.get_vocab_embeddings()[0] == ["a cat", "dog"]

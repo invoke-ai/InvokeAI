@@ -12,5 +12,6 @@ export const imageMapWidgetManifest: WidgetManifest = {
   label: (t) => t('widgets.labels.imageMap'),
   load: () => import('./implementation').then((module) => module.widgetImplementation),
   loadHost: () => import('./ImageMapDataRuntime').then((module) => module.ImageMapDataRuntime),
+  settingsSection: 'imageMap',
   version: 1,
 };

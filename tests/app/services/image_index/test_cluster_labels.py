@@ -1,12 +1,15 @@
 """Tests for the vocabulary-based cluster labeling math."""
 
 import numpy as np
+import pytest
 
 from invokeai.app.services.image_index.cluster_labels import (
+    MAX_CUSTOM_VOCAB_TERM_LENGTH,
     PROMPT_TEMPLATES,
     ensemble_phrase_embeddings,
     label_clusters,
     load_vocabulary,
+    normalize_custom_vocab_terms,
     vocab_fingerprint,
 )
 
@@ -16,6 +19,32 @@ def test_load_vocabulary_is_nonempty_and_deduplicated() -> None:
     assert len(vocabulary) > 500
     assert not any(phrase.startswith("#") for phrase in vocabulary)
     assert len({phrase.casefold() for phrase in vocabulary}) == len(vocabulary)
+
+
+def test_normalize_custom_vocab_terms_lowercases_collapses_and_dedupes() -> None:
+    normalized = normalize_custom_vocab_terms(["  Golden   Retriever ", "golden retriever", "", "   ", "Zebra"])
+    # First occurrence wins and input order is preserved (storage sorts later).
+    assert normalized == ["golden retriever", "zebra"]
+
+
+def test_normalize_custom_vocab_terms_strips_control_characters() -> None:
+    # A NUL inside a term would make the fingerprint's NUL-joined phrase
+    # stream ambiguous: vocab_fingerprint(["cat", "dog"]) equals
+    # vocab_fingerprint(["cat\x00dog"]), so two different term lists could
+    # serve each other's cached embeddings.
+    assert normalize_custom_vocab_terms(["cat\x00dog", "tab\there"]) == ["catdog", "tab here"]
+
+
+def test_normalize_custom_vocab_terms_rejects_an_overlong_term() -> None:
+    # Rejected rather than truncated: a silently shortened phrase would embed
+    # as something the user never wrote.
+    term = "x" * (MAX_CUSTOM_VOCAB_TERM_LENGTH + 1)
+    with pytest.raises(ValueError, match=str(MAX_CUSTOM_VOCAB_TERM_LENGTH)):
+        normalize_custom_vocab_terms([term])
+    # Whitespace collapse happens first, so a term only *padded* past the
+    # limit is fine.
+    padded = "y" * MAX_CUSTOM_VOCAB_TERM_LENGTH + "   "
+    assert normalize_custom_vocab_terms([padded]) == ["y" * MAX_CUSTOM_VOCAB_TERM_LENGTH]
 
 
 def test_vocab_fingerprint_changes_with_content() -> None:
