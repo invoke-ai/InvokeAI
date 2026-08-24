@@ -156,9 +156,11 @@ const reserveComposite = (
   layerCount: number
 ): { release(): void } => {
   const pixels = Math.max(0, entry.bbox.width) * Math.max(0, entry.bbox.height);
-  // Final/accumulator surface + final scan ImageData, plus one temporary
-  // surface and one ImageData buffer for every adjusted/mask layer.
-  const reservation = deps.reserve?.(pixels * 4 * (2 + layerCount * 2));
+  // Final/accumulator surface plus a final scan ImageData (except for control
+  // layers, which are made opaque by construction), plus one temporary surface
+  // and one ImageData buffer for every adjusted/mask layer.
+  const finalBuffers = entry.kind === 'control-layer' ? 1 : 2;
+  const reservation = deps.reserve?.(pixels * 4 * (finalBuffers + layerCount * 2));
   if (reservation?.status === 'over-budget') {
     throw new CompositeOverBudgetError();
   }
@@ -222,6 +224,25 @@ const isFullyOpaque = (imageData: ImageData): boolean => {
 };
 
 /**
+ * Flattens an RGBA control composite over black. Control adapters consume RGB
+ * rather than alpha; leaving transparent pixels in the uploaded PNG lets the
+ * backend's shared channel normalizer matte them over white, which turns an
+ * erased area into strong control signal. Legacy generation rasterized control
+ * layers with `bg: 'black'`, so preserve that model-facing contract here while
+ * editable layer surfaces remain transparent.
+ */
+const flattenControlSurfaceOverBlack = (surface: RasterSurface): void => {
+  const { ctx } = surface;
+  ctx.save();
+  setTransform(ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'destination-over';
+  ctx.fillStyle = 'black';
+  ctx.fillRect(0, 0, surface.width, surface.height);
+  ctx.restore();
+};
+
+/**
  * Composites, scans coverage, encodes, hashes, dedupes, and (when needed)
  * uploads a single raster-style entry (`base-raster` or `control-layer`).
  * Shared by {@link executeCompositePlan} and {@link executeControlComposite} so
@@ -256,9 +277,14 @@ const executeRasterEntry = async (
   );
   try {
     const surface = await renderRasterComposite(entry, deps);
-    const bboxFullyCovered = isFullyOpaque(
-      readImageData(surface, { height: surface.height, width: surface.width, x: 0, y: 0 })
-    );
+    let bboxFullyCovered: boolean;
+    if (entry.kind === 'control-layer') {
+      flattenControlSurfaceOverBlack(surface);
+      bboxFullyCovered = surface.width > 0 && surface.height > 0;
+    } else {
+      const fullRect: Rect = { height: surface.height, width: surface.width, x: 0, y: 0 };
+      bboxFullyCovered = isFullyOpaque(readImageData(surface, fullRect));
+    }
 
     const blob = await deps.backend.encodeSurface(surface);
     const pixelHash = await hashBlob(blob);
