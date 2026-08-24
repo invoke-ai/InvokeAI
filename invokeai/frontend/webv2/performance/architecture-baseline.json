@@ -464,7 +464,6 @@
           "source:src/features/generation/core/batch.ts",
           "source:src/features/generation/core/canvas/addControlLayers.ts",
           "source:src/features/generation/core/canvas/addRegionalGuidance.ts",
-          "source:src/features/generation/core/canvas/compileCanvasGraph.ts",
           "source:src/features/generation/core/canvas/controlValidation.ts",
           "source:src/features/generation/core/catalogSearch.ts",
           "source:src/features/generation/core/componentCompatibility.ts",

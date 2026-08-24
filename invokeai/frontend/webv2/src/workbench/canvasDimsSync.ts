@@ -77,6 +77,25 @@ export type CanvasDimsReconcileResult =
   /** Resize the bbox to the (grid-snapped) generate dims, keeping its top-left position. */
   | { kind: 'set-bbox'; bbox: Bbox };
 
+const getDimsPatch = (width: number, height: number, aspectWidth = width, aspectHeight = height) => ({
+  aspectRatioId: deriveAspectRatioId(aspectWidth, aspectHeight),
+  aspectRatioValue: aspectHeight > 0 ? aspectWidth / aspectHeight : 1,
+  height,
+  width,
+});
+
+const createSnapshot = (
+  bbox: Pick<Bbox, 'width' | 'height'>,
+  dims: { width: number; height: number },
+  grid: number
+): CanvasDimsSnapshot => ({
+  bboxHeight: bbox.height,
+  bboxWidth: bbox.width,
+  dimsHeight: dims.height,
+  dimsWidth: dims.width,
+  grid,
+});
+
 /**
  * Decide which direction of the bbox <-> dims sync to apply.
  *
@@ -99,7 +118,7 @@ export const reconcileCanvasDims = ({
   }
 
   const bboxIsOnGrid = bbox.width % grid === 0 && bbox.height % grid === 0;
-  const gridChanged = prev !== null && prev.grid !== grid;
+  const gridChanged = prev && prev.grid !== grid;
 
   if (bboxIsOnGrid && !gridChanged && bbox.width === dims.width && bbox.height === dims.height) {
     return { kind: 'none' };
@@ -111,16 +130,10 @@ export const reconcileCanvasDims = ({
     const width = clampDimension(bbox.width, grid);
     const height = clampDimension(bbox.height, grid);
 
-    return {
-      aspectRatioId: deriveAspectRatioId(bbox.width, bbox.height),
-      aspectRatioValue: bbox.height > 0 ? bbox.width / bbox.height : 1,
-      height,
-      kind: 'patch-dims',
-      width,
-    };
+    return { ...getDimsPatch(width, height, bbox.width, bbox.height), kind: 'patch-dims' };
   }
 
-  const dimsChanged = !prev || prev.dimsWidth !== dims.width || prev.dimsHeight !== dims.height;
+  const dimsChanged = prev!.dimsWidth !== dims.width || prev!.dimsHeight !== dims.height;
 
   if (dimsChanged) {
     const width = clampDimension(dims.width, grid);
@@ -152,7 +165,7 @@ export interface CanvasDimsSync {
 
 const readFiniteDimension = (values: Record<string, unknown>, key: 'width' | 'height'): number | null => {
   const raw = values[key];
-  return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : null;
+  return Number.isFinite(raw as number) && (raw as number) > 0 ? (raw as number) : null;
 };
 
 const readModelBase = (values: Record<string, unknown>): string | null => {
@@ -213,59 +226,32 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
     const bbox = project.canvas.document.bbox;
     const grid = gridSizeForModelBase(readModelBase(generateValues));
     const result = reconcileCanvasDims({ bbox, dims: { height, width }, grid, prev });
+    const projectId = project.id;
 
     switch (result.kind) {
       case 'none': {
-        prev = { bboxHeight: bbox.height, bboxWidth: bbox.width, dimsHeight: height, dimsWidth: width, grid };
+        prev = createSnapshot(bbox, { height, width }, grid);
         return;
       }
       case 'patch-dims': {
-        prev = {
-          bboxHeight: bbox.height,
-          bboxWidth: bbox.width,
-          dimsHeight: result.height,
-          dimsWidth: result.width,
-          grid,
-        };
+        const { kind: _, ...patch } = result;
+        prev = createSnapshot(bbox, result, grid);
         isSyncing = true;
         try {
-          store.commands.generation.patchSettings(
-            {
-              aspectRatioId: result.aspectRatioId,
-              aspectRatioValue: result.aspectRatioValue,
-              height: result.height,
-              width: result.width,
-            },
-            project.id,
-            'system'
-          );
+          store.commands.generation.patchSettings(patch, projectId, 'system');
         } finally {
           isSyncing = false;
         }
         return;
       }
       case 'set-bbox': {
-        prev = {
-          bboxHeight: result.bbox.height,
-          bboxWidth: result.bbox.width,
-          dimsHeight: result.bbox.height,
-          dimsWidth: result.bbox.width,
-          grid,
-        };
+        const nextBbox = result.bbox;
+        prev = createSnapshot(nextBbox, nextBbox, grid);
         isSyncing = true;
         try {
-          store.commands.canvas.apply(project.id, { bbox: result.bbox, type: 'setCanvasBbox' }, 'system');
-          if (width !== result.bbox.width || height !== result.bbox.height) {
-            store.commands.generation.patchSettings(
-              {
-                aspectRatioId: deriveAspectRatioId(result.bbox.width, result.bbox.height),
-                aspectRatioValue: result.bbox.width / result.bbox.height,
-                height: result.bbox.height,
-                width: result.bbox.width,
-              },
-              project.id,
-              'system'
-            );
+          store.commands.canvas.apply(projectId, { bbox: nextBbox, type: 'setCanvasBbox' }, 'system');
+          if (width !== nextBbox.width || height !== nextBbox.height) {
+            store.commands.generation.patchSettings(getDimsPatch(nextBbox.width, nextBbox.height), projectId, 'system');
           }
         } finally {
           isSyncing = false;

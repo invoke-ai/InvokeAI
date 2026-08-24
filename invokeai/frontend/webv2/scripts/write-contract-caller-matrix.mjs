@@ -37,6 +37,7 @@ const hubs = [
   'features/models/react.ts',
   'features/nodes/index.ts',
   'features/generation/components.ts',
+  'features/generation/canvasGraph.ts',
   'features/generation/contracts.ts',
   'features/generation/graph.ts',
   'features/generation/index.ts',

@@ -42,14 +42,13 @@ import type { WorkbenchNotificationKind } from '@workbench/projectContracts';
 import type { ProjectSettings } from '@workbench/settings/contracts';
 import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbench/workbenchStore';
 
+import { compileCanvasGraph, type CanvasCompileMode } from '@features/generation/canvasGraph';
 import {
-  compileCanvasGraph,
   detectCanvasMode,
   getControlValidationReason,
   getControlValidationReasonMessage,
   getRegionalGuidanceRejectionReason,
   isRegionalGuidanceSupportedForBase,
-  type CanvasCompileMode,
   type ControlLayerGraphInput,
   type ControlValidationReason,
   type RegionalGuidanceInput,
