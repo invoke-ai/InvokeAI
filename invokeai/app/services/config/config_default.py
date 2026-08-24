@@ -261,7 +261,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # IMAGE INDEX
     image_index_enabled:           bool = Field(default=False,              description="Maintain a semantic embedding index of gallery images, used by the image map and semantic search features.")
-    image_index_model:              str = Field(default="clip-vit-large-patch14", description="Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.")
+    image_index_model:              str = Field(default="DFN2B-CLIP-ViT-L-14-39B", description="Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.")
     image_index_device:   Optional[str] = Field(default=None,               description="Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.")
     image_index_batch_size:         int = Field(default=8, gt=0,            description="Number of images embedded per batch by the image index worker.")
 

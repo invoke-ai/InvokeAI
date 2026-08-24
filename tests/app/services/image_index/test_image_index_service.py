@@ -309,7 +309,7 @@ def test_model_not_installed_message_flags_same_name_wrong_type() -> None:
     )
     message = service._model_not_installed_message("clip-vit-large-patch14")
     assert "clip_embed" in message
-    assert "InvokeAI/clip-vit-large-patch14" in message
+    assert "apple/DFN2B-CLIP-ViT-L-14-39B" in message
 
     service._invoker.services.model_manager.store.search_by_attr = lambda model_name=None: []
     message = service._model_not_installed_message("clip-vit-large-patch14")
