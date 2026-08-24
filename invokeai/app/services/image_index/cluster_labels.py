@@ -134,6 +134,16 @@ def ensemble_phrase_embeddings(embed_texts, phrases: list[str], batch_size: int 
     return (matrix / norms).astype(EMBEDDING_DTYPE)
 
 
+# Weight of the corpus-mean term in cluster label ranking (see label_clusters).
+# 0 is raw cosine (hub phrases win everywhere); 1 is full mean-centering (no
+# floor — content-orthogonal phrases can win on corpus anti-alignment, and two
+# clusters rank by exact negations of each other). 0.75 demotes hub phrases
+# even when clusters share a large common component, while a phrase must still
+# beat the winner's 0.25 * raw-cosine residue to displace a strong content
+# match.
+_CORPUS_CONTRAST_WEIGHT = 0.75
+
+
 def label_clusters(
     cluster_labels: np.ndarray,
     image_embeddings: np.ndarray,
@@ -142,6 +152,22 @@ def label_clusters(
     top_k: int = 3,
 ) -> dict[int, dict]:
     """Top-k vocabulary labels for every non-noise cluster.
+
+    Phrases are ranked by ``cos(phrase, centroid) - W * cos(phrase, corpus
+    mean)``, not by raw cosine alone. Raw cosine has a hubness problem: generic
+    phrases (color words especially) sit close to the mean direction of any
+    image collection, and averaging a cluster pulls its centroid toward that
+    same mean — so hub phrases win everywhere regardless of what the cluster
+    is about. The corpus term cancels that shared component. It is a weighted
+    blend rather than full mean-centering because pure contrast has no floor:
+    with the centroid's own cosine fully cancelled, a phrase orthogonal to the
+    cluster's content can win on corpus anti-alignment alone (with exactly two
+    clusters the centered directions are exact negations of each other, so one
+    cluster is always labeled by whatever anti-correlates with the other). The
+    ``1 - W`` residue of raw cosine keeps the winner tied to what the cluster
+    actually contains, and makes degenerate contrast safe by construction: a
+    centroid equal to the corpus mean scores every phrase at ``(1 - W) * raw``,
+    which ranks identically to raw cosine — no fallback threshold needed.
 
     Args:
         cluster_labels: (N,) DBSCAN labels, row-aligned with image_embeddings.
@@ -152,9 +178,17 @@ def label_clusters(
 
     Returns:
         {cluster_id: {"label": str, "alternates": [str], "score": float}};
-        noise (-1) is omitted.
+        noise (-1) is omitted. "score" is the raw cosine between the chosen
+        phrase and the unit centroid, so it stays comparable across clusters.
     """
     results: dict[int, dict] = {}
+    clustered = image_embeddings[cluster_labels >= 0]
+    corpus_scores: np.ndarray | None = None
+    if clustered.shape[0]:
+        corpus_mean = clustered.mean(axis=0)
+        corpus_norm = np.linalg.norm(corpus_mean)
+        if corpus_norm > 0:
+            corpus_scores = vocab_embeddings @ (corpus_mean / corpus_norm).astype(vocab_embeddings.dtype)
     for cluster_id in sorted({int(label) for label in cluster_labels if label >= 0}):
         members = image_embeddings[cluster_labels == cluster_id]
         if members.shape[0] == 0:
@@ -163,14 +197,18 @@ def label_clusters(
         norm = np.linalg.norm(centroid)
         if norm == 0:
             continue
-        centroid = centroid / norm
-        scores = vocab_embeddings @ centroid.astype(vocab_embeddings.dtype)
+        unit_centroid = (centroid / norm).astype(vocab_embeddings.dtype)
+        raw_scores = vocab_embeddings @ unit_centroid
+        if corpus_scores is None:
+            scores = raw_scores
+        else:
+            scores = raw_scores - _CORPUS_CONTRAST_WEIGHT * corpus_scores
         count = min(top_k, len(vocabulary))
         top = np.argpartition(-scores, count - 1)[:count]
         top = top[np.argsort(-scores[top])]
         results[cluster_id] = {
             "alternates": [vocabulary[index] for index in top[1:]],
             "label": vocabulary[top[0]],
-            "score": float(scores[top[0]]),
+            "score": float(raw_scores[top[0]]),
         }
     return results

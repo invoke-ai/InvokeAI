@@ -20266,7 +20266,7 @@ export type components = {
             /**
              * Image Index Model
              * @description Name of the installed CLIP Vision or SigLIP model used to embed gallery images. Changing the model discards embeddings computed by the previous model.
-             * @default clip-vit-large-patch14
+             * @default DFN2B-CLIP-ViT-L-14-39B
              */
             image_index_model?: string;
             /**
