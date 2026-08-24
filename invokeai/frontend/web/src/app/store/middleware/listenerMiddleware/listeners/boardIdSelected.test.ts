@@ -186,6 +186,30 @@ describe('addBoardIdSelectedListener', () => {
     );
   });
 
+  it('still selects when a real board switch lands on a list containing the displayed item', async () => {
+    // The skip keys on "did this navigation change anything", not on whether the displayed item is
+    // in the new list. A virtual date board's query args drop `board_id` and filter on
+    // `created_date` alone, so its list is a superset of every board's items for that day — a
+    // membership test alone would read switching to it as a no-op and leave the viewer showing the
+    // previous board's item, with the grid scrolled to that instead of to the newest.
+    const store = buildStore();
+    store.dispatch(selectionChanged(['from-board-a.png']));
+
+    store.dispatch(boardIdSelected({ boardId: 'by_date:2026-08-24' }));
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['newest-today.png', 'from-board-a.png'],
+        starred_count: 0,
+        total_count: 2,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.getState().gallery.selection).toEqual(['newest-today.png']);
+  });
+
   it('does not report an empty board as the user picking something', async () => {
     // The probe writes for the user, so it uses the mutation action rather than `imageSelected`.
     // Everywhere else that is belt-and-braces — the check above means any write it does make moves
@@ -231,17 +255,23 @@ describe('addBoardIdSelectedListener', () => {
     await vi.advanceTimersByTimeAsync(6000);
     store.dispatch(selectionChanged([]));
 
-    // Clicking the board again, with the list already cached.
+    // Clicking the board again, with the list already cached. The tick is only there to wake the
+    // probe: `condition` re-evaluates on a dispatched action, never on its own timer, so an
+    // already-fulfilled list plus a quiet store leaves it waiting. Pre-existing, and not what this
+    // test is about — the point here is that the click is not swallowed.
     store.dispatch(boardIdSelected({ boardId: 'none' }));
+    store.dispatch({ type: 'test/tick' });
     await vi.advanceTimersByTimeAsync(6000);
 
     expect(store.getState().gallery.selection).toEqual(['newest.png']);
   });
 
-  it('does not clear a good selection just because the store went quiet', async () => {
-    // `condition` only re-evaluates on a dispatched action, so with the list already cached and
-    // nothing else happening there is no wake-up at all: the probe used to sit through its 5s
-    // deadline and then clear the selection it should have kept.
+  it('does not clear a good selection when a no-op click meets a quiet store', async () => {
+    // Why the "did anything change?" question is answered *before* the query wait rather than
+    // after it. `condition` re-evaluates only on a dispatched action, never on its own timer, so a
+    // click with the list already cached and nothing else happening gets no wake-up at all: a
+    // probe that had started would sit through its 5s deadline and then clear, through the give-up
+    // branch, the selection this click was never supposed to touch.
     const store = buildStore();
 
     store.dispatch(boardIdSelected({ boardId: 'none' }));

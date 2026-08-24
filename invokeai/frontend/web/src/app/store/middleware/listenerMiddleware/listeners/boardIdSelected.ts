@@ -2,7 +2,8 @@ import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
 import {
   selectGalleryItemNamesQueryArgs,
-  selectLastSelectedItem,
+  selectGalleryView,
+  selectSelectedBoardId,
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
@@ -29,7 +30,7 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
     // needed costs nothing.
     predicate: (action, currentState, previousState) =>
       startsProbe(action) || selectSelection(currentState) !== selectSelection(previousState),
-    effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {
+    effect: async (action, { getState, getOriginalState, dispatch, condition, cancelActiveListeners }) => {
       // Cancel any in-progress instances of this listener, we don't want to select an item from a previous board
       cancelActiveListeners();
 
@@ -49,18 +50,43 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
         return;
       }
 
+      // Nothing to probe for if this "change" changed nothing and the user already has a
+      // selection. Clicking the board you are already on, or the tab already showing, dispatches
+      // regardless (NoBoardBoard and the view tabs don't guard, unlike GalleryBoard and
+      // VirtualBoardItem), and the probe picks the list's first item unconditionally — so it would
+      // throw the user's selection away, and moving the displayed item mid-generation also lifts
+      // the progress overlay off it for a couple of seconds.
+      //
+      // Decided here rather than after the query, because the wait itself is not safe for a click
+      // that should do nothing: `condition` re-evaluates only on a dispatched action, so a quiet
+      // store lets its 5s deadline expire and the give-up branch below clears the selection.
+      //
+      // And decided on whether the *navigation* changed anything rather than on whether the
+      // displayed item is in the new list: a real board switch can land on a list that contains it
+      // — a virtual date board's args drop `board_id` and filter on `created_date` alone, so its
+      // list is a superset of every board's items for that day — and skipping that would strand
+      // the viewer on the previous board's item.
+      //
+      // An empty selection still probes: with nothing to show, clicking the board is how the user
+      // asks for something, and it is reachable — deleting the last item, hiding date boards while
+      // one is selected, or this listener's own give-up all leave the selection empty.
+      const previousState = getOriginalState();
+      const isNoOpNavigation =
+        (boardIdSelected.match(action) && selectSelectedBoardId(previousState) === action.payload.boardId) ||
+        (galleryViewChanged.match(action) && selectGalleryView(previousState) === action.payload);
+
+      if (isNoOpNavigation && selectSelection(getState()).length > 0) {
+        return;
+      }
+
       // The grid is backed by the polymorphic listGalleryItemNames endpoint (the legacy
       // getImageNames query is no longer dispatched), so the auto-select probe must read its
       // cache or it will time out and clear the user's selection on every board switch. The
       // selector already maps a virtual board id to its `created_date` filter.
       const selectQuery = galleryApi.endpoints.listGalleryItemNames.select(selectGalleryItemNamesQueryArgs(getState()));
-      // wait until the board has some items - maybe it already has some from a previous fetch.
-      // `condition` only re-evaluates its predicate when an action is dispatched, never on its own
-      // timer, so a list that is *already* fulfilled has to be checked here: otherwise a quiet
-      // store gives no wake-up, the 5s deadline expires, and the give-up branch below clears a
-      // selection that was perfectly good. must use getState() to avoid stale state.
-      const isSuccess =
-        selectQuery(getState()).isSuccess || (await condition(() => selectQuery(getState()).isSuccess, 5000));
+      // wait until the board has some items - maybe it already has some from a previous fetch
+      // must use getState() to ensure we do not have stale state
+      const isSuccess = await condition(() => selectQuery(getState()).isSuccess, 5000);
 
       if (!isSuccess) {
         dispatch(selectionChanged([]));
@@ -69,18 +95,6 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       // the board was just changed - we can select the first gallery item (image or video)
       const itemNames = selectQuery(getState()).data?.item_names;
-
-      // ...unless what the viewer is already showing is in this list, in which case the board or
-      // view did not really change (clicking the board you are already on, or the tab already
-      // showing, both dispatch unconditionally) and there is nothing for the probe to fix.
-      // Replacing a perfectly good selection with the newest item would discard the user's pick,
-      // and moving the displayed item mid-generation also lifts the progress overlay off it for a
-      // couple of seconds. Deciding it here rather than in each caller keeps the rule in one place
-      // and reads the live selection instead of a render-time snapshot of it.
-      const activeItem = selectLastSelectedItem(getState());
-      if (activeItem && itemNames?.includes(activeItem)) {
-        return;
-      }
 
       // The probe picks *for* the user, so it writes with the mutation action rather than
       // `imageSelected`. The state is identical either way, but `imageSelected` means "the user
