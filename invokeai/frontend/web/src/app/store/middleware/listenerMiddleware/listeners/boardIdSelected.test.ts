@@ -186,6 +186,31 @@ describe('addBoardIdSelectedListener', () => {
     );
   });
 
+  it('does not report an empty board as the user picking something', async () => {
+    // The probe writes for the user, so it uses the mutation action rather than `imageSelected`.
+    // Everywhere else that is belt-and-braces — the check above means any write it does make moves
+    // the displayed item, which publishes under either action. Here is where the choice shows:
+    // an empty board with nothing selected is a write that changes nothing, and as `imageSelected`
+    // it would still publish, telling the viewer the user asked to see something.
+    resetGallerySelectionSource();
+    const store = buildStore({ withSelectionSource: true });
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: [],
+        starred_count: 0,
+        total_count: 0,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.getState().gallery.selection).toEqual([]);
+    expect($gallerySelection.get().generation, 'nothing to show is not a selection').toBe(0);
+  });
+
   it('still selects for the user when the viewer has nothing left to show', async () => {
     // The mirror case, and the reason the "did anything change?" test lives in the probe rather
     // than in each click handler: deleting the last item, or the probe's own give-up, leaves the
