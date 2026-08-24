@@ -2276,7 +2276,7 @@
         "autoSwitchProgress": "In progress",
         "generating": "Generating…",
         "moreAcceptOptions": "More accept options",
-        "saveAsDisabledLayer": "Save Disabled Layer & Keep Staging",
+        "saveAsDisabledLayer": "Save & Continue",
         "saveError": "Couldn't save to gallery",
         "saveToGallery": "Save to gallery",
         "saved": "Saved to gallery",

@@ -188,7 +188,7 @@ describe('StagingBar thumbnail strip', () => {
     await interact(() => trigger!.click());
 
     const menuItem = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) =>
-      item.textContent?.includes('Save Disabled Layer & Keep Staging')
+      item.textContent?.includes('Save & Continue')
     );
     expect(menuItem).toBeDefined();
     await interact(() => menuItem!.click());

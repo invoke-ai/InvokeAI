@@ -33,12 +33,19 @@ vi.mock('@workbench/widgets/canvas/engineStoreHooks', () => ({
   useLayerThumbnailVersion: () => 0,
 }));
 
-vi.mock('./LayerPropertiesPopover', () => ({
-  LayerPropertiesPopover: () => <button aria-label="Layer properties" type="button" />,
-}));
+vi.mock('./LayerPropertiesPopover', async () => {
+  const { createElement } = await import('react');
+  const { createPortal } = await import('react-dom');
+  return {
+    LayerPropertiesPopover: () =>
+      createPortal(createElement('textarea', { 'aria-label': 'Regional guidance prompt' }), document.body),
+  };
+});
 
 vi.mock('./LayerContextMenu', () => ({
-  CanvasLayerContextMenu: () => null,
+  CanvasLayerContextMenu: ({ target }: { target: { layerId: string } | null }) => (
+    <output data-testid="layer-context-menu-target">{target?.layerId ?? 'none'}</output>
+  ),
   LayerContextMenu: () => <button aria-label="Layer menu" type="button" />,
 }));
 
@@ -245,6 +252,43 @@ describe('LayerListItem accessibility', () => {
 
     expect(visibility).toHaveAttribute('aria-pressed', 'false');
     expect(selectedLayer()).toBe('none');
+  });
+
+  it('preserves the native context menu inside portalled layer settings', async () => {
+    await renderHarness();
+    const prompt = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Regional guidance prompt"]');
+    expect(prompt).not.toBeNull();
+    const event = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 30,
+      clientY: 40,
+    });
+
+    await act(() => prompt!.dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(selectedLayer()).toBe('none');
+  });
+
+  it('still opens the layer context menu from the row itself', async () => {
+    await renderHarness();
+    const event = new MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      clientX: 30,
+      clientY: 40,
+    });
+
+    await act(() => selectionButton('First layer').dispatchEvent(event));
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(selectedLayer()).toBe('first');
+    expect(
+      Array.from(host!.querySelectorAll<HTMLOutputElement>('[data-testid="layer-context-menu-target"]')).some(
+        (output) => output.value === 'first'
+      )
+    ).toBe(true);
   });
 
   it('keeps thumbnail retry focus, click, and pointer movement isolated from row selection and sorting', async () => {

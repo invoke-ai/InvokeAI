@@ -368,7 +368,13 @@ export const LayerListItem = ({
             >
               {layer.isLocked ? <LockIcon /> : <LockOpenIcon />}
             </IconButton>
-            <Box display="flex" flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
+            <Box
+              display="flex"
+              flexShrink="0"
+              onClick={stopPropagation}
+              onContextMenu={stopPropagation}
+              onPointerDown={stopPropagation}
+            >
               <LayerPropertiesPopover dispatch={dispatch} engine={engine} layer={layer} />
             </Box>
             <Box display="flex" flexShrink="0" onPointerDown={stopPropagation}>
