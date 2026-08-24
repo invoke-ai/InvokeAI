@@ -7,17 +7,21 @@ import type {
   ViewerProgressDatum,
 } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
 import { createViewerProgressLifecycle } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
+import { $gallerySelection } from 'features/gallery/store/gallerySelectionSource';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import type { ProgressImage as ProgressImageType } from 'features/nodes/types/common';
 import { LRUCache } from 'lru-cache';
 import { type Atom, atom, computed, map, type MapStore, type WritableAtom } from 'nanostores';
-import type { MutableRefObject, PropsWithChildren } from 'react';
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import type { PropsWithChildren } from 'react';
+import { createContext, memo, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { S } from 'services/api/types';
 import { getEventScope } from 'services/events/eventScope';
 import { $socket } from 'services/events/stores';
 import { assert } from 'tsafe';
 import type { JsonObject } from 'type-fest';
+
+import type { SelectedItemRevealMachine } from './selectedItemReveal';
+import { createSelectedItemRevealMachine } from './selectedItemReveal';
 
 export type { ViewerProgressDatum } from 'features/gallery/components/ImageViewer/viewerProgressLifecycle';
 
@@ -31,11 +35,9 @@ type ImageViewerContextValue = {
   $activeProgressData: Atom<ViewerProgressDatum[]>;
   $isProgressImageResolving: Atom<boolean>;
   $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
-  /** Name of the item most recently rendered by either preview component (image or video). Shared
-   * across the two components so a click that switches media type (image -> video or back) still
-   * reads as a selection change to the temporary-reveal logic — a per-component ref resets on the
-   * swap and would silently swallow the first reveal after every type switch. */
-  lastRenderedItemNameRef: MutableRefObject<string | null>;
+  /** The viewer's reveal state machine. Both preview components drive this one instance, so a
+   * click that switches media type is just another selection. */
+  revealMachine: SelectedItemRevealMachine;
   /**
    * The viewer finished loading the final image/video for the given session (its DTO's
    * `session_id`, or null when it has none). Ends the completed session's "resolve" illusion.
@@ -44,12 +46,12 @@ type ImageViewerContextValue = {
 };
 
 /** How long a mid-generation gallery click shows the clicked item before the live preview returns. */
-export const SELECTED_ITEM_REVEAL_DURATION_MS = 2000;
+const SELECTED_ITEM_REVEAL_DURATION_MS = 2000;
 
-/** How long a reveal waits for the selected item's first frame before showing it anyway. Long
- * enough for a decode on a slow connection, short enough that a click on media that will never
- * load still lands well inside the reveal it was promised. */
-export const SELECTED_ITEM_MEDIA_GRACE_MS = 1000;
+/** How long a reveal waits for the selected item's media to paint before showing it anyway. Long
+ * enough for a decode or a first video frame on a slow connection, short enough that a click on
+ * media that will never load still lands well inside the reveal it was promised. */
+const SELECTED_ITEM_MEDIA_GRACE_MS = 1000;
 
 const ImageViewerContext = createContext<ImageViewerContextValue | null>(null);
 
@@ -73,7 +75,13 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
   )[0];
   const $isProgressImageResolving = useState(() => atom(false))[0];
   const $isTemporarilyShowingSelectedImage = useState(() => atom(false))[0];
-  const lastRenderedItemNameRef = useRef<string | null>(null);
+  const [revealMachine] = useState(() =>
+    createSelectedItemRevealMachine({
+      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
+      durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
+      mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
+    })
+  );
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const [finishedQueueItemIds] = useState(() => new LRUCache<number, boolean>({ max: 200 }));
@@ -92,6 +100,14 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       itemIdBySessionId,
     })
   )[0];
+
+  // Selections that land while no preview component is mounted (comparison mode) have to be
+  // settled somewhere, or returning to the viewer replays them as a reveal nobody asked for.
+  useEffect(() => $gallerySelection.listen((selection) => revealMachine.noteSelection(selection)), [revealMachine]);
+
+  // The machine outlives the components that drive it, so its timers are this provider's to clean
+  // up: without this an armed grace timer fires on a dead machine and raises an orphaned flag.
+  useEffect(() => () => revealMachine.reset(), [revealMachine]);
 
   useEffect(() => {
     if (!socket) {
@@ -216,7 +232,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       $activeProgressData,
       $isProgressImageResolving,
       $isTemporarilyShowingSelectedImage,
-      lastRenderedItemNameRef,
+      revealMachine,
       onLoadImage,
     }),
     [
@@ -228,6 +244,7 @@ export const ImageViewerContextProvider = memo((props: PropsWithChildren) => {
       $progressEvent,
       $progressImage,
       onLoadImage,
+      revealMachine,
     ]
   );
 
