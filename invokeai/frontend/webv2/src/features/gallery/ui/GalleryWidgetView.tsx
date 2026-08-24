@@ -188,8 +188,14 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     publishGalleryTotal(total);
   }, [total]);
 
+  // Runs in BOTH modes: `page` is the paginated page number and also the
+  // infinite window's anchor, so either way a page past the end of a shrunken
+  // listing renders an empty grid — which, with no search active, reads as an
+  // empty board (the upload dropzone) rather than as a stale position.
+  // Clamping to the last real page keeps the user near where they were and
+  // always shows something that exists.
   useEffect(() => {
-    if (settings.paginationMode !== 'paginated' || total === null) {
+    if (total === null) {
       return;
     }
 
@@ -198,7 +204,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     if (page > maxPage) {
       galleryCommands.setPage(maxPage);
     }
-  }, [galleryCommands, page, settings.paginationMode, total]);
+  }, [galleryCommands, page, total]);
 
   if (region === 'bottom' && presentation !== 'expanded') {
     return <GalleryStatusChip count={total ?? gallery.items.length} />;

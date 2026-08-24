@@ -57,7 +57,20 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
  */
 export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set(['projectBoardId', 'selectedBoardId']);
 
-const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([...GALLERY_SELECTION_KEYS, ...GALLERY_INSTALLATION_KEYS]);
+/**
+ * Where the gallery was scrolled to. Meaningless in another install: the board
+ * ids above are stripped, so an imported project lands on a different (usually
+ * near-empty) board, where a page number — or, in infinite mode, the mid-board
+ * window anchor it doubles as — describes a position that does not exist and
+ * renders as an empty board.
+ */
+export const GALLERY_POSITION_KEYS: ReadonlySet<string> = new Set(['galleryPage']);
+
+const INSTALLATION_STATE_KEYS: ReadonlySet<string> = new Set([
+  ...GALLERY_SELECTION_KEYS,
+  ...GALLERY_INSTALLATION_KEYS,
+  ...GALLERY_POSITION_KEYS,
+]);
 
 /**
  * URLs the document caches beside a media name, naming *this* install's copy.

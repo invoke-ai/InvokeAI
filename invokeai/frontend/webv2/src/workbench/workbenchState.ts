@@ -52,6 +52,7 @@ import type {
 
 import {
   getBoundedRecentImages,
+  getGalleryPage,
   getPersistedSelectedGalleryItemKeys,
   getGallerySettings,
   getSelectedGalleryItemFromValues,
@@ -2792,9 +2793,22 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
   const nextSelectedItem = nextSelectedImage ? legacyGeneratedImageToGalleryItem(nextSelectedImage) : undefined;
   const nextSelectedItemKey = nextSelectedItem ? toGalleryItemKey(nextSelectedItem) : undefined;
   const gallerySettings = getGallerySettings(galleryValues);
+  // A deep reveal from the image map anchors the infinite window mid-board.
+  // New images land at the TOP of that board's listing, which such a window
+  // never covers — and an anchored window also suppresses the recents overlay
+  // and the queue placeholders. Release the anchor when an incoming image
+  // belongs to the board being viewed, or the user would never see their own
+  // generation appear. Scoped to that board: an anchor on some other board's
+  // listing has nothing to do with this result.
+  const viewedBoardId = typeof galleryValues.selectedBoardId === 'string' ? galleryValues.selectedBoardId : 'none';
+  const releasesWindowAnchor =
+    gallerySettings.paginationMode === 'infinite' &&
+    getGalleryPage(galleryValues) > 0 &&
+    newImages.some((image) => image.boardId === viewedBoardId);
 
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
+    ...(releasesWindowAnchor ? { galleryPage: 0 } : {}),
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
     selectedImage: nextSelectedItem ?? galleryValues.selectedImage,
     selectedImageName: nextSelectedItemKey ?? galleryValues.selectedImageName,

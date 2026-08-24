@@ -49,6 +49,22 @@ describe('image cluster registry', () => {
     expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'b.png', 'c.png']);
   });
 
+  it('rolls back only its own removals when another prune interleaves', () => {
+    // Two deletions overlap: the first fails and rolls back while the second
+    // has already pruned. Restoring the captured list wholesale would
+    // resurrect the second deletion's image; an identity guard would skip the
+    // restore entirely and strand the failed deletion's image outside the
+    // cluster for good.
+    const clusterId = registerImageCluster(['a.png', 'b.png', 'c.png'], 'beaches');
+    const rollbackFirst = pruneImageClusterMembers(['a.png']);
+
+    pruneImageClusterMembers(['b.png']);
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['c.png']);
+
+    rollbackFirst();
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'c.png']);
+  });
+
   it('makes pruning a no-op when nothing matches, and rollback a no-op once superseded', () => {
     const clusterId = registerImageCluster(['a.png'], 'beaches');
 

@@ -208,6 +208,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
   ];
 
   return {
+    anchoredWindowPage: 0,
     boards: [board],
     compareImageKey: null,
     currentItem: { itemKey: 'image:first.png', kind: 'item' },
@@ -450,6 +451,11 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
 };
 
 beforeEach(() => {
+  // The reveal channel is a module singleton, so a request from a previous
+  // test would otherwise be adopted by the next mount (grids deliberately
+  // honor a request that predates them). Drain it with one that can never
+  // match an item here.
+  requestGalleryItemReveal('image:__drained__');
   accountLifecycle.activate('grid-user');
   vi.clearAllMocks();
   registeredCommands.clear();
@@ -1017,6 +1023,46 @@ describe('GalleryImageGrid reveal requests', () => {
       selectedItemKey: 'image:deep.png',
       selectedItemKeys: ['image:deep.png'],
     });
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors a reveal requested before this grid mounted, while its item is still selected', async () => {
+    // The gallery is frequently opened (or swapped between its stacked and
+    // wide layouts, which remounts the grid) in response to the very reveal
+    // that is outstanding, so a grid must not ignore a request just because
+    // it arrived before the mount.
+    await interact(() => requestGalleryItemReveal('image:last.png'));
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    await renderGallery(createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] }));
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a reveal requested before mount once the selection has moved on', async () => {
+    // Age is not what makes a request stale — a superseding selection is.
+    await interact(() => requestGalleryItemReveal('image:last.png'));
+    await renderGallery(createGallery({ selectedItemKey: 'image:first.png', selectedItemKeys: ['image:first.png'] }));
+
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('keeps a reveal pending while its item has no row, then scrolls when one appears', async () => {
+    // A starred item under a collapsed Starred section is loaded but has no
+    // row to scroll to; consuming the reveal there would silently drop it.
+    const starred = createItem('image', 'starred.png', { starred: true });
+    const gallery = createGallery({
+      items: [starred, createItem('image', 'regular.png')],
+      selectedItemKey: 'image:starred.png',
+      selectedItemKeys: ['image:starred.png'],
+    });
+
+    await renderGallery(gallery);
+    await click(getButton('Collapse starred items'));
+    await interact(() => requestGalleryItemReveal('image:starred.png'));
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    await click(getButton('Expand starred items'));
     expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
   });
 

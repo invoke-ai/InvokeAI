@@ -72,6 +72,13 @@ export type GalleryCurrentItem =
   | null;
 
 export interface GalleryStateView {
+  /**
+   * Page the infinite window starts at, when a reveal has anchored it
+   * mid-board; 0 whenever the window covers the top of the listing (always so
+   * in paginated mode). Non-zero means the grid cannot scroll above its first
+   * row, so the surface owes the user both an explanation and a way back.
+   */
+  anchoredWindowPage: number;
   boards: GalleryBoard[];
   compareImageKey: GalleryItemKey | null;
   currentItem: GalleryCurrentItem;
@@ -436,6 +443,7 @@ export const getGalleryStateView = (
   });
 
   return {
+    anchoredWindowPage: isAnchoredInfiniteWindow ? getGalleryPage(values) : 0,
     boards,
     compareImageKey,
     currentItem,

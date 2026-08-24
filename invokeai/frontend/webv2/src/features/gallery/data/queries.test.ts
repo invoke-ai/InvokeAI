@@ -273,6 +273,25 @@ describe('Gallery item query read model', () => {
     }
   });
 
+  it('never grows an anchored infinite window above its anchor, but still lets paginated anchors', () => {
+    // The grid shares the anchored entry and cannot request earlier pages
+    // itself, so a prepend would splice 60 items in above its viewport and
+    // shift the content under the user. Paginated consumers slice out the one
+    // page they want by pageParam, so prepending is invisible there — and
+    // Preview walks backwards through exactly that mechanism.
+    const page: GalleryItemsPage = { items: [], total: 20_000 };
+    const onePage = [page];
+    const anchored = galleryItemsInfiniteOptions(baseFilter, { kind: 'infinite', offset: 6000 });
+    const base = galleryItemsInfiniteOptions(baseFilter);
+    const paginated = galleryItemsInfiniteOptions(baseFilter, { kind: 'anchor', offset: 6000 });
+
+    expect(anchored.getPreviousPageParam?.(page, onePage, 6000, [6000])).toBeUndefined();
+    expect(anchored.getPreviousPageParam?.(page, onePage, 6060, [6060])).toBe(6000);
+    expect(base.getPreviousPageParam?.(page, onePage, 0, [0])).toBeUndefined();
+    expect(base.getPreviousPageParam?.(page, onePage, GALLERY_PAGE_SIZE, [GALLERY_PAGE_SIZE])).toBe(0);
+    expect(paginated.getPreviousPageParam?.(page, onePage, 6000, [6000])).toBe(6000 - GALLERY_PAGE_SIZE);
+  });
+
   it('does not create item-list cache entries for repeated invalidation events', async () => {
     const queryClient = createQueryClient();
     backend.listGalleryItems.mockResolvedValue(createPage({ count: 1, offset: 0, total: 1 }));

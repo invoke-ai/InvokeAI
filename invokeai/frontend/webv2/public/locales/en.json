@@ -3022,7 +3022,10 @@
       "uploadUnsupported": "No supported media files to upload (PNG, JPEG, WebP, or MP4).",
       "videoCount_one": "{{count}} video",
       "videoCount_other": "{{count}} videos",
-      "windowLimit": "Showing the first {{count}} items. Narrow the search or switch to Pages to reach the rest."
+      "windowAnchored": "Showing this board from item {{index}}.",
+      "backToBoardTop": "Back to top",
+      "windowLimit": "Showing the first {{count}} items. Narrow the search or switch to Pages to reach the rest.",
+      "windowLimitFrom": "Showing {{count}} items from item {{index}}. Narrow the search or switch to Pages to reach the rest."
     },
     "queueStatus": {
       "idle": "Queue idle",

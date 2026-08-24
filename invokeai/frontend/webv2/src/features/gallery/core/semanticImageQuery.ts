@@ -121,9 +121,8 @@ export const getImageCluster = (clusterId: string): { imageNames: string[]; labe
  * Drops deleted images from the registered cluster, in step with the gallery's
  * optimistic cache patch: the member list is client-owned, so without this the
  * cluster view's total (and its trailing page) would keep counting images that
- * no longer exist. Returns a rollback that restores the previous member list —
- * unless a different registration has since replaced the entry, in which case
- * the rollback is a no-op (the newer cluster owns the slot).
+ * no longer exist. Returns a rollback that puts back exactly the names THIS
+ * call removed — a no-op once a different registration owns the slot.
  */
 export const pruneImageClusterMembers = (imageNames: readonly string[]): (() => void) => {
   const entry = [...clusters.entries()].at(0);
@@ -133,21 +132,40 @@ export const pruneImageClusterMembers = (imageNames: readonly string[]): (() => 
   }
 
   const [clusterId, cluster] = entry;
-  const removed = new Set(imageNames);
-  const prunedNames = cluster.imageNames.filter((name) => !removed.has(name));
+  const requested = new Set(imageNames);
+  const originalNames = cluster.imageNames;
+  const removedNames = originalNames.filter((name) => requested.has(name));
 
-  if (prunedNames.length === cluster.imageNames.length) {
+  if (removedNames.length === 0) {
     return () => undefined;
   }
 
-  clusters.set(clusterId, { imageNames: prunedNames, label: cluster.label });
+  const removed = new Set(removedNames);
+
+  clusters.set(clusterId, {
+    imageNames: originalNames.filter((name) => !removed.has(name)),
+    label: cluster.label,
+  });
 
   return () => {
     const current = clusters.get(clusterId);
 
-    if (current && current.imageNames === prunedNames) {
-      clusters.set(clusterId, { imageNames: cluster.imageNames, label: current.label });
+    if (!current) {
+      return;
     }
+
+    // Rebuilt from the pre-prune order rather than swapped back wholesale, so
+    // that a concurrent deletion's prune (or its rollback) landing in between
+    // survives: whatever this call did not remove keeps whatever state the
+    // other call left it in. Restoring the captured array instead would either
+    // resurrect that deletion's images or — guarded on identity — skip the
+    // restore entirely and strand a failed deletion's image outside the list.
+    const restored = new Set([...current.imageNames, ...removedNames]);
+
+    clusters.set(clusterId, {
+      imageNames: originalNames.filter((name) => restored.has(name)),
+      label: current.label,
+    });
   };
 };
 

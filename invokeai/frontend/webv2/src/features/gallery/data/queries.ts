@@ -353,10 +353,20 @@ export const galleryItemsInfiniteOptions = (
       allPages.length >= GALLERY_MAX_INFINITE_PAGES
         ? undefined
         : getNextPageParam(normalizedWindow, lastPage, lastPageParam),
-    getPreviousPageParam: (_firstPage, allPages, firstPageParam) =>
-      allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam >= GALLERY_PAGE_SIZE
+    getPreviousPageParam: (_firstPage, allPages, firstPageParam) => {
+      // An anchored INFINITE window must not grow upward past its anchor: its
+      // cache key names that start offset, and the grid — which shares the
+      // entry and cannot request earlier pages itself — would have 60 items
+      // spliced in above its viewport, shifting the content under the user.
+      // Paginated anchors keep growing freely: their consumer slices out the
+      // one page it wants by pageParam, so a prepend is invisible there, and
+      // Preview walks backwards through exactly this mechanism.
+      const lowestPageParam = normalizedWindow.kind === 'infinite' ? normalizedWindow.offset : 0;
+
+      return allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam - GALLERY_PAGE_SIZE >= lowestPageParam
         ? firstPageParam - GALLERY_PAGE_SIZE
-        : undefined,
+        : undefined;
+    },
     initialPageParam,
     maxPages: GALLERY_MAX_INFINITE_PAGES,
     queryFn: async ({ client, pageParam, signal }) => {

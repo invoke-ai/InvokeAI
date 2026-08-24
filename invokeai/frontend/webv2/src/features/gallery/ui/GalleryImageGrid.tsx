@@ -7,7 +7,8 @@ import {
   type GalleryRevealRequest,
 } from '@features/gallery/core/revealRequest';
 import { isDateBoardId } from '@features/gallery/data/backend';
-import { DropZone } from '@platform/ui';
+import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
+import { Button, DropZone } from '@platform/ui';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
 import {
   useCallback,
@@ -128,7 +129,7 @@ const GalleryStarredSectionHeader = ({
 export const GalleryImageGrid = () => {
   const { t } = useTranslation();
   const { actions, gallery, isWindowTruncated, itemActions, region } = useGalleryWidget();
-  const { account, antialiasProgressImages, ImageContextMenu } = useGalleryUi();
+  const { account, antialiasProgressImages, gallery: galleryCommands, ImageContextMenu } = useGalleryUi();
   const [isDropActive, setIsDropActive] = useState(false);
   const [isStarredOpen, setIsStarredOpen] = useState(true);
   const [viewportWidth, setViewportWidth] = useState(() => viewportWidthCache.get(region) ?? 0);
@@ -204,12 +205,16 @@ export const GalleryImageGrid = () => {
   // an effect event, which always sees the latest render's closure, so a stable
   // identity would buy nothing and pinning the mutable virtualizer into a
   // dependency array defeats the compiler's own memoization.
-  const scrollToItemIndex = (itemIndex: number) => {
+  /** Returns whether the item had a row to scroll to — a collapsed section has none. */
+  const scrollToItemIndex = (itemIndex: number): boolean => {
     const rowIndex = getGalleryGridRowIndexForItem(rows, itemIndex);
 
-    if (rowIndex >= 0) {
-      virtualizer.scrollToIndex(rowIndex);
+    if (rowIndex < 0) {
+      return false;
     }
+
+    virtualizer.scrollToIndex(rowIndex);
+    return true;
   };
 
   useGalleryGridHotkeys({ actionSelectionRefs, columnCount, scrollToItemIndex });
@@ -224,7 +229,13 @@ export const GalleryImageGrid = () => {
   // retries), and is dropped as soon as some other selection supersedes it.
   const revealRequest = useSyncExternalStore(subscribeGalleryRevealRequests, getGalleryRevealRequest);
   const pendingRevealRef = useRef<GalleryRevealRequest | null>(null);
-  const consumedRevealTokenRef = useRef(revealRequest?.token ?? 0);
+  // Seeded below any real token so a grid that mounts AFTER the request still
+  // honors it: the gallery is often opened (or swapped between its stacked and
+  // wide layouts, which remounts this component) in response to the very
+  // reveal that is outstanding. Staleness is judged by the selection guard
+  // below rather than by age — a request whose item is no longer the selection
+  // retires without scrolling.
+  const consumedRevealTokenRef = useRef(0);
   const settlePendingReveal = useEffectEvent(() => {
     const pending = pendingRevealRef.current;
 
@@ -243,9 +254,12 @@ export const GalleryImageGrid = () => {
 
     const itemIndex = gallery.items.findIndex((item) => toGalleryItemKey(item) === pending.itemKey);
 
-    if (itemIndex >= 0) {
+    // Consumed only once it actually scrolled: the item can be loaded and
+    // still have no row — a starred item under a collapsed Starred section —
+    // and clearing on the attempt alone would silently drop the reveal
+    // instead of honoring it when the section is expanded again.
+    if (itemIndex >= 0 && scrollToItemIndex(itemIndex)) {
       pendingRevealRef.current = null;
-      scrollToItemIndex(itemIndex);
     }
   });
 
@@ -376,6 +390,11 @@ export const GalleryImageGrid = () => {
     [itemActions]
   );
 
+  // Releasing the anchor puts the window back over the top of the listing.
+  const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
+
+  const anchoredWindowFirstItem = gallery.anchoredWindowPage * GALLERY_PAGE_SIZE + 1;
+
   return (
     <Box
       ref={syncRangeInteractionContext}
@@ -391,6 +410,16 @@ export const GalleryImageGrid = () => {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {gallery.anchoredWindowPage > 0 ? (
+        <Flex align="center" bg="bg.panel" gap="2" justify="space-between" px="2" py="1">
+          <Text color="fg.muted" fontSize="2xs" truncate>
+            {t('widgets.gallery.windowAnchored', { index: anchoredWindowFirstItem })}
+          </Text>
+          <Button flexShrink={0} size="2xs" variant="ghost" onClick={handleReturnToBoardTop}>
+            {t('widgets.gallery.backToBoardTop')}
+          </Button>
+        </Flex>
+      ) : null}
       {isEmpty ? (
         gallery.isLoading || hasActiveSearch || isVirtualBoard ? (
           <Flex align="center" color="fg.muted" h="full" justify="center" minH="8rem">
@@ -517,7 +546,12 @@ export const GalleryImageGrid = () => {
               {paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
                 <Flex align="center" justify="center" py="3">
                   <Text color="fg.subtle" fontSize="xs" textAlign="center">
-                    {t('widgets.gallery.windowLimit', { count: gallery.items.length })}
+                    {gallery.anchoredWindowPage > 0
+                      ? t('widgets.gallery.windowLimitFrom', {
+                          count: gallery.items.length,
+                          index: anchoredWindowFirstItem,
+                        })
+                      : t('widgets.gallery.windowLimit', { count: gallery.items.length })}
                   </Text>
                 </Flex>
               )}
