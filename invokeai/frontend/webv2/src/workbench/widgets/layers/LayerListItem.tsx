@@ -37,6 +37,7 @@ const ROW_SELECTION_FOCUS = {
   outlineColor: 'accent.solid',
   outlineOffset: '-2px',
 };
+const LAYER_ROW_BACKGROUND_TRANSITION = 'background min(40ms, var(--wb-motion-duration-fast)) ease-out';
 const VISIBILITY_DOT_BASE = {
   borderRadius: 'full',
   borderWidth: '1px',
@@ -272,6 +273,7 @@ export const LayerListItem = ({
         gap="1.5"
         p="1.5"
         position="relative"
+        transition={LAYER_ROW_BACKGROUND_TRANSITION}
         onContextMenu={handleContextMenu}
       >
         {/*

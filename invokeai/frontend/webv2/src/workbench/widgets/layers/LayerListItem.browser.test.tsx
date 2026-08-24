@@ -196,6 +196,17 @@ afterEach(async () => {
 });
 
 describe('LayerListItem accessibility', () => {
+  it('keeps layer-row background feedback nearly immediate', async () => {
+    await renderHarness();
+
+    const row = selectionButton('First layer').parentElement;
+    expect(row).not.toBeNull();
+    const style = getComputedStyle(row!);
+
+    expect(style.transitionProperty).toBe('background');
+    expect(style.transitionDuration).toBe('0.04s');
+  });
+
   it('keeps the sortable control free of interactive descendants', async () => {
     await renderHarness();
 

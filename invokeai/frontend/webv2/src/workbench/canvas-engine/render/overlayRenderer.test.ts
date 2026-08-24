@@ -77,6 +77,16 @@ describe('renderOverlay', () => {
     expect(arc!.args.slice(0, 3)).toEqual([100, 100, 20]);
   });
 
+  it('outlines the brush cursor in dark and light for contrast on any background', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(200, 200);
+    renderOverlay(target, baseState({ cursor: { point: { x: 50, y: 50 }, radiusDoc: 10 }, showBbox: false }));
+
+    expect(findSet(target.callLog, 'strokeStyle')).toEqual(['#000000', '#ffffff']);
+    expect(findSet(target.callLog, 'lineWidth')).toEqual([3, 1]);
+    expect(target.callLog.filter((entry) => entry.op === 'stroke')).toHaveLength(2);
+  });
+
   it('omits the cursor ring when cursor is null', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);

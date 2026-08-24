@@ -30,7 +30,10 @@ const BBOX_DASH: readonly number[] = [4, 4];
 /** The bbox-overlay dim fill (legacy `CanvasBboxToolModule` overlayRect parity). */
 const BBOX_OVERLAY_FILL = 'hsl(220 12% 10% / 0.8)';
 const GRID_COLOR = 'rgba(128, 128, 128, 0.25)';
-const CURSOR_COLOR = '#ffffff';
+const CURSOR_DARK = '#000000';
+const CURSOR_LIGHT = '#ffffff';
+const CURSOR_OUTER_WIDTH_PX = 3;
+const CURSOR_INNER_WIDTH_PX = 1;
 /** Side length (screen px) of a drawn bbox resize handle. */
 const BBOX_HANDLE_DRAW_PX = 8;
 const BBOX_HANDLE_FILL = '#ffffff';
@@ -206,11 +209,16 @@ const drawCursor = (ctx: Ctx, state: OverlayState): void => {
   const center = applyToPoint(state.view, cursor.point);
   const radius = cursor.radiusDoc * getScale(state.view);
   ctx.save();
-  ctx.strokeStyle = CURSOR_COLOR;
-  ctx.lineWidth = 1;
   ctx.setLineDash([]);
   ctx.beginPath();
   ctx.arc(center.x, center.y, Math.max(0, radius), 0, Math.PI * 2);
+  // A dark outer ring plus a light inner ring stays legible over either end of
+  // the value range without sampling pixels or relying on blend-mode support.
+  ctx.strokeStyle = CURSOR_DARK;
+  ctx.lineWidth = CURSOR_OUTER_WIDTH_PX;
+  ctx.stroke();
+  ctx.strokeStyle = CURSOR_LIGHT;
+  ctx.lineWidth = CURSOR_INNER_WIDTH_PX;
   ctx.stroke();
   ctx.restore();
 };
