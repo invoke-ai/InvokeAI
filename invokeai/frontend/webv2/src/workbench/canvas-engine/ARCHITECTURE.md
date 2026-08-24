@@ -118,6 +118,8 @@ Staged-result acceptance is engine-owned. The UI enables Accept from interaction
 
 The initial `commitStagedImage` mutation atomically inserts the new raster layer, selects it, clears staging, and records the project event. The controller verifies both the reducer postcondition and the document mirror before pushing exactly one engine-history entry. It returns `busy`, `stale`, or `missing` without changing staging or history when any guard fails.
 
+The continue-staging variant uses the same guarded transaction but inserts the candidate as a disabled raster layer, preserves the exact staging-area state and current layer selection, and keeps the staged preview active. This lets users bank candidates without visually doubling the preview or ending comparison. Undo and redo affect only the banked layer after the initial transaction.
+
 Undo removes the accepted layer and restores the prior selection. Redo restores the identical layer and selection without recreating the event or staging candidate. The history entry uses failure-atomic replay, and a successful commit uses the normal history `push`, which clears any previous redo stack. Undo intentionally does not return the accepted candidate to staging.
 
 ## PSD export

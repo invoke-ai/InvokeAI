@@ -60,6 +60,7 @@ export type CanvasProjectMutation =
   | {
       type: 'commitStagedImage';
       candidateFingerprint: string;
+      continueStaging: boolean;
       event: ProjectEvent;
       layer: CanvasRasterLayerContractV2;
       selectedImageIndex: number;
@@ -67,6 +68,7 @@ export type CanvasProjectMutation =
   | {
       type: 'rollbackStagedImageCommit';
       event: ProjectEvent;
+      continueStaging: boolean;
       layer: CanvasRasterLayerContractV2;
       selectedLayerId: string | null;
       stagingArea: CanvasStagingAreaContractV2;

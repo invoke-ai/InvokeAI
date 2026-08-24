@@ -264,14 +264,20 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [engine, isInteractionLocked]);
 
   /* eslint-disable react/react-compiler -- imperative engine payload is mutable by design */
-  const acceptStagedImage = useCallback(() => {
-    if (selectedSlot?.kind === 'candidate') {
-      engine?.layers.commitStagedImage({
-        candidate: selectedSlot.candidate,
-        selectedImageIndex: stagingArea.selectedImageIndex,
-      });
-    }
-  }, [engine, selectedSlot, stagingArea.selectedImageIndex]);
+  const commitSelectedStagedImage = useCallback(
+    (continueStaging: boolean) => {
+      if (selectedSlot?.kind === 'candidate') {
+        engine?.layers.commitStagedImage({
+          candidate: selectedSlot.candidate,
+          continueStaging,
+          selectedImageIndex: stagingArea.selectedImageIndex,
+        });
+      }
+    },
+    [engine, selectedSlot, stagingArea.selectedImageIndex]
+  );
+  const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
+  const saveStagedImageAndContinue = useCallback(() => commitSelectedStagedImage(true), [commitSelectedStagedImage]);
   /* eslint-enable react/react-compiler */
   const cancelQueueItem = useCallback((queueItemId: string) => queue.cancel(undefined, queueItemId), [queue]);
   const cycleStagedImage = useCallback(
@@ -509,6 +515,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 onDiscardAll={discardAllStagedImages}
                 onDiscardSelected={discardSelectedStagedImage}
                 onSelectImage={selectStagedImage}
+                onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}
                 onToggleThumbnails={toggleStagingThumbnails}
                 onToggleVisibility={toggleStagingVisibility}

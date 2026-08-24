@@ -140,6 +140,7 @@ const commitSelectedStagedImage = (state: WorkbenchState, projectId = state.acti
   return reduceWorkbench(state, {
     mutation: {
       candidateFingerprint: getCanvasStagingCandidateFingerprint(candidate),
+      continueStaging: false,
       event: {
         createdAt: '2026-07-16T00:00:00.000Z',
         id: `event-${candidate.imageName}`,

@@ -376,6 +376,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       if (project.canvas.document.layers.some((candidate) => candidate.id === layer.id)) {
         return project;
       }
+      const selectedLayerId = mutation.continueStaging ? project.canvas.document.selectedLayerId : layer.id;
       return {
         ...project,
         canvas: {
@@ -383,19 +384,25 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           document: {
             ...project.canvas.document,
             layers: [layer, ...project.canvas.document.layers],
-            selectedLayerId: layer.id,
+            selectedLayerId,
           },
-          stagingArea: clearStagingArea(project.canvas.stagingArea),
+          stagingArea: mutation.continueStaging
+            ? project.canvas.stagingArea
+            : clearStagingArea(project.canvas.stagingArea),
         },
         events: [mutation.event, ...project.events],
       };
     }
     case 'rollbackStagedImageCommit': {
+      const expectedSelectedLayerId = mutation.continueStaging ? mutation.selectedLayerId : mutation.layer.id;
+      const stagingMatchesCommit = mutation.continueStaging
+        ? project.canvas.stagingArea === mutation.stagingArea
+        : project.canvas.stagingArea.pendingImages.length === 0;
       if (
-        project.canvas.document.selectedLayerId !== mutation.layer.id ||
+        project.canvas.document.selectedLayerId !== expectedSelectedLayerId ||
         project.canvas.document.layers[0] !== mutation.layer ||
         project.events[0] !== mutation.event ||
-        project.canvas.stagingArea.pendingImages.length !== 0
+        !stagingMatchesCommit
       ) {
         return project;
       }

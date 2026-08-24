@@ -17,7 +17,7 @@ import {
 import { galleryDurability } from '@features/gallery';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
-import { Button, IconButton, MenuContent, toaster, Tooltip } from '@platform/ui';
+import { Button, Group, IconButton, MenuContent, toaster, Tooltip } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { getCancelableCanvasStagingQueueItemId } from '@workbench/canvasStagingView';
@@ -64,6 +64,7 @@ interface StagingBarProps {
   onDiscardAll: () => void;
   onDiscardSelected: () => void;
   onSelectImage: (imageIndex: number) => void;
+  onSaveToLayerAndContinue: () => void;
   onSetAutoSwitch: (mode: AutoSwitchMode) => void;
   onToggleThumbnails: () => void;
   onToggleVisibility: () => void;
@@ -96,6 +97,7 @@ export const StagingBar = ({
   onDiscardAll,
   onDiscardSelected,
   onSelectImage,
+  onSaveToLayerAndContinue,
   onSetAutoSwitch,
   onToggleThumbnails,
   onToggleVisibility,
@@ -280,10 +282,35 @@ export const StagingBar = ({
                   {t('common.discardAll')}
                 </Button>
 
-                <Button disabled={!canAccept} size="xs" onClick={onAccept}>
-                  <CheckIcon />
-                  {t('widgets.canvas.acceptToLayer')}
-                </Button>
+                <Menu.Root positioning={MENU_POSITIONING}>
+                  <Group attached>
+                    <Button disabled={!canAccept} size="xs" onClick={onAccept}>
+                      <CheckIcon />
+                      {t('widgets.canvas.acceptToLayer')}
+                    </Button>
+                    <Menu.Trigger asChild>
+                      <IconButton
+                        aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
+                        disabled={!canAccept}
+                        minW="0"
+                        size="xs"
+                        w="6"
+                      >
+                        <ChevronDownIcon />
+                      </IconButton>
+                    </Menu.Trigger>
+                  </Group>
+                  <Portal>
+                    <Menu.Positioner>
+                      <MenuContent minW="13rem" py="1">
+                        <Menu.Item value="save-disabled-layer" onClick={onSaveToLayerAndContinue}>
+                          <EyeOffIcon size={14} />
+                          <Menu.ItemText fontSize="xs">{t('widgets.canvas.staging.saveAsDisabledLayer')}</Menu.ItemText>
+                        </Menu.Item>
+                      </MenuContent>
+                    </Menu.Positioner>
+                  </Portal>
+                </Menu.Root>
               </>
             ) : null}
           </>

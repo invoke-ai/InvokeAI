@@ -7,7 +7,7 @@ import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { StagingBar } from './StagingBar';
@@ -51,7 +51,11 @@ const interact = (action: () => void): Promise<void> =>
     });
   });
 
-const renderStagingBar = async (slotCount: number, selectedImageIndex = 0) => {
+const renderStagingBar = async (
+  slotCount: number,
+  selectedImageIndex = 0,
+  onSaveToLayerAndContinue: () => void = noop
+) => {
   const slots = Array.from({ length: slotCount }, (_, index) => makeSlot(index));
   const selectedSlot = slots[selectedImageIndex];
 
@@ -86,6 +90,7 @@ const renderStagingBar = async (slotCount: number, selectedImageIndex = 0) => {
                   onDiscardAll={noop}
                   onDiscardSelected={noop}
                   onSelectImage={noop}
+                  onSaveToLayerAndContinue={onSaveToLayerAndContinue}
                   onSetAutoSwitch={noop}
                   onToggleThumbnails={noop}
                   onToggleVisibility={noop}
@@ -172,5 +177,22 @@ describe('StagingBar thumbnail strip', () => {
     const trailingGap = bounds.right - thumbnails[1]!.getBoundingClientRect().right;
     expect(leadingGap).toBeGreaterThan(0);
     expect(Math.abs(leadingGap - trailingGap)).toBeLessThan(2);
+  });
+
+  it('offers a split-button action that saves without ending staging', async () => {
+    const onSaveToLayerAndContinue = vi.fn();
+    await renderStagingBar(1, 0, onSaveToLayerAndContinue);
+
+    const trigger = document.querySelector<HTMLButtonElement>('button[aria-label="More accept options"]');
+    expect(trigger).not.toBeNull();
+    await interact(() => trigger!.click());
+
+    const menuItem = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) =>
+      item.textContent?.includes('Save Disabled Layer & Keep Staging')
+    );
+    expect(menuItem).toBeDefined();
+    await interact(() => menuItem!.click());
+
+    expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
   });
 });

@@ -253,6 +253,8 @@ export interface CanvasLayerCapability {
 
 export interface CommitStagedImageOptions {
   candidate: CanvasStagingCandidateContract;
+  /** Save a disabled layer without clearing or otherwise disturbing staging. */
+  continueStaging?: boolean;
   selectedImageIndex: number;
 }
 
