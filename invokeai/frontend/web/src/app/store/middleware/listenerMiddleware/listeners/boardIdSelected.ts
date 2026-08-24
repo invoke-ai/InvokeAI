@@ -1,8 +1,10 @@
+import type { UnknownAction } from '@reduxjs/toolkit';
 import { isAnyOf } from '@reduxjs/toolkit';
-import type { AppStartListening } from 'app/store/store';
+import type { AppStartListening, RootState } from 'app/store/store';
 import {
   selectGalleryItemNamesQueryArgs,
   selectGalleryView,
+  selectLastSelectedItem,
   selectSelectedBoardId,
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
@@ -11,6 +13,48 @@ import { galleryApi } from 'services/api/endpoints/gallery';
 
 /** The actions that ask this listener to pick an item for the user. */
 const startsProbe = isAnyOf(boardIdSelected, galleryViewChanged);
+
+/**
+ * Whether this navigation has nothing for the probe to do: it did not actually change the board or
+ * the view, and the item the viewer is showing is in the list that board/view is already displaying.
+ *
+ * Clicking the board you are already on, or the tab already showing, dispatches regardless
+ * (NoBoardBoard and the view tabs don't guard, unlike GalleryBoard and VirtualBoardItem). The probe
+ * picks the list's first item unconditionally, so left alone it throws the user's selection away —
+ * and moving the displayed item mid-generation also lifts the progress overlay off it for a couple
+ * of seconds.
+ *
+ * Both halves are load-bearing:
+ *
+ * - Comparing the *navigation* against the previous state, not just the item against the list: a
+ *   real board switch can land on a list that contains the displayed item, which virtual date
+ *   boards guarantee — their query args drop `board_id` and filter on `created_date` alone, so the
+ *   list is a superset of every board's items for that day. Skipping that strands the viewer on the
+ *   previous board's item.
+ * - Requiring the displayed item to be in the list: the selection can be non-empty and still not be
+ *   in what the grid shows — a search term narrows the list without starting a probe, and so do
+ *   `starredFirst`, `orderDir` and the archived-boards toggle. Clicking the board is how the user
+ *   gets unstuck from that, so the click must fall through and re-pick. Likewise when the selection
+ *   is empty, after deleting the last item or hiding date boards while one is selected.
+ *
+ * Answered synchronously off the cached list rather than after the query wait, because that wait is
+ * not safe for a click that should do nothing: `condition` re-evaluates only on a dispatched
+ * action, so a quiet store lets its 5s deadline expire and the give-up branch clears the selection.
+ * An uncached list simply falls through and probes as before.
+ */
+const isNoOpNavigation = (action: UnknownAction, state: RootState, previousState: RootState): boolean => {
+  const changedNothing =
+    (boardIdSelected.match(action) && selectSelectedBoardId(previousState) === action.payload.boardId) ||
+    (galleryViewChanged.match(action) && selectGalleryView(previousState) === action.payload);
+
+  if (!changedNothing) {
+    return false;
+  }
+
+  const activeItem = selectLastSelectedItem(state);
+  const cached = galleryApi.endpoints.listGalleryItemNames.select(selectGalleryItemNamesQueryArgs(state))(state);
+  return !!activeItem && !!cached.data?.item_names.includes(activeItem);
+};
 
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
@@ -31,6 +75,18 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
     predicate: (action, currentState, previousState) =>
       startsProbe(action) || selectSelection(currentState) !== selectSelection(previousState),
     effect: async (action, { getState, getOriginalState, dispatch, condition, cancelActiveListeners }) => {
+      // Decided before cancelling anything, and before the first await (the only point
+      // getOriginalState is valid at). A navigation that changes nothing has no business killing
+      // the probe of one that did: the app dispatches `boardIdSelected` and `galleryViewChanged`
+      // back to back in several places (deleting the selected board, uploading to another board),
+      // and the second of those pairs is routinely a no-op — cancelling there and returning left
+      // nothing to select the new board's item, stranding the viewer on the old one.
+      if (startsProbe(action) && !(boardIdSelected.match(action) && action.payload.select)) {
+        if (isNoOpNavigation(action, getState(), getOriginalState())) {
+          return;
+        }
+      }
+
       // Cancel any in-progress instances of this listener, we don't want to select an item from a previous board
       cancelActiveListeners();
 
@@ -47,35 +103,6 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       if (boardIdSelected.match(action) && action.payload.select) {
         // This action already has a resource selection - skip the below auto-selection logic
-        return;
-      }
-
-      // Nothing to probe for if this "change" changed nothing and the user already has a
-      // selection. Clicking the board you are already on, or the tab already showing, dispatches
-      // regardless (NoBoardBoard and the view tabs don't guard, unlike GalleryBoard and
-      // VirtualBoardItem), and the probe picks the list's first item unconditionally — so it would
-      // throw the user's selection away, and moving the displayed item mid-generation also lifts
-      // the progress overlay off it for a couple of seconds.
-      //
-      // Decided here rather than after the query, because the wait itself is not safe for a click
-      // that should do nothing: `condition` re-evaluates only on a dispatched action, so a quiet
-      // store lets its 5s deadline expire and the give-up branch below clears the selection.
-      //
-      // And decided on whether the *navigation* changed anything rather than on whether the
-      // displayed item is in the new list: a real board switch can land on a list that contains it
-      // — a virtual date board's args drop `board_id` and filter on `created_date` alone, so its
-      // list is a superset of every board's items for that day — and skipping that would strand
-      // the viewer on the previous board's item.
-      //
-      // An empty selection still probes: with nothing to show, clicking the board is how the user
-      // asks for something, and it is reachable — deleting the last item, hiding date boards while
-      // one is selected, or this listener's own give-up all leave the selection empty.
-      const previousState = getOriginalState();
-      const isNoOpNavigation =
-        (boardIdSelected.match(action) && selectSelectedBoardId(previousState) === action.payload.boardId) ||
-        (galleryViewChanged.match(action) && selectGalleryView(previousState) === action.payload);
-
-      if (isNoOpNavigation && selectSelection(getState()).length > 0) {
         return;
       }
 

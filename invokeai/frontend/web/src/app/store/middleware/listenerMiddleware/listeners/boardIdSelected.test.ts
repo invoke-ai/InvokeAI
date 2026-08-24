@@ -186,6 +186,36 @@ describe('addBoardIdSelectedListener', () => {
     );
   });
 
+  it('still selects when a real board switch lands on an already-cached list containing the displayed item', async () => {
+    // The dangerous version of the case below: the destination list is cached *before* the switch,
+    // so the membership test alone would answer "nothing to do" the instant the click lands. Only
+    // comparing the navigation against the state before the action keeps this a real switch.
+    const store = buildStore();
+
+    // Cache the date board's list, then go elsewhere and select something that is in it.
+    store.dispatch(boardIdSelected({ boardId: 'by_date:2026-08-24' }));
+    const seed = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['newest-today.png', 'from-board-a.png'],
+        starred_count: 0,
+        total_count: 2,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await seed;
+    await vi.advanceTimersByTimeAsync(6000);
+    store.dispatch(boardIdSelected({ boardId: 'board-a' }));
+    store.dispatch(imageSelected('from-board-a.png'));
+    await vi.advanceTimersByTimeAsync(6000);
+
+    // Back to the date board, whose cached list contains the item on screen.
+    store.dispatch(boardIdSelected({ boardId: 'by_date:2026-08-24' }));
+    store.dispatch({ type: 'test/tick' });
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.getState().gallery.selection).toEqual(['newest-today.png']);
+  });
+
   it('still selects when a real board switch lands on a list containing the displayed item', async () => {
     // The skip keys on "did this navigation change anything", not on whether the displayed item is
     // in the new list. A virtual date board's query args drop `board_id` and filter on
@@ -208,6 +238,90 @@ describe('addBoardIdSelectedListener', () => {
     await vi.advanceTimersByTimeAsync(6000);
 
     expect(store.getState().gallery.selection).toEqual(['newest-today.png']);
+  });
+
+  it('does not let a no-op navigation cancel the probe of one that did change something', async () => {
+    // The app dispatches these two back to back when the selected board is deleted or archived
+    // (addArchivedOrDeletedBoardListener) and when an upload targets another board. The second is
+    // routinely a no-op — if it cancels, the first board change is left with nothing to select it
+    // and the viewer stays on an item from the board that just went away.
+    const store = buildStore();
+    store.dispatch(selectionChanged(['from-deleted-board.png']));
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    store.dispatch(galleryViewChanged('images'));
+
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['uncategorized-newest.png'],
+        starred_count: 0,
+        total_count: 1,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.getState().gallery.selection).toEqual(['uncategorized-newest.png']);
+  });
+
+  it('leaves a still-valid selection alone when the tab already showing is clicked', async () => {
+    // The view half of the same question. `GalleryPanel` dispatches galleryViewChanged on every
+    // tab click, including the active one.
+    const store = buildStore();
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['newest.png', 'older.png'],
+        starred_count: 0,
+        total_count: 2,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+    await vi.advanceTimersByTimeAsync(6000);
+    store.dispatch(imageSelected('older.png'));
+
+    store.galleryActions.length = 0;
+    store.dispatch(galleryViewChanged('images'));
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.galleryActions).not.toContain('gallery/selectionChanged');
+    expect(store.getState().gallery.selection).toEqual(['older.png']);
+  });
+
+  it('re-picks when a no-op click finds the displayed item filtered out of the list', async () => {
+    // A search term changes the query args without starting a probe, so the selection can be
+    // non-empty and yet absent from what the grid shows. Clicking the board is how the user gets
+    // unstuck, so this click must fall through and pick from the list on screen.
+    const store = buildStore();
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    store.dispatch(imageSelected('dog.png'));
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['cat.png'],
+        starred_count: 0,
+        total_count: 1,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    const rewake = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['cat.png'],
+        starred_count: 0,
+        total_count: 1,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await rewake;
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.getState().gallery.selection).toEqual(['cat.png']);
   });
 
   it('does not report an empty board as the user picking something', async () => {
@@ -255,12 +369,20 @@ describe('addBoardIdSelectedListener', () => {
     await vi.advanceTimersByTimeAsync(6000);
     store.dispatch(selectionChanged([]));
 
-    // Clicking the board again, with the list already cached. The tick is only there to wake the
-    // probe: `condition` re-evaluates on a dispatched action, never on its own timer, so an
-    // already-fulfilled list plus a quiet store leaves it waiting. Pre-existing, and not what this
-    // test is about — the point here is that the click is not swallowed.
+    // Clicking the board again. The probe must not be swallowed: with nothing selected there is
+    // nothing to protect, and this click is how the user asks for something to look at.
     store.dispatch(boardIdSelected({ boardId: 'none' }));
-    store.dispatch({ type: 'test/tick' });
+    // The list landing is what wakes the probe in the app — `condition` re-evaluates on a
+    // dispatched action, never on its own timer.
+    const rewake = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['newest.png'],
+        starred_count: 0,
+        total_count: 1,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await rewake;
     await vi.advanceTimersByTimeAsync(6000);
 
     expect(store.getState().gallery.selection).toEqual(['newest.png']);
