@@ -46,7 +46,9 @@ async def async_call_deepseek_llm(
     response_format: ResponseFormat = "text",
 ) -> str:
     # async method may be called by a fastapi handler without a new thread.
-    request = _build_request(app_config, model_name, prompt, system_prompt, images, max_tokens, temperature, response_format)
+    request = _build_request(
+        app_config, model_name, prompt, system_prompt, images, max_tokens, temperature, response_format
+    )
     # httpx timeout default is 5s, too low for long responses. Increase read timeout while leaving other timeouts intact.
     async with httpx.AsyncClient(timeout=httpx.Timeout(5, read=2 * max_tokens)) as client:
         response = await client.send(request)
@@ -66,7 +68,9 @@ def call_deepseek_llm(
     # Apparently there's not a great way of using an async function from a synchronous one
     # https://discuss.python.org/t/calling-coroutines-from-sync-code-2/24093
     # so we have two functions that use different client implementations.
-    request = _build_request(app_config, model_name, prompt, system_prompt, images, max_tokens, temperature, response_format)
+    request = _build_request(
+        app_config, model_name, prompt, system_prompt, images, max_tokens, temperature, response_format
+    )
     # httpx timeout default is 5s, too low for long responses. Increase read timeout while leaving other timeouts intact.
     with httpx.Client(timeout=httpx.Timeout(5, read=2 * max_tokens)) as client:
         response = client.send(request)
@@ -153,7 +157,7 @@ MAX_PIXELS = 800 * 800  # size for deepseek-v4-flash-vision-exp (August 2026)
 WEBP_METHOD = 2  # 0–6
 
 
-def downsample_image(image: Image, max_pixels: int=MAX_PIXELS) -> Image:
+def downsample_image(image: Image, max_pixels: int = MAX_PIXELS) -> Image:
     # Does this code already exist somewhere?
     pixels = image.width * image.height
     if pixels <= max_pixels:
@@ -166,7 +170,7 @@ def encode_image(image: Image) -> str:
     with BytesIO() as b:
         image.save(b, format="WebP", method=WEBP_METHOD)
         encoded = b64encode(b.getbuffer())
-        return 'data:image/webp;base64,' + encoded.decode('ascii')
+        return "data:image/webp;base64," + encoded.decode("ascii")
 
 
 @invocation(
@@ -192,7 +196,9 @@ class DeepSeekTextApiInvocation(BaseInvocation):
     )
     images: list[ImageField] = InputField()
     # not hardcoding model names in the schema because the API provider may change them at any time
-    model: str = InputField(title="DeepSeek Model", description="`deepseek-v4-flash` or `deepseek-v4-pro` or `deepseek-v4-flash-vision-exp`")
+    model: str = InputField(
+        title="DeepSeek Model", description="`deepseek-v4-flash` or `deepseek-v4-pro` or `deepseek-v4-flash-vision-exp`"
+    )
     max_tokens: int = InputField(
         default=300,
         ge=1,
