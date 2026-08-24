@@ -47,6 +47,8 @@ class FakeImageIndexService(ImageIndexServiceBase):
         self.text_unavailable = False
         self.embedded_texts: list[str] = []
         self.embedded_images: list = []
+        self.vocab_invalidations = 0
+        self.vocab_state: tuple[str, str | None] = ("idle", None)
 
     @property
     def model_id(self) -> str | None:
@@ -94,6 +96,15 @@ class FakeImageIndexService(ImageIndexServiceBase):
         # phrase i points along axis i.
         vocabulary = ["alpha", "beta", "gamma", "delta"]
         return vocabulary, np.eye(DIM, dtype=np.float32)
+
+    def invalidate_vocab(self) -> None:
+        self.vocab_invalidations += 1
+        self.vocab_state = ("building", None)
+
+    def get_vocab_build_state(self) -> tuple[str, str | None]:
+        if self._model_id is None:
+            return "unavailable", None
+        return self.vocab_state
 
     def request_projection(
         self,
@@ -1104,3 +1115,95 @@ def test_cluster_labels_empty_without_projection(client: TestClient) -> None:
         "updated_at": None,
         "visible_hash": None,
     }
+
+
+# --- Supplementary vocabulary ---
+
+
+def test_vocab_get_returns_terms_and_state(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _records(mock_invoker).set_custom_vocab_terms(["zebra", "aardvark"])
+
+    body = client.get("/api/v1/image_map/vocab").json()
+
+    assert body["terms"] == ["aardvark", "zebra"]
+    assert body["state"] == "idle"
+    assert body["error"] is None
+    # The client sizes its input constraints from these.
+    assert body["max_terms"] > 0
+    assert body["max_term_length"] > 0
+
+
+def test_vocab_get_reports_unavailable_when_indexer_not_running(
+    image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    image_index_service._model_id = None
+    body = client.get("/api/v1/image_map/vocab").json()
+    # Terms are still served: they persist and apply when indexing next runs.
+    assert body["state"] == "unavailable"
+
+
+def test_vocab_put_normalizes_dedupes_stores_and_invalidates(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    response = client.put(
+        "/api/v1/image_map/vocab",
+        json={"terms": ["  Golden   Retriever ", "golden retriever", "", "Zebra"]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["terms"] == ["golden retriever", "zebra"]
+    assert body["state"] == "building"
+    # Stored, and the embedding cache was invalidated after the commit.
+    assert _records(mock_invoker).get_custom_vocab_terms() == ["golden retriever", "zebra"]
+    assert image_index_service.vocab_invalidations == 1
+
+
+def test_vocab_put_replaces_rather_than_merges(mock_invoker: Invoker, client: TestClient) -> None:
+    client.put("/api/v1/image_map/vocab", json={"terms": ["zebra"]})
+    client.put("/api/v1/image_map/vocab", json={"terms": ["okapi"]})
+    assert _records(mock_invoker).get_custom_vocab_terms() == ["okapi"]
+
+    client.put("/api/v1/image_map/vocab", json={"terms": []})
+    assert _records(mock_invoker).get_custom_vocab_terms() == []
+
+
+def test_vocab_put_rejects_an_overlong_term_and_stores_nothing(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _records(mock_invoker).set_custom_vocab_terms(["zebra"])
+
+    response = client.put("/api/v1/image_map/vocab", json={"terms": ["ok", "x" * 65]})
+
+    assert response.status_code == 422
+    assert "64" in response.json()["detail"]
+    # The stored list is untouched and nothing was invalidated.
+    assert _records(mock_invoker).get_custom_vocab_terms() == ["zebra"]
+    assert image_index_service.vocab_invalidations == 0
+
+
+def test_vocab_put_rejects_too_many_terms(mock_invoker: Invoker, client: TestClient) -> None:
+    response = client.put("/api/v1/image_map/vocab", json={"terms": [f"term {i}" for i in range(501)]})
+    assert response.status_code == 422
+    assert _records(mock_invoker).get_custom_vocab_terms() == []
+
+
+def test_vocab_writes_are_admin_only(multiuser, mock_invoker: Invoker, client: TestClient) -> None:
+    _create_user(mock_invoker, "admin@test.com", is_admin=True)
+    _create_user(mock_invoker, "user1@test.com")
+    admin_headers = _login(client, "admin@test.com")
+    user_headers = _login(client, "user1@test.com")
+
+    denied = client.put("/api/v1/image_map/vocab", json={"terms": ["zebra"]}, headers=user_headers)
+    assert denied.status_code == 403
+    assert _records(mock_invoker).get_custom_vocab_terms() == []
+
+    allowed = client.put("/api/v1/image_map/vocab", json={"terms": ["zebra"]}, headers=admin_headers)
+    assert allowed.status_code == 200
+
+    # The list itself is readable by any user.
+    read = client.get("/api/v1/image_map/vocab", headers=user_headers)
+    assert read.status_code == 200
+    assert read.json()["terms"] == ["zebra"]

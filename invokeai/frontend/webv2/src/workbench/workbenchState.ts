@@ -78,6 +78,7 @@ import {
   isHighConfidenceGenerateEdit,
   isHighConfidenceGraphEdit,
   isHighConfidenceUpscaleEdit,
+  isHighConfidenceVideoEdit,
   type CanvasEditIntent,
   type WorkbenchActionOrigin,
 } from './autoRoutePolicy';
@@ -115,6 +116,17 @@ import {
   syncUpscaleWidgetValuesWithModels,
   type UpscaleWidgetValues,
 } from '@features/upscale';
+import {
+  clearDeletedVideoMedia,
+  cloneVideoWidgetValues,
+  compileVideoGraph,
+  getVideoDimensions,
+  getVideoWidgetValidationReasons,
+  normalizeVideoWidgetValues,
+  resolveVideoSeed,
+  syncVideoWidgetValuesWithModels,
+  type VideoWidgetValues,
+} from '@features/video';
 import { compileProjectGraph } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import {
@@ -239,7 +251,7 @@ type WorkbenchReducerAction =
   | {
       type: 'patchProjectPromptDraft';
       values: ProjectPromptDraftPatch;
-      sourceId: 'generate' | 'upscale';
+      sourceId: 'generate' | 'upscale' | 'video';
       projectId?: string;
       origin?: WorkbenchActionOrigin;
     }
@@ -1226,6 +1238,7 @@ const createWidgetStates = (): WidgetStateMap => ({
   'version-status': { id: 'version-status', label: 'Version', values: {}, version: 1 },
   workflow: { graphId: 'workflow-graph', id: 'workflow', label: 'Workflow', values: {}, version: 1 },
   upscale: { graphId: 'upscale-graph', id: 'upscale', label: 'Upscale', values: {}, version: 1 },
+  video: { graphId: 'video-graph', id: 'video', label: 'Video', values: {}, version: 1 },
 });
 
 const createWidgetState = (widgetId: WidgetTypeId): WidgetStateContract =>
@@ -1260,6 +1273,7 @@ const defaultWidgetInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   generate: 'generate',
   'image-map': 'image-map',
   upscale: 'upscale',
+  video: 'video',
   layers: 'layers',
   notifications: 'notifications',
   preview: 'preview',
@@ -1290,31 +1304,54 @@ const LEGACY_DEFAULT_LEFT_REGION_WIDGET_IDS: readonly WidgetInstanceId[][] = [
   ['generate', 'workflow', 'gallery'],
 ];
 
+// Every left rail shipped as a default between the Upscale and Video widgets
+// (including pre-upscale defaults after the splice above normalizes them).
+const PRE_VIDEO_DEFAULT_LEFT_REGION_WIDGET_IDS: readonly WidgetInstanceId[][] = [
+  ['generate', 'upscale'],
+  ['generate', 'workflow', 'upscale'],
+  ['workflow', 'generate', 'upscale'],
+  ['generate', 'workflow', 'upscale', 'gallery'],
+];
+
 const ensureLeftRegion = (leftRegion: WidgetRegionState | undefined): WidgetRegionState => {
   const fallback = createWidgetRegions().left;
 
   if (!leftRegion) {
     return fallback;
   }
-  if (leftRegion.instanceIds.includes('upscale')) {
-    return leftRegion;
+  let region = leftRegion;
+
+  if (!region.instanceIds.includes('upscale')) {
+    const legacyMatch = LEGACY_DEFAULT_LEFT_REGION_WIDGET_IDS.some(
+      (ids) => ids.length === region.instanceIds.length && ids.every((id, index) => region.instanceIds[index] === id)
+    );
+
+    if (legacyMatch) {
+      const galleryIndex = region.instanceIds.indexOf('gallery');
+      const instanceIds = [...region.instanceIds];
+
+      instanceIds.splice(galleryIndex === -1 ? instanceIds.length : galleryIndex, 0, 'upscale');
+      region = { ...region, instanceIds };
+    }
   }
 
-  const legacyMatch = LEGACY_DEFAULT_LEFT_REGION_WIDGET_IDS.some(
-    (ids) =>
-      ids.length === leftRegion.instanceIds.length && ids.every((id, index) => leftRegion.instanceIds[index] === id)
-  );
+  // Same treatment for rails persisted before the Video widget shipped: only a
+  // rail that exactly matches a shipped default (after the upscale splice above)
+  // adopts it — a customized rail is left alone.
+  if (region.instanceIds.includes('upscale') && !region.instanceIds.includes('video')) {
+    const preVideoMatch = PRE_VIDEO_DEFAULT_LEFT_REGION_WIDGET_IDS.some(
+      (ids) => ids.length === region.instanceIds.length && ids.every((id, index) => region.instanceIds[index] === id)
+    );
 
-  if (!legacyMatch) {
-    return leftRegion;
+    if (preVideoMatch) {
+      const instanceIds = [...region.instanceIds];
+
+      instanceIds.splice(instanceIds.indexOf('upscale') + 1, 0, 'video');
+      region = { ...region, instanceIds };
+    }
   }
 
-  const galleryIndex = leftRegion.instanceIds.indexOf('gallery');
-  const instanceIds = [...leftRegion.instanceIds];
-
-  instanceIds.splice(galleryIndex === -1 ? instanceIds.length : galleryIndex, 0, 'upscale');
-
-  return { ...leftRegion, instanceIds };
+  return region;
 };
 
 // Every right rail this app has shipped as a default. A project persisted with
@@ -1627,6 +1664,9 @@ export const normalizeWorkbenchProject = (project: Project): Project => {
 
   if (leftRegion.instanceIds.includes('upscale') && !widgetInstances.upscale) {
     widgetInstances.upscale = createWidgetInstance('upscale');
+  }
+  if (leftRegion.instanceIds.includes('video') && !widgetInstances.video) {
+    widgetInstances.video = createWidgetInstance('video');
   }
 
   if (bottomRegion.instanceIds.includes('queue-status') && !widgetInstances['queue-status']) {
@@ -2302,6 +2342,35 @@ const compileInvocationSnapshot = (
     return { graph: compiledGraph, widgetStates };
   }
 
+  if (route.sourceId === 'video') {
+    const values = normalizeVideoWidgetValues(getWidgetValues(project, 'video'));
+
+    if (!values) {
+      return null;
+    }
+
+    const syncedValues = models ? syncVideoWidgetValuesWithModels(values, models) : values;
+    const currentValues: VideoWidgetValues = {
+      ...syncedValues,
+      ...getPromptDraftFromValues(getProjectWidgetValues(project, 'generate')),
+    };
+
+    if (!currentValues.model || getVideoWidgetValidationReasons(currentValues, models).length > 0) {
+      return null;
+    }
+
+    const resolvedValues: VideoWidgetValues = { ...currentValues, seed: resolveVideoSeed(currentValues) };
+    const compiledGraph = compileVideoGraph(resolvedValues, currentValues.model).graph;
+
+    widgetStates.video = {
+      ...widgetStates.video,
+      graphId: compiledGraph.id,
+      values: { ...cloneVideoWidgetValues(resolvedValues) },
+    };
+
+    return { graph: compiledGraph, widgetStates };
+  }
+
   if (route.sourceId !== 'generate') {
     const widgetGraph = project.widgetGraphs[route.sourceId as WidgetTypeId];
 
@@ -2502,6 +2571,13 @@ const removeGalleryItemsFromAllProjects = (
       return ref.kind === 'image' ? [ref.name] : [];
     })
   );
+  const removedVideoNames = new Set(
+    [...removedItemKeys].flatMap((key) => {
+      const ref = parseGalleryItemKey(key);
+
+      return ref.kind === 'video' ? [ref.name] : [];
+    })
+  );
   let didChange = false;
   const projects = state.projects.map((project) => {
     const withoutGalleryItems = updateProjectWidgetValues(project, 'gallery', (values) => {
@@ -2552,8 +2628,15 @@ const removeGalleryItemsFromAllProjects = (
       return { ...clearDeletedUpscaleInput(values, removedImageNames) };
     });
 
-    didChange ||= withoutUpscaleInput !== project;
-    return withoutUpscaleInput;
+    // The sweep runs against the RAW slots: normalizing first would let a
+    // reference masked by the first-frame/initial-video exclusion survive the
+    // deletion and resurface later as a dangling media name.
+    const withoutVideoMedia = updateProjectWidgetValues(withoutUpscaleInput, 'video', (rawValues) =>
+      clearDeletedVideoMedia(rawValues, removedImageNames, removedVideoNames)
+    );
+
+    didChange ||= withoutVideoMedia !== project;
+    return withoutVideoMedia;
   });
 
   return didChange ? { ...state, projects } : state;
@@ -2828,6 +2911,7 @@ const enqueueCompiledSnapshot = (
     route.sourceId === 'generate' ? normalizeGenerateSettings(widgetStates.generate.values) : null;
   const upscaleSettings =
     route.sourceId === 'upscale' ? normalizeUpscaleWidgetValues(widgetStates.upscale.values) : null;
+  const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
   const sourceGenerateSettings =
@@ -2837,7 +2921,9 @@ const enqueueCompiledSnapshot = (
         ? generateSettings
         : route.sourceId === 'upscale'
           ? upscaleSettings
-          : null;
+          : route.sourceId === 'video'
+            ? videoSettings
+            : null;
   // The prompts that actually generate: the authored text wrapped by the active
   // prompt template. Computed once here because this is the only place every
   // Generate-shaped route converges — `generate` and `canvas` both land here, as
@@ -2856,6 +2942,7 @@ const enqueueCompiledSnapshot = (
   // authored prompt never had, and the caller expanded the merged text too.
   const expandedPositivePrompts =
     route.sourceId !== 'upscale' &&
+    route.sourceId !== 'video' &&
     compiled.positivePrompts &&
     compiled.positivePrompts.length > 0 &&
     effectivePrompts &&
@@ -2901,13 +2988,17 @@ const enqueueCompiledSnapshot = (
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
   const selectedGalleryBoardId = widgetStates.gallery?.values.selectedBoardId;
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
+  const videoPresentationDimensions =
+    route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
   const presentationDimensions =
     route.sourceId === 'upscale' && upscaleSettings?.inputImage
       ? getUpscaleOutputDimensions(upscaleSettings.inputImage, upscaleSettings.scale)
-      : {
-          height: generatePresentationSettings?.height ?? project.canvas.document.height,
-          width: generatePresentationSettings?.width ?? project.canvas.document.width,
-        };
+      : videoPresentationDimensions
+        ? videoPresentationDimensions
+        : {
+            height: generatePresentationSettings?.height ?? project.canvas.document.height,
+            width: generatePresentationSettings?.width ?? project.canvas.document.width,
+          };
   const queueItem: QueueItem = {
     cancellable: backendSupportsCancellation,
     id: queueItemId,
@@ -2937,7 +3028,9 @@ const enqueueCompiledSnapshot = (
         ? { resultNodeIds: ['canvas_output'] }
         : route.sourceId === 'upscale'
           ? { resultNodeIds: ['upscale_output'] }
-          : {}),
+          : route.sourceId === 'video'
+            ? { resultNodeIds: ['video_output'] }
+            : {}),
       submittedAt,
       widgetInstances: cloneQueueWidgetInstances(project.widgetInstances),
       widgetStates,
@@ -2965,7 +3058,12 @@ const enqueueCompiledSnapshot = (
             negativePrompt: upscaleSettings.negativePromptEnabled ? upscaleSettings.negativePrompt : null,
             positivePrompt: upscaleSettings.positivePrompt,
           })
-        : project.promptHistory,
+        : videoSettings
+          ? addPromptHistoryItem(project.promptHistory, {
+              negativePrompt: videoSettings.negativePromptEnabled ? videoSettings.negativePrompt : null,
+              positivePrompt: videoSettings.positivePrompt,
+            })
+          : project.promptHistory,
     invocation: {
       ...project.invocation,
       destination: route.destination,
@@ -2974,7 +3072,7 @@ const enqueueCompiledSnapshot = (
     },
     queue: { items: [queueItem, ...project.queue.items] },
     widgetGraphs:
-      route.sourceId === 'generate' || route.sourceId === 'upscale'
+      route.sourceId === 'generate' || route.sourceId === 'upscale' || route.sourceId === 'video'
         ? { ...project.widgetGraphs, [route.sourceId]: cloneGraph(graph) }
         : project.widgetGraphs,
   };
@@ -3682,7 +3780,7 @@ export const __workbenchReducerInternal = (
 
         return action.sourceId === 'generate'
           ? applyAutoRouteForGenerateEdit(updated, context)
-          : applyAutoRouteForEdit(updated, 'upscale', context);
+          : applyAutoRouteForEdit(updated, action.sourceId, context);
       });
     }
     case 'setGenerateBatchCount': {
@@ -3730,6 +3828,9 @@ export const __workbenchReducerInternal = (
         }
         if (action.widgetId === 'upscale' && isHighConfidenceUpscaleEdit(changedKeys)) {
           return applyAutoRouteForEdit(updated, 'upscale', context);
+        }
+        if (action.widgetId === 'video' && isHighConfidenceVideoEdit(changedKeys)) {
+          return applyAutoRouteForEdit(updated, 'video', context);
         }
 
         return updated;

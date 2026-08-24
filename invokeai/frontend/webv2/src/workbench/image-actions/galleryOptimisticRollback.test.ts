@@ -168,6 +168,75 @@ describe('gallery optimistic rollback against the real reducer', () => {
     expect(getProjectWidgetValues(getProject(restored, projectId), 'upscale').inputImage).toEqual(upscaleInputImage);
   });
 
+  it('does not restore a video slot whose exclusive rival was claimed while the delete was in flight', () => {
+    const seeded = seedProjectWithItem();
+    const projectId = seeded.projectId;
+    const firstFrame = { height: 480, image_name: 'a.png', width: 832 };
+    const sourceClip = {
+      endFrame: 79,
+      fps: 16,
+      height: 480,
+      numFrames: 81,
+      startFrame: 0,
+      video_name: 'clip.mp4',
+      width: 832,
+    };
+    const state = workbenchReducer(seeded.state, {
+      projectId,
+      type: 'patchWidgetValues',
+      values: { firstFrameImage: firstFrame },
+      widgetId: 'video',
+    });
+
+    const before = captureGalleryWidgetKeyValues(state.projects);
+    const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
+
+    // Sanity: the optimistic removal cleared the video slot.
+    expect(getProjectWidgetValues(getProject(afterRemoval, projectId), 'video').firstFrameImage).toBeNull();
+
+    const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
+
+    // The slot freed up, so the user drops an initial video — exactly the
+    // patch `setSourceVideo` makes — before the server delete fails.
+    const claimed = workbenchReducer(afterRemoval, {
+      projectId,
+      type: 'patchWidgetValues',
+      values: { firstFrameImage: null, sourceVideo: sourceClip },
+      widgetId: 'video',
+    });
+
+    const patches = selectRestorableGalleryWidgetPatches(entries, claimed.projects);
+    const restored = applyRestorePatches(claimed, patches);
+    const videoValues = getProjectWidgetValues(getProject(restored, projectId), 'video');
+
+    // Restoring the first frame would recreate the forbidden
+    // first-frame+initial-video pair; the restore loses.
+    expect(videoValues.firstFrameImage).toBeNull();
+    expect(videoValues.sourceVideo).toEqual(sourceClip);
+    // Unrelated fields still restore normally.
+    expect(getProjectWidgetValues(getProject(restored, projectId), 'gallery').selectedImage).toEqual(galleryItem);
+  });
+
+  it('still restores a cleared video slot when its rival stayed empty', () => {
+    const seeded = seedProjectWithItem();
+    const projectId = seeded.projectId;
+    const firstFrame = { height: 480, image_name: 'a.png', width: 832 };
+    const state = workbenchReducer(seeded.state, {
+      projectId,
+      type: 'patchWidgetValues',
+      values: { firstFrameImage: firstFrame },
+      widgetId: 'video',
+    });
+
+    const before = captureGalleryWidgetKeyValues(state.projects);
+    const afterRemoval = workbenchReducer(state, { itemKeys: ['image:a.png'], type: 'removeGalleryItems' });
+    const entries = diffGalleryWidgetKeyValues(before, afterRemoval.projects);
+    const patches = selectRestorableGalleryWidgetPatches(entries, afterRemoval.projects);
+    const restored = applyRestorePatches(afterRemoval, patches);
+
+    expect(getProjectWidgetValues(getProject(restored, projectId), 'video').firstFrameImage).toEqual(firstFrame);
+  });
+
   it('restores nothing when the optimistic removal did not actually change anything', () => {
     const { state } = seedProjectWithItem();
     const before = captureGalleryWidgetKeyValues(state.projects);

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Literal, Optional
 
 import numpy as np
 from PIL import Image
@@ -9,6 +9,14 @@ from invokeai.app.services.image_index.image_index_common import ImageIndexStatu
 
 class TextSearchUnavailableError(Exception):
     """The configured embedding model has no usable text tower installed."""
+
+
+# unavailable: the indexer is not running (disabled, or its model is missing).
+# idle: nothing has asked for cluster labels yet; the build runs on demand.
+# building: a build is queued or in progress (including after an invalidation).
+# ready: the vocabulary embeddings are cached and serving.
+# error: the last build failed; invalidate_vocab() clears the failure and retries.
+VocabBuildState = Literal["unavailable", "idle", "building", "ready", "error"]
 
 
 class ImageIndexServiceBase(ABC):
@@ -79,6 +87,29 @@ class ImageIndexServiceBase(ABC):
 
         Raises:
             TextSearchUnavailableError: No usable text encoder is installed.
+        """
+        pass
+
+    @abstractmethod
+    def invalidate_vocab(self) -> None:
+        """Discard the cached vocabulary embeddings and queue a rebuild.
+
+        Called after the supplementary vocabulary changes. Must never block:
+        it may be called from a request thread while the worker holds the
+        vocabulary lock for a minutes-long build, so implementations signal
+        the worker rather than clearing caches inline. Also clears a memoized
+        build failure, so it doubles as the retry path for a failed build.
+
+        Safe to call when the indexer is not running: the vocabulary lives in
+        the database and the next start builds from current state anyway.
+        """
+        pass
+
+    @abstractmethod
+    def get_vocab_build_state(self) -> tuple[VocabBuildState, Optional[str]]:
+        """The vocabulary embedding build's state, plus an error message when failed.
+
+        Never blocks and never triggers a build; safe on request threads.
         """
         pass
 

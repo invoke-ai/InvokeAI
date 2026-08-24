@@ -18,7 +18,7 @@ export interface QueueBackendGraph {
 }
 
 export type QueueResultDestination = 'canvas' | 'gallery';
-export type QueueSourceId = 'canvas' | 'generate' | 'upscale' | 'workflow';
+export type QueueSourceId = 'canvas' | 'generate' | 'upscale' | 'video' | 'workflow';
 
 export interface QueueSubmissionPresentation {
   batchCount: number;

@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Icon, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { Link } from '@tanstack/react-router';
 import { LAUNCHPAD_INTENT_IDS } from '@workbench/launchpad/intents';
-import { BlocksIcon, BrushIcon, ScalingIcon, TypeIcon } from 'lucide-react';
+import { BlocksIcon, BrushIcon, ClapperboardIcon, ScalingIcon, TypeIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
  * level it is the first move rather than a thing you find after arriving.
  */
 
-const TILE_COLUMNS = { base: 1, lg: 4, sm: 2 } as const;
+const TILE_COLUMNS = { base: 1, lg: 5, sm: 2 } as const;
 const TILE_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
 const TILE_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
@@ -25,6 +25,7 @@ const INTENT_ICON: Record<LaunchpadIntentId, LucideIcon> = {
   canvas: BrushIcon,
   generate: TypeIcon,
   upscale: ScalingIcon,
+  video: ClapperboardIcon,
   workflow: BlocksIcon,
 };
 
@@ -34,6 +35,7 @@ const INTENT_LABEL_KEY: Record<LaunchpadIntentId, string> = {
   canvas: 'launchpad.home.intents.canvas',
   generate: 'launchpad.home.intents.generate',
   upscale: 'launchpad.home.intents.upscale',
+  video: 'launchpad.home.intents.video',
   workflow: 'launchpad.home.intents.workflow',
 };
 
@@ -41,6 +43,7 @@ const INTENT_DESCRIPTION_KEY: Record<LaunchpadIntentId, string> = {
   canvas: 'launchpad.home.intents.canvasDescription',
   generate: 'launchpad.home.intents.generateDescription',
   upscale: 'launchpad.home.intents.upscaleDescription',
+  video: 'launchpad.home.intents.videoDescription',
   workflow: 'launchpad.home.intents.workflowDescription',
 };
 

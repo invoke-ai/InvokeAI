@@ -5,7 +5,8 @@ import type { ChangeEvent } from 'react';
 import { createListCollection, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
 // Imported by subpath rather than from the `@platform/ui` barrel, which is at its
-// direct-importer budget. See the note in GenerateModelFamilyFields.
+// direct-importer budget (a dev-invalidation limit) — depending on the components
+// actually used means this module only rebuilds when those change.
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';

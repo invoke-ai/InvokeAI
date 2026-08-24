@@ -1,24 +1,28 @@
 ---
 title: Video Workflows
-description: A plain-language guide to the ready-made Wan 2.2 video workflows that ship with InvokeAI — which one to pick, and how to run it.
-lastUpdated: 2026-05-30
+description: A plain-language guide to the ready-made Wan 2.2 and MiniMax H3 video workflows that ship with InvokeAI — which one to pick, and how to run it.
+lastUpdated: 2026-08-22
 ---
 
 import { Card, CardGrid, Steps, LinkButton } from '@astrojs/starlight/components';
 
-InvokeAI ships **ten ready-made video workflows** so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
+InvokeAI ships **fifteen ready-made video workflows** — ten for **Wan 2.2** and five for **MiniMax H3** — so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
 
-This page helps you choose the right workflow and run it. For how the models work under the hood, VRAM details, and troubleshooting, see the [Video Generation guide](/features/video-generation/).
+This page helps you choose the right workflow and run it. For how the models work under the hood, VRAM details, and troubleshooting, see the [Video Generation guide](/concepts/video-generation/).
+
+:::tip[There's an easier way]
+Most of what these workflows do is also available with no graph at all: the **Video panel** in the editor's left rail infers the right pipeline from whatever you fill in — prompt, first/last frame, initial video — and handles model constraints automatically. Start with the [Video Generation guide](/concepts/video-generation/) if you just want to make a video; come here when you want graph-level control.
+:::
 
 :::caution[Experimental]
-Video generation is a prototype feature. These workflows and the models behind them are new — expect rough edges, and check the [Video Generation guide](/features/video-generation/) if something misbehaves.
+Video generation is a prototype feature. These workflows and the models behind them are new — expect rough edges, and check the [Video Generation guide](/concepts/video-generation/) if something misbehaves.
 :::
 
 ---
 
 ## Before you start
 
-**1. Install the video models.** Open the **Model Manager** and install a Wan 2.2 starter bundle (Text-to-Video and/or Image-to-Video). The [Video Generation guide explains the bundles and what fits your GPU](/features/video-generation/#installing-models).
+**1. Install the video models.** Open the **Model Manager** and install a starter bundle: **Wan 2.2 Text-to-Video**, **Wan 2.2 Image-to-Video**, and/or **MiniMax H3**. The [Video Generation guide explains the bundles and what fits your GPU](/concepts/video-generation/#the-models).
 
 **2. You'll select models when you open a workflow.** The shipped workflows come with their model slots **left empty on purpose** — every InvokeAI install stores models a little differently, so a workflow can't point at yours automatically. When you open one, look at its **Notes** panel (the note icon in the workflow editor): it lists exactly which model to pick in each slot. Drop those in once and you're set.
 
@@ -30,23 +34,25 @@ Whenever a workflow won't run because a model field is empty, open its **Notes**
 
 ## Which workflow should I use?
 
-The workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus an **Interpolate** workflow that bridges two images and an **Extend Video to Image** variant that steers a continuation toward a target frame.
+The Wan workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus an **Interpolate** workflow that bridges two images and an **Extend Video to Image** variant that steers a continuation toward a target frame. The five **MiniMax H3** workflows cover the same conditioning modes with one model — and add sound.
 
 | I want to… | Use | Notes |
 |---|---|---|
 | Make a clip from a text description | **Text to Video - Wan 2.2 Lightning** | Best quality, fast. Start here. |
-| Animate an existing image | **Image to Video - Wan 2.2 Lightning** | Your image becomes the first frame. |
-| Make a video between two images | **Interpolate 2 Images to Video - Wan 2.2 Lightning** | Provide a start and end image; the model interpolates between them. |
-| Make a video longer than ~5 seconds | **Extend Video - Wan 2.2 Lightning** | Continues an existing video and stitches the pieces together. |
+| Make a clip **with a soundtrack** | **Text to Video - MiniMax H3** | H3 generates synchronized stereo audio with every video. |
+| Animate an existing image | **Image to Video - Wan 2.2 Lightning** or **First Frame to Video - MiniMax H3** | Your image becomes the first frame. |
+| Make a video that *ends on* an image | **Last Frame to Video - MiniMax H3** | H3 only — the video builds toward your image. |
+| Make a video between two images | **Interpolate 2 Images to Video - Wan 2.2 Lightning** or **First and Last Frame to Video - MiniMax H3** | Provide a start and end image; the model interpolates between them. |
+| Make a video longer than one generation | **Extend Video - Wan 2.2 Lightning** or **Extend Video - MiniMax H3** | Continues an existing video and stitches the pieces together. |
 | Extend a video toward a specific end frame | **Extend Video to Image - Wan 2.2 Lightning** | Continues a video and interpolates the new part to a target image. |
-| Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of any of the above | Same as the base workflow, plus slots for your LoRAs. |
+| Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of a Wan workflow | Same as the base workflow, plus slots for your LoRAs. |
 | Run on a smaller GPU (≈12–16 GB) | a **TI2V-5B (Low Quality)** workflow | Smaller model, lower memory, lower quality. |
 
-If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a feel for it, then move to Image-to-Video and Extend.
+If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a feel for it, then move to Image-to-Video and Extend — or straight to **Text to Video - MiniMax H3** if you want audio and have the hardware for it.
 
 ---
 
-## Bundled video workflows
+## Bundled Wan 2.2 workflows
 
 ### Text to Video
 
@@ -120,47 +126,79 @@ Because the endpoint is pinned to your image, it's ideal for bridging a clip to 
 
 ---
 
+## Bundled MiniMax H3 workflows
+
+One model, five workflows, every conditioning mode — and every output is an MP4 with a **jointly generated stereo soundtrack**. All five default to the **Turbo** step-distillation LoRA (6 steps); H3 has no CFG or negative prompt to tune, and always renders at 24 fps.
+
+<CardGrid>
+  <Card title="Text to Video - MiniMax H3" icon="pencil">
+    Type a prompt, get a clip **with sound**. H3's vision-language text encoder follows detailed scene descriptions well — describe the audio you expect, too.
+  </Card>
+  <Card title="First Frame to Video - MiniMax H3" icon="star">
+    Drop in a starting image; the video animates outward from it, soundtrack included.
+  </Card>
+  <Card title="Last Frame to Video - MiniMax H3" icon="star">
+    The reverse — provide an **ending** image and the video builds toward it. Unique to H3; no Wan workflow can do this.
+  </Card>
+  <Card title="First and Last Frame to Video - MiniMax H3" icon="random">
+    Provide both; the model interpolates a clip (with audio) that starts on the first image and lands on the second.
+  </Card>
+  <Card title="Extend Video - MiniMax H3" icon="clock">
+    Continue an existing video with a new H3 segment, joined on with a smooth transition. The continuation renders at H3's fixed 24 fps.
+  </Card>
+</CardGrid>
+
+:::note[Selecting the H3 models]
+The H3 workflows use the **MiniMax H3 Model Loader**, which takes three selections from the **MiniMax H3** starter bundle: the **MiniMax H3 Components** install as the main model, plus the single-file **FL2VA Transformer (int8, pruned)** and **Text Encoder (int8)** in its override fields. Each workflow's **Notes** panel lists them. H3 is the heaviest local video option — see [the hardware notes](/concepts/video-generation/#installing-minimax-h3).
+:::
+
+:::caution[License restrictions]
+MiniMax H3 is distributed under a restrictive community license that excludes certain territories (currently the US, EU, UK, and South Korea) and extends to outputs. See the [Video Generation guide's license note](/concepts/video-generation/#installing-minimax-h3) before installing.
+:::
+
+---
+
 ## Running a workflow
 
 <Steps>
 
 1. **Open the Workflows tab** and load one of the workflows from the library.
 
-2. **Read the Notes** (note icon) and select the models it lists — the main model, VAE, and text encoder, plus the Lightning LoRA pair on the A14B workflows.
+2. **Read the Notes** (note icon) and select the models it lists — the main model, VAE, and text encoder, plus the Lightning LoRA pair on the A14B workflows, or the H3 loader's three selections plus the Turbo LoRA on the MiniMax workflows.
 
 3. **Set your inputs:**
    - *Text to Video* — type a **positive prompt** describing the scene and motion.
-   - *Image to Video* — drop a starting **image** into the image field, and optionally add a prompt.
+   - *Image to Video / First (or Last) Frame to Video* — drop a starting (or ending) **image** into the image field, and optionally add a prompt.
    - *Extend Video* — provide a **starting video** and use the sliders to pick where the continuation begins.
 
 4. **(Optional) adjust resolution.** The defaults are chosen to balance speed and memory. If you hit an out-of-memory error, lower the resolution preset — see the [VRAM tips](#which-one-fits-my-gpu) below.
 
-5. **Press Invoke.** The finished MP4 appears in the gallery and plays inline in the viewer.
+5. **Press Invoke.** The finished MP4 appears in the gallery and plays inline in the viewer — with its audio track, on H3.
 
 </Steps>
 
 :::tip
-Leave the **frame count** and **steps** at their defaults to start. They're already tuned for each workflow (for example, the Lightning workflows use only 4 steps, which is what makes them fast).
+Leave the **frame count** and **steps** at their defaults to start. They're already tuned for each workflow (for example, the Lightning workflows use only 4 steps and the H3 workflows 6, which is what makes them fast).
 :::
 
 ---
 
 ## Which one fits my GPU?
 
-A rough guide — exact numbers depend on resolution and your system. See [Video Generation → OOM errors](/features/video-generation/#oom-errors) for the full picture.
+A rough guide — exact numbers depend on resolution and your system. See [Video Generation → OOM errors](/concepts/video-generation/#oom-errors) for the full picture.
 
 | Your GPU | Best choice |
 |---|---|
-| 24 GB and up | Any workflow at 720p. |
+| 24 GB and up | Any Wan workflow at 720p; the MiniMax H3 workflows (with `enable_partial_loading` and generous system RAM). |
 | 16–24 GB | A14B Lightning workflows at 480p; TI2V-5B at up to 720p. |
 | 12–16 GB | The **TI2V-5B (Low Quality)** workflows. |
 
-If you get an **out-of-memory** error, lower the resolution first (it helps far more than reducing the frame count), and switch to a TI2V-5B workflow if you're still over budget.
+If you get an **out-of-memory** error, lower the resolution first (it helps far more than reducing the frame count), and switch to a TI2V-5B workflow if you're still over budget. On H3, switch the resolution to **768 lowres** for drafts.
 
 ---
 
 ## Going further
 
-These workflows are starting points. Once you're comfortable, the [Video Generation guide](/features/video-generation/) covers what's happening inside them — the model variants, how image conditioning works, the trick for chaining clips into longer videos, recommended parameters, and troubleshooting.
+These workflows are starting points. Once you're comfortable, the [Video Generation guide](/concepts/video-generation/) covers the **Video panel** (the no-graph way to run all of this), the model variants, how image conditioning works, extending clips into longer videos, recommended parameters, and troubleshooting.
 
-<LinkButton href="/features/video-generation/" variant="secondary">Read the Video Generation guide</LinkButton>
+<LinkButton href="/concepts/video-generation/" variant="secondary">Read the Video Generation guide</LinkButton>

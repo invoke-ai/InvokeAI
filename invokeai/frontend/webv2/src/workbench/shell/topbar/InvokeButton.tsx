@@ -136,7 +136,7 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
   const destination = getDestinationLabel(invocation.destination);
   const promptCount = promptExpansion.count;
   const summary =
-    invocation.sourceId === 'generate' || invocation.sourceId === 'upscale'
+    invocation.sourceId === 'generate' || invocation.sourceId === 'upscale' || invocation.sourceId === 'video'
       ? promptExpansion.isLoading
         ? t('topbar.invoke.expandingPrompts')
         : `${plural(promptCount, 'prompt')} × ${plural(batchCount, 'iteration')} → ${plural(promptCount * batchCount, 'generation')}`

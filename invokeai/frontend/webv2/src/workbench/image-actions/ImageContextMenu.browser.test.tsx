@@ -54,6 +54,8 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   openItemInPreview: vi.fn(),
   openImageInPreview: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
+  getVideoRecallCapabilities: vi.fn(() => Promise.resolve({ all: false, prompts: false, remix: false, seed: false })),
+  recallVideoData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendToCanvas: vi.fn(() => Promise.resolve()),
   setItemsStarred: vi.fn(() => Promise.resolve()),
@@ -249,7 +251,8 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('Delete Video');
     expect(document.body.textContent).not.toContain('Copy to clipboard');
     expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
-    expect(document.body.textContent).not.toContain('Recall Metadata');
+    // Videos carry their own Recall Metadata submenu (parameter recall).
+    expect(document.body.textContent).toContain('Recall Metadata');
     expect(document.body.textContent).not.toContain('Send to Upscale');
     expect(document.body.textContent).not.toContain('Select for Compare');
     expect(document.body.textContent).not.toContain('New from Image');

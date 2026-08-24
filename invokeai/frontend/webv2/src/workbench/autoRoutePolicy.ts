@@ -2,6 +2,7 @@ import type { ProjectGraphAction } from '@features/workflow/utility';
 import type { InvocationRoute, InvocationSourceId, ResultDestination } from '@workbench/invocationContracts';
 
 import { GENERATE_UI_STATE_KEYS } from '@features/generation/settings';
+import { VIDEO_UI_STATE_KEYS } from '@features/video';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
@@ -15,6 +16,7 @@ export const autoSwitchDestinations: Record<InvocationSourceId, ResultDestinatio
   canvas: 'canvas',
   generate: 'gallery',
   upscale: 'gallery',
+  video: 'gallery',
   workflow: 'gallery',
 };
 
@@ -64,6 +66,12 @@ export const isHighConfidenceGenerateEdit = (changedKeys: readonly string[]): bo
 
 export const isHighConfidenceUpscaleEdit = (changedKeys: readonly string[]): boolean =>
   hasIntentBearingKey(changedKeys, UPSCALE_UI_NOISE_KEYS);
+
+// Named beside VideoSettings for the same reason as generate's.
+const VIDEO_UI_NOISE_KEYS: ReadonlySet<string> = new Set(Object.keys(VIDEO_UI_STATE_KEYS));
+
+export const isHighConfidenceVideoEdit = (changedKeys: readonly string[]): boolean =>
+  hasIntentBearingKey(changedKeys, VIDEO_UI_NOISE_KEYS);
 
 const GRAPH_EDIT_CONFIDENCE = {
   addEdge: true,

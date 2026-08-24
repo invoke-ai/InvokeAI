@@ -41,6 +41,17 @@ export interface StoredRebalancePreset {
   multiplier: number;
 }
 
+/**
+ * A named Generate settings snapshot ("recipe") as it is persisted. `values` is
+ * opaque to Settings for the same bundle reason as {@link StoredRebalancePreset}:
+ * the generation feature owns the shape and re-normalizes it on apply.
+ */
+export interface StoredGeneratePreset {
+  id: string;
+  label: string;
+  values: Record<string, unknown>;
+}
+
 /** User-tunable appearance + behavior preferences surfaced in the Settings modal. */
 export interface WorkbenchPreferences {
   themeId: WorkbenchThemeId;
@@ -83,4 +94,6 @@ export interface WorkbenchPreferences {
   launchpadPinnedProjectIds: string[];
   /** User-saved Krea-2 conditioning rebalance curves, in the order they were saved. */
   krea2RebalancePresets: StoredRebalancePreset[];
+  /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
+  generatePresets: StoredGeneratePreset[];
 }

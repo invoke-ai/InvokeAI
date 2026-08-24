@@ -58,5 +58,5 @@ export {
   type InvocationStartedEvent,
   type QueueItemStatusChangedEvent,
 } from './data/events';
-export { createProductionQueueRuntime, queueCommands } from './publicApi';
+export { createProductionQueueRuntime, getQueueReadModelOptions, queueCommands } from './publicApi';
 export { hasPendingWorkflowQueueItem } from './ui/queueViewModel';

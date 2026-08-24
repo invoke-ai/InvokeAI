@@ -23,6 +23,7 @@ export type FirstPartyWidgetTypeId =
   | 'queue-status'
   | 'server-status'
   | 'upscale'
+  | 'video'
   | 'users'
   | 'version-status'
   | 'workflow';
@@ -281,6 +282,7 @@ export type SettingsSectionId =
   | 'project'
   | 'queue'
   | 'workflow'
+  | 'imageMap'
   | 'developer'
   | 'workspace';
 

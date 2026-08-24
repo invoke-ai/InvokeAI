@@ -41,6 +41,7 @@ import {
   FolderIcon,
   KeyboardIcon,
   ListOrderedIcon,
+  MapIcon,
   PaletteIcon,
   RotateCcwIcon,
   SettingsIcon,
@@ -54,6 +55,7 @@ import { useTranslation } from 'react-i18next';
 
 import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
+import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
 import { setWorkbenchSettingsSection, settingsDialogStore } from './settingsDialogStore';
 import {
   clearWorkbenchSettings,
@@ -208,6 +210,12 @@ const SettingsTabs = () => {
         icon: WorkflowIcon,
         label: t('settings.tabs.workflow'),
         value: 'workflow',
+      },
+      {
+        children: <ImageMapSection />,
+        icon: MapIcon,
+        label: t('settings.tabs.imageMap'),
+        value: 'imageMap',
       },
       {
         children: <DeveloperSection />,
@@ -591,6 +599,21 @@ const QueueSection = () => {
         title="Generation Devices"
       >
         <GenerationDevicesSettings />
+      </SettingsSection>
+    </Stack>
+  );
+};
+
+const ImageMapSection = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="6">
+      <SettingsSection
+        description={t('settings.imageMapVocabulary.description')}
+        title={t('settings.imageMapVocabulary.title')}
+      >
+        <ImageMapVocabularySettings />
       </SettingsSection>
     </Stack>
   );

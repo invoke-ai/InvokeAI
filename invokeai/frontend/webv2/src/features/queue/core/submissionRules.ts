@@ -6,6 +6,7 @@ export const BACKEND_SUBMITTABLE_SOURCE_IDS = [
   'generate',
   'workflow',
   'upscale',
+  'video',
   'canvas',
 ] as const satisfies readonly QueueSourceId[];
 

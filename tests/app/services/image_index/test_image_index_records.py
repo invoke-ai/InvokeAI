@@ -687,3 +687,24 @@ def test_projection_rejects_mismatched_lengths(index_records: ImageIndexRecordsS
         index_records.set_projection(
             SYSTEM_USER_ID, MODEL_ID, "hash-1", "{}", ["a.png"], np.zeros((2, 2), dtype=np.float32)
         )
+
+
+def test_custom_vocab_terms_roundtrip_sorted_with_replace_semantics(index_records: ImageIndexRecordsSqlite) -> None:
+    assert index_records.get_custom_vocab_terms() == []
+
+    index_records.set_custom_vocab_terms(["zebra", "aardvark"])
+    assert index_records.get_custom_vocab_terms() == ["aardvark", "zebra"]
+
+    # Replacement, not merge: what is passed is what is stored.
+    index_records.set_custom_vocab_terms(["okapi"])
+    assert index_records.get_custom_vocab_terms() == ["okapi"]
+
+    index_records.set_custom_vocab_terms([])
+    assert index_records.get_custom_vocab_terms() == []
+
+
+def test_custom_vocab_case_variant_duplicates_cannot_fail_the_replace(index_records: ImageIndexRecordsSqlite) -> None:
+    # Callers normalize, but the NOCASE primary key is a backstop: a
+    # case-variant pair must collapse to one row, not roll back the replace.
+    index_records.set_custom_vocab_terms(["Zebra", "zebra"])
+    assert len(index_records.get_custom_vocab_terms()) == 1

@@ -1,6 +1,6 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, Button, Center, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@workbench/image-map/imageMapSettings';
 import {
   ensureImageMapLoaded,
@@ -13,7 +13,7 @@ import { isIndexing } from '@workbench/image-map/indexProgress';
 import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useEffect } from 'react';
 
-import { ImageIndexProgressPanel } from './ImageIndexProgress';
+import { ImageIndexActivityBadge, ImageIndexProgressPanel } from './ImageIndexProgress';
 
 // Lazy so the plotly bundle (its own vite chunk, ~1.5MB) loads only when the
 // widget is actually shown.
@@ -81,9 +81,16 @@ export const ImageMapWidgetView = (_props: WidgetViewProps) => {
     // already-loaded map suspended anyway. Confining it here keeps the frame
     // mounted and the spinner where the plot will appear.
     return (
-      <Suspense fallback={plotLoadingFallback}>
-        <ImageMapPlot clickSelectsCluster={clickSelectsCluster} showClusterLabels={showClusterLabels} />
-      </Suspense>
+      // Positioned so the indexing badge can overlay the plot. That badge is
+      // the only sign of an index run once there are points to draw: this
+      // branch preempts the progress panel below, which is right — a usable
+      // stale map beats a progress bar — but silently, which was not.
+      <Box h="full" position="relative" w="full">
+        <Suspense fallback={plotLoadingFallback}>
+          <ImageMapPlot clickSelectsCluster={clickSelectsCluster} showClusterLabels={showClusterLabels} />
+        </Suspense>
+        {isIndexing(indexCounts) ? <ImageIndexActivityBadge counts={indexCounts} updatedAt={indexUpdatedAt} /> : null}
+      </Box>
     );
   }
 

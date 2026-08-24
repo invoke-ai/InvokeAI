@@ -2,7 +2,7 @@ import type { PromptTemplateSnapshot } from '@features/generation/core/promptTem
 import type { PromptTemplateRecord } from '@features/generation/data/promptTemplates';
 import type { PendingPromptTemplateDraft } from '@features/generation/ui/promptTemplateDraftStore';
 
-import { Popover, Portal } from '@chakra-ui/react';
+import { Popover, Portal, Text } from '@chakra-ui/react';
 import { toPromptTemplateSnapshot } from '@features/generation/data/promptTemplates';
 import { PromptTemplateEditor } from '@features/generation/ui/promptFields/PromptTemplateEditor';
 import { PromptTemplatesPanel } from '@features/generation/ui/promptFields/PromptTemplatesPanel';
@@ -113,23 +113,20 @@ export const PromptTemplatesButton = ({
     >
       <Tooltip content={tooltip} ids={popoverIds}>
         <Popover.Trigger asChild>
+          {/* A labeled primary rather than a bare icon: the label is the word
+              "Templates" until one is applied, then the applied template's name. */}
           <IconButton
             aria-label={t('widgets.generate.promptTemplates.title')}
-            // Quiet states only: a dimmed icon when nothing is applied, the
-            // template's name beside it when one is. No accent, no motion.
+            // Quiet states only: dimmed while nothing is applied. No accent, no motion.
             opacity={activeTemplate ? undefined : 0.5}
-            // Explicit `'0'`, not `undefined`: Chakra's IconButton spreads
-            // incoming props over its own `px: '0'`, so undefined clobbers it
-            // and the size recipe's `px: '2'` widened the icon-only button past
-            // the square neighbours it sits beside.
-            px={activeTemplate ? '1' : '0'}
+            px="1"
             size="2xs"
             variant="ghost"
-            w={activeTemplate ? 'auto' : undefined}
+            w="auto"
           >
             <LayoutTemplateIcon />
             {activeTemplate ? (
-              // Dimmed when it is gone, the same way the icon dims when nothing
+              // Dimmed when it is gone, the same way the button dims when nothing
               // is applied — one vocabulary for "not fully live", no new colour.
               <MiddleTruncate
                 as="span"
@@ -138,7 +135,11 @@ export const PromptTemplatesButton = ({
                 opacity={isMissing ? 0.5 : undefined}
                 text={activeTemplate.name}
               />
-            ) : null}
+            ) : (
+              <Text as="span" fontSize="2xs">
+                {t('widgets.generate.templatesButton')}
+              </Text>
+            )}
           </IconButton>
         </Popover.Trigger>
       </Tooltip>

@@ -32,7 +32,7 @@ describe('widget registry', () => {
   it('registers first-party widget manifests without icon validation failures', () => {
     const widgets = registerFirstPartyWidgets();
 
-    expect(widgets).toHaveLength(16);
+    expect(widgets).toHaveLength(17);
     expect(widgets.flatMap((widget) => widget.failure ?? [])).toEqual([]);
     expect(widgets.every((widget) => widget.status === 'enabled')).toBe(true);
   });
