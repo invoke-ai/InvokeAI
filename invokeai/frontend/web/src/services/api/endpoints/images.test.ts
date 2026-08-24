@@ -1,6 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+import { configureStore } from '@reduxjs/toolkit';
+import type { BaseQueryApi } from '@reduxjs/toolkit/query';
+import { sessionExpiredLogout } from 'features/auth/store/authSlice';
 import { toast } from 'features/toast/toast';
 import i18n from 'i18next';
 import {
@@ -17,7 +20,7 @@ import {
 import type { ImageDTO } from 'services/api/types';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api } from '..';
+import { api, buildV1Url, dynamicBaseQuery } from '..';
 
 vi.mock('features/toast/toast', () => ({ toast: vi.fn() }));
 vi.mock('i18next', () => ({ default: { t: vi.fn((key: string) => key) } }));
@@ -959,5 +962,143 @@ describe('imageDTOsByNamesQueryFn', () => {
 
     expect(baseQuery).toHaveBeenCalledTimes(1);
     expect(await result).toEqual({ error: { status: 'CUSTOM_ERROR', error: expect.stringContaining('Aborted') } });
+  });
+});
+
+describe('unauthorized responses', () => {
+  // `getDeploymentBaseUrl` reads `window.location.origin`, and these are the only tests in this
+  // file that issue a real request rather than driving a queryFn with a mocked baseQuery.
+  beforeAll(() => {
+    vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
+  });
+
+  /** One real request through `dynamicBaseQuery`, with the server's answer staged by `respond`. */
+  const request = async (respond: () => Response) => {
+    const dispatch = vi.fn();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(respond()))
+    );
+    const result = await dynamicBaseQuery(
+      buildV1Url('images/i/a.png'),
+      {
+        dispatch,
+        getState: () => ({}),
+        signal: new AbortController().signal,
+        abort: () => {},
+        endpoint: 'getImageDTO',
+        type: 'query',
+        forced: false,
+        extra: undefined,
+      } as unknown as BaseQueryApi,
+      {}
+    );
+    return { dispatch, result: result as { error?: { status?: unknown } } };
+  };
+
+  it('ends the session when the token that got the 401 is still the live one', async () => {
+    login('user-a');
+
+    const { dispatch, result } = await request(() => new Response(null, { status: 401 }));
+
+    expect(result.error?.status).toBe(401);
+    expect(dispatch).toHaveBeenCalledWith(sessionExpiredLogout());
+  });
+
+  it('does not end the session that replaced the one the 401 belongs to', async () => {
+    // A's request is slow. While it is in flight B takes over the tab -- a login here, or one in
+    // another tab, which lands the same way because localStorage is shared. Then A's 401 arrives.
+    // Ending the session on it logs out B, who never issued the request and whose own credential
+    // the server never rejected.
+    login('user-a');
+
+    const { dispatch, result } = await request(() => {
+      switchUser('user-b');
+      return new Response(null, { status: 401 });
+    });
+
+    // The 401 is still reported to the caller -- that request did fail. What must not happen is
+    // the session-wide consequence.
+    expect(result.error?.status).toBe(401);
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(localStorage.getItem('auth_token')).toBe(tokenFor('user-b'));
+  });
+
+  it('does not end a session over a 401 for the token a refresh replaced', async () => {
+    // Same user throughout: the sliding window minted a new token mid-request. The old token's
+    // 401 says nothing about the new one, and if the session really is over the next request
+    // carries the live token and its 401 ends it.
+    login('user-a', 1);
+
+    const { dispatch } = await request(() => {
+      login('user-a', 2);
+      return new Response(null, { status: 401 });
+    });
+
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(localStorage.getItem('auth_token')).toBe(tokenFor('user-a', 2));
+  });
+
+  it('leaves a 401 on an unauthenticated request alone', async () => {
+    // No token was sent, so nothing about a session was disproved. These fire during page load.
+    const { dispatch } = await request(() => new Response(null, { status: 401 }));
+
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('star invalidation', () => {
+  beforeAll(() => {
+    vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
+  });
+
+  const dtoUrl = `http://localhost/${buildV1Url('images/i/a.png')}`;
+
+  /** A store holding just the API slice: enough for tag invalidation to drive a refetch. */
+  const buildStore = () =>
+    configureStore({
+      reducer: { [api.reducerPath]: api.reducer },
+      middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
+    });
+
+  type ApiStore = ReturnType<typeof buildStore>;
+
+  it.each([
+    {
+      label: 'star',
+      body: { starred_images: [], failed_images: ['a.png'], affected_boards: [] },
+      mutate: (store: ApiStore) => store.dispatch(imagesApi.endpoints.starImages.initiate({ image_names: ['a.png'] })),
+    },
+    {
+      label: 'unstar',
+      body: { unstarred_images: [], failed_images: ['a.png'], affected_boards: [] },
+      mutate: (store: ApiStore) =>
+        store.dispatch(imagesApi.endpoints.unstarImages.initiate({ image_names: ['a.png'] })),
+    },
+  ])('refetches an image whose $label the server could not confirm', async ({ body, mutate }) => {
+    // `ImageService.update` writes the record and then reads the DTO back to return it. A
+    // failure in that read reports the name in `failed_images` with the row already starred, so
+    // the client's cached DTO is now wrong and nothing else will ever contradict it. Invalidating
+    // only the successes leaves the gallery showing the old star until a full reload.
+    login('user-a');
+    const fetched: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: Request) => {
+        fetched.push(request.url);
+        const payload = request.method === 'POST' ? body : { image_name: 'a.png', starred: false };
+        return Promise.resolve(
+          new Response(JSON.stringify(payload), { headers: { 'content-type': 'application/json' } })
+        );
+      })
+    );
+    const store = buildStore();
+
+    await store.dispatch(imagesApi.endpoints.getImageDTO.initiate('a.png'));
+    expect(fetched.filter((url) => url === dtoUrl)).toHaveLength(1);
+
+    await mutate(store);
+
+    await vi.waitFor(() => expect(fetched.filter((url) => url === dtoUrl)).toHaveLength(2));
   });
 });

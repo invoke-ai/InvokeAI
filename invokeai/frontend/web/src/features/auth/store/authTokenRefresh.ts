@@ -45,6 +45,28 @@ export const beginAuthTransition = () => {
 export const shouldAcceptRefreshedToken = (requestToken: string, requestGeneration: number) =>
   getAuthGeneration() === requestGeneration && localStorage.getItem('auth_token') === requestToken;
 
+/**
+ * True when a 401 for a request that carried `requestToken` should end the live session.
+ *
+ * A 401 is evidence about the credential that was *sent*, and about nothing else. By the time
+ * one lands, the tab may already belong to someone else: `setCredentials` (a login here) and
+ * `externalTokenAdopted` (a login in another tab — localStorage is shared) both swap the token
+ * synchronously while earlier requests are still in flight. Ending the session on such a 401
+ * destroys the session that just replaced it, and the user who never issued the request is the
+ * one logged out. So the token that was sent must still be the live one.
+ *
+ * Byte equality, deliberately — and note this is the opposite of what `isSameAuthContext` wants.
+ * A sliding-window refresh must NOT pass here: it mints a new token for the same login, and a
+ * 401 for the token it replaced says nothing about whether the replacement is still good. That
+ * costs nothing, because the session ending is not a one-shot event to be caught — if it really
+ * has ended, the next request carries the live token and its 401 ends it here.
+ *
+ * A null `requestToken` never qualifies: unauthenticated requests (client_state probes during
+ * page load, the setup-status query) 401 routinely and must not log anyone out.
+ */
+export const shouldEndSessionForUnauthorized = (requestToken: string | null): boolean =>
+  requestToken !== null && localStorage.getItem('auth_token') === requestToken;
+
 /** The session an operation started under. See `isSameAuthContext`. */
 export type AuthContext = {
   token: string | null;

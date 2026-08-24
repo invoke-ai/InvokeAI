@@ -320,16 +320,27 @@ const getDeleteImagesTags = (result: components['schemas']['DeleteImagesResult']
   { type: 'ImageCollection', id: LIST_TAG },
 ];
 
+/**
+ * A failed name is refetched, not ignored — the star routes can fail *after* committing.
+ * `ImageService.update` writes the record and then reads the DTO back to return it; a failure in
+ * that read (or in the event emit that follows) leaves the row starred while the route reports
+ * the name in `failed_images`. Invalidating only the successes would leave the client showing
+ * the pre-star value indefinitely, since nothing else will contradict it. Names folded in
+ * client-side for chunks that never went out ride along; their refetch merely confirms the cache.
+ */
 const getStarImagesTags = (result: components['schemas']['StarredImagesResult']): InvalidateTagsArg => [
   ...getTagsToInvalidateForImageMutation(result.starred_images),
+  ...getTagsToInvalidateForImageMutation(result.failed_images),
   ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
   'ImageCollectionCounts',
   { type: 'ImageCollection', id: 'starred' },
   { type: 'ImageCollection', id: 'unstarred' },
 ];
 
+/** See `getStarImagesTags` for why the failed names are invalidated too. */
 const getUnstarImagesTags = (result: components['schemas']['UnstarredImagesResult']): InvalidateTagsArg => [
   ...getTagsToInvalidateForImageMutation(result.unstarred_images),
+  ...getTagsToInvalidateForImageMutation(result.failed_images),
   ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
   'ImageCollectionCounts',
   { type: 'ImageCollection', id: 'starred' },
