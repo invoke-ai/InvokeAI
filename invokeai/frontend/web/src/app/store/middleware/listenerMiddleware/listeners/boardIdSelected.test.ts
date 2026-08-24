@@ -1,5 +1,5 @@
 import { configureStore, createListenerMiddleware } from '@reduxjs/toolkit';
-import type { AppStartListening } from 'app/store/store';
+import type { AppStartListening, RootState } from 'app/store/store';
 import { $gallerySelection, resetGallerySelectionSource } from 'features/gallery/store/gallerySelectionSource';
 import { selectGalleryItemNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
@@ -134,10 +134,14 @@ describe('addBoardIdSelectedListener', () => {
     const store = buildStore({ withSelectionSource: true });
 
     store.dispatch(boardIdSelected({ boardId: 'none' }));
-    // Fulfil the item-name query the probe is waiting on. The upsert has to be flushed through the
-    // fake timers before it is awaited, or its fulfilled action lands after the probe's 5s give-up.
+    // Fulfil the item-name query the probe is waiting on, under the same cache key it computes.
+    // The store here carries only the two slices this listener needs, so the selector — typed
+    // against the whole RootState — has to be told that is enough.
+    const queryArgs = selectGalleryItemNamesQueryArgs(store.getState() as unknown as RootState);
+    // The upsert has to be flushed through the fake timers before it is awaited, or its fulfilled
+    // action lands after the probe's 5s give-up.
     const upsert = store.dispatch(
-      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+      galleryApi.util.upsertQueryData('listGalleryItemNames', queryArgs, {
         item_names: ['already-showing.png'],
         starred_count: 0,
         total_count: 1,
