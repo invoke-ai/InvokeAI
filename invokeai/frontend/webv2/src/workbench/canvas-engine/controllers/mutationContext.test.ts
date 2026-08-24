@@ -121,6 +121,24 @@ describe('createCanvasMutationContext', () => {
       expect(deps.commitEdit).toHaveBeenCalledWith({ kind: 'mutation', mutation: action });
     });
 
+    it('contains a routing failure after reducer and mirror acceptance', () => {
+      const failure = new Error('edit routing observer exploded');
+      const { context, deps } = createHarness({
+        commitEdit: vi.fn(() => {
+          throw failure;
+        }),
+      });
+
+      expect(() =>
+        context.dispatchPrepared(
+          action,
+          () => true,
+          () => true
+        )
+      ).not.toThrow();
+      expect(deps.commitEdit).toHaveBeenCalledWith({ kind: 'mutation', mutation: action });
+    });
+
     it('does not commit system-originated or history-replayed edit intent', () => {
       const history = createHistory();
       const { context, deps } = createHarness({ history });

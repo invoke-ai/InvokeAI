@@ -52,7 +52,7 @@ Current extracted ownership includes:
 - `RasterExportController`: guarded layer rasterization, transformed copies, encoding, reservations, and pin leases.
 - `PsdExportController`: immutable PSD planning, snapshot capture, reservation, execution, and cancellation.
 - `StagedResultController`: guarded staged-candidate acceptance and its history entry.
-- `ControlPixelController`, `SelectionImageController`, and `LayerMutationController`: atomic pixel/document publication at their respective boundaries.
+- `PixelEditController`, `SelectionImageController`, and `LayerMutationController`: atomic pixel/document publication at their respective boundaries. The pixel editor materializes control layers and raster-image layers in place before destructive edits, keeping conversion plus pixels in one undoable transaction.
 - `MaskResultController`, `FilterResultController`, and `GeneratedResultController`: guarded application-result adoption through narrow host ports.
 
 Controller-local tests instantiate these boundaries with fakes. Integration tests in `engine.test.ts` cover composition, document routing, and cross-controller invariants.

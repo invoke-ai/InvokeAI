@@ -38,7 +38,7 @@ describe('SelectionPixelController', () => {
     const controller = new SelectionPixelController({
       applyImagePatch: vi.fn(),
       backend,
-      beginControlEdit: () => null,
+      beginPixelEdit: () => null,
       canEdit: () => true,
       deleteDerived: vi.fn(),
       endBurst: vi.fn(),

@@ -61,7 +61,7 @@ export interface PixelEditPatch {
   after: ImageData;
 }
 
-export interface ControlPixelEditTransaction {
+export interface PixelEditTransaction {
   readonly layerId: string;
   commitPatch(label: string, patch: PixelEditPatch): void;
   commitStroke(event: StrokeCommittedEvent): void;
@@ -110,8 +110,8 @@ export interface ToolContext {
    * on activate / when a layer is clicked. Absent in minimal test harnesses.
    */
   beginTransformSession?(layerId: string): void;
-  /** Prepares direct or transactional pixel editing for a selected control layer. */
-  beginControlPixelEdit?(layerId: string): ControlPixelEditTransaction | null;
+  /** Prepares direct or materializing pixel editing for a selected control or raster-image layer. */
+  beginPixelEdit?(layerId: string): PixelEditTransaction | null;
   /** Updates the active transform session's live transform (drag or numeric edit). */
   updateTransformSession?(transform: LayerTransform): void;
   /**

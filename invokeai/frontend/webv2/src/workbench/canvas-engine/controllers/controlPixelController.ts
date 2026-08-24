@@ -1,43 +1,47 @@
+/** Transactional pixel editing for controls and destructively edited raster images. */
+
 import type { CanvasControlLayerContract, CanvasDocumentContractV2 } from '@workbench/canvas-engine/contracts';
 import type { BitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerPixelSnapshot, LayerPixelSnapshotApply } from '@workbench/canvas-engine/history/layerSnapshot';
-import type { LayerCacheStore, PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type {
-  ControlPixelEditTransaction,
-  PixelEditPatch,
-  StrokeCommittedEvent,
-} from '@workbench/canvas-engine/tools/tool';
+  LayerCacheEntry,
+  LayerCacheStore,
+  PreparedLayerCacheReplacement,
+} from '@workbench/canvas-engine/render/layerCache';
+import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { PixelEditTransaction, PixelEditPatch, StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import {
-  bakeControlPixelEditSurface,
-  buildMaterializedControlLayer,
-  decideControlPixelEdit,
+  bakePixelEditSurface,
+  buildMaterializedPixelLayer,
+  decidePixelEdit,
+  type PixelEditableLayer,
 } from '@workbench/canvas-engine/editing/controlPixelEdit';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
 import { createLayerSnapshotEntry } from '@workbench/canvas-engine/history/layerSnapshot';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 
-export interface ControlPixelControllerOptions {
+export interface PixelEditControllerOptions {
   readonly applyImagePatch: ImagePatchApply;
   readonly backend: RasterBackend;
   readonly bitmapStore: Pick<BitmapStore, 'discardLayer' | 'markLayerDirty' | 'suspendLayer'>;
   readonly canEdit: () => boolean;
   readonly deleteDerived: (layerId: string) => void;
-  readonly dispatchReplacement: (layer: CanvasControlLayerContract) => void;
+  readonly dispatchReplacement: (layer: PixelEditableLayer) => void;
   readonly endBurst: () => void;
   readonly getActiveProjectId: () => string | null;
+  readonly getAdjustedSurface: (layer: PixelEditableLayer, entry: LayerCacheEntry) => RasterSurface | null;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
   readonly getTransformSession: () => unknown;
   readonly history: History;
   readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
   readonly invalidate: (layerId: string, overlay?: boolean) => void;
-  readonly isCacheReady: (layer: CanvasControlLayerContract, document: CanvasDocumentContractV2) => boolean;
+  readonly isCacheReady: (layer: PixelEditableLayer, document: CanvasDocumentContractV2) => boolean;
   readonly isOperationIdle: () => boolean;
   readonly layers: LayerCacheStore;
   readonly notifyPainted: (layerId: string) => void;
@@ -63,11 +67,11 @@ const isImageDataEqual = (left: ImageData, right: ImageData): boolean => {
   return true;
 };
 
-/** Owns the exclusive direct/materialized control-layer pixel transaction. */
-export class ControlPixelController {
+/** Owns the exclusive direct/materialized pixel transaction for control layers and raster images. */
+export class PixelEditController {
   private open: { cancel: () => void; layerId: string } | null = null;
 
-  constructor(private readonly options: ControlPixelControllerOptions) {}
+  constructor(private readonly options: PixelEditControllerOptions) {}
 
   cancel(): void {
     this.open?.cancel();
@@ -92,7 +96,7 @@ export class ControlPixelController {
     this.options.installPrepared(prepared, snapshot.layer.source.type === 'paint');
   };
 
-  begin(layerId: string): ControlPixelEditTransaction | null {
+  begin(layerId: string): PixelEditTransaction | null {
     const o = this.options;
     const document = o.getDocument();
     const layer = document?.layers.find((candidate) => candidate.id === layerId);
@@ -101,7 +105,7 @@ export class ControlPixelController {
       !document ||
       document.selectedLayerId !== layerId ||
       !layer ||
-      layer.type !== 'control' ||
+      (layer.type !== 'control' && !(layer.type === 'raster' && layer.source.type === 'image')) ||
       this.open ||
       !o.isOperationIdle() ||
       o.getTransformSession()
@@ -109,7 +113,7 @@ export class ControlPixelController {
       return null;
     }
     const contentRect = getSourceContentRect(layer, document);
-    const decision = decideControlPixelEdit({
+    const decision = decidePixelEdit({
       hasSourceContent: !isEmpty(contentRect),
       isCacheReady: o.isCacheReady(layer, document),
       layer,
@@ -118,12 +122,15 @@ export class ControlPixelController {
       return null;
     }
     if (decision.status === 'direct') {
+      if (layer.type !== 'control') {
+        return null;
+      }
       return this.beginDirect(layerId, layer);
     }
     return this.beginMaterialized(layerId, layer, contentRect);
   }
 
-  private beginDirect(layerId: string, layer: CanvasControlLayerContract): ControlPixelEditTransaction | null {
+  private beginDirect(layerId: string, layer: CanvasControlLayerContract): PixelEditTransaction | null {
     const o = this.options;
     const originalEntry = o.layers.get(layerId);
     let originalPixels: ImageData | null = null;
@@ -233,19 +240,27 @@ export class ControlPixelController {
         restoreAndRelease();
         throw error;
       }
-      o.endBurst();
       try {
+        // Once the pixels are accepted, persistence and history are the
+        // authoritative consequences. Publish UI/render notifications only
+        // afterwards: a faulty observer must not make a visible edit ephemeral.
         if (entry) {
           o.history.push(entry);
         }
-        o.notifyPainted(layerId);
         o.bitmapStore.markLayerDirty(layerId);
+        o.endBurst();
+        try {
+          o.notifyPainted(layerId);
+        } catch {
+          // The live cache already owns the accepted pixels and is dirty. A
+          // later render invalidation reconciles ancillary UI observers.
+        }
       } finally {
         releasePersistence();
       }
       return true;
     };
-    const transaction: ControlPixelEditTransaction = {
+    const transaction: PixelEditTransaction = {
       cancel,
       commitPatch: (label, patch) => void commitPatch(label, patch),
       commitStroke: (event) => {
@@ -272,9 +287,9 @@ export class ControlPixelController {
 
   private beginMaterialized(
     layerId: string,
-    layer: CanvasControlLayerContract,
+    layer: PixelEditableLayer,
     contentRect: Rect
-  ): ControlPixelEditTransaction | null {
+  ): PixelEditTransaction | null {
     const o = this.options;
     const originalEntry = o.layers.get(layerId);
     const original = originalEntry
@@ -302,9 +317,13 @@ export class ControlPixelController {
     let prepared: PreparedLayerCacheReplacement;
     try {
       if (originalEntry && !isEmpty(originalEntry.rect)) {
-        const baked = bakeControlPixelEditSurface({
+        const adjusted = layer.type === 'raster' ? o.getAdjustedSurface(layer, originalEntry) : null;
+        const baked = bakePixelEditSurface({
           backend: o.backend,
-          source: originalEntry.surface,
+          // Raster presentation adjustments precede transforms in the normal
+          // compositor. Bake from that adjusted surface so interpolation occurs
+          // in the same order and untouched pixels remain visually identical.
+          source: adjusted ?? originalEntry.surface,
           sourceRect: originalEntry.rect,
           transform: layer.transform,
         });
@@ -394,7 +413,7 @@ export class ControlPixelController {
         const pixels = isEmpty(edited.rect)
           ? null
           : edited.surface.ctx.getImageData(0, 0, edited.rect.width, edited.rect.height);
-        const materialized = buildMaterializedControlLayer(layer, edited.rect);
+        const materialized = buildMaterializedPixelLayer(layer, edited.rect);
         const after: LayerPixelSnapshot = { layer: materialized, pixels, rect: { ...edited.rect } };
         if (!o.history.isApplying()) {
           entry = createLayerSnapshotEntry({ after, apply: this.applySnapshot, before, label });
@@ -404,14 +423,21 @@ export class ControlPixelController {
         restoreAndRelease();
         throw error;
       }
-      o.setTransformOverride(layerId, null);
-      o.endBurst();
       try {
+        // The replacement has passed reducer and mirror postconditions. From
+        // here on it must never be treated as rollback-safe, even if cleanup or
+        // an observer fails.
         if (entry) {
           o.history.push(entry);
         }
-        o.notifyPainted(layerId);
         o.bitmapStore.markLayerDirty(layerId);
+        o.setTransformOverride(layerId, null);
+        o.endBurst();
+        try {
+          o.notifyPainted(layerId);
+        } catch {
+          // See the direct path: persistence is already authoritative.
+        }
       } finally {
         releasePersistence();
       }
@@ -419,7 +445,7 @@ export class ControlPixelController {
         o.publishStroke(event);
       }
     };
-    const transaction: ControlPixelEditTransaction = {
+    const transaction: PixelEditTransaction = {
       cancel,
       commitPatch: (label, patch) => (isImageDataEqual(patch.before, patch.after) ? cancel() : commit(label)),
       commitStroke: (event) =>

@@ -76,7 +76,7 @@ const isMaskLayer = (layer: CanvasLayerContract): boolean =>
   layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
 
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
-const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
+const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget | null => {
   const doc = ctx.getDocument();
   if (!doc) {
     return null;
@@ -98,6 +98,24 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
     };
   }
 
+  if (selected?.type === 'raster' && selected.source.type === 'image' && tool === 'eraser') {
+    // Erasing is a destructive pixel edit, so materialize the image into an
+    // undoable paint layer in place. A locked/disabled/unready image refuses the
+    // transaction; never spawn a new layer over the selected image.
+    if (selected.isLocked || !selected.isEnabled || selected.isTransparencyLocked) {
+      return null;
+    }
+    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
+    if (!transaction) {
+      return null;
+    }
+    return {
+      cancel: transaction.cancel,
+      commit: transaction.commitStroke,
+      layerId: transaction.layerId,
+    };
+  }
+
   if (selected && isMaskLayer(selected)) {
     // The selection is a mask: paint the stroke into its alpha stencil cache
     // (brush adds coverage, eraser removes — the shared stroke session handles
@@ -116,7 +134,7 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   }
 
   if (selected?.type === 'control') {
-    const transaction = ctx.beginControlPixelEdit?.(selected.id) ?? null;
+    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
     if (!transaction) {
       return null;
     }
@@ -223,7 +241,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       if (session || (input.buttons & PRIMARY_BUTTON) === 0) {
         return;
       }
-      const resolvedTarget = resolveTarget(ctx);
+      const resolvedTarget = resolveTarget(ctx, spec.id);
       updateCursorRing(ctx, input);
       if (!resolvedTarget) {
         return;

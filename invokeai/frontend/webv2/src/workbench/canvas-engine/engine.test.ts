@@ -2714,8 +2714,8 @@ interface ControlPaintHarnessOptions {
   pixelWrites?: { enabled: boolean };
 }
 
-const createControlPaintHarness = (
-  overrides: ControlPaintHarnessOverrides,
+const createPixelEditHarness = (
+  layer: CanvasControlLayerContract | CanvasRasterLayerContractV2,
   options: ControlPaintHarnessOptions = {}
 ) => {
   const raf = createControllableRaf();
@@ -2731,28 +2731,6 @@ const createControlPaintHarness = (
     }
   );
 
-  const { source, ...layerOverrides } = overrides;
-  const layer: CanvasControlLayerContract = {
-    adapter: {
-      beginEndStepPct: [0.1, 0.9],
-      controlMode: 'more_control',
-      kind: 'controlnet',
-      model: 'control-model',
-      weight: 0.7,
-    },
-    blendMode: 'screen',
-    filter: { settings: { low: 10 }, type: 'canny' },
-    id: 'control',
-    isEnabled: true,
-    isLocked: false,
-    name: 'Control',
-    opacity: 0.6,
-    source,
-    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-    type: 'control',
-    withTransparencyEffect: true,
-    ...layerOverrides,
-  };
   const document: CanvasDocumentContractV2 = {
     background: 'transparent',
     bbox: { height: 100, width: 100, x: 0, y: 0 },
@@ -2822,6 +2800,55 @@ const createControlPaintHarness = (
     store,
     strokes,
   };
+};
+
+const createControlPaintHarness = (
+  overrides: ControlPaintHarnessOverrides,
+  options: ControlPaintHarnessOptions = {}
+) => {
+  const { source, ...layerOverrides } = overrides;
+  const layer: CanvasControlLayerContract = {
+    adapter: {
+      beginEndStepPct: [0.1, 0.9],
+      controlMode: 'more_control',
+      kind: 'controlnet',
+      model: 'control-model',
+      weight: 0.7,
+    },
+    blendMode: 'screen',
+    filter: { settings: { low: 10 }, type: 'canny' },
+    id: 'control',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Control',
+    opacity: 0.6,
+    source,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: true,
+    ...layerOverrides,
+  };
+  return createPixelEditHarness(layer, options);
+};
+
+const createRasterImageEraserHarness = (
+  overrides: Partial<Omit<CanvasRasterLayerContractV2, 'source' | 'type'>> = {},
+  options: ControlPaintHarnessOptions = {}
+) => {
+  const layer: CanvasRasterLayerContractV2 = {
+    adjustments: { brightness: 0.1, contrast: 0.2, saturation: -0.1 },
+    blendMode: 'screen',
+    id: 'image',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Image',
+    opacity: 0.6,
+    source: { image: { height: 10, imageName: 'raster-image', width: 20 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+    type: 'raster',
+    ...overrides,
+  };
+  return createPixelEditHarness(layer, options);
 };
 
 const createControlSelectionHarness = (overrides: ControlPaintHarnessOverrides) => {
@@ -2965,7 +2992,154 @@ const putImageDataCalls = (surfaces: StubRasterSurface[]): { image: unknown; x: 
       .map((entry) => ({ image: entry.args[0], x: entry.args[1], y: entry.args[2] }))
   );
 
-describe('engine-owned control pixel editing', () => {
+describe('engine-owned pixel editing', () => {
+  it('materializes an image layer plus eraser stroke as one reversible edit', async () => {
+    const h = createRasterImageEraserHarness();
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument()!.layers[0]);
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }));
+
+    const after = structuredClone(h.engine.document.getDocument()!.layers[0]);
+    expect(h.engine.document.getDocument()!.layers).toHaveLength(1);
+    expect(after).toMatchObject({
+      id: 'image',
+      source: { type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect(after).not.toHaveProperty('adjustments');
+    expect(h.strokes).toHaveLength(1);
+    expect(h.strokes[0]).toMatchObject({ layerId: 'image', tool: 'eraser' });
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledWith('image');
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('image');
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+
+    h.engine.history.undo();
+    expect(h.engine.document.getDocument()!.layers[0]).toEqual(before);
+    expect(h.engine.stores.canRedo.get()).toBe(true);
+
+    h.engine.history.redo();
+    expect(h.engine.document.getDocument()!.layers[0]).toEqual(after);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('persists and releases a materialized image erase when a thumbnail observer throws', async () => {
+    const h = createRasterImageEraserHarness();
+    await h.publishInitialCache();
+    const unsubscribe = h.engine.stores.thumbnailVersion.subscribe(() => {
+      throw new Error('thumbnail observer failed');
+    });
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }))).not.toThrow();
+    expect(h.engine.document.getDocument()!.layers[0]).toMatchObject({ source: { type: 'paint' }, type: 'raster' });
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('image');
+    expect(h.bitmapStore.markLayerDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
+    );
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+
+    unsubscribe();
+    h.engine.lifecycle.dispose();
+  });
+
+  it('rolls a byte-identical image-layer erase back without converting the layer', async () => {
+    const h = createRasterImageEraserHarness({}, { pixelWrites: { enabled: false } });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'image');
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    const restored = await h.engine.exports.exportLayerPixels('image', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('rolls a cancelled image-layer erase back without converting the layer', async () => {
+    const h = createRasterImageEraserHarness();
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'image');
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointercancel', pointerAt(25, 25, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    const restored = await h.engine.exports.exportLayerPixels('image', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('does not erase or auto-create while an image-layer cache is still loading', () => {
+    const h = createRasterImageEraserHarness();
+    h.raf.flush();
+    const before = structuredClone(h.engine.document.getDocument());
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    expect(h.engine.document.getDocument()!.layers).toHaveLength(1);
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
+  it.each([
+    ['locked', { isLocked: true }],
+    ['disabled', { isEnabled: false }],
+    ['transparency locked', { isTransparencyLocked: true }],
+  ] as const)('does not erase or auto-create over a %s image layer', async (_scenario, overrides) => {
+    const h = createRasterImageEraserHarness(overrides);
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument());
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
   it('brushes an empty control in place and never creates a raster layer', () => {
     const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
     h.engine.tools.setTool('brush');
@@ -2983,6 +3157,27 @@ describe('engine-owned control pixel editing', () => {
       h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
     );
     expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('persists and releases a direct control stroke when a thumbnail observer throws', () => {
+    const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
+    const unsubscribe = h.engine.stores.thumbnailVersion.subscribe(() => {
+      throw new Error('thumbnail observer failed');
+    });
+    h.engine.tools.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(40, 40));
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }))).not.toThrow();
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('control');
+    expect(h.bitmapStore.markLayerDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
+    );
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+
+    unsubscribe();
     h.engine.lifecycle.dispose();
   });
 

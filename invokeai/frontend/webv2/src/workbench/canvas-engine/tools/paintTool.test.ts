@@ -5,7 +5,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type {
-  ControlPixelEditTransaction,
+  PixelEditTransaction,
   StrokeCommittedEvent,
   Tool,
   ToolContext,
@@ -80,11 +80,11 @@ const controlImageLayer = (id: string): CanvasControlLayerContract => ({
   source: { image: { height: 20, imageName: id, width: 20 }, type: 'image' },
 });
 
-const controlTransaction = (): ControlPixelEditTransaction => ({
+const controlTransaction = (layerId = 'control'): PixelEditTransaction => ({
   cancel: vi.fn(),
   commitPatch: vi.fn(),
   commitStroke: vi.fn(),
-  layerId: 'control',
+  layerId,
 });
 
 const makeDoc = (layers: CanvasLayerContract[], selectedLayerId: string | null): CanvasDocumentContractV2 => ({
@@ -115,7 +115,7 @@ const up = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerUp?.
 const cancel = (t: Tool, ctx: ToolContext): void => t.onPointerCancel?.(ctx);
 
 interface Harness {
-  beginControlPixelEdit: ReturnType<typeof vi.fn> | null;
+  beginPixelEdit: ReturnType<typeof vi.fn> | null;
   ctx: ToolContext;
   backend: StubRasterBackend;
   layers: LayerCacheStore;
@@ -127,7 +127,7 @@ interface Harness {
 
 const createHarness = (
   doc: CanvasDocumentContractV2,
-  transaction: ControlPixelEditTransaction | null | undefined = undefined
+  transaction: PixelEditTransaction | null | undefined = undefined
 ): Harness => {
   const backend = createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
@@ -136,12 +136,12 @@ const createHarness = (
   const strokes: StrokeCommittedEvent[] = [];
   const painted: string[] = [];
   const createdIds: string[] = [];
-  const beginControlPixelEdit = transaction === undefined ? null : vi.fn(() => transaction);
+  const beginPixelEdit = transaction === undefined ? null : vi.fn(() => transaction);
   let idCounter = 0;
 
   const ctx: ToolContext = {
     backend,
-    ...(beginControlPixelEdit ? { beginControlPixelEdit } : {}),
+    ...(beginPixelEdit ? { beginPixelEdit } : {}),
     commitStructural: vi.fn(),
     createLayerId: () => {
       const id = `new-layer-${(idCounter += 1)}`;
@@ -168,7 +168,7 @@ const createHarness = (
     viewport: null as never,
   };
 
-  return { backend, beginControlPixelEdit, createdIds, ctx, dispatched, layers, painted, strokes };
+  return { backend, beginPixelEdit, createdIds, ctx, dispatched, layers, painted, strokes };
 };
 
 const cacheOps = (surface: StubRasterSurface): string[] => surface.callLog.map((entry) => entry.op);
@@ -245,6 +245,21 @@ describe('eraser tool', () => {
     expect(h.strokes[0]!.tool).toBe('eraser');
     expect(lastCompositeOp(cacheSurface(h, 'paint1'))).toBe('destination-out');
   });
+
+  it('edits a selected image layer through a materializing pixel transaction', () => {
+    const transaction = controlTransaction('img1');
+    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'), transaction);
+    const eraser = createEraserTool();
+
+    down(eraser, h.ctx, pointer(2, 2));
+    move(eraser, h.ctx, pointer(6, 6), [pointer(6, 6)]);
+    up(eraser, h.ctx, pointer(6, 6));
+
+    expect(h.beginPixelEdit).toHaveBeenCalledWith('img1');
+    expect(transaction.commitStroke).toHaveBeenCalledOnce();
+    expect(h.dispatched).toHaveLength(0);
+    expect(h.createdIds).toHaveLength(0);
+  });
 });
 
 describe('brush tool: cancel', () => {
@@ -273,7 +288,7 @@ describe('paint tool: target resolution', () => {
     move(brush, h.ctx, pointer(20, 20), [pointer(20, 20)]);
     up(brush, h.ctx, pointer(20, 20, { buttons: 0 }));
 
-    expect(h.beginControlPixelEdit).toHaveBeenCalledWith('control');
+    expect(h.beginPixelEdit).toHaveBeenCalledWith('control');
     expect(transaction.commitStroke).toHaveBeenCalledOnce();
     expect(transaction.cancel).not.toHaveBeenCalled();
     expect(h.dispatched).toHaveLength(0);
@@ -312,7 +327,7 @@ describe('paint tool: target resolution', () => {
 
     drawImage.mockRestore();
     down(brush, h.ctx, pointer(30, 30));
-    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+    expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
 
   it('aborts the control transaction and releases the gesture after stroke finalization fails', () => {
@@ -334,7 +349,7 @@ describe('paint tool: target resolution', () => {
 
     getImageData.mockRestore();
     down(brush, h.ctx, pointer(30, 30));
-    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+    expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
 
   it('still cancels the control transaction and releases the gesture when pixel restoration fails', () => {
@@ -356,7 +371,7 @@ describe('paint tool: target resolution', () => {
 
     putImageData.mockRestore();
     down(brush, h.ctx, pointer(30, 30));
-    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+    expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
 
   it('does not roll back an accepted stroke when transaction publication throws', () => {
@@ -373,7 +388,7 @@ describe('paint tool: target resolution', () => {
     expect(transaction.commitStroke).toHaveBeenCalledOnce();
     expect(transaction.cancel).not.toHaveBeenCalled();
     down(brush, h.ctx, pointer(30, 30));
-    expect(h.beginControlPixelEdit).toHaveBeenCalledTimes(2);
+    expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
 
   it('does not fall through to raster auto-create when control preparation is rejected', () => {

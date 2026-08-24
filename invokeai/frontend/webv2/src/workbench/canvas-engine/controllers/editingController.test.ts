@@ -48,7 +48,7 @@ const createTransformOptions = () => ({
 const createSelectionPixelOptions = () => ({
   applyImagePatch: vi.fn(),
   backend: {} as never,
-  beginControlEdit: () => null,
+  beginPixelEdit: () => null,
   canEdit: () => true,
   deleteDerived: vi.fn(),
   endBurst: vi.fn(),

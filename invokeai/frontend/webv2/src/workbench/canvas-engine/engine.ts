@@ -80,7 +80,7 @@ import type { Rect, RenderFlags, ToolId, Vec2 } from '@workbench/canvas-engine/t
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
-import { ControlPixelController } from '@workbench/canvas-engine/controllers/controlPixelController';
+import { PixelEditController } from '@workbench/canvas-engine/controllers/controlPixelController';
 import { EditingController } from '@workbench/canvas-engine/controllers/editingController';
 import { FilterResultController } from '@workbench/canvas-engine/controllers/filterResultController';
 import { GeneratedResultController } from '@workbench/canvas-engine/controllers/generatedResultController';
@@ -407,6 +407,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     string,
     { x: number; y: number; scaleX?: number; scaleY?: number; rotation?: number }
   >();
+  let pixelEditController: PixelEditController | null = null;
 
   const cancelLayerRasterization = (layerId: string): void => rasterController.cancelRasterization(layerId);
   const cancelAllLayerRasterizations = (): void => rasterController.cancelAllRasterization();
@@ -483,8 +484,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // adjustments change (never per frame). Reused each frame by the compositor.
   const derivedSurfaceCache = rasterController.derived;
   const deleteDerivedSurfaces = (layerId: string): void => rasterController.deleteDerivedSurfaces(layerId);
-  const getAdjustedSurface = (layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null =>
-    rasterController.getAdjustedSurface(layer, entry);
+  const getAdjustedSurface = (layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null => {
+    if (layer.type === 'raster' && pixelEditController?.isOpenFor([layer.id])) {
+      // A raster-image pixel transaction replaces the live cache with pixels
+      // that already include adjustments while leaving the reducer contract
+      // untouched until commit. Drawing that preview through the contract's
+      // adjustments would apply them twice and snap back on pointer-up.
+      return null;
+    }
+    return rasterController.getAdjustedSurface(layer, entry);
+  };
 
   /**
    * Re-reads the live cache sizes into the memory budget. Both caches change
@@ -611,7 +620,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (floatingSelection.get()?.layerId === layerId) {
       return true;
     }
-    if (controlPixelController?.isOpenFor([layerId])) {
+    if (pixelEditController?.isOpenFor([layerId])) {
       return true;
     }
     const layer = mirror.getDocument()?.layers.find((candidate) => candidate.id === layerId);
@@ -681,9 +690,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // Direct pixel writes do not replace the reducer canvas object. Snapshot
   // freshness therefore also binds to this engine-local content epoch.
   let rasterContentEpoch = 0;
-  let controlPixelController: ControlPixelController | null = null;
-  const cancelOpenControlPixelEdit = (): void => {
-    controlPixelController?.cancel();
+  const cancelOpenPixelEdit = (): void => {
+    pixelEditController?.cancel();
   };
 
   const structuralController = new StructuralLayerController({
@@ -851,7 +859,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     selectionPixels: {
       applyImagePatch,
       backend,
-      beginControlEdit: (layerId) => beginControlPixelEdit(layerId),
+      beginPixelEdit: (layerId) => beginPixelEdit(layerId),
       canEdit: () => canEditDocument(),
       deleteDerived: deleteDerivedSurfaces,
       endBurst: () => endNudgeBurst(),
@@ -954,7 +962,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const toolContext: ToolContext = {
     applyTransform: () => applyTransform(),
     backend,
-    beginControlPixelEdit: (layerId) => beginControlPixelEdit(layerId),
+    beginPixelEdit: (layerId) => beginPixelEdit(layerId),
     beginTransformSession: (layerId) => beginTransformSession(layerId),
     cancelTextEdit: () => cancelTextEdit(),
     cancelTransform: () => cancelTransform(),
@@ -1354,7 +1362,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       const cleanup = createCleanupAccumulator();
       cleanup.run(() => editingController.invalidateDocument());
       cleanup.run(() => pipeline.cancelActiveGesture());
-      cleanup.run(cancelOpenControlPixelEdit);
+      cleanup.run(cancelOpenPixelEdit);
       const previousImageNames = rasterController.mirroredImageNames();
       cleanup.run(() => rasterController.invalidateDocument());
       cleanup.run(() => stores.thumbnailStatus.clear());
@@ -1442,9 +1450,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         // `cancel` is a no-op restore when the layer is already gone.
         cleanup.run(() => floatingSelection.cancel());
       }
-      if (controlPixelController?.isOpenFor(ids)) {
+      if (pixelEditController?.isOpenFor(ids)) {
         cleanup.run(() => pipeline.cancelActiveGesture());
-        cleanup.run(cancelOpenControlPixelEdit);
+        cleanup.run(cancelOpenPixelEdit);
       }
       const doc = mirror.getDocument();
       for (const id of sourceChangedIds) {
@@ -1578,7 +1586,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       const cleanup = createCleanupAccumulator();
       cleanup.run(() => editingController.invalidateProject());
       cleanup.run(() => pipeline.cancelActiveGesture());
-      cleanup.run(cancelOpenControlPixelEdit);
+      cleanup.run(cancelOpenPixelEdit);
       cleanup.run(() => rasterController.invalidateDocument());
       cleanup.run(() => stores.thumbnailStatus.clear());
       const ids = new Set<string>(renderController.previews.filterLayerIds());
@@ -2021,7 +2029,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     return current !== undefined && areJsonValuesStructurallyEqual(current, expected);
   };
 
-  controlPixelController = new ControlPixelController({
+  pixelEditController = new PixelEditController({
     applyImagePatch,
     backend,
     bitmapStore,
@@ -2035,6 +2043,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       ),
     endBurst: () => endNudgeBurst(),
     getActiveProjectId: () => projectId,
+    getAdjustedSurface,
     getDocument: () => mirror.getDocument(),
     getTransformSession: () => stores.transformSession.get(),
     history,
@@ -2059,7 +2068,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       }
     },
   });
-  const beginControlPixelEdit = controlPixelController.begin.bind(controlPixelController);
+  const beginPixelEdit = pixelEditController.begin.bind(pixelEditController);
 
   const captureLayerCache = (
     layer: CanvasLayerContract,
@@ -2327,8 +2336,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     lifecycleState = 'disposed';
     const cleanup = createCleanupAccumulator();
     cleanup.run(() => pipeline.cancelActiveGesture());
-    cleanup.run(cancelOpenControlPixelEdit);
-    cleanup.run(() => controlPixelController?.dispose());
+    cleanup.run(cancelOpenPixelEdit);
+    cleanup.run(() => pixelEditController?.dispose());
     cleanup.run(() => filterResultController.dispose());
     cleanup.run(() => generatedResultController.dispose());
     cleanup.run(() => stagedResultController.dispose());
