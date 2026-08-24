@@ -143,7 +143,10 @@ def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault
 
 def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user may not view the video."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+    from invokeai.app.services.board_records.board_records_common import (
+        BoardRecordNotFoundException,
+        BoardVisibility,
+    )
 
     if current_user.is_admin:
         return
@@ -153,12 +156,18 @@ def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefaul
 
     board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
     if board_id is not None:
+        # See `assert_image_read_access`: this 403 is also the answer a *deleted* video gets,
+        # because the decision rests on a `user_id` that is gone with the row, so clients act on
+        # it by dropping their reference to the video. Only a board positively known to be gone
+        # may produce it; a lookup that cannot be decided propagates instead of impersonating a
+        # permission decision.
         try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+            board = ApiDependencies.invoker.services.board_records.get(board_id)
+        except BoardRecordNotFoundException:
+            pass
+        else:
             if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
                 return
-        except Exception:
-            pass
 
     raise HTTPException(status_code=403, detail="Not authorized to access this video")
 

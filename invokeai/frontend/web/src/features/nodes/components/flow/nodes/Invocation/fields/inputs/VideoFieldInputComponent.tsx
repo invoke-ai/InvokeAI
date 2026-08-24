@@ -16,7 +16,7 @@ import { useGetVideoDTOQuery } from 'services/api/endpoints/videos';
 import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
-import { isVideoMissingError } from './videoFieldErrors';
+import { isVideoUnavailableError } from './videoFieldErrors';
 
 /**
  * Counterpart to ImageFieldInputComponent for VideoField inputs. Shows the video's WebP
@@ -48,11 +48,12 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
     [field.name, nodeId]
   );
 
-  // If the referenced video was deleted while disconnected, drop the stale reference once
-  // we reconnect. Only a confirmed 404 means the video is gone — transient network, auth
-  // (401/403), or server (5xx) failures must not silently clear the user's input.
+  // If the referenced video was deleted while disconnected, drop the stale reference once we
+  // reconnect. Only the server saying the video is not available to this client counts — a 404,
+  // or the 403 a deleted video answers with in multiuser mode. A transient network failure, a
+  // 401, or a 5xx must not silently clear the user's input. See `isVideoUnavailableError`.
   useEffect(() => {
-    if (isConnected && isVideoMissingError(error)) {
+    if (isConnected && isVideoUnavailableError(error)) {
       handleReset();
     }
   }, [handleReset, isConnected, error]);

@@ -257,6 +257,69 @@ def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock
     assert sorted(delete_calls) == ["dup.mp4", "other.mp4"]
 
 
+def test_deleted_video_reads_as_unavailable_rather_than_undecidable(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """A deleted video answers 403, and the clients depend on being able to trust it.
+
+    The read decision rests on ``videos.user_id``, which is gone with the row, so a non-admin
+    cannot be told a deleted video from someone else's and both are refused the same way. The
+    frontend therefore drops its reference to a video on a 403 as well as a 404 -- a workflow's
+    video field clears itself on one. Pinned here because that behaviour reads as over-broad
+    without this route's answer to point at.
+    """
+    mock_invoker.services.video_records.get_user_id.return_value = None
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+
+    response = client.get(
+        "/api/v1/videos/i/gone.mp4",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_unreadable_board_does_not_read_as_unavailable_for_videos(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """A storage error must not reach the client wearing the deleted video's answer.
+
+    ``_assert_video_read_access`` used to catch every exception from the board lookup and fall
+    through to the same 403 a deleted video gets. Since the clients read that 403 as "gone, drop
+    your reference", a locked database would have taken every workflow field pointing at a
+    shared board's videos down with it.
+    """
+    import sqlite3
+
+    mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
+    mock_invoker.services.board_records.get = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
+
+    # The storage error leaves the route uncaught, which is a 500 in production; the test client
+    # re-raises unhandled server exceptions instead of rendering them. Either way the one thing
+    # that must not happen is a 403 -- the answer the clients act on destructively.
+    with pytest.raises(sqlite3.OperationalError):
+        client.get("/api/v1/videos/i/shared.mp4", headers={"Authorization": f"Bearer {user1_token}"})
+
+
+def test_vanished_board_still_reads_as_an_ordinary_refusal_for_videos(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """The narrowed catch stays exactly that narrow, in both directions."""
+    from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+
+    mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
+    mock_invoker.services.board_records.get = MagicMock(side_effect=BoardRecordNotFoundException)
+
+    response = client.get(
+        "/api/v1/videos/i/board-gone.mp4",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
 def test_video_batch_rejects_too_many_or_overlong_names() -> None:
     with pytest.raises(ValidationError):
         VideoNamesBatch(video_names=[f"{index}.mp4" for index in range(1001)])

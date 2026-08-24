@@ -1,4 +1,5 @@
 import { Center, Spinner } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
@@ -34,7 +35,7 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     data: currentUser,
     isLoading: isLoadingUser,
     error: userError,
-  } = useGetCurrentUserQuery(undefined, {
+  } = useGetCurrentUserQuery(token ?? skipToken, {
     skip: !shouldFetchUser,
   });
 
@@ -49,9 +50,12 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     // this query goes out during page load carrying an expired token, another tab logs in
     // meanwhile, and this 401 lands before the adoption poll has run. `dynamicBaseQuery`
     // already declines to end the session in that case; this is the same decision, and both
-    // ask `shouldEndSessionForUnauthorized`. Reading the token out of the store rather than
-    // out of the request is sound because the two can only diverge via `externalTokenAdopted`,
-    // whose foreign-token branch resets the API state and takes this error with it.
+    // ask `shouldEndSessionForUnauthorized`.
+    //
+    // That check alone would only postpone it, because the store's token catches up when the
+    // poll adopts the new one and this effect re-runs. What stops it then is the query being
+    // keyed by token: the adopted session reads its own cache entry, so the superseded 401 is
+    // no longer in hand to act on. See `getCurrentUser`.
     if (userError && isAuthenticated && 'status' in userError && userError.status === 401) {
       if (!shouldEndSessionForUnauthorized(token ?? null)) {
         return;
