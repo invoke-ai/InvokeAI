@@ -51,6 +51,8 @@ export const DEFAULT_DEDUPE_CAP = 64;
 export const DEFAULT_FAILURE_BACKOFF_MS = [2000, 5000, 15000, 30000] as const;
 /** Consecutive ambient failures before the circuit opens (no more auto-retries). */
 export const DEFAULT_MAX_CONSECUTIVE_FAILURES = 5;
+/** Short barrier poll while another canvas operation transiently owns pixels. */
+export const DEFAULT_DEFERRED_RETRY_MS = 50;
 
 export class BitmapPersistenceError extends Error {
   readonly layerIds: readonly string[];
@@ -113,7 +115,7 @@ export interface BitmapStoreDeps {
    * Trims a layer's cache to its visible pixels (see **Truthful extent** above).
    * Called after the source-type guard and BEFORE `getLayerSurface`, so this flush
    * reads the trimmed surface and offset. A `'deferred'` result leaves the layer
-   * dirty without encoding; a barrier reports that it could not persist the layer.
+   * dirty without encoding; a barrier waits and retries until ownership is released.
    * Absent ⇒ `'kept'` ⇒ no trimming.
    */
   trimLayerPixels?(layerId: string): PaintCacheTrim;
@@ -234,9 +236,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
    * Why a layer is currently in `dirty`: `'stroke'` means a new paint stroke
    * (re)marked it — worth retrying inside a barrier call; `'failure'` means
    * its last flush attempt failed, and `'deferred'` means another operation still
-   * owns the pixels. Neither is retried again within the same
-   * {@link flushPendingUploads} call (anti-spin). A new stroke flips either back
-   * to `'stroke'`.
+   * owns the pixels. Failures are not retried again within the same
+   * {@link flushPendingUploads} call (anti-spin); deferrals are polled until the
+   * owner releases the pixels. A new stroke flips either back to `'stroke'`.
    */
   const dirtyReason = new Map<string, 'deferred' | 'failure' | 'stroke'>();
   /** Active debounce timers, keyed by layer id. */
@@ -492,13 +494,19 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       clearTimer(layerId);
       return;
     }
-    if (pendingClears.has(layerId)) {
+    const placed = deps.getLayerSurface(layerId);
+    if (pendingClears.has(layerId) && !placed) {
       dirty.delete(layerId);
       clearTimer(layerId);
       clearLayerBitmap(layerId, requeueFailure);
       return;
     }
-    const placed = deps.getLayerSurface(layerId);
+    if (pendingClears.has(layerId)) {
+      // A failed clear may outlive the empty cache that requested it. A later
+      // rasterization can restore visible pixels without calling markLayerDirty,
+      // so the fresh surface verdict wins over the stale clear intent.
+      pendingClears.delete(layerId);
+    }
     if (!placed) {
       // Layer or its cache is gone (or empty); nothing to persist.
       dirty.delete(layerId);
@@ -768,9 +776,10 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     // then await the in-flight ops — looping so a layer re-dirtied by a NEW
     // stroke that lands while its upload is in flight gets a follow-up flush
     // before the barrier resolves (the "document points at the latest painted
-    // pixels" guarantee). A layer whose flush FAILED or DEFERRED within this
-    // barrier call is not retried again this call, so neither a persistent error
-    // nor an operation that still owns the pixels can spin the barrier forever.
+    // pixels" guarantee). A layer whose flush FAILED within this barrier call is
+    // not retried again this call. A transient DEFERRED layer is different: the
+    // barrier polls until the operation owning its pixels releases them, matching
+    // suspension semantics instead of surfacing a false persistence failure.
     const blockedThisBarrier = new Set<string>();
     for (let iteration = 0; iteration < MAX_BARRIER_ITERATIONS; iteration += 1) {
       const toFlush = Array.from(dirty).filter((layerId) => !blockedThisBarrier.has(layerId) && !isSuspended(layerId));
@@ -793,10 +802,16 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         return;
       }
       await Promise.all(ops);
+      let deferredThisRound = false;
       for (const layerId of toFlush) {
-        if (dirty.has(layerId) && dirtyReason.get(layerId) !== 'stroke') {
+        if (dirty.has(layerId) && dirtyReason.get(layerId) === 'failure') {
           blockedThisBarrier.add(layerId);
+        } else if (dirty.has(layerId) && dirtyReason.get(layerId) === 'deferred') {
+          deferredThisRound = true;
         }
+      }
+      if (deferredThisRound) {
+        await sleep(DEFAULT_DEFERRED_RETRY_MS);
       }
     }
     throw new Error('Canvas pixel persistence barrier exceeded its iteration limit.');

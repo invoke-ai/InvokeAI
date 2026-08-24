@@ -70,7 +70,11 @@ export const runLayerFilter = async (options: RunLayerFilterOptions): Promise<La
   throwIfAborted(options.signal);
   const uploaded = await options.deps.uploadIntermediate(blob, options.signal);
   throwIfAborted(options.signal);
-  const built = buildFilterGraph(options.filterType, uploaded.imageName, options.settings);
+  const built = buildFilterGraph(options.filterType, uploaded.imageName, options.settings, {
+    height: options.input.rect.height,
+    preserveTransparency: true,
+    width: options.input.rect.width,
+  });
   const output = await options.deps.runFilterGraph({
     graph: built.graph,
     outputNodeId: built.outputNodeId,

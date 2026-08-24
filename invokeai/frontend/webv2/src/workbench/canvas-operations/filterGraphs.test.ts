@@ -21,6 +21,7 @@ const EXPECTED_DEFAULTS: Record<string, Record<string, unknown>> = {
   hed_edge_detection: { scribble: false },
   mlsd_detection: { score_threshold: 0.1, distance_threshold: 20 },
   pidi_edge_detection: { quantize_edges: false, scribble: false },
+  scribble_edge_detection: {},
   content_shuffle: { scale_factor: 256 },
   mediapipe_face_detection: { max_faces: 1, min_confidence: 0.5 },
   color_map: { tile_size: 64 },
@@ -42,10 +43,10 @@ const SPANDREL_MODEL = {
 };
 
 describe('CONTROL_FILTERS registry', () => {
-  it('contains exactly all sixteen legacy filter types', () => {
+  it('contains the legacy filters plus the Scribble preset', () => {
     const types = CONTROL_FILTERS.map((definition) => definition.type);
-    expect(types).toHaveLength(16);
-    expect(new Set(types).size).toBe(16);
+    expect(types).toHaveLength(17);
+    expect(new Set(types).size).toBe(17);
     expect(types).toEqual(EXPECTED_TYPES);
   });
 
@@ -144,7 +145,7 @@ describe('buildFilterGraph', () => {
 
   it('builds the direct legacy filter nodes with default params', () => {
     const directTypes = EXPECTED_TYPES.filter(
-      (type) => !['adjust_image', 'spandrel_filter', 'img_blur', 'img_noise'].includes(type)
+      (type) => !['adjust_image', 'spandrel_filter', 'img_blur', 'img_noise', 'scribble_edge_detection'].includes(type)
     );
     for (const type of directTypes) {
       const { graph, outputNodeId } = buildFilterGraph(type, imageName);
@@ -169,6 +170,63 @@ describe('buildFilterGraph', () => {
         expect(node[key]).toBe(value);
       }
     }
+  });
+
+  it('builds Scribble as a discoverable HED scribble-mode preset', () => {
+    const { graph, outputNodeId } = buildFilterGraph('scribble_edge_detection', imageName);
+
+    expect(graph.nodes[FILTER_NODE_ID]).toMatchObject({
+      image: { image_name: imageName },
+      scribble: true,
+      type: 'hed_edge_detection',
+    });
+    expect(outputNodeId).toBe(FILTER_NODE_ID);
+  });
+
+  it('flattens transparent control inputs over white before processing and reapplies their alpha', () => {
+    const { graph, outputNodeId } = buildFilterGraph('canny_edge_detection', imageName, undefined, {
+      height: 80,
+      preserveTransparency: true,
+      width: 120,
+    });
+
+    expect(graph.nodes.control_filter_background).toMatchObject({
+      color: { a: 255, b: 255, g: 255, r: 255 },
+      height: 80,
+      type: 'blank_image',
+      width: 120,
+    });
+    expect(graph.nodes.control_filter_flatten).toMatchObject({
+      crop: true,
+      image: { image_name: imageName },
+      type: 'img_paste',
+    });
+    expect(graph.nodes.control_filter_source_alpha).toMatchObject({
+      image: { image_name: imageName },
+      type: 'tomask',
+    });
+    expect(graph.nodes.control_filter_restore_alpha).toMatchObject({
+      is_intermediate: true,
+      type: 'apply_mask_to_image',
+    });
+    expect(graph.nodes[FILTER_NODE_ID]).not.toHaveProperty('image');
+    expect(graph.edges).toEqual(
+      expect.arrayContaining([
+        {
+          destination: { field: 'image', node_id: FILTER_NODE_ID },
+          source: { field: 'image', node_id: 'control_filter_flatten' },
+        },
+        {
+          destination: { field: 'image', node_id: 'control_filter_restore_alpha' },
+          source: { field: 'image', node_id: FILTER_NODE_ID },
+        },
+        {
+          destination: { field: 'mask', node_id: 'control_filter_restore_alpha' },
+          source: { field: 'image', node_id: 'control_filter_source_alpha' },
+        },
+      ])
+    );
+    expect(outputNodeId).toBe('control_filter_restore_alpha');
   });
 
   it('builds adjust_image as offset or channel multiply', () => {

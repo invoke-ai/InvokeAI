@@ -415,6 +415,40 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let lifecycleState: 'active' | 'cooling' | 'cool' | 'disposed' = 'active';
   let lifecycleGeneration = 0;
   let cooldownPromise: Promise<'cooled' | 'dirty'> | null = null;
+  const trimPinCounts = new Map<string, number>();
+  const trimPinsByGeneration = new Map<number, Set<{ release(): void }>>();
+  const pinLayerForTrim = (layerId: string, generation: number): { release(): void } => {
+    trimPinCounts.set(layerId, (trimPinCounts.get(layerId) ?? 0) + 1);
+    let released = false;
+    const lease = {
+      release: (): void => {
+        if (released) {
+          return;
+        }
+        released = true;
+        const count = trimPinCounts.get(layerId) ?? 0;
+        if (count <= 1) {
+          trimPinCounts.delete(layerId);
+        } else {
+          trimPinCounts.set(layerId, count - 1);
+        }
+        const generationPins = trimPinsByGeneration.get(generation);
+        generationPins?.delete(lease);
+        if (generationPins?.size === 0) {
+          trimPinsByGeneration.delete(generation);
+        }
+      },
+    };
+    const generationPins = trimPinsByGeneration.get(generation) ?? new Set<{ release(): void }>();
+    generationPins.add(lease);
+    trimPinsByGeneration.set(generation, generationPins);
+    return lease;
+  };
+  const releaseTrimPinGeneration = (generation: number): void => {
+    for (const lease of trimPinsByGeneration.get(generation) ?? []) {
+      lease.release();
+    }
+  };
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
   let overlayCursor: OverlayCursor | null = null;
@@ -568,7 +602,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (pipeline.isGestureActive()) {
       return true;
     }
-    if (stores.documentEditingLocked.get() || rasterController.memory.isPinned(layerId)) {
+    if (stores.documentEditingLayerId.get() === layerId || (trimPinCounts.get(layerId) ?? 0) > 0) {
       return true;
     }
     if (stores.transformSession.get()?.layerId === layerId || stores.textEditSession.get()?.layerId === layerId) {
@@ -1757,7 +1791,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // resets the pointer pipeline so a held space/alt temp tool doesn't strand
   // when the window loses focus mid-hold.
   const kickPendingFlush = (): void => {
-    void persistenceController.flush();
+    // Lifecycle events cannot await this best-effort flush. Real persistence
+    // failures are already reported through BitmapStore.onError; consume the
+    // rejection so pagehide/visibilitychange never creates an unhandled promise.
+    void persistenceController.flush().catch(() => undefined);
   };
   const onPageHide = (): void => {
     kickPendingFlush();
@@ -1807,6 +1844,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     rasterController.memory.releaseGeneration(lifecycleGeneration);
+    releaseTrimPinGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     lifecycleState = 'active';
     editingController.activate();
@@ -1825,6 +1863,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     psdExportController.cancel();
     rasterController.memory.releaseGeneration(lifecycleGeneration);
+    releaseTrimPinGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     const generation = lifecycleGeneration;
     lifecycleState = 'cooling';
@@ -2133,6 +2172,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       isDisposed: () => disposed,
       isGuardCurrent: isLayerExportGuardCurrent,
       memory: rasterController.memory,
+      pinForTrim: pinLayerForTrim,
       rasterizeLayerPixels,
       syncMemoryBaselines,
     });
@@ -2282,6 +2322,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     disposed = true;
     releaseActiveSnapshots();
     rasterController.memory.releaseGeneration(lifecycleGeneration);
+    releaseTrimPinGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     lifecycleState = 'disposed';
     const cleanup = createCleanupAccumulator();
@@ -2435,7 +2476,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         snapshot.documentGeneration === rasterController.getDocumentGeneration() &&
         snapshot.lifecycleGeneration === lifecycleGeneration,
       pin: (layerIds) => {
-        const leases = layerIds.map((layerId) => rasterController.memory.pinOperation(layerId));
+        const leases = layerIds.map((layerId) => ({
+          memory: rasterController.memory.pinOperation(layerId),
+          trim: pinLayerForTrim(layerId, lifecycleGeneration),
+        }));
         let released = false;
         return {
           release: () => {
@@ -2444,7 +2488,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
             }
             released = true;
             for (const lease of leases) {
-              lease.release();
+              lease.memory.release();
+              lease.trim.release();
             }
           },
         };

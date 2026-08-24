@@ -549,6 +549,8 @@ export interface EngineStores {
   snapToGrid: ScalarStore<boolean>;
   /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
+  /** The layer targeted by that operation, or null when no operation is active. */
+  documentEditingLayerId: ScalarStore<string | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -671,6 +673,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
+  documentEditingLayerId: createScalarStore<string | null>(null),
   documentEditingLocked: createScalarStore<boolean>(false),
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),

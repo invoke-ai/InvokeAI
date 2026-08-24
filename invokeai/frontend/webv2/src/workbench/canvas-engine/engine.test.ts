@@ -11995,6 +11995,7 @@ describe('guarded filter previews', () => {
       }
 
       expect(engine.stores.documentEditingLocked.get()).toBe(true);
+      expect(engine.stores.documentEditingLayerId.get()).toBe('L');
       engine.history.undo();
       expect(
         engine.layers.applyStructuralPreview({ id: 'L', patch: { opacity: 0.2 }, type: 'updateCanvasLayer' })
@@ -12026,6 +12027,7 @@ describe('guarded filter previews', () => {
         operation?.cancel();
       }
       expect(engine.stores.documentEditingLocked.get()).toBe(false);
+      expect(engine.stores.documentEditingLayerId.get()).toBeNull();
       engine.history.undo();
       expect(engine.document.getDocument()!.layers[0]?.name).toBe('L');
       engine.lifecycle.dispose();
@@ -12662,19 +12664,24 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
     expect(getCanvasOperations(engine).startFilterOperation('paint1')).toBe('started');
     expect(getCanvasOperations(engine).setFilterOperationAutoProcess(false)).toBe('updated');
 
-    await expect(engine.lifecycle.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    let barrierSettled = false;
+    const barrier = engine.lifecycle.flushPendingUploads().then(() => {
+      barrierSettled = true;
+    });
+    await flushMicrotasks();
+    expect(barrierSettled).toBe(false);
     expect(uploadImage).not.toHaveBeenCalled();
     expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({ status: 'active' });
 
     getCanvasOperations(engine).cancelFilterOperation();
-    await expect(engine.lifecycle.flushPendingUploads()).resolves.toBeUndefined();
+    await expect(barrier).resolves.toBeUndefined();
     expect(uploadImage).toHaveBeenCalledOnce();
 
     engine.lifecycle.dispose();
     uploadImage.mockRestore();
   });
 
-  it('defers paint-cache trimming while a raster snapshot pins the layer', async () => {
+  it('persists once a raster snapshot has detached the pixels it needs', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -12712,9 +12719,6 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
       throw new Error('expected a document snapshot');
     }
     const capture = engine.exports.captureRasterSnapshot(documentSnapshot, ['paint1']);
-
-    await expect(engine.lifecycle.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
-    expect(uploadImage).not.toHaveBeenCalled();
 
     const captured = await capture;
     expect(captured.status).toBe('ok');

@@ -23,15 +23,21 @@ export interface AlphaPixels {
 
 const EMPTY_RECT: Rect = { height: 0, width: 0, x: 0, y: 0 };
 
-/** Too small to describe `width * height` pixels — never trusted to prove emptiness. */
-const isUnreadable = (pixels: AlphaPixels): boolean =>
-  pixels.width <= 0 || pixels.height <= 0 || pixels.data.length < pixels.width * pixels.height * 4;
+const hasNonPositiveDimensions = (pixels: AlphaPixels): boolean => pixels.width <= 0 || pixels.height <= 0;
+
+/** Fail closed: incomplete readback must never be allowed to prove pixel emptiness. */
+const assertCompleteBuffer = (pixels: AlphaPixels): void => {
+  if (pixels.data.length < pixels.width * pixels.height * 4) {
+    throw new RangeError('RGBA pixel buffer is shorter than its dimensions require.');
+  }
+};
 
 /** True when any pixel has non-zero alpha. Early-exits, so cheaper than {@link alphaBounds}. */
 export const hasVisiblePixels = (pixels: AlphaPixels): boolean => {
-  if (isUnreadable(pixels)) {
+  if (hasNonPositiveDimensions(pixels)) {
     return false;
   }
+  assertCompleteBuffer(pixels);
   const { data } = pixels;
   const end = pixels.width * pixels.height * 4;
   for (let index = 3; index < end; index += 4) {
@@ -48,9 +54,10 @@ export const hasVisiblePixels = (pixels: AlphaPixels): boolean => {
  * Edge-inclusive: one opaque pixel yields a 1x1 rect.
  */
 export const alphaBounds = (pixels: AlphaPixels): Rect => {
-  if (isUnreadable(pixels)) {
+  if (hasNonPositiveDimensions(pixels)) {
     return EMPTY_RECT;
   }
+  assertCompleteBuffer(pixels);
   const { data, height, width } = pixels;
   let minX = width;
   let minY = -1;

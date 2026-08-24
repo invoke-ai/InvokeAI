@@ -1508,9 +1508,10 @@ describe('truthful extent: trimming and clearing', () => {
     offset: { x: 0, y: 0 },
     type: 'paint',
   };
+  const noSurface = (): null => null;
 
   it('clears the ref instead of uploading when the trim finds no visible pixels', async () => {
-    const h = createHarness({ trimLayerPixels: () => 'emptied' });
+    const h = createHarness({ getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
     h.setSource(withBitmap);
 
     h.store.markLayerDirty(LAYER);
@@ -1530,7 +1531,7 @@ describe('truthful extent: trimming and clearing', () => {
   });
 
   it('prefers the injected clearBitmap seam over the default dispatch', async () => {
-    const h = createHarness({ clearBitmap: () => true, trimLayerPixels: () => 'emptied' });
+    const h = createHarness({ clearBitmap: () => true, getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
     h.setSource(withBitmap);
 
     h.store.markLayerDirty(LAYER);
@@ -1543,7 +1544,7 @@ describe('truthful extent: trimming and clearing', () => {
   });
 
   it('does not dispatch when the document already holds no bitmap', async () => {
-    const h = createHarness({ trimLayerPixels: () => 'emptied' });
+    const h = createHarness({ getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
     // Default source is `{ bitmap: null }` — the clear would be a no-op.
 
     h.store.markLayerDirty(LAYER);
@@ -1556,7 +1557,10 @@ describe('truthful extent: trimming and clearing', () => {
 
   it('drops a stale self-echo entry when the document already holds no bitmap', async () => {
     let erased = false;
-    const h = createHarness({ trimLayerPixels: () => (erased ? 'emptied' : 'kept') });
+    const h = createHarness({
+      getLayerSurface: (surface, offset) => (erased ? null : { offset, surface }),
+      trimLayerPixels: () => (erased ? 'emptied' : 'kept'),
+    });
 
     h.store.markLayerDirty(LAYER);
     await h.store.flushPendingUploads();
@@ -1575,7 +1579,10 @@ describe('truthful extent: trimming and clearing', () => {
 
   it('drops the self-echo entry, so a later undo re-dispatching the old name is not mistaken for an echo', async () => {
     let erased = false;
-    const h = createHarness({ trimLayerPixels: () => (erased ? 'emptied' : 'kept') });
+    const h = createHarness({
+      getLayerSurface: (surface, offset) => (erased ? null : { offset, surface }),
+      trimLayerPixels: () => (erased ? 'emptied' : 'kept'),
+    });
 
     // First flush establishes `lastApplied` for the uploaded image.
     h.store.markLayerDirty(LAYER);
@@ -1597,7 +1604,12 @@ describe('truthful extent: trimming and clearing', () => {
 
   it('requeues as a failure when the clear is rejected', async () => {
     const onError = vi.fn();
-    const h = createHarness({ clearBitmap: () => false, onError, trimLayerPixels: () => 'emptied' });
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: noSurface,
+      onError,
+      trimLayerPixels: () => 'emptied',
+    });
     h.setSource(withBitmap);
 
     h.store.markLayerDirty(LAYER);
@@ -1664,6 +1676,69 @@ describe('truthful extent: trimming and clearing', () => {
     h.store.dispose();
   });
 
+  it('cancels a pending clear when visible pixels are restored without a new dirty mark', async () => {
+    let cacheEmpty = false;
+    let trimmedOnce = false;
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      trimLayerPixels: () => {
+        if (!trimmedOnce) {
+          trimmedOnce = true;
+          cacheEmpty = true;
+          return 'emptied';
+        }
+        return 'kept';
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    // A cache re-rasterization may restore pixels without going through
+    // markLayerDirty(). The pending clear must respect the fresh trim/surface
+    // verdict instead of deleting those visible pixels from the document.
+    cacheEmpty = false;
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(h.clearBitmap).toHaveBeenCalledOnce();
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('lets a surface restored during trim cancel a pending clear in the same flush', async () => {
+    let cacheEmpty = true;
+    let primedPendingClear = false;
+    let restoreDuringTrim = false;
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      trimLayerPixels: () => {
+        if (!primedPendingClear) {
+          primedPendingClear = true;
+          return 'emptied';
+        }
+        if (restoreDuringTrim) {
+          cacheEmpty = false;
+          return 'emptied';
+        }
+        return 'kept';
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    restoreDuringTrim = true;
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(h.clearBitmap).toHaveBeenCalledOnce();
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
   it('reports a throwing trim as a typed persistence failure and keeps it retryable', async () => {
     const error = new Error('alpha readback failed');
     const onError = vi.fn();
@@ -1710,20 +1785,19 @@ describe('truthful extent: trimming and clearing', () => {
     h.store.dispose();
   });
 
-  it('defers persistence without uploading an untrimmed surface, then retries when ready', async () => {
+  it('waits through a transient trim deferral without reporting persistence failure', async () => {
     let busy = true;
-    const h = createHarness({ trimLayerPixels: () => (busy ? 'deferred' : 'kept') });
+    const sleep = vi.fn(() => {
+      busy = false;
+      return Promise.resolve();
+    });
+    const h = createHarness({ sleep, trimLayerPixels: () => (busy ? 'deferred' : 'kept') });
 
     h.store.markLayerDirty(LAYER);
-    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
-
-    expect(h.encodeSurface).not.toHaveBeenCalled();
-    expect(h.uploadImage).not.toHaveBeenCalled();
-    expect(h.dispatch).not.toHaveBeenCalled();
-
-    busy = false;
     await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
 
+    expect(sleep).toHaveBeenCalled();
+    expect(h.trimLayerPixels).toHaveBeenCalledTimes(2);
     expect(h.uploadImage).toHaveBeenCalledTimes(1);
     expect(h.dispatch).toHaveBeenCalledTimes(1);
     h.store.dispose();

@@ -162,9 +162,7 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
       ctx.dispatch({ ids: [layerId], type: 'removeCanvasLayers' });
       // The reducer's nearest-neighbour fallback would otherwise select whatever sits
       // at the top, not what the user had selected when the gesture began.
-      if (previousSelectedLayerId !== null) {
-        ctx.dispatch({ id: previousSelectedLayerId, type: 'setCanvasSelectedLayer' });
-      }
+      ctx.dispatch({ id: previousSelectedLayerId, type: 'setCanvasSelectedLayer' });
     },
     commit: (event) => ctx.emitStrokeCommitted(event),
     createdLayer: { index: 0, layer },

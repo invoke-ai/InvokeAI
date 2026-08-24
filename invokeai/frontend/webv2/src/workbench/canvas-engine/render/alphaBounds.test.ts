@@ -91,8 +91,10 @@ describe('alphaBounds', () => {
     expect(isEmpty(alphaBounds({ data: new Uint8ClampedArray(0), height: 4, width: -1 }))).toBe(true);
   });
 
-  it('returns an empty rect when the buffer is too short to describe its dimensions', () => {
-    expect(isEmpty(alphaBounds({ data: new Uint8ClampedArray(4 * 4 * 4 - 1), height: 4, width: 4 }))).toBe(true);
+  it('rejects a buffer too short to describe its dimensions', () => {
+    expect(() => alphaBounds({ data: new Uint8ClampedArray(4 * 4 * 4 - 1), height: 4, width: 4 })).toThrow(
+      'RGBA pixel buffer is shorter than its dimensions require.'
+    );
   });
 
   it('ignores bytes beyond width * height * 4', () => {
@@ -108,13 +110,7 @@ describe('hasVisiblePixels', () => {
     setAlpha(single, 5, 0, 1);
     const opaque = buffer(3, 3);
     opaque.data.fill(255);
-    const cases: AlphaPixels[] = [
-      buffer(6, 6),
-      single,
-      opaque,
-      buffer(0, 0),
-      { data: new Uint8ClampedArray(4 * 4 * 4 - 1), height: 4, width: 4 },
-    ];
+    const cases: AlphaPixels[] = [buffer(6, 6), single, opaque, buffer(0, 0)];
     for (const pixels of cases) {
       expect(hasVisiblePixels(pixels)).toBe(!isEmpty(alphaBounds(pixels)));
     }
@@ -124,5 +120,11 @@ describe('hasVisiblePixels', () => {
     const pixels = buffer(4, 4);
     setAlpha(pixels, 3, 3, 1);
     expect(hasVisiblePixels(pixels)).toBe(true);
+  });
+
+  it('rejects a buffer too short to prove that it has no visible pixels', () => {
+    expect(() => hasVisiblePixels({ data: new Uint8ClampedArray(4 * 4 * 4 - 1), height: 4, width: 4 })).toThrow(
+      'RGBA pixel buffer is shorter than its dimensions require.'
+    );
   });
 });

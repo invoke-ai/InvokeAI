@@ -586,14 +586,16 @@ describe('auto-created layer rollback (a gesture that commits nothing leaves no 
     expect(h.layers.peek(h.createdIds[0]!)).toBeDefined();
   });
 
-  it('omits the reselect when nothing was selected to begin with', () => {
+  it('restores a null selection when nothing was selected to begin with', () => {
     const h = clipped(makeDoc([paintLayer('p1')], null));
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(80, 80));
     up(brush, h.ctx, pointer(80, 80));
 
-    expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers']);
+    expect(kinds(h)).toEqual(['addCanvasLayer', 'removeCanvasLayers', 'setCanvasSelectedLayer']);
+    const reselect = h.dispatched[2]!;
+    expect(reselect.type === 'setCanvasSelectedLayer' && reselect.id).toBeNull();
   });
 
   it('keeps the layer when the stroke DOES commit pixels', () => {

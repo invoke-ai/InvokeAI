@@ -2514,6 +2514,7 @@
           "mlsd_detection": "MLSD",
           "normal_map": "Normal map",
           "pidi_edge_detection": "PiDiNet",
+          "scribble_edge_detection": "Scribble",
           "spandrel_filter": "Spandrel"
         },
         "invalidLayer": "Control layer \"{{name}}\": {{reason}}",

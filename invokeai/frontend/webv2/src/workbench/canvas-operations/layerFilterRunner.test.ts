@@ -99,11 +99,15 @@ describe('runLayerFilter', () => {
           calls.push('run');
           expect(graph.nodes.control_filter).toMatchObject({
             high_threshold: 200,
-            image: { image_name: 'input' },
             low_threshold: 100,
             type: 'canny_edge_detection',
           });
-          expect(outputNodeId).toBe('control_filter');
+          expect(graph.nodes.control_filter_flatten).toMatchObject({
+            image: { image_name: 'input' },
+            type: 'img_paste',
+          });
+          expect(graph.nodes.control_filter_restore_alpha).toMatchObject({ type: 'apply_mask_to_image' });
+          expect(outputNodeId).toBe('control_filter_restore_alpha');
           expect(receivedSignal).toBe(signal);
           return Promise.resolve({ height: 60, imageName: 'output', width: 80 });
         },
