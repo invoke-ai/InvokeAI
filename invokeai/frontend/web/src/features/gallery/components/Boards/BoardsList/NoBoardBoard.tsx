@@ -6,13 +6,13 @@ import { removeImageFromBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
 import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
-import { getNoBoardClickActions } from 'features/gallery/components/Boards/BoardsList/noBoardBoardClickActions';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import {
   selectAutoAddBoardId,
   selectAutoAssignBoardOnClick,
   selectBoardSearchText,
 } from 'features/gallery/store/gallerySelectors';
+import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -54,10 +54,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const boardName = useBoardName('none');
   const handleSelectBoard = useCallback(() => {
-    for (const action of getNoBoardClickActions(isSelected, autoAssignBoardOnClick)) {
-      dispatch(action);
+    dispatch(boardIdSelected({ boardId: 'none' }));
+    if (autoAssignBoardOnClick) {
+      dispatch(autoAddBoardIdChanged('none'));
     }
-  }, [dispatch, autoAssignBoardOnClick, isSelected]);
+  }, [dispatch, autoAssignBoardOnClick]);
 
   const dndTargetData = useMemo<RemoveImageFromBoardDndTargetData>(() => removeImageFromBoardDndTarget.getData(), []);
 

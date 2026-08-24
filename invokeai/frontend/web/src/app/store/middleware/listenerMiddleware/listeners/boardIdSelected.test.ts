@@ -140,11 +140,12 @@ describe('addBoardIdSelectedListener', () => {
     });
   });
 
-  it("auto-selects the board's first item without that reading as a user pick", async () => {
-    // The probe picks *for* the user, so its write must not publish as a pick when it lands on the
-    // item already displayed: NoBoardBoard re-dispatches boardIdSelected even when its board is
-    // already selected, and the viewer answers a pick by lifting a running generation's progress
-    // overlay off the item for two seconds — a stale flash for a click on the current board.
+  it("auto-selects the board's first item, and leaves a still-valid selection alone", async () => {
+    // Both halves of the probe's job. It must select *for* the user when the viewer has nothing
+    // valid to show — but a board or view "change" that changed nothing (clicking the board you
+    // are already on, or the tab already showing: both dispatch unconditionally) must not replace
+    // the user's pick with the newest item. That would discard their selection, and moving the
+    // displayed item mid-generation also lifts the progress overlay off it for two seconds.
     resetGallerySelectionSource();
     const store = buildStore({ withSelectionSource: true });
 
@@ -153,7 +154,49 @@ describe('addBoardIdSelectedListener', () => {
     // fake timers before it is awaited, or its fulfilled action lands after the probe's 5s give-up.
     const upsert = store.dispatch(
       galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
-        item_names: ['already-showing.png'],
+        item_names: ['newest.png', 'older.png'],
+        starred_count: 0,
+        total_count: 2,
+      })
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+    await vi.advanceTimersByTimeAsync(6000);
+
+    // Nothing was selected, so the probe picks the first item — the only coverage of that path.
+    expect(store.getState().gallery.selection).toEqual(['newest.png']);
+    const generationAfterFirstProbe = $gallerySelection.get().generation;
+    expect(generationAfterFirstProbe, 'moving the viewer to a new item is worth publishing').toBeGreaterThan(0);
+
+    // The user scrolls down and picks something else, then clicks the board they are already on.
+    store.dispatch(imageSelected('older.png'));
+    const generationAfterUserPick = $gallerySelection.get().generation;
+    store.galleryActions.length = 0;
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    await vi.advanceTimersByTimeAsync(6000);
+
+    // `older.png` is still in this list, so the probe has nothing to fix and writes nothing at all
+    // — not even a no-op write, which would still have to be checked for a spurious reveal. (The
+    // click itself shows up in galleryActions; what must not is a write to the selection.)
+    expect(store.galleryActions).not.toContain('gallery/selectionChanged');
+    expect(store.galleryActions).not.toContain('gallery/imageSelected');
+    expect(store.getState().gallery.selection).toEqual(['older.png']);
+    expect($gallerySelection.get().generation, 'nothing moved, so there is nothing to reveal').toBe(
+      generationAfterUserPick
+    );
+  });
+
+  it('still selects for the user when the viewer has nothing left to show', async () => {
+    // The mirror case, and the reason the "did anything change?" test lives in the probe rather
+    // than in each click handler: deleting the last item, or the probe's own give-up, leaves the
+    // selection empty, and clicking the board is how the user asks for something to look at. A
+    // handler that simply swallowed the click for the already-selected board made that inert.
+    const store = buildStore();
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['newest.png'],
         starred_count: 0,
         total_count: 1,
       })
@@ -161,27 +204,38 @@ describe('addBoardIdSelectedListener', () => {
     await vi.advanceTimersByTimeAsync(0);
     await upsert;
     await vi.advanceTimersByTimeAsync(6000);
+    store.dispatch(selectionChanged([]));
 
-    // The probe really does select for the user — this is also the only coverage of that path.
-    expect(store.getState().gallery.selection).toEqual(['already-showing.png']);
-    const generationAfterFirstProbe = $gallerySelection.get().generation;
-    expect(generationAfterFirstProbe, 'moving the viewer to a new item is worth publishing').toBeGreaterThan(0);
-
-    // Re-select the same board. The probe runs again and lands on the item already displayed.
-    store.galleryActions.length = 0;
+    // Clicking the board again, with the list already cached.
     store.dispatch(boardIdSelected({ boardId: 'none' }));
-    // The listener's `condition` only re-evaluates its predicate when an action is dispatched, so a
-    // test that merely advances time would watch this second probe time out and clear the selection
-    // — the give-up path, not the path under test. Any action wakes it; this one touches nothing.
-    store.dispatch({ type: 'test/tick' });
     await vi.advanceTimersByTimeAsync(6000);
 
-    // The probe did write — this is the write not reading as a pick, not the probe skipping it.
-    expect(store.galleryActions).toContain('gallery/selectionChanged');
-    expect(store.galleryActions).not.toContain('gallery/imageSelected');
-    expect(store.getState().gallery.selection).toEqual(['already-showing.png']);
-    expect($gallerySelection.get().generation, 'nothing moved, so there is nothing to reveal').toBe(
-      generationAfterFirstProbe
+    expect(store.getState().gallery.selection).toEqual(['newest.png']);
+  });
+
+  it('does not clear a good selection just because the store went quiet', async () => {
+    // `condition` only re-evaluates on a dispatched action, so with the list already cached and
+    // nothing else happening there is no wake-up at all: the probe used to sit through its 5s
+    // deadline and then clear the selection it should have kept.
+    const store = buildStore();
+
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    const upsert = store.dispatch(
+      galleryApi.util.upsertQueryData('listGalleryItemNames', selectGalleryItemNamesQueryArgs(store.getState()), {
+        item_names: ['a.png', 'b.png'],
+        starred_count: 0,
+        total_count: 2,
+      })
     );
+    await vi.advanceTimersByTimeAsync(0);
+    await upsert;
+    await vi.advanceTimersByTimeAsync(6000);
+    store.dispatch(imageSelected('b.png'));
+
+    // A second board click, then silence — no further dispatch to wake `condition`.
+    store.dispatch(boardIdSelected({ boardId: 'none' }));
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(store.getState().gallery.selection).toEqual(['b.png']);
   });
 });

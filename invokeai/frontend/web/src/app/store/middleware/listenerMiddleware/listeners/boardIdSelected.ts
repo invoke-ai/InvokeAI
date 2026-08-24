@@ -1,6 +1,10 @@
 import { isAnyOf } from '@reduxjs/toolkit';
 import type { AppStartListening } from 'app/store/store';
-import { selectGalleryItemNamesQueryArgs, selectSelection } from 'features/gallery/store/gallerySelectors';
+import {
+  selectGalleryItemNamesQueryArgs,
+  selectLastSelectedItem,
+  selectSelection,
+} from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { galleryApi } from 'services/api/endpoints/gallery';
 
@@ -50,18 +54,14 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
       // cache or it will time out and clear the user's selection on every board switch. The
       // selector already maps a virtual board id to its `created_date` filter.
       const selectQuery = galleryApi.endpoints.listGalleryItemNames.select(selectGalleryItemNamesQueryArgs(getState()));
-      // wait until the board has some items - maybe it already has some from a previous fetch
-      // must use getState() to ensure we do not have stale state
-      const isSuccess = await condition(() => selectQuery(getState()).isSuccess, 5000);
+      // wait until the board has some items - maybe it already has some from a previous fetch.
+      // `condition` only re-evaluates its predicate when an action is dispatched, never on its own
+      // timer, so a list that is *already* fulfilled has to be checked here: otherwise a quiet
+      // store gives no wake-up, the 5s deadline expires, and the give-up branch below clears a
+      // selection that was perfectly good. must use getState() to avoid stale state.
+      const isSuccess =
+        selectQuery(getState()).isSuccess || (await condition(() => selectQuery(getState()).isSuccess, 5000));
 
-      // The probe picks an item *for* the user, so it writes the selection with the mutation
-      // action rather than `imageSelected`. The state is identical either way, but `imageSelected`
-      // means "the user asked to see this", and while a generation is running the viewer answers
-      // that by lifting the progress overlay off the item for a couple of seconds. Re-selecting
-      // the board already selected (NoBoardBoard doesn't guard against it) lands the probe on the
-      // item already on screen, which as a pick would flash a stale result over a live render.
-      // When the probe genuinely moves the viewer to a different item that still reveals — the
-      // listener publishes any change of the active item. See gallerySelectionSource.
       if (!isSuccess) {
         dispatch(selectionChanged([]));
         return;
@@ -69,6 +69,24 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       // the board was just changed - we can select the first gallery item (image or video)
       const itemNames = selectQuery(getState()).data?.item_names;
+
+      // ...unless what the viewer is already showing is in this list, in which case the board or
+      // view did not really change (clicking the board you are already on, or the tab already
+      // showing, both dispatch unconditionally) and there is nothing for the probe to fix.
+      // Replacing a perfectly good selection with the newest item would discard the user's pick,
+      // and moving the displayed item mid-generation also lifts the progress overlay off it for a
+      // couple of seconds. Deciding it here rather than in each caller keeps the rule in one place
+      // and reads the live selection instead of a render-time snapshot of it.
+      const activeItem = selectLastSelectedItem(getState());
+      if (activeItem && itemNames?.includes(activeItem)) {
+        return;
+      }
+
+      // The probe picks *for* the user, so it writes with the mutation action rather than
+      // `imageSelected`. The state is identical either way, but `imageSelected` means "the user
+      // asked to see this", which the viewer answers by lifting the progress overlay. This write
+      // always moves the displayed item (the check above returned otherwise), so it still
+      // publishes through the change-of-active-item clause. See gallerySelectionSource.
       const firstItemName = itemNames?.[0];
 
       dispatch(selectionChanged(firstItemName ? [firstItemName] : []));
