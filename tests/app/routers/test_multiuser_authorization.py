@@ -864,6 +864,83 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/some-image")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
+    def test_deleted_image_reads_as_unavailable_rather_than_undecidable(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """A deleted image answers 403, and the clients depend on being able to trust it.
+
+        The read decision rests on `images.user_id`, which is gone with the row, so a
+        non-admin cannot be told a deleted image from someone else's and both are refused
+        the same way. The frontend therefore drops its reference to an image on a 403 as
+        well as a 404 -- a workflow's image field clears itself on one. Pinned here because
+        that behaviour reads as over-broad without this route's answer to point at.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-doomed", user1.user_id)
+        mock_invoker.services.image_records.delete("user1-doomed")
+
+        r = client.get("/api/v1/images/i/user1-doomed", headers=_auth(user1_token))
+
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_unreadable_board_does_not_read_as_unavailable(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """A storage error must not reach the client wearing the deleted image's answer.
+
+        `assert_image_read_access` used to catch every exception from the board lookup and
+        fall through to the same 403 a deleted image gets. Since the clients read that 403 as
+        "gone, drop your reference", a locked database would have taken every workflow field
+        and reference image pointing at a shared board's images down with it. Only a board
+        positively known to be gone may still answer 403.
+        """
+        import sqlite3
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Shared Read Board")
+        _set_board_visibility(client, user1_token, board_id, "shared")
+        _save_image(mock_invoker, "user1-shared-read", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-shared-read")
+
+        # Patched only after the setup above used the real store. user2 is neither admin nor
+        # direct owner, so the decision reaches the board lookup and cannot complete.
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        # The storage error leaves the route uncaught, which is a 500 in production; the test
+        # client re-raises unhandled server exceptions instead of rendering them. Either way the
+        # one thing that must not happen is a 403 -- the answer the clients act on destructively.
+        with pytest.raises(sqlite3.OperationalError):
+            client.get("/api/v1/images/i/user1-shared-read", headers=_auth(user2_token))
+
+    def test_vanished_board_still_reads_as_an_ordinary_refusal(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """The narrowed catch stays exactly that narrow, in both directions."""
+        from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Vanishing Read Board")
+        _set_board_visibility(client, user1_token, board_id, "shared")
+        _save_image(mock_invoker, "user1-read-board-gone", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-read-board-gone")
+
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=BoardRecordNotFoundException),
+        )
+
+        r = client.get("/api/v1/images/i/user1-read-board-gone", headers=_auth(user2_token))
+
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
     def test_get_image_metadata_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/images/i/some-image/metadata")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED

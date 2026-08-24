@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCropBold, PiRulerBold } from 'react-icons/pi';
 import { useGetImageDTOQuery, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { isImageMissingError } from 'services/api/util/imageErrors';
+import { isImageUnavailableError } from 'services/api/util/imageErrors';
 import { $isConnected } from 'services/events/stores';
 
 type Props<T extends typeof setGlobalReferenceImageDndTarget | typeof setRegionalGuidanceReferenceImageDndTarget> = {
@@ -57,12 +57,13 @@ export const RefImageImage = memo(
     }, [onChangeImage]);
 
     useEffect(() => {
-      // Only a 404 clears the reference. Any other error leaves it alone: a 5xx or a dropped
-      // connection says nothing about whether the image exists, and this reset is silent and
-      // has no undo. See `isImageMissingError`.
+      // Cleared only when the server says the image is not available to this client (404,
+      // or the 403 a deleted image answers with in multiuser mode). Any other error leaves
+      // it alone: a 5xx or a dropped connection says nothing about whether the image
+      // exists, and this reset is silent and has no undo. See `isImageUnavailableError`.
       if (
-        (isConnected && isImageMissingError(croppedImageDTOReq.error)) ||
-        isImageMissingError(originalImageDTOReq.error)
+        (isConnected && isImageUnavailableError(croppedImageDTOReq.error)) ||
+        isImageUnavailableError(originalImageDTOReq.error)
       ) {
         handleResetControlImage();
       }

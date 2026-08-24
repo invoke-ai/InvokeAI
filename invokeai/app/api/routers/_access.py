@@ -71,12 +71,19 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
 
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
     if board_id is not None:
+        # See `assert_image_owner` for why this reads the board record and catches only
+        # not-found. The read side needs it for a second reason: this 403 is also the answer a
+        # *deleted* image gets, because the decision rests on `images.user_id` and that is gone
+        # with the row. Clients therefore have to read 403 as "this image is not available to
+        # me" and drop their reference to it — a workflow's image field clears itself on one.
+        # An unreadable database must not be able to produce that answer.
         try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+            board = ApiDependencies.invoker.services.board_records.get(board_id)
+        except BoardRecordNotFoundException:
+            pass
+        else:
             if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
                 return
-        except Exception:
-            pass
 
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
 
