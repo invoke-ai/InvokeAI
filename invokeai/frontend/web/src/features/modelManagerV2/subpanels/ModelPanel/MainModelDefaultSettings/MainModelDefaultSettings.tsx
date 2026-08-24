@@ -56,10 +56,6 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
     return ['flux', 'flux2'].includes(modelConfig.base);
   }, [modelConfig]);
 
-  const isZImage = useMemo(() => {
-    return modelConfig.base === 'z-image';
-  }, [modelConfig]);
-
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
   const optimalDimension = useMemo(() => {
     const modelBase = modelConfig?.base;
@@ -148,7 +144,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
         {!isFluxFamily && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
         <DefaultWidth control={control} optimalDimension={optimalDimension} />
         <DefaultHeight control={control} optimalDimension={optimalDimension} />
-        {!isZImage && <DefaultFp8Storage control={control} name="fp8Storage" />}
+        <DefaultFp8Storage control={control} name="fp8Storage" />
       </SimpleGrid>
     </>
   );

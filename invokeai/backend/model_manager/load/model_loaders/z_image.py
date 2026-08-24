@@ -482,6 +482,11 @@ class ZImageCheckpointModel(ModelLoader):
             sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True)
+
+        # Every param is uniform `model_dtype` at this point (the loop above casts the whole state
+        # dict, including ComfyUI fp8 checkpoints, whose scale metadata was filtered out above), so
+        # the layerwise cast has a single unambiguous compute dtype to restore to.
+        model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 
