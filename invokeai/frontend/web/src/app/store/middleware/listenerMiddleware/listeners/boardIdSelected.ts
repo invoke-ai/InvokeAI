@@ -1,70 +1,21 @@
-import type { UnknownAction } from '@reduxjs/toolkit';
 import { isAnyOf } from '@reduxjs/toolkit';
-import type { AppStartListening, RootState } from 'app/store/store';
-import {
-  selectGalleryItemNamesQueryArgs,
-  selectGalleryView,
-  selectLastSelectedItem,
-  selectSelectedBoardId,
-  selectSelection,
-} from 'features/gallery/store/gallerySelectors';
+import type { AppStartListening } from 'app/store/store';
+import { selectGalleryItemNamesQueryArgs, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { boardIdSelected, galleryViewChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { galleryApi } from 'services/api/endpoints/gallery';
 
 /** The actions that ask this listener to pick an item for the user. */
 const startsProbe = isAnyOf(boardIdSelected, galleryViewChanged);
 
-/**
- * Whether this navigation has nothing for the probe to do: it did not actually change the board or
- * the view, and the item the viewer is showing is in the list that board/view is already displaying.
- *
- * Clicking the board you are already on, or the tab already showing, dispatches regardless
- * (NoBoardBoard and the view tabs don't guard, unlike GalleryBoard and VirtualBoardItem). The probe
- * picks the list's first item unconditionally, so left alone it throws the user's selection away —
- * and moving the displayed item mid-generation also lifts the progress overlay off it for a couple
- * of seconds.
- *
- * Both halves are load-bearing:
- *
- * - Comparing the *navigation* against the previous state, not just the item against the list: a
- *   real board switch can land on a list that contains the displayed item, which virtual date
- *   boards guarantee — their query args drop `board_id` and filter on `created_date` alone, so the
- *   list is a superset of every board's items for that day. Skipping that strands the viewer on the
- *   previous board's item.
- * - Requiring the displayed item to be in the list: the selection can be non-empty and still not be
- *   in what the grid shows — a search term narrows the list without starting a probe, and so do
- *   `starredFirst`, `orderDir` and the archived-boards toggle. Clicking the board is how the user
- *   gets unstuck from that, so the click must fall through and re-pick. Likewise when the selection
- *   is empty, after deleting the last item or hiding date boards while one is selected.
- *
- * Answered synchronously off the cached list rather than after the query wait, because that wait is
- * not safe for a click that should do nothing: `condition` re-evaluates only on a dispatched
- * action, so a quiet store lets its 5s deadline expire and the give-up branch clears the selection.
- * An uncached list simply falls through and probes as before.
- */
-const isNoOpNavigation = (action: UnknownAction, state: RootState, previousState: RootState): boolean => {
-  const changedNothing =
-    (boardIdSelected.match(action) && selectSelectedBoardId(previousState) === action.payload.boardId) ||
-    (galleryViewChanged.match(action) && selectGalleryView(previousState) === action.payload);
-
-  if (!changedNothing) {
-    return false;
-  }
-
-  const activeItem = selectLastSelectedItem(state);
-  const cached = galleryApi.endpoints.listGalleryItemNames.select(selectGalleryItemNamesQueryArgs(state))(state);
-  return !!activeItem && !!cached.data?.item_names.includes(activeItem);
-};
-
 export const addBoardIdSelectedListener = (startAppListening: AppStartListening) => {
   startAppListening({
     // Two jobs, so this cannot be a plain action matcher. The probe below is started by a board or
     // view change — but it must also be *cancelled* by any selection that lands while it waits,
     // and a selection arrives through several actions: imageSelected from the gallery's auto-switch,
-    // plain thumbnail clicks and next/prev navigation, selectionChanged from ctrl/shift-clicks, the
-    // grid's own arrow-key handler, the delete flow's pruning and this listener's probe,
-    // boardIdSelected carrying a selection. Matching the resulting change of the selection covers
-    // all of them, including any writer added later — an action list would silently miss it.
+    // plain thumbnail clicks and keyboard navigation, selectionChanged from ctrl/shift-clicks, the
+    // delete flow's pruning and this listener's own probe, boardIdSelected carrying a selection.
+    // Matching the resulting change of the selection covers all of them, including any writer added
+    // later — an action list would silently miss it.
     //
     // The whole selection, not just its active item: removing one of several selected thumbnails,
     // or re-picking the one already active, leaves the last item unchanged while still being the
@@ -74,19 +25,7 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
     // needed costs nothing.
     predicate: (action, currentState, previousState) =>
       startsProbe(action) || selectSelection(currentState) !== selectSelection(previousState),
-    effect: async (action, { getState, getOriginalState, dispatch, condition, cancelActiveListeners }) => {
-      // Decided before cancelling anything, and before the first await (the only point
-      // getOriginalState is valid at). A navigation that changes nothing has no business killing
-      // the probe of one that did: the app dispatches `boardIdSelected` and `galleryViewChanged`
-      // back to back in several places (deleting the selected board, uploading to another board),
-      // and the second of those pairs is routinely a no-op — cancelling there and returning left
-      // nothing to select the new board's item, stranding the viewer on the old one.
-      if (startsProbe(action) && !(boardIdSelected.match(action) && action.payload.select)) {
-        if (isNoOpNavigation(action, getState(), getOriginalState())) {
-          return;
-        }
-      }
-
+    effect: async (action, { getState, dispatch, condition, cancelActiveListeners }) => {
       // Cancel any in-progress instances of this listener, we don't want to select an item from a previous board
       cancelActiveListeners();
 
@@ -115,6 +54,20 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
       // must use getState() to ensure we do not have stale state
       const isSuccess = await condition(() => selectQuery(getState()).isSuccess, 5000);
 
+      // The probe picks an item *for* the user, so it writes the selection with the mutation
+      // action rather than `imageSelected`. The state is identical either way, but `imageSelected`
+      // means "the user asked to see this", and while a generation is running the viewer answers
+      // that by lifting the progress overlay off the item for a couple of seconds — so a write
+      // that changes nothing must not announce itself as a pick. NoBoardBoard and the view tabs
+      // dispatch even when nothing changed (unlike GalleryBoard and VirtualBoardItem), which
+      // re-runs this probe; when it lands back on the item already displayed, the mutation action
+      // is what keeps it silent. A write that genuinely moves the displayed item still reveals,
+      // through the change-of-active-item clause. See gallerySelectionSource.
+      //
+      // This does NOT stop that re-run from *replacing* a selection further down the list with
+      // `item_names[0]` — a real bug, but an older and wider one than this file, tracked in its own
+      // issue along with the give-up branch below clearing a good selection whenever `condition`
+      // gets no wake-up within 5s.
       if (!isSuccess) {
         dispatch(selectionChanged([]));
         return;
@@ -122,12 +75,6 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
 
       // the board was just changed - we can select the first gallery item (image or video)
       const itemNames = selectQuery(getState()).data?.item_names;
-
-      // The probe picks *for* the user, so it writes with the mutation action rather than
-      // `imageSelected`. The state is identical either way, but `imageSelected` means "the user
-      // asked to see this", which the viewer answers by lifting the progress overlay. This write
-      // always moves the displayed item (the check above returned otherwise), so it still
-      // publishes through the change-of-active-item clause. See gallerySelectionSource.
       const firstItemName = itemNames?.[0];
 
       dispatch(selectionChanged(firstItemName ? [firstItemName] : []));

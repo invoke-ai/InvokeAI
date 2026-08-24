@@ -28,9 +28,11 @@ import { boardIdSelected, comparedImagesSwapped, imageSelected } from 'features/
  * selected". Choosing the action is necessary but not sufficient, though: the clause below still
  * publishes if the write *moves* the active item, so such a writer must also leave the active item
  * alone rather than collapsing the selection onto a stale snapshot of it. See the delete modals'
- * survivor branch and the board auto-select probe in listeners/boardIdSelected.ts — and note that
- * the survivor branch's fallback, which fires only when everything selected has been deleted,
- * cannot honour the second half and does reveal.
+ * survivor branch, which does both, and its fallback, which fires only when everything selected has
+ * been deleted and cannot honour the second half — so it does reveal. The board auto-select probe
+ * in listeners/boardIdSelected.ts honours the first half only: it is silent when it lands back on
+ * the item already displayed, but a re-run for a navigation that changed nothing still replaces a
+ * selection further down the list, which is tracked separately.
  */
 const isSelectionDispatch = (action: UnknownAction): boolean =>
   isAnyOf(imageSelected, comparedImagesSwapped)(action) ||
