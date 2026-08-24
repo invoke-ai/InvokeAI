@@ -215,6 +215,7 @@ class Flux2RefImageExtension:
                 image_tensor=image_tensor,
                 vae=vae_info.model,
                 tile_size=REF_ENCODE_TILE_SIZE,
+                device=TorchDevice.choose_torch_device(),
             )
 
             with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):

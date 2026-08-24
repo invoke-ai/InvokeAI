@@ -9,6 +9,8 @@ from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+from invokeai.backend.util.attention import sdpa_score_matrix_bytes
+from invokeai.backend.util.devices import TorchDevice
 
 _WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT = 2900
 _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B = 6500
@@ -99,26 +101,45 @@ def estimate_vae_working_memory_flux(
     return int(working_memory)
 
 
+# The FLUX.2 VAE runs one attention block at the bottom of the encoder and one at the top of the
+# decoder, on the 8x-downsampled grid. Both are single-head, with the head dim set to the block
+# width: 512 for the stock VAE and 384 for the small-decoder variant. The distinction does not
+# matter here -- what matters is that both sit far above the 128 head dim ROCm's fused SDPA kernels
+# accept, so only the value's side of that limit is load-bearing.
+_FLUX2_VAE_MID_BLOCK_HEADS = 1
+_FLUX2_VAE_MID_BLOCK_HEAD_DIM = 512
+_FLUX2_VAE_SPATIAL_COMPRESSION = 8
+
+
 def estimate_vae_working_memory_flux2(
     operation: Literal["encode", "decode"],
     image_tensor: torch.Tensor,
     vae: AutoencoderKLFlux2,
     tile_size: int | None = None,
+    device: torch.device | None = None,
 ) -> int:
     """Estimate the working memory required to encode or decode with the FLUX.2 (32-channel) VAE.
 
-    Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE --
-    ``AutoencoderKLFlux2``'s mid-block attention runs through SDPA, so no O(area^2) term appears.
+    Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE.
     Measured on CUDA/bf16 as peak *reserved* memory (the conservative quantity, including allocator
     overhead), the implied constants are ~2170 (decode) and ~1070 (encode) bytes per pixel per
     element byte, flat across 512-1536px; the constants below round those up and match the FLUX.1
     ones. For reference, decoding 1024x1024 peaks at ~4.3GB and 1536x1536 at ~9.6GB -- far above the
     default ``device_working_mem_gb``, which is why this estimate must be passed to the model cache.
 
+    That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
+    fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
+    512-wide head, and measured peak stays linear from 512 to 1536px). A build whose fused kernels
+    reject the head dim -- ROCm caps it at 128 -- drops to SDPA's ``math`` fallback and materializes
+    a (pixels/8)^2 score matrix on top of the linear term: ~3.5GB at 1024px and ~17GB at 1536px. We
+    ask torch which path applies rather than assuming, so the estimate is right on both.
+
     When tiling is enabled the peak is bounded by a single tile instead of the full image (measured
-    ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap).
+    ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap), and the score
+    matrix, if one is materialized at all, is bounded by the tile too.
     """
-    element_size = next(vae.parameters()).element_size()
+    param = next(vae.parameters())
+    element_size = param.element_size()
 
     # Encoding uses ~50% the working memory of decoding.
     scaling_constant = 2200 if operation == "decode" else 1100
@@ -126,11 +147,21 @@ def estimate_vae_working_memory_flux2(
     if tile_size is not None:
         # Add 25% for tile overlap and the blending buffers, mirroring the SD1/SDXL estimate.
         working_memory = tile_size * tile_size * element_size * scaling_constant * 1.25
+        mid_block_seq_len = (tile_size // _FLUX2_VAE_SPATIAL_COMPRESSION) ** 2
     else:
         latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
         out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
         out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
         working_memory = out_h * out_w * element_size * scaling_constant
+        mid_block_seq_len = (out_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (out_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
+
+    working_memory += sdpa_score_matrix_bytes(
+        device=device if device is not None else TorchDevice.choose_torch_device(),
+        dtype=param.dtype,
+        num_heads=_FLUX2_VAE_MID_BLOCK_HEADS,
+        head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
+        seq_len=mid_block_seq_len,
+    )
 
     return int(working_memory)
 

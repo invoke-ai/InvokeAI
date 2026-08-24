@@ -54,7 +54,7 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         # far above the default working memory the cache would otherwise reserve. Tell it up front so
         # it offloads enough of the (possibly still resident) transformer to leave room.
         estimated_working_memory = estimate_vae_working_memory_flux2(
-            operation="decode", image_tensor=latents, vae=vae_info.model
+            operation="decode", image_tensor=latents, vae=vae_info.model, device=vae_info.compute_device
         )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):

@@ -49,7 +49,15 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXConditioningInfo
+from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
+
+# FLUX.2 attention geometry. The head dim is 128 across every variant; the head count follows the
+# hidden size (Klein 4B: 24, Klein 9B: 32, FLUX.2 dev: 48). Only the head dim decides which SDPA
+# kernel is eligible; the head count scales the `math` fallback's score matrix, and since the
+# working-memory estimate is computed before the transformer is loaded, we use the largest.
+FLUX2_ATTENTION_HEAD_DIM = 128
+FLUX2_MAX_ATTENTION_HEADS = 48
 
 
 @invocation(
@@ -465,18 +473,23 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # concatenated onto the image stream, so three 1024x1024 references quadruple the sequence
         # (and with it the activation footprint) of a 1024x1024 generation.
         ref_image_seq_len = ref_image_extension.ref_image_latents.shape[1] if ref_image_extension is not None else 0
+        # The additive bias is skipped entirely when reference images are present (see below), so the
+        # mask only costs anything -- storage, and possibly a materialized score matrix -- without them.
+        regional_attn_mask = regional_extension.restricted_attn_mask if ref_image_seq_len == 0 else None
         estimated_working_memory = self._estimate_working_memory(
             image_seq_len=packed_h * packed_w,
             ref_image_seq_len=ref_image_seq_len,
             text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
             num_loras=len(self.transformer.loras),
             # The mask itself is already allocated; only the additive bias built per forward is new.
-            # It is skipped entirely when reference images are present (see below).
             regional_attention_bias_bytes=(
-                regional_extension.restricted_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
-                if regional_extension.restricted_attn_mask is not None and ref_image_seq_len == 0
+                regional_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
+                if regional_attn_mask is not None
                 else 0
             ),
+            has_regional_attention_mask=regional_attn_mask is not None,
+            device=device,
+            dtype=inference_dtype,
         )
 
         with ExitStack() as exit_stack:
@@ -608,6 +621,9 @@ class Flux2DenoiseInvocation(BaseInvocation):
         text_seq_len: int,
         num_loras: int,
         regional_attention_bias_bytes: int = 0,
+        has_regional_attention_mask: bool = False,
+        device: torch.device | None = None,
+        dtype: torch.dtype = torch.bfloat16,
     ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
@@ -626,13 +642,30 @@ class Flux2DenoiseInvocation(BaseInvocation):
         A fixed base covers resolution-independent overhead (transient fp8/GGUF -> bf16 weight casts
         during the forward, and allocator slack across many steps). LoRA sidecar patches add an extra
         activation branch per patched layer, so we add a per-LoRA margin.
+
+        The linear model holds only while SDPA picks a fused kernel. Regional prompting is where that
+        stops being a given: it hands the transformer a dense additive ``S x S`` bias, which flash
+        attention never accepts and which ROCm's memory-efficient kernel rejects as well, leaving the
+        ``math`` fallback and its materialized ``heads x S x S`` score matrix. We ask torch which path
+        this build will take for these shapes and add the score matrix only when it is really there --
+        on CUDA the memory-efficient kernel takes the bias and the term is zero (verified: peak stays
+        linear with the bias attached).
         """
         GB = 1024**3
         MB = 1024**2
         per_token_bytes = int(0.4 * MB)
-        estimated = (image_seq_len + ref_image_seq_len + text_seq_len) * per_token_bytes
+        total_seq_len = image_seq_len + ref_image_seq_len + text_seq_len
+        estimated = total_seq_len * per_token_bytes
         estimated += int(1.0 * GB)
         estimated += regional_attention_bias_bytes
+        estimated += sdpa_score_matrix_bytes(
+            device=device if device is not None else TorchDevice.choose_torch_device(),
+            dtype=dtype,
+            num_heads=FLUX2_MAX_ATTENTION_HEADS,
+            head_dim=FLUX2_ATTENTION_HEAD_DIM,
+            seq_len=total_seq_len,
+            has_attn_mask=has_regional_attention_mask,
+        )
         if num_loras > 0:
             estimated += int(0.5 * num_loras * GB)
         return estimated

@@ -50,7 +50,10 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
         # See the decode node: FLUX.2 VAE activations are multi-GB, so the cache needs the estimate to
         # free room rather than discovering the shortfall as an OOM.
         estimated_working_memory = estimate_vae_working_memory_flux2(
-            operation="encode", image_tensor=image_tensor, vae=vae_info.model
+            operation="encode",
+            image_tensor=image_tensor,
+            vae=vae_info.model,
+            device=TorchDevice.choose_torch_device(),
         )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
