@@ -8,6 +8,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
+from invokeai.backend.model_manager.util.clip_tower_config import clip_tower_config_override
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.CLIPVision, format=ModelFormat.Diffusers)
@@ -27,8 +28,12 @@ class ClipVisionLoader(ModelLoader):
 
         model_path = Path(config.path)
 
+        # Full-CLIP checkpoints may carry a nested projection_dim that
+        # disagrees with the weights; see clip_tower_config_override.
+        tower_config = clip_tower_config_override(model_path, "vision")
+        extra_kwargs = {} if tower_config is None else {"config": tower_config}
         model = CLIPVisionModelWithProjection.from_pretrained(
-            model_path, torch_dtype=self._torch_dtype, local_files_only=True
+            model_path, torch_dtype=self._torch_dtype, local_files_only=True, **extra_kwargs
         )
         assert isinstance(model, CLIPVisionModelWithProjection)
 
