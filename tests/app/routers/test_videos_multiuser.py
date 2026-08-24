@@ -278,6 +278,24 @@ def test_deleted_video_reads_as_gone_rather_than_denied(client: TestClient, mock
     assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
+def test_unreadable_storage_does_not_read_as_a_deleted_video(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    """The DTO route's 404 is the one clients destroy references on, so only absence earns it.
+
+    The route ended ``except Exception: raise HTTPException(404)``, so any failure inside
+    ``get_dto`` answered the same 404 that tells a workflow field its video is gone.
+    """
+    import sqlite3
+
+    mock_invoker.services.videos.get_dto = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
+
+    # Uncaught in the route, so a 500 in production; the test client re-raises instead of
+    # rendering it. Either way it must not be the 404 that clears the user's reference.
+    with pytest.raises(sqlite3.OperationalError):
+        client.get("/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"})
+
+
 def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock_invoker: Invoker, user1_token: str):
     """A reversible refusal must not read as gone.
 

@@ -884,6 +884,32 @@ class TestImageReadAuth:
 
         assert r.status_code == status.HTTP_404_NOT_FOUND
 
+    def test_unreadable_storage_does_not_read_as_a_deleted_image(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str
+    ):
+        """The DTO route's 404 is the one clients destroy references on, so only absence earns it.
+
+        The route ended `except Exception: raise HTTPException(404)`, so any failure inside
+        `get_dto` -- the board lookup, the URL service, not just a missing row -- answered the
+        same 404 that tells a workflow field its image is gone. The caller here owns the image
+        and it is still there; the board lookup is what breaks.
+        """
+        import sqlite3
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-unreadable", user1.user_id)
+        monkeypatch.setattr(
+            mock_invoker.services.board_image_records,
+            "get_board_for_image",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        # Uncaught in the route, so a 500 in production; the test client re-raises instead of
+        # rendering it. Either way it must not be the 404 that clears the user's reference.
+        with pytest.raises(sqlite3.OperationalError):
+            client.get("/api/v1/images/i/user1-unreadable", headers=_auth(user1_token))
+
     def test_revoking_access_to_a_live_image_stays_a_denial(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):

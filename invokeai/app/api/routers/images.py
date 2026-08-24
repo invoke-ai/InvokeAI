@@ -317,7 +317,13 @@ def get_image_dto(
 
     try:
         return ApiDependencies.invoker.services.images.get_dto(image_name)
-    except Exception:
+    except ImageRecordNotFoundException:
+        # Only a genuinely missing record answers 404. This route is what a workflow's image
+        # field and a canvas reference image read, and they drop the user's reference when it
+        # 404s, so nothing else may wear that answer: a board lookup against an unreadable
+        # database, or a URL service failure, would otherwise clear a live image out of the
+        # workflows using it. Narrowed here rather than everywhere, because this is the 404
+        # that is acted on destructively — the media, metadata and workflow routes keep theirs.
         raise HTTPException(status_code=404)
 
 

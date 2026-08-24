@@ -494,7 +494,9 @@ def get_video_dto(
     _assert_video_read_access(video_name, current_user)
     try:
         return ApiDependencies.invoker.services.videos.get_dto(video_name)
-    except Exception:
+    except VideoRecordNotFoundException:
+        # See get_image_dto: this is the 404 a workflow's video field drops its reference on,
+        # so only a genuinely missing record may produce it.
         raise HTTPException(status_code=404)
 
 
