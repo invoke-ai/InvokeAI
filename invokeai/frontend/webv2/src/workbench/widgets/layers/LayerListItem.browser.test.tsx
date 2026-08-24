@@ -21,6 +21,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
+import { createLayerPanelSelection, selectLayerInPanel } from './layerGroups';
 import { LayerListItem, type LayerListItemEngine } from './LayerListItem';
 import { createEmptyPaintLayer } from './layerOps';
 
@@ -78,15 +79,16 @@ const requestLayerThumbnail = vi.fn();
 
 const Harness = () => {
   const [layers, setLayers] = useState(INITIAL_LAYERS);
-  const [selectedLayerId, setSelectedLayerId] = useState<string | null>(null);
+  const [selection, setSelection] = useState(() => createLayerPanelSelection('test-project', null));
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, LAYER_KEYBOARD_SENSOR_OPTIONS)
   );
   const layerIds = useMemo(() => layers.map((layer) => layer.id), [layers]);
+  const selectedLayerId = selection.primaryId;
   const dispatch = useCallback((mutation: CanvasProjectMutation) => {
     if (mutation.type === 'setCanvasSelectedLayer') {
-      setSelectedLayerId(mutation.id);
+      setSelection(createLayerPanelSelection('test-project', mutation.id));
     } else if (mutation.type === 'updateCanvasLayer' && mutation.patch.isEnabled !== undefined) {
       setLayers((current) =>
         current.map((layer) =>
@@ -95,6 +97,12 @@ const Harness = () => {
       );
     }
   }, []);
+  const handleSelect = useCallback(
+    (id: string, modifiers: { additive: boolean; range: boolean }) => {
+      setSelection((current) => selectLayerInPanel(current, id, layerIds, modifiers));
+    },
+    [layerIds]
+  );
   const engine = useMemo(
     () =>
       ({
@@ -130,13 +138,16 @@ const Harness = () => {
             editingLocked={false}
             engine={engine}
             index={index}
-            isSelected={selectedLayerId === layer.id}
+            isPrimarySelected={selectedLayerId === layer.id}
+            isSelected={selection.selectedIds.includes(layer.id)}
             layer={layer}
             layers={layers}
+            onSelect={handleSelect}
           />
         ))}
       </SortableContext>
       <output data-testid="selected-layer">{selectedLayerId ?? 'none'}</output>
+      <output data-testid="selected-layers">{selection.selectedIds.join(',') || 'none'}</output>
       <output data-testid="layer-order">{layers.map((layer) => layer.id).join(',')}</output>
     </DndContext>
   );
@@ -173,6 +184,7 @@ const selectionButton = (name: string): HTMLButtonElement =>
   host!.querySelector<HTMLButtonElement>(`button[aria-label="Select ${name}"]`)!;
 
 const selectedLayer = (): string => host!.querySelector<HTMLOutputElement>('[data-testid="selected-layer"]')!.value;
+const selectedLayers = (): string => host!.querySelector<HTMLOutputElement>('[data-testid="selected-layers"]')!.value;
 const layerOrder = (): string => host!.querySelector<HTMLOutputElement>('[data-testid="layer-order"]')!.value;
 
 afterEach(async () => {
@@ -229,6 +241,39 @@ describe('LayerListItem accessibility', () => {
     await act(() => userEvent.click(selectionButton('First layer')));
 
     expect(selectedLayer()).toBe('first');
+  });
+
+  it('adds and removes rows with Ctrl/Cmd-click while marking the latest addition primary', async () => {
+    await renderHarness();
+    await act(() => userEvent.click(selectionButton('First layer')));
+
+    await act(() =>
+      selectionButton('Second layer').dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }))
+    );
+    expect(selectedLayers()).toBe('first,second');
+    expect(selectedLayer()).toBe('second');
+    expect(selectionButton('First layer')).toHaveAttribute('aria-pressed', 'true');
+    expect(selectionButton('First layer')).not.toHaveAttribute('aria-current');
+    expect(selectionButton('Second layer')).toHaveAttribute('aria-current', 'true');
+    expect(selectionButton('Second layer')).toHaveAttribute('data-primary', 'true');
+
+    await act(() =>
+      selectionButton('First layer').dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
+    );
+    expect(selectedLayers()).toBe('second');
+    expect(selectedLayer()).toBe('second');
+  });
+
+  it('selects a visible range with Shift-click', async () => {
+    await renderHarness();
+    await act(() => userEvent.click(selectionButton('First layer')));
+
+    await act(() =>
+      selectionButton('Second layer').dispatchEvent(new MouseEvent('click', { bubbles: true, shiftKey: true }))
+    );
+
+    expect(selectedLayers()).toBe('first,second');
+    expect(selectedLayer()).toBe('second');
   });
 
   it.each([

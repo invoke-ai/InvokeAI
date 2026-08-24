@@ -15,6 +15,92 @@ export const LAYER_GROUP_ORDER: readonly LayerGroupKey[] = ['inpaint_mask', 'reg
 /** The group a layer belongs to — its contract type maps 1:1 to a group key. */
 export const getLayerGroupKey = (layer: CanvasLayerContract): LayerGroupKey => layer.type;
 
+/** Transient Layers-panel selection; only `primaryId` is persisted in the canvas document. */
+export interface LayerPanelSelection {
+  anchorId: string | null;
+  primaryId: string | null;
+  projectId: string;
+  selectedIds: readonly string[];
+}
+
+export interface LayerSelectionModifiers {
+  additive: boolean;
+  range: boolean;
+}
+
+export const createLayerPanelSelection = (projectId: string, primaryId: string | null): LayerPanelSelection => ({
+  anchorId: primaryId,
+  primaryId,
+  projectId,
+  selectedIds: primaryId ? [primaryId] : [],
+});
+
+/** Reconciles transient selection after an external primary change, project switch, or layer removal. */
+export const reconcileLayerPanelSelection = (
+  selection: LayerPanelSelection,
+  projectId: string,
+  orderedIds: readonly string[],
+  primaryId: string | null
+): LayerPanelSelection => {
+  const existing = new Set(orderedIds);
+  const validPrimaryId = primaryId && existing.has(primaryId) ? primaryId : null;
+  if (selection.projectId !== projectId || selection.primaryId !== validPrimaryId) {
+    return createLayerPanelSelection(projectId, validPrimaryId);
+  }
+  const selected = new Set(selection.selectedIds.filter((id) => existing.has(id)));
+  if (validPrimaryId) {
+    selected.add(validPrimaryId);
+  }
+  const selectedIds = orderedIds.filter((id) => selected.has(id));
+  const anchorId = selection.anchorId && existing.has(selection.anchorId) ? selection.anchorId : validPrimaryId;
+  if (
+    anchorId === selection.anchorId &&
+    selectedIds.length === selection.selectedIds.length &&
+    selectedIds.every((id, index) => id === selection.selectedIds[index])
+  ) {
+    return selection;
+  }
+  return { ...selection, anchorId, selectedIds };
+};
+
+/** Applies plain, Ctrl/Cmd-toggle, and Shift-range row selection semantics. */
+export const selectLayerInPanel = (
+  selection: LayerPanelSelection,
+  layerId: string,
+  orderedIds: readonly string[],
+  modifiers: LayerSelectionModifiers
+): LayerPanelSelection => {
+  if (!orderedIds.includes(layerId)) {
+    return selection;
+  }
+  if (modifiers.range) {
+    const anchorId = selection.anchorId && orderedIds.includes(selection.anchorId) ? selection.anchorId : layerId;
+    const start = orderedIds.indexOf(anchorId);
+    const end = orderedIds.indexOf(layerId);
+    const rangeIds = orderedIds.slice(Math.min(start, end), Math.max(start, end) + 1);
+    const selected = modifiers.additive ? new Set(selection.selectedIds) : new Set<string>();
+    rangeIds.forEach((id) => selected.add(id));
+    return { ...selection, anchorId, primaryId: layerId, selectedIds: orderedIds.filter((id) => selected.has(id)) };
+  }
+  if (modifiers.additive) {
+    const selected = new Set(selection.selectedIds);
+    const wasSelected = selected.has(layerId);
+    if (wasSelected) {
+      selected.delete(layerId);
+    } else {
+      selected.add(layerId);
+    }
+    const selectedIds = orderedIds.filter((id) => selected.has(id));
+    const primaryId = wasSelected
+      ? selection.primaryId === layerId || !selection.primaryId || !selected.has(selection.primaryId)
+        ? (selectedIds[0] ?? null)
+        : selection.primaryId
+      : layerId;
+    return { ...selection, anchorId: layerId, primaryId, selectedIds };
+  }
+  return { ...selection, anchorId: layerId, primaryId: layerId, selectedIds: [layerId] };
+};
+
 /** A non-empty type group: its key plus its members in global relative order. */
 export interface LayerGroup {
   key: LayerGroupKey;
@@ -108,6 +194,43 @@ export const reorderWithinGroup = (
     const from = groupIds.indexOf(activeId);
     const to = groupIds.indexOf(overId);
     return moveItem(groupIds, from, to);
+  });
+};
+
+/**
+ * Drag-reorders the selected members of the active layer's group as one block.
+ * Selections in other type groups stay put. Dragging an unselected row retains
+ * the normal single-row behaviour.
+ */
+export const reorderSelectionWithinGroup = (
+  layers: readonly CanvasLayerContract[],
+  activeId: string,
+  overId: string,
+  selectedIds: readonly string[]
+): string[] | null => {
+  const active = layers.find((layer) => layer.id === activeId);
+  const over = layers.find((layer) => layer.id === overId);
+  if (!active || !over || getLayerGroupKey(active) !== getLayerGroupKey(over)) {
+    return null;
+  }
+  const selected = new Set(selectedIds);
+  if (!selected.has(activeId)) {
+    return reorderWithinGroup(layers, activeId, overId);
+  }
+  return remapGroupOrder(layers, getLayerGroupKey(active), (groupIds) => {
+    const moving = groupIds.filter((id) => selected.has(id));
+    if (moving.length < 2) {
+      return moveItem(groupIds, groupIds.indexOf(activeId), groupIds.indexOf(overId));
+    }
+    if (selected.has(overId)) {
+      return null;
+    }
+    const activeIndex = groupIds.indexOf(activeId);
+    const overIndex = groupIds.indexOf(overId);
+    const remaining = groupIds.filter((id) => !selected.has(id));
+    const remainingOverIndex = remaining.indexOf(overId);
+    const insertAt = activeIndex < overIndex ? remainingOverIndex + 1 : remainingOverIndex;
+    return [...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)];
   });
 };
 

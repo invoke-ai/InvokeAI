@@ -1,13 +1,13 @@
 import type { CanvasDocumentContractV2, CanvasEngine } from '@workbench/canvas-engine/api';
-import type { LayerReorderKind } from '@workbench/canvasLayerOps';
+import type { LayerReorderKind, StructuralActions } from '@workbench/canvasLayerOps';
 import type { CanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 
 import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
 import {
   deleteLayerActions,
   duplicateLayerActions,
-  reorderIdsForHotkey,
   reorderLayerActions,
+  reorderSelectionWithinGroupsByKind,
 } from '@workbench/canvasLayerOps';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 
@@ -31,6 +31,31 @@ const REORDER_KINDS: Record<string, LayerReorderKind> = {
   'canvas.layerToFront': 'front',
 };
 
+const deleteSelectedLayerActions = (
+  layers: CanvasDocumentContractV2['layers'],
+  selectedIds: readonly string[],
+  selectedLayerId: string
+): StructuralActions | null => {
+  const selected = new Set(selectedIds);
+  const removed = layers.filter((layer) => selected.has(layer.id));
+  if (removed.length === 0 || removed.some((layer) => layer.isLocked)) {
+    return null;
+  }
+  if (removed.length === 1) {
+    return deleteLayerActions(removed[0]!, layers.indexOf(removed[0]!));
+  }
+  return {
+    forward: { ids: removed.map((layer) => layer.id), type: 'removeCanvasLayers' },
+    inverse: {
+      add: { index: 0, layers: removed },
+      enabledUpdates: [],
+      orderedIds: layers.map((layer) => layer.id),
+      selectedLayerId,
+      type: 'applyCanvasLayerStackMutation',
+    },
+  };
+};
+
 /**
  * Everything the canvas hotkey dispatcher reads or drives. The widget supplies
  * these from its render scope; keeping them as an explicit parameter is what
@@ -44,6 +69,7 @@ export interface CanvasHotkeyContext {
   /** A staged candidate is selected, so Delete discards it instead of touching layers. */
   readonly hasSelectedStagedCandidate: boolean;
   readonly isInteractionLocked: boolean;
+  readonly selectedLayerIds: readonly string[];
   readonly dispatch: CanvasProjectMutationDispatch;
   readonly copySelection: (cut: boolean) => void;
   readonly pasteFromClipboard: () => void;
@@ -101,7 +127,7 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
       return;
     }
     const currentIds = layers.map((layer) => layer.id);
-    const nextIds = reorderIdsForHotkey(currentIds, selectedIndex, reorderKind);
+    const nextIds = reorderSelectionWithinGroupsByKind(layers, ctx.selectedLayerIds, reorderKind);
     if (!nextIds) {
       return;
     }
@@ -115,9 +141,11 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     // Photoshop meaning. Only with no selection does it delete the layer.
     if (engine?.interaction.get('hasSelection')) {
       engine.selection.eraseSelection();
-    } else if (engine && selectedLayer && selectedIndex >= 0) {
-      const { forward, inverse } = deleteLayerActions(selectedLayer, selectedIndex);
-      engine.layers.commitStructural(t('widgets.canvas.commands.deleteLayer'), forward, inverse);
+    } else if (engine && selectedLayer && selectedIndex >= 0 && !selectedLayer.isLocked) {
+      const actions = deleteSelectedLayerActions(layers, ctx.selectedLayerIds, selectedLayer.id);
+      if (actions) {
+        engine.layers.commitStructural(t('widgets.canvas.commands.deleteLayer'), actions.forward, actions.inverse);
+      }
     }
   } else if (commandId === 'canvas.copySelection' || commandId === 'canvas.cutSelection') {
     ctx.copySelection(commandId === 'canvas.cutSelection');

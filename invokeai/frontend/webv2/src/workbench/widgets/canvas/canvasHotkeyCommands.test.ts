@@ -86,6 +86,7 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   hasStagingSlots: false,
   isInteractionLocked: false,
   pasteFromClipboard,
+  selectedLayerIds: ['a'],
   t: (key) => key,
   ...overrides,
 });
@@ -191,6 +192,7 @@ describe('layer reorder', () => {
     (commandId) => {
       const engine = run(commandId, {
         document: documentOf([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')], 'b'),
+        selectedLayerIds: ['b'],
       });
       expect(engine.layers.commitStructural).toHaveBeenCalledWith(
         'widgets.canvas.commands.reorderLayer',
@@ -213,6 +215,25 @@ describe('layer reorder', () => {
   it('is a no-op without an engine', () => {
     expect(() => executeCanvasHotkeyCommand('canvas.layerForward', contextOf({ engine: null }))).not.toThrow();
   });
+
+  it('moves the full multi-selection within each layer type group', () => {
+    const layers = [
+      rasterLayer('c1', { type: 'control' }),
+      rasterLayer('r1'),
+      rasterLayer('c2', { type: 'control' }),
+      rasterLayer('r2'),
+    ];
+    const engine = run('canvas.layerForward', {
+      document: documentOf(layers, 'c2'),
+      selectedLayerIds: ['c2', 'r2'],
+    });
+
+    expect(engine.layers.commitStructural).toHaveBeenCalledWith(
+      'widgets.canvas.commands.reorderLayer',
+      { orderedIds: ['c2', 'r2', 'c1', 'r1'], type: 'reorderCanvasLayers' },
+      { orderedIds: ['c1', 'r1', 'c2', 'r2'], type: 'reorderCanvasLayers' }
+    );
+  });
 });
 
 describe('delete: pixels vs layer', () => {
@@ -230,6 +251,26 @@ describe('delete: pixels vs layer', () => {
       expect.anything(),
       expect.anything()
     );
+  });
+
+  it('deletes the full Layers-panel selection as one history edit', () => {
+    const layers = [rasterLayer('a'), rasterLayer('b'), rasterLayer('c')];
+    const engine = run('canvas.deleteSelected', { document: documentOf(layers, 'a'), selectedLayerIds: ['a', 'c'] });
+
+    expect(engine.layers.commitStructural).toHaveBeenCalledWith(
+      'widgets.canvas.commands.deleteLayer',
+      { ids: ['a', 'c'], type: 'removeCanvasLayers' },
+      expect.objectContaining({ orderedIds: ['a', 'b', 'c'], selectedLayerId: 'a' })
+    );
+  });
+
+  it('does not delete when any selected layer is locked', () => {
+    const engine = run('canvas.deleteSelected', {
+      document: documentOf([rasterLayer('a'), rasterLayer('b', { isLocked: true })], 'a'),
+      selectedLayerIds: ['a', 'b'],
+    });
+
+    expect(engine.layers.commitStructural).not.toHaveBeenCalled();
   });
 
   it('does nothing with neither a selection nor a selected layer', () => {

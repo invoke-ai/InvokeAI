@@ -1,15 +1,18 @@
 import { Flex, Icon, Stack, Text } from '@chakra-ui/react';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
+import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { publishLayerPanelSelection, readLayerPanelSelection } from '@workbench/workbenchStore';
 import { LayersIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { LayerGroupKey } from './layerGroups';
+import type { LayerGroupKey, LayerSelectionModifiers } from './layerGroups';
 
-import { groupLayers } from './layerGroups';
+import { groupLayers, reconcileLayerPanelSelection, selectLayerInPanel } from './layerGroups';
 import { LayerGroupSection } from './LayerGroupSection';
+import { LayerMultiSelectionActions } from './LayerMultiSelectionActions';
 import { isLayerPropertiesGroupRequested, useCurrentLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { LayersPanelHeader } from './LayersPanelHeader';
 
@@ -23,7 +26,9 @@ import { LayersPanelHeader } from './LayersPanelHeader';
 export const LayersWidgetView = () => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
+  const projectId = useActiveProjectId();
   const dispatch = useCanvasProjectMutationDispatch();
+  const editingLocked = useCanvasDocumentEditingLocked(engine);
   const propertiesRequest = useCurrentLayerPropertiesRequest();
   const { layers, selectedLayerId } = useActiveProjectSelector(
     (project) => ({
@@ -34,10 +39,40 @@ export const LayersWidgetView = () => {
   );
 
   const groups = useMemo(() => groupLayers(layers), [layers]);
-
   // Collapse is transient panel UI state (not part of the canvas document / undo
   // history): a set of collapsed group keys, defaulting to expanded.
   const [collapsedGroups, setCollapsedGroups] = useState<Partial<Record<LayerGroupKey, boolean>>>({});
+  const allLayerIds = useMemo(() => groups.flatMap((group) => group.layers.map((layer) => layer.id)), [groups]);
+  const visibleLayerIds = groups.flatMap((group) =>
+    collapsedGroups[group.key] === true && !isLayerPropertiesGroupRequested(propertiesRequest, group.layers)
+      ? []
+      : group.layers.map((layer) => layer.id)
+  );
+  const [storedPanelSelection, setPanelSelection] = useState(() => {
+    const shared = readLayerPanelSelection(projectId, selectedLayerId);
+    return { ...shared, anchorId: shared.primaryId };
+  });
+  const selection = useMemo(
+    () => reconcileLayerPanelSelection(storedPanelSelection, projectId, allLayerIds, selectedLayerId),
+    [allLayerIds, projectId, selectedLayerId, storedPanelSelection]
+  );
+  if (selection !== storedPanelSelection) {
+    setPanelSelection(selection);
+  }
+  const selectedIds = selection.selectedIds;
+
+  const handleSelectLayer = useCallback(
+    (layerId: string, modifiers: LayerSelectionModifiers) => {
+      const next = selectLayerInPanel(selection, layerId, modifiers.range ? visibleLayerIds : allLayerIds, modifiers);
+      setPanelSelection(next);
+      publishLayerPanelSelection(next);
+      if (next.primaryId !== selectedLayerId) {
+        dispatch({ id: next.primaryId, type: 'setCanvasSelectedLayer' });
+      }
+    },
+    [allLayerIds, dispatch, selectedLayerId, selection, visibleLayerIds]
+  );
+
   const handleToggleCollapse = useCallback((groupKey: LayerGroupKey) => {
     setCollapsedGroups((prev) => ({ ...prev, [groupKey]: !prev[groupKey] }));
   }, []);
@@ -45,6 +80,16 @@ export const LayersWidgetView = () => {
   return (
     <Stack h="full">
       <LayersPanelHeader />
+      {selectedIds.length > 1 ? (
+        <LayerMultiSelectionActions
+          dispatch={dispatch}
+          editingLocked={editingLocked}
+          engine={engine}
+          layers={layers}
+          selectedIds={selectedIds}
+          selectedLayerId={selectedLayerId}
+        />
+      ) : null}
       {groups.length === 0 ? (
         <Flex
           align="center"
@@ -77,7 +122,9 @@ export const LayersWidgetView = () => {
                 collapsedGroups[group.key] === true && !isLayerPropertiesGroupRequested(propertiesRequest, group.layers)
               }
               layers={layers}
+              onSelectLayer={handleSelectLayer}
               onToggleCollapse={handleToggleCollapse}
+              selectedIds={selectedIds}
               selectedLayerId={selectedLayerId}
             />
           ))}

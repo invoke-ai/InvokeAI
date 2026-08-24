@@ -86,7 +86,10 @@ export type CanvasProjectMutation =
       add?: { index: number; layers: readonly CanvasLayerContract[] };
       removeIds?: readonly string[];
       enabledUpdates: readonly { id: string; isEnabled: boolean }[];
-      selectedLayerId: string | null;
+      lockedUpdates?: readonly { id: string; isLocked: boolean }[];
+      orderedIds?: readonly string[];
+      /** Omit to preserve the current selection, repairing it if that layer is removed. */
+      selectedLayerId?: string | null;
     }
   | { type: 'removeCanvasLayers'; ids: string[] }
   | { type: 'duplicateCanvasLayer'; sourceId: string; newId: string }

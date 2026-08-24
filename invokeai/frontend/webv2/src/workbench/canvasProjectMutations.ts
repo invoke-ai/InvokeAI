@@ -178,7 +178,14 @@ const applyLayerStackMutation = (
   }
   if (
     mutation.enabledUpdates.some((update) => !projectedIds.has(update.id)) ||
-    (mutation.selectedLayerId !== null && !projectedIds.has(mutation.selectedLayerId))
+    (mutation.lockedUpdates?.some((update) => !projectedIds.has(update.id)) ?? false) ||
+    (mutation.orderedIds !== undefined &&
+      (mutation.orderedIds.length !== projectedIds.size ||
+        new Set(mutation.orderedIds).size !== mutation.orderedIds.length ||
+        mutation.orderedIds.some((id) => !projectedIds.has(id)))) ||
+    (mutation.selectedLayerId !== undefined &&
+      mutation.selectedLayerId !== null &&
+      !projectedIds.has(mutation.selectedLayerId))
   ) {
     return document;
   }
@@ -193,22 +200,50 @@ const applyLayerStackMutation = (
     layers = layers.filter((layer) => !removeIds.has(layer.id));
     changed = true;
   }
+  if (mutation.orderedIds) {
+    const orderChanged = layers.some((layer, index) => layer.id !== mutation.orderedIds?.[index]);
+    if (orderChanged) {
+      const byId = new Map(layers.map((layer) => [layer.id, layer]));
+      layers = mutation.orderedIds.map((id) => byId.get(id)!);
+      changed = true;
+    }
+  }
   const enabledById = new Map(mutation.enabledUpdates.map((update) => [update.id, update.isEnabled]));
-  let enabledChanged = false;
+  const lockedById = new Map(mutation.lockedUpdates?.map((update) => [update.id, update.isLocked]) ?? []);
+  let baseChanged = false;
   const nextLayers = layers.map((layer) => {
     const isEnabled = enabledById.get(layer.id);
-    if (isEnabled === undefined || isEnabled === layer.isEnabled) {
+    const isLocked = lockedById.get(layer.id);
+    const enabledChanged = isEnabled !== undefined && isEnabled !== layer.isEnabled;
+    const lockedChanged = isLocked !== undefined && isLocked !== layer.isLocked;
+    if (!enabledChanged && !lockedChanged) {
       return layer;
     }
-    enabledChanged = true;
+    baseChanged = true;
     changed = true;
-    return { ...layer, isEnabled };
+    return {
+      ...layer,
+      ...(enabledChanged ? { isEnabled: isEnabled as boolean } : {}),
+      ...(lockedChanged ? { isLocked: isLocked as boolean } : {}),
+    };
   });
-  if (enabledChanged) {
+  if (baseChanged) {
     layers = nextLayers;
   }
-  changed ||= document.selectedLayerId !== mutation.selectedLayerId;
-  return changed ? { ...document, layers, selectedLayerId: mutation.selectedLayerId } : document;
+  const selectedLayerId =
+    mutation.selectedLayerId === undefined
+      ? document.selectedLayerId !== null && layers.some((layer) => layer.id === document.selectedLayerId)
+        ? document.selectedLayerId
+        : (layers[0]?.id ?? null)
+      : mutation.selectedLayerId;
+  changed ||= document.selectedLayerId !== selectedLayerId;
+  return changed
+    ? {
+        ...document,
+        layers,
+        selectedLayerId,
+      }
+    : document;
 };
 
 const addLayer = (document: CanvasDocumentContractV2, layer: CanvasLayerContract, index = 0) => {

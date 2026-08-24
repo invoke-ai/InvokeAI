@@ -20,7 +20,12 @@ import {
   type WorkbenchLoadOptions,
 } from './projects/syncedPersistence';
 import { getProjectWidgetValues } from './widgetState';
-import { createWorkbenchStore, type WorkbenchSnapshot, type WorkbenchInternalStore } from './workbenchStore';
+import {
+  createWorkbenchStore,
+  resetLayerPanelSelection,
+  type WorkbenchSnapshot,
+  type WorkbenchInternalStore,
+} from './workbenchStore';
 
 interface WorkbenchContextValue {
   activeProject: Project;
@@ -60,6 +65,8 @@ export const WorkbenchProvider = ({
   // The runtime is created inside the effect: disposal is terminal, so each
   // mount (including a StrictMode remount) must get its own instance.
   useMountEffect(() => {
+    const activeProject = store.getSnapshot().activeProject;
+    resetLayerPanelSelection(activeProject.id, activeProject.canvas.document.selectedLayerId);
     const persistenceRuntime = createWorkbenchPersistenceRuntime({
       aggregate: {
         ...store.internal.persistence,
@@ -117,6 +124,7 @@ export const WorkbenchProvider = ({
     persistenceRuntime.start();
 
     return () => {
+      resetLayerPanelSelection('', null);
       openProjectBroker.dispose();
       persistenceRuntime.dispose();
     };

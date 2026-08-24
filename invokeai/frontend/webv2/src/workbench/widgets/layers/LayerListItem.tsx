@@ -13,6 +13,8 @@ import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { LayerSelectionModifiers } from './layerGroups';
+
 import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
 import {
   CanvasLayerContextMenu,
@@ -82,9 +84,11 @@ interface LayerListItemProps {
   editingLocked: boolean;
   engine: LayerListItemEngine | null;
   index: number;
+  isPrimarySelected: boolean;
   isSelected: boolean;
   layer: CanvasLayerContract;
   layers: readonly CanvasLayerContract[];
+  onSelect: (layerId: string, modifiers: LayerSelectionModifiers) => void;
 }
 
 export const getLayerListItemInteractionState = (editingLocked: boolean) => ({
@@ -100,9 +104,11 @@ export const LayerListItem = ({
   editingLocked,
   engine,
   index,
+  isPrimarySelected,
   isSelected,
   layer,
   layers,
+  onSelect,
 }: LayerListItemProps) => {
   const { t } = useTranslation();
   const interaction = getLayerListItemInteractionState(editingLocked);
@@ -125,11 +131,20 @@ export const LayerListItem = ({
     [isDragging, transform, transition]
   );
 
-  const handleSelect = useCallback(() => {
-    if (interaction.canSelect && !isSelected) {
-      dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+  const handleSelect = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (interaction.canSelect) {
+        onSelect(layer.id, { additive: event.metaKey || event.ctrlKey, range: event.shiftKey });
+      }
+    },
+    [interaction.canSelect, layer.id, onSelect]
+  );
+
+  const selectForContextMenu = useCallback(() => {
+    if (!isSelected) {
+      onSelect(layer.id, { additive: false, range: false });
     }
-  }, [dispatch, interaction.canSelect, isSelected, layer.id]);
+  }, [isSelected, layer.id, onSelect]);
 
   const patchBase = useCallback(
     (label: string, forward: Partial<CanvasLayerContract>, inverse: Partial<CanvasLayerContract>) => {
@@ -211,11 +226,11 @@ export const LayerListItem = ({
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       if (!isSelected) {
-        dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+        selectForContextMenu();
       }
       setContextMenuTarget(createLayerMenuTargetFromContextEvent(layer.id, event));
     },
-    [dispatch, isSelected, layer.id]
+    [isSelected, layer.id, selectForContextMenu]
   );
 
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
@@ -250,6 +265,8 @@ export const LayerListItem = ({
       <Row
         {...sortableRowListeners}
         active={isSelected ? 'muted' : undefined}
+        borderStartColor={isPrimarySelected ? 'accent.solid' : 'transparent'}
+        borderStartWidth="2px"
         cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"
         gap="1.5"
@@ -268,8 +285,10 @@ export const LayerListItem = ({
         <chakra.button
           ref={setActivatorNodeRef}
           {...sortableAttributes}
+          aria-current={isPrimarySelected ? 'true' : undefined}
           aria-label={t('widgets.layers.actions.select', { name: layer.name })}
           aria-pressed={isSelected}
+          data-primary={isPrimarySelected || undefined}
           cursor={isDragging ? 'grabbing' : undefined}
           inset="0"
           position="absolute"

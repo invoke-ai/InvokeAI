@@ -15,6 +15,7 @@ const harness = vi.hoisted(() => ({ engine: null as CanvasEngine | null, project
 
 vi.mock('@dnd-kit/core', () => ({ useDndMonitor: () => undefined }));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useActiveProjectId: () => harness.project!.id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project!),
   useWorkbenchCommands: () => ({
     canvas: { apply: vi.fn() },

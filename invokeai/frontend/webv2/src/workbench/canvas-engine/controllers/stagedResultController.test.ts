@@ -58,7 +58,10 @@ describe('StagedResultController', () => {
                 : mutation.add
                   ? [...mutation.add.layers, ...reducerCanvas.document.layers]
                   : reducerCanvas.document.layers,
-              selectedLayerId: mutation.selectedLayerId,
+              selectedLayerId:
+                mutation.selectedLayerId === undefined
+                  ? reducerCanvas.document.selectedLayerId
+                  : mutation.selectedLayerId,
             },
           };
           expect(reducerAccepted()).toBe(true);

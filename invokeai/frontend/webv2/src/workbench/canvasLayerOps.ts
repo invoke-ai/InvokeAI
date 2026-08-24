@@ -44,6 +44,69 @@ export const reorderLayerActions = (currentIds: readonly string[], nextIds: read
 /** A z-reorder direction for the layer hotkeys. */
 export type LayerReorderKind = 'forward' | 'backward' | 'front' | 'back';
 
+const LAYER_TYPE_ORDER: readonly CanvasLayerContract['type'][] = [
+  'inpaint_mask',
+  'regional_guidance',
+  'control',
+  'raster',
+];
+
+const reorderSelectedIds = (
+  groupIds: readonly string[],
+  selected: ReadonlySet<string>,
+  kind: LayerReorderKind
+): string[] => {
+  if (kind === 'front' || kind === 'back') {
+    const moving = groupIds.filter((id) => selected.has(id));
+    const remaining = groupIds.filter((id) => !selected.has(id));
+    return kind === 'front' ? [...moving, ...remaining] : [...remaining, ...moving];
+  }
+  const next = [...groupIds];
+  if (kind === 'forward') {
+    for (let index = 1; index < next.length; index += 1) {
+      if (selected.has(next[index]!) && !selected.has(next[index - 1]!)) {
+        [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
+      }
+    }
+  } else {
+    for (let index = next.length - 2; index >= 0; index -= 1) {
+      if (selected.has(next[index]!) && !selected.has(next[index + 1]!)) {
+        [next[index], next[index + 1]] = [next[index + 1]!, next[index]!];
+      }
+    }
+  }
+  return next;
+};
+
+/** Moves every selected layer within its own type group, preserving group boundaries. */
+export const reorderSelectionWithinGroupsByKind = (
+  layers: readonly CanvasLayerContract[],
+  selectedIds: readonly string[],
+  kind: LayerReorderKind
+): string[] | null => {
+  const selected = new Set(selectedIds);
+  const nextIds = layers.map((layer) => layer.id);
+  let changed = false;
+  for (const type of LAYER_TYPE_ORDER) {
+    const slots: number[] = [];
+    const groupIds: string[] = [];
+    layers.forEach((layer, index) => {
+      if (layer.type === type) {
+        slots.push(index);
+        groupIds.push(layer.id);
+      }
+    });
+    const reordered = reorderSelectedIds(groupIds, selected, kind);
+    if (reordered.some((id, index) => id !== groupIds[index])) {
+      reordered.forEach((id, index) => {
+        nextIds[slots[index]!] = id;
+      });
+      changed = true;
+    }
+  }
+  return changed ? nextIds : null;
+};
+
 /** The destination index for a z-reorder of the layer at `index` in a stack of `count`. */
 export const reorderTargetIndex = (index: number, count: number, kind: LayerReorderKind): number => {
   switch (kind) {

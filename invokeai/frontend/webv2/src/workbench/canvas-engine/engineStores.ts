@@ -190,7 +190,7 @@ export const DEFAULT_BBOX_OPTIONS: BboxToolOptions = {
 };
 
 /** Smallest and largest brush/eraser diameters (document units) the size step clamps to. */
-export const MIN_BRUSH_SIZE = 1;
+export const MIN_BRUSH_SIZE = 0.1;
 export const MAX_BRUSH_SIZE = 2000;
 
 /** Sensible starting brush options. */

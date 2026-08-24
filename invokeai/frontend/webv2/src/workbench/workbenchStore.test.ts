@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { CanvasLayerContract } from './canvas-engine/contracts';
 import type { LayoutPreset, LayoutPresetRoute } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
@@ -7,7 +8,19 @@ import { clearProjectDiagnostics, configureDiagnostics, getProjectDiagnostics } 
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
 import { getProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState } from './workbenchState';
-import { createWorkbenchStore } from './workbenchStore';
+import { createWorkbenchStore, publishLayerPanelSelection, readLayerPanelSelection } from './workbenchStore';
+
+const paintLayer = (id: string): CanvasLayerContract => ({
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'raster',
+});
 
 const watchSelector = <Selected>(
   store: WorkbenchInternalStore,
@@ -55,6 +68,38 @@ describe('createWorkbenchStore', () => {
     expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
     expect(snapshot.projects).toHaveLength(1);
+  });
+
+  it('resets transient layer multi-selection across project switches even without a Layers panel', () => {
+    const store = createWorkbenchStore();
+    const firstProjectId = store.getSnapshot().activeProject.id;
+    store.commands.canvas.apply(firstProjectId, { layer: paintLayer('a'), type: 'addCanvasLayer' });
+    store.commands.canvas.apply(firstProjectId, { layer: paintLayer('b'), type: 'addCanvasLayer' });
+    publishLayerPanelSelection({ primaryId: 'b', projectId: firstProjectId, selectedIds: ['a', 'b'] });
+
+    const secondProject = store.commands.projects.create();
+    store.commands.projects.switchTo(firstProjectId);
+
+    expect(readLayerPanelSelection(firstProjectId, 'b').selectedIds).toEqual(['b']);
+    expect(readLayerPanelSelection(secondProject.id, null).selectedIds).toEqual([]);
+  });
+
+  it('does not resurrect stale secondaries after external primary changes in the same project', () => {
+    const store = createWorkbenchStore();
+    const projectId = store.getSnapshot().activeProject.id;
+    for (const id of ['a', 'b', 'c']) {
+      store.commands.canvas.apply(projectId, { layer: paintLayer(id), type: 'addCanvasLayer' });
+    }
+    // Model a panel-originated multi-selection: it publishes before dispatching
+    // its new primary, so the store preserves the selected set.
+    publishLayerPanelSelection({ primaryId: 'c', projectId, selectedIds: ['a', 'c'] });
+    store.commands.canvas.apply(projectId, { id: 'c', type: 'setCanvasSelectedLayer' });
+    expect(readLayerPanelSelection(projectId, 'c').selectedIds).toEqual(['a', 'c']);
+
+    store.commands.canvas.apply(projectId, { id: 'b', type: 'setCanvasSelectedLayer' });
+    store.commands.canvas.apply(projectId, { id: 'c', type: 'setCanvasSelectedLayer' });
+
+    expect(readLayerPanelSelection(projectId, 'c').selectedIds).toEqual(['c']);
   });
 
   it('coordinates layout preset activation across every command caller', async () => {

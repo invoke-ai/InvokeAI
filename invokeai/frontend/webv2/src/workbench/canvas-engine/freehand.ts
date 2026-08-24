@@ -185,6 +185,12 @@ export const strokeOutlinePolygon = (points: readonly StrokeSamplePoint[], opts:
   }
   const last = opts.last ?? false;
   const samples = decimateSamples(points, sampleSpacing(opts.size), last);
+  // perfect-freehand gives a lone sample a pen-oriented fallback dot whose
+  // diameter bottoms out around 2.5px. Repeating the tap makes it use the real
+  // outline size, which matters now that brushes can be smaller than one pixel.
+  if (samples.length === 1) {
+    samples.push(samples[0]!);
+  }
   const strokePoints = getStrokePoints(
     samples.map((p) => [p.x, p.y, p.pressure]),
     {

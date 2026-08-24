@@ -4070,6 +4070,84 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(after[0]).not.toBe(before[0]);
   });
 
+  it('applies stack-wide lock updates without replacing unrelated layers', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createRasterLayer('c'),
+    ]);
+    const before = getCanvas(state).document.layers;
+
+    state = workbenchReducer(state, {
+      enabledUpdates: [],
+      lockedUpdates: [
+        { id: 'a', isLocked: true },
+        { id: 'c', isLocked: true },
+      ],
+      selectedLayerId: 'a',
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    const after = getCanvas(state).document.layers;
+    expect(after.map((layer) => [layer.id, layer.isLocked])).toEqual([
+      ['a', true],
+      ['b', false],
+      ['c', true],
+    ]);
+    expect(after[1]).toBe(before[1]);
+  });
+
+  it('preserves the current selection when applying or undoing lock-only stack mutations', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createRasterLayer('c'),
+    ]);
+    state = workbenchReducer(state, { id: 'a', type: 'setCanvasSelectedLayer' });
+    state = workbenchReducer(state, {
+      enabledUpdates: [],
+      lockedUpdates: [{ id: 'a', isLocked: true }],
+      type: 'applyCanvasLayerStackMutation',
+    });
+    state = workbenchReducer(state, { id: 'c', type: 'setCanvasSelectedLayer' });
+    state = workbenchReducer(state, {
+      enabledUpdates: [],
+      lockedUpdates: [{ id: 'a', isLocked: false }],
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getCanvas(state).document.selectedLayerId).toBe('c');
+    expect(getCanvas(state).document.layers[0]?.isLocked).toBe(false);
+  });
+
+  it('repairs the selection when an omitted stack-mutation selection removes the current layer', () => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    state = workbenchReducer(state, { id: 'a', type: 'setCanvasSelectedLayer' });
+
+    state = workbenchReducer(state, {
+      enabledUpdates: [],
+      removeIds: ['a'],
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getLayerIds(state)).toEqual(['b']);
+    expect(getCanvas(state).document.selectedLayerId).toBe('b');
+  });
+
+  it('atomically restores deleted layers into their original non-contiguous order', () => {
+    const layers = [createRasterLayer('a'), createRasterLayer('b'), createRasterLayer('c')];
+    const removed = workbenchReducer(withCanvasLayers(createInitialWorkbenchState(), [layers[1]!]), {
+      add: { index: 0, layers: [layers[0]!, layers[2]!] },
+      enabledUpdates: [],
+      orderedIds: ['a', 'b', 'c'],
+      selectedLayerId: 'c',
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getLayerIds(removed)).toEqual(['a', 'b', 'c']);
+    expect(getCanvas(removed).document.selectedLayerId).toBe('c');
+  });
+
   it('returns the same document when a bulk visibility action changes nothing', () => {
     const state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
     const before = getCanvas(state).document;

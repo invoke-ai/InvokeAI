@@ -12,7 +12,13 @@ import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
+import { readLayerPanelSelection } from '@workbench/workbenchStore';
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,6 +70,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const canvasDispatch = useCanvasProjectMutationDispatch();
   const queries = useWorkbenchQueries();
   const engine = useCanvasEngine();
+  const projectId = useActiveProjectId();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
@@ -349,6 +356,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [engine]);
 
   const executeCanvasHotkey = useEffectEvent((commandId: string) => {
+    const selectedLayerIds = readLayerPanelSelection(projectId, document.selectedLayerId).selectedIds;
     executeCanvasHotkeyCommand(commandId, {
       copySelection,
       createLayerId,
@@ -359,6 +367,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       hasStagingSlots,
       isInteractionLocked,
       pasteFromClipboard,
+      selectedLayerIds,
       t,
     });
   });
