@@ -77,6 +77,11 @@ ip_adapter_sdxl_image_encoder = StarterModel(
 )
 # Note: This model is installed from the same source as the CLIPEmbed model below. The model contains both the image
 # encoder and the text encoder, but we need separate model entries so that they get loaded correctly.
+# Dependency-only (like the IP-Adapter encoders above): not listed in STARTER_MODELS,
+# because its name collides with the same-named FLUX CLIPEmbed text encoder in the
+# picker and it is no longer the imagemap index default. The FLUX IP-Adapter was
+# trained against these exact OpenAI weights, so its dependency must stay this
+# model, not the DFN2B one below.
 clip_vit_l_image_encoder = StarterModel(
     name="clip-vit-large-patch14",
     base=BaseModelType.Any,
@@ -2442,7 +2447,6 @@ STARTER_MODELS: list[StarterModel] = [
     t5_gguf_q3_k_s_encoder,
     t5_gguf_q6_k_encoder,
     clip_l_encoder,
-    clip_vit_l_image_encoder,
     dfn2b_clip_vit_l_image_encoder,
     siglip,
     flux_redux,
