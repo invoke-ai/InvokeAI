@@ -92,11 +92,47 @@ const makeFlux2Model = (variant: string) => ({
   variant,
 });
 
+// --- Flux2 [dev] model fixtures ---
+
+const flux2DevGGUFModel = {
+  key: 'flux2-dev-gguf',
+  hash: 'flux2-dev-gguf-hash',
+  name: 'FLUX.2 [dev] GGUF',
+  base: 'flux2',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 'dev',
+};
+
+const flux2DevDiffusersModel = {
+  key: 'flux2-dev-diffusers',
+  hash: 'flux2-dev-diff-hash',
+  name: 'FLUX.2 [dev]',
+  base: 'flux2',
+  type: 'main',
+  format: 'diffusers',
+  variant: 'dev',
+};
+
+const flux2DevSourceModelFixture = {
+  key: 'flux2-dev-source-diffusers',
+  hash: 'flux2-dev-src-hash',
+  name: 'FLUX.2 [dev] Source',
+  base: 'flux2',
+  type: 'main',
+  format: 'diffusers',
+  variant: 'dev',
+};
+
+const mistralEncoderFixture = { key: 'mistral-enc', name: 'Mistral Small 3', base: 'any', type: 'mistral_encoder' };
+
 // --- Mutable state shared by all tests ---
 
 let currentModel: Record<string, unknown> | null = null;
-let currentKleinVae: Record<string, unknown> | null = null;
+let currentFlux2Vae: Record<string, unknown> | null = null;
 let currentKleinQwen3: Record<string, unknown> | null = null;
+let currentFlux2Mistral: Record<string, unknown> | null = null;
+let devDiffusersModels: Record<string, unknown>[] = [];
 let diffusersModels: Record<string, unknown>[] = [];
 
 const mockParams = {
@@ -115,8 +151,9 @@ const mockParams = {
 vi.mock('features/controlLayers/store/paramsSlice', () => ({
   selectMainModelConfig: vi.fn(() => currentModel),
   selectParamsSlice: vi.fn(() => mockParams),
-  selectKleinVaeModel: vi.fn(() => currentKleinVae),
+  selectFlux2VaeModel: vi.fn(() => currentFlux2Vae),
   selectKleinQwen3EncoderModel: vi.fn(() => currentKleinQwen3),
+  selectFlux2DevMistralEncoderModel: vi.fn(() => currentFlux2Mistral),
 }));
 
 vi.mock('features/controlLayers/store/refImagesSlice', () => ({
@@ -173,6 +210,7 @@ vi.mock('features/nodes/util/graph/generation/addWatermarker', () => ({
 vi.mock('features/nodes/util/graph/generation/addRegions', () => ({ addRegions: vi.fn(() => []) }));
 vi.mock('features/nodes/util/graph/generation/addFLUXLoRAs', () => ({ addFLUXLoRAs: vi.fn() }));
 vi.mock('features/nodes/util/graph/generation/addFlux2KleinLoRAs', () => ({ addFlux2KleinLoRAs: vi.fn() }));
+vi.mock('features/nodes/util/graph/generation/addFlux2DevLoRAs', () => ({ addFlux2DevLoRAs: vi.fn() }));
 vi.mock('features/nodes/util/graph/generation/addFLUXFill', () => ({ addFLUXFill: vi.fn() }));
 vi.mock('features/nodes/util/graph/generation/addFLUXRedux', () => ({
   addFLUXReduxes: vi.fn(() => ({ addedFLUXReduxes: 0 })),
@@ -187,6 +225,7 @@ vi.mock('features/nodes/util/graph/generation/addIPAdapters', () => ({
 
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectFlux2DiffusersModels: vi.fn(() => diffusersModels),
+  selectFlux2DevDiffusersModels: vi.fn(() => devDiffusersModels),
 }));
 
 vi.mock('services/api/types', async () => {
@@ -237,9 +276,11 @@ const getLoaderNode = async () => {
 const resetState = () => {
   nextId = 0;
   currentModel = null;
-  currentKleinVae = null;
+  currentFlux2Vae = null;
   currentKleinQwen3 = null;
+  currentFlux2Mistral = null;
   diffusersModels = [];
+  devDiffusersModels = [];
 };
 
 beforeEach(resetState);
@@ -281,13 +322,13 @@ describe('buildFLUXGraph (FLUX.2 Klein)', () => {
   describe('Klein VAE / Qwen3 metadata', () => {
     it('persists separately selected Klein VAE and Qwen3 encoder into metadata', async () => {
       currentModel = makeFlux2Model('klein_9b_base');
-      currentKleinVae = { key: 'vae-1', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
+      currentFlux2Vae = { key: 'vae-1', hash: 'h', name: 'Klein VAE', base: 'flux2', type: 'vae' };
       currentKleinQwen3 = { key: 'q3-1', hash: 'h', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
 
       const { g } = await buildFLUXGraph(buildGraphArg());
 
       const metadata = getMetadata(g);
-      expect(metadata.vae).toEqual(currentKleinVae);
+      expect(metadata.vae).toEqual(currentFlux2Vae);
       expect(metadata.qwen3_encoder).toEqual(currentKleinQwen3);
     });
 
@@ -328,7 +369,7 @@ describe('buildFLUXGraph – FLUX.2 Klein qwen3_source_model', () => {
 
   it('does not set qwen3_source_model when main model is GGUF but standalone VAE and Qwen3 are both selected', async () => {
     currentModel = { ...flux2GGUFModel };
-    currentKleinVae = kleinVaeModelFixture;
+    currentFlux2Vae = kleinVaeModelFixture;
     currentKleinQwen3 = kleinQwen3EncoderModelFixture;
     diffusersModels = [diffusersSourceModelFixture];
 
@@ -348,7 +389,7 @@ describe('buildFLUXGraph – FLUX.2 Klein qwen3_source_model', () => {
 
   it('sets qwen3_source_model when only VAE is selected but Qwen3 is missing', async () => {
     currentModel = { ...flux2GGUFModel };
-    currentKleinVae = kleinVaeModelFixture;
+    currentFlux2Vae = kleinVaeModelFixture;
     currentKleinQwen3 = null;
     diffusersModels = [diffusersSourceModelFixture];
 
@@ -359,7 +400,7 @@ describe('buildFLUXGraph – FLUX.2 Klein qwen3_source_model', () => {
 
   it('sets qwen3_source_model when only Qwen3 is selected but VAE is missing', async () => {
     currentModel = { ...flux2GGUFModel };
-    currentKleinVae = null;
+    currentFlux2Vae = null;
     currentKleinQwen3 = kleinQwen3EncoderModelFixture;
     diffusersModels = [diffusersSourceModelFixture];
 
@@ -370,7 +411,7 @@ describe('buildFLUXGraph – FLUX.2 Klein qwen3_source_model', () => {
 
   it('passes standalone vae_model and qwen3_encoder_model when selected', async () => {
     currentModel = { ...flux2DiffusersModel };
-    currentKleinVae = kleinVaeModelFixture;
+    currentFlux2Vae = kleinVaeModelFixture;
     currentKleinQwen3 = kleinQwen3EncoderModelFixture;
 
     const loader = await getLoaderNode();
@@ -443,5 +484,168 @@ describe('buildFLUXGraph – FLUX.2 Klein qwen3_source_model', () => {
       const nodeTypes = Object.values(graph.nodes).map((n) => n.type);
       expect(nodeTypes).toContain('flux2_denoise');
     });
+  });
+});
+
+describe('buildFLUXGraph (FLUX.2 [dev])', () => {
+  const getDevLoader = (g: Graph): Record<string, unknown> | undefined => {
+    const entry = Object.entries(g.getGraph().nodes).find(([id]) => id.startsWith('flux2_dev_model_loader:'));
+    return entry?.[1] as Record<string, unknown> | undefined;
+  };
+
+  describe('graph structure', () => {
+    it('uses the dev model loader + text encoder and the shared flux2 denoise / vae decode', async () => {
+      currentModel = { ...flux2DevDiffusersModel };
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      const nodeIds = Object.keys(g.getGraph().nodes);
+      expect(nodeIds.some((id) => id.startsWith('flux2_dev_model_loader:'))).toBe(true);
+      expect(nodeIds.some((id) => id.startsWith('flux2_dev_text_encoder:'))).toBe(true);
+      // Must not fall through to the Klein loader/encoder.
+      expect(nodeIds.some((id) => id.startsWith('flux2_klein_model_loader:'))).toBe(false);
+      const nodeTypes = Object.values(g.getGraph().nodes).map((n) => n.type);
+      expect(nodeTypes).toContain('flux2_denoise');
+      expect(nodeTypes).toContain('flux2_vae_decode');
+    });
+
+    it('routes the dev conditioning through a collector (regional-guidance parity with Klein)', async () => {
+      currentModel = { ...flux2DevDiffusersModel };
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      const nodeTypes = Object.values(g.getGraph().nodes).map((n) => n.type);
+      expect(nodeTypes).toContain('collect');
+    });
+  });
+
+  describe('VAE / Mistral encoder metadata', () => {
+    it('persists a separately selected FLUX.2 VAE and Mistral encoder', async () => {
+      currentModel = { ...flux2DevDiffusersModel };
+      currentFlux2Vae = { key: 'vae-1', hash: 'h', name: 'FLUX.2 VAE', base: 'flux2', type: 'vae' };
+      currentFlux2Mistral = { ...mistralEncoderFixture };
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      const metadata = getMetadata(g);
+      expect(metadata.vae).toEqual(currentFlux2Vae);
+      expect(metadata.mistral_encoder).toEqual(currentFlux2Mistral);
+    });
+
+    it('omits vae / mistral_encoder when none are selected', async () => {
+      currentModel = { ...flux2DevDiffusersModel };
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      const metadata = getMetadata(g);
+      expect(metadata.vae).toBeUndefined();
+      expect(metadata.mistral_encoder).toBeUndefined();
+    });
+  });
+
+  describe('mistral_source_model auto-detection', () => {
+    it('does not set mistral_source_model when main model is diffusers', async () => {
+      currentModel = { ...flux2DevDiffusersModel };
+      devDiffusersModels = [flux2DevSourceModelFixture];
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      expect(getDevLoader(g)?.mistral_source_model).toBeUndefined();
+    });
+
+    it('sets mistral_source_model when main is GGUF and a dev diffusers model is available', async () => {
+      currentModel = { ...flux2DevGGUFModel };
+      devDiffusersModels = [flux2DevSourceModelFixture];
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      expect((getDevLoader(g)?.mistral_source_model as { key?: string } | undefined)?.key).toBe(
+        flux2DevSourceModelFixture.key
+      );
+    });
+
+    it('does not set mistral_source_model when GGUF but standalone VAE and Mistral encoder are both selected', async () => {
+      currentModel = { ...flux2DevGGUFModel };
+      currentFlux2Vae = { key: 'vae-1', hash: 'h', name: 'FLUX.2 VAE', base: 'flux2', type: 'vae' };
+      currentFlux2Mistral = { ...mistralEncoderFixture };
+      devDiffusersModels = [flux2DevSourceModelFixture];
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      expect(getDevLoader(g)?.mistral_source_model).toBeUndefined();
+    });
+
+    it('does not set mistral_source_model when GGUF and no dev diffusers model is available', async () => {
+      currentModel = { ...flux2DevGGUFModel };
+      devDiffusersModels = [];
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      expect(getDevLoader(g)?.mistral_source_model).toBeUndefined();
+    });
+
+    it('passes standalone vae_model and mistral_encoder_model when selected', async () => {
+      currentModel = { ...flux2DevGGUFModel };
+      currentFlux2Vae = { key: 'vae-1', hash: 'h', name: 'FLUX.2 VAE', base: 'flux2', type: 'vae' };
+      currentFlux2Mistral = { ...mistralEncoderFixture };
+      const { g } = await buildFLUXGraph(buildGraphArg());
+      const loader = getDevLoader(g);
+      expect(loader?.vae_model).toEqual(currentFlux2Vae);
+      expect(loader?.mistral_encoder_model).toEqual(currentFlux2Mistral);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FLUX.1: a complete SDNQ pipeline supplies its own T5 / CLIP / VAE
+//
+// The backend model loader falls back to the main model for any omitted component, but the graph
+// builder used to assert all three were selected, so that path was unreachable from the UI.
+// ---------------------------------------------------------------------------
+
+const flux1SdnqPipelineModel = {
+  key: 'flux1-sdnq-pipeline',
+  hash: 'flux1-sdnq-hash',
+  name: 'FLUX.1 dev SDNQ',
+  base: 'flux',
+  type: 'main',
+  format: 'sdnq_quantized',
+  variant: 'dev',
+  submodels: {
+    transformer: {},
+    vae: {},
+    text_encoder: {},
+    tokenizer: {},
+    text_encoder_2: {},
+    tokenizer_2: {},
+  },
+};
+
+const flux1SingleFileModel = {
+  key: 'flux1-gguf',
+  hash: 'flux1-gguf-hash',
+  name: 'FLUX.1 dev GGUF',
+  base: 'flux',
+  type: 'main',
+  format: 'gguf_quantized',
+  variant: 'dev',
+};
+
+const getFluxModelLoaderNode = async () => {
+  const { g } = await buildFLUXGraph(buildGraphArg());
+  const graph = g.getGraph();
+  const entry = Object.entries(graph.nodes).find(([id]) => id.startsWith('flux_model_loader:'));
+  return entry?.[1] as Record<string, unknown> | undefined;
+};
+
+describe('buildFLUXGraph – self-contained FLUX.1 SDNQ pipeline', () => {
+  it('omits the standalone component inputs when the pipeline ships them', async () => {
+    currentModel = { ...flux1SdnqPipelineModel };
+
+    const loader = await getFluxModelLoaderNode();
+
+    expect(loader).toBeDefined();
+    expect(loader!.t5_encoder_model).toBeUndefined();
+    expect(loader!.clip_embed_model).toBeUndefined();
+    expect(loader!.vae_model).toBeUndefined();
+    // The main model is still wired in — the node resolves the parts from it.
+    expect(loader!.model).toBeDefined();
+  });
+
+  it('still requires the standalone components for a single-file FLUX.1 model', async () => {
+    currentModel = { ...flux1SingleFileModel };
+
+    await expect(buildFLUXGraph(buildGraphArg())).rejects.toThrow(/T5 Encoder/);
+  });
+
+  it('still requires them when the pipeline is missing its T5 pair', async () => {
+    const { text_encoder_2: _te2, tokenizer_2: _tok2, ...withoutT5 } = flux1SdnqPipelineModel.submodels;
+    currentModel = { ...flux1SdnqPipelineModel, submodels: withoutT5 };
+
+    await expect(buildFLUXGraph(buildGraphArg())).rejects.toThrow(/T5 Encoder/);
   });
 });

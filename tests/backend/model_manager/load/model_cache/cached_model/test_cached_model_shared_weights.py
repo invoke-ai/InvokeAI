@@ -113,9 +113,10 @@ class _RepointFailsModule(DummyModule):
 
 
 def test_acquire_is_released_if_repoint_fails():
-    # First device registers the canonical weights (refcount 1).
+    # First device registers the canonical weights (refcount 1). The wrapper must stay bound: an
+    # abandoned wrapper's collection-time finalizer releases its reference (by design).
     store = SharedCpuWeightsStore()
-    CachedModelWithPartialLoad(DummyModule(), CPU, keep_ram_copy=True, shared_store=store, cache_key="m")
+    first = CachedModelWithPartialLoad(DummyModule(), CPU, keep_ram_copy=True, shared_store=store, cache_key="m")
     assert store.refcount("m") == 1
 
     # Second device adopts the canonical copy, but its re-point throws. The just-acquired reference
@@ -124,3 +125,4 @@ def test_acquire_is_released_if_repoint_fails():
         CachedModelWithPartialLoad(_RepointFailsModule(), CPU, keep_ram_copy=True, shared_store=store, cache_key="m")
 
     assert store.refcount("m") == 1  # back to just the first device, not leaked at 2
+    assert first.uses_shared_weights  # keep the first wrapper alive through the assertions above

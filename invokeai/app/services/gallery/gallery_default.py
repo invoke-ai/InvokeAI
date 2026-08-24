@@ -6,6 +6,7 @@ from invokeai.app.services.gallery.gallery_common import (
     BoardMediaSummary,
     GalleryItem,
     GalleryItemKind,
+    GalleryItemNames,
     GalleryItemNamesResult,
     GalleryItemRef,
 )
@@ -100,19 +101,24 @@ class SqliteGalleryService(GalleryServiceABC):
             total=image_count + video_count,
         )
 
-    def list_item_names(
+    def _query_name_rows(
         self,
-        starred_first: bool = True,
-        order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        origin: Optional[ResourceOrigin] = None,
-        categories: Optional[list[ImageCategory]] = None,
-        is_intermediate: Optional[bool] = None,
-        board_id: Optional[str] = None,
-        search_term: Optional[str] = None,
-        user_id: Optional[str] = None,
-        is_admin: bool = False,
-        created_date: Optional[str] = None,
-    ) -> GalleryItemNamesResult:
+        starred_first: bool,
+        order_dir: SQLiteDirection,
+        origin: Optional[ResourceOrigin],
+        categories: Optional[list[ImageCategory]],
+        is_intermediate: Optional[bool],
+        board_id: Optional[str],
+        search_term: Optional[str],
+        user_id: Optional[str],
+        is_admin: bool,
+        created_date: Optional[str],
+    ) -> tuple[list[sqlite3.Row], int]:
+        """Runs the ordered name query and returns its rows plus the starred count.
+
+        Shared by both name-list shapes so the deprecated `(kind, name)` variant and the flat
+        one can never drift apart in ordering or filtering.
+        """
         image_half, image_params, _ = self._build_half(
             kind="image",
             origin=origin,
@@ -158,8 +164,65 @@ class SqliteGalleryService(GalleryServiceABC):
             if starred_first:
                 starred_count = sum(1 for r in rows if r["starred"])
 
+        return rows, starred_count
+
+    def list_item_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_date: Optional[str] = None,
+    ) -> GalleryItemNamesResult:
+        rows, starred_count = self._query_name_rows(
+            starred_first=starred_first,
+            order_dir=order_dir,
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+            created_date=created_date,
+        )
         refs = [GalleryItemRef(kind=GalleryItemKind(row["kind"]), name=row["name"]) for row in rows]
         return GalleryItemNamesResult(items=refs, starred_count=starred_count, total_count=len(refs))
+
+    def get_item_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_date: Optional[str] = None,
+    ) -> GalleryItemNames:
+        rows, starred_count = self._query_name_rows(
+            starred_first=starred_first,
+            order_dir=order_dir,
+            origin=origin,
+            categories=categories,
+            is_intermediate=is_intermediate,
+            board_id=board_id,
+            search_term=search_term,
+            user_id=user_id,
+            is_admin=is_admin,
+            created_date=created_date,
+        )
+        # A list comprehension over the raw column, deliberately: building one model per row
+        # is what made the deprecated variant expensive.
+        names = [row["name"] for row in rows]
+        return GalleryItemNames(item_names=names, starred_count=starred_count, total_count=len(names))
 
     def get_dates(
         self,
@@ -372,6 +435,24 @@ class SqliteGalleryService(GalleryServiceABC):
         else:
             raise ValueError(f"Unknown kind: {kind}")
 
+        if board_id == "none":
+            from_clause = f"FROM {base_table}"
+            board_id_expr = "NULL"
+        elif board_id is not None:
+            # CROSS JOIN keeps explicit-board work proportional to board membership.
+            from_clause = (
+                f"FROM {join_table} CROSS JOIN {base_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+            )
+            board_id_expr = f"{join_table}.board_id"
+        elif names_only:
+            from_clause = f"FROM {base_table}"
+            board_id_expr = "NULL"
+        else:
+            from_clause = (
+                f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
+            )
+            board_id_expr = f"{join_table}.board_id"
+
         if names_only:
             select_cols = (
                 f"'{kind}' AS kind, "
@@ -388,13 +469,11 @@ class SqliteGalleryService(GalleryServiceABC):
                 f"{base_table}.{category_col} AS category, "
                 f"{base_table}.starred AS starred, "
                 f"{base_table}.is_intermediate AS is_intermediate, "
-                f"{join_table}.board_id AS board_id, "
+                f"{board_id_expr} AS board_id, "
                 f"{base_table}.created_at AS created_at, "
                 f"{duration_expr} AS duration, "
                 f"{fps_expr} AS fps"
             )
-
-        from_clause = f"FROM {base_table} LEFT JOIN {join_table} ON {join_table}.{name_col} = {base_table}.{name_col}"
 
         conditions = ""
         params: list[Union[int, str, bool]] = []
@@ -419,7 +498,11 @@ class SqliteGalleryService(GalleryServiceABC):
             params.append(created_date)
 
         if board_id == "none":
-            conditions += f" AND {join_table}.board_id IS NULL "
+            conditions += f""" AND NOT EXISTS (
+                SELECT 1
+                FROM {join_table}
+                WHERE {join_table}.{name_col} = {base_table}.{name_col}
+            ) """
             if user_id is not None and not is_admin:
                 conditions += f" AND {base_table}.user_id = ? "
                 params.append(user_id)
