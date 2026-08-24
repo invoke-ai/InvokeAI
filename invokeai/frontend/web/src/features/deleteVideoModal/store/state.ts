@@ -128,12 +128,19 @@ export const handleDeletions = async (video_names: string[], store: AppStore) =>
       // The displayed item survived (its delete failed) — keep viewing it and just prune
       // the deleted items from the multi-selection.
       //
-      // This is a mutation, not a pick. `imageSelected` would leave exactly the same
-      // state, but it is the action that means "the user asked to see this" — and while a
-      // generation is running the viewer answers that by lifting the progress overlay off
-      // the item for a couple of seconds. Deleting some *other* item is not a request to
-      // look at the one already on screen. See gallerySelectionSource.
-      dispatch(selectionChanged([lastSelected]));
+      // This is a mutation, not a pick. `imageSelected` would leave the same state in the
+      // ordinary case, but it is the action that means "the user asked to see this" — and
+      // while a generation is running the viewer answers that by lifting the progress
+      // overlay off the item for a couple of seconds. Deleting some *other* item is not a
+      // request to look at the one already on screen. See gallerySelectionSource.
+      //
+      // Filtered from the *live* selection rather than collapsed onto the pre-await
+      // snapshot: the user can select something else while the delete is in flight, and
+      // collapsing would both discard that and move the active item — which publishes as a
+      // change of active item and reveals anyway, the very flash this avoids. The fallback
+      // covers the case where everything they since selected was deleted.
+      const survivors = stateAfter.gallery.selection.filter((name) => !deletedNames.has(name));
+      dispatch(selectionChanged(survivors.length > 0 ? survivors : [lastSelected]));
     } else {
       const replacement =
         lastSelectedIndex >= 0 ? pickSelectionAfterDelete(galleryItemNames, lastSelectedIndex, deletedNames) : null;

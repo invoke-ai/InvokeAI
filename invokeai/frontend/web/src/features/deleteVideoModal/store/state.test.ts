@@ -76,52 +76,62 @@ const buildVideoFieldNode = (nodeId: string, videoName: string) => ({
   },
 });
 
-const buildStore = (selection: string[], failingNames: Set<string>, nodes: unknown[] = [], rejectAll = false) => {
+/**
+ * `selectionDuringDelete` re-points the store's selection the moment the delete request settles,
+ * standing in for the user selecting something else while the request is in flight. The rest of
+ * handleDeletions runs against that newer selection, as it does in the app.
+ */
+const buildStore = (
+  selection: string[],
+  failingNames: Set<string>,
+  nodes: unknown[] = [],
+  rejectAll = false,
+  selectionDuringDelete?: string[]
+) => {
   const dispatched: unknown[] = [];
+  let currentSelection = selection;
   const dispatch = vi.fn((action: unknown) => {
     dispatched.push(action);
     const typed = action as { type?: string; video_names?: string[] };
     if (typed?.type === 'videosApi/deleteVideos') {
       return {
-        unwrap: () =>
-          rejectAll
+        unwrap: () => {
+          if (selectionDuringDelete) {
+            currentSelection = selectionDuringDelete;
+          }
+          return rejectAll
             ? Promise.reject(new Error('delete failed'))
             : Promise.resolve({
                 deleted_videos: (typed.video_names ?? []).filter((name) => !failingNames.has(name)),
                 failed_videos: (typed.video_names ?? []).filter((name) => failingNames.has(name)),
                 affected_boards: ['none'],
-              }),
+              });
+        },
       };
     }
     return action;
   });
-  const getState = vi.fn(() => ({ gallery: { selection }, nodes: { present: { nodes } } }));
+  const getState = vi.fn(() => ({ gallery: { selection: currentSelection }, nodes: { present: { nodes } } }));
   return { store: { dispatch, getState } as unknown as AppStore, dispatched };
 };
 
 /**
- * The post-delete write to the selection, whichever action carried it. The two branches use
- * different actions deliberately: advancing to a neighbour *picks* an item (`imageSelected`),
- * while keeping the displayed item and dropping the deleted ones from the multi-selection is a
- * *mutation* (`selectionChanged`). `activeItem` is what the viewer displays either way, so the
- * existing expectations read the same; the tests that care about the distinction assert `type`.
+ * The post-delete write to the selection, whichever action carried it — returned raw, so the
+ * expectations pin the whole payload rather than just the item left displayed.
+ *
+ * The two branches use different actions deliberately: advancing to a neighbour *picks* an item
+ * (`imageSelected`), while keeping the displayed item and dropping the deleted ones from the
+ * multi-selection is a *mutation* (`selectionChanged`), which the viewer does not treat as the
+ * user asking to see anything.
  */
-const getSelectionChange = (dispatched: unknown[]) => {
-  const action = dispatched.find(
+const getSelectionChange = (dispatched: unknown[]) =>
+  dispatched.find(
     (candidate): candidate is { type: string; payload: string | string[] | null } =>
       !!candidate &&
       typeof candidate === 'object' &&
       ((candidate as { type?: string }).type === 'gallery/imageSelected' ||
         (candidate as { type?: string }).type === 'gallery/selectionChanged')
   );
-
-  if (!action) {
-    return undefined;
-  }
-
-  const { payload } = action;
-  return { type: action.type, activeItem: Array.isArray(payload) ? (payload.at(-1) ?? null) : payload };
-};
 
 const getVideoFieldChanges = (dispatched: unknown[]) =>
   dispatched.filter(
@@ -182,7 +192,7 @@ describe('handleDeletions selection behavior on partial failure', () => {
     await handleDeletions(['a.mp4', 'b.mp4'], store);
 
     // Before the fix, b.mp4 was excluded as "deleted" and the selection skipped to c.png.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', activeItem: 'b.mp4' });
+    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', payload: 'b.mp4' });
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ status: 'warning' }));
   });
 
@@ -199,7 +209,7 @@ describe('handleDeletions selection behavior on partial failure', () => {
     // very same selection, but it is the action that means "the user picked this", which makes the
     // viewer lift an in-progress generation's overlay off the video for two seconds. Deleting some
     // other video is not a request to look at this one.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/selectionChanged', activeItem: 'a.mp4' });
+    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/selectionChanged', payload: ['a.mp4'] });
     expect(imageSelected).not.toHaveBeenCalled();
   });
 
@@ -211,8 +221,29 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     // The displayed item is gone, so the viewer really does move to a different video: that is a
     // pick, and revealing it over a running generation is the point.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', activeItem: 'a.mp4' });
+    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', payload: 'a.mp4' });
     expect(imageSelected).toHaveBeenCalledWith('a.mp4');
+  });
+
+  it('leaves a selection made while the delete was in flight alone', async () => {
+    // The branch decides on a snapshot taken before the request, so by the time it runs the user
+    // may have selected something else. Collapsing onto the snapshot would discard that pick *and*
+    // move the active item back — which the viewer publishes as a change of active item and
+    // reveals, the very flash the mutation action avoids.
+    vi.mocked(selectLastSelectedItem).mockReturnValue('a.mp4');
+    const { store, dispatched } = buildStore(['a.mp4', 'b.mp4'], new Set(['a.mp4']), [], false, [
+      'a.mp4',
+      'b.mp4',
+      'c.png',
+    ]);
+
+    await handleDeletions(['a.mp4', 'b.mp4'], store);
+
+    expect(getSelectionChange(dispatched)).toEqual({
+      type: 'gallery/selectionChanged',
+      payload: ['a.mp4', 'c.png'],
+    });
+    expect(imageSelected).not.toHaveBeenCalled();
   });
 });
 
