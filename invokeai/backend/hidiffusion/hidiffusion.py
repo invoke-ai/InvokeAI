@@ -137,11 +137,29 @@ def _get_max_timesteps(info_dict: dict) -> int:
 
 
 def _get_switching_threshold_ratio(module: torch.nn.Module, presets: dict, preset_key: str) -> float:
-    """Resolve a threshold ratio without mutating process-global presets."""
+    """Resolve a threshold ratio for the executed part of the denoising schedule."""
     override = module.info["switching_threshold_overrides"].get(module.switching_threshold_ratio)
+    full_schedule_ratio = override if override is not None else presets[preset_key][module.switching_threshold_ratio]
+
+    denoising_start = module.info.get("denoising_start", 0.0)
+    denoising_end = module.info.get("denoising_end", 1.0)
+    if denoising_end <= denoising_start:
+        return 0.0
+
+    executed_schedule_ratio = (full_schedule_ratio - denoising_start) / (denoising_end - denoising_start)
+    return max(0.0, min(1.0, executed_schedule_ratio))
+
+
+def _should_use_aggressive_raunet(module: torch.nn.Module) -> bool:
+    """Resolve whether RAU-Net should be activated after denoising has already started."""
+    override = module.info.get("use_aggressive_raunet")
     if override is not None:
         return override
-    return presets[preset_key][module.switching_threshold_ratio]
+    if module.info["is_inpainting_task"]:
+        return inpainting_is_aggressive_raunet
+    if module.info["is_playground"]:
+        return playground_is_aggressive_raunet
+    return is_aggressive_raunet
 
 
 def make_diffusers_sdxl_controlnet_ppl(block_class):
@@ -1581,12 +1599,7 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
                             self, switching_threshold_ratio_dict, "sdxl_2048"
                         )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
                 else:
                     self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
@@ -1717,12 +1730,7 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
                             self, switching_threshold_ratio_dict, "sdxl_2048"
                         )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
 
                 else:
                     self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
@@ -1856,12 +1864,7 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                             self, switching_threshold_ratio_dict, "sdxl_2048"
                         )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
                 else:
                     self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
@@ -1939,12 +1942,7 @@ def make_diffusers_upsampler_block(block_class: Type[torch.nn.Module]) -> Type[t
                             self, switching_threshold_ratio_dict, "sdxl_2048"
                         )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
                 else:
                     self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
@@ -2063,6 +2061,10 @@ def apply_hidiffusion(
     is_controlnet_text_to_image: bool = False,
     t1_ratio: float | None = None,
     t2_ratio: float | None = None,
+    is_inpainting_task: bool | None = None,
+    use_aggressive_raunet: bool | None = None,
+    denoising_start: float = 0.0,
+    denoising_end: float = 1.0,
 ):
     """
     model: diffusers model. We support SD 1.5, 2.1, XL, XL Turbo.
@@ -2138,13 +2140,17 @@ def apply_hidiffusion(
         elif set(sdxl_module_key) < set(diffusion_model_module_key):
             name_or_path = "stabilityai/stable-diffusion-xl-base-1.0"
 
+    detected_inpainting_task = model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values()
     diffusion_model.info = {
         "size": None,
         "upsample_size": None,
         "hooks": [],
         "text_to_img_controlnet": has_controlnet and is_controlnet_text_to_image,
-        "is_inpainting_task": model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values(),
+        "is_inpainting_task": detected_inpainting_task if is_inpainting_task is None else is_inpainting_task,
         "is_playground": is_playground,
+        "use_aggressive_raunet": use_aggressive_raunet,
+        "denoising_start": denoising_start,
+        "denoising_end": denoising_end,
         "pipeline": model,
         "switching_threshold_overrides": {"T1_ratio": t1_ratio, "T2_ratio": t2_ratio},
     }

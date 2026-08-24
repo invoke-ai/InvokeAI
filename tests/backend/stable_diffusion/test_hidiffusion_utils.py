@@ -6,7 +6,9 @@ import pytest
 import torch
 
 from invokeai.backend.hidiffusion.hidiffusion import (
+    _get_switching_threshold_ratio,
     _resize_controlnet_residual,
+    _should_use_aggressive_raunet,
     make_diffusers_downsampler_block,
     switching_threshold_ratio_dict,
     text_to_img_controlnet_switching_threshold_ratio_dict,
@@ -394,6 +396,79 @@ def test_hidiffusion_ratio_overrides_are_isolated_between_overlapping_patches():
     assert applied_overrides == [(first_model, 0.2, 0.1), (second_model, 0.8, 0.9)]
     assert switching_threshold_ratio_dict == original_switching
     assert text_to_img_controlnet_switching_threshold_ratio_dict == original_controlnet
+
+
+def test_hidiffusion_patch_forwards_generation_context():
+    model = SimpleNamespace(unet=DummyUNet())
+
+    with (
+        patch("invokeai.backend.hidiffusion.hidiffusion.apply_hidiffusion") as mock_apply_hidiffusion,
+        patch("invokeai.backend.hidiffusion.hidiffusion.remove_hidiffusion"),
+    ):
+        with hidiffusion_patch(
+            model,
+            name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
+            is_inpainting_task=True,
+            use_aggressive_raunet=False,
+            denoising_start=0.6,
+            denoising_end=1.0,
+        ):
+            pass
+
+    kwargs = mock_apply_hidiffusion.call_args.kwargs
+    assert kwargs["is_inpainting_task"] is True
+    assert kwargs["use_aggressive_raunet"] is False
+    assert kwargs["denoising_start"] == 0.6
+    assert kwargs["denoising_end"] == 1.0
+
+
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end", "expected_ratio"),
+    [
+        (0.0, 1.0, 0.4),
+        (0.6, 1.0, 0.0),
+        (0.0, 0.2, 1.0),
+        (0.2, 0.6, 0.5),
+    ],
+)
+def test_hidiffusion_ratios_are_mapped_to_the_executed_denoising_range(
+    denoising_start: float, denoising_end: float, expected_ratio: float
+):
+    module = SimpleNamespace(
+        switching_threshold_ratio="T1_ratio",
+        info={
+            "switching_threshold_overrides": {"T1_ratio": None, "T2_ratio": None},
+            "denoising_start": denoising_start,
+            "denoising_end": denoising_end,
+        },
+    )
+
+    ratio = _get_switching_threshold_ratio(module, switching_threshold_ratio_dict, "sdxl_2048")
+
+    assert ratio == pytest.approx(expected_ratio)
+
+
+@pytest.mark.parametrize(
+    ("is_inpainting_task", "override", "expected"),
+    [
+        (False, False, False),
+        (True, True, True),
+        (True, None, False),
+        (False, None, True),
+    ],
+)
+def test_explicit_aggressive_raunet_setting_takes_precedence(
+    is_inpainting_task: bool, override: bool | None, expected: bool
+):
+    module = SimpleNamespace(
+        info={
+            "is_inpainting_task": is_inpainting_task,
+            "is_playground": False,
+            "use_aggressive_raunet": override,
+        }
+    )
+
+    assert _should_use_aggressive_raunet(module) is expected
 
 
 def test_sdxl_t2_override_controls_downsampler_at_2048_resolution():

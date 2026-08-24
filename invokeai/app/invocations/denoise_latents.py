@@ -926,6 +926,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
+                    is_inpainting_task=self.denoise_mask is not None,
+                    use_aggressive_raunet=False,
+                    denoising_start=self.denoising_start,
+                    denoising_end=self.denoising_end,
                 )
             )
 
@@ -1157,6 +1161,10 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
+                    is_inpainting_task=self.denoise_mask is not None,
+                    use_aggressive_raunet=False,
+                    denoising_start=self.denoising_start,
+                    denoising_end=self.denoising_end,
                 )
                 if self.hidiffusion
                 else nullcontext()
