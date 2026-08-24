@@ -62,6 +62,7 @@ describe('staged result project-port integration', () => {
     const selected = { ...candidate, placement: { ...candidate.placement, x: 90 } };
     store.commands.canvas.appendStagingCandidate({ candidate: first, projectId });
     store.commands.canvas.appendStagingCandidate({ candidate: selected, projectId });
+    store.commands.canvas.apply(projectId, { imageIndex: 1, type: 'setStagedImageIndex' });
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),

@@ -1583,7 +1583,21 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(activeProject.queue.items).toEqual([]);
   });
 
-  it('appends a workflow candidate to its explicit project and selects its resolved staging slot', () => {
+  it("keeps the selected workflow candidate when auto-switch is 'off'", () => {
+    let state = createInitialWorkbenchState();
+    const projectId = state.activeProjectId;
+    const placement = { height: 64, opacity: 1, width: 64, x: 0, y: 0 };
+    const firstCandidate = createStagingCandidate('first.png', 'layer-workflow:first', placement);
+    const secondCandidate = createStagingCandidate('second.png', 'layer-workflow:second', placement);
+
+    state = workbenchReducer(state, { candidate: firstCandidate, projectId, type: 'appendCanvasStagingCandidate' });
+    state = workbenchReducer(state, { candidate: secondCandidate, projectId, type: 'appendCanvasStagingCandidate' });
+
+    expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('off');
+    expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(0);
+  });
+
+  it("appends a workflow candidate to its explicit project and selects its resolved staging slot when auto-switch is 'latest'", () => {
     let state = createInitialWorkbenchState();
     const originProjectId = state.activeProjectId;
     const firstCandidate = createStagingCandidate('first.png', 'layer-workflow:first', {
@@ -1601,6 +1615,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       y: 17,
     });
 
+    state = workbenchReducer(state, { mode: 'latest', type: 'setCanvasStagingAutoSwitch' });
     state = workbenchReducer(state, { type: 'createProject' });
     const activeProjectId = state.activeProjectId;
     state = workbenchReducer(state, {
@@ -1627,6 +1642,33 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       kind: 'candidate',
     });
     expect(getProject(state, activeProjectId).canvas.stagingArea.pendingImages).toEqual([]);
+  });
+
+  it("selects the exact appended workflow candidate in 'latest' mode when candidate keys are duplicated", () => {
+    let state = createInitialWorkbenchState();
+    const projectId = state.activeProjectId;
+    const firstCandidate = createStagingCandidate('duplicate.png', 'layer-workflow:duplicate', {
+      height: 64,
+      opacity: 1,
+      width: 64,
+      x: 10,
+      y: 0,
+    });
+    const latestCandidate = {
+      ...firstCandidate,
+      placement: { ...firstCandidate.placement, x: 90 },
+    };
+
+    state = workbenchReducer(state, { mode: 'latest', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, { candidate: firstCandidate, projectId, type: 'appendCanvasStagingCandidate' });
+    state = workbenchReducer(state, { candidate: latestCandidate, projectId, type: 'appendCanvasStagingCandidate' });
+
+    const project = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(project.canvas, project.queue.items)[
+      project.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ candidate: { placement: { x: 90 } }, kind: 'candidate' });
   });
 
   it('accepts a workflow candidate at its own placement, scale, and opacity', () => {
@@ -1952,6 +1994,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       queueItemId: secondQueueItem.id,
       type: 'routeQueueItemResults',
     });
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
 
     expect(
       getCanvasStagingSlots(getCanvas(state), getActiveProject(state).queue.items).map((slot) => slot.kind)
@@ -1985,6 +2028,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       queueItemId: secondQueueItem.id,
       type: 'routeQueueItemResults',
     });
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
     state = workbenchReducer(state, { type: 'discardSelectedStagedImage' });
 
     expect(getActiveProject(state).canvas.stagingArea.pendingImages).toEqual([]);
@@ -2022,6 +2066,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     let state = submitGenerate(primeGenerate());
     const firstQueueItem = getActiveProject(state).queue.items[0];
 
+    state = workbenchReducer(state, { mode: 'latest', type: 'setCanvasStagingAutoSwitch' });
     state = workbenchReducer(state, {
       images: [createImage('candidate-1.png', firstQueueItem.id)],
       projectId: getActiveProject(state).id,
@@ -2225,6 +2270,38 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, { type: 'clearCompletedQueueItems' });
 
     expect(getActiveProject(state).queue.items.map((item) => item.status)).toEqual(['cancelled']);
+  });
+
+  it('keeps the selected staged candidate when completed queue history is cleared', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: [createImage('completed-result.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, {
+      candidate: createStagingCandidate('workflow-result.png', 'layer-workflow:result', {
+        height: 64,
+        opacity: 1,
+        width: 64,
+        x: 0,
+        y: 0,
+      }),
+      projectId: project.id,
+      type: 'appendCanvasStagingCandidate',
+    });
+    state = workbenchReducer(state, { type: 'clearCompletedQueueItems' });
+
+    const updatedProject = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(updatedProject.canvas, updatedProject.queue.items)[
+      updatedProject.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ candidate: { imageName: 'completed-result.png' }, kind: 'candidate' });
   });
 
   it('can mark stale reconciled queue items failed without creating notifications', () => {
@@ -4689,6 +4766,203 @@ describe('workbenchReducer canvas staging auto-switch + canvas submission', () =
 
     expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('latest');
     expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(1);
+  });
+
+  it("'off' keeps the current candidate selected as results arrive", () => {
+    let state = submitGenerate(primeGenerate());
+
+    state = workbenchReducer(state, { mode: 'latest', type: 'setCanvasStagingAutoSwitch' });
+    state = stageResults(state, ['first.png', 'second.png']);
+    state = workbenchReducer(state, { mode: 'off', type: 'setCanvasStagingAutoSwitch' });
+    state = stageResults(state, ['first.png', 'second.png', 'third.png']);
+
+    expect(getCanvas(state).stagingArea.autoSwitchMode).toBe('off');
+    expect(getCanvas(state).stagingArea.selectedImageIndex).toBe(1);
+  });
+
+  it("'off' keeps the selected candidate when a workflow result is inserted before it", () => {
+    let state = submitGenerate(primeGenerate());
+
+    state = stageResults(state, ['generated.png']);
+    state = workbenchReducer(state, {
+      candidate: createStagingCandidate('workflow.png', 'layer-workflow:result', {
+        height: 64,
+        opacity: 1,
+        width: 64,
+        x: 0,
+        y: 0,
+      }),
+      projectId: state.activeProjectId,
+      type: 'appendCanvasStagingCandidate',
+    });
+
+    const project = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(project.canvas, project.queue.items)[
+      project.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ candidate: { imageName: 'generated.png' }, kind: 'candidate' });
+  });
+
+  it("'off' keeps the selected logical slot when its placeholder becomes a partial result", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, { mode: 'progress', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12, 13],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, { mode: 'off', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [createImage('candidate-1.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+
+    const updatedProject = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(updatedProject.canvas, updatedProject.queue.items)[
+      updatedProject.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ itemIndex: 1, kind: 'candidate' });
+  });
+
+  it("'off' keeps a later placeholder selected when an earlier partial result arrives", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12, 13],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [createImage('candidate-1.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+
+    const updatedProject = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(updatedProject.canvas, updatedProject.queue.items)[
+      updatedProject.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+  });
+
+  it("'off' keeps a later placeholder selected when an earlier partial has no visible images", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 3 }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11, 12, 13],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      images: [],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+
+    const updatedProject = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(updatedProject.canvas, updatedProject.queue.items)[
+      updatedProject.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ itemIndex: 2, kind: 'placeholder' });
+  });
+
+  it("'off' keeps a candidate selected when an earlier final result has no visible images", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 1 }));
+    const firstProject = getActiveProject(state);
+    const firstQueueItem = firstProject.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11],
+      projectId: firstProject.id,
+      queueItemId: firstQueueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = submitGenerate(primeGenerate(state, { batchCount: 2, positivePrompt: 'second prompt' }));
+
+    const secondProject = getActiveProject(state);
+    const secondQueueItem = secondProject.queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: [createImage('candidate-1.png', secondQueueItem.id), createImage('candidate-2.png', secondQueueItem.id)],
+      projectId: secondProject.id,
+      queueItemId: secondQueueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, {
+      images: [],
+      projectId: firstProject.id,
+      queueItemId: firstQueueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    const updatedProject = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(updatedProject.canvas, updatedProject.queue.items)[
+      updatedProject.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ candidate: { imageName: 'candidate-1.png' }, kind: 'candidate' });
+  });
+
+  it("'off' keeps a candidate selected when an earlier placeholder is cancelled", () => {
+    let state = submitGenerate(primeGenerate(undefined, { batchCount: 1 }));
+    const firstProject = getActiveProject(state);
+    const firstQueueItem = firstProject.queue.items[0];
+
+    state = workbenchReducer(state, {
+      backendItemIds: [11],
+      projectId: firstProject.id,
+      queueItemId: firstQueueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = submitGenerate(primeGenerate(state, { batchCount: 2, positivePrompt: 'second prompt' }));
+
+    const secondProject = getActiveProject(state);
+    const secondQueueItem = secondProject.queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: [createImage('candidate-1.png', secondQueueItem.id), createImage('candidate-2.png', secondQueueItem.id)],
+      projectId: secondProject.id,
+      queueItemId: secondQueueItem.id,
+      type: 'routeQueueItemResults',
+    });
+    state = workbenchReducer(state, { imageIndex: 1, type: 'setStagedImageIndex' });
+    state = workbenchReducer(state, {
+      backendItemId: 11,
+      projectId: firstProject.id,
+      queueItemId: firstQueueItem.id,
+      type: 'markQueueItemBackendCancelled',
+    });
+
+    const updatedProject = getActiveProject(state);
+    const selectedSlot = getCanvasStagingSlots(updatedProject.canvas, updatedProject.queue.items)[
+      updatedProject.canvas.stagingArea.selectedImageIndex
+    ];
+
+    expect(selectedSlot).toMatchObject({ candidate: { imageName: 'candidate-1.png' }, kind: 'candidate' });
   });
 
   it("'progress' selects the active in-progress placeholder", () => {

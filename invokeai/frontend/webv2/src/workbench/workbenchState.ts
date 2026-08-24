@@ -142,6 +142,7 @@ import {
   getCanvasStagingSlotCount,
   getCanvasStagingSlots,
   getFirstCanvasPlaceholderSlotIndex,
+  type CanvasStagingSlot,
 } from './canvasStagingView';
 import { cascadeDefaultGeometry, clampSizeToMinimum, nextStackOrder } from './floatingWindows';
 import {
@@ -695,6 +696,42 @@ const getCanvasWithPendingImages = (
   },
 });
 
+const getSelectedCanvasStagingSlot = (project: Project): CanvasStagingSlot | undefined =>
+  getCanvasStagingSlots(project.canvas, project.queue.items)[project.canvas.stagingArea.selectedImageIndex];
+
+const findPreservedCanvasStagingSlotIndex = (
+  slots: CanvasStagingSlot[],
+  selectedSlot: CanvasStagingSlot | undefined
+): number => {
+  if (!selectedSlot) {
+    return -1;
+  }
+
+  if (selectedSlot.kind === 'candidate') {
+    const exactCandidateIndex = slots.findIndex(
+      (slot) => slot.kind === 'candidate' && slot.candidate === selectedSlot.candidate
+    );
+
+    if (exactCandidateIndex !== -1) {
+      return exactCandidateIndex;
+    }
+  }
+
+  const exactIdIndex = slots.findIndex((slot) => slot.id === selectedSlot.id);
+
+  if (exactIdIndex !== -1) {
+    return exactIdIndex;
+  }
+
+  if (selectedSlot.itemIndex === undefined) {
+    return -1;
+  }
+
+  return slots.findIndex(
+    (slot) => slot.queueItemId === selectedSlot.queueItemId && slot.itemIndex === selectedSlot.itemIndex
+  );
+};
+
 const getCanvasStagingCandidateSlotIndex = (
   project: Project,
   pendingImages: CanvasStagingCandidateContract[],
@@ -704,10 +741,14 @@ const getCanvasStagingCandidateSlotIndex = (
     return -1;
   }
 
-  return getCanvasStagingSlots(
-    getCanvasWithPendingImages(project.canvas, pendingImages),
-    project.queue.items
-  ).findIndex(
+  const slots = getCanvasStagingSlots(getCanvasWithPendingImages(project.canvas, pendingImages), project.queue.items);
+  const exactIndex = slots.findIndex((slot) => slot.kind === 'candidate' && slot.candidate === target);
+
+  if (exactIndex !== -1) {
+    return exactIndex;
+  }
+
+  return slots.findIndex(
     (slot) =>
       slot.kind === 'candidate' &&
       slot.candidate.sourceQueueItemId === target.sourceQueueItemId &&
@@ -718,11 +759,13 @@ const getCanvasStagingCandidateSlotIndex = (
 const resolveStagingSelectionIndexForSlots = ({
   incomingImages,
   pendingImages,
+  previousSelectedSlot,
   project,
   slotCount,
 }: {
   incomingImages: CanvasStagingCandidateContract[];
   pendingImages: CanvasStagingCandidateContract[];
+  previousSelectedSlot?: CanvasStagingSlot;
   project: Project;
   slotCount: number;
 }): number => {
@@ -743,14 +786,21 @@ const resolveStagingSelectionIndexForSlots = ({
       : clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
   }
 
-  if (incomingImages.length === 0) {
+  if (project.canvas.stagingArea.autoSwitchMode === 'off' || incomingImages.length === 0) {
+    const selectedSlot = previousSelectedSlot ?? getSelectedCanvasStagingSlot(project);
+    const preservedSlotIndex = findPreservedCanvasStagingSlotIndex(
+      getCanvasStagingSlots(getCanvasWithPendingImages(project.canvas, pendingImages), project.queue.items),
+      selectedSlot
+    );
+
+    if (preservedSlotIndex !== -1) {
+      return preservedSlotIndex;
+    }
+
     return clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
   }
 
-  const selectedImage =
-    project.canvas.stagingArea.autoSwitchMode === 'latest'
-      ? (pendingImages[pendingImages.length - 1] ?? incomingImages[incomingImages.length - 1])
-      : incomingImages[0];
+  const selectedImage = pendingImages[pendingImages.length - 1] ?? incomingImages[incomingImages.length - 1];
   const selectedSlotIndex = getCanvasStagingCandidateSlotIndex(project, pendingImages, selectedImage);
 
   return selectedSlotIndex === -1
@@ -762,7 +812,8 @@ const stageCanvasResultImages = (
   project: Project,
   queueItemId: string,
   images: GeneratedImageContract[],
-  sourceBackendItemIds?: readonly (number | undefined)[]
+  sourceBackendItemIds?: readonly (number | undefined)[],
+  previousSelectedSlot?: CanvasStagingSlot
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
 
@@ -807,6 +858,7 @@ const stageCanvasResultImages = (
         selectedImageIndex: resolveStagingSelectionIndexForSlots({
           incomingImages: newImages,
           pendingImages,
+          previousSelectedSlot,
           project,
           slotCount,
         }),
@@ -819,11 +871,13 @@ const stageCanvasResultImages = (
 const appendCanvasStagingCandidate = (project: Project, candidate: CanvasStagingCandidateContract): Project => {
   const appendedCandidate = normalizeStagingCandidate(candidate, project.canvas.document);
   const pendingImages = [...project.canvas.stagingArea.pendingImages, appendedCandidate];
-  const candidateKey = `${appendedCandidate.sourceQueueItemId}:${appendedCandidate.imageName}`;
   const slots = getCanvasStagingSlots(getCanvasWithPendingImages(project.canvas, pendingImages), project.queue.items);
-  const selectedImageIndex = slots
-    .map((slot) => (slot.kind === 'candidate' ? `${slot.candidate.sourceQueueItemId}:${slot.candidate.imageName}` : ''))
-    .lastIndexOf(candidateKey);
+  const selectedImageIndex = resolveStagingSelectionIndexForSlots({
+    incomingImages: [appendedCandidate],
+    pendingImages,
+    project,
+    slotCount: slots.length,
+  });
 
   return {
     ...project,
@@ -842,16 +896,20 @@ const appendCanvasStagingCandidate = (project: Project, candidate: CanvasStaging
   };
 };
 
-const clampCanvasStagingSelection = (project: Project): Project => {
-  const slotCount = getCanvasStagingSlotCount(project.canvas, project.queue.items);
+const clampCanvasStagingSelection = (project: Project, previousSelectedSlot?: CanvasStagingSlot): Project => {
+  const slots = getCanvasStagingSlots(project.canvas, project.queue.items);
+  const slotCount = slots.length;
   const placeholderIndex =
     project.canvas.stagingArea.autoSwitchMode === 'progress'
       ? getFirstCanvasPlaceholderSlotIndex(project.canvas, project.queue.items)
       : -1;
+  const preservedSlotIndex = findPreservedCanvasStagingSlotIndex(slots, previousSelectedSlot);
   const selectedImageIndex =
-    placeholderIndex === -1
-      ? clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount)
-      : placeholderIndex;
+    placeholderIndex !== -1
+      ? placeholderIndex
+      : preservedSlotIndex !== -1
+        ? preservedSlotIndex
+        : clampStagedImageIndex(project.canvas.stagingArea.selectedImageIndex, slotCount);
   const isVisible = slotCount > 0 ? project.canvas.stagingArea.isVisible : false;
 
   if (
@@ -2825,6 +2883,7 @@ const routeQueueItemPartialResults = (
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
   const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
+  const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
   const nextProject = updateQueueItem(project, queueItemId, (item) => ({
     ...item,
     completedBackendItemIds: item.completedBackendItemIds?.includes(backendItemId)
@@ -2837,12 +2896,17 @@ const routeQueueItemPartialResults = (
     return updateGalleryWithResultImages(nextProject, images);
   }
 
+  if (images.length === 0) {
+    return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+  }
+
   return clampCanvasStagingSelection(
     stageCanvasResultImages(
       nextProject,
       queueItemId,
       images,
-      images.map(() => backendItemId)
+      images.map(() => backendItemId),
+      previousSelectedSlot
     )
   );
 };
@@ -2850,6 +2914,7 @@ const routeQueueItemPartialResults = (
 const routeQueueItemResults = (project: Project, queueItemId: string, images: GeneratedImageContract[]): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
   const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
+  const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
   const nextProject = updateQueueItem(project, queueItemId, (item) => ({
     ...item,
     completedBackendItemIds: item.backendItemIds
@@ -2874,11 +2939,15 @@ const routeQueueItemResults = (project: Project, queueItemId: string, images: Ge
     return nextProject;
   }
 
+  if (images.length === 0) {
+    return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+  }
+
   const sourceBackendItemIds = queueItem?.backendItemIds?.filter(
     (backendItemId) => !queueItem.cancelledBackendItemIds?.includes(backendItemId)
   );
 
-  return stageCanvasResultImages(nextProject, queueItemId, images, sourceBackendItemIds);
+  return stageCanvasResultImages(nextProject, queueItemId, images, sourceBackendItemIds, previousSelectedSlot);
 };
 
 /**
@@ -3983,20 +4052,21 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'markQueueItemBackendSubmitted': {
-      return updateProjectById(state, action.projectId, (project) =>
-        clampCanvasStagingSelection(
-          updateQueueItem(project, action.queueItemId, (item) => {
-            const status = item.status === 'cancelled' ? 'cancelled' : 'running';
-            const hasSameBackendItemIds =
-              item.backendItemIds?.length === action.backendItemIds.length &&
-              item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
+      return updateProjectById(state, action.projectId, (project) => {
+        const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
+        const nextProject = updateQueueItem(project, action.queueItemId, (item) => {
+          const status = item.status === 'cancelled' ? 'cancelled' : 'running';
+          const hasSameBackendItemIds =
+            item.backendItemIds?.length === action.backendItemIds.length &&
+            item.backendItemIds.every((id, index) => id === action.backendItemIds[index]);
 
-            return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
-              ? item
-              : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
-          })
-        )
-      );
+          return item.backendBatchId === action.backendBatchId && hasSameBackendItemIds && item.status === status
+            ? item
+            : { ...item, backendBatchId: action.backendBatchId, backendItemIds: action.backendItemIds, status };
+        });
+
+        return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+      });
     }
     case 'setQueueItemStatus': {
       const project = state.projects.find((project) => project.id === action.projectId);
@@ -4010,15 +4080,16 @@ export const __workbenchReducerInternal = (
         return state;
       }
 
-      const nextState = updateProjectById(state, action.projectId, (project) =>
-        clampCanvasStagingSelection(
-          updateQueueItem(project, action.queueItemId, (item) => ({
-            ...item,
-            error: action.error,
-            status: action.status,
-          }))
-        )
-      );
+      const nextState = updateProjectById(state, action.projectId, (project) => {
+        const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
+        const nextProject = updateQueueItem(project, action.queueItemId, (item) => ({
+          ...item,
+          error: action.error,
+          status: action.status,
+        }));
+
+        return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+      });
 
       if (action.notify === false || (action.status !== 'failed' && action.status !== 'cancelled')) {
         return nextState;
@@ -4055,6 +4126,7 @@ export const __workbenchReducerInternal = (
       }
 
       return updateProjectById(state, action.projectId, (project) => {
+        const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
         const nextProject = updateQueueItem(project, action.queueItemId, (item) => {
           const cancelledBackendItemIds = mergeBackendItemId(item.cancelledBackendItemIds, action.backendItemId);
 
@@ -4065,7 +4137,7 @@ export const __workbenchReducerInternal = (
           };
         });
 
-        return clampCanvasStagingSelection(nextProject);
+        return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
       });
     }
     case 'routeQueueItemResults': {
@@ -4383,8 +4455,9 @@ export const __workbenchReducerInternal = (
       const targetProject = state.projects.find((project) => project.id === targetProjectId);
       const queueItem = targetProject?.queue.items.find((item) => item.id === action.queueItemId);
       const canCancelQueueItem = queueItem ? isCancellableQueueItem(queueItem) : false;
-      const nextState = updateProjectById(state, targetProjectId, (project) =>
-        clampCanvasStagingSelection({
+      const nextState = updateProjectById(state, targetProjectId, (project) => {
+        const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
+        const nextProject: Project = {
           ...project,
           queue: {
             items: project.queue.items.map((item) => {
@@ -4395,8 +4468,10 @@ export const __workbenchReducerInternal = (
               return { ...item, status: 'cancelled' };
             }),
           },
-        })
-      );
+        };
+
+        return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+      });
 
       if (!targetProject || !queueItem || !canCancelQueueItem) {
         return nextState;
@@ -4427,8 +4502,9 @@ export const __workbenchReducerInternal = (
 
       const nextState: WorkbenchState = {
         ...state,
-        projects: state.projects.map((project) =>
-          clampCanvasStagingSelection({
+        projects: state.projects.map((project) => {
+          const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
+          const nextProject: Project = {
             ...project,
             queue: {
               items: shouldApplyQueueBulkActionToProject(project, action.projectId)
@@ -4437,8 +4513,10 @@ export const __workbenchReducerInternal = (
                   )
                 : project.queue.items,
             },
-          })
-        ),
+          };
+
+          return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+        }),
       };
 
       return addNotification(
@@ -4468,8 +4546,9 @@ export const __workbenchReducerInternal = (
 
       const nextState: WorkbenchState = {
         ...state,
-        projects: state.projects.map((project) =>
-          clampCanvasStagingSelection({
+        projects: state.projects.map((project) => {
+          const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
+          const nextProject: Project = {
             ...project,
             queue: {
               items: shouldApplyQueueBulkActionToProject(project, action.projectId)
@@ -4480,8 +4559,10 @@ export const __workbenchReducerInternal = (
                   )
                 : project.queue.items,
             },
-          })
-        ),
+          };
+
+          return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+        }),
       };
 
       return addNotification(
@@ -4496,10 +4577,15 @@ export const __workbenchReducerInternal = (
     case 'clearCompletedQueueItems': {
       return {
         ...state,
-        projects: state.projects.map((project) => ({
-          ...project,
-          queue: { items: project.queue.items.filter((item) => !isClearableQueueItem(item)) },
-        })),
+        projects: state.projects.map((project) => {
+          const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
+          const nextProject: Project = {
+            ...project,
+            queue: { items: project.queue.items.filter((item) => !isClearableQueueItem(item)) },
+          };
+
+          return clampCanvasStagingSelection(nextProject, previousSelectedSlot);
+        }),
       };
     }
     case 'undoProjectChange': {
