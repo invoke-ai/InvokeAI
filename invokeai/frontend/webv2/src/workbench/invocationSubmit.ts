@@ -28,6 +28,7 @@ import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
 
+import { readCanvasOutputOnlyMaskedRegions } from './widgets/canvas/canvasSettings';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
 import { getProjectWidgetValues } from './widgetState';
@@ -179,6 +180,7 @@ const dispatchResolvedInvocation = (
       formatControlLayerError,
       generateValues: getProjectWidgetValues(project, 'generate'),
       models,
+      outputOnlyMaskedRegions: readCanvasOutputOnlyMaskedRegions(getProjectWidgetValues(project, 'canvas')),
       owner,
       positivePrompts,
       projectId: project.id,

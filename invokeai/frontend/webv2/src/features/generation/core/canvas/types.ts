@@ -82,6 +82,8 @@ export interface CompileCanvasGraphInput {
   noiseMaskImageName?: string | null;
   /** Denoising strength in (0, 1]. Consulted for `img2img` / `inpaint` / `outpaint`. */
   strength: number;
+  /** When true, preserve alpha outside the generated mask instead of compositing over the source image. */
+  outputOnlyMaskedRegions: boolean;
   /** Infill / coherence / mask-blur knobs. Defaults applied by the reader. */
   compositing?: CanvasCompositingSettings;
   /**

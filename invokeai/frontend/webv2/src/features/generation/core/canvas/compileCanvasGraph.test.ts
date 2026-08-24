@@ -109,6 +109,7 @@ const compile = (
     compositing?: Partial<CanvasCompositingSettings>;
     strength?: number;
     destination?: 'canvas' | 'gallery';
+    outputOnlyMaskedRegions?: boolean;
     controlLayers?: readonly ControlLayerGraphInput[];
     regionalGuidance?: readonly RegionalGuidanceInput[];
   } = {}
@@ -128,6 +129,7 @@ const compile = (
     mode,
     model,
     noiseMaskImageName: overrides.noiseMaskImageName ?? null,
+    outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
     projectSettings: PROJECT_SETTINGS,
     settings: settingsFor(model, {
       ...COMPONENT_OVERRIDES[model.base],
@@ -462,6 +464,7 @@ describe('compileCanvasGraph', () => {
           destination: 'canvas',
           mode: 'txt2img',
           model: fluxModel,
+          outputOnlyMaskedRegions: false,
           projectSettings: PROJECT_SETTINGS,
           settings: settingsFor(fluxModel),
           strength: 0.6,
@@ -530,6 +533,34 @@ describe('compileCanvasGraph — inpaint per base', () => {
       (edge) => edge.source.node_id === metadata.id && edge.destination.field === 'metadata'
     );
     expect(metaEdge?.destination.node_id).toBe('canvas_output');
+  });
+
+  it('outputs only the generated mask region with transparency when requested', () => {
+    const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: true });
+
+    const output = backendGraph.nodes.canvas_output;
+    expect(output?.type).toBe('apply_mask_to_image');
+    expect(output?.invert_mask).toBe(true);
+    expect(output?.is_intermediate).toBe(true);
+    expect(backendGraph.nodes.canvas_l2i?.is_intermediate).toBe(true);
+    expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_l2i');
+    expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+    expect(output?.layer_base).toBeUndefined();
+
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    const metaEdge = backendGraph.edges.find(
+      (edge) => edge.source.node_id === metadata.id && edge.destination.field === 'metadata'
+    );
+    expect(metaEdge?.destination.node_id).toBe('canvas_output');
+  });
+
+  it('composites the generated mask region over the initial image when masked-only output is disabled', () => {
+    const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: false });
+
+    expect(backendGraph.nodes.canvas_output).toMatchObject({
+      layer_base: { image_name: 'canvas-composite.png' },
+      type: 'invokeai_img_blend',
+    });
   });
 
   it('wires a UNet edge into create_gradient_mask only for SD-family models', () => {

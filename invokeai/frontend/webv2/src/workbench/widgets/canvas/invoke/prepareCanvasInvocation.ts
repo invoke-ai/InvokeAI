@@ -121,6 +121,8 @@ export interface RunCanvasInvocationDeps {
   strength: number;
   /** Persisted compositing settings (infill / coherence / mask blur), defaulted + clamped. */
   compositing: CanvasCompositingSettings;
+  /** Preserve transparency outside the generated mask instead of compositing over the source image. */
+  outputOnlyMaskedRegions: boolean;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /** Localizes a control-layer rejection; defaults to the English validation sentence. */
   formatControlLayerError?: (code: ControlValidationReason, layerName: string) => string;
@@ -389,6 +391,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
       mode,
       model,
       noiseMaskImageName: composites.noiseMaskImageName,
+      outputOnlyMaskedRegions: deps.outputOnlyMaskedRegions,
       projectSettings: deps.projectSettings,
       randDevice: deps.randDevice,
       regionalGuidance: regions.toGraphInputs(composites.regionalMaskImages),
@@ -457,6 +460,8 @@ export interface PrepareCanvasInvocationArgs {
    * (`readCanvasCompositingSettings`). Falls back to legacy defaults when omitted.
    */
   compositing?: CanvasCompositingSettings;
+  /** Preserve transparency outside the generated mask. Defaults to legacy behavior (enabled). */
+  outputOnlyMaskedRegions?: boolean;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /** Localizes a control-layer rejection; defaults to the English validation sentence. */
   formatControlLayerError?: (code: ControlValidationReason, layerName: string) => string;
@@ -491,6 +496,7 @@ export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs)
     inFlight: inFlightProjects,
     inFlightKey: `${owner.epoch}:${args.projectId}`,
     models: args.models,
+    outputOnlyMaskedRegions: args.outputOnlyMaskedRegions ?? true,
     projectId: args.projectId,
     projectSettings: args.projectSettings,
     randDevice: resolveRandDeviceMetadata(args.projectSettings.useCpuNoise, getGenerationDevicesSnapshot().options),

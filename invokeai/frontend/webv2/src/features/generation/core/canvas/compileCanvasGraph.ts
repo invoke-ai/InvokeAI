@@ -289,9 +289,9 @@ const addInfillNode = (
 
 /**
  * Shared inpaint/outpaint tail: gradient denoise mask → denoise, expand-with-fade,
- * and the composite-back blend (`canvas_output`). `maskSource` supplies the
- * grayscale mask feeding `create_gradient_mask`; `initialImageName` is the base
- * to paste the decoded result back onto.
+ * and the final `canvas_output`. The output either retains transparency outside
+ * the generated region or composites back over the source image, depending on
+ * `outputOnlyMaskedRegions`.
  */
 const graftMaskTail = (
   graph: BackendGraphContract,
@@ -304,14 +304,17 @@ const graftMaskTail = (
     initialImageName: string;
     compositing: CanvasCompositingSettings;
     destination: CompileCanvasGraphInput['destination'];
+    outputOnlyMaskedRegions: boolean;
     /** Either a fixed mask image field or an edge-fed source node. */
     gradientMaskImage?: { image_name: string };
     gradientMaskEdge?: { node: BackendInvocationContract; field: string };
   }
 ): void => {
-  const { compositing, denoise, destination, i2lType, initialImageName, settings, vaeSource } = args;
+  const { compositing, denoise, destination, i2lType, initialImageName, outputOnlyMaskedRegions, settings, vaeSource } =
+    args;
 
-  // Demote the base decode to an intermediate `canvas_l2i`; the blend becomes `canvas_output`.
+  // Demote the base decode to an intermediate `canvas_l2i`; the final mask or
+  // composite node claims `canvas_output`.
   const l2i = renameNode(graph, 'canvas_output', 'canvas_l2i');
   l2i.is_intermediate = true;
 
@@ -344,20 +347,28 @@ const graftMaskTail = (
   });
   addEdge(graph, gradientMask, 'expanded_mask_area', expandMask, 'mask');
 
-  const blend = addNode(graph, {
-    id: 'canvas_output',
-    is_intermediate: destination === 'canvas',
-    layer_base: { image_name: initialImageName },
-    type: 'invokeai_img_blend',
-    use_cache: false,
-  });
-  addEdge(graph, l2i, 'image', blend, 'layer_upper');
-  addEdge(graph, expandMask, 'image', blend, 'mask');
+  const output = outputOnlyMaskedRegions
+    ? addNode(graph, {
+        id: 'canvas_output',
+        invert_mask: true,
+        is_intermediate: destination === 'canvas',
+        type: 'apply_mask_to_image',
+        use_cache: false,
+      })
+    : addNode(graph, {
+        id: 'canvas_output',
+        is_intermediate: destination === 'canvas',
+        layer_base: { image_name: initialImageName },
+        type: 'invokeai_img_blend',
+        use_cache: false,
+      });
+  addEdge(graph, l2i, 'image', output, outputOnlyMaskedRegions ? 'image' : 'layer_upper');
+  addEdge(graph, expandMask, 'image', output, 'mask');
 
   // The base builder wired core_metadata → the decode's `metadata`; `renameNode`
   // followed it onto the (now intermediate) canvas_l2i. Re-point it to the final
-  // blend so the saved image carries generation metadata (invokeai_img_blend is
-  // WithMetadata). Board fields, when present, ride the same node.
+  // output so the saved image carries generation metadata. Both possible output
+  // nodes are WithMetadata; board fields, when present, ride the same node.
   const metadataEdge = graph.edges.find(
     (edge) => edge.destination.node_id === 'canvas_l2i' && edge.destination.field === 'metadata'
   );
@@ -428,6 +439,7 @@ const graftInpaint = (
     i2lType,
     initialImageName,
     model,
+    outputOnlyMaskedRegions: input.outputOnlyMaskedRegions,
     settings: input.settings,
     vaeSource,
   });
@@ -492,6 +504,7 @@ const graftOutpaint = (
     i2lType,
     initialImageName,
     model,
+    outputOnlyMaskedRegions: input.outputOnlyMaskedRegions,
     settings: input.settings,
     vaeSource,
   });

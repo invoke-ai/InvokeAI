@@ -2256,6 +2256,7 @@
         "invertBrushScroll": "Invert scroll for brush size",
         "label": "Canvas settings",
         "logDebugInfo": "Log debug info",
+        "outputOnlyMaskedRegions": "Output only generated regions",
         "ruleOfThirds": "Rule of thirds",
         "sections": {
           "behavior": "Behavior",

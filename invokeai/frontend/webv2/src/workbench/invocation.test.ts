@@ -103,8 +103,11 @@ const createGenerateValues = (
   ...overrides,
 });
 
-const getActiveProject = (values: GenerateWidgetValues) => {
-  const state = workbenchReducer(createInitialWorkbenchState(), { type: 'setGenerateSettings', values });
+const getActiveProject = (values: GenerateWidgetValues, canvasValues?: Record<string, unknown>) => {
+  let state = workbenchReducer(createInitialWorkbenchState(), { type: 'setGenerateSettings', values });
+  if (canvasValues) {
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: canvasValues, widgetId: 'canvas' });
+  }
   const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
 
   expect(project).toBeDefined();
@@ -364,7 +367,8 @@ describe('submitResolvedInvocation', () => {
 
   it('routes a canvas source through prepareCanvasInvocation and does not dispatch a resolved snapshot', () => {
     const project = getActiveProject(
-      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae }),
+      { outputOnlyMaskedRegions: false }
     );
     const commands = createWorkbenchStore().commands;
     const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
@@ -379,6 +383,7 @@ describe('submitResolvedInvocation', () => {
     // The resolved destination rides through so a Canvas source can target the Gallery.
     expect(prepareCanvasInvocation.mock.calls[0]?.[0]).toMatchObject({
       destination: 'gallery',
+      outputOnlyMaskedRegions: false,
       owner,
       projectId: project.id,
     });

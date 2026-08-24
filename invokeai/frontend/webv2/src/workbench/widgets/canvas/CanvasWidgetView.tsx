@@ -100,8 +100,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       return;
     }
     for (const setting of CANVAS_SETTINGS) {
-      // Only engine-backed settings feed a store; React-consumed ones (e.g.
-      // showProgressOnCanvas, read below) have no store and are skipped here.
+      // Only engine-backed settings feed a store; settings consumed elsewhere
+      // in the frontend have no store and are skipped here.
       if (setting.store) {
         engine.interaction.set(setting.store, settings[setting.key]);
       }
