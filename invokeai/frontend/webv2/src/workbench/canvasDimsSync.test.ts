@@ -15,11 +15,12 @@ const dispatchCanvas = (store: ReturnType<typeof createWorkbenchStore>, mutation
   store.commands.canvas.apply(store.getState().activeProjectId, mutation);
 };
 
-const snapshot = (bboxW: number, bboxH: number, dimsW: number, dimsH: number): CanvasDimsSnapshot => ({
+const snapshot = (bboxW: number, bboxH: number, dimsW: number, dimsH: number, grid = 8): CanvasDimsSnapshot => ({
   bboxHeight: bboxH,
   bboxWidth: bboxW,
   dimsHeight: dimsH,
   dimsWidth: dimsW,
+  grid,
 });
 
 describe('reconcileCanvasDims (pure)', () => {
@@ -120,21 +121,38 @@ describe('reconcileCanvasDims (pure)', () => {
       bbox: bbox(512, 512),
       dims: { height: 100, width: 100 },
       grid: 16,
-      prev: snapshot(512, 512, 512, 512),
+      prev: snapshot(512, 512, 512, 512, 16),
     });
 
     expect(result).toEqual({ bbox: { height: 96, width: 96, x: 0, y: 0 }, kind: 'set-bbox' });
   });
 
-  it('clamps a sub-grid dimension up to the grid minimum', () => {
+  it('clamps a tiny dimension up to the shared generation minimum', () => {
     const result = reconcileCanvasDims({
       bbox: bbox(512, 512),
       dims: { height: 1, width: 1 },
       grid: 16,
-      prev: snapshot(512, 512, 512, 512),
+      prev: snapshot(512, 512, 512, 512, 16),
     });
 
-    expect(result).toEqual({ bbox: { height: 16, width: 16, x: 0, y: 0 }, kind: 'set-bbox' });
+    expect(result).toEqual({ bbox: { height: 64, width: 64, x: 0, y: 0 }, kind: 'set-bbox' });
+  });
+
+  it('clamps an oversized bbox to the shared processing maximum without changing its footprint', () => {
+    const result = reconcileCanvasDims({
+      bbox: bbox(5000, 6000),
+      dims: { height: 512, width: 512 },
+      grid: 16,
+      prev: snapshot(512, 512, 512, 512, 16),
+    });
+
+    expect(result).toEqual({
+      aspectRatioId: 'Free',
+      aspectRatioValue: 5 / 6,
+      height: 4096,
+      kind: 'patch-dims',
+      width: 4096,
+    });
   });
 
   it('no-ops the dims->bbox direction when the snapped size already matches the bbox', () => {
@@ -142,7 +160,7 @@ describe('reconcileCanvasDims (pure)', () => {
       bbox: bbox(96, 96),
       dims: { height: 100, width: 100 },
       grid: 16,
-      prev: snapshot(96, 96, 96, 96),
+      prev: snapshot(96, 96, 96, 96, 16),
     });
 
     expect(result).toEqual({ kind: 'none' });
@@ -195,6 +213,7 @@ describe('reconcileCanvasDims (pure)', () => {
 });
 
 const model: MainModelConfig = { base: 'sdxl', key: 'test-model', name: 'Test Model', type: 'main' };
+const flux2Model: MainModelConfig = { base: 'flux2', key: 'test-flux2-model', name: 'Test FLUX.2 Model', type: 'main' };
 
 const getActiveGenerate = (state: WorkbenchState) => {
   const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
@@ -266,6 +285,32 @@ describe('createCanvasDimsSync (wiring)', () => {
     sync.dispose();
   });
 
+  it('snaps an off-grid bbox and generation dimensions to the active model grid', () => {
+    const { getSyncDispatches, store, sync } = setupCanvasStore();
+
+    dispatchCanvas(store, { bbox: { height: 503, width: 501, x: 32, y: 48 }, type: 'setCanvasBbox' });
+
+    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
+    expect(nextBbox).toEqual({ height: 503, width: 501, x: 32, y: 48 });
+    expect(values.width).toBe(504);
+    expect(values.height).toBe(504);
+    expect(getSyncDispatches()).toBe(1);
+    sync.dispose();
+  });
+
+  it('re-snaps an agreed bbox and dimensions when the model changes to a stricter grid', () => {
+    const { store, sync } = setupCanvasStore();
+
+    dispatchCanvas(store, { bbox: { height: 504, width: 504, x: 32, y: 48 }, type: 'setCanvasBbox' });
+    store.commands.generation.patchSettings({ model: flux2Model, modelKey: flux2Model.key });
+
+    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
+    expect(nextBbox).toEqual({ height: 504, width: 504, x: 32, y: 48 });
+    expect(values.width).toBe(512);
+    expect(values.height).toBe(512);
+    sync.dispose();
+  });
+
   it('a bbox-driven ratio is what a subsequent constrained width edit uses (not the pre-drag ratio)', () => {
     const { store, sync } = setupCanvasStore();
 
@@ -314,15 +359,14 @@ describe('createCanvasDimsSync (wiring)', () => {
     const before = getSyncDispatches();
 
     // 501 is not a multiple of the sdxl grid (8): dims -> bbox must snap it,
-    // and the bbox -> dims echo from that snapped bbox must not re-trigger
-    // another round of reconciliation (the snapped bbox and the still-501-wide
-    // dims disagree by construction, but the sync's re-entrancy guard must
-    // still hold the total dispatch count for this one external change to 1).
+    // then write the valid value back to the dimensions. The re-entrancy guard
+    // must keep those two bounded system writes from echoing indefinitely.
     store.commands.generation.patchSettings({ width: 501 });
 
-    const { bbox: nextBbox } = getActiveGenerate(store.getState());
+    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
     expect(nextBbox.width).toBe(504); // snapped up to the nearest multiple of 8
-    expect(getSyncDispatches() - before).toBe(1);
+    expect(values.width).toBe(504);
+    expect(getSyncDispatches() - before).toBe(2);
     sync.dispose();
   });
 

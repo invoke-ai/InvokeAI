@@ -1,12 +1,17 @@
 /**
  * Two-way sync between a project's canvas generation frame (`canvas.document.bbox`)
- * and its generate-widget dimensions (`width` / `height` / `aspectRatioId`).
+ * and its model-valid generate-widget processing dimensions (`width` / `height` /
+ * `aspectRatioId`).
  *
- * Legacy parity: while a project is invoking into the canvas, the generation
- * frame IS the generation size. Resizing the bbox (tool gesture, BboxOptions,
- * undo/redo) drives the generate width/height; editing the generate dimensions
- * (or picking an aspect preset) resizes the bbox in place (top-left anchored).
- * Position-only bbox moves never touch the dimensions.
+ * Legacy-compatible geometry: the generation frame remains the exact final
+ * canvas footprint, including off-grid sizes. Resizing the bbox (tool gesture,
+ * BboxOptions, undo/redo) drives width/height snapped to the selected model's
+ * hard processing grid; the canvas graph resizes inputs to that processing size
+ * and the result back to the bbox. Unlike legacy's optional "Scale Before
+ * Processing" policy, this does not silently upscale small bboxes to an optimal
+ * pixel area. Editing the generate dimensions (or picking an aspect preset)
+ * still resizes the bbox in place (top-left anchored). Position-only bbox moves
+ * never touch the dimensions.
  *
  * The module is two parts:
  * - {@link reconcileCanvasDims}: a pure, unit-tested reconcile that decides which
@@ -30,7 +35,7 @@ import type { AspectRatioId } from '@features/generation/contracts';
 import type { CanvasDocumentContractV2 } from '@workbench/canvas-engine/api';
 import type { WorkbenchState } from '@workbench/projectContracts';
 
-import { deriveAspectRatioId } from '@features/generation/settings';
+import { clampDimension, deriveAspectRatioId } from '@features/generation/settings';
 
 import type { WorkbenchCommands } from './workbenchStore';
 
@@ -45,6 +50,7 @@ export interface CanvasDimsSnapshot {
   bboxHeight: number;
   dimsWidth: number;
   dimsHeight: number;
+  grid: number;
 }
 
 export interface CanvasDimsReconcileInput {
@@ -61,31 +67,26 @@ export interface CanvasDimsReconcileInput {
 export type CanvasDimsReconcileResult =
   | { kind: 'none' }
   /**
-   * Write the bbox size onto the generate dims (bbox wins), re-deriving the
-   * aspect id *and* the numeric aspect ratio. Both are re-derived from the bbox
-   * unconditionally (even when the form's ratio is locked to a preset) so the
-   * id, the numeric ratio, and the dims stay mutually consistent after the
-   * patch — a locked preset does not veto the bbox, which remains authoritative.
+   * Write a model-grid processing size onto the generate dims (bbox wins),
+   * retaining the exact bbox ratio in the aspect controls. Both aspect values
+   * are re-derived from the bbox unconditionally (even when the form's ratio is
+   * locked to a preset) so a locked preset does not veto the bbox, which remains
+   * authoritative.
    */
   | { kind: 'patch-dims'; width: number; height: number; aspectRatioId: AspectRatioId; aspectRatioValue: number }
   /** Resize the bbox to the (grid-snapped) generate dims, keeping its top-left position. */
   | { kind: 'set-bbox'; bbox: Bbox };
 
-const snapToGrid = (value: number, grid: number): number => {
-  const step = grid > 0 ? grid : 1;
-  return Math.max(step, Math.round(value / step) * step);
-};
-
 /**
  * Decide which direction of the bbox <-> dims sync to apply.
  *
  * - No bbox (not in canvas mode) -> `none`.
- * - Bbox and dims already agree -> `none` (the primary loop guard).
+ * - A grid-valid bbox and dims that already agree -> `none` (the primary loop guard).
  * - Otherwise the side that changed since `prev` wins; the bbox is authoritative
- *   when both (or neither, on first run) changed, matching "the frame is the
- *   generation size". Bbox -> dims writes the exact bbox size and re-derives the
- *   aspect id. Dims -> bbox snaps to the grid and only emits when the snapped
- *   size actually differs from the live bbox.
+ *   when both (or neither, on first run) changed. Bbox -> dims writes the nearest
+ *   model-grid processing size while preserving the exact bbox footprint and
+ *   aspect. Dims -> bbox snaps to the grid and only emits when the snapped size
+ *   actually differs from the live bbox.
  */
 export const reconcileCanvasDims = ({
   bbox,
@@ -97,27 +98,33 @@ export const reconcileCanvasDims = ({
     return { kind: 'none' };
   }
 
-  if (bbox.width === dims.width && bbox.height === dims.height) {
+  const bboxIsOnGrid = bbox.width % grid === 0 && bbox.height % grid === 0;
+  const gridChanged = prev !== null && prev.grid !== grid;
+
+  if (bboxIsOnGrid && !gridChanged && bbox.width === dims.width && bbox.height === dims.height) {
     return { kind: 'none' };
   }
 
-  const bboxChanged = !prev || prev.bboxWidth !== bbox.width || prev.bboxHeight !== bbox.height;
+  const bboxChanged = !prev || gridChanged || prev.bboxWidth !== bbox.width || prev.bboxHeight !== bbox.height;
 
   if (bboxChanged) {
+    const width = clampDimension(bbox.width, grid);
+    const height = clampDimension(bbox.height, grid);
+
     return {
       aspectRatioId: deriveAspectRatioId(bbox.width, bbox.height),
       aspectRatioValue: bbox.height > 0 ? bbox.width / bbox.height : 1,
-      height: bbox.height,
+      height,
       kind: 'patch-dims',
-      width: bbox.width,
+      width,
     };
   }
 
   const dimsChanged = !prev || prev.dimsWidth !== dims.width || prev.dimsHeight !== dims.height;
 
   if (dimsChanged) {
-    const width = snapToGrid(dims.width, grid);
-    const height = snapToGrid(dims.height, grid);
+    const width = clampDimension(dims.width, grid);
+    const height = clampDimension(dims.height, grid);
 
     if (width === bbox.width && height === bbox.height) {
       return { kind: 'none' };
@@ -209,7 +216,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
 
     switch (result.kind) {
       case 'none': {
-        prev = { bboxHeight: bbox.height, bboxWidth: bbox.width, dimsHeight: height, dimsWidth: width };
+        prev = { bboxHeight: bbox.height, bboxWidth: bbox.width, dimsHeight: height, dimsWidth: width, grid };
         return;
       }
       case 'patch-dims': {
@@ -218,6 +225,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
           bboxWidth: bbox.width,
           dimsHeight: result.height,
           dimsWidth: result.width,
+          grid,
         };
         isSyncing = true;
         try {
@@ -240,12 +248,25 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
         prev = {
           bboxHeight: result.bbox.height,
           bboxWidth: result.bbox.width,
-          dimsHeight: height,
-          dimsWidth: width,
+          dimsHeight: result.bbox.height,
+          dimsWidth: result.bbox.width,
+          grid,
         };
         isSyncing = true;
         try {
           store.commands.canvas.apply(project.id, { bbox: result.bbox, type: 'setCanvasBbox' }, 'system');
+          if (width !== result.bbox.width || height !== result.bbox.height) {
+            store.commands.generation.patchSettings(
+              {
+                aspectRatioId: deriveAspectRatioId(result.bbox.width, result.bbox.height),
+                aspectRatioValue: result.bbox.width / result.bbox.height,
+                height: result.bbox.height,
+                width: result.bbox.width,
+              },
+              project.id,
+              'system'
+            );
+          }
         } finally {
           isSyncing = false;
         }
