@@ -21,7 +21,11 @@ from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidato
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.video_records.video_records_common import VideoNamesResult, VideoRecordChanges
+from invokeai.app.services.video_records.video_records_common import (
+    VideoNamesResult,
+    VideoRecordChanges,
+    VideoRecordNotFoundException,
+)
 from invokeai.app.services.videos.videos_common import (
     AddVideosToBoardResult,
     DeleteVideosResult,
@@ -156,11 +160,9 @@ def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefaul
 
     board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
     if board_id is not None:
-        # See `assert_image_read_access`: this 403 is also the answer a *deleted* video gets,
-        # because the decision rests on a `user_id` that is gone with the row, so clients act on
-        # it by dropping their reference to the video. Only a board positively known to be gone
-        # may produce it; a lookup that cannot be decided propagates instead of impersonating a
-        # permission decision.
+        # See `assert_image_read_access`: only a board positively known to be gone may fall
+        # through to a refusal; a lookup that cannot be decided propagates instead of
+        # impersonating a permission decision.
         try:
             board = ApiDependencies.invoker.services.board_records.get(board_id)
         except BoardRecordNotFoundException:
@@ -169,6 +171,12 @@ def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefaul
             if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
                 return
 
+    # Gone and denied mean opposite things to a client holding a reference to this video, and
+    # nothing above can tell them apart. See `_assert_image_record_exists`.
+    try:
+        ApiDependencies.invoker.services.video_records.get(video_name)
+    except VideoRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Video not found") from None
     raise HTTPException(status_code=403, detail="Not authorized to access this video")
 
 

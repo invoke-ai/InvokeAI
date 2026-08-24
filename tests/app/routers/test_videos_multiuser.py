@@ -257,22 +257,46 @@ def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock
     assert sorted(delete_calls) == ["dup.mp4", "other.mp4"]
 
 
-def test_deleted_video_reads_as_unavailable_rather_than_undecidable(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
-):
-    """A deleted video answers 403, and the clients depend on being able to trust it.
+def test_deleted_video_reads_as_gone_rather_than_denied(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    """A deleted video answers 404 even to a non-admin, and the clients depend on it.
 
-    The read decision rests on ``videos.user_id``, which is gone with the row, so a non-admin
-    cannot be told a deleted video from someone else's and both are refused the same way. The
-    frontend therefore drops its reference to a video on a 403 as well as a 404 -- a workflow's
-    video field clears itself on one. Pinned here because that behaviour reads as over-broad
-    without this route's answer to point at.
+    The ownership decision rests on ``videos.user_id``, which is gone with the row, so nothing
+    above the refusal can tell a deleted video from a foreign one -- both used to come back 403.
+    A workflow's video field drops its reference on a 404, so the two answers have to differ.
     """
+    from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
+
     mock_invoker.services.video_records.get_user_id.return_value = None
     mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+    mock_invoker.services.video_records.get = MagicMock(side_effect=VideoRecordNotFoundException)
 
     response = client.get(
         "/api/v1/videos/i/gone.mp4",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    """A reversible refusal must not read as gone.
+
+    A shared board flipped back to Private refuses every video on it, and every one of them
+    still exists. Answering 404 would clear the workflow fields pointing at them, and restoring
+    the permission would not bring those back.
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
+    private_board = MagicMock()
+    private_board.board_visibility = BoardVisibility.Private
+    mock_invoker.services.board_records.get = MagicMock(return_value=private_board)
+    # The video itself is untouched -- `get` returning normally is what says so.
+    mock_invoker.services.video_records.get = MagicMock(return_value=MagicMock())
+
+    response = client.get(
+        "/api/v1/videos/i/still-here.mp4",
         headers={"Authorization": f"Bearer {user1_token}"},
     )
 
@@ -311,6 +335,9 @@ def test_vanished_board_still_reads_as_an_ordinary_refusal_for_videos(
     mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
     mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
     mock_invoker.services.board_records.get = MagicMock(side_effect=BoardRecordNotFoundException)
+    # The video itself is still there, so the refusal is a denial and not the 404 that would
+    # take the caller's reference with it.
+    mock_invoker.services.video_records.get = MagicMock(return_value=MagicMock())
 
     response = client.get(
         "/api/v1/videos/i/board-gone.mp4",

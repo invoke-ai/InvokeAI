@@ -1,23 +1,16 @@
 /**
- * True when the server has answered that this client cannot have the video: it is gone, or it
- * is not theirs to read. Both mean the reference is unusable and the field holding it should
- * let it go.
+ * True only for a confirmed "this video no longer exists" (HTTP 404).
  *
- * Two statuses, because "deleted" does not always arrive as 404. `_assert_video_read_access`
- * decides on `videos.user_id`, which disappears with the row, so in a multiuser deployment a
- * deleted video is indistinguishable from someone else's and both are refused with 403 — only
- * an admin (and so every single-user deployment, whose default user is one) reaches the read
- * that 404s. Treating 404 alone as gone would strand a deleted video in every workflow field
- * that references it.
+ * `VideoFieldInputComponent` drops the user's reference when the video behind it is gone. That
+ * reset is silent and has no undo, so it may only follow an answer that is both definite and
+ * permanent — which a 403 is not. Access is revoked and restored: flip a board to Private and
+ * every field referencing its videos would clear; flip it back and the videos are all still
+ * there, but the workflows that pointed at them are not.
  *
- * Everything else is indeterminate and must NOT discard the user's input: a transient network
- * error (`FETCH_ERROR`), an auth failure (401), a timeout or a 5xx says nothing about whether
- * the video exists, and the reset is silent and has no undo.
- *
- * The 403 arm carries a matching obligation on the server, met in `_assert_video_read_access`:
- * a storage error must never be laundered into a 403, or an unreadable database would present
- * as a permission decision and take the user's references down with it. `isImageUnavailableError`
- * is the same predicate for images.
+ * `_assert_video_read_access` draws that distinction server-side, answering 404 for a video
+ * positively absent and 403 only for one it is refusing, and `video_records.get` no longer
+ * translates storage errors into not-found — without which an unreadable database would present
+ * as a deleted video. `isImageMissingError` is the same predicate for images.
  */
-export const isVideoUnavailableError = (error: unknown): boolean =>
-  error instanceof Object && 'status' in error && (error.status === 404 || error.status === 403);
+export const isVideoMissingError = (error: unknown): boolean =>
+  error instanceof Object && 'status' in error && error.status === 404;

@@ -26,18 +26,20 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
         self._db = db
 
     def get(self, video_name: str) -> VideoRecord:
+        # A sqlite3.Error is deliberately NOT translated into VideoRecordNotFoundException, for
+        # the same reason as SqliteImageRecordStorage.get: it would make the exception mean "the
+        # row is absent, OR the database is unreadable". `_assert_video_read_access` now answers
+        # 404 on a positive not-found, and the clients drop their references to a video on that
+        # 404 — so a locked database would silently clear the user's workflow fields.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    f"""--sql
-                    SELECT {VIDEO_DTO_COLS} FROM videos
-                    WHERE video_name = ?;
-                    """,
-                    (video_name,),
-                )
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-            except sqlite3.Error as e:
-                raise VideoRecordNotFoundException from e
+            cursor.execute(
+                f"""--sql
+                SELECT {VIDEO_DTO_COLS} FROM videos
+                WHERE video_name = ?;
+                """,
+                (video_name,),
+            )
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
         if not result:
             raise VideoRecordNotFoundException

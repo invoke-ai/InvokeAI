@@ -316,6 +316,19 @@ const getDeleteImagesTags = (result: components['schemas']['DeleteImagesResult']
   // We ignore the deleted images when getting tags to invalidate. If we did not, we will invalidate the queries
   // that fetch image DTOs, metadata, and workflows. But we have just deleted those images! Invalidating the tags
   // will force those queries to re-fetch, and the requests will of course 404.
+  //
+  // The *failed* names are the opposite case and are refetched deliberately. Their outcome is
+  // unknown — a chunk that timed out or 5xx'd may well have committed — so `handleDeletions`
+  // leaves every reference to them in place, since pruning on a guess would discard work over a
+  // request that merely failed. Asking is what settles it: a name that is really gone answers
+  // 404 and every component holding it drops it, and one that survived answers with its DTO and
+  // keeps it. Names folded in client-side for chunks that never went out ride along and simply
+  // confirm the cache.
+  //
+  // Partial by construction: it repairs what is mounted and subscribed. Canvas raster and
+  // control layers hold image names without a DTO query behind them, and only `handleDeletions`
+  // prunes those — which needs a definitive per-name outcome from the server (#9533).
+  ...getTagsToInvalidateForImageMutation(result.failed_images),
   ...getTagsToInvalidateForBoardAffectingMutation(result.affected_boards),
   'ImageCollectionCounts',
   { type: 'ImageCollection', id: LIST_TAG },

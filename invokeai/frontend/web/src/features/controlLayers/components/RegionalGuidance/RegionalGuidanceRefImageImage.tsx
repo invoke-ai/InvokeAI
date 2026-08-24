@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiRulerBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
-import { isImageUnavailableError } from 'services/api/util/imageErrors';
+import { isImageMissingError } from 'services/api/util/imageErrors';
 import { $isConnected } from 'services/events/stores';
 
 type Props = {
@@ -39,11 +39,11 @@ export const RegionalGuidanceRefImageImage = memo(({ image, onChangeImage, dndTa
   }, [onChangeImage]);
 
   useEffect(() => {
-    // Cleared only when the server says the image is not available to this client (404,
-    // or the 403 a deleted image answers with in multiuser mode). Any other error leaves
-    // it alone: a 5xx or a dropped connection says nothing about whether the image
-    // exists, and this reset is silent and has no undo. See `isImageUnavailableError`.
-    if (isConnected && isImageUnavailableError(error)) {
+    // Cleared only on a confirmed 404. A 403 is a permission decision that can be
+    // reversed — a board flipped back to Shared — and the image behind it still
+    // exists; a 5xx or a dropped connection says nothing at all. Dropping the
+    // reference is silent and has no undo. See `isImageMissingError`.
+    if (isConnected && isImageMissingError(error)) {
       handleResetControlImage();
     }
   }, [handleResetControlImage, error, isConnected]);

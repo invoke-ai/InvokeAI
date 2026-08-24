@@ -864,16 +864,16 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/some-image")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_deleted_image_reads_as_unavailable_rather_than_undecidable(
+    def test_deleted_image_reads_as_gone_rather_than_denied(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str
     ):
-        """A deleted image answers 403, and the clients depend on being able to trust it.
+        """A deleted image answers 404 even to a non-admin, and the clients depend on it.
 
-        The read decision rests on `images.user_id`, which is gone with the row, so a
-        non-admin cannot be told a deleted image from someone else's and both are refused
-        the same way. The frontend therefore drops its reference to an image on a 403 as
-        well as a 404 -- a workflow's image field clears itself on one. Pinned here because
-        that behaviour reads as over-broad without this route's answer to point at.
+        The ownership decision rests on `images.user_id`, which is gone with the row, so
+        nothing above the refusal can tell a deleted image from a foreign one -- both used to
+        come back 403. The two mean opposite things to a client holding a reference: gone is
+        permanent and the reference should go with it, denied is reversible and it must not.
+        Only the refusal path pays for the distinction.
         """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
@@ -881,6 +881,32 @@ class TestImageReadAuth:
         mock_invoker.services.image_records.delete("user1-doomed")
 
         r = client.get("/api/v1/images/i/user1-doomed", headers=_auth(user1_token))
+
+        assert r.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_revoking_access_to_a_live_image_stays_a_denial(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """The other half, and the one with teeth: a reversible refusal must not read as gone.
+
+        A shared board flipped back to Private refuses every image on it, and every one of
+        them still exists. The clients drop a workflow field or a reference image on a 404, so
+        answering one here would destroy work that restoring the permission could not bring
+        back.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Formerly Shared Board")
+        _set_board_visibility(client, user1_token, board_id, "shared")
+        _save_image(mock_invoker, "user1-still-here", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-still-here")
+        assert client.get("/api/v1/images/i/user1-still-here", headers=_auth(user2_token)).status_code == (
+            status.HTTP_200_OK
+        )
+
+        _set_board_visibility(client, user1_token, board_id, "private")
+
+        r = client.get("/api/v1/images/i/user1-still-here", headers=_auth(user2_token))
 
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
@@ -921,7 +947,11 @@ class TestImageReadAuth:
     def test_vanished_board_still_reads_as_an_ordinary_refusal(
         self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
     ):
-        """The narrowed catch stays exactly that narrow, in both directions."""
+        """The narrowed catch stays exactly that narrow, in both directions.
+
+        A dangling board_image row refuses the read, but the image itself is still there, so
+        the refusal is a 403 and not the 404 that would take the caller's reference with it.
+        """
         from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
 
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")

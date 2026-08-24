@@ -1,26 +1,27 @@
 /**
- * True when the server has answered that this client cannot have the image: it is gone, or it
- * is not theirs to read. Both mean the reference is unusable and the component holding it
- * should let it go.
+ * True only for a confirmed "this image no longer exists" (HTTP 404).
  *
- * Two statuses, because "deleted" does not always arrive as 404. `assert_image_read_access`
- * decides on `images.user_id`, which disappears with the row, so in a multiuser deployment a
- * deleted image is indistinguishable from someone else's and both are refused with 403 — only
- * an admin (and so every single-user deployment, whose default user is one) reaches the read
- * that 404s. Treating 404 alone as gone would strand a deleted image in every workflow field
- * that references it.
+ * Several components drop the user's reference when the image behind it is gone — a node's
+ * image field, a global reference image, a regional guidance reference image. That reset is
+ * silent and has no undo, so it may only follow an answer that is both definite and permanent.
  *
- * Everything else is indeterminate and must NOT discard the user's input. A transient network
- * failure (`FETCH_ERROR`), a timeout, a parse failure or a 5xx says nothing about whether the
- * image exists, and this reset is silent and has no undo. That distinction became load-bearing
- * when the star/unstar mutations began invalidating the DTOs of names the server reported in
- * `failed_images`: a name is reported there precisely because a storage failure interrupted its
- * write, so the refetch the invalidation triggers is running against a store that is already
- * unwell and is likelier than usual to answer 500.
+ * A 403 is neither, which is why it is excluded even though it is the answer a deleted image
+ * *used* to produce for a non-admin. Access is revoked and restored: flip a board to Private
+ * and every reference to its images would clear; flip it back and the images are all still
+ * there, but the workflows that pointed at them are not. The server draws the distinction
+ * instead — `assert_image_read_access` answers 404 for an image positively absent and 403 only
+ * for one it is refusing — and that is what makes 404 alone the right test here.
  *
- * The 403 arm carries a matching obligation on the server, met in `assert_image_read_access`:
- * a storage error must never be laundered into a 403, or an unreadable database would present
- * as a permission decision and take the user's references down with it.
+ * Everything else is indeterminate and must NOT discard the user's input: a transient network
+ * failure (`FETCH_ERROR`), a timeout, a parse failure, a 401 or a 5xx says nothing about
+ * whether the image exists. That became load-bearing when the star/unstar mutations began
+ * invalidating the DTOs of names reported in `failed_images`: a name is reported there precisely
+ * because a storage failure interrupted its write, so the refetch the invalidation triggers is
+ * running against a store that is already unwell and is likelier than usual to answer 500.
+ *
+ * The server side carries the matching obligation, met in `image_records.get`: a storage error
+ * must never be translated into not-found, or an unreadable database would present as a
+ * deleted image and take the user's references down with it.
  */
-export const isImageUnavailableError = (error: unknown): boolean =>
-  error instanceof Object && 'status' in error && (error.status === 404 || error.status === 403);
+export const isImageMissingError = (error: unknown): boolean =>
+  error instanceof Object && 'status' in error && error.status === 404;

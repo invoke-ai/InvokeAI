@@ -12,6 +12,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
     BoardVisibility,
 )
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 
 
 def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -54,6 +55,33 @@ def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> N
     raise HTTPException(status_code=403, detail="Not authorized to modify this image")
 
 
+def _assert_image_record_exists(image_name: str) -> None:
+    """Turn a refusal into a 404 when the image is positively gone.
+
+    The two refusals mean opposite things to a client holding a reference to the image — a
+    workflow's image field, a reference image on a canvas layer. Gone is permanent, and the
+    reference should be dropped. Denied is a permission decision that can be reversed (a board
+    flipped back to Shared, an owner re-granting access), and dropping the reference over one
+    destroys work the user cannot get back by restoring the permission.
+
+    Nothing above can tell them apart: the ownership test rests on `images.user_id`, which is
+    gone with the row, so a deleted image reaches that same 403 as a foreign one. So the
+    distinction is made here, on the refusal path only — the happy path pays nothing for it.
+
+    A storage error propagates rather than answering either. `image_records.get` deliberately
+    does not translate sqlite errors into not-found, so an unreadable database cannot present as
+    a deleted image and take the user's references down with it.
+
+    The cost is that an authenticated caller can now tell an absent image from one they may not
+    read. Image names are generated UUIDs, so this buys an attacker nothing they could enumerate,
+    and it is the answer admins have always received.
+    """
+    try:
+        ApiDependencies.invoker.services.image_records.get(image_name)
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found") from None
+
+
 def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user may not view the image.
 
@@ -72,11 +100,7 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
     if board_id is not None:
         # See `assert_image_owner` for why this reads the board record and catches only
-        # not-found. The read side needs it for a second reason: this 403 is also the answer a
-        # *deleted* image gets, because the decision rests on `images.user_id` and that is gone
-        # with the row. Clients therefore have to read 403 as "this image is not available to
-        # me" and drop their reference to it — a workflow's image field clears itself on one.
-        # An unreadable database must not be able to produce that answer.
+        # not-found: a lookup that cannot be decided must not present as a permission decision.
         try:
             board = ApiDependencies.invoker.services.board_records.get(board_id)
         except BoardRecordNotFoundException:
@@ -85,6 +109,7 @@ def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault
             if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
                 return
 
+    _assert_image_record_exists(image_name)
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
 
 

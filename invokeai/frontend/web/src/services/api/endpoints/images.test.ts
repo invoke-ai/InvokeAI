@@ -1075,6 +1075,15 @@ describe('star invalidation', () => {
       mutate: (store: ApiStore) =>
         store.dispatch(imagesApi.endpoints.unstarImages.initiate({ image_names: ['a.png'] })),
     },
+    {
+      // A delete whose outcome is unknown. `handleDeletions` prunes references only for names
+      // the server confirmed, so nothing else asks about this one; the refetch is what settles
+      // whether the components holding it should let it go.
+      label: 'deletion',
+      body: { deleted_images: [], failed_images: ['a.png'], affected_boards: [] },
+      mutate: (store: ApiStore) =>
+        store.dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names: ['a.png'] })),
+    },
   ])('refetches an image whose $label the server could not confirm', async ({ body, mutate }) => {
     // `ImageService.update` writes the record and then reads the DTO back to return it. A
     // failure in that read reports the name in `failed_images` with the row already starred, so
