@@ -12,7 +12,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
 import {
   pickSelectionAfterDelete,
   selectCachedGalleryItemNames,
@@ -107,7 +107,13 @@ export const handleDeletions = async (image_names: string[], store: AppStore) =>
         // video displayed while images were deleted, or a hover-delete of another item)
         // or its own delete failed. Keep viewing it and just prune the deleted items
         // from the multi-selection.
-        dispatch(imageSelected(lastSelected));
+        //
+        // This is a mutation, not a pick. `imageSelected` would leave exactly the same
+        // state, but it is the action that means "the user asked to see this" — and while
+        // a generation is running the viewer answers that by lifting the progress overlay
+        // off the item for a couple of seconds. Deleting some *other* item is not a
+        // request to look at the one already on screen. See gallerySelectionSource.
+        dispatch(selectionChanged([lastSelected]));
       } else {
         // Advance to a still-living neighbour (prev > next) so the Viewer keeps a real
         // selection. May pick a video — the polymorphic list intentionally allows that.

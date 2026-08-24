@@ -13,12 +13,18 @@ import { boardIdSelected, comparedImagesSwapped, imageSelected } from 'features/
  * that happens to still be selected — the viewer would reveal an item they never clicked.
  *
  * `selectionChanged` is deliberately absent: it is the multi-selection *mutation* action
- * (ctrl/shift-clicks, bulk operations), and a mutation that leaves the active item in place —
- * ctrl-clicking a non-active item off the selection, say — is bookkeeping, not the user asking to
- * see the item that stays active; counting it would flash the progress overlay off for a gesture
- * aimed at a different item. A mutation that *moves* the active item is caught by the
- * change-of-active-item clause below, and a plain click dispatches `imageSelected`, so the
- * deliberate re-pick of the already-active item still lands here.
+ * (ctrl/shift-clicks, bulk operations, the delete flow pruning deleted names out of the
+ * selection), and a mutation that leaves the active item in place — ctrl-clicking a non-active
+ * item off the selection, say — is bookkeeping, not the user asking to see the item that stays
+ * active; counting it would flash the progress overlay off for a gesture aimed at a different
+ * item. A mutation that *moves* the active item is caught by the change-of-active-item clause
+ * below, and a plain click dispatches `imageSelected`, so the deliberate re-pick of the
+ * already-active item still lands here.
+ *
+ * The corollary binds the writers, not just this file: code that rewrites the selection without
+ * the user having asked for anything must use `selectionChanged`, even where `imageSelected`
+ * would leave identical state. The two actions are the only thing distinguishing "the user picked
+ * this" from "this happens to still be selected" — see the delete modals' survivor branch.
  */
 const isSelectionDispatch = (action: UnknownAction): boolean =>
   isAnyOf(imageSelected, comparedImagesSwapped)(action) ||

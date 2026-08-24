@@ -32,6 +32,7 @@ vi.mock('features/gallery/store/gallerySelectors', () => ({
 
 vi.mock('features/gallery/store/gallerySlice', () => ({
   imageSelected: vi.fn((payload: string | null) => ({ type: 'gallery/imageSelected', payload })),
+  selectionChanged: vi.fn((payload: string[]) => ({ type: 'gallery/selectionChanged', payload })),
 }));
 
 vi.mock('features/system/store/systemSlice', () => ({
@@ -58,6 +59,7 @@ vi.mock('features/gallery/store/selectCachedGalleryItemNames', async (importOrig
 
 import type { AppStore } from 'app/store/store';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
 
 import { handleDeletions } from './state';
@@ -82,11 +84,29 @@ const buildStore = (selection: string[], failingNames: Set<string>) => {
   return { store: { dispatch, getState } as unknown as AppStore, dispatched };
 };
 
-const getSelectionChange = (dispatched: unknown[]) =>
-  dispatched.find(
-    (action): action is { type: string; payload: string | null } =>
-      !!action && typeof action === 'object' && (action as { type?: string }).type === 'gallery/imageSelected'
+/**
+ * The post-delete write to the selection, whichever action carried it. The two branches use
+ * different actions deliberately: advancing to a neighbour *picks* an item (`imageSelected`),
+ * while keeping the displayed item and dropping the deleted ones from the multi-selection is a
+ * *mutation* (`selectionChanged`). `activeItem` is what the viewer displays either way, so the
+ * existing expectations read the same; the tests that care about the distinction assert `type`.
+ */
+const getSelectionChange = (dispatched: unknown[]) => {
+  const action = dispatched.find(
+    (candidate): candidate is { type: string; payload: string | string[] | null } =>
+      !!candidate &&
+      typeof candidate === 'object' &&
+      ((candidate as { type?: string }).type === 'gallery/imageSelected' ||
+        (candidate as { type?: string }).type === 'gallery/selectionChanged')
   );
+
+  if (!action) {
+    return undefined;
+  }
+
+  const { payload } = action;
+  return { type: action.type, activeItem: Array.isArray(payload) ? (payload.at(-1) ?? null) : payload };
+};
 
 describe('handleDeletions selection behavior', () => {
   beforeEach(() => {
@@ -103,17 +123,22 @@ describe('handleDeletions selection behavior', () => {
 
     // Before the fix this dispatched imageSelected(null) and dropped the viewer to its
     // empty state even though the displayed video still exists.
-    expect(getSelectionChange(dispatched)?.payload).toBe('c.mp4');
+    expect(getSelectionChange(dispatched)?.activeItem).toBe('c.mp4');
   });
 
-  it('keeps viewing the displayed image on hover-delete of another selected image', async () => {
+  it('keeps viewing the displayed image on hover-delete of another selected image, without re-picking it', async () => {
     // Multi-selection [a, b] with b displayed; the hover delete button deletes only a.
     vi.mocked(selectLastSelectedItem).mockReturnValue('b.png');
     const { store, dispatched } = buildStore(['a.png', 'b.png'], new Set());
 
     await handleDeletions(['a.png'], store);
 
-    expect(getSelectionChange(dispatched)?.payload).toBe('b.png');
+    // The action matters, not just the resulting state (PR #9520 review). `imageSelected('b.png')`
+    // would leave the very same selection, but it is the action that means "the user picked this",
+    // and the viewer answers a pick by lifting an in-progress generation's overlay off the item for
+    // two seconds. Deleting `a` must not flash `b` over a running render.
+    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/selectionChanged', activeItem: 'b.png' });
+    expect(imageSelected).not.toHaveBeenCalled();
   });
 
   it('does not move the selection when the displayed image fails to delete', async () => {
@@ -133,7 +158,7 @@ describe('handleDeletions selection behavior', () => {
     await handleDeletions(['a.png', 'b.png'], store);
 
     // If b.png were treated as deleted, the selection would skip to c.mp4.
-    expect(getSelectionChange(dispatched)?.payload).toBe('b.png');
+    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', activeItem: 'b.png' });
   });
 
   it('advances to the nearest surviving neighbour when everything requested is deleted', async () => {
@@ -142,6 +167,8 @@ describe('handleDeletions selection behavior', () => {
 
     await handleDeletions(['b.png'], store);
 
-    expect(getSelectionChange(dispatched)?.payload).toBe('a.png');
+    // The displayed item is gone, so the viewer really does move to a different image: that is a
+    // pick, and revealing it over a running generation is the point.
+    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', activeItem: 'a.png' });
   });
 });

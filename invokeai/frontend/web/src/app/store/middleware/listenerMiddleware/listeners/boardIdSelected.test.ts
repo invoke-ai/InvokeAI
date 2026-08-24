@@ -64,8 +64,8 @@ describe('addBoardIdSelectedListener', () => {
   });
 
   it('does not overwrite a selection made through the gallery grid either', () => {
-    // Thumbnail clicks and keyboard navigation dispatch selectionChanged, not imageSelected, so
-    // matching on the action type alone leaves the ordinary path exposed.
+    // Ctrl/shift-clicks and the delete flow's selection pruning dispatch selectionChanged, not
+    // imageSelected, so matching on the action type alone leaves those paths exposed.
     const store = buildStore();
 
     store.dispatch(galleryViewChanged('images'));
