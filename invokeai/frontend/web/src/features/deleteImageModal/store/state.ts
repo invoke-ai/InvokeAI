@@ -117,8 +117,14 @@ export const handleDeletions = async (image_names: string[], store: AppStore) =>
         // Filtered from the *live* selection rather than collapsed onto the pre-await
         // snapshot: the user can select something else while the delete is in flight, and
         // collapsing would both discard that and move the active item — which publishes as
-        // a change of active item and reveals anyway, the very flash this avoids. The
-        // fallback covers the case where everything they since selected was deleted.
+        // a change of active item and reveals anyway, the very flash this avoids.
+        //
+        // The fallback (everything they had selected meanwhile was deleted) does not get
+        // that guarantee: `lastSelected` is not in the live selection at all there, so it
+        // moves the active item and does reveal — and `deletedNames` only proves it outlived
+        // *this* request, so a second delete overlapping this one can leave it pointing at
+        // an item that is already gone. Both are pre-existing and want the advance branch's
+        // neighbour search, which cannot run off these pre-await snapshots.
         const survivors = getState().gallery.selection.filter((name) => !deletedNames.has(name));
         dispatch(selectionChanged(survivors.length > 0 ? survivors : [lastSelected]));
       } else {

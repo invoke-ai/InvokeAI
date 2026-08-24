@@ -37,13 +37,22 @@ export const GalleryPanel = memo(() => {
   const shouldUsePagedGalleryView = useAppSelector(selectShouldUsePagedGalleryView);
   const searchDisclosure = useDisclosure(!!initialSearchTerm);
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
+  // Only dispatch when the view actually changes. A view change restarts the gallery's
+  // auto-select probe (listeners/boardIdSelected.ts), which selects the first item of the list
+  // unconditionally — so clicking the tab already showing would discard whatever the user had
+  // selected, and moving the displayed item mid-generation also lifts the progress overlay for a
+  // couple of seconds. The boards list guards its own clicks the same way.
   const handleClickImages = useCallback(() => {
-    dispatch(galleryViewChanged('images'));
-  }, [dispatch]);
+    if (galleryView !== 'images') {
+      dispatch(galleryViewChanged('images'));
+    }
+  }, [dispatch, galleryView]);
 
   const handleClickAssets = useCallback(() => {
-    dispatch(galleryViewChanged('assets'));
-  }, [dispatch]);
+    if (galleryView !== 'assets') {
+      dispatch(galleryViewChanged('assets'));
+    }
+  }, [dispatch, galleryView]);
 
   const handleClickSearch = useCallback(() => {
     onResetSearchTerm();

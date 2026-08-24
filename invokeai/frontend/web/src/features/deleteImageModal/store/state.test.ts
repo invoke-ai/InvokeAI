@@ -65,9 +65,14 @@ import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCache
 import { handleDeletions } from './state';
 
 /**
- * `selectionDuringDelete` re-points the store's selection the moment the delete request resolves,
- * standing in for the user selecting something else while the request is in flight. The rest of
- * handleDeletions runs against that newer selection, as it does in the app.
+ * `selectionDuringDelete` re-points the store's selection when the delete request is issued,
+ * standing in for the user selecting something else while it is in flight. The rest of
+ * handleDeletions then runs against that newer selection, as it does in the app.
+ *
+ * It writes `currentSelection` directly rather than dispatching, so the simulated gesture does not
+ * land in `dispatched` and cannot be mistaken for the production write under test. The seam is
+ * only equivalent to a real mid-flight click because neither modal reads state between issuing the
+ * request and the post-await block; anything added in between would need a real dispatch here.
  */
 const buildStore = (selection: string[], failingNames: Set<string>, selectionDuringDelete?: string[]) => {
   const dispatched: unknown[] = [];
@@ -95,16 +100,17 @@ const buildStore = (selection: string[], failingNames: Set<string>, selectionDur
 };
 
 /**
- * The post-delete write to the selection, whichever action carried it — returned raw, so the
- * expectations pin the whole payload rather than just the item left displayed.
+ * Every write to the selection, in order and raw — so an expectation pins the whole payload *and*
+ * that there was exactly one write. Returning just the first match let a stray second dispatch
+ * (which is what the user would actually end up looking at) pass unnoticed.
  *
  * The two branches use different actions deliberately: advancing to a neighbour *picks* an item
  * (`imageSelected`), while keeping the displayed item and dropping the deleted ones from the
  * multi-selection is a *mutation* (`selectionChanged`), which the viewer does not treat as the
  * user asking to see anything.
  */
-const getSelectionChange = (dispatched: unknown[]) =>
-  dispatched.find(
+const getSelectionWrites = (dispatched: unknown[]) =>
+  dispatched.filter(
     (candidate): candidate is { type: string; payload: string | string[] | null } =>
       !!candidate &&
       typeof candidate === 'object' &&
@@ -127,7 +133,7 @@ describe('handleDeletions selection behavior', () => {
 
     // Before the fix this dispatched imageSelected(null) and dropped the viewer to its
     // empty state even though the displayed video still exists.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/selectionChanged', payload: ['c.mp4'] });
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['c.mp4'] }]);
   });
 
   it('keeps viewing the displayed image on hover-delete of another selected image, without re-picking it', async () => {
@@ -141,7 +147,7 @@ describe('handleDeletions selection behavior', () => {
     // would leave the very same selection, but it is the action that means "the user picked this",
     // and the viewer answers a pick by lifting an in-progress generation's overlay off the item for
     // two seconds. Deleting `a` must not flash `b` over a running render.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/selectionChanged', payload: ['b.png'] });
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['b.png'] }]);
     expect(imageSelected).not.toHaveBeenCalled();
   });
 
@@ -151,7 +157,7 @@ describe('handleDeletions selection behavior', () => {
 
     await handleDeletions(['a.png'], store);
 
-    expect(getSelectionChange(dispatched), 'a failed delete must not advance the selection').toBeUndefined();
+    expect(getSelectionWrites(dispatched), 'a failed delete must not advance the selection').toEqual([]);
   });
 
   it('keeps a surviving (failed-delete) neighbour as the replacement candidate', async () => {
@@ -162,7 +168,7 @@ describe('handleDeletions selection behavior', () => {
     await handleDeletions(['a.png', 'b.png'], store);
 
     // If b.png were treated as deleted, the selection would skip to c.mp4.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', payload: 'b.png' });
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/imageSelected', payload: 'b.png' }]);
   });
 
   it('advances to the nearest surviving neighbour when everything requested is deleted', async () => {
@@ -173,7 +179,18 @@ describe('handleDeletions selection behavior', () => {
 
     // The displayed item is gone, so the viewer really does move to a different image: that is a
     // pick, and revealing it over a running generation is the point.
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/imageSelected', payload: 'a.png' });
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/imageSelected', payload: 'a.png' }]);
+  });
+
+  it('keeps surviving siblings of a larger multi-selection', async () => {
+    // No race here: [a, b, c] with c displayed, delete a. Collapsing onto the displayed item used
+    // to deselect b as collateral, which the branch's own comment never claimed to do.
+    vi.mocked(selectLastSelectedItem).mockReturnValue('c.mp4');
+    const { store, dispatched } = buildStore(['a.png', 'b.png', 'c.mp4'], new Set());
+
+    await handleDeletions(['a.png'], store);
+
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['b.png', 'c.mp4'] }]);
   });
 
   it('leaves a selection made while the delete was in flight alone', async () => {
@@ -186,10 +203,7 @@ describe('handleDeletions selection behavior', () => {
 
     await handleDeletions(['a.png'], store);
 
-    expect(getSelectionChange(dispatched)).toEqual({
-      type: 'gallery/selectionChanged',
-      payload: ['b.png', 'c.mp4'],
-    });
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['b.png', 'c.mp4'] }]);
     expect(imageSelected).not.toHaveBeenCalled();
   });
 
@@ -201,6 +215,6 @@ describe('handleDeletions selection behavior', () => {
 
     await handleDeletions(['a.png'], store);
 
-    expect(getSelectionChange(dispatched)).toEqual({ type: 'gallery/selectionChanged', payload: ['b.png'] });
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['b.png'] }]);
   });
 });

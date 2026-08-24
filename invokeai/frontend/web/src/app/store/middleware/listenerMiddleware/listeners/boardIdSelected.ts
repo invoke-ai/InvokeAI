@@ -12,10 +12,10 @@ export const addBoardIdSelectedListener = (startAppListening: AppStartListening)
     // Two jobs, so this cannot be a plain action matcher. The probe below is started by a board or
     // view change — but it must also be *cancelled* by any selection that lands while it waits,
     // and a selection arrives through several actions: imageSelected from the gallery's auto-switch,
-    // plain thumbnail clicks and keyboard navigation, selectionChanged from ctrl/shift-clicks, the
-    // delete flow's pruning and this listener's own probe, boardIdSelected carrying a selection.
-    // Matching the resulting change of the selection covers all of them, including any writer added
-    // later — an action list would silently miss it.
+    // plain thumbnail clicks and next/prev navigation, selectionChanged from ctrl/shift-clicks, the
+    // grid's own arrow-key handler, the delete flow's pruning and this listener's probe,
+    // boardIdSelected carrying a selection. Matching the resulting change of the selection covers
+    // all of them, including any writer added later — an action list would silently miss it.
     //
     // The whole selection, not just its active item: removing one of several selected thumbnails,
     // or re-picking the one already active, leaves the last item unchanged while still being the

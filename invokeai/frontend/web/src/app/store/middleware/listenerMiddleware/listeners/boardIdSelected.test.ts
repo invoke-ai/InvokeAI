@@ -26,14 +26,29 @@ const buildStore = ({ withSelectionSource = false }: { withSelectionSource?: boo
   if (withSelectionSource) {
     addGallerySelectionSourceListener(listenerMiddleware.startListening as unknown as AppStartListening);
   }
-  return configureStore({
+  // Records every gallery action the store sees, so a test can tell "the probe wrote the selection
+  // without publishing it as a pick" from "the probe never wrote anything at all" — the resulting
+  // state is the same either way.
+  const galleryActions: string[] = [];
+  const recorder = () => (next: (action: unknown) => unknown) => (action: unknown) => {
+    const type = (action as { type?: string }).type;
+    if (type?.startsWith('gallery/')) {
+      galleryActions.push(type);
+    }
+    return next(action);
+  };
+  const store = configureStore({
     reducer: {
       gallery: gallerySliceConfig.slice.reducer,
       [api.reducerPath]: api.reducer,
     },
     middleware: (getDefaultMiddleware) =>
-      getDefaultMiddleware({ serializableCheck: false }).prepend(listenerMiddleware.middleware).concat(api.middleware),
+      getDefaultMiddleware({ serializableCheck: false })
+        .prepend(listenerMiddleware.middleware)
+        .concat(recorder)
+        .concat(api.middleware),
   });
+  return Object.assign(store, { galleryActions });
 };
 
 describe('addBoardIdSelectedListener', () => {
@@ -153,6 +168,7 @@ describe('addBoardIdSelectedListener', () => {
     expect(generationAfterFirstProbe, 'moving the viewer to a new item is worth publishing').toBeGreaterThan(0);
 
     // Re-select the same board. The probe runs again and lands on the item already displayed.
+    store.galleryActions.length = 0;
     store.dispatch(boardIdSelected({ boardId: 'none' }));
     // The listener's `condition` only re-evaluates its predicate when an action is dispatched, so a
     // test that merely advances time would watch this second probe time out and clear the selection
@@ -160,6 +176,9 @@ describe('addBoardIdSelectedListener', () => {
     store.dispatch({ type: 'test/tick' });
     await vi.advanceTimersByTimeAsync(6000);
 
+    // The probe did write — this is the write not reading as a pick, not the probe skipping it.
+    expect(store.galleryActions).toContain('gallery/selectionChanged');
+    expect(store.galleryActions).not.toContain('gallery/imageSelected');
     expect(store.getState().gallery.selection).toEqual(['already-showing.png']);
     expect($gallerySelection.get().generation, 'nothing moved, so there is nothing to reveal').toBe(
       generationAfterFirstProbe
