@@ -28,18 +28,9 @@ export interface CanvasCompositingSettings {
   coherenceMode: CanvasCoherenceMode;
   coherenceMinDenoise: number;
   coherenceEdgeSize: number;
+  /** Preserve transparency outside the generated mask instead of compositing over the source image. */
+  outputOnlyMaskedRegions: boolean;
 }
-
-export const DEFAULT_CANVAS_COMPOSITING: CanvasCompositingSettings = {
-  coherenceEdgeSize: 16,
-  coherenceMinDenoise: 0,
-  coherenceMode: 'Gaussian Blur',
-  infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
-  infillMethod: 'lama',
-  infillPatchmatchDownscaleSize: 1,
-  infillTileSize: 32,
-  maskBlur: 16,
-};
 
 /** The legacy-parity generation modes a canvas invoke resolves to. */
 export type CanvasGenerationMode = 'txt2img' | 'img2img' | 'inpaint' | 'outpaint';
@@ -82,10 +73,8 @@ export interface CompileCanvasGraphInput {
   noiseMaskImageName?: string | null;
   /** Denoising strength in (0, 1]. Consulted for `img2img` / `inpaint` / `outpaint`. */
   strength: number;
-  /** When true, preserve alpha outside the generated mask instead of compositing over the source image. */
-  outputOnlyMaskedRegions: boolean;
-  /** Infill / coherence / mask-blur knobs. Defaults applied by the reader. */
-  compositing?: CanvasCompositingSettings;
+  /** Resolved infill / coherence / mask-blur knobs and output-compositing policy. */
+  compositing: CanvasCompositingSettings;
   /**
    * Valid, already-resolved control layers (each with its own uploaded composite
    * image name). The executor filters + composites these; the compiler only

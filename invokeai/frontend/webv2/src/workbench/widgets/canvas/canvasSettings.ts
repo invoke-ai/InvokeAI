@@ -22,6 +22,8 @@
  * no React, no engine imports — unit-testable in node.
  */
 
+import { CANVAS_COMPOSITING_KEYS, DEFAULT_CANVAS_COMPOSITING } from './invoke/canvasCompositing';
+
 /** Which engine boolean store a setting feeds (settings without one are consumed elsewhere in the frontend). */
 export type CanvasSettingStore =
   | 'checkerboard'
@@ -46,12 +48,12 @@ export const CANVAS_RULE_OF_THIRDS_KEY = 'ruleOfThirds';
 export const CANVAS_SNAP_TO_GRID_KEY = 'snapToGrid';
 export const CANVAS_CLIP_TO_BBOX_KEY = 'clipToBbox';
 export const CANVAS_SHOW_PROGRESS_KEY = 'showProgressOnCanvas';
-export const CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY = 'outputOnlyMaskedRegions';
+export const CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY = CANVAS_COMPOSITING_KEYS.outputOnlyMaskedRegions;
 
 const OUTPUT_ONLY_MASKED_REGIONS_SETTING: CanvasBooleanSetting = {
   // Legacy parity: generation results keep alpha outside the expanded mask
   // unless the user explicitly asks to composite them over the source image.
-  defaultValue: true,
+  defaultValue: DEFAULT_CANVAS_COMPOSITING.outputOnlyMaskedRegions,
   key: CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY,
   labelKey: 'widgets.canvas.settings.outputOnlyMaskedRegions',
   section: 'behavior',
@@ -165,10 +167,6 @@ export const readCanvasBooleanSetting = (
   const raw = values?.[setting.key];
   return typeof raw === 'boolean' ? raw : setting.defaultValue;
 };
-
-/** Reads whether generation output should retain transparency outside the mask. */
-export const readCanvasOutputOnlyMaskedRegions = (values: Record<string, unknown> | undefined): boolean =>
-  readCanvasBooleanSetting(values, OUTPUT_ONLY_MASKED_REGIONS_SETTING);
 
 /** Resolves every canvas setting from persisted values into a key→boolean map. */
 export const resolveCanvasSettings = (values: Record<string, unknown> | undefined): ResolvedCanvasSettings => {

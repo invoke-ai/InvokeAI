@@ -2,12 +2,12 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 837395,
+        "brotliBytes": 837433,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 836375,
+        "gzipBytes": 836417,
         "imageRawBytes": 156376,
-        "initialRawBytes": 1947050,
+        "initialRawBytes": 1947147,
         "largestAssetRawBytes": 746355,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 69114,
@@ -287,12 +287,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 845769,
+        "brotliBytes": 845808,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 844739,
+        "gzipBytes": 844782,
         "imageRawBytes": 157940,
-        "initialRawBytes": 1966521,
+        "initialRawBytes": 1966619,
         "largestAssetRawBytes": 753819,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 69114,
@@ -305,12 +305,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1050685,
+        "brotliBytes": 1050651,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1046295,
+        "gzipBytes": 1046347,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2585403,
+        "initialRawBytes": 2586287,
         "largestAssetRawBytes": 746355,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 115755,
@@ -466,7 +466,6 @@
           "source:src/features/generation/core/canvas/addRegionalGuidance.ts",
           "source:src/features/generation/core/canvas/compileCanvasGraph.ts",
           "source:src/features/generation/core/canvas/controlValidation.ts",
-          "source:src/features/generation/core/canvas/types.ts",
           "source:src/features/generation/core/catalogSearch.ts",
           "source:src/features/generation/core/componentCompatibility.ts",
           "source:src/features/generation/core/conditioningRebalance.ts",
@@ -865,12 +864,12 @@
         ]
       },
       "limits": {
-        "brotliBytes": 1061192,
+        "brotliBytes": 1061158,
         "cssRawBytes": 2181,
         "fontRawBytes": 221675,
-        "gzipBytes": 1056758,
+        "gzipBytes": 1056811,
         "imageRawBytes": 157940,
-        "initialRawBytes": 2611258,
+        "initialRawBytes": 2612150,
         "largestAssetRawBytes": 753819,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 115755,
@@ -882,7 +881,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-08-23",
+  "capturedAt": "2026-08-24",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

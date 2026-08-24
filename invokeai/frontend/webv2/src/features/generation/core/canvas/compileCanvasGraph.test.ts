@@ -15,7 +15,6 @@ import type { RegionalGuidanceInput } from './addRegionalGuidance';
 import type { CanvasCompileMode, CanvasCompositingSettings, Rect } from './types';
 
 import { compileCanvasGraph } from './compileCanvasGraph';
-import { DEFAULT_CANVAS_COMPOSITING } from './types';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -97,6 +96,18 @@ const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = 
 
 const bbox: Rect = { height: 1024, width: 768, x: 128, y: 64 };
 
+const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
+  coherenceEdgeSize: 16,
+  coherenceMinDenoise: 0,
+  coherenceMode: 'Gaussian Blur',
+  infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
+  infillMethod: 'lama',
+  infillPatchmatchDownscaleSize: 1,
+  infillTileSize: 32,
+  maskBlur: 16,
+  outputOnlyMaskedRegions: false,
+};
+
 const compile = (
   model: GenerateModelConfig,
   mode: CanvasCompileMode,
@@ -118,9 +129,11 @@ const compile = (
     bbox: overrides.bbox ?? bbox,
     compositeImageName:
       'compositeImageName' in overrides ? (overrides.compositeImageName ?? null) : 'canvas-composite.png',
-    compositing: overrides.compositing
-      ? { ...DEFAULT_CANVAS_COMPOSITING, ...overrides.compositing }
-      : DEFAULT_CANVAS_COMPOSITING,
+    compositing: {
+      ...COMPOSITING_FIXTURE,
+      outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
+      ...overrides.compositing,
+    },
     controlLayers: overrides.controlLayers,
     regionalGuidance: overrides.regionalGuidance,
     destination: overrides.destination ?? 'canvas',
@@ -129,7 +142,6 @@ const compile = (
     mode,
     model,
     noiseMaskImageName: overrides.noiseMaskImageName ?? null,
-    outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
     projectSettings: PROJECT_SETTINGS,
     settings: settingsFor(model, {
       ...COMPONENT_OVERRIDES[model.base],
@@ -461,10 +473,10 @@ describe('compileCanvasGraph', () => {
         compileCanvasGraph({
           bbox,
           compositeImageName: null,
+          compositing: COMPOSITING_FIXTURE,
           destination: 'canvas',
           mode: 'txt2img',
           model: fluxModel,
-          outputOnlyMaskedRegions: false,
           projectSettings: PROJECT_SETTINGS,
           settings: settingsFor(fluxModel),
           strength: 0.6,

@@ -383,7 +383,7 @@ describe('submitResolvedInvocation', () => {
     // The resolved destination rides through so a Canvas source can target the Gallery.
     expect(prepareCanvasInvocation.mock.calls[0]?.[0]).toMatchObject({
       destination: 'gallery',
-      outputOnlyMaskedRegions: false,
+      compositing: expect.objectContaining({ outputOnlyMaskedRegions: false }),
       owner,
       projectId: project.id,
     });

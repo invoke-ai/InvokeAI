@@ -253,7 +253,10 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
 
   const deps: RunCanvasInvocationDeps = {
     composeForGeneration: (composeOptions) => composeForGeneration(host, composeOptions),
-    compositing: DEFAULT_CANVAS_COMPOSITING,
+    compositing: {
+      ...DEFAULT_CANVAS_COMPOSITING,
+      outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
+    },
     destination: options.destination ?? 'canvas',
     commands: {
       generation: {
@@ -267,7 +270,6 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
     generateValues: generateValuesFor(model),
     inFlight: options.inFlight ?? new Set<string>(),
     models: options.models,
-    outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
     projectId: options.projectId ?? 'project-1',
     projectSettings: { useCpuNoise: true },
     signal: new AbortController().signal,

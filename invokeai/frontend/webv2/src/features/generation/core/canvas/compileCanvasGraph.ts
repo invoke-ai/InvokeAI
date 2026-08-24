@@ -42,7 +42,6 @@ import type {
 
 import { addControlLayers } from './addControlLayers';
 import { addRegionalGuidance, isRegionalGuidanceSupportedForBase } from './addRegionalGuidance';
-import { DEFAULT_CANVAS_COMPOSITING } from './types';
 
 /**
  * The backend image-to-latents (encode) node type per supported base. sd-1 /
@@ -304,14 +303,12 @@ const graftMaskTail = (
     initialImageName: string;
     compositing: CanvasCompositingSettings;
     destination: CompileCanvasGraphInput['destination'];
-    outputOnlyMaskedRegions: boolean;
     /** Either a fixed mask image field or an edge-fed source node. */
     gradientMaskImage?: { image_name: string };
     gradientMaskEdge?: { node: BackendInvocationContract; field: string };
   }
 ): void => {
-  const { compositing, denoise, destination, i2lType, initialImageName, outputOnlyMaskedRegions, settings, vaeSource } =
-    args;
+  const { compositing, denoise, destination, i2lType, initialImageName, settings, vaeSource } = args;
 
   // Demote the base decode to an intermediate `canvas_l2i`; the final mask or
   // composite node claims `canvas_output`.
@@ -347,7 +344,7 @@ const graftMaskTail = (
   });
   addEdge(graph, gradientMask, 'expanded_mask_area', expandMask, 'mask');
 
-  const output = outputOnlyMaskedRegions
+  const output = compositing.outputOnlyMaskedRegions
     ? addNode(graph, {
         id: 'canvas_output',
         invert_mask: true,
@@ -362,7 +359,7 @@ const graftMaskTail = (
         type: 'invokeai_img_blend',
         use_cache: false,
       });
-  addEdge(graph, l2i, 'image', output, outputOnlyMaskedRegions ? 'image' : 'layer_upper');
+  addEdge(graph, l2i, 'image', output, compositing.outputOnlyMaskedRegions ? 'image' : 'layer_upper');
   addEdge(graph, expandMask, 'image', output, 'mask');
 
   // The base builder wired core_metadata → the decode's `metadata`; `renameNode`
@@ -439,7 +436,6 @@ const graftInpaint = (
     i2lType,
     initialImageName,
     model,
-    outputOnlyMaskedRegions: input.outputOnlyMaskedRegions,
     settings: input.settings,
     vaeSource,
   });
@@ -504,7 +500,6 @@ const graftOutpaint = (
     i2lType,
     initialImageName,
     model,
-    outputOnlyMaskedRegions: input.outputOnlyMaskedRegions,
     settings: input.settings,
     vaeSource,
   });
@@ -541,7 +536,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     randDevice: input.randDevice ?? (projectSettings.useCpuNoise ? 'cpu' : 'cuda'),
   };
   const backendGraph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
-  const compositing = input.compositing ?? DEFAULT_CANVAS_COMPOSITING;
+  const { compositing } = input;
 
   // Validation above guarantees the composite/mask images required per mode.
   if (mode === 'img2img') {

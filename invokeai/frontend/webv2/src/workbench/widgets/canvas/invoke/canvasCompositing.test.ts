@@ -17,6 +17,7 @@ describe('readCanvasCompositingSettings', () => {
       infillPatchmatchDownscaleSize: 1,
       infillTileSize: 32,
       maskBlur: 16,
+      outputOnlyMaskedRegions: true,
     });
   });
 
@@ -27,12 +28,14 @@ describe('readCanvasCompositingSettings', () => {
       coherenceMode: 'Box Blur',
       infillMethod: 'patchmatch',
       maskBlur: 8,
+      outputOnlyMaskedRegions: false,
     });
     expect(settings.coherenceEdgeSize).toBe(32);
     expect(settings.coherenceMinDenoise).toBe(0.2);
     expect(settings.coherenceMode).toBe('Box Blur');
     expect(settings.infillMethod).toBe('patchmatch');
     expect(settings.maskBlur).toBe(8);
+    expect(settings.outputOnlyMaskedRegions).toBe(false);
   });
 
   it('falls back to defaults for invalid enum values', () => {
