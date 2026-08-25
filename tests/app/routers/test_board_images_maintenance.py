@@ -7,7 +7,7 @@ from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.auth.token_service import TokenData
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.board_records.board_records_common import BoardRecord, BoardVisibility
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.invoker import Invoker
 
@@ -17,6 +17,25 @@ class MockApiDependencies(ApiDependencies):
 
     def __init__(self, invoker) -> None:
         self.invoker = invoker
+
+
+def _board_record() -> BoardRecord:
+    """The record behind the DTO below.
+
+    Board write access is decided off the record, not the DTO: ownership and visibility are
+    two columns, while boards.get_dto() also resolves a cover image and runs three COUNT
+    aggregates, and that cost per name is what the batch routes cannot afford.
+    """
+    return BoardRecord(
+        board_id="board-id",
+        board_name="Board",
+        user_id="system",
+        created_at="2024-01-01 00:00:00.000",
+        updated_at="2024-01-01 00:00:00.000",
+        archived=False,
+        board_visibility=BoardVisibility.Private,
+        cover_image_name=None,
+    )
 
 
 @pytest.fixture
@@ -64,6 +83,7 @@ def test_board_image_mutations_are_blocked_during_image_move_maintenance(
             )
         ),
     )
+    monkeypatch.setattr(mock_invoker.services.board_records, "get", MagicMock(return_value=_board_record()))
     monkeypatch.setattr("invokeai.app.api.routers.board_images.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
@@ -102,6 +122,7 @@ def test_board_image_mutation_checks_access_before_image_move_maintenance(
             )
         ),
     )
+    monkeypatch.setattr(mock_invoker.services.board_records, "get", MagicMock(return_value=_board_record()))
     monkeypatch.setattr("invokeai.app.api.routers.board_images.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
