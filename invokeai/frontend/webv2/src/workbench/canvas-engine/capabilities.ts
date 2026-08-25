@@ -312,10 +312,9 @@ export interface FilterPreviewInput {
  * fewer than two eligible rasters have content.
  */
 export type MergeVisibleResult = 'merged' | 'not-ready' | 'over-budget' | 'busy' | 'nothing';
-export interface DuplicateLayersResult {
-  readonly duplicateIds: readonly string[];
-  readonly selectedLayerId: string;
-}
+export type DuplicateLayersResult =
+  | { readonly status: 'duplicated'; readonly duplicateIds: readonly string[]; readonly selectedLayerId: string }
+  | { readonly status: 'busy' | 'nothing' | 'not-ready' | 'over-budget' | 'stale' };
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
 export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
@@ -381,7 +380,7 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   commitTextEdit(content: string, styleChanges?: Partial<TextToolOptions>): void;
   copyLayerToRaster(layerId: string): Promise<string | null>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
-  duplicateLayers(layerIds: readonly string[]): DuplicateLayersResult | null;
+  duplicateLayers(layerIds: readonly string[]): Promise<DuplicateLayersResult>;
   mergeLayerDown(upperLayerId: string): boolean;
   mergeSelectedRasterLayers(layerIds: readonly string[]): Promise<MergeVisibleResult>;
   mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;

@@ -72,7 +72,9 @@ interface PaintTarget {
 }
 
 /** True for a mask-bearing layer (inpaint mask / regional guidance) — a paintable alpha stencil. */
-const isMaskLayer = (layer: CanvasLayerContract): boolean =>
+const isMaskLayer = (
+  layer: CanvasLayerContract
+): layer is Extract<CanvasLayerContract, { type: 'inpaint_mask' | 'regional_guidance' }> =>
   layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
 
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
@@ -88,6 +90,17 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
     // (a no-op — don't silently spawn a new layer over the user's locked target).
     if (selected.isLocked || !selected.isEnabled) {
       return null;
+    }
+    if (selected.source.bitmap) {
+      const entry = ctx.layers.get(selected.id);
+      if (!entry || entry.stale) {
+        // A durable paint source can legitimately have no cache while disabled
+        // or outside the current frame. Never grow a transparent stroke-sized
+        // cache over it; the compositor's rasterization pass will publish the
+        // source first, and the next gesture can edit the complete pixels.
+        ctx.requestLayerRasterization?.(selected.id);
+        return null;
+      }
     }
     // The cache (if any) keeps its current content extent; the stroke grows it.
     return {
@@ -123,6 +136,13 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
     // locked/hidden mask refuses the stroke (a no-op, not a spawn).
     if (selected.isLocked || !selected.isEnabled) {
       return null;
+    }
+    if (selected.mask.bitmap) {
+      const entry = ctx.layers.get(selected.id);
+      if (!entry || entry.stale) {
+        ctx.requestLayerRasterization?.(selected.id);
+        return null;
+      }
     }
     return {
       cancel: () => undefined,

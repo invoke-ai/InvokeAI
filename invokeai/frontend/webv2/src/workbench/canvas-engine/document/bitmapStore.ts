@@ -155,6 +155,10 @@ export interface BitmapStoreDeps {
 
 /** The imperative bitmap-store handle. */
 export interface BitmapStore {
+  /** Whether the live cache is empty but clearing the durable bitmap is still pending. */
+  hasPendingClear(layerId: string): boolean;
+  /** Whether this layer has pixels that are not yet represented by its persisted bitmap ref. */
+  hasPendingWork(layerId: string): boolean;
   /** Marks a layer dirty and (re)arms its debounce timer. Called on each committed stroke. */
   markLayerDirty(layerId: string): void;
   /**
@@ -872,5 +876,24 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
     reportedStreaks.clear();
   };
 
-  return { discardLayer, dispose, flushPendingUploads, isSelfEcho, markLayerDirty, reset, suspendLayer };
+  const hasPendingWork = (layerId: string): boolean =>
+    dirty.has(layerId) ||
+    pendingClears.has(layerId) ||
+    debounceTimers.has(layerId) ||
+    inFlight.has(layerId) ||
+    isSuspended(layerId);
+
+  const hasPendingClear = (layerId: string): boolean => pendingClears.has(layerId);
+
+  return {
+    discardLayer,
+    dispose,
+    flushPendingUploads,
+    hasPendingClear,
+    hasPendingWork,
+    isSelfEcho,
+    markLayerDirty,
+    reset,
+    suspendLayer,
+  };
 };

@@ -375,6 +375,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       hasSelectedStagedCandidate: selectedCandidate !== undefined,
       hasStagingSlots,
       isInteractionLocked,
+      notifyLayerDuplicateFailed: () =>
+        notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
       selectedLayerIds,
       t,

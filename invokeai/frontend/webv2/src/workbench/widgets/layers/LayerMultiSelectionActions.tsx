@@ -79,16 +79,28 @@ export const LayerMultiSelectionActions = ({
       engine.exports.hasExportableLayerContent(layerId)
     );
 
-  const duplicateSelected = useCallback(() => {
-    const result = engine?.layers.duplicateLayers(selectedIds);
-    if (result) {
-      publishLayerPanelSelection({
-        primaryId: result.selectedLayerId,
-        projectId,
-        selectedIds: result.duplicateIds,
-      });
+  const duplicateSelected = useCallback(async () => {
+    try {
+      const result = await engine?.layers.duplicateLayers(selectedIds);
+      if (result?.status === 'duplicated') {
+        publishLayerPanelSelection({
+          primaryId: result.selectedLayerId,
+          projectId,
+          selectedIds: result.duplicateIds,
+        });
+        return;
+      }
+      if (result?.status === 'busy') {
+        return;
+      }
+    } catch {
+      // Reducer rejection is failure-atomic; surface the same actionable result
+      // as a preflight refusal instead of leaking an event-handler exception.
     }
-  }, [engine, projectId, selectedIds]);
+    if (engine) {
+      toaster.create({ title: t('widgets.layers.actions.copyFailed'), type: 'warning' });
+    }
+  }, [engine, projectId, selectedIds, t]);
 
   const mergeSelected = useCallback(() => {
     if (!engine) {

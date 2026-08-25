@@ -8,6 +8,8 @@ const createStore = (): BitmapStore => ({
   discardLayer: vi.fn(),
   dispose: vi.fn(),
   flushPendingUploads: vi.fn(() => Promise.resolve()),
+  hasPendingClear: vi.fn(() => false),
+  hasPendingWork: vi.fn(() => false),
   isSelfEcho: vi.fn(() => false),
   markLayerDirty: vi.fn(),
   reset: vi.fn(),

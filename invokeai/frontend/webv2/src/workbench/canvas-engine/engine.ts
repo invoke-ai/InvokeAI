@@ -87,7 +87,10 @@ import { GeneratedResultController } from '@workbench/canvas-engine/controllers/
 import { HistoryController } from '@workbench/canvas-engine/controllers/historyController';
 import { InteractionController } from '@workbench/canvas-engine/controllers/interactionController';
 import { LayerController } from '@workbench/canvas-engine/controllers/layerController';
-import { LayerMutationController } from '@workbench/canvas-engine/controllers/layerMutationController';
+import {
+  type DuplicateLayerRasterPlan,
+  LayerMutationController,
+} from '@workbench/canvas-engine/controllers/layerMutationController';
 import { MaskResultController } from '@workbench/canvas-engine/controllers/maskResultController';
 import {
   createCanvasMutationContext,
@@ -121,6 +124,7 @@ import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
 import { createCheckerboardTile } from '@workbench/canvas-engine/render/compositor';
 import { createFontLoader, domFontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
+import { hasLayerDisplayEffect } from '@workbench/canvas-engine/render/layerDisplayEffect';
 import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill';
 import { renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCacheTrim';
@@ -886,10 +890,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getFillColor: () => stores.brushOptions.get().color,
       history,
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+      isRasterCacheReady: (layer, document) => isLayerCacheReadyForOp(layer, document),
       isGestureActive: () => pipeline.isGestureActive(),
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
+      requestRasterization: (layerId) => scheduleLayerRasterization([layerId]),
     },
     selectionImage: {
       capturePermit: (owner) => captureDocumentEditPermit(owner),
@@ -1021,6 +1027,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     invalidate: (payload) => scheduler.invalidate(payload),
     layers: layerCache,
     notifyLayerPainted,
+    requestLayerRasterization: (layerId) => scheduleLayerRasterization([layerId]),
     getSamInteraction: () => stores.samInteraction.get(),
     openTextCreate: (docPoint) => openTextCreate(docPoint),
     openTextEdit: (layerId) => openTextEdit(layerId),
@@ -1182,6 +1189,27 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
   });
   const rasterizeLayerPixels = rasterExportController.rasterize.bind(rasterExportController);
+  const prepareLayerRasterCache = async (layerId: string) => {
+    const result = await rasterizeLayerPixels(layerId, { includeDisabled: true });
+    if (result.status !== 'ok') {
+      return { status: result.status === 'over-budget' ? ('over-budget' as const) : ('not-ready' as const) };
+    }
+    const layer = result.guard.layer;
+    result.release();
+    return { layer, status: 'ready' as const };
+  };
+  const scheduleLayerRasterization = (layerIds: readonly string[]): void => {
+    void (async () => {
+      for (const layerId of layerIds) {
+        try {
+          await prepareLayerRasterCache(layerId);
+        } catch {
+          // Each target can retry independently through its next paint/fill
+          // gesture; one failed source must not starve the rest of the batch.
+        }
+      }
+    })();
+  };
   const exportBakedLayerPixels = rasterExportController.baked.bind(rasterExportController);
   const exportBakedLayerBlob = rasterExportController.blob.bind(rasterExportController);
   type StructuralExportLayerPixelsResult =
@@ -2113,20 +2141,55 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (isCurrentRasterizationJob(layer) || (entry.stale && !isEmpty(getSourceContentRect(layer, doc)))) {
       return 'not-ready';
     }
-    const pixels = backend.createSurface(entry.rect.width, entry.rect.height);
+    const pixels = backend.createSurface(entry.rect.width, entry.rect.height, { willReadFrequently: true });
     pixels.ctx.drawImage(entry.surface.canvas, 0, 0);
     return { pixels, rect: { ...entry.rect } };
   };
 
-  const estimateLayerCacheBytes = (layer: CanvasLayerContract, doc: CanvasDocumentContractV2): number | 'not-ready' => {
+  const getDuplicateRasterPlan = (
+    layer: CanvasLayerContract,
+    doc: CanvasDocumentContractV2
+  ): DuplicateLayerRasterPlan => {
+    const source = renderableSourceOf(layer);
+    if (!source) {
+      return { type: 'empty' };
+    }
     const entry = layerCache.get(layer.id);
     if (!entry || isEmpty(entry.rect)) {
-      return 0;
+      // Persistence clearing is failure-tolerant: the live cache may already be
+      // empty while the contract still names the old bitmap. The cache is the
+      // pixel authority in that state, so the duplicate must explicitly start
+      // empty rather than resurrecting the durable image.
+      if (source.type === 'paint' && bitmapStore.hasPendingClear(layer.id)) {
+        return { type: 'empty' };
+      }
+      if (isEmpty(getSourceContentRect(layer, doc))) {
+        return { type: 'empty' };
+      }
+      if (source.type === 'paint' && bitmapStore.hasPendingWork(layer.id)) {
+        return { type: 'not-ready' };
+      }
+      if (layer.isEnabled) {
+        return { type: 'not-ready' };
+      }
+      return { type: 'reference' };
     }
     if (isCurrentRasterizationJob(layer) || (entry.stale && !isEmpty(getSourceContentRect(layer, doc)))) {
-      return 'not-ready';
+      return { type: 'not-ready' };
     }
-    return entry.rect.width * entry.rect.height * 4;
+    const captureBytes = entry.rect.width * entry.rect.height * 4;
+    const createsDerivedSurface =
+      layer.type === 'regional_guidance' || layer.type === 'inpaint_mask' || hasLayerDisplayEffect(layer);
+    const retainForHistory =
+      source.type === 'paint' && (source.bitmap === null || bitmapStore.hasPendingWork(layer.id));
+    const derivedBytes = createsDerivedSurface ? captureBytes : 0;
+    return {
+      captureBytes,
+      initialReserveBytes: captureBytes * (retainForHistory ? 2 : 1) + derivedBytes,
+      replayReserveBytes: captureBytes + derivedBytes,
+      retainForHistory,
+      type: 'capture',
+    };
   };
 
   const reserveLayerOperation = (bytes: number) => {
@@ -2151,23 +2214,39 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const layerMutationController = new LayerMutationController({
     canEdit: () => canEditDocument(),
+    capturePermit: () => captureDocumentEditPermit(),
     captureCache: captureLayerCache,
     createLayerId,
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
     dispatchPrepared: dispatchPreparedMutation,
     endBurst: () => endNudgeBurst(),
-    estimateCacheBytes: estimateLayerCacheBytes,
+    getDuplicateRasterPlan,
     getDocument: () => mirror.getDocument(),
     getReducerDocument,
     getSelectedLayerIds: resolveSelectedLayerIds,
+    hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
     history,
     installPrepared: installGeneratedPaintCache,
     isGestureActive: () => pipeline.isGestureActive(),
+    isPermitCurrent: (permit) => isDocumentEditPermitCurrent(permit),
     needsPixelPersistence: layerNeedsPixelPersistence,
     preparePixels: prepareGeneratedPaintCache,
+    prepareDuplicateRasterSource: prepareLayerRasterCache,
+    pinDuplicateRasterSources: (layerIds) => {
+      const leases = layerIds.map((layerId) => rasterController.memory.pinOperation(layerId));
+      return {
+        release: () => {
+          for (const lease of leases) {
+            lease.release();
+          }
+        },
+      };
+    },
     publishSelectedLayerIds: (primaryId, selectedIds) => opts.setSelectedLayerIds?.(primaryId, selectedIds),
     reserve: reserveLayerOperation,
+    scheduleDuplicateRasterization: scheduleLayerRasterization,
     sameContract: documentHasLayerContract,
+    trackDetached: (bytes) => rasterController.memory.trackDetached(bytes, lifecycleGeneration),
   });
   const commitLayerCopy = layerMutationController.copy.bind(layerMutationController);
   const commitLayerConversion = layerMutationController.convert.bind(layerMutationController);

@@ -30,7 +30,12 @@ export interface SelectionPixelControllerOptions {
   readonly endBurst: () => void;
   readonly deleteDerived: (layerId: string) => void;
   readonly invalidateLayer: (layerId: string) => void;
+  readonly isRasterCacheReady: (
+    layer: CanvasDocumentContractV2['layers'][number],
+    document: CanvasDocumentContractV2
+  ) => boolean;
   readonly notifyPainted: (layerId: string) => void;
+  readonly requestRasterization: (layerId: string) => void;
   readonly markDirty: (layerId: string) => void;
 }
 
@@ -80,6 +85,14 @@ export class SelectionPixelController {
     }
     const selectionRect = roundOut(bounds);
     const selectedLayer = document.layers.find((candidate) => candidate.id === document.selectedLayerId);
+    if (
+      selectedLayer?.type === 'raster' &&
+      selectedLayer.source.type === 'paint' &&
+      !this.deps.isRasterCacheReady(selectedLayer, document)
+    ) {
+      this.deps.requestRasterization(selectedLayer.id);
+      return;
+    }
     if (
       kind === 'erase' &&
       selectedLayer?.type === 'control' &&
