@@ -50,7 +50,10 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
     (data) => {
       const body = {
         preprocessor: data.preprocessor.isEnabled ? data.preprocessor.value : null,
-        fp8_storage: data.fp8Storage.isEnabled ? data.fp8Storage.value : null,
+        // Null it out wherever the control is hidden. react-hook-form keeps unrendered fields in
+        // `defaultValues`, so without this a value persisted before the control was hidden would be
+        // re-sent verbatim on every save, with no UI left to clear it.
+        fp8_storage: supportsFp8Storage(modelConfig) && data.fp8Storage.isEnabled ? data.fp8Storage.value : null,
       };
 
       updateModel({
@@ -76,7 +79,7 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
           }
         });
     },
-    [updateModel, modelConfig.key, t, reset]
+    [updateModel, modelConfig, t, reset]
   );
 
   return (

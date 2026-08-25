@@ -18,7 +18,7 @@ import accelerate
 import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
+from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config, MainModelDefaultSettings
 from invokeai.backend.model_manager.load.load_default import (
     _FP8_DEFAULT_SKIP_PATTERNS,
     _FP8_SUPPORTED_PYTORCH_LAYERS,
@@ -112,7 +112,12 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
 
     checkpoint_path = tmp_path / "anima.safetensors"
     checkpoint_path.touch()
-    config = Main_Checkpoint_Anima_Config.model_construct(path=str(checkpoint_path), fp8_storage=True)
+    # `fp8_storage` lives under `default_settings` -- passing it as a top-level kwarg to
+    # `model_construct` would be silently discarded (the config has no such field and no extra="allow"),
+    # leaving the toggle off in a test whose whole point is that the toggle is wired up.
+    config = Main_Checkpoint_Anima_Config.model_construct(
+        path=str(checkpoint_path), default_settings=MainModelDefaultSettings(fp8_storage=True)
+    )
 
     monkeypatch.setattr(anima_transformer_module, "AnimaTransformer", _TinyAnimaTransformer)
     monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: {"weight": torch.ones(2, 2)})
