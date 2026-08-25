@@ -37,25 +37,6 @@ export const waitForMediaCookieSelfHeal = (): Promise<void> => {
   });
 };
 
-export const openMediaInNewTab = (url: string) => {
-  if (!isMediaCookieSelfHealPending()) {
-    window.open(url, '_blank', 'noopener,noreferrer');
-    return;
-  }
-
-  // Open the media URL during the user gesture so popup blockers allow it. Do not
-  // use about:blank here: some browser shells delegate that URL to the OS instead
-  // of creating a browser tab. If the first request races the cookie refresh, the
-  // replace below retries it once self-heal settles.
-  const tab = window.open(url, '_blank');
-  if (tab) {
-    tab.opener = null;
-  }
-  void waitForMediaCookieSelfHeal().then(() => {
-    tab?.location.replace(url);
-  });
-};
-
 export const abortAndWaitForPendingRefreshes = async (pending: Set<PendingRefresh>) => {
   for (const refresh of pending) {
     refresh.abort();

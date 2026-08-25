@@ -59,12 +59,14 @@ describe('video review regressions', () => {
     expect(locale).toContain('"problemDownloadingMedia": "Unable to Download Media"');
   });
 
-  it('waits for cookie self-heal before opening protected video URLs', () => {
+  it('opens protected video URLs through the shared direct opener', () => {
     const preview = readSource('./components/ImageViewer/CurrentVideoPreview.tsx');
     const contextMenu = readSource('./components/ContextMenu/MenuItems/ContextMenuItemOpenInNewTabVideo.tsx');
 
     expect(preview).toContain('openMediaInNewTab');
     expect(contextMenu).toContain('openMediaInNewTab');
+    expect(preview).toContain("from 'common/util/openMediaInNewTab'");
+    expect(contextMenu).toContain("from 'common/util/openMediaInNewTab'");
     expect(preview).not.toContain('window.open(videoDTO.video_url');
     expect(contextMenu).not.toContain('window.open(videoDTO.video_url');
   });
