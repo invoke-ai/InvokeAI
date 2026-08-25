@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { getGalleryRevealRequest, requestGalleryItemReveal, subscribeGalleryRevealRequests } from './revealRequest';
+import { getGalleryRevealRequest, requestGalleryItemReveal, subscribeGalleryRevealRequests } from './selection';
 
 describe('gallery reveal requests', () => {
   it('notifies subscribers with a fresh token per request, even for the same item', () => {

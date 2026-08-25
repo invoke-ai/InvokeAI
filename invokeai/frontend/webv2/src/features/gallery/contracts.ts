@@ -40,7 +40,6 @@ export {
   registerImageCluster,
   type GallerySemanticReference,
 } from './core/semanticImageQuery';
-export { requestGalleryItemReveal } from './core/revealRequest';
 export {
   DEFAULT_GALLERY_SETTINGS,
   getGallerySettings,
@@ -67,4 +66,5 @@ export {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
+  requestGalleryItemReveal,
 } from './core/selection';

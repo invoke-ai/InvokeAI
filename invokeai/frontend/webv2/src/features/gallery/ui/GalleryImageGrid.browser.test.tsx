@@ -14,7 +14,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { requestGalleryItemReveal } from '@features/gallery/core/revealRequest';
+import { requestGalleryItemReveal } from '@features/gallery/core/selection';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { isGalleryImageDragData } from '@features/gallery/utility';

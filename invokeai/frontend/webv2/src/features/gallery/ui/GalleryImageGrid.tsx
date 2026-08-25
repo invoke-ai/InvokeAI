@@ -5,7 +5,7 @@ import {
   getGalleryRevealRequest,
   subscribeGalleryRevealRequests,
   type GalleryRevealRequest,
-} from '@features/gallery/core/revealRequest';
+} from '@features/gallery/core/selection';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { Button, DropZone } from '@platform/ui';
