@@ -36,6 +36,7 @@ vi.mock('features/gallery/store/gallerySelectors', () => ({
 
 vi.mock('features/gallery/store/gallerySlice', () => ({
   imageSelected: vi.fn((payload: string | null) => ({ type: 'gallery/imageSelected', payload })),
+  selectionChanged: vi.fn((payload: string[]) => ({ type: 'gallery/selectionChanged', payload })),
 }));
 
 vi.mock('features/nodes/store/nodesSlice', () => ({
@@ -75,33 +76,67 @@ const buildVideoFieldNode = (nodeId: string, videoName: string) => ({
   },
 });
 
-const buildStore = (selection: string[], failingNames: Set<string>, nodes: unknown[] = [], rejectAll = false) => {
+/**
+ * `selectionDuringDelete` re-points the store's selection when the delete request is issued,
+ * standing in for the user selecting something else while it is in flight. The rest of
+ * handleDeletions then runs against that newer selection, as it does in the app.
+ *
+ * It writes `currentSelection` directly rather than dispatching, so the simulated gesture does not
+ * land in `dispatched` and cannot be mistaken for the production write under test. The seam is
+ * only equivalent to a real mid-flight click because neither modal reads state between issuing the
+ * request and the post-await block; anything added in between would need a real dispatch here.
+ */
+const buildStore = (
+  selection: string[],
+  failingNames: Set<string>,
+  nodes: unknown[] = [],
+  rejectAll = false,
+  selectionDuringDelete?: string[]
+) => {
   const dispatched: unknown[] = [];
+  let currentSelection = selection;
   const dispatch = vi.fn((action: unknown) => {
     dispatched.push(action);
     const typed = action as { type?: string; video_names?: string[] };
     if (typed?.type === 'videosApi/deleteVideos') {
       return {
-        unwrap: () =>
-          rejectAll
+        unwrap: () => {
+          if (selectionDuringDelete) {
+            currentSelection = selectionDuringDelete;
+          }
+          return rejectAll
             ? Promise.reject(new Error('delete failed'))
             : Promise.resolve({
                 deleted_videos: (typed.video_names ?? []).filter((name) => !failingNames.has(name)),
                 failed_videos: (typed.video_names ?? []).filter((name) => failingNames.has(name)),
                 affected_boards: ['none'],
-              }),
+              });
+        },
       };
     }
     return action;
   });
-  const getState = vi.fn(() => ({ gallery: { selection }, nodes: { present: { nodes } } }));
+  const getState = vi.fn(() => ({ gallery: { selection: currentSelection }, nodes: { present: { nodes } } }));
   return { store: { dispatch, getState } as unknown as AppStore, dispatched };
 };
 
-const getSelectionChange = (dispatched: unknown[]) =>
-  dispatched.find(
-    (action): action is { type: string; payload: string | null } =>
-      !!action && typeof action === 'object' && (action as { type?: string }).type === 'gallery/imageSelected'
+/**
+ * Every write to the selection, in order and raw — so an expectation pins the whole payload *and*
+ * that there was exactly one write. Returning just the first match let a stray second dispatch
+ * (which is what the user would actually end up looking at) pass unnoticed.
+ *
+ * The two branches use different actions deliberately: advancing to a neighbour *picks* an item
+ * (`imageSelected`), while keeping the displayed item and dropping the deleted ones from the
+ * multi-selection is a *mutation* (`selectionChanged`), which the viewer does not treat as the
+ * user asking to see anything.
+ */
+const getSelectionWrites = (dispatched: unknown[]) =>
+  dispatched.filter(
+    (candidate): candidate is { type: string; payload: string | string[] | null } =>
+      !!candidate &&
+      typeof candidate === 'object' &&
+      ((candidate as { type?: string }).type === 'gallery/imageSelected' ||
+        (candidate as { type?: string }).type === 'gallery/selectionChanged')
   );
 
 const getVideoFieldChanges = (dispatched: unknown[]) =>
@@ -143,7 +178,7 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     await handleDeletions(['a.mp4'], store);
 
-    expect(getSelectionChange(dispatched), 'a failed delete must not advance the selection').toBeUndefined();
+    expect(getSelectionWrites(dispatched), 'a failed delete must not advance the selection').toEqual([]);
   });
 
   it('does not move the selection when the whole batch request fails', async () => {
@@ -152,7 +187,7 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     await handleDeletions(['a.mp4'], store);
 
-    expect(getSelectionChange(dispatched)).toBeUndefined();
+    expect(getSelectionWrites(dispatched)).toEqual([]);
   });
 
   it('keeps a surviving (failed-delete) neighbour as the replacement candidate', async () => {
@@ -163,11 +198,11 @@ describe('handleDeletions selection behavior on partial failure', () => {
     await handleDeletions(['a.mp4', 'b.mp4'], store);
 
     // Before the fix, b.mp4 was excluded as "deleted" and the selection skipped to c.png.
-    expect(getSelectionChange(dispatched)?.payload).toBe('b.mp4');
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/imageSelected', payload: 'b.mp4' }]);
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ status: 'warning' }));
   });
 
-  it('keeps viewing the displayed video when its delete fails but another selected video was deleted', async () => {
+  it('keeps viewing the displayed video when another selected video was deleted, without re-picking it', async () => {
     vi.mocked(selectLastSelectedItem).mockReturnValue('a.mp4');
     const { store, dispatched } = buildStore(['a.mp4', 'b.mp4'], new Set(['a.mp4']));
 
@@ -175,7 +210,13 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     // The multi-selection contained a deleted item (b), so the selection is pruned — but it
     // must land on the still-existing displayed video, not jump to a neighbour.
-    expect(getSelectionChange(dispatched)?.payload).toBe('a.mp4');
+    //
+    // And it must prune rather than re-pick (PR #9520 review): `imageSelected('a.mp4')` leaves the
+    // very same selection, but it is the action that means "the user picked this", which makes the
+    // viewer lift an in-progress generation's overlay off the video for two seconds. Deleting some
+    // other video is not a request to look at this one.
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['a.mp4'] }]);
+    expect(imageSelected).not.toHaveBeenCalled();
   });
 
   it('advances to the nearest surviving neighbour when everything requested is deleted', async () => {
@@ -184,8 +225,40 @@ describe('handleDeletions selection behavior on partial failure', () => {
 
     await handleDeletions(['b.mp4'], store);
 
-    expect(getSelectionChange(dispatched)?.payload).toBe('a.mp4');
+    // The displayed item is gone, so the viewer really does move to a different video: that is a
+    // pick, and revealing it over a running generation is the point.
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/imageSelected', payload: 'a.mp4' }]);
     expect(imageSelected).toHaveBeenCalledWith('a.mp4');
+  });
+
+  it('leaves a selection made while the delete was in flight alone', async () => {
+    // The branch decides on a snapshot taken before the request, so by the time it runs the user
+    // may have selected something else. Collapsing onto the snapshot would discard that pick *and*
+    // move the active item back — which the viewer publishes as a change of active item and
+    // reveals, the very flash the mutation action avoids.
+    vi.mocked(selectLastSelectedItem).mockReturnValue('a.mp4');
+    const { store, dispatched } = buildStore(['a.mp4', 'b.mp4'], new Set(['a.mp4']), [], false, [
+      'a.mp4',
+      'b.mp4',
+      'c.png',
+    ]);
+
+    await handleDeletions(['a.mp4', 'b.mp4'], store);
+
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['a.mp4', 'c.png'] }]);
+    expect(imageSelected).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the surviving displayed video when the newer selection is all deleted', async () => {
+    // Same race, but everything the user selected meanwhile went away. Without the fallback this
+    // dispatches selectionChanged([]) and drops the viewer to its empty-state placeholder while a
+    // surviving video is still on screen — the original #9163 bug this file exists to guard.
+    vi.mocked(selectLastSelectedItem).mockReturnValue('a.mp4');
+    const { store, dispatched } = buildStore(['a.mp4'], new Set(['a.mp4']), [], false, ['b.mp4']);
+
+    await handleDeletions(['a.mp4', 'b.mp4'], store);
+
+    expect(getSelectionWrites(dispatched)).toEqual([{ type: 'gallery/selectionChanged', payload: ['a.mp4'] }]);
   });
 });
 

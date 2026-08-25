@@ -4,7 +4,11 @@ import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } fr
 import { isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
 import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { deleteVideosWithDialog } from 'features/deleteVideoModal/store/state';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
+import {
+  $gallerySelection,
+  markNextSelectionAutoSwitched,
+  resetGallerySelectionSource,
+} from 'features/gallery/store/gallerySelectionSource';
 import {
   autoAddBoardIdChanged,
   boardIdSelected,
@@ -124,20 +128,19 @@ describe('auth cache isolation', () => {
 });
 
 describe('gallery listener registration', () => {
-  it('settles the auto-switch marker through the real store wiring', () => {
+  it('publishes selections through the real store wiring', () => {
     // The per-listener tests build their own store, so nothing else fails if the registration in
-    // store.ts is deleted — and without it the marker never settles, every stale marker suppresses
-    // the user's next click on that item, and the exact dead click the marker exists to prevent
-    // comes back. This is the one test that dispatches through createStore()'s own listeners.
+    // store.ts is deleted — and without it no selection is ever published: the auto-switch mark is
+    // never spent, and the viewer's reveal machine never hears about any selection at all. This is
+    // the one test that dispatches through createStore()'s own listeners.
     const store = createStore();
-    autoSwitchedImages.settle(null); // module singleton; start from empty
+    resetGallerySelectionSource(); // module singleton; start from empty
 
-    autoSwitchedImages.record('auto-switched.png');
+    markNextSelectionAutoSwitched();
     store.dispatch(imageSelected('auto-switched.png'));
-    store.dispatch(imageSelected('user-clicked-elsewhere.png'));
+    expect($gallerySelection.get()).toMatchObject({ name: 'auto-switched.png', isAutoSwitch: true });
 
-    expect(autoSwitchedImages.consume('auto-switched.png'), 'the marker must not survive the selection moving on').toBe(
-      false
-    );
+    store.dispatch(imageSelected('user-clicked.png'));
+    expect($gallerySelection.get()).toMatchObject({ name: 'user-clicked.png', isAutoSwitch: false });
   });
 });
