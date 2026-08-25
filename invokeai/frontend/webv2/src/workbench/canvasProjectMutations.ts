@@ -11,7 +11,7 @@ import type { Project } from '@workbench/projectContracts';
 
 import { isHideableLayer } from '@workbench/canvas-engine/api';
 
-import { normalizeCanvasDocumentControlAdapters } from './canvasMigration';
+import { normalizeCanvasDocumentContract } from './canvasMigration';
 import {
   getCanvasStagingCandidateFingerprint,
   getCanvasStagingSlotCount,
@@ -690,7 +690,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
     case 'replaceCanvasDocument':
       return setCanvasState(project, {
         ...project.canvas,
-        document: repairSelectedLayerId(normalizeCanvasDocumentControlAdapters(structuredClone(mutation.document))),
+        document: repairSelectedLayerId(normalizeCanvasDocumentContract(structuredClone(mutation.document))),
         documentRevision: project.canvas.documentRevision + 1,
         stagingArea: clearStagingArea(project.canvas.stagingArea),
       });
@@ -701,7 +701,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           ...project.canvas.snapshots,
           {
             createdAt: mutation.createdAt,
-            document: normalizeCanvasDocumentControlAdapters(structuredClone(project.canvas.document)),
+            document: normalizeCanvasDocumentContract(structuredClone(project.canvas.document)),
             id: mutation.id,
             name: mutation.name,
           },
@@ -712,7 +712,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       return snapshot
         ? setCanvasState(project, {
             ...project.canvas,
-            document: repairSelectedLayerId(normalizeCanvasDocumentControlAdapters(structuredClone(snapshot.document))),
+            document: repairSelectedLayerId(normalizeCanvasDocumentContract(structuredClone(snapshot.document))),
             documentRevision: project.canvas.documentRevision + 1,
           })
         : project;

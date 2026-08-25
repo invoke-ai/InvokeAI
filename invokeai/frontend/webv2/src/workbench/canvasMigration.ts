@@ -212,6 +212,27 @@ const asPositiveNumber = (value: unknown, fallback: number): number => {
   return numeric > 0 ? numeric : fallback;
 };
 
+/** A positive whole-pixel dimension, shared by creation and every migration path. */
+const asPositiveInteger = (value: unknown, fallback: number): number =>
+  Math.max(1, Math.round(asPositiveNumber(value, fallback)));
+
+/** The canonical whole-pixel geometry for a live or persisted canvas document. */
+const normalizeCanvasDocumentGeometry = (rawWidth: unknown, rawHeight: unknown, rawBbox?: unknown) => {
+  const width = asPositiveInteger(rawWidth, DEFAULT_CANVAS_DOCUMENT_WIDTH);
+  const height = asPositiveInteger(rawHeight, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
+  const bbox = isRecord(rawBbox) ? rawBbox : {};
+  return {
+    bbox: {
+      height: asPositiveInteger(bbox.height, height),
+      width: asPositiveInteger(bbox.width, width),
+      x: Math.round(asNumber(bbox.x, 0)),
+      y: Math.round(asNumber(bbox.y, 0)),
+    },
+    height,
+    width,
+  };
+};
+
 export const createEmptyCanvasStateV2 = (
   width = DEFAULT_CANVAS_DOCUMENT_WIDTH,
   height = DEFAULT_CANVAS_DOCUMENT_HEIGHT
@@ -226,15 +247,16 @@ export const createEmptyCanvasStateV2 = (
 export const createEmptyCanvasDocumentV2 = (
   width = DEFAULT_CANVAS_DOCUMENT_WIDTH,
   height = DEFAULT_CANVAS_DOCUMENT_HEIGHT
-): CanvasDocumentContractV2 => ({
-  background: 'transparent',
-  bbox: { height, width, x: 0, y: 0 },
-  height,
-  layers: [],
-  selectedLayerId: null,
-  version: 2,
-  width,
-});
+): CanvasDocumentContractV2 => {
+  const geometry = normalizeCanvasDocumentGeometry(width, height);
+  return {
+    background: 'transparent',
+    ...geometry,
+    layers: [],
+    selectedLayerId: null,
+    version: 2,
+  };
+};
 
 /**
  * A brand-new project's default inpaint mask: one empty mask (no bitmap/strokes)
@@ -353,18 +375,14 @@ const migrateLayerToV2 = (rawLayer: unknown, index: number): CanvasRasterLayerCo
 
 const migrateDocumentToV2 = (rawCanvas: Record<string, unknown>): CanvasDocumentContractV2 => {
   const rawDocument = isRecord(rawCanvas.document) ? rawCanvas.document : rawCanvas;
-  const width = asPositiveNumber(rawDocument.width, DEFAULT_CANVAS_DOCUMENT_WIDTH);
-  const height = asPositiveNumber(rawDocument.height, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
   const rawLayers = Array.isArray(rawDocument.layers) ? rawDocument.layers : [];
 
   return {
     background: 'transparent',
-    bbox: { height, width, x: 0, y: 0 },
-    height,
+    ...normalizeCanvasDocumentGeometry(rawDocument.width, rawDocument.height),
     layers: rawLayers.map((rawLayer, index) => migrateLayerToV2(rawLayer, index)),
     selectedLayerId: null,
     version: 2,
-    width,
   };
 };
 
@@ -431,10 +449,9 @@ const normalizeCanvasLayer = (value: unknown): CanvasDocumentContractV2['layers'
   return parsed.success ? (candidate as unknown as CanvasDocumentContractV2['layers'][number]) : null;
 };
 
-export const normalizeCanvasDocumentControlAdapters = (
-  document: CanvasDocumentContractV2
-): CanvasDocumentContractV2 => ({
+export const normalizeCanvasDocumentContract = (document: CanvasDocumentContractV2): CanvasDocumentContractV2 => ({
   ...document,
+  ...normalizeCanvasDocumentGeometry(document.width, document.height, document.bbox),
   layers: document.layers.flatMap((layer) => {
     const normalized = normalizeCanvasLayer(layer);
     return normalized ? [normalized] : [];
@@ -451,25 +468,15 @@ const normalizeCanvasDocumentV2 = (value: unknown, requireValidLayers: boolean):
   if (requireValidLayers && (!Array.isArray(rawDocument.layers) || layers.length !== rawLayers.length)) {
     return null;
   }
-  const width = asPositiveNumber(rawDocument.width, DEFAULT_CANVAS_DOCUMENT_WIDTH);
-  const height = asPositiveNumber(rawDocument.height, DEFAULT_CANVAS_DOCUMENT_HEIGHT);
-  const bbox = isRecord(rawDocument.bbox) ? rawDocument.bbox : {};
   return {
     background:
       rawDocument.background === 'transparent' || isRecord(rawDocument.background)
         ? (rawDocument.background as CanvasDocumentContractV2['background'])
         : 'transparent',
-    bbox: {
-      height: asPositiveNumber(bbox.height, height),
-      width: asPositiveNumber(bbox.width, width),
-      x: asNumber(bbox.x, 0),
-      y: asNumber(bbox.y, 0),
-    },
-    height,
+    ...normalizeCanvasDocumentGeometry(rawDocument.width, rawDocument.height, rawDocument.bbox),
     layers,
     selectedLayerId: typeof rawDocument.selectedLayerId === 'string' ? rawDocument.selectedLayerId : null,
     version: 2,
-    width,
   };
 };
 

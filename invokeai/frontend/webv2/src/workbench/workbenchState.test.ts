@@ -4698,6 +4698,28 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(state).document.layers[0]).not.toBe(replacement.layers[0]);
   });
 
+  it('canonicalizes whole-pixel geometry across document replacement and snapshots', () => {
+    let state = createInitialWorkbenchState();
+    const fractional = {
+      ...createEmptyCanvasDocumentV2(),
+      bbox: { height: 99.6, width: 100.4, x: 1.2, y: -2.6 },
+      height: 511.6,
+      width: 512.4,
+    };
+    const expected = { bbox: { height: 100, width: 100, x: 1, y: -3 }, height: 512, width: 512 };
+
+    state = workbenchReducer(state, { document: fractional, type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).document).toMatchObject(expected);
+
+    Object.assign(getCanvas(state).document, fractional);
+    state = workbenchReducer(state, { createdAt: 'now', id: 'snap-1', name: 'Fractional', type: 'saveCanvasSnapshot' });
+    expect(getCanvas(state).snapshots[0]?.document).toMatchObject(expected);
+
+    Object.assign(getCanvas(state).snapshots[0]!.document, fractional);
+    state = workbenchReducer(state, { snapshotId: 'snap-1', type: 'restoreCanvasSnapshot' });
+    expect(getCanvas(state).document).toMatchObject(expected);
+  });
+
   it('clears the staging area on replaceCanvasDocument (staged candidates belong to the outgoing document)', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
     const staged: Project['canvas']['stagingArea']['pendingImages'][number] = {

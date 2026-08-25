@@ -9,7 +9,8 @@
  * - **Pointer-move** updates an engine-transient preview rect (via
  *   `stores.bboxPreview`) that the overlay renders — it never dispatches. Sizes
  *   and positions snap to the model grid (`stores.bboxGrid`); hold **alt** to
- *   bypass snapping. While moving, **shift** constrains the frame to the
+ *   bypass model-grid snapping. Bypassed movement and resize still stay aligned
+ *   to whole document pixels. While moving, **shift** constrains the frame to the
  *   dominant horizontal or vertical axis. Corner/edge resize preserves the
  *   aspect ratio when the lock is active (`stores.bboxOptions`); **shift**
  *   toggles the constraint on for an unlocked frame (a locked ratio stays
@@ -87,6 +88,7 @@ const nextBboxFor = (
 ): Rect => {
   const grid = ctx.stores.bboxGrid.get();
   // Snap to the model grid unless Alt bypasses it or the snap-to-grid setting is off.
+  // The geometry helpers still apply baseline whole-pixel alignment in either bypass case.
   const snap = !modifiers.alt && ctx.stores.snapToGrid.get();
   const dx = point.x - state.startDoc.x;
   const dy = point.y - state.startDoc.y;
