@@ -122,8 +122,15 @@ export const requestImageMapRefresh = async (): Promise<boolean> => {
   return body.enqueued;
 };
 
+export interface ImageMapClusterLabelInfo {
+  /** Best-matching vocabulary phrase. */
+  label: string;
+  /** Runner-up phrases, best first. */
+  alternates: string[];
+}
+
 export interface ImageMapClusterLabels {
-  labels: Record<string, string>;
+  labels: Record<string, ImageMapClusterLabelInfo>;
   /** Fingerprint of the visible image set the labels were clustered over. */
   visibleHash: string | null;
   /** The projection these labels were computed against. */
@@ -146,14 +153,35 @@ export const fetchImageMapClusterLabels = async (options?: {
 
   const queryString = query.toString();
   const body = await apiFetchJson<{
-    labels: Record<string, { label: string }>;
+    labels: Record<string, { label: string; alternates?: string[] }>;
     visible_hash?: string | null;
     updated_at?: string | null;
   }>(`/api/v1/image_map/cluster_labels${queryString ? `?${queryString}` : ''}`);
 
   return {
-    labels: Object.fromEntries(Object.entries(body.labels).map(([clusterId, info]) => [clusterId, info.label])),
+    labels: Object.fromEntries(
+      Object.entries(body.labels).map(([clusterId, info]) => [
+        clusterId,
+        { alternates: info.alternates ?? [], label: info.label },
+      ])
+    ),
     updatedAt: body.updated_at ?? null,
     visibleHash: body.visible_hash ?? null,
   };
+};
+
+export interface ImageMapImageLabels {
+  /** Best-matching vocabulary phrase. */
+  label: string;
+  /** Runner-up phrases, best first. */
+  alternates: string[];
+}
+
+export const fetchImageMapImageLabels = async (imageName: string): Promise<ImageMapImageLabels> => {
+  const query = new URLSearchParams({ image_name: imageName });
+  const body = await apiFetchJson<{ label: string; alternates?: string[] }>(
+    `/api/v1/image_map/image_labels?${query.toString()}`
+  );
+
+  return { alternates: body.alternates ?? [], label: body.label };
 };

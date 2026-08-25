@@ -1548,6 +1548,31 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/image_map/image_labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Map Image Labels
+         * @description Labels one image with the vocabulary phrases most similar to its stored embedding.
+         *
+         *     Serves map hover cards, so it only covers images the index has embedded;
+         *     an unindexed image (assets, intermediates, not-yet-indexed) is a 404
+         *     rather than an on-demand embed — a hover must never queue encoder work.
+         *     Requires the embedding model's text encoder, like /cluster_labels.
+         */
+        get: operations["get_image_map_image_labels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/image_map/refresh": {
         parameters: {
             query?: never;
@@ -17550,6 +17575,27 @@ export type components = {
              * @description The projection these labels were computed against; clients must discard labels whose projection does not match their points
              */
             updated_at?: string | null;
+        };
+        /**
+         * ImageMapImageLabelsResponse
+         * @description The best vocabulary labels for one image.
+         */
+        ImageMapImageLabelsResponse: {
+            /**
+             * Label
+             * @description Best-matching vocabulary phrase
+             */
+            label: string;
+            /**
+             * Alternates
+             * @description Runner-up phrases
+             */
+            alternates: string[];
+            /**
+             * Score
+             * @description Cosine similarity of the best phrase to the image's embedding
+             */
+            score: number;
         };
         /**
          * ImageMapPoint
@@ -47644,6 +47690,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImageMapClusterLabelsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_image_map_image_labels: {
+        parameters: {
+            query: {
+                /** @description The image to label */
+                image_name: string;
+                /** @description Number of candidate labels */
+                top_k?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageMapImageLabelsResponse"];
                 };
             };
             /** @description Validation Error */

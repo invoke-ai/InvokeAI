@@ -6,7 +6,7 @@ import {
 import { createExternalStore } from '@platform/state/externalStore';
 import { getApiErrorMessage } from '@platform/transport/http';
 
-import type { ImageMapPoints } from './api';
+import type { ImageMapClusterLabelInfo, ImageMapPoints } from './api';
 import type { ImageIndexCounts } from './indexProgress';
 
 import { fetchImageMapClusterLabels, fetchImageMapPoints, fetchImageMapStatus } from './api';
@@ -32,8 +32,21 @@ export interface ImageMapSnapshot {
    * whenever there are no counts.
    */
   indexUpdatedAt: number | null;
-  /** Cluster id -> automatic label; null when unavailable (e.g. no text encoder). */
-  clusterLabels: Record<string, string> | null;
+  /** Cluster id -> automatic label info; null when unavailable (e.g. no text encoder). */
+  clusterLabels: Record<string, ImageMapClusterLabelInfo> | null;
+  /**
+   * The visible-set fingerprint `clusterLabels` were computed over, so a
+   * consumer can tell whether they still describe the drawn clustering.
+   *
+   * Labels lag their points by a request: a refresh replaces `data` while the
+   * previous clustering's labels are still in the store, and DBSCAN can
+   * renumber every cluster between the two. Annotations have always accepted
+   * that lag (clearing them on each refresh would blink every label off and
+   * back on), but a consumer making a stronger promise — the hover card names
+   * one specific cluster — compares this against `data.visibleHash` and shows
+   * nothing rather than another cluster's tags.
+   */
+  clusterLabelsHash: string | null;
   /**
    * The plot canvas itself failed (WebGL unavailable). Distinct from `error`,
    * which means a fetch failed: with `error` the cached points are still worth
@@ -45,6 +58,7 @@ export interface ImageMapSnapshot {
 
 const EMPTY_IMAGE_MAP_SNAPSHOT: ImageMapSnapshot = {
   clusterLabels: null,
+  clusterLabelsHash: null,
   data: null,
   error: null,
   indexCounts: null,
@@ -133,14 +147,30 @@ export const refreshImageMapPoints = (): Promise<void> => {
 
 let labelsSequence = 0;
 
-const areLabelMapsEqual = (left: Record<string, string> | null, right: Record<string, string>): boolean => {
+const areLabelMapsEqual = (
+  left: Record<string, ImageMapClusterLabelInfo> | null,
+  right: Record<string, ImageMapClusterLabelInfo>
+): boolean => {
   if (left === null) {
     return false;
   }
 
   const keys = Object.keys(right);
 
-  return keys.length === Object.keys(left).length && keys.every((key) => left[key] === right[key]);
+  return (
+    keys.length === Object.keys(left).length &&
+    keys.every((key) => {
+      const before = left[key];
+      const after = right[key];
+
+      return (
+        before !== undefined &&
+        before.label === after.label &&
+        before.alternates.length === after.alternates.length &&
+        before.alternates.every((alternate, index) => alternate === after.alternates[index])
+      );
+    })
+  );
 };
 
 /**
@@ -168,7 +198,7 @@ export const setClusterLabelsEnabled = (enabled: boolean): void => {
   if (!enabled) {
     // Bump the sequence so a request already in flight cannot land after this.
     labelsSequence += 1;
-    imageMapStore.patchSnapshot({ clusterLabels: null });
+    imageMapStore.patchSnapshot({ clusterLabels: null, clusterLabelsHash: null });
 
     return;
   }
@@ -190,7 +220,7 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
     // sequence so an in-flight labels response cannot repopulate the labels
     // this clears.
     labelsSequence += 1;
-    imageMapStore.patchSnapshot({ clusterLabels: null });
+    imageMapStore.patchSnapshot({ clusterLabels: null, clusterLabelsHash: null });
 
     return;
   }
@@ -214,7 +244,7 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
       }
 
       if (!areLabelMapsEqual(current.clusterLabels, response.labels)) {
-        imageMapStore.patchSnapshot({ clusterLabels: response.labels });
+        imageMapStore.patchSnapshot({ clusterLabels: response.labels, clusterLabelsHash: response.visibleHash });
       }
     })
     .catch(() => {
@@ -222,7 +252,7 @@ const refreshClusterLabels = (data: ImageMapPoints): void => {
       // labels. A slow stale request failing after a newer one already set
       // fresh labels must not wipe them.
       if (sequence === labelsSequence) {
-        imageMapStore.patchSnapshot({ clusterLabels: null });
+        imageMapStore.patchSnapshot({ clusterLabels: null, clusterLabelsHash: null });
       }
     });
 };
