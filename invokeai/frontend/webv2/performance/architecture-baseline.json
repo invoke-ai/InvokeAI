@@ -702,6 +702,7 @@
           "source:src/workbench/canvas-engine/render/rasterizers/textRasterizer.ts",
           "source:src/workbench/canvas-engine/transform/transformMath.ts",
           "source:src/workbench/canvasDimsSync.ts",
+          "source:src/workbench/canvasInvocationPreparation.ts",
           "source:src/workbench/canvasLayerContent.ts",
           "source:src/workbench/canvasMigration.ts",
           "source:src/workbench/canvasProjectMutations.ts",
