@@ -1063,6 +1063,39 @@ describe('star invalidation', () => {
 
   type ApiStore = ReturnType<typeof buildStore>;
 
+  it('reconciles a single-chunk delete whose outcome was lost in transit', async () => {
+    // Anything up to the batch cap is one request, so this is what an ordinary delete looks like
+    // when the response never comes back: the mutation rejects, `invalidatesTags` never runs on
+    // a result, and `handleDeletions` prunes nothing because nothing was confirmed. The only
+    // thing that can settle it is the invalidation the queryFn dispatches on its way out, and
+    // the refetch it triggers — which answers 404 if the delete did commit, and the DTO if it
+    // did not.
+    login('user-a');
+    const fetched: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: Request) => {
+        fetched.push(request.url);
+        if (request.method === 'POST') {
+          return Promise.reject(new TypeError('Failed to fetch'));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ image_name: 'a.png', starred: false }), {
+            headers: { 'content-type': 'application/json' },
+          })
+        );
+      })
+    );
+    const store = buildStore();
+
+    await store.dispatch(imagesApi.endpoints.getImageDTO.initiate('a.png'));
+    expect(fetched.filter((url) => url === dtoUrl)).toHaveLength(1);
+
+    await store.dispatch(imagesApi.endpoints.deleteImages.initiate({ image_names: ['a.png'] }));
+
+    await vi.waitFor(() => expect(fetched.filter((url) => url === dtoUrl)).toHaveLength(2));
+  });
+
   it.each([
     {
       label: 'star',

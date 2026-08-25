@@ -173,10 +173,8 @@ def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefaul
 
     # Gone and denied mean opposite things to a client holding a reference to this video, and
     # nothing above can tell them apart. See `_assert_image_record_exists`.
-    try:
-        ApiDependencies.invoker.services.video_records.get(video_name)
-    except VideoRecordNotFoundException:
-        raise HTTPException(status_code=404, detail="Video not found") from None
+    if not ApiDependencies.invoker.services.video_records.exists(video_name):
+        raise HTTPException(status_code=404, detail="Video not found")
     raise HTTPException(status_code=403, detail="Not authorized to access this video")
 
 

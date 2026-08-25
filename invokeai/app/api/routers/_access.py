@@ -12,7 +12,6 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
     BoardVisibility,
 )
-from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 
 
 def assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -68,18 +67,18 @@ def _assert_image_record_exists(image_name: str) -> None:
     gone with the row, so a deleted image reaches that same 403 as a foreign one. So the
     distinction is made here, on the refusal path only — the happy path pays nothing for it.
 
-    A storage error propagates rather than answering either. `image_records.get` deliberately
-    does not translate sqlite errors into not-found, so an unreadable database cannot present as
-    a deleted image and take the user's references down with it.
+    A storage error propagates rather than answering either, so an unreadable database cannot
+    present as a deleted image and take the user's references down with it. `exists` is a bare
+    row probe rather than `get` for the same reason from the other side: `get` deserializes, so
+    a row written by a newer version — an enum value this one does not know — would fail exactly
+    as absence does, and a live image would be reported gone.
 
     The cost is that an authenticated caller can now tell an absent image from one they may not
     read. Image names are generated UUIDs, so this buys an attacker nothing they could enumerate,
     and it is the answer admins have always received.
     """
-    try:
-        ApiDependencies.invoker.services.image_records.get(image_name)
-    except ImageRecordNotFoundException:
-        raise HTTPException(status_code=404, detail="Image not found") from None
+    if not ApiDependencies.invoker.services.image_records.exists(image_name):
+        raise HTTPException(status_code=404, detail="Image not found")
 
 
 def assert_image_read_access(image_name: str, current_user: CurrentUserOrDefault) -> None:

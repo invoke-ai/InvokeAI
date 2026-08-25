@@ -65,6 +65,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 return None
             return cast(Optional[str], dict(result).get("user_id"))
 
+    def exists(self, image_name: str) -> bool:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT 1 FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+            return cursor.fetchone() is not None
+
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         # See get(): a storage error must not masquerade as a missing row.
         with self._db.transaction() as cursor:

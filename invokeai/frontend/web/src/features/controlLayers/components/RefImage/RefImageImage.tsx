@@ -61,9 +61,12 @@ export const RefImageImage = memo(
       // reversed — a board flipped back to Shared — and the image behind it still
       // exists; a 5xx or a dropped connection says nothing at all. Dropping the
       // reference is silent and has no undo. See `isImageMissingError`.
+      // Both arms wait for the connection, where the original's used to clear regardless. The
+      // two images belong to one reference and there is no reading under which losing the crop
+      // is more suspect than losing the original.
       if (
-        (isConnected && isImageMissingError(croppedImageDTOReq.error)) ||
-        isImageMissingError(originalImageDTOReq.error)
+        isConnected &&
+        (isImageMissingError(croppedImageDTOReq.error) || isImageMissingError(originalImageDTOReq.error))
       ) {
         handleResetControlImage();
       }

@@ -739,7 +739,16 @@ export const imagesApi = api.injectEndpoints({
       queryFn: buildChunkedImageBatchQueryFn(
         () => ({ url: buildImagesUrl('delete'), method: 'POST' }),
         getDeleteImagesTags,
-        (image_names) => ({ deleted_images: image_names, failed_images: [], affected_boards: [] })
+        // The only one of these that lists its names twice, because a lost delete is the only
+        // one whose two readings call for different tags. As committed, the names drive the
+        // board and collection counts. As unconfirmed — which is the truth, and what
+        // `failed_images` means here — their DTOs are re-asked, and that is the whole
+        // reconciliation: a name that is really gone answers 404 and the components holding it
+        // let go. Reporting them only as deleted would invalidate neither, since
+        // `getDeleteImagesTags` deliberately skips the DTOs of names it believes are gone. This
+        // is also the only path a single-chunk delete has — anything up to the batch cap is one
+        // request, so it never reaches the mid-run merge below.
+        (image_names) => ({ deleted_images: image_names, failed_images: image_names, affected_boards: [] })
       ),
       onQueryStarted: reportImageBatchOutcome,
       invalidatesTags: (result) => (result ? getDeleteImagesTags(result) : []),

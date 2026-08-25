@@ -78,6 +78,17 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
             return None
         return deserialize_video_record(dict(result))
 
+    def exists(self, video_name: str) -> bool:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT 1 FROM videos
+                WHERE video_name = ?;
+                """,
+                (video_name,),
+            )
+            return cursor.fetchone() is not None
+
     def get_metadata(self, video_name: str) -> Optional[MetadataField]:
         with self._db.transaction() as cursor:
             try:

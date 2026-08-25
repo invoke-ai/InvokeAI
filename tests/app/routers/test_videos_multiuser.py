@@ -264,11 +264,9 @@ def test_deleted_video_reads_as_gone_rather_than_denied(client: TestClient, mock
     above the refusal can tell a deleted video from a foreign one -- both used to come back 403.
     A workflow's video field drops its reference on a 404, so the two answers have to differ.
     """
-    from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
-
     mock_invoker.services.video_records.get_user_id.return_value = None
     mock_invoker.services.board_video_records.get_board_for_video.return_value = None
-    mock_invoker.services.video_records.get = MagicMock(side_effect=VideoRecordNotFoundException)
+    mock_invoker.services.video_records.exists = MagicMock(return_value=False)
 
     response = client.get(
         "/api/v1/videos/i/gone.mp4",
@@ -310,8 +308,8 @@ def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock
     private_board = MagicMock()
     private_board.board_visibility = BoardVisibility.Private
     mock_invoker.services.board_records.get = MagicMock(return_value=private_board)
-    # The video itself is untouched -- `get` returning normally is what says so.
-    mock_invoker.services.video_records.get = MagicMock(return_value=MagicMock())
+    # The video itself is untouched, which is what makes this a denial rather than a 404.
+    mock_invoker.services.video_records.exists = MagicMock(return_value=True)
 
     response = client.get(
         "/api/v1/videos/i/still-here.mp4",
@@ -355,7 +353,7 @@ def test_vanished_board_still_reads_as_an_ordinary_refusal_for_videos(
     mock_invoker.services.board_records.get = MagicMock(side_effect=BoardRecordNotFoundException)
     # The video itself is still there, so the refusal is a denial and not the 404 that would
     # take the caller's reference with it.
-    mock_invoker.services.video_records.get = MagicMock(return_value=MagicMock())
+    mock_invoker.services.video_records.exists = MagicMock(return_value=True)
 
     response = client.get(
         "/api/v1/videos/i/board-gone.mp4",
