@@ -56,6 +56,15 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
     return ['flux', 'flux2'].includes(modelConfig.base);
   }, [modelConfig]);
 
+  // Already-quantized weights cannot also be stored as FP8 — the backend refuses it (see
+  // `_should_use_fp8`), so offering the switch would be a control that silently does nothing.
+  // Keep in sync with `_QUANTIZED_MODEL_FORMATS` in `load_default.py`.
+  const isQuantized = useMemo(() => {
+    return ['gguf_quantized', 'bnb_quantized_nf4b', 'bnb_quantized_int8b', 'sdnq_quantized'].includes(
+      modelConfig.format
+    );
+  }, [modelConfig]);
+
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
   const optimalDimension = useMemo(() => {
     const modelBase = modelConfig?.base;
@@ -144,7 +153,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
         {!isFluxFamily && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
         <DefaultWidth control={control} optimalDimension={optimalDimension} />
         <DefaultHeight control={control} optimalDimension={optimalDimension} />
-        <DefaultFp8Storage control={control} name="fp8Storage" />
+        {!isQuantized && <DefaultFp8Storage control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );

@@ -985,6 +985,27 @@ class AnimaTransformer(MiniTrainDIT):
     text embeddings before they are fed to the DiT cross-attention layers.
     """
 
+    # Modules that must keep their compute dtype when FP8 storage is enabled. Read by
+    # `ModelLoader._apply_fp8_layerwise_casting`, which uses the same attribute name diffusers
+    # models use, so no loader-side special-casing is needed.
+    #
+    # The generic skip patterns don't reach these: they match `norm`, `pos_embed`, `patch_embed`
+    # and `proj_in/out`, but this architecture names the equivalent modules differently.
+    #
+    # `t_embedder` is the one that matters, and it is not a rounding-quality nicety: with it cast
+    # to FP8 the model renders a heavily dithered image with no fine detail at all (verified
+    # against a bf16 run at the same seed/steps/CFG). It feeds `adaln_lora` into every block, so
+    # its error is applied to every token everywhere. Measured, same seed each time: casting
+    # nothing = broken; `t_embedder` alone = clean, and adding either of the two below changes
+    # nothing further. They are kept as ~2MB of margin on the I/O layers, matching what diffusers
+    # skips by default for comparable DiTs. `adaln_modulation` was also tested and is deliberately
+    # NOT listed — it costs 168MB and made no difference.
+    _skip_layerwise_casting_patterns = [
+        "t_embedder",  # timestep embedding MLP -> adaln_lora for every block
+        "x_embedder",  # patch embedding (named `patch_embed` in diffusers models)
+        "final_layer",  # output projection
+    ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.llm_adapter = LLMAdapter()
