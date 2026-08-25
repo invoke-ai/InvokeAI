@@ -4,7 +4,17 @@ import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } fr
 import { isModalOpenChanged, videosToChangeSelected } from 'features/changeBoardModal/store/slice';
 import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { deleteVideosWithDialog } from 'features/deleteVideoModal/store/state';
-import { autoAddBoardIdChanged, boardIdSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
+import {
+  $gallerySelection,
+  markNextSelectionAutoSwitched,
+  resetGallerySelectionSource,
+} from 'features/gallery/store/gallerySelectionSource';
+import {
+  autoAddBoardIdChanged,
+  boardIdSelected,
+  imageSelected,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
 import type { S } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
@@ -114,5 +124,23 @@ describe('auth cache isolation', () => {
     store.dispatch(logOut());
 
     await expect(pending).rejects.toBe('User canceled');
+  });
+});
+
+describe('gallery listener registration', () => {
+  it('publishes selections through the real store wiring', () => {
+    // The per-listener tests build their own store, so nothing else fails if the registration in
+    // store.ts is deleted — and without it no selection is ever published: the auto-switch mark is
+    // never spent, and the viewer's reveal machine never hears about any selection at all. This is
+    // the one test that dispatches through createStore()'s own listeners.
+    const store = createStore();
+    resetGallerySelectionSource(); // module singleton; start from empty
+
+    markNextSelectionAutoSwitched();
+    store.dispatch(imageSelected('auto-switched.png'));
+    expect($gallerySelection.get()).toMatchObject({ name: 'auto-switched.png', isAutoSwitch: true });
+
+    store.dispatch(imageSelected('user-clicked.png'));
+    expect($gallerySelection.get()).toMatchObject({ name: 'user-clicked.png', isAutoSwitch: false });
   });
 });

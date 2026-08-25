@@ -21,6 +21,17 @@ const mockAnimaVAE = {
   format: 'diffusers' as const,
 };
 
+// The Anima loader accepts a FLUX VAE as a fallback, so it belongs to the Anima *slot* pool
+// (selectAnimaCompatibleVAEModels) but not to the base-driven pool Krea-2 draws from.
+const mockFluxVAE = {
+  key: 'flux-vae-key',
+  hash: 'flux-vae-hash',
+  name: 'FLUX VAE',
+  base: 'flux' as const,
+  type: 'vae' as const,
+  format: 'checkpoint' as const,
+};
+
 const mockAnimaMainModel = {
   key: 'anima-main-key',
   hash: 'anima-main-hash',
@@ -134,20 +145,25 @@ vi.mock('i18next', () => ({
 const mockSelectAnimaQwen3EncoderModels = vi.fn((_state: unknown) => [mockAnimaQwen3Encoder]);
 
 const mockSelectAnimaVAEModels = vi.fn((_state: unknown) => [mockAnimaVAE]);
+const mockSelectAnimaCompatibleVAEModels = vi.fn((_state: unknown) => [mockAnimaVAE] as unknown[]);
 
 // Krea-2 standalone-component selectors (used only by the Krea-2 auto-select branch).
 const mockSelectQwenImageVAEModels = vi.fn((_state: unknown) => [mockKrea2Vae]);
 const mockSelectQwen3VLEncoderModels = vi.fn((_state: unknown) => [mockKrea2Qwen3VlEncoder]);
 const mockSelectZImageDiffusersModels = vi.fn((_state: unknown) => [] as unknown[]);
+// Z-Image borrows the FLUX.1 VAE pool - flux2 VAEs are deliberately not part of it.
+const mockSelectFlux1VAEModels = vi.fn((_state: unknown) => [] as unknown[]);
+const mockSelectQwen3EncoderModels = vi.fn((_state: unknown) => [] as unknown[]);
 
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectAnimaQwen3EncoderModels: (state: unknown) => mockSelectAnimaQwen3EncoderModels(state),
   selectAnimaVAEModels: (state: unknown) => mockSelectAnimaVAEModels(state),
+  selectAnimaCompatibleVAEModels: (state: unknown) => mockSelectAnimaCompatibleVAEModels(state),
   selectQwenImageVAEModels: (state: unknown) => mockSelectQwenImageVAEModels(state),
   selectQwen3VLEncoderModels: (state: unknown) => mockSelectQwen3VLEncoderModels(state),
-  selectQwen3EncoderModels: vi.fn(() => []),
+  selectQwen3EncoderModels: (state: unknown) => mockSelectQwen3EncoderModels(state),
   selectZImageDiffusersModels: (state: unknown) => mockSelectZImageDiffusersModels(state),
-  selectFluxVAEModels: vi.fn(() => []),
+  selectFlux1VAEModels: (state: unknown) => mockSelectFlux1VAEModels(state),
   selectGlobalRefImageModels: vi.fn(() => []),
   selectRegionalRefImageModels: vi.fn(() => []),
 }));
@@ -232,6 +248,7 @@ const paramsSliceActual = (await vi.importActual('features/controlLayers/store/p
   krea2VaeModelSelected: { type: string };
   krea2Qwen3VlEncoderModelSelected: { type: string };
   zImageQwen3SourceModelSelected: { type: string };
+  zImageVaeModelSelected: { type: string };
 };
 const {
   animaQwen3EncoderModelSelected,
@@ -239,6 +256,7 @@ const {
   krea2VaeModelSelected,
   krea2Qwen3VlEncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  zImageVaeModelSelected,
 } = paramsSliceActual;
 
 // Import after mocks are set up
@@ -262,8 +280,9 @@ function buildMockState(overrides: Record<string, unknown> = {}) {
       animaVaeModel: null,
       animaQwen3EncoderModel: null,
       animaScheduler: 'euler',
-      kleinVaeModel: null,
+      flux2VaeModel: null,
       kleinQwen3EncoderModel: null,
+      flux2DevMistralEncoderModel: null,
       zImageScheduler: 'euler',
       ...overrides,
     },
@@ -278,6 +297,7 @@ describe('modelSelected listener - Anima defaulting', () => {
     mockDispatch.mockClear();
     mockSelectAnimaQwen3EncoderModels.mockReturnValue([mockAnimaQwen3Encoder]);
     mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([mockAnimaVAE]);
   });
 
   it('should dispatch encoder models with full ModelIdentifierField payloads when switching to Anima', () => {
@@ -349,6 +369,7 @@ describe('modelSelected listener - Anima defaulting', () => {
   it('should not dispatch encoder defaults when no encoder models are available', () => {
     mockSelectAnimaQwen3EncoderModels.mockReturnValue([]);
     mockSelectAnimaVAEModels.mockReturnValue([]);
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([]);
 
     const state = buildMockState({ model: mockFluxMainModel });
     const action = modelSelected(zParameterModel.parse(mockAnimaMainModel));
@@ -390,6 +411,37 @@ describe('modelSelected listener - Anima defaulting', () => {
     expect(qwen3Dispatch!.payload).toBeNull();
     expect(vaeDispatch).toBeDefined();
     expect(vaeDispatch!.payload).toBeNull();
+  });
+
+  // The compatible pool is ordered by model name, not by preference, and also holds the fallbacks the
+  // Anima loader merely tolerates: a FLUX VAE decodes on a different code path in anima_l2i entirely.
+  // Taking [0] blindly handed the default to whichever VAE happened to sort first.
+  it('should prefer a native Anima VAE over a compatible fallback that sorts first', () => {
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([mockFluxVAE, mockAnimaVAE]);
+    mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockAnimaMainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === animaVaeModelSelected.type);
+    expect(vaeDispatch!.payload).toMatchObject({ key: mockAnimaVAE.key, base: 'anima' });
+  });
+
+  // ...but the fallback is still a valid default when nothing native is installed, which is the whole
+  // reason the pool was widened.
+  it('should fall back to a compatible VAE when no native Anima VAE is installed', () => {
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([mockFluxVAE]);
+    mockSelectAnimaVAEModels.mockReturnValue([]);
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockAnimaMainModel));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === animaVaeModelSelected.type);
+    expect(vaeDispatch!.payload).toMatchObject({ key: mockFluxVAE.key, base: 'flux' });
   });
 });
 
@@ -507,6 +559,8 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
     // GGUF) transformer, which is what triggers the auto-select branch.
     mockSelectQwenImageVAEModels.mockReturnValue([mockKrea2Vae]);
     mockSelectAnimaVAEModels.mockReturnValue([mockAnimaVAE]);
+    // Krea-2 must read the base-driven pool, never the widened Anima-slot one.
+    mockSelectAnimaCompatibleVAEModels.mockReturnValue([mockAnimaVAE, mockFluxVAE]);
     mockSelectQwen3VLEncoderModels.mockReturnValue([mockKrea2Qwen3VlEncoder]);
     mockSelectModelConfigsQuery.mockReturnValue({ data: {} });
     mockSelectModelById.mockReturnValue({ format: 'checkpoint' });
@@ -698,5 +752,41 @@ describe('modelSelected listener - Krea-2 defaulting', () => {
     expect(vaeDispatch!.payload).toBeNull();
     expect(encoderDispatch).toBeDefined();
     expect(encoderDispatch!.payload).toBeNull();
+  });
+});
+
+// The Z-Image VAE slot draws from the FLUX.1 pool: its picker is `useFlux1VAEModels`, and there is no
+// `base: 'z-image'` VAE config at all. Defaulting it from the wider flux+flux2 pool put a FLUX.2 VAE
+// into a slot the user could not see it in and that Z-Image cannot decode with.
+describe('modelSelected listener - Z-Image VAE defaulting', () => {
+  beforeEach(() => {
+    dispatched.length = 0;
+    mockDispatch.mockClear();
+    // No diffusers model installed, so the listener falls through to the encoder + VAE branch.
+    mockSelectZImageDiffusersModels.mockReturnValue([]);
+    mockSelectQwen3EncoderModels.mockReturnValue([mockAnimaQwen3Encoder]);
+    mockSelectFlux1VAEModels.mockReturnValue([mockFluxVAE]);
+  });
+
+  it('should default the Z-Image VAE slot from the FLUX.1 pool', () => {
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === zImageVaeModelSelected.type && a.payload !== null);
+    expect(vaeDispatch!.payload).toMatchObject({ key: mockFluxVAE.key, base: 'flux' });
+  });
+
+  it('should not default the Z-Image VAE slot when the FLUX.1 pool is empty', () => {
+    mockSelectFlux1VAEModels.mockReturnValue([]);
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const vaeDispatch = dispatched.find((a) => a.type === zImageVaeModelSelected.type && a.payload !== null);
+    expect(vaeDispatch).toBeUndefined();
   });
 });

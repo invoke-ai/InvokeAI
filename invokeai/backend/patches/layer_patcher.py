@@ -11,6 +11,7 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
 # The optional third item pins the patch's model-cache record without moving the whole patch to VRAM.
@@ -199,13 +200,11 @@ class LayerPatcher:
     def _is_any_part_of_layer_on_cpu(layer: torch.nn.Module) -> bool:
         return any(p.device.type == "cpu" for p in layer.parameters())
 
-    # FP8 storage dtypes. Direct patching does in-place arithmetic on the model weights, which has no
-    # CUDA kernel for these dtypes, so a layer with fp8 weights must be patched via the sidecar wrapper.
-    _FP8_DTYPES = (torch.float8_e4m3fn, torch.float8_e5m2)
-
+    # Direct patching does in-place arithmetic on the model weights, which has no CUDA kernel for the
+    # FP8 storage dtypes, so a layer with fp8 weights must be patched via the sidecar wrapper.
     @staticmethod
     def _is_any_part_of_layer_fp8(layer: torch.nn.Module) -> bool:
-        return any(p.dtype in LayerPatcher._FP8_DTYPES for p in layer.parameters())
+        return any(p.dtype in FP8_STORAGE_DTYPES for p in layer.parameters())
 
     @staticmethod
     @torch.no_grad()
