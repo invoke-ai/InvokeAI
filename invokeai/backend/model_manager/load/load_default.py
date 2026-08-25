@@ -160,12 +160,15 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
 # Model formats whose weights are already quantized. FP8 storage is meaningless for them (the
 # payload is packed integers, not values we may re-encode) and actively harmful — see
 # `_should_use_fp8`. Declared as strings to keep this module free of a taxonomy import at module
-# scope; compared against `config.format`, which is a `ModelFormat` str-enum.
+# scope; compared against `config.format`, which is a `ModelFormat` str-enum. Must list every
+# quantized member of `ModelFormat`; `test_quantized_format_set_matches_the_taxonomy` pins the
+# strings to the enum so a rename cannot silently disable the check.
 _QUANTIZED_MODEL_FORMATS: frozenset[str] = frozenset(
     {
         "gguf_quantized",
         "bnb_quantized_nf4b",
         "bnb_quantized_int8b",
+        "sdnq_quantized",
     }
 )
 
@@ -374,12 +377,14 @@ class ModelLoader(ModelLoaderBase):
         from invokeai.backend.model_manager.taxonomy import ModelType
 
         # Already-quantized models are excluded. Their weights are packed integer payloads, not
-        # values we may re-encode, and every quantized-format loader reaches this helper. Casting
-        # them is not a no-op:
-        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly` at load time.
+        # values we may re-encode, and casting them is not a no-op:
+        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly`.
         #   - bnb NF4 corrupts *silently* — `bnb.nn.LinearNF4` subclasses `nn.Linear`, so the packed
         #     uint8 payload is cast to float8, inference still returns finite numbers, and the model
         #     just produces garbage.
+        # No quantized-format loader calls `_apply_fp8_layerwise_casting` today, so this is a guard
+        # against the next loader that gets wired up (they are being added one model at a time)
+        # rather than a fix for a live crash.
         if hasattr(config, "format") and config.format in _QUANTIZED_MODEL_FORMATS:
             return False
 

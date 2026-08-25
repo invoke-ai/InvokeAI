@@ -1,7 +1,14 @@
 import { Center, Spinner } from '@invoke-ai/ui-library';
+import { skipToken } from '@reduxjs/toolkit/query';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { externalTokenAdopted, logout, sessionExpiredLogout, setCredentials } from 'features/auth/store/authSlice';
+import {
+  externalTokenAdopted,
+  sessionExpiredLogout,
+  setCredentials,
+  staleCredentialsDiscarded,
+} from 'features/auth/store/authSlice';
+import { shouldEndSessionForUnauthorized } from 'features/auth/store/authTokenRefresh';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -28,7 +35,7 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     data: currentUser,
     isLoading: isLoadingUser,
     error: userError,
-  } = useGetCurrentUserQuery(undefined, {
+  } = useGetCurrentUserQuery(token ?? skipToken, {
     skip: !shouldFetchUser,
   });
 
@@ -36,11 +43,27 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     // Only treat 401 as session expiry. Other errors (500, network, etc.) are
     // transient and should not force logout — the 401 handler in dynamicBaseQuery
     // already covers the actual expiry case.
+    //
+    // And only while this tab's token is still the live one. `sessionExpiredLogout` removes
+    // `auth_token` from localStorage, which is SHARED across tabs, so acting on a 401 that
+    // belongs to a superseded session deletes the credential of the session that replaced it:
+    // this query goes out during page load carrying an expired token, another tab logs in
+    // meanwhile, and this 401 lands before the adoption poll has run. `dynamicBaseQuery`
+    // already declines to end the session in that case; this is the same decision, and both
+    // ask `shouldEndSessionForUnauthorized`.
+    //
+    // That check alone would only postpone it, because the store's token catches up when the
+    // poll adopts the new one and this effect re-runs. What stops it then is the query being
+    // keyed by token: the adopted session reads its own cache entry, so the superseded 401 is
+    // no longer in hand to act on. See `getCurrentUser`.
     if (userError && isAuthenticated && 'status' in userError && userError.status === 401) {
+      if (!shouldEndSessionForUnauthorized(token ?? null)) {
+        return;
+      }
       dispatch(sessionExpiredLogout());
       navigate('/login', { replace: true });
     }
-  }, [userError, isAuthenticated, dispatch, navigate]);
+  }, [userError, isAuthenticated, token, dispatch, navigate]);
 
   // Detect when auth_token is removed from localStorage (e.g. by another tab,
   // browser devtools, or token expiry cleanup). The 'storage' event fires when
@@ -91,9 +114,12 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
   useEffect(() => {
     // If multiuser is disabled, allow access without authentication
     if (!multiuserEnabled) {
-      // Clear any persisted auth state when switching to single-user mode
+      // Discard the leftover auth state when switching to single-user mode. Deliberately not
+      // `logout()`: that is the account-change action, and the workspace slices reset on it —
+      // a mode switch keeps the same human at the machine, and in single-user mode the wipe
+      // would persist over their stored canvas and workflows. See staleCredentialsDiscarded.
       if (isAuthenticated) {
-        dispatch(logout());
+        dispatch(staleCredentialsDiscarded());
       }
       return;
     }
