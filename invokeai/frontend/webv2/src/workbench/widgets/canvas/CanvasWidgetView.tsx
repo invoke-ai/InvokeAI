@@ -5,7 +5,6 @@ import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
-import { createLayerId } from '@workbench/canvasLayerOps';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
@@ -359,7 +358,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     const selectedLayerIds = readLayerPanelSelection(projectId, document.selectedLayerId).selectedIds;
     executeCanvasHotkeyCommand(commandId, {
       copySelection,
-      createLayerId,
       dispatch: canvasDispatch,
       document,
       engine,

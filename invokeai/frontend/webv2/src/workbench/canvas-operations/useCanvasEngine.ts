@@ -6,6 +6,7 @@ import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutatio
 import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import { getSelectedModelBase } from '@workbench/widgets/layers/selectedModel';
 import { useActiveProjectId, useWorkbenchCommands, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
+import { publishLayerPanelSelection, readLayerPanelSelection } from '@workbench/workbenchStore';
 import { useMemo, useSyncExternalStore } from 'react';
 
 import type { EngineDeps } from './engineRegistry';
@@ -69,6 +70,12 @@ export const useCanvasEngine = (): CanvasEngineHandle | null => {
           const project = store.getState().projects.find((candidate) => candidate.id === projectId);
           return project ? getSelectedModelBase(project) : null;
         },
+        getSelectedLayerIds: () => {
+          const project = store.getState().projects.find((candidate) => candidate.id === projectId);
+          return project ? readLayerPanelSelection(projectId, project.canvas.document.selectedLayerId).selectedIds : [];
+        },
+        setSelectedLayerIds: (primaryId, selectedIds) =>
+          publishLayerPanelSelection({ primaryId, projectId, selectedIds }),
         imageResolver: createImageResolver(),
         mutationPort: createCanvasProjectMutationPort(store, projectId),
         reportError: notifications.reportError,

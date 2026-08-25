@@ -3,13 +3,9 @@ import type { LayerReorderKind, StructuralActions } from '@workbench/canvasLayer
 import type { CanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 
 import { isHideableLayer, isLayerHidden } from '@workbench/canvas-engine/api';
-import {
-  deleteLayerActions,
-  duplicateLayerActions,
-  reorderLayerActions,
-  reorderSelectionWithinGroupsByKind,
-} from '@workbench/canvasLayerOps';
+import { deleteLayerActions, reorderLayerActions, reorderSelectionWithinGroupsByKind } from '@workbench/canvasLayerOps';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
+import { publishLayerPanelSelection } from '@workbench/workbenchStore';
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -73,7 +69,6 @@ export interface CanvasHotkeyContext {
   readonly dispatch: CanvasProjectMutationDispatch;
   readonly copySelection: (cut: boolean) => void;
   readonly pasteFromClipboard: () => void;
-  readonly createLayerId: () => string;
   readonly t: (key: string) => string;
 }
 
@@ -86,7 +81,7 @@ export interface CanvasHotkeyContext {
  * nudge, reorder, and the per-command table apply.
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
-  const { createLayerId, dispatch, document, engine, t } = ctx;
+  const { dispatch, document, engine, t } = ctx;
   const { layers, selectedLayerId } = document;
   const selectedIndex = selectedLayerId ? layers.findIndex((layer) => layer.id === selectedLayerId) : -1;
   const selectedLayer = selectedIndex >= 0 ? layers[selectedIndex] : undefined;
@@ -244,8 +239,14 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     if (engine?.interaction.get('hasSelection')) {
       engine.selection.liftSelectionToLayer();
     } else if (engine && selectedLayer) {
-      const { forward, inverse } = duplicateLayerActions(selectedLayer.id, createLayerId());
-      engine.layers.commitStructural(t('widgets.canvas.commands.duplicateLayer'), forward, inverse);
+      const result = engine.layers.duplicateLayers(ctx.selectedLayerIds);
+      if (result) {
+        publishLayerPanelSelection({
+          primaryId: result.selectedLayerId,
+          projectId: engine.projectId,
+          selectedIds: result.duplicateIds,
+        });
+      }
     }
   } else if (commandId === 'canvas.mergeDown') {
     // Gate on the SAME predicate the layers panel's context menu uses to

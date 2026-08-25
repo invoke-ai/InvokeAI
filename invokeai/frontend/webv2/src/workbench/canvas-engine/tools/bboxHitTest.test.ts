@@ -294,6 +294,9 @@ describe('moveBbox', () => {
   it('bypasses snap when snap is false', () => {
     expect(moveBbox(rect(10, 10, 100, 100), 5, 5, 8, false)).toEqual(rect(15, 15, 100, 100));
   });
+  it('does not snap an unchanged axis from an off-grid origin', () => {
+    expect(moveBbox(rect(10, 11, 100, 100), 5, 0, 8, true)).toEqual(rect(16, 11, 100, 100));
+  });
 });
 
 describe('constrainBboxToRatio', () => {

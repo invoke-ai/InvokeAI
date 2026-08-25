@@ -141,6 +141,16 @@ export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
+/** Re-renders when any live layer cache gains, loses, or changes pixels. */
+export const useCanvasRasterContentEpoch = (engine: CanvasCoreStoreCapability | null): number => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('rasterContentEpoch', listener) ?? (() => undefined),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine?.interaction.get('rasterContentEpoch') ?? 0, [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
+
 /**
  * The brush tool's current options (size / color / opacity / pressure). Write
  * through `engine.interaction.set('brushOptions', ...)` directly — there is no reducer

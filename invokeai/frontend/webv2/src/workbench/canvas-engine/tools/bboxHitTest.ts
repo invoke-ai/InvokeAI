@@ -15,7 +15,7 @@
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { type AspectAnchor, constrainAspect, snapToGrid } from '@workbench/canvas-engine/math/snapping';
+import { type AspectAnchor, constrainAspect, snapMovedPoint, snapToGrid } from '@workbench/canvas-engine/math/snapping';
 
 /** The eight resize handles: four corners + four edge midpoints. */
 export type BboxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -100,12 +100,9 @@ export const bboxMinSize = (grid: number): number => Math.max(1, grid);
 
 /** Translates `start` by a document-space delta, snapping the origin to `grid` unless bypassed. */
 export const moveBbox = (start: Rect, dx: number, dy: number, grid: number, snap: boolean): Rect => {
-  let x = start.x + dx;
-  let y = start.y + dy;
-  if (snap) {
-    x = snapToGrid(x, grid);
-    y = snapToGrid(y, grid);
-  }
+  const { x, y } = snap
+    ? snapMovedPoint({ x: start.x, y: start.y }, { x: dx, y: dy }, grid)
+    : { x: start.x + dx, y: start.y + dy };
   return { height: start.height, width: start.width, x, y };
 };
 

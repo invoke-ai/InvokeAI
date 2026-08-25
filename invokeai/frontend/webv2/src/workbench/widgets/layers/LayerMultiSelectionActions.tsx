@@ -1,21 +1,26 @@
-import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch } from 'react';
 
 import { HStack, Text } from '@chakra-ui/react';
+import { toaster } from '@platform/ui';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { canMergeSelectedRasters, type CanvasLayerContract } from '@workbench/canvas-engine/api';
 import { reorderSelectionWithinGroupsByKind, type LayerReorderKind } from '@workbench/canvasLayerOps';
+import { useCanvasRasterContentEpoch } from '@workbench/widgets/canvas/engineStoreHooks';
+import { publishLayerPanelSelection } from '@workbench/workbenchStore';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
   ChevronsDownIcon,
   ChevronsUpIcon,
+  CopyIcon,
   EyeIcon,
   EyeOffIcon,
   LockIcon,
   LockOpenIcon,
+  MergeIcon,
   Trash2Icon,
 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
@@ -23,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 import { deleteLayersActions } from './layerMultiSelectionModel';
 
-type MultiSelectionEngine = Pick<CanvasEngineHandle, 'layers'>;
+type MultiSelectionEngine = Pick<CanvasEngineHandle, 'exports' | 'interaction' | 'layers'>;
 const BULK_TOOLTIP_POSITIONING = { placement: 'top' } as const;
 
 interface LayerMultiSelectionActionsProps {
@@ -31,6 +36,7 @@ interface LayerMultiSelectionActionsProps {
   editingLocked: boolean;
   engine: MultiSelectionEngine | null;
   layers: readonly CanvasLayerContract[];
+  projectId: string;
   selectedIds: readonly string[];
   selectedLayerId: string | null;
 }
@@ -54,10 +60,12 @@ export const LayerMultiSelectionActions = ({
   editingLocked,
   engine,
   layers,
+  projectId,
   selectedIds,
   selectedLayerId,
 }: LayerMultiSelectionActionsProps) => {
   const { t } = useTranslation();
+  useCanvasRasterContentEpoch(engine);
   const selected = useMemo(() => {
     const ids = new Set(selectedIds);
     return layers.filter((layer) => ids.has(layer.id));
@@ -65,6 +73,35 @@ export const LayerMultiSelectionActions = ({
   const allEnabled = selected.every((layer) => layer.isEnabled);
   const allLocked = selected.every((layer) => layer.isLocked);
   const hasLocked = selected.some((layer) => layer.isLocked);
+  const canMergeSelected =
+    !!engine &&
+    canMergeSelectedRasters(layers, new Set(selectedIds), (layerId) =>
+      engine.exports.hasExportableLayerContent(layerId)
+    );
+
+  const duplicateSelected = useCallback(() => {
+    const result = engine?.layers.duplicateLayers(selectedIds);
+    if (result) {
+      publishLayerPanelSelection({
+        primaryId: result.selectedLayerId,
+        projectId,
+        selectedIds: result.duplicateIds,
+      });
+    }
+  }, [engine, projectId, selectedIds]);
+
+  const mergeSelected = useCallback(() => {
+    if (!engine) {
+      return;
+    }
+    void engine.layers.mergeSelectedRasterLayers(selectedIds).then((result) => {
+      if (result === 'not-ready') {
+        toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
+      } else if (result === 'over-budget') {
+        toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
+      }
+    });
+  }, [engine, selectedIds, t]);
 
   const reorder = useCallback(
     (kind: LayerReorderKind, label: string) => {
@@ -189,6 +226,18 @@ export const LayerMultiSelectionActions = ({
         icon={allLocked ? LockOpenIcon : LockIcon}
         label={t(allLocked ? 'widgets.layers.actions.unlockSelected' : 'widgets.layers.actions.lockSelected')}
         onClick={toggleLocked}
+      />
+      <BulkActionButton
+        disabled={editingLocked || !engine}
+        icon={CopyIcon}
+        label={t('widgets.layers.actions.duplicateSelected')}
+        onClick={duplicateSelected}
+      />
+      <BulkActionButton
+        disabled={editingLocked || !engine || !canMergeSelected}
+        icon={MergeIcon}
+        label={t('widgets.layers.actions.mergeSelected')}
+        onClick={mergeSelected}
       />
       <BulkActionButton
         colorPalette="red"

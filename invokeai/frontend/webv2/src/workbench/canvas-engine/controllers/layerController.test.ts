@@ -65,7 +65,10 @@ describe('LayerController', () => {
     isCacheReady: () => true,
     layers: {} as never,
     markDirty: vi.fn(),
+    needsPixelPersistence: () => false,
     notifyPainted: vi.fn(),
+    publishSelectedLayerIds: vi.fn(),
+    reserve: vi.fn(),
   };
   const booleanMerge = {
     backend: {} as never,

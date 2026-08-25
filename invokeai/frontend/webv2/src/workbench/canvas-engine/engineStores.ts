@@ -406,6 +406,8 @@ export interface EngineStores {
   cursor: ScalarStore<string>;
   thumbnailVersion: KeyedVersionStore;
   thumbnailStatus: KeyedThumbnailStatusStore;
+  /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
+  rasterContentEpoch: ScalarStore<number>;
   /** Brush tool options (size / color / opacity / pressure). */
   brushOptions: ScalarStore<BrushOptions>;
   /** Eraser tool options (size / opacity). */
@@ -687,6 +689,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   lassoPreview: createScalarStore<readonly Vec2[] | null>(null),
   marqueeOptions: createScalarStore<MarqueeToolOptions>({ ...DEFAULT_MARQUEE_OPTIONS }, marqueeOptionsEqual),
   marqueePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
+  rasterContentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),

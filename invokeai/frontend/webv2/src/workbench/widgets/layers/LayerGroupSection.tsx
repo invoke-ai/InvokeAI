@@ -269,6 +269,8 @@ const GroupActions = ({
     void engine.layers.mergeVisibleRasterLayers().then((result) => {
       if (result === 'not-ready') {
         toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
+      } else if (result === 'over-budget') {
+        toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
       }
     });
   }, [engine, t]);

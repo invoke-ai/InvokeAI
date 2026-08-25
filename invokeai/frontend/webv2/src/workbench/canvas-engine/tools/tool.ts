@@ -88,6 +88,8 @@ export interface ToolContext {
   viewport: Viewport;
   /** The current mirrored document, or `null` when none is available. */
   getDocument(): CanvasDocumentContractV2 | null;
+  /** Selected layer ids from the Layers panel, including the document's primary layer. */
+  getSelectedLayerIds?(): readonly string[];
   /** Requests a re-render for the given flags. */
   invalidate(payload: InvalidatePayload): void;
   /** Reducer bridge. Painting tools use it for the single gesture-start `addCanvasLayer`. */

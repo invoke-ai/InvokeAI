@@ -93,6 +93,8 @@ interface Harness {
 }
 
 interface HarnessOptions {
+  /** Transient multi-selection supplied by the Layers panel. */
+  selectedLayerIds?: readonly string[];
   /** Whether a live selection contains every point (the ants are "under" the cursor). */
   selectionContainsPoint?: boolean;
   /** Whether a lift succeeds when the tool asks for one. */
@@ -139,6 +141,7 @@ const createHarness = (doc: CanvasDocumentContractV2, options: HarnessOptions = 
     dispatch: (action) => dispatched.push(action),
     emitStrokeCommitted: vi.fn(),
     getDocument: () => doc,
+    getSelectedLayerIds: () => options.selectedLayerIds ?? (doc.selectedLayerId ? [doc.selectedLayerId] : []),
     getFloatingSelection: () => float.current,
     invalidate: vi.fn(),
     isPointInSelection: () => options.selectionContainsPoint === true,
@@ -229,6 +232,58 @@ describe('move tool: the layers panel owns selection', () => {
 });
 
 describe('move tool: drag', () => {
+  it('previews and commits every selected layer with one shared snapped delta', () => {
+    const doc = makeDoc(
+      [imageLayer('a', { x: 0, y: 0 }), imageLayer('middle', { x: 50, y: 50 }), imageLayer('b', { x: 7, y: 11 })],
+      'a'
+    );
+    const h = createHarness(doc, { bboxGrid: 8, selectedLayerIds: ['a', 'b'], snapToGrid: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(25, 25));
+    up(tool, h.ctx, pointer(25, 25));
+
+    expect(h.overrides).toEqual([
+      { layerId: 'a', override: { x: 16, y: 16 } },
+      { layerId: 'b', override: { x: 23, y: 27 } },
+      { layerId: 'a', override: null },
+      { layerId: 'b', override: null },
+    ]);
+    expect(h.commits).toEqual([
+      {
+        forward: {
+          type: 'setCanvasLayerPositions',
+          updates: [
+            { id: 'a', x: 16, y: 16 },
+            { id: 'b', x: 23, y: 27 },
+          ],
+        },
+        inverse: {
+          type: 'setCanvasLayerPositions',
+          updates: [
+            { id: 'a', x: 0, y: 0 },
+            { id: 'b', x: 7, y: 11 },
+          ],
+        },
+        label: 'Move layers',
+      },
+    ]);
+  });
+
+  it('moves none of a selected group when any selected layer is locked', () => {
+    const doc = makeDoc([imageLayer('a'), imageLayer('b', { isLocked: true })], 'a');
+    const h = createHarness(doc, { selectedLayerIds: ['a', 'b'] });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 30));
+    up(tool, h.ctx, pointer(30, 30));
+
+    expect(h.overrides).toEqual([]);
+    expect(h.commits).toEqual([]);
+  });
+
   it('previews via override on move then commits one structural transform on up', () => {
     const doc = makeDoc([imageLayer('a', { x: 0, y: 0, width: 50, height: 50 })], 'a');
     const h = createHarness(doc);

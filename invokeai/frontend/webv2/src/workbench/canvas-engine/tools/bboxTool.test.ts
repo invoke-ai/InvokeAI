@@ -117,6 +117,29 @@ describe('bbox tool: move gesture', () => {
     up(tool, h.ctx, pointer(75, 75, { alt: true }));
     expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 31, y: 31 }, type: 'setCanvasBbox' });
   });
+
+  it('constrains movement to the dominant axis while shift is held', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(91, 69, { shift: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 48, y: 16 });
+    up(tool, h.ctx, pointer(91, 69, { shift: true }));
+
+    expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 48, y: 16 }, type: 'setCanvasBbox' });
+  });
+
+  it('resamples the shift-constrained axis during a drag', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(69, 91, { shift: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 16, y: 48 });
+    move(tool, h.ctx, pointer(91, 69, { shift: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 48, y: 16 });
+  });
 });
 
 describe('bbox tool: resize gesture', () => {

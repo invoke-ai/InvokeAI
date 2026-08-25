@@ -47,6 +47,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     ...interaction,
   };
   const engine = {
+    projectId: 'project',
     history: { redo: vi.fn(), undo: vi.fn() },
     interaction: {
       get: vi.fn((key: string) => state[key]),
@@ -57,6 +58,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     layers: {
       clearMask: vi.fn(),
       commitStructural: vi.fn(),
+      duplicateLayers: vi.fn(() => ({ duplicateIds: ['new-layer'], selectedLayerId: 'new-layer' })),
       mergeLayerDown: vi.fn(),
       nudgeSelectedLayer: vi.fn(),
     },
@@ -78,7 +80,6 @@ let pasteFromClipboard: Mock<() => void>;
 
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
   copySelection,
-  createLayerId: () => 'new-layer',
   dispatch,
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
   engine: createEngine(),
@@ -287,13 +288,14 @@ describe('duplicate: lift vs whole layer', () => {
     expect(engine.layers.commitStructural).not.toHaveBeenCalled();
   });
 
-  it('duplicates the whole layer with no pixel selection, using the injected id', () => {
+  it('duplicates the whole layer with no pixel selection', () => {
     const engine = run('canvas.duplicateLayer');
-    expect(engine.layers.commitStructural).toHaveBeenCalledWith(
-      'widgets.canvas.commands.duplicateLayer',
-      { newId: 'new-layer', sourceId: 'a', type: 'duplicateCanvasLayer' },
-      { ids: ['new-layer'], type: 'removeCanvasLayers' }
-    );
+    expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a']);
+  });
+
+  it('duplicates every selected layer as one engine operation', () => {
+    const engine = run('canvas.duplicateLayer', { selectedLayerIds: ['a', 'b'] });
+    expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a', 'b']);
   });
 });
 

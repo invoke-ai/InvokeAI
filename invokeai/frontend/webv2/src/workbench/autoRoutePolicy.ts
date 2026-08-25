@@ -126,6 +126,7 @@ const CANVAS_EDIT_CONFIDENCE = {
   rollbackStagedImageCommit: 'none',
   saveCanvasSnapshot: 'none',
   setCanvasBbox: 'high',
+  setCanvasLayerPositions: 'high',
   setCanvasLayersEnabled: 'conditional',
   // Display-only: hiding an overlay changes nothing about the generated image,
   // so it must never re-route the invoke target.

@@ -98,6 +98,8 @@ export interface CanvasInteractionState {
   invertBrushSizeScroll: boolean;
   lassoOptions: LassoToolOptions;
   marqueeOptions: MarqueeToolOptions;
+  /** Monotonic signal for live layer-pixel/cache content changes. */
+  rasterContentEpoch: number;
   ruleOfThirds: boolean;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
@@ -305,10 +307,15 @@ export interface FilterPreviewInput {
 /**
  * Result of {@link CanvasEngineLayerCapability.mergeVisibleRasterLayers}: `'merged'` when a new
  * composite layer was inserted, `'not-ready'` when a contributor could not be
- * rasterized consistently, `'busy'` when another edit owns the document, and
- * `'nothing'` when fewer than two visible rasters have content.
+ * rasterized consistently, `'over-budget'` when safe raster allocation was
+ * refused, `'busy'` when another edit owns the document, and `'nothing'` when
+ * fewer than two eligible rasters have content.
  */
-export type MergeVisibleResult = 'merged' | 'not-ready' | 'busy' | 'nothing';
+export type MergeVisibleResult = 'merged' | 'not-ready' | 'over-budget' | 'busy' | 'nothing';
+export interface DuplicateLayersResult {
+  readonly duplicateIds: readonly string[];
+  readonly selectedLayerId: string;
+}
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'not-ready' | 'busy' | 'empty';
 export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
@@ -374,7 +381,9 @@ export interface CanvasEngineLayerCapability extends CanvasLayerCapability {
   commitTextEdit(content: string, styleChanges?: Partial<TextToolOptions>): void;
   copyLayerToRaster(layerId: string): Promise<string | null>;
   cropLayerToBbox(layerId: string): Promise<CropLayerResult>;
+  duplicateLayers(layerIds: readonly string[]): DuplicateLayersResult | null;
   mergeLayerDown(upperLayerId: string): boolean;
+  mergeSelectedRasterLayers(layerIds: readonly string[]): Promise<MergeVisibleResult>;
   mergeVisibleRasterLayers(): Promise<MergeVisibleResult>;
   nudgeSelectedLayer(dx: number, dy: number): void;
   openTextCreate(docPoint: Vec2): void;
@@ -470,7 +479,11 @@ export {
   isRenderableLayer,
   renderableSourceOf,
 } from './document/sources';
-export { canMergeVisibleRasters } from './document/mergeVisible';
+export {
+  areSelectedRasterLayersContiguous,
+  canMergeSelectedRasters,
+  canMergeVisibleRasters,
+} from './document/mergeVisible';
 export { documentToExportLocalSamPoint } from './samCoordinates';
 export { bboxEquals, constrainBboxToRatio, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';

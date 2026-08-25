@@ -52,10 +52,14 @@ export const LayersWidgetView = () => {
     const shared = readLayerPanelSelection(projectId, selectedLayerId);
     return { ...shared, anchorId: shared.primaryId };
   });
-  const selection = useMemo(
-    () => reconcileLayerPanelSelection(storedPanelSelection, projectId, allLayerIds, selectedLayerId),
-    [allLayerIds, projectId, selectedLayerId, storedPanelSelection]
-  );
+  const selection = useMemo(() => {
+    const shared = readLayerPanelSelection(projectId, selectedLayerId);
+    const source =
+      storedPanelSelection.projectId === projectId && storedPanelSelection.primaryId === selectedLayerId
+        ? storedPanelSelection
+        : { ...shared, anchorId: shared.primaryId };
+    return reconcileLayerPanelSelection(source, projectId, allLayerIds, selectedLayerId);
+  }, [allLayerIds, projectId, selectedLayerId, storedPanelSelection]);
   if (selection !== storedPanelSelection) {
     setPanelSelection(selection);
   }
@@ -86,6 +90,7 @@ export const LayersWidgetView = () => {
           editingLocked={editingLocked}
           engine={engine}
           layers={layers}
+          projectId={projectId}
           selectedIds={selectedIds}
           selectedLayerId={selectedLayerId}
         />

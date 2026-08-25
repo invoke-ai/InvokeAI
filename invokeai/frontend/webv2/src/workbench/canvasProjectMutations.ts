@@ -41,6 +41,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'restoreCanvasSnapshot',
   'saveCanvasSnapshot',
   'setCanvasBbox',
+  'setCanvasLayerPositions',
   'setCanvasLayersEnabled',
   'setCanvasLayersHidden',
   'setCanvasSelectedLayer',
@@ -152,14 +153,36 @@ const setCanvasLayersHidden = (
   return changed ? { ...document, layers } : document;
 };
 
+const setCanvasLayerPositions = (
+  document: CanvasDocumentContractV2,
+  updates: readonly { id: string; x: number; y: number }[]
+): CanvasDocumentContractV2 => {
+  const positions = new Map(updates.map((update) => [update.id, update]));
+  if (
+    positions.size !== updates.length ||
+    updates.some(
+      (update) => !layerExists(document.layers, update.id) || !Number.isFinite(update.x) || !Number.isFinite(update.y)
+    )
+  ) {
+    return document;
+  }
+  let changed = false;
+  const layers = document.layers.map((layer) => {
+    const position = positions.get(layer.id);
+    if (!position || (layer.transform.x === position.x && layer.transform.y === position.y)) {
+      return layer;
+    }
+    changed = true;
+    return { ...layer, transform: { ...layer.transform, x: position.x, y: position.y } };
+  });
+  return changed ? { ...document, layers } : document;
+};
+
 const applyLayerStackMutation = (
   document: CanvasDocumentContractV2,
   mutation: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }>
 ): CanvasDocumentContractV2 => {
   const currentIds = new Set(document.layers.map((layer) => layer.id));
-  if (mutation.add && (mutation.removeIds?.length ?? 0) > 0) {
-    return document;
-  }
   const removeIds = new Set(mutation.removeIds ?? []);
   if ([...removeIds].some((id) => !currentIds.has(id))) {
     return document;
@@ -170,7 +193,7 @@ const applyLayerStackMutation = (
   }
   if (mutation.add) {
     for (const layer of mutation.add.layers) {
-      if (projectedIds.has(layer.id)) {
+      if (currentIds.has(layer.id) || projectedIds.has(layer.id)) {
         return document;
       }
       projectedIds.add(layer.id);
@@ -575,6 +598,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       );
     case 'setCanvasLayersEnabled':
       return updateCanvasDocument(project, (document) => setCanvasLayersEnabled(document, mutation.updates));
+    case 'setCanvasLayerPositions':
+      return updateCanvasDocument(project, (document) => setCanvasLayerPositions(document, mutation.updates));
     case 'setCanvasLayersHidden':
       return updateCanvasDocument(project, (document) => setCanvasLayersHidden(document, mutation.updates));
     case 'updateCanvasLayerSource':

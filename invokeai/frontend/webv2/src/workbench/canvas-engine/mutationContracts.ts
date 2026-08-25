@@ -97,6 +97,7 @@ export type CanvasProjectMutation =
   | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
   | { type: 'replaceCanvasLayer'; layerId: string; layer: CanvasLayerContract }
   | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
+  | { type: 'setCanvasLayerPositions'; updates: readonly { id: string; x: number; y: number }[] }
   | { type: 'setCanvasLayersHidden'; updates: readonly { id: string; isHidden: boolean }[] }
   | { type: 'updateCanvasLayerSource'; id: string; source: CanvasLayerSourceContract }
   | { type: 'updateCanvasLayerConfig'; id: string; config: CanvasLayerConfigPatch }

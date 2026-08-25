@@ -6,7 +6,12 @@ import type {
 
 import { describe, expect, it } from 'vitest';
 
-import { canMergeVisibleRasters, getMergeVisibleRasterLayers } from './mergeVisible';
+import {
+  areSelectedRasterLayersContiguous,
+  canMergeSelectedRasters,
+  canMergeVisibleRasters,
+  getMergeVisibleRasterLayers,
+} from './mergeVisible';
 
 const raster = (id: string, overrides: Partial<CanvasRasterLayerContractV2> = {}): CanvasRasterLayerContractV2 => ({
   blendMode: 'normal',
@@ -76,5 +81,52 @@ describe('getMergeVisibleRasterLayers', () => {
     expect(canMergeVisibleRasters([raster('one'), raster('hidden', { isEnabled: false })], hasContent)).toBe(false);
     expect(canMergeVisibleRasters([raster('one'), raster('empty')], hasContent)).toBe(false);
     expect(canMergeVisibleRasters([], hasContent)).toBe(false);
+  });
+});
+
+describe('merge-selected eligibility', () => {
+  const hasContent = (id: string): boolean => id !== 'empty';
+
+  it('treats other layer groups as harmless gaps in a contiguous raster selection', () => {
+    const layers = [raster('top'), mask('mask'), raster('bottom')];
+    const selected = new Set(['top', 'bottom']);
+
+    expect(areSelectedRasterLayersContiguous(layers, selected)).toBe(true);
+    expect(canMergeSelectedRasters(layers, selected, hasContent)).toBe(true);
+  });
+
+  it('rejects a selection spanning an unselected raster', () => {
+    const layers = [raster('top'), raster('middle'), raster('bottom')];
+    const selected = new Set(['top', 'bottom']);
+
+    expect(areSelectedRasterLayersContiguous(layers, selected)).toBe(false);
+    expect(canMergeSelectedRasters(layers, selected, hasContent)).toBe(false);
+  });
+
+  it('rejects empty, locked, hidden, or non-normal raster contributors', () => {
+    expect(canMergeSelectedRasters([raster('top'), raster('empty')], new Set(['top', 'empty']), hasContent)).toBe(
+      false
+    );
+    expect(
+      canMergeSelectedRasters(
+        [raster('top'), raster('bottom', { isLocked: true })],
+        new Set(['top', 'bottom']),
+        hasContent
+      )
+    ).toBe(false);
+    expect(
+      canMergeSelectedRasters(
+        [raster('top'), raster('bottom', { isEnabled: false })],
+        new Set(['top', 'bottom']),
+        hasContent
+      )
+    ).toBe(false);
+    expect(
+      canMergeSelectedRasters(
+        [raster('top'), raster('bottom', { blendMode: 'multiply' })],
+        new Set(['top', 'bottom']),
+        hasContent
+      )
+    ).toBe(false);
   });
 });

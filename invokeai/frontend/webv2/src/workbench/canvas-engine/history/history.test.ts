@@ -120,6 +120,14 @@ describe('createHistory: byte-budget eviction', () => {
   it('exports the 256 MB default byte budget', () => {
     expect(HISTORY_BYTE_BUDGET).toBe(256 * 1024 * 1024);
   });
+
+  it('reports whether one entry can remain undoable after eviction', () => {
+    const history = createHistory({ byteBudget: 25 });
+
+    expect(history.canRetain(25)).toBe(true);
+    expect(history.canRetain(26)).toBe(false);
+    expect(history.canRetain(Number.POSITIVE_INFINITY)).toBe(false);
+  });
 });
 
 describe('createHistory: change listener', () => {

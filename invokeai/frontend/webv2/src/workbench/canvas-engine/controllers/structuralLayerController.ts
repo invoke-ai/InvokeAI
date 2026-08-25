@@ -8,6 +8,7 @@ export interface StructuralLayerControllerOptions {
   readonly history: History;
   readonly dispatch: (action: CanvasProjectMutation) => void;
   readonly getDocument: () => CanvasDocumentContractV2 | null;
+  readonly getSelectedLayerIds?: (document: CanvasDocumentContractV2) => readonly string[];
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
   readonly now?: () => number;
@@ -15,8 +16,8 @@ export interface StructuralLayerControllerOptions {
 
 interface NudgeBurst {
   expiresAt: number;
-  layerId: string;
-  origin: { x: number; y: number };
+  selectionKey: string;
+  origins: readonly { id: string; x: number; y: number }[];
 }
 
 const NUDGE_COALESCE_MS = 500;
@@ -62,24 +63,43 @@ export class StructuralLayerController {
       return;
     }
     const document = this.deps.getDocument();
-    const layer = document?.layers.find((candidate) => candidate.id === document.selectedLayerId);
-    if (!document?.selectedLayerId || !layer || layer.isLocked || !layer.isEnabled) {
+    if (!document?.selectedLayerId) {
       return;
     }
-    const next = { x: layer.transform.x + dx, y: layer.transform.y + dy };
+    const requested = new Set(this.deps.getSelectedLayerIds?.(document) ?? [document.selectedLayerId]);
+    const layers = document.layers.filter((layer) => requested.has(layer.id));
+    if (
+      layers.length === 0 ||
+      layers.length !== requested.size ||
+      !requested.has(document.selectedLayerId) ||
+      layers.some((layer) => layer.isLocked || !layer.isEnabled)
+    ) {
+      return;
+    }
+    const selectionKey = layers.map((layer) => layer.id).join('\0');
     const now = this.now();
-    const coalesce = !!this.burst && this.burst.layerId === layer.id && now < this.burst.expiresAt;
-    const origin = coalesce && this.burst ? this.burst.origin : { x: layer.transform.x, y: layer.transform.y };
-    const forward: CanvasProjectMutation = {
-      id: layer.id,
-      patch: { transform: next },
-      type: 'updateCanvasLayer',
-    };
-    const inverse: CanvasProjectMutation = {
-      id: layer.id,
-      patch: { transform: origin },
-      type: 'updateCanvasLayer',
-    };
+    const coalesce = !!this.burst && this.burst.selectionKey === selectionKey && now < this.burst.expiresAt;
+    const origins =
+      coalesce && this.burst
+        ? this.burst.origins
+        : layers.map((layer) => ({ id: layer.id, x: layer.transform.x, y: layer.transform.y }));
+    const next = layers.map((layer) => ({ id: layer.id, x: layer.transform.x + dx, y: layer.transform.y + dy }));
+    const forward: CanvasProjectMutation =
+      layers.length === 1
+        ? {
+            id: layers[0]!.id,
+            patch: { transform: { x: next[0]!.x, y: next[0]!.y } },
+            type: 'updateCanvasLayer',
+          }
+        : { type: 'setCanvasLayerPositions', updates: next };
+    const inverse: CanvasProjectMutation =
+      layers.length === 1
+        ? {
+            id: layers[0]!.id,
+            patch: { transform: { x: origins[0]!.x, y: origins[0]!.y } },
+            type: 'updateCanvasLayer',
+          }
+        : { type: 'setCanvasLayerPositions', updates: origins };
     this.deps.dispatch(forward);
     const entry = createDocumentPatchEntry({ dispatch: this.deps.dispatch, forward, inverse, label: 'Nudge layer' });
     if (coalesce) {
@@ -87,7 +107,7 @@ export class StructuralLayerController {
     } else {
       this.deps.history.push(entry);
     }
-    this.burst = { expiresAt: now + NUDGE_COALESCE_MS, layerId: layer.id, origin };
+    this.burst = { expiresAt: now + NUDGE_COALESCE_MS, origins, selectionKey };
   }
 
   dispose(): void {

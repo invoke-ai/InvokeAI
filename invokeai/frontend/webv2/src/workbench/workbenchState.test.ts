@@ -86,6 +86,7 @@ const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
   'setCanvasLayersEnabled',
   'setCanvasLayersHidden',
   'setCanvasSelectedLayer',
+  'setCanvasLayerPositions',
   'setCanvasStagingAutoSwitch',
   'setStagedImageIndex',
   'toggleCanvasStagingThumbnailsVisibility',
@@ -4148,6 +4149,58 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(removed).document.selectedLayerId).toBe('c');
   });
 
+  it('atomically replaces non-contiguous layers with one result and restores them', () => {
+    const layers = [createRasterLayer('a'), createRasterLayer('b'), createRasterLayer('c')];
+    const result = createRasterLayer('result');
+    const initial = workbenchReducer(withCanvasLayers(createInitialWorkbenchState(), layers), {
+      id: 'c',
+      type: 'setCanvasSelectedLayer',
+    });
+    const merged = workbenchReducer(initial, {
+      add: { index: 0, layers: [result] },
+      enabledUpdates: [],
+      orderedIds: ['result', 'b'],
+      removeIds: ['a', 'c'],
+      selectedLayerId: 'result',
+      type: 'applyCanvasLayerStackMutation',
+    });
+
+    expect(getLayerIds(merged)).toEqual(['result', 'b']);
+    expect(getCanvas(merged).document.selectedLayerId).toBe('result');
+
+    const restored = workbenchReducer(merged, {
+      add: { index: 0, layers: [layers[0]!, layers[2]!] },
+      enabledUpdates: [],
+      orderedIds: ['a', 'b', 'c'],
+      removeIds: ['result'],
+      selectedLayerId: 'c',
+      type: 'applyCanvasLayerStackMutation',
+    });
+    expect(getCanvas(restored).document.layers).toEqual(layers);
+    expect(getCanvas(restored).document.selectedLayerId).toBe('c');
+  });
+
+  it('sets multiple layer positions atomically and rejects invalid coordinates', () => {
+    const initial = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
+    const moved = workbenchReducer(initial, {
+      type: 'setCanvasLayerPositions',
+      updates: [
+        { id: 'a', x: 3, y: -2 },
+        { id: 'b', x: 13, y: 18 },
+      ],
+    });
+    expect(getCanvas(moved).document.layers.map((layer) => layer.transform)).toMatchObject([
+      { x: 3, y: -2 },
+      { x: 13, y: 18 },
+    ]);
+    expect(
+      workbenchReducer(initial, {
+        type: 'setCanvasLayerPositions',
+        updates: [{ id: 'a', x: Number.NaN, y: 0 }],
+      })
+    ).toBe(initial);
+  });
+
   it('returns the same document when a bulk visibility action changes nothing', () => {
     const state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a'), createRasterLayer('b')]);
     const before = getCanvas(state).document;
@@ -4285,7 +4338,7 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
         type: 'applyCanvasLayerStackMutation',
       },
       {
-        add: { index: 0, layers: [createRasterLayer('c')] },
+        add: { index: 0, layers: [createRasterLayer('a')] },
         enabledUpdates: [],
         removeIds: ['a'],
         selectedLayerId: 'b',

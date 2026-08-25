@@ -2635,6 +2635,9 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     // both leave the same final version number. Tracking call count/timing does.
     const thumbnailListener = vi.fn();
     const unsubscribe = engine.stores.thumbnailVersion.subscribeKey('a', thumbnailListener);
+    const contentListener = vi.fn();
+    const unsubscribeContent = engine.interaction.subscribe('rasterContentEpoch', contentListener);
+    expect(engine.interaction.get('rasterContentEpoch')).toBe(0);
 
     // Frame 1: dispatches the first rasterize for imageName 'a'; it stays in flight
     // (the deferred is never auto-resolved).
@@ -2657,6 +2660,8 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     raf.flush();
     expect(thumbnailListener).toHaveBeenCalledTimes(1);
     expect(engine.stores.thumbnailVersion.get('a')).toBe(2);
+    expect(contentListener).toHaveBeenCalledTimes(1);
+    expect(engine.interaction.get('rasterContentEpoch')).toBe(1);
 
     // The older decode resolves afterwards. It may finish its isolated scratch
     // draw, but it must neither publish nor notify subscribers.
@@ -2664,9 +2669,11 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     await flushMicrotasks();
     raf.flush();
     expect(thumbnailListener).toHaveBeenCalledTimes(1);
+    expect(contentListener).toHaveBeenCalledTimes(1);
     expect(resolver).toHaveBeenCalledTimes(2);
 
     unsubscribe();
+    unsubscribeContent();
     engine.lifecycle.dispose();
   });
 });
@@ -6764,11 +6771,25 @@ describe('mergeVisibleRasterLayers', () => {
     return { ...base, layers: [upper, maskLayer('mid-mask'), below] };
   };
 
+  const selectedMergeDoc = (): CanvasDocumentContractV2 => {
+    const doc = interleavedDoc();
+    return {
+      ...doc,
+      layers: doc.layers.map((layer) => (layer.id === 'upper' ? { ...layer, blendMode: 'normal' as const } : layer)),
+    };
+  };
+
   const setup = (doc: CanvasDocumentContractV2) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
     const { projectId, store } = createReducerBackedStore(doc);
+    const baseMutationPort = createTestMutationPort(store, projectId);
+    let rejectMutations = false;
+    const mutationPort: CanvasProjectMutationPort = {
+      ...baseMutationPort,
+      dispatch: (mutation, origin) => (rejectMutations ? false : baseMutationPort.dispatch(mutation, origin)),
+    };
     const base = createTestStubRasterBackend();
     const surfaces: StubRasterSurface[] = [];
     const backend: StubRasterBackend = {
@@ -6779,17 +6800,255 @@ describe('mergeVisibleRasterLayers', () => {
         return surface;
       },
     };
+    let panelSelectedIds = doc.selectedLayerId ? [doc.selectedLayerId] : [];
+    const selectionChanges: { primaryId: string | null; selectedIds: readonly string[] }[] = [];
     const engine = createCanvasEngine({
       backend,
+      getSelectedLayerIds: () => panelSelectedIds,
       imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort,
       projectId,
+      setSelectedLayerIds: (primaryId, selectedIds) => {
+        panelSelectedIds = [...selectedIds];
+        selectionChanges.push({ primaryId, selectedIds: [...selectedIds] });
+      },
       store,
     });
     const screen = createFakeCanvas();
     const overlay = createFakeCanvas();
     engine.surface.attach(screen.element, overlay.element);
-    return { engine, raf, store, surfaces };
+    return {
+      engine,
+      getPanelSelectedIds: () => panelSelectedIds,
+      raf,
+      selectionChanges,
+      setRejectMutations: (reject: boolean) => {
+        rejectMutations = reject;
+      },
+      setPanelSelectedIds: (selectedIds: readonly string[]) => {
+        panelSelectedIds = [...selectedIds];
+      },
+      store,
+      surfaces,
+    };
   };
+
+  it('duplicates a selected batch directly above each source with live caches and one undo step', async () => {
+    const { engine, getPanelSelectedIds, raf, setPanelSelectedIds } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+
+    const result = engine.layers.duplicateLayers(['upper', 'below']);
+    expect(result).not.toBeNull();
+    const [upperCopyId, belowCopyId] = result!.duplicateIds;
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([
+      upperCopyId,
+      'upper',
+      'mid-mask',
+      belowCopyId,
+      'below',
+    ]);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(upperCopyId);
+    expect(getPanelSelectedIds()).toEqual([upperCopyId, belowCopyId]);
+    expect(engine.exports.hasExportableLayerContent(upperCopyId!)).toBe(true);
+    expect(engine.exports.hasExportableLayerContent(belowCopyId!)).toBe(true);
+
+    engine.history.undo();
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe('upper');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+
+    engine.history.redo();
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([
+      upperCopyId,
+      'upper',
+      'mid-mask',
+      belowCopyId,
+      'below',
+    ]);
+    expect(engine.exports.hasExportableLayerContent(upperCopyId!)).toBe(true);
+    expect(engine.exports.hasExportableLayerContent(belowCopyId!)).toBe(true);
+    expect(getPanelSelectedIds()).toEqual([upperCopyId, belowCopyId]);
+    engine.lifecycle.dispose();
+  });
+
+  it('publishes duplicate multi-selection only after successful initial, undo, and redo transactions', async () => {
+    const { engine, getPanelSelectedIds, raf, selectionChanges, setPanelSelectedIds, setRejectMutations } =
+      setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+
+    setRejectMutations(true);
+    expect(() => engine.layers.duplicateLayers(['upper', 'below'])).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(0);
+    expect(engine.stores.canUndo.get()).toBe(false);
+
+    setRejectMutations(false);
+    const result = engine.layers.duplicateLayers(['upper', 'below'])!;
+    expect(getPanelSelectedIds()).toEqual(result.duplicateIds);
+    expect(selectionChanges).toHaveLength(1);
+
+    setRejectMutations(true);
+    expect(() => engine.history.undo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(result.duplicateIds);
+    expect(selectionChanges).toHaveLength(1);
+    expect(engine.stores.canUndo.get()).toBe(true);
+
+    setRejectMutations(false);
+    engine.history.undo();
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+
+    setRejectMutations(true);
+    expect(() => engine.history.redo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('merges rasters separated only by another layer group and restores them on undo', async () => {
+    const { engine, getPanelSelectedIds, raf, setPanelSelectedIds } = setup(selectedMergeDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+    const before = engine.document.getDocument()!;
+
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('merged');
+    const merged = engine.document.getDocument()!.layers[0]!;
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([merged.id, 'mid-mask']);
+    expect(merged).toMatchObject({ name: 'upper merged', type: 'raster' });
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(merged.id);
+    expect(getPanelSelectedIds()).toEqual([merged.id]);
+
+    engine.history.undo();
+    expect(engine.document.getDocument()!.layers).toEqual(before.layers);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(before.selectedLayerId);
+    expect(engine.exports.hasExportableLayerContent('upper')).toBe(true);
+    expect(engine.exports.hasExportableLayerContent('below')).toBe(true);
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+
+    engine.history.redo();
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([merged.id, 'mid-mask']);
+    expect(engine.exports.hasExportableLayerContent(merged.id)).toBe(true);
+    expect(getPanelSelectedIds()).toEqual([merged.id]);
+    engine.lifecycle.dispose();
+  });
+
+  it('publishes merge selection only after successful initial, undo, and redo transactions', async () => {
+    const { engine, getPanelSelectedIds, raf, selectionChanges, setPanelSelectedIds, setRejectMutations } =
+      setup(selectedMergeDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+
+    setRejectMutations(true);
+    await expect(engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).rejects.toThrow(
+      'Canvas document mutation was rejected'
+    );
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(0);
+    expect(engine.stores.canUndo.get()).toBe(false);
+
+    setRejectMutations(false);
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('merged');
+    const resultId = engine.document.getDocument()!.selectedLayerId!;
+    expect(getPanelSelectedIds()).toEqual([resultId]);
+    expect(selectionChanges).toHaveLength(1);
+
+    setRejectMutations(true);
+    expect(() => engine.history.undo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual([resultId]);
+    expect(selectionChanges).toHaveLength(1);
+
+    setRejectMutations(false);
+    engine.history.undo();
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+
+    setRejectMutations(true);
+    expect(() => engine.history.redo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses to merge across an unselected raster because that would reorder the composite', async () => {
+    const doc = selectedMergeDoc();
+    const middle: CanvasRasterLayerContractV2 = {
+      ...(doc.layers.find((layer) => layer.id === 'below') as CanvasRasterLayerContractV2),
+      id: 'middle-raster',
+      name: 'middle-raster',
+      source: { bitmap: { height: 50, imageName: 'middle-bmp', width: 50 }, type: 'paint' },
+    };
+    const upper = doc.layers.find((layer) => layer.id === 'upper')!;
+    const below = doc.layers.find((layer) => layer.id === 'below')!;
+    const withRasterGap = { ...doc, layers: [upper, middle, below] };
+    const { engine, raf } = setup(withRasterGap);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('nothing');
+    expect(engine.document.getDocument()!.layers).toEqual(withRasterGap.layers);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses selected non-normal blend modes instead of changing their backdrop interaction', async () => {
+    const doc = interleavedDoc();
+    const { engine, raf } = setup(doc);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('nothing');
+    expect(engine.document.getDocument()!.layers).toEqual(doc.layers);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('declines oversized duplicate and merge batches before unbounded transaction copies', async () => {
+    const size = 4096;
+    const layers = ['top', 'middle', 'bottom'].map((id): CanvasLayerContract => ({
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      name: id,
+      opacity: 1,
+      source: { bitmap: { height: size, imageName: `${id}-bmp`, width: size }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    }));
+    const doc: CanvasDocumentContractV2 = {
+      ...twoPaintDoc(),
+      height: size,
+      layers,
+      selectedLayerId: 'top',
+      width: size,
+    };
+    const { engine, raf, surfaces } = setup(doc);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const afterRasterization = surfaces.length;
+
+    expect(engine.layers.duplicateLayers(layers.map((layer) => layer.id))).toBeNull();
+    expect(surfaces).toHaveLength(afterRasterization);
+    expect(await engine.layers.mergeSelectedRasterLayers(layers.map((layer) => layer.id))).toBe('over-budget');
+    expect(engine.document.getDocument()!.layers).toEqual(layers);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
 
   it('waits for contributor rasterization before applying one atomic insertion', async () => {
     const { engine, raf } = setup(interleavedDoc());
@@ -7426,11 +7685,12 @@ const selectedImageDoc = (
 });
 
 describe('nudgeSelectedLayer', () => {
-  const setup = (doc: CanvasDocumentContractV2) => {
+  const setup = (doc: CanvasDocumentContractV2, selectedLayerIds?: readonly string[]) => {
     const { store } = createFakeStore(doc);
     const dispatch = store.dispatch as Mock;
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
+      getSelectedLayerIds: () => selectedLayerIds ?? (doc.selectedLayerId ? [doc.selectedLayerId] : []),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -7478,6 +7738,31 @@ describe('nudgeSelectedLayer', () => {
       id: 'a',
       patch: { transform: { x: 0, y: 0 } },
       type: 'updateCanvasLayer',
+    });
+    engine.lifecycle.dispose();
+  });
+
+  it('nudges every selected layer together and undoes the batch atomically', () => {
+    const doc = selectedImageDoc();
+    const second = { ...rasterLayer('b'), transform: { ...rasterLayer('b').transform, x: 10, y: 20 } };
+    const { dispatch, engine } = setup({ ...doc, layers: [doc.layers[0]!, second] }, ['a', 'b']);
+
+    engine.layers.nudgeSelectedLayer(3, -2);
+    expect(dispatch).toHaveBeenNthCalledWith(1, {
+      type: 'setCanvasLayerPositions',
+      updates: [
+        { id: 'a', x: 3, y: -2 },
+        { id: 'b', x: 13, y: 18 },
+      ],
+    });
+
+    engine.history.undo();
+    expect(dispatch).toHaveBeenNthCalledWith(2, {
+      type: 'setCanvasLayerPositions',
+      updates: [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 10, y: 20 },
+      ],
     });
     engine.lifecycle.dispose();
   });
