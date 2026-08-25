@@ -3776,10 +3776,10 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "New model types: Krea.2-Turbo/Raw, Ideogram 4, Ernie",
-	    "Video generation with Wan 2.2",
+            "Video generation with Wan 2.2",
             "Parallel generation on systems with multiple GPUs",
             "Anima controlnets and inpainting mode",
-            "Performance improvements and bug fixes",
+            "Performance improvements and bug fixes"
         ],
         "readReleaseNotes": "Read Release Notes",
         "readTheDocs": "Read the Docs",
