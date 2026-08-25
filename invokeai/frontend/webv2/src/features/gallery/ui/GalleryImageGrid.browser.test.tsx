@@ -14,6 +14,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { requestGalleryItemReveal } from '@features/gallery/core/selection';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { isGalleryImageDragData } from '@features/gallery/utility';
@@ -207,6 +208,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
   ];
 
   return {
+    anchoredWindowPage: 0,
     boards: [board],
     compareImageKey: null,
     currentItem: { itemKey: 'image:first.png', kind: 'item' },
@@ -449,6 +451,11 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
 };
 
 beforeEach(() => {
+  // The reveal channel is a module singleton, so a request from a previous
+  // test would otherwise be adopted by the next mount (grids deliberately
+  // honor a request that predates them). Drain it with one that can never
+  // match an item here.
+  requestGalleryItemReveal('image:__drained__');
   accountLifecycle.activate('grid-user');
   vi.clearAllMocks();
   registeredCommands.clear();
@@ -972,6 +979,111 @@ describe('GalleryImageGrid upload drop zone', () => {
 
     expect(host?.textContent).toContain('Loading gallery');
     expect(host?.querySelector('[role="button"]')).toBeNull();
+  });
+});
+
+describe('GalleryImageGrid reveal requests', () => {
+  it('never scrolls on selection changes alone', async () => {
+    // The selection also changes when a finished generation auto-selects its
+    // image; scrolling on that would yank the grid out from under a browsing
+    // user. Only the explicit reveal channel may scroll.
+    const gallery = createGallery();
+
+    await renderGallery(gallery);
+    await renderGallery({ ...gallery, selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] });
+
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('scrolls to a revealed item, and again when the same item is re-revealed', async () => {
+    const gallery = createGallery();
+
+    await renderGallery(gallery);
+    await interact(() => requestGalleryItemReveal('image:first.png'));
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+
+    // Re-clicking the same map point after scrolling away must reveal again
+    // even though the selection is unchanged.
+    await interact(() => requestGalleryItemReveal('image:first.png'));
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a reveal pending until its item materializes with a late-loading page', async () => {
+    const items = [createItem('image', 'first.png')];
+    const gallery = createGallery({ items, selectedItemKey: null, selectedItemKeys: [] });
+
+    await renderGallery(gallery);
+    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    // The page lands and the revealed item appears: scroll exactly then.
+    await renderGallery({
+      ...gallery,
+      items: [...items, createItem('image', 'deep.png')],
+      selectedItemKey: 'image:deep.png',
+      selectedItemKeys: ['image:deep.png'],
+    });
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('honors a reveal requested before this grid mounted, while its item is still selected', async () => {
+    // The gallery is frequently opened (or swapped between its stacked and
+    // wide layouts, which remounts the grid) in response to the very reveal
+    // that is outstanding, so a grid must not ignore a request just because
+    // it arrived before the mount.
+    await interact(() => requestGalleryItemReveal('image:last.png'));
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    await renderGallery(createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] }));
+
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores a reveal requested before mount once the selection has moved on', async () => {
+    // Age is not what makes a request stale — a superseding selection is.
+    await interact(() => requestGalleryItemReveal('image:last.png'));
+    await renderGallery(createGallery({ selectedItemKey: 'image:first.png', selectedItemKeys: ['image:first.png'] }));
+
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('keeps a reveal pending while its item has no row, then scrolls when one appears', async () => {
+    // A starred item under a collapsed Starred section is loaded but has no
+    // row to scroll to; consuming the reveal there would silently drop it.
+    const starred = createItem('image', 'starred.png', { starred: true });
+    const gallery = createGallery({
+      items: [starred, createItem('image', 'regular.png')],
+      selectedItemKey: 'image:starred.png',
+      selectedItemKeys: ['image:starred.png'],
+    });
+
+    await renderGallery(gallery);
+    await click(getButton('Collapse starred items'));
+    await interact(() => requestGalleryItemReveal('image:starred.png'));
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+
+    await click(getButton('Expand starred items'));
+    expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
+  });
+
+  it('retires a pending reveal once a different selection lands', async () => {
+    const items = [createItem('image', 'first.png')];
+    const gallery = createGallery({ items, selectedItemKey: null, selectedItemKeys: [] });
+
+    await renderGallery(gallery);
+    await interact(() => requestGalleryItemReveal('image:deep.png'));
+
+    // The user picks something else before the reveal's page arrives.
+    await renderGallery({ ...gallery, selectedItemKey: 'image:first.png', selectedItemKeys: ['image:first.png'] });
+
+    // The revealed item arriving later must not scroll away from that choice.
+    await renderGallery({
+      ...gallery,
+      items: [...items, createItem('image', 'deep.png')],
+      selectedItemKey: 'image:first.png',
+      selectedItemKeys: ['image:first.png'],
+    });
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 });
 

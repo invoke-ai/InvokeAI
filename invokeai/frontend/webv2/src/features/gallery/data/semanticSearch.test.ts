@@ -1,4 +1,4 @@
-import { registerExternalImageFile } from '@features/gallery/core/semanticImageQuery';
+import { registerExternalImageFile, registerImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -131,6 +131,30 @@ describe('listSemanticGalleryItemNames', () => {
       starredCount: 0,
       total: 2,
     });
+  });
+
+  it('answers cluster queries from the registry without a server round trip', async () => {
+    mocks.apiFetchJson.mockReset();
+    const clusterId = registerImageCluster(['near.png', 'far.png'], 'beaches');
+
+    await expect(listSemanticGalleryItemNames({ query: { clusterId, kind: 'cluster' } })).resolves.toEqual({
+      items: [
+        { kind: 'image', name: 'near.png' },
+        { kind: 'image', name: 'far.png' },
+      ],
+      starredCount: 0,
+      total: 2,
+    });
+    // An evicted key (another cluster registered, or a reload) degrades to an
+    // empty list rather than an error — the parse layer clears the reference
+    // before the UI would ever show that.
+    registerImageCluster(['other.png'], 'newer');
+    await expect(listSemanticGalleryItemNames({ query: { clusterId, kind: 'cluster' } })).resolves.toEqual({
+      items: [],
+      starredCount: 0,
+      total: 0,
+    });
+    expect(mocks.apiFetchJson).not.toHaveBeenCalled();
   });
 });
 

@@ -75,7 +75,14 @@ export interface CanonicalGalleryItemsFilter {
   starredFirst: boolean;
 }
 
-export type GalleryItemsWindow = { kind: 'anchor'; offset: number } | { kind: 'infinite' };
+/**
+ * An infinite window can start below the top of the listing: `offset` (a row
+ * offset, normalized to a page multiple, default 0) anchors where the window
+ * begins, and the `GALLERY_MAX_ROWS` reach applies from there. This is what
+ * lets a reveal land the gallery on an image deeper than the base window
+ * could ever load — every board/search/view change resets the anchor to 0.
+ */
+export type GalleryItemsWindow = { kind: 'anchor'; offset: number } | { kind: 'infinite'; offset?: number };
 
 interface GalleryAccountKey {
   accountId: string | null;
@@ -90,7 +97,7 @@ type GalleryItemsInfiniteQueryKey = readonly [
   CanonicalGalleryItemsFilter,
 ];
 
-type GalleryItemsAnchorQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'anchor', number];
+type GalleryItemsAnchorQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'anchor' | 'infinite', number];
 
 export type GalleryItemsListQueryKey = GalleryItemsAnchorQueryKey | GalleryItemsInfiniteQueryKey;
 
@@ -144,8 +151,19 @@ const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
 const normalizePageOffset = (offset: number): number =>
   Math.max(0, Math.floor(offset / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
 
-const getWindowKey = (window: GalleryItemsWindow): readonly [] | readonly ['anchor', number] =>
-  window.kind === 'infinite' ? [] : ([window.kind, normalizePageOffset(window.offset)] as const);
+const getWindowKey = (
+  window: GalleryItemsWindow
+): readonly [] | readonly ['anchor', number] | readonly ['infinite', number] => {
+  if (window.kind === 'infinite') {
+    const offset = normalizePageOffset(window.offset ?? 0);
+
+    // A zero offset keeps the historical key shape, so every existing
+    // consumer of the base window shares one cache entry with it.
+    return offset === 0 ? [] : (['infinite', offset] as const);
+  }
+
+  return [window.kind, normalizePageOffset(window.offset)] as const;
+};
 
 export const galleryKeys = {
   all: ['gallery'] as const,
@@ -302,7 +320,8 @@ const getNextPageParam = (
   lastPageParam: number
 ): number | undefined => {
   const nextOffset = lastPageParam + GALLERY_PAGE_SIZE;
-  const isInsideWindow = window.kind === 'anchor' || nextOffset < GALLERY_MAX_ROWS;
+  const isInsideWindow =
+    window.kind === 'anchor' || nextOffset < normalizePageOffset(window.offset ?? 0) + GALLERY_MAX_ROWS;
 
   return isInsideWindow && nextOffset < lastPage.total ? nextOffset : undefined;
 };
@@ -314,8 +333,11 @@ export const galleryItemsInfiniteOptions = (
   const owner = captureAccountScope();
   const filter = canonicalizeGalleryItemsFilter(inputFilter);
   const normalizedWindow =
-    window.kind === 'infinite' ? window : ({ ...window, offset: normalizePageOffset(window.offset) } as const);
-  const initialPageParam = normalizedWindow.kind === 'infinite' ? 0 : normalizedWindow.offset;
+    window.kind === 'infinite'
+      ? ({ kind: 'infinite', offset: normalizePageOffset(window.offset ?? 0) } as const)
+      : ({ ...window, offset: normalizePageOffset(window.offset) } as const);
+  const initialPageParam = normalizedWindow.offset;
+  const isBaseInfiniteWindow = normalizedWindow.kind === 'infinite' && normalizedWindow.offset === 0;
 
   return infiniteQueryOptions<
     GalleryItemsPage,
@@ -324,15 +346,27 @@ export const galleryItemsInfiniteOptions = (
     GalleryItemsListQueryKey,
     number
   >({
-    ...(normalizedWindow.kind === 'infinite' ? {} : { gcTime: 0 }),
+    // Anchored windows (paginated pages and deep infinite reveals) are
+    // transient views; only the base window's cache is worth keeping around.
+    ...(isBaseInfiniteWindow ? {} : { gcTime: 0 }),
     getNextPageParam: (lastPage, allPages, lastPageParam) =>
       allPages.length >= GALLERY_MAX_INFINITE_PAGES
         ? undefined
         : getNextPageParam(normalizedWindow, lastPage, lastPageParam),
-    getPreviousPageParam: (_firstPage, allPages, firstPageParam) =>
-      allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam >= GALLERY_PAGE_SIZE
+    getPreviousPageParam: (_firstPage, allPages, firstPageParam) => {
+      // An anchored INFINITE window must not grow upward past its anchor: its
+      // cache key names that start offset, and the grid — which shares the
+      // entry and cannot request earlier pages itself — would have 60 items
+      // spliced in above its viewport, shifting the content under the user.
+      // Paginated anchors keep growing freely: their consumer slices out the
+      // one page it wants by pageParam, so a prepend is invisible there, and
+      // Preview walks backwards through exactly this mechanism.
+      const lowestPageParam = normalizedWindow.kind === 'infinite' ? normalizedWindow.offset : 0;
+
+      return allPages.length < GALLERY_MAX_INFINITE_PAGES && firstPageParam - GALLERY_PAGE_SIZE >= lowestPageParam
         ? firstPageParam - GALLERY_PAGE_SIZE
-        : undefined,
+        : undefined;
+    },
     initialPageParam,
     maxPages: GALLERY_MAX_INFINITE_PAGES,
     queryFn: async ({ client, pageParam, signal }) => {

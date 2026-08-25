@@ -69,6 +69,7 @@ const boards = [
 
 const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateView =>
   ({
+    anchoredWindowPage: 0,
     boards,
     compareImageKey: null,
     currentItem: null,

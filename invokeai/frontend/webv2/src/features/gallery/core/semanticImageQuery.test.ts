@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   gallerySemanticReferenceKey,
   getExternalImageFile,
+  getImageCluster,
   parseGallerySemanticReference,
+  pruneImageClusterMembers,
   registerExternalImageFile,
+  registerImageCluster,
   semanticReferenceFromDataTransfer,
   toGallerySemanticQuery,
 } from './semanticImageQuery';
@@ -20,6 +23,63 @@ describe('external image registry', () => {
     expect(secondId).not.toBe(firstId);
     expect(getExternalImageFile(firstId)).toBe(null);
     expect(getExternalImageFile(secondId)).toMatchObject({ label: 'second.png' });
+  });
+});
+
+describe('image cluster registry', () => {
+  it('holds a single slot: registering a new cluster evicts the previous one', () => {
+    const firstId = registerImageCluster(['a.png', 'b.png'], 'first cluster');
+
+    expect(getImageCluster(firstId)).toEqual({ imageNames: ['a.png', 'b.png'], label: 'first cluster' });
+
+    const secondId = registerImageCluster(['c.png'], 'second cluster');
+
+    expect(secondId).not.toBe(firstId);
+    expect(getImageCluster(firstId)).toBe(null);
+    expect(getImageCluster(secondId)).toEqual({ imageNames: ['c.png'], label: 'second cluster' });
+  });
+
+  it('prunes deleted members with a rollback, preserving order', () => {
+    const clusterId = registerImageCluster(['a.png', 'b.png', 'c.png'], 'beaches');
+    const rollback = pruneImageClusterMembers(['b.png', 'unrelated.png']);
+
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'c.png']);
+
+    rollback();
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'b.png', 'c.png']);
+  });
+
+  it('rolls back only its own removals when another prune interleaves', () => {
+    // Two deletions overlap: the first fails and rolls back while the second
+    // has already pruned. Restoring the captured list wholesale would
+    // resurrect the second deletion's image; an identity guard would skip the
+    // restore entirely and strand the failed deletion's image outside the
+    // cluster for good.
+    const clusterId = registerImageCluster(['a.png', 'b.png', 'c.png'], 'beaches');
+    const rollbackFirst = pruneImageClusterMembers(['a.png']);
+
+    pruneImageClusterMembers(['b.png']);
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['c.png']);
+
+    rollbackFirst();
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png', 'c.png']);
+  });
+
+  it('makes pruning a no-op when nothing matches, and rollback a no-op once superseded', () => {
+    const clusterId = registerImageCluster(['a.png'], 'beaches');
+
+    // Nothing to prune: the entry is untouched.
+    pruneImageClusterMembers(['other.png']);
+    expect(getImageCluster(clusterId)?.imageNames).toEqual(['a.png']);
+
+    // A rollback captured before a newer registration must not resurrect the
+    // old list into the newer cluster's slot.
+    const rollback = pruneImageClusterMembers(['a.png']);
+    const newerId = registerImageCluster(['x.png'], 'newer');
+
+    rollback();
+    expect(getImageCluster(clusterId)).toBe(null);
+    expect(getImageCluster(newerId)?.imageNames).toEqual(['x.png']);
   });
 });
 
@@ -88,6 +148,27 @@ describe('parseGallerySemanticReference', () => {
     expect(parseGallerySemanticReference({ kind: 'nonsense' })).toBe(null);
     expect(parseGallerySemanticReference('')).toBe(null);
   });
+
+  it('parses cluster references while registered and drops dangling cluster keys', () => {
+    const clusterId = registerImageCluster(['a.png', 'b.png'], 'beaches');
+
+    expect(parseGallerySemanticReference({ clusterId, kind: 'cluster', label: 'beaches' })).toEqual({
+      clusterId,
+      kind: 'cluster',
+      label: 'beaches',
+    });
+    // A missing label falls back to the registered one rather than dropping
+    // the reference.
+    expect(parseGallerySemanticReference({ clusterId, kind: 'cluster' })).toEqual({
+      clusterId,
+      kind: 'cluster',
+      label: 'beaches',
+    });
+    // Registering evicts prior entries, so a stale key reads as no search —
+    // exactly how a reload behaves.
+    registerImageCluster(['c.png'], 'newer');
+    expect(parseGallerySemanticReference({ clusterId, kind: 'cluster', label: 'beaches' })).toBe(null);
+  });
 });
 
 describe('semantic reference identity', () => {
@@ -101,6 +182,12 @@ describe('semantic reference identity', () => {
     );
     expect(gallerySemanticReferenceKey({ fileId: 'external-1', kind: 'file', label: 'a' })).toBe(
       gallerySemanticReferenceKey({ fileId: 'external-1', kind: 'file', label: 'b' })
+    );
+    expect(gallerySemanticReferenceKey({ clusterId: 'cluster-1', kind: 'cluster', label: 'a' })).toBe(
+      gallerySemanticReferenceKey({ clusterId: 'cluster-1', kind: 'cluster', label: 'b' })
+    );
+    expect(gallerySemanticReferenceKey({ clusterId: 'external-1', kind: 'cluster', label: 'a' })).not.toBe(
+      gallerySemanticReferenceKey({ fileId: 'external-1', kind: 'file', label: 'a' })
     );
   });
 
@@ -120,6 +207,10 @@ describe('semantic reference identity', () => {
     expect(toGallerySemanticQuery({ kind: 'text', query: 'a sunset' })).toEqual({
       kind: 'text',
       query: 'a sunset',
+    });
+    expect(toGallerySemanticQuery({ clusterId: 'cluster-7', kind: 'cluster', label: 'beaches' })).toEqual({
+      clusterId: 'cluster-7',
+      kind: 'cluster',
     });
   });
 });

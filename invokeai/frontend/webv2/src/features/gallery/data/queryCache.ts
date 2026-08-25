@@ -10,6 +10,7 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { InfiniteData, QueryClient, QueryKey } from '@tanstack/react-query';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { pruneImageClusterMembers } from '@features/gallery/core/semanticImageQuery';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { rollBackUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { hashKey } from '@tanstack/react-query';
@@ -168,6 +169,13 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
     return () => undefined;
   }
 
+  // The cluster filter's member list is client-owned, so a server refetch can
+  // never reconcile it: prune it in the same optimistic step (and restore it
+  // with the same rollback) as the list caches it feeds.
+  const rollbackClusterMembers =
+    patch.kind === 'delete'
+      ? pruneImageClusterMembers(patch.result.succeeded.filter((ref) => ref.kind === 'image').map((ref) => ref.name))
+      : null;
   const rollbackEntries: ItemCacheRollbackEntry[] = [];
 
   for (const query of getGalleryItemListQueries(client)) {
@@ -191,12 +199,14 @@ export const patchGalleryItemCaches = (client: QueryClient, patch: GalleryItemCa
     }
   }
 
-  return () =>
+  return () => {
+    rollbackClusterMembers?.();
     rollBackUnclaimedEntries(
       rollbackEntries,
       (entry) => client.getQueryData<InfiniteData<GalleryItemsPage, number>>(entry.queryKey),
       (entry) => client.setQueryData(entry.queryKey, entry.before)
     );
+  };
 };
 
 /**
@@ -357,7 +367,9 @@ const runGalleryInvalidation = async (
     }
 
     const anchorOffset =
-      query.queryKey[5] === 'anchor' && typeof query.queryKey[6] === 'number' ? query.queryKey[6] : 0;
+      (query.queryKey[5] === 'anchor' || query.queryKey[5] === 'infinite') && typeof query.queryKey[6] === 'number'
+        ? query.queryKey[6]
+        : 0;
     const anchorIndex = Math.max(0, data.pageParams.indexOf(anchorOffset));
 
     client.setQueryData<InfiniteData<GalleryItemsPage, number>>(query.queryKey, {

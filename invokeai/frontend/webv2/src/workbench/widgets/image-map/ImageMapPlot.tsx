@@ -6,9 +6,11 @@ import type { CSSProperties } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import {
+  getImageCluster,
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
   parseGalleryItemKey,
+  parseGallerySemanticReference,
 } from '@features/gallery/contracts';
 import { attachWheelZoom } from '@workbench/image-map/attachWheelZoom';
 import { getClusterColor, isClusterColorLight } from '@workbench/image-map/clusterPalette';
@@ -314,7 +316,21 @@ const ImageMapPlot = ({
         .map((ref) => ref.name),
     shallowEqual
   );
-  const selectedNames = useMemo(() => new Set(selectedImageNames), [selectedImageNames]);
+  // With a cluster filter active in the gallery, the whole cluster stays
+  // highlighted on the map — the gallery is showing exactly these images.
+  const clusterQueryImageNames = useWidgetValuesSelector(
+    'gallery',
+    (values) => {
+      const reference = parseGallerySemanticReference(values.semanticImageQuery);
+
+      return reference?.kind === 'cluster' ? (getImageCluster(reference.clusterId)?.imageNames ?? null) : null;
+    },
+    shallowEqual
+  );
+  const selectedNames = useMemo(
+    () => new Set([...selectedImageNames, ...(clusterQueryImageNames ?? [])]),
+    [clusterQueryImageNames, selectedImageNames]
+  );
   const { selectCluster, selectImage } = useMapSelection();
   // Bumped after every scene rebuild so the overlay effects (marker,
   // highlight) re-apply onto the fresh, empty overlay traces.
@@ -328,13 +344,15 @@ const ImageMapPlot = ({
   const pointsRef = useRef(points);
   const selectedImageNameRef = useRef(selectedImageName);
   const clusterModeRef = useRef(clickSelectsCluster);
+  const clusterLabelsRef = useRef(clusterLabels);
 
   // Declared before the effects below so the refs are fresh when they run.
   useEffect(() => {
     pointsRef.current = points;
     selectedImageNameRef.current = selectedImageName;
     clusterModeRef.current = clickSelectsCluster;
-  }, [clickSelectsCluster, points, selectedImageName]);
+    clusterLabelsRef.current = clusterLabels;
+  }, [clickSelectsCluster, clusterLabels, points, selectedImageName]);
   // The full annotation set for the current data; which of them actually show
   // is view-dependent (see applyDeclutteredAnnotations), so the source list
   // lives in a ref the relayout listener can re-filter without re-rendering.
@@ -454,7 +472,17 @@ const ImageMapPlot = ({
           const clusterNames = clusterModeRef.current ? collectClusterSelection(points, imageName) : null;
 
           if (clusterNames) {
-            selectCluster(imageName, clusterNames);
+            const clicked = points.find((point) => point.imageName === imageName);
+            // The backend's cluster label names the filter chip when one has
+            // arrived; the member count is the fallback (labels can be off,
+            // still loading, or missing for this cluster). Only the primary
+            // phrase is used — the alternates belong to the hover card, which
+            // has room to show them.
+            const label =
+              (clicked ? clusterLabelsRef.current?.[String(clicked.cluster)]?.label : undefined) ??
+              `${clusterNames.length} images`;
+
+            selectCluster(imageName, clusterNames, label);
           } else {
             // Also the cluster-mode fallback for noise points (cluster -1).
             selectImage(imageName);

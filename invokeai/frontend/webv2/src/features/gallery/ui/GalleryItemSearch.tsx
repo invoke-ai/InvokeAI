@@ -4,7 +4,7 @@ import { Box, Code, HStack, Icon, Popover, Portal, Stack, Text } from '@chakra-u
 import { semanticReferenceFromDataTransfer } from '@features/gallery/core/semanticImageQuery';
 import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
 import { CloseButton, IconButton } from '@platform/ui/Button';
-import { CircleHelpIcon, ImageIcon, SparklesIcon } from 'lucide-react';
+import { CircleHelpIcon, ImageIcon, MapIcon, SparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -34,6 +34,8 @@ const getSemanticReferenceTitle = (reference: GallerySemanticReference): string 
       return reference.url;
     case 'file':
       return reference.label;
+    case 'cluster':
+      return reference.label;
   }
 };
 
@@ -45,6 +47,8 @@ const getSemanticReferenceName = (reference: GallerySemanticReference): string =
     case 'image':
       return reference.imageName;
     case 'file':
+      return reference.label;
+    case 'cluster':
       return reference.label;
     case 'url': {
       try {
@@ -246,6 +250,7 @@ export const GalleryItemSearch = () => {
 const GallerySemanticChip = ({ onClear, reference }: { onClear: () => void; reference: GallerySemanticReference }) => {
   const { t } = useTranslation();
   const isText = reference.kind === 'text';
+  const isCluster = reference.kind === 'cluster';
   const name = getSemanticReferenceName(reference) || t('widgets.gallery.semanticWebImage');
 
   return (
@@ -261,12 +266,27 @@ const GallerySemanticChip = ({ onClear, reference }: { onClear: () => void; refe
       title={getSemanticReferenceTitle(reference)}
       w="full"
     >
-      <Icon as={isText ? SparklesIcon : ImageIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+      <Icon
+        as={isText ? SparklesIcon : isCluster ? MapIcon : ImageIcon}
+        boxSize="3.5"
+        color="fg.subtle"
+        flexShrink={0}
+      />
       <Text color="fg.muted" flex="1" fontSize="xs" minW="0" truncate>
-        {isText ? t('widgets.gallery.semanticTextSearch', { name }) : t('widgets.gallery.semanticSimilarTo', { name })}
+        {isText
+          ? t('widgets.gallery.semanticTextSearch', { name })
+          : isCluster
+            ? t('widgets.gallery.semanticCluster', { name })
+            : t('widgets.gallery.semanticSimilarTo', { name })}
       </Text>
       <CloseButton
-        aria-label={isText ? t('widgets.gallery.clearSemanticSearch') : t('widgets.gallery.clearImageSearch')}
+        aria-label={
+          isText
+            ? t('widgets.gallery.clearSemanticSearch')
+            : isCluster
+              ? t('widgets.gallery.clearClusterSearch')
+              : t('widgets.gallery.clearImageSearch')
+        }
         size="2xs"
         onClick={onClear}
       />

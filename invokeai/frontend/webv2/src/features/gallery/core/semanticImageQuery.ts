@@ -1,19 +1,25 @@
 /**
  * Identity of a semantic gallery search: a text prompt, a gallery image, a
- * web image URL, or a dropped file held in the external-image registry.
+ * web image URL, a dropped file held in the external-image registry, or an
+ * image-map cluster held in the cluster registry.
  */
 export type GallerySemanticQuery =
   | { kind: 'text'; query: string }
   | { kind: 'image'; imageName: string }
   | { kind: 'url'; url: string }
-  | { kind: 'file'; fileId: string };
+  | { kind: 'file'; fileId: string }
+  | { kind: 'cluster'; clusterId: string };
 
-/** A persisted semantic search: a text prompt, a gallery image, a web URL, or a dropped file. */
+/**
+ * A persisted semantic search: a text prompt, a gallery image, a web URL, a
+ * dropped file, or an image-map cluster.
+ */
 export type GallerySemanticReference =
   | { kind: 'text'; query: string }
   | { kind: 'image'; imageName: string }
   | { kind: 'url'; url: string }
-  | { kind: 'file'; fileId: string; label: string };
+  | { kind: 'file'; fileId: string; label: string }
+  | { kind: 'cluster'; clusterId: string; label: string };
 
 /**
  * Stable identity for equality checks and fetch keys. A file reference is
@@ -34,6 +40,8 @@ export const gallerySemanticReferenceKey = (reference: GallerySemanticReference 
       return `url:${reference.url}`;
     case 'file':
       return `file:${reference.fileId}`;
+    case 'cluster':
+      return `cluster:${reference.clusterId}`;
   }
 };
 
@@ -48,6 +56,8 @@ export const toGallerySemanticQuery = (reference: GallerySemanticReference): Gal
       return { kind: 'url', url: reference.url };
     case 'file':
       return { fileId: reference.fileId, kind: 'file' };
+    case 'cluster':
+      return { clusterId: reference.clusterId, kind: 'cluster' };
   }
 };
 
@@ -77,6 +87,87 @@ export const registerExternalImageFile = (blob: Blob, label: string): string => 
 };
 
 export const getExternalImageFile = (fileId: string): { blob: Blob; label: string } | null => files.get(fileId) ?? null;
+
+/*
+ * In-memory registry for image-map cluster queries, mirroring the file
+ * registry above: a cluster's member list (which can run to thousands of
+ * names) cannot live in persisted widget values, so the persisted value keeps
+ * a registry key, and a key that no longer resolves (e.g. after a reload)
+ * reads as a cleared search. Only one cluster query is active at a time, so
+ * registering a new cluster evicts the previous one.
+ */
+
+let nextClusterId = 0;
+
+const clusters = new Map<string, { imageNames: string[]; label: string }>();
+
+export const registerImageCluster = (imageNames: string[], label: string): string => {
+  nextClusterId += 1;
+  // Same shape as file ids: the random token keeps a persisted id from a
+  // previous JS realm (another tab, a reload) from resolving to this realm's
+  // unrelated cluster.
+  const clusterId = `cluster-${String(nextClusterId)}-${Math.random().toString(36).slice(2, 10)}`;
+
+  clusters.clear();
+  clusters.set(clusterId, { imageNames, label });
+
+  return clusterId;
+};
+
+export const getImageCluster = (clusterId: string): { imageNames: string[]; label: string } | null =>
+  clusters.get(clusterId) ?? null;
+
+/**
+ * Drops deleted images from the registered cluster, in step with the gallery's
+ * optimistic cache patch: the member list is client-owned, so without this the
+ * cluster view's total (and its trailing page) would keep counting images that
+ * no longer exist. Returns a rollback that puts back exactly the names THIS
+ * call removed — a no-op once a different registration owns the slot.
+ */
+export const pruneImageClusterMembers = (imageNames: readonly string[]): (() => void) => {
+  const entry = [...clusters.entries()].at(0);
+
+  if (!entry || imageNames.length === 0) {
+    return () => undefined;
+  }
+
+  const [clusterId, cluster] = entry;
+  const requested = new Set(imageNames);
+  const originalNames = cluster.imageNames;
+  const removedNames = originalNames.filter((name) => requested.has(name));
+
+  if (removedNames.length === 0) {
+    return () => undefined;
+  }
+
+  const removed = new Set(removedNames);
+
+  clusters.set(clusterId, {
+    imageNames: originalNames.filter((name) => !removed.has(name)),
+    label: cluster.label,
+  });
+
+  return () => {
+    const current = clusters.get(clusterId);
+
+    if (!current) {
+      return;
+    }
+
+    // Rebuilt from the pre-prune order rather than swapped back wholesale, so
+    // that a concurrent deletion's prune (or its rollback) landing in between
+    // survives: whatever this call did not remove keeps whatever state the
+    // other call left it in. Restoring the captured array instead would either
+    // resurrect that deletion's images or — guarded on identity — skip the
+    // restore entirely and strand a failed deletion's image outside the list.
+    const restored = new Set([...current.imageNames, ...removedNames]);
+
+    clusters.set(clusterId, {
+      imageNames: originalNames.filter((name) => restored.has(name)),
+      label: current.label,
+    });
+  };
+};
 
 /**
  * Parses a persisted widget value into a semantic reference. Tolerates the
@@ -115,6 +206,22 @@ export const parseGallerySemanticReference = (value: unknown): GallerySemanticRe
         fileId: record.fileId,
         kind: 'file',
         label: typeof record.label === 'string' && record.label ? record.label : 'dropped image',
+      };
+    }
+
+    if (record.kind === 'cluster' && typeof record.clusterId === 'string' && record.clusterId) {
+      // Cluster members live in an in-memory registry; a persisted key that
+      // no longer resolves (e.g. after a reload) reads as no search at all.
+      const cluster = getImageCluster(record.clusterId);
+
+      if (cluster === null) {
+        return null;
+      }
+
+      return {
+        clusterId: record.clusterId,
+        kind: 'cluster',
+        label: typeof record.label === 'string' && record.label ? record.label : cluster.label,
       };
     }
   }

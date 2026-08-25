@@ -72,6 +72,13 @@ export type GalleryCurrentItem =
   | null;
 
 export interface GalleryStateView {
+  /**
+   * Page the infinite window starts at, when a reveal has anchored it
+   * mid-board; 0 whenever the window covers the top of the listing (always so
+   * in paginated mode). Non-zero means the grid cannot scroll above its first
+   * row, so the surface owes the user both an explanation and a way back.
+   */
+  anchoredWindowPage: number;
   boards: GalleryBoard[];
   compareImageKey: GalleryItemKey | null;
   currentItem: GalleryCurrentItem;
@@ -414,8 +421,16 @@ export const getGalleryStateView = (
   // pending placeholders (which stand in for images-to-come) are hidden while
   // a semantic query is active — exactly as they are for a text search.
   const semanticImageQuery = getGallerySemanticImageQuery(values);
+  // Placeholders stand in for images that will land at the TOP of the board's
+  // listing. An infinite window anchored mid-board (a deep reveal) shows a
+  // slice nowhere near the top, so they are hidden there too.
+  const isAnchoredInfiniteWindow = settings.paginationMode === 'infinite' && getGalleryPage(values) > 0;
   const visibleActivePlaceholder =
-    settings.showPendingItems && galleryView === 'images' && searchTerm.trim() === '' && semanticImageQuery === null
+    settings.showPendingItems &&
+    galleryView === 'images' &&
+    searchTerm.trim() === '' &&
+    semanticImageQuery === null &&
+    !isAnchoredInfiniteWindow
       ? generationSequence.liveSlot?.boardId === selectedBoardId
         ? generationSequence.liveSlot
         : null
@@ -428,6 +443,7 @@ export const getGalleryStateView = (
   });
 
   return {
+    anchoredWindowPage: isAnchoredInfiniteWindow ? getGalleryPage(values) : 0,
     boards,
     compareImageKey,
     currentItem,
@@ -435,7 +451,7 @@ export const getGalleryStateView = (
     items,
     isLoading,
     pendingPlaceholders:
-      settings.showPendingItems && semanticImageQuery === null
+      settings.showPendingItems && semanticImageQuery === null && !isAnchoredInfiniteWindow
         ? getVisibleGalleryQueuePlaceholders(generationSequence.chronologicalSlots, {
             galleryView,
             imageOrderDir: settings.imageOrderDir,
