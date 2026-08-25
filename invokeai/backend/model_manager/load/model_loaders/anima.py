@@ -2,7 +2,7 @@
 """Class for Anima model loading in InvokeAI."""
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import accelerate
 
@@ -31,6 +31,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
+    strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
 from invokeai.backend.util.devices import TorchDevice
@@ -79,19 +80,6 @@ _NON_MODEL_KEY_SUFFIXES = (
     "pos_embedder.seq",
 )
 _NON_MODEL_KEY_PREFIXES = ("model_sampling.",)
-
-
-def _strip_anima_prefix_from_layer_paths(layer_names: Any) -> dict[str, str]:
-    """Map checkpoint-scheme layer names to the paths the module tree actually uses.
-
-    `_quantization_metadata` names its layers in the checkpoint's own scheme -- `net.`-prefixed on
-    every Anima redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
-    has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match nothing
-    and are silently ignored. Rather than restating the prefix list, the names are pushed through
-    the real strip function and read back.
-    """
-    stripped = _strip_anima_bundle_prefix({f"{name}.weight": None for name in layer_names})
-    return {name: key[: -len(".weight")] for name, key in zip(layer_names, stripped.keys(), strict=True)}
 
 
 def _filter_non_model_keys(sd: dict) -> dict:
@@ -196,10 +184,13 @@ class AnimaCheckpointModel(ModelLoader):
         # so a sibling scale travels with its weight and nothing has to be split.
         keep_fp8 = should_keep_fp8_weights(target_device)
         header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
-        path_map = _strip_anima_prefix_from_layer_paths(list(header_hints))
+        # The header names layers in the checkpoint's own scheme -- `net.`-prefixed on every Anima
+        # redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
+        # has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match
+        # nothing and are silently ignored.
         layer_hints = {
             **extract_comfy_quant_hints(sd),
-            **{path_map.get(name, name): hints for name, hints in header_hints.items()},
+            **strip_layer_path_prefix(header_hints),
         }
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
         if fp8_layers and not keep_fp8:

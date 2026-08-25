@@ -50,6 +50,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
     split_qkv_sidechannel,
+    strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -466,7 +467,10 @@ class ZImageCheckpointModel(ModelLoader):
         # Per-layer `full_precision_matrix_mult` hints, from the safetensors header and/or the
         # per-tensor `.comfy_quant` markers. The header names layers in the checkpoint's own scheme,
         # so it is remapped below; the markers ride along through the key conversion instead.
-        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger))
+        # The names in the header still carry the checkpoint prefix stripped off `sd` above.
+        header_hints = strip_layer_path_prefix(
+            parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger))
+        )
 
         # Check if the state dict is in original format (not diffusers format)
         # Original format has keys like "x_embedder.weight" instead of "all_x_embedder.2-1.weight"

@@ -142,3 +142,66 @@ class TestFlux2RawFp8Gate:
         assert out["double_blocks.0.img_attn.qkv.weight"].dtype is torch.bfloat16
         assert torch.allclose(out["double_blocks.0.img_attn.qkv.weight"], torch.full((48, 16), 4.0).bfloat16())
         assert "double_blocks.0.img_attn.qkv.weight_scale" not in out
+
+
+class TestAdaLnSwapIsMirroredOntoTheScale:
+    """`final_layer.adaLN_modulation.1.weight` has its two halves swapped (BFL vs diffusers order).
+
+    A per-output-channel `weight_scale` has one entry per row, so it has to be swapped identically.
+    Copying it verbatim leaves rows 0..n/2 holding the original second half while still carrying the
+    first half's scale factors - every row scaled by another row's factor. It is the one converter
+    transform that reorders rows and is not the fused-qkv split.
+    """
+
+    def test_a_per_channel_scale_is_swapped_with_its_weight(self) -> None:
+        weight = torch.arange(24, dtype=torch.float32).reshape(6, 4)
+        sd = {
+            "final_layer.adaLN_modulation.1.weight": weight,
+            "final_layer.adaLN_modulation.1.weight_scale": torch.arange(1, 7, dtype=torch.float32),
+        }
+
+        converted = convert_flux2_bfl_to_diffusers(sd)
+
+        assert converted["norm_out.linear.weight"][:, 0].tolist() == [12, 16, 20, 0, 4, 8]
+        assert converted["norm_out.linear.weight_scale"].tolist() == [4, 5, 6, 1, 2, 3]
+
+    def test_the_scale_weight_spelling_is_swapped_too(self) -> None:
+        sd = {
+            "final_layer.adaLN_modulation.1.weight": torch.arange(24, dtype=torch.float32).reshape(6, 4),
+            "final_layer.adaLN_modulation.1.scale_weight": torch.arange(1, 7, dtype=torch.float32),
+        }
+
+        converted = convert_flux2_bfl_to_diffusers(sd)
+
+        assert converted["norm_out.linear.scale_weight"].tolist() == [4, 5, 6, 1, 2, 3]
+
+    def test_per_tensor_scales_and_markers_are_left_alone(self) -> None:
+        """They describe the whole layer, so reordering them would be wrong.
+
+        The `input_scale` is per-tensor by construction (Ada rejects per-row activation scaling) and
+        `comfy_quant` is a JSON byte blob, not a vector.
+        """
+        sd = {
+            "final_layer.adaLN_modulation.1.weight": torch.arange(24, dtype=torch.float32).reshape(6, 4),
+            "final_layer.adaLN_modulation.1.weight_scale": torch.tensor(0.5),
+            "final_layer.adaLN_modulation.1.input_scale": torch.tensor(0.25),
+            "final_layer.adaLN_modulation.1.comfy_quant": torch.tensor(list(b'{"a":1}'), dtype=torch.uint8),
+        }
+
+        converted = convert_flux2_bfl_to_diffusers(sd)
+
+        assert converted["norm_out.linear.weight_scale"].item() == 0.5
+        assert converted["norm_out.linear.input_scale"].item() == 0.25
+        assert bytes(converted["norm_out.linear.comfy_quant"].tolist()) == b'{"a":1}'
+
+    def test_other_layers_are_not_reordered(self) -> None:
+        """Only this one key is row-permuted; a scale elsewhere must be copied verbatim."""
+        sd = {
+            "final_layer.linear.weight": torch.arange(24, dtype=torch.float32).reshape(6, 4),
+            "final_layer.linear.weight_scale": torch.arange(1, 7, dtype=torch.float32),
+        }
+
+        converted = convert_flux2_bfl_to_diffusers(sd)
+
+        scale = next(v for k, v in converted.items() if k.endswith(".weight_scale"))
+        assert scale.tolist() == [1, 2, 3, 4, 5, 6]

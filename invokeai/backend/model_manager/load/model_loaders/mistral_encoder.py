@@ -49,6 +49,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
+    strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -948,12 +949,21 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         keep_fp8 = should_keep_fp8_weights(target_device)
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
-            header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+            header_hints = strip_layer_path_prefix(
+                parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+            )
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
         if not fp8_layers:
             # Dequantize straight to the compute dtype (per-tensor peak, not whole-dict fp32).
             sd = _drop_quantization_metadata(sd, logger, target_dtype=model_dtype)
+        else:
+            # `extract_fp8_scaled_layers` removes the keys it interprets, but this producer also
+            # emits `.scale` and `scaled_fp8*`, which it does not recognize. On the dequantizing
+            # path `_drop_quantization_metadata` takes those; here nothing did, so they reached
+            # `load_state_dict` and padded the "ignored N unexpected keys" line.
+            for k in [k for k in sd if isinstance(k, str) and (k.endswith(".scale") or k.startswith("scaled_fp8"))]:
+                del sd[k]
 
         mistral_config = _build_mistral_config(sd, torch_dtype=model_dtype)
         logger.info(

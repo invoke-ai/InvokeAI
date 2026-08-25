@@ -96,6 +96,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     read_safetensors_metadata,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
+    strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
@@ -747,7 +748,12 @@ class FluxCheckpointModel(ModelLoader):
         # Hints ship either in the safetensors header or as per-layer `.comfy_quant` markers; the
         # header wins on the rare checkpoint carrying both.
         metadata = read_safetensors_metadata(model_path, self._logger)
-        layer_hints = {**extract_comfy_quant_hints(sd), **parse_quantization_metadata(metadata)}
+        # Header names still carry the checkpoint prefix that was stripped off `sd`; strip it from
+        # them too, or every per-layer flag matches nothing.
+        layer_hints = {
+            **extract_comfy_quant_hints(sd),
+            **strip_layer_path_prefix(parse_quantization_metadata(metadata)),
+        }
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
 
         # A checkpoint that ships raw fp8 weights (fp8 tensors, no weight_scale) keeps them when the
@@ -1060,7 +1066,9 @@ class Flux2CheckpointModel(ModelLoader):
         # Hints ship in the safetensors header or as per-layer `.comfy_quant` markers, and both name
         # layers in the checkpoint's BFL scheme. The scales are read after the rename, so the hints
         # have to be renamed too -- a fused `qkv` becomes three diffusers layers.
-        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger))
+        header_hints = strip_layer_path_prefix(
+            parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger))
+        )
         layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
         path_map = remap_flux2_layer_paths(layer_hints.keys())
         layer_hints = {

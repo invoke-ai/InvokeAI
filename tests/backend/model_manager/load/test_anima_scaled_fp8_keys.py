@@ -18,13 +18,13 @@ import torch
 from invokeai.backend.model_manager.load.model_loaders.anima import (
     _filter_non_model_keys,
     _strip_anima_bundle_prefix,
-    _strip_anima_prefix_from_layer_paths,
 )
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     is_scale_metadata_key,
+    strip_layer_path_prefix,
 )
 from tests.backend.model_manager.load.state_dicts.anima_transformer_scaled_fp8_keys import (
     layer_hints as header_hints,
@@ -89,10 +89,9 @@ def test_header_hints_are_renamed_to_the_stripped_paths() -> None:
     """
     assert all(name.startswith("net.") for name in header_hints), "fixture header is not prefixed"
 
-    mapping = _strip_anima_prefix_from_layer_paths(list(header_hints))
+    remapped = strip_layer_path_prefix(header_hints)
 
-    assert all(not renamed.startswith("net.") for renamed in mapping.values())
-    remapped = {mapping[name]: hints for name, hints in header_hints.items()}
+    assert all(not renamed.startswith("net.") for renamed in remapped)
 
     layers = extract_fp8_scaled_layers(_build_state_dict(), layer_hints=remapped)
 
@@ -109,9 +108,8 @@ def test_the_single_full_precision_flag_survives_both_transports() -> None:
     marked = [name for name, hints in header_hints.items() if hints.get("full_precision_matrix_mult")]
     assert len(marked) == 1, f"fixture should carry exactly one marked layer, has {len(marked)}"
 
-    mapping = _strip_anima_prefix_from_layer_paths(list(header_hints))
     for hints in (
-        {mapping[n]: h for n, h in header_hints.items()},  # header transport
+        strip_layer_path_prefix(header_hints),  # header transport
         extract_comfy_quant_hints(_build_state_dict()),  # per-layer marker transport
     ):
         layers = extract_fp8_scaled_layers(_build_state_dict(), layer_hints=hints)
@@ -124,8 +122,7 @@ def test_only_the_full_precision_layer_lacks_an_input_scale() -> None:
     That is coherent on the producer's side: a layer excluded from the fp8 matmul has no activation
     scale to calibrate. It also means "all layers have an input scale" is the wrong invariant.
     """
-    mapping = _strip_anima_prefix_from_layer_paths(list(header_hints))
-    marked = {mapping[n] for n, h in header_hints.items() if h.get("full_precision_matrix_mult")}
+    marked = {n for n, h in strip_layer_path_prefix(header_hints).items() if h.get("full_precision_matrix_mult")}
 
     layers = extract_fp8_scaled_layers(_build_state_dict())
 

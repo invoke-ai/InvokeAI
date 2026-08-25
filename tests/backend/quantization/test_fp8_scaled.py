@@ -12,6 +12,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     count_fp8_weights,
     dequantize_fp8_scaled,
     dequantize_weight,
+    detach_layer_sidechannel,
     device_supports_fp8_matmul,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
@@ -19,11 +20,13 @@ from invokeai.backend.quantization.fp8_scaled import (
     iter_weight_scale_pairs,
     parse_quantization_metadata,
     predict_cast_state_dict_size,
+    reattach_layer_sidechannel,
     reset_fp8_matmul_support_cache,
     scaled_mm_linear,
     set_fp8_matmul_enabled,
     set_full_precision_hints_respected,
     split_fp8_scaled_layers,
+    strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
 
@@ -770,3 +773,192 @@ class TestScaleSpellingHelpers:
         # `norm.scale` is a real learned parameter in several architectures - stripping it would
         # delete weights, and it is why this cannot just match "scale" anywhere in the key.
         assert not is_scale_metadata_key(key)
+
+
+def _fp8(rows: int = 4, cols: int = 4, value: float = 1.0) -> torch.Tensor:
+    return (torch.ones(rows, cols) * value).to(FP8_DTYPE)
+
+
+class _Linear(torch.nn.Module):
+    def __init__(self, out_features: int = 4, in_features: int = 4) -> None:
+        super().__init__()
+        self.lin = torch.nn.Linear(in_features, out_features, bias=False)
+
+
+class TestE5m2ScaleRecovery:
+    """`float8_e5m2` may not stay quantized, but it must not lose its scale on the way to bf16."""
+
+    def test_the_scale_is_recovered_and_folded(self) -> None:
+        # Gating extraction on e4m3fn alone popped the scale key and then dropped it, so
+        # `cast_state_dict` did a plain `.to(bf16)` and the weight came out off by 1/weight_scale.
+        sd = {"lin.weight": (torch.ones(4, 4) * 2).to(torch.float8_e5m2), "lin.weight_scale": torch.tensor(0.25)}
+
+        layers = extract_fp8_scaled_layers(sd)
+        assert "lin" in layers
+
+        dequantize_fp8_scaled(sd, layers, torch.bfloat16)
+        assert torch.allclose(sd["lin.weight"].float(), torch.full((4, 4), 0.5))
+
+    def test_it_is_never_left_quantized(self) -> None:
+        """`scaled_mm_linear` cannot take e5m2 as the weight operand, so it must be widened."""
+        sd = {"lin.weight": (torch.ones(4, 4) * 2).to(torch.float8_e5m2), "lin.weight_scale": torch.tensor(0.25)}
+
+        kept = split_fp8_scaled_layers(sd, extract_fp8_scaled_layers(sd), torch.bfloat16, model=_Linear())
+
+        assert kept == {}
+        assert sd["lin.weight"].dtype is torch.bfloat16
+        assert torch.allclose(sd["lin.weight"].float(), torch.full((4, 4), 0.5))
+
+
+class TestBlockWiseScale:
+    """A 2-D ``weight_scale`` has one entry per *block* of weight elements, not per row."""
+
+    def test_the_layout_survives_extraction(self) -> None:
+        # Flattening it destroys the block geometry, and the multiply then fails on shape.
+        sd = {"b.weight": _fp8(64, 128), "b.weight_scale": torch.full((64, 2), 0.5)}
+
+        layers = extract_fp8_scaled_layers(sd)
+
+        assert tuple(layers["b"].weight_scale.shape) == (64, 2)
+
+    def test_it_is_expanded_rather_than_raising(self) -> None:
+        # Before: `RuntimeError: The size of tensor a (64) must match the size of tensor b (128)`,
+        # i.e. with fp8_compute off - the default - the model failed to load at all.
+        sd = {"b.weight": _fp8(64, 128), "b.weight_scale": torch.full((64, 2), 0.5)}
+
+        dequantize_fp8_scaled(sd, extract_fp8_scaled_layers(sd), torch.bfloat16)
+
+        assert sd["b.weight"].shape == (64, 128)
+        assert torch.allclose(sd["b.weight"].float(), torch.full((64, 128), 0.5))
+
+    def test_it_is_never_left_quantized(self) -> None:
+        """`scaled_mm_linear` can apply a per-tensor or per-row scale and nothing else.
+
+        Left quantized, the mismatch surfaces mid-generation inside the kernel instead.
+        Dequantizing here - before `predict_cast_state_dict_size` runs - also keeps the RAM
+        reservation honest.
+        """
+        sd = {"lin.weight": _fp8(4, 4), "lin.weight_scale": torch.full((4, 2), 0.5)}
+
+        kept = split_fp8_scaled_layers(sd, extract_fp8_scaled_layers(sd), torch.bfloat16, model=_Linear())
+
+        assert kept == {}
+        assert sd["lin.weight"].dtype is torch.bfloat16
+
+    def test_a_per_row_scale_still_stays_quantized(self) -> None:
+        sd = {"lin.weight": _fp8(4, 4), "lin.weight_scale": torch.full((4,), 0.5)}
+
+        kept = split_fp8_scaled_layers(sd, extract_fp8_scaled_layers(sd), torch.bfloat16, model=_Linear())
+
+        assert set(kept) == {"lin"}
+        assert sd["lin.weight"].dtype is FP8_DTYPE
+
+
+class TestSidechannelDetachReattach:
+    """Key converters rename ``.weight``; the side channel has to be carried across separately."""
+
+    def test_entries_follow_their_module_to_the_new_path(self) -> None:
+        sd = {
+            "old.linear.weight": _fp8(),
+            "old.linear.weight_scale": torch.tensor(0.5),
+            "old.linear.input_scale": torch.tensor(0.25),
+        }
+
+        detached = detach_layer_sidechannel(sd)
+        assert list(sd) == ["old.linear.weight"], "scales must be out of the converter's way"
+
+        converted = {"new.linear.weight": sd["old.linear.weight"]}
+        orphaned = reattach_layer_sidechannel(converted, detached, {"old.linear": "new.linear"})
+
+        assert orphaned == []
+        layers = extract_fp8_scaled_layers(converted)
+        assert set(layers) == {"new.linear"}
+        assert layers["new.linear"].input_scale is not None
+
+    def test_a_module_the_converter_drops_is_reported_not_swallowed(self) -> None:
+        """A silently dropped scale is exactly the failure this pair exists to prevent."""
+        sd = {"gone.weight": _fp8(), "gone.weight_scale": torch.tensor(0.5)}
+
+        detached = detach_layer_sidechannel(sd)
+        orphaned = reattach_layer_sidechannel({}, detached, {})
+
+        assert orphaned == ["gone"]
+
+    def test_both_scale_spellings_are_detached(self) -> None:
+        sd = {
+            "a.weight": _fp8(),
+            "a.scale_weight": torch.tensor(0.5),
+            "b.weight": _fp8(),
+            "b.weight_scale": torch.tensor(0.5),
+        }
+
+        detached = detach_layer_sidechannel(sd)
+
+        assert set(detached) == {"a", "b"}
+
+
+class TestStripLayerPathPrefix:
+    """`_quantization_metadata` is read from the file header, so its names keep the prefix."""
+
+    def test_the_checkpoint_prefix_is_removed(self) -> None:
+        hints = {"model.diffusion_model.blocks.0.attn.wq": {"full_precision_matrix_mult": True}}
+
+        assert strip_layer_path_prefix(hints) == {"blocks.0.attn.wq": {"full_precision_matrix_mult": True}}
+
+    def test_unprefixed_names_are_passed_through_not_dropped(self) -> None:
+        """Running the names through a prefix *filter* truncated a partially-prefixed header, and
+        the strict-zip that read the result back aborted the whole load with a ValueError."""
+        hints = {"net.blocks.0.attn.q_proj": {}, "final_layer.linear": {}}
+
+        assert set(strip_layer_path_prefix(hints)) == {"blocks.0.attn.q_proj", "final_layer.linear"}
+
+
+class TestNonFloatTensorsAreNotCast:
+    """Integer payloads are not weights; casting them to the compute dtype corrupts them."""
+
+    def test_cast_state_dict_leaves_them_alone(self) -> None:
+        sd = {"w.weight": torch.ones(2, 2), "ids": torch.arange(4, dtype=torch.int64)}
+
+        cast_state_dict(sd, torch.bfloat16, keep_fp8=False)
+
+        assert sd["w.weight"].dtype is torch.bfloat16
+        assert sd["ids"].dtype is torch.int64
+
+    def test_the_size_prediction_agrees(self) -> None:
+        sd = {"ids": torch.arange(4, dtype=torch.int64)}
+
+        assert predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=False) == 4 * 8
+
+
+class TestProbeFailureCaching:
+    """The probe runs during a model load, i.e. under real VRAM pressure."""
+
+    def test_an_allocation_failure_is_not_cached(self) -> None:
+        reset_fp8_matmul_support_cache()
+        device = torch.device("cuda", 0)
+        with (
+            mock.patch("torch.cuda.is_available", return_value=True),
+            mock.patch("torch.cuda.get_device_capability", return_value=(8, 9)),
+            mock.patch("torch.cuda.current_device", return_value=0),
+        ):
+            with mock.patch("torch._scaled_mm", side_effect=torch.OutOfMemoryError("transient")):
+                assert device_supports_fp8_matmul(device) is False
+            # A momentary OOM must not disable fp8 for the rest of the process.
+            with mock.patch("torch._scaled_mm", return_value=torch.zeros(1)):
+                assert device_supports_fp8_matmul(device) is True
+        reset_fp8_matmul_support_cache()
+
+    def test_a_genuine_unsupported_op_is_cached(self) -> None:
+        reset_fp8_matmul_support_cache()
+        device = torch.device("cuda", 0)
+        with (
+            mock.patch("torch.cuda.is_available", return_value=True),
+            mock.patch("torch.cuda.get_device_capability", return_value=(8, 9)),
+            mock.patch("torch.cuda.current_device", return_value=0),
+        ):
+            with mock.patch("torch._scaled_mm", side_effect=RuntimeError("not supported on this device")):
+                assert device_supports_fp8_matmul(device) is False
+            # No second probe: the answer cannot change at runtime.
+            with mock.patch("torch._scaled_mm", side_effect=AssertionError("must not be probed again")):
+                assert device_supports_fp8_matmul(device) is False
+        reset_fp8_matmul_support_cache()

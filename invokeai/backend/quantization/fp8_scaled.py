@@ -26,6 +26,12 @@ import torch
 
 FP8_DTYPE = torch.float8_e4m3fn
 
+# Every float8 dtype a checkpoint may store weights in. Scale *recovery* must cover all of them:
+# only `float8_e4m3fn` can stay quantized (see `can_stay_quantized`), but an `e5m2` weight still
+# needs its `weight_scale` folded in on the way to bf16. Gating extraction on e4m3fn alone dropped
+# the scale key and then cast the weight unscaled — off by `1/weight_scale`, silently.
+FP8_WEIGHT_DTYPES = (torch.float8_e4m3fn, torch.float8_e5m2)
+
 WEIGHT_SCALE_SUFFIXES = (".weight_scale", ".scale_weight")
 # Both spellings occur, exactly as for the weight scale. ComfyUI normalizes `.scale_input` to
 # `.input_scale` on load (comfy/utils.py, convert_old_quants); reading only one of them means a
@@ -141,6 +147,92 @@ def extract_comfy_quant_hints(sd: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return hints
 
 
+# Key prefixes redistributors wrap a transformer in. Loaders strip these off the state dict before
+# anything else, so `_quantization_metadata` — which is read from the file and still carries them —
+# has to be stripped the same way.
+TRANSFORMER_KEY_PREFIXES = ("model.diffusion_model.", "diffusion_model.", "net.")
+
+
+def strip_layer_path_prefix(
+    layer_hints: Mapping[str, Any],
+    prefixes: Iterable[str] = TRANSFORMER_KEY_PREFIXES,
+) -> dict[str, Any]:
+    """Re-key ``layer_hints`` as if the checkpoint prefix had been stripped from their names.
+
+    ``_quantization_metadata`` lives in the safetensors header, so its layer names are in the
+    file's own scheme — ``model.diffusion_model.blocks.0.attn.wq`` — while the state dict has had
+    that prefix removed before the scales are extracted. A hint whose name still carries the prefix
+    matches no layer, so ``full_precision_matrix_mult`` is silently ignored and the producer's
+    "do not multiply this one in fp8" instruction is disregarded: exactly the failure the hint
+    plumbing exists to prevent.
+
+    Names that carry none of ``prefixes`` are passed through unchanged. Dropping them instead — as
+    running the names through a strip function that filters by prefix would — turns a
+    partially-prefixed header into a silently truncated one, and can abort the load.
+    """
+    out: dict[str, Any] = {}
+    for name, hints in layer_hints.items():
+        if isinstance(name, str):
+            for prefix in prefixes:
+                if name.startswith(prefix):
+                    name = name[len(prefix) :]
+                    break
+        out[name] = hints
+    return out
+
+
+# Every per-layer side-channel suffix that belongs to a module rather than being a tensor of its
+# own. Used by the detach/reattach pair below.
+LAYER_SIDECHANNEL_SUFFIXES = WEIGHT_SCALE_SUFFIXES + INPUT_SCALE_SUFFIXES + (COMFY_QUANT_SUFFIX,)
+
+
+def detach_layer_sidechannel(sd: dict[str, Any]) -> dict[str, list[tuple[str, Any]]]:
+    """Pop every per-layer quantization side-channel entry, keyed by the module path it belongs to.
+
+    For loaders that rename checkpoint keys. Key converters are written against ``.weight`` — they
+    match it as a substring, or test whole keys for equality — so a sibling ``.scale_weight`` or
+    ``.input_scale`` is *not* carried along, and neither is any scale on a key the converter renames
+    by equality. The scale is then orphaned under its old path while its weight moves, and
+    :func:`extract_fp8_scaled_layers` drops it because no fp8 weight sits at the old path any more.
+    The weight stays quantized with no scale attached and is off by ``1/weight_scale``, in silence:
+    the layer never enters ``fp8_layers``, so :func:`warn_on_unattached_scales` cannot see it either.
+
+    Take the side channel out of the way, convert, then :func:`reattach_layer_sidechannel`.
+    """
+    detached: dict[str, list[tuple[str, Any]]] = {}
+    for key in list(sd.keys()):
+        if not isinstance(key, str):
+            continue
+        for suffix in LAYER_SIDECHANNEL_SUFFIXES:
+            if key.endswith(suffix):
+                detached.setdefault(key[: -len(suffix)], []).append((suffix, sd.pop(key)))
+                break
+    return detached
+
+
+def reattach_layer_sidechannel(
+    sd: dict[str, Any],
+    detached: Mapping[str, list[tuple[str, Any]]],
+    path_map: Mapping[str, str],
+) -> list[str]:
+    """Put detached side-channel entries back under their renamed module paths.
+
+    Returns the module paths that could not be placed. A path with no entry in ``path_map`` had no
+    destination in the converted state dict — usually because the converter drops that module
+    outright — so its scale is dropped with it. Returning them rather than swallowing them lets the
+    caller say so: a *silently* dropped scale is exactly the failure this pair exists to prevent.
+    """
+    orphaned: list[str] = []
+    for path, entries in detached.items():
+        destination = path_map.get(path, path)
+        if f"{destination}.weight" not in sd:
+            orphaned.append(path)
+            continue
+        for suffix, value in entries:
+            sd[f"{destination}{suffix}"] = value
+    return orphaned
+
+
 def iter_weight_scale_pairs(sd: Mapping[str, Any]) -> Iterable[tuple[str, str]]:
     """Yield ``(weight_key, scale_key)`` for every weight scale in ``sd``, in either spelling.
 
@@ -240,6 +332,63 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
     return scale
 
 
+def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:
+    """Canonical float32 form of a weight scale, preserving its layout.
+
+    Per-tensor scales become 0-d and per-output-channel scales 1-D, so downstream code can branch on
+    ``numel()``. A scale with more than one dimension is *block-wise* — one entry per block of
+    weight elements — and is returned with its shape intact: flattening it destroys the block
+    geometry that :func:`expand_weight_scale` needs to line it back up with the weight.
+    """
+    scale = scale.float()
+    if scale.numel() == 1:
+        return scale.reshape(())
+    if scale.dim() > 1:
+        return scale
+    return scale.flatten()
+
+
+def expand_weight_scale(weight: torch.Tensor, scale: torch.Tensor) -> torch.Tensor:
+    """Broadcast ``scale`` to line up with ``weight`` for an elementwise multiply.
+
+    Handles the three layouts producers emit:
+
+    - per-tensor (0-d / single element) — returned unchanged, broadcasting handles it;
+    - per-output-channel (one entry per row) — reshaped to ``(rows, 1, ...)``;
+    - block-wise (one entry per block along one or more dims) — each axis is
+      ``repeat_interleave``d by that axis' block size.
+
+    Without the block-wise case a 2-D scale reaches the multiply as-is and raises a shape error, so
+    a checkpoint using that layout fails to load outright. That is the layout ComfyUI's own
+    dequantizer expands, and the FLUX.2 loader used to expand before this module centralized the
+    logic.
+    """
+    if scale.numel() == 1:
+        return scale
+    if scale.dim() <= 1:
+        return scale.reshape(-1, *([1] * (weight.dim() - 1)))
+    for dim in range(weight.dim()):
+        if dim < scale.dim() and scale.shape[dim] != weight.shape[dim]:
+            block = weight.shape[dim] // scale.shape[dim]
+            if block > 1:
+                scale = scale.repeat_interleave(block, dim=dim)
+    return scale
+
+
+def is_matmul_usable_scale(weight: Any, scale: torch.Tensor) -> bool:
+    """Whether ``scaled_mm_linear`` can apply ``scale`` without materializing the weight.
+
+    It handles exactly two layouts: a per-tensor scalar, which goes into the ``_scaled_mm`` call,
+    and a per-output-channel vector, which is applied to the *result* (scaling weight row ``j``
+    scales output column ``j``). A block-wise scale is separable in neither sense, so such a layer
+    has to be dequantized up front instead of failing mid-generation inside the kernel.
+    """
+    if scale.numel() == 1:
+        return True
+    rows = getattr(weight, "shape", (None,))[0]
+    return scale.dim() == 1 and scale.numel() == rows
+
+
 def extract_fp8_scaled_layers(
     sd: dict[str, Any],
     metadata: Mapping[str, Any] | None = None,
@@ -281,13 +430,13 @@ def extract_fp8_scaled_layers(
     layers: dict[str, Fp8ScaledLayer] = {}
     for path, scale in weight_scales.items():
         weight = sd.get(f"{path}.weight")
-        if weight is None or getattr(weight, "dtype", None) != FP8_DTYPE:
+        if weight is None or getattr(weight, "dtype", None) not in FP8_WEIGHT_DTYPES:
             # A scale without an fp8 weight means the weight was already dequantized (or the key
             # naming does not line up). Applying the scale later would corrupt it, so drop it.
             continue
         hints = layer_meta.get(path, {})
         layers[path] = Fp8ScaledLayer(
-            weight_scale=scale.float().reshape(()) if scale.numel() == 1 else scale.float().flatten(),
+            weight_scale=_normalize_weight_scale(scale),
             input_scale=_usable_input_scale(input_scales.get(path)),
             full_precision_matmul=bool(hints.get("full_precision_matrix_mult", False)),
         )
@@ -310,10 +459,8 @@ def dequantize_fp8_scaled(
         weight = sd.get(key)
         if weight is None:
             continue
-        scale = layer.weight_scale
-        if scale.numel() > 1:
-            scale = scale.reshape(-1, *([1] * (weight.dim() - 1)))
-        sd[key] = (weight.float() * scale).to(dtype)
+        weight = weight.float()
+        sd[key] = (weight * expand_weight_scale(weight, layer.weight_scale)).to(dtype)
     return sd
 
 
@@ -441,7 +588,7 @@ def full_precision_hints_respected() -> bool:
         return True
 
 
-def _probe_fp8_matmul(index: int) -> bool:
+def _probe_fp8_matmul(index: int) -> bool | None:
     """Run one minimal ``_scaled_mm`` on device ``index`` and report whether it worked.
 
     Asking the device is the only reliable test. ``get_device_capability`` reports the *gfx arch*
@@ -450,6 +597,12 @@ def _probe_fp8_matmul(index: int) -> bool:
     devices with compute capability >= 9.0 or 8.9, or ROCm MI300+``. The whole point of the
     capability gate is to *fall back* rather than raise mid-generation, so it must not itself be a
     guess. The probe is one 16x16 matmul, run once per device and cached.
+
+    Returns ``None`` when the probe could not be *carried out* — an allocation failure rather than
+    an unsupported operation. The probe runs during a model load, i.e. under real VRAM pressure, and
+    caching a momentary OOM as "this GPU cannot do fp8" would disable the fp8 matmul for the rest of
+    the process. Same reasoning as `_device_supports_fp8_storage`, which also refuses to cache a
+    transient failure.
     """
     try:
         device = torch.device("cuda", index)
@@ -458,6 +611,13 @@ def _probe_fp8_matmul(index: int) -> bool:
         rhs = torch.zeros((_MM_ALIGNMENT, _MM_ALIGNMENT), device=device, dtype=FP8_DTYPE).t()
         scale = torch.ones((1, 1), device=device, dtype=torch.float32)
         torch._scaled_mm(lhs, rhs, scale, scale, out_dtype=torch.bfloat16)
+    except torch.OutOfMemoryError:
+        return None
+    except RuntimeError as e:
+        # cuBLAS reports a failed workspace allocation as a plain RuntimeError, not an OOM.
+        if "out of memory" in str(e).lower() or "ALLOC_FAILED" in str(e):
+            return None
+        return False
     except Exception:
         return False
     return True
@@ -469,13 +629,20 @@ def device_supports_fp8_matmul(device: torch.device) -> bool:
         return False
     index = device.index if device.index is not None else torch.cuda.current_device()
     cached = _fp8_mm_supported.get(index)
-    if cached is None:
-        # The capability check is only a cheap pre-filter that spares older CUDA cards the probe;
-        # it is deliberately not trusted on its own (see `_probe_fp8_matmul`).
-        supported = torch.version.hip is not None or torch.cuda.get_device_capability(index) >= (8, 9)
-        cached = supported and _probe_fp8_matmul(index)
-        _fp8_mm_supported[index] = cached
-    return cached
+    if cached is not None:
+        return cached
+    # The capability check is only a cheap pre-filter that spares older CUDA cards the probe;
+    # it is deliberately not trusted on its own (see `_probe_fp8_matmul`).
+    if not (torch.version.hip is not None or torch.cuda.get_device_capability(index) >= (8, 9)):
+        _fp8_mm_supported[index] = False
+        return False
+    probed = _probe_fp8_matmul(index)
+    if probed is None:
+        # Inconclusive: answer this call conservatively but leave the cache empty so the next load
+        # re-probes instead of the process being stuck without fp8 after one transient OOM.
+        return False
+    _fp8_mm_supported[index] = probed
+    return probed
 
 
 def reset_fp8_matmul_support_cache() -> None:
@@ -546,6 +713,17 @@ def can_stay_quantized(
     )
 
 
+def _is_castable_float(tensor: Any) -> bool:
+    """Whether ``tensor`` is a floating-point payload that may be cast to the compute dtype."""
+    is_floating_point = getattr(tensor, "is_floating_point", None)
+    if not callable(is_floating_point):
+        return False
+    try:
+        return bool(is_floating_point())
+    except Exception:
+        return False
+
+
 def cast_state_dict(
     sd: dict[str, Any],
     dtype: torch.dtype,
@@ -574,6 +752,11 @@ def cast_state_dict(
         if keep_fp8 and can_stay_quantized(key, tensor, model, patterns):
             kept += 1
             continue
+        if not _is_castable_float(tensor):
+            # Integer payloads (embedding indices, packed buffers) are not weights and must keep
+            # their dtype. Loaders used to guard this themselves; centralizing it here means a
+            # loader that switches to `cast_state_dict` does not silently lose the guard.
+            continue
         sd[key] = tensor.to(dtype)
     return kept
 
@@ -597,7 +780,7 @@ def predict_cast_state_dict_size(
     patterns = tuple(skip_patterns)
     total = 0
     for key, tensor in sd.items():
-        if keep_fp8 and can_stay_quantized(key, tensor, model, patterns):
+        if (keep_fp8 and can_stay_quantized(key, tensor, model, patterns)) or not _is_castable_float(tensor):
             total += tensor.nelement() * tensor.element_size()
         else:
             total += tensor.nelement() * dtype.itemsize
@@ -625,6 +808,15 @@ def split_fp8_scaled_layers(
     So the filters are applied here instead, *before* the cast, and the affected layers go through
     :func:`dequantize_fp8_scaled`, which applies the scale properly. They are then dropped from the
     returned mapping — they are no longer fp8, so there is nothing left to attach.
+
+    A scale layout :func:`scaled_mm_linear` cannot apply — block-wise, or a vector that does not
+    match the weight's row count — is dequantized here too. Left quantized it would fail inside the
+    kernel mid-generation instead. Doing it here rather than in :func:`can_stay_quantized` keeps the
+    RAM accounting honest: every caller runs this before
+    :func:`predict_cast_state_dict_size`, so the prediction sees the already-widened tensor.
+
+    ``float8_e5m2`` layers land here by way of :func:`can_stay_quantized`, which admits only
+    ``float8_e4m3fn`` — they are dequantized *with* their scale applied rather than losing it.
     """
     patterns = tuple(skip_patterns)
     usable: dict[str, Fp8ScaledLayer] = {}
@@ -632,7 +824,11 @@ def split_fp8_scaled_layers(
     for path, layer in layers.items():
         key = f"{path}.weight"
         tensor = sd.get(key)
-        if tensor is not None and can_stay_quantized(key, tensor, model, patterns):
+        if (
+            tensor is not None
+            and can_stay_quantized(key, tensor, model, patterns)
+            and is_matmul_usable_scale(tensor, layer.weight_scale)
+        ):
             usable[path] = layer
         else:
             unusable[path] = layer
@@ -661,9 +857,7 @@ def dequantize_weight(weight: torch.Tensor, weight_scale: torch.Tensor | None, d
     if weight_scale is None:
         return out
     scale = weight_scale.to(device=out.device, dtype=dtype)
-    if scale.numel() > 1:
-        scale = scale.reshape(-1, *([1] * (out.dim() - 1)))
-    return out * scale
+    return out * expand_weight_scale(out, scale)
 
 
 def scaled_mm_linear(

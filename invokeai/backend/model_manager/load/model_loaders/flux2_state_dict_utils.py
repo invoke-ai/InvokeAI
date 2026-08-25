@@ -364,6 +364,28 @@ def _flux2_sidechannel_destinations(base: str) -> list[str]:
     return [k[: -len(".weight")] for k in _convert_flux2_weight_keys(probe) if k.endswith(".weight")]
 
 
+# Converter transforms that reorder weight *rows*. A per-output-channel weight scale has one entry
+# per row, so it has to be reordered identically or every row ends up scaled by another row's
+# factor. The fused-QKV split is handled separately (`split_qkv_sidechannel`); this is the only
+# other row-reordering transform the converter applies.
+_ROW_PERMUTED_BY_CONVERSION = {"final_layer.adaLN_modulation.1"}
+
+
+def _mirror_row_permutation(base: str, suffix: str, value: Any) -> Any:
+    """Apply the converter's row reordering to a per-output-channel weight scale.
+
+    Only weight scales carry per-row structure: the activation scale is per-tensor and the
+    `comfy_quant` marker is a byte blob, both of which describe the whole layer and must be copied
+    verbatim. A per-tensor weight scale is likewise unaffected.
+    """
+    if base not in _ROW_PERMUTED_BY_CONVERSION or suffix not in ("weight_scale", "scale_weight"):
+        return value
+    tensor = torch.as_tensor(value) if hasattr(value, "shape") else value
+    if not hasattr(tensor, "shape") or tensor.dim() < 1 or tensor.numel() <= 1 or tensor.shape[0] % 2 != 0:
+        return value
+    return _flux2_swap_scale_shift(tensor)
+
+
 def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
     """Convert a FLUX.2 transformer BFL-format state dict to diffusers format.
 
@@ -386,7 +408,7 @@ def convert_flux2_bfl_to_diffusers(sd: dict) -> dict:
             # no matching fp8 weight, which is the safe outcome -- better than guessing a target.
             converted[key] = value
         elif len(destinations) == 1:
-            converted[f"{destinations[0]}.{suffix}"] = value
+            converted[f"{destinations[0]}.{suffix}"] = _mirror_row_permutation(base, suffix, value)
         else:
             for destination, part in zip(destinations, split_qkv_sidechannel(key, value), strict=True):
                 converted[f"{destination}.{suffix}"] = part

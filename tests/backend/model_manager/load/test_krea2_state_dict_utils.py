@@ -17,12 +17,18 @@ import torch
 from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     KREA2_TRANSFORMER_CONFIG,
     _convert_krea2_native_to_diffusers,
-    _dequantize_scaled_fp8,
     _is_native_krea2_format,
     _normalize_qwen3vl_rope_config,
     _reject_incomplete_load,
+    _remap_native_layer_paths,
     _remap_qwen3vl_singlefile_keys,
     _strip_comfyui_prefix,
+)
+from invokeai.backend.quantization.fp8_scaled import (
+    FP8_DTYPE,
+    detach_layer_sidechannel,
+    extract_fp8_scaled_layers,
+    reattach_layer_sidechannel,
 )
 
 
@@ -82,66 +88,6 @@ class TestIsNativeKrea2Format:
     )
     def test_false_for_diffusers_keys(self, key: str) -> None:
         assert _is_native_krea2_format({key: torch.zeros(1)}) is False
-
-
-class TestDequantizeScaledFp8:
-    def test_folds_scale_into_weight_and_drops_scale_key(self) -> None:
-        sd = {
-            "layer.weight": torch.tensor([2.0, 4.0]),
-            "layer.weight_scale": torch.tensor(0.5),
-        }
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-        assert "layer.weight_scale" not in out
-        assert torch.allclose(out["layer.weight"].float(), torch.tensor([1.0, 2.0]))
-
-    def test_result_is_stored_in_the_compute_dtype_not_float32(self) -> None:
-        """The whole model must never be materialized in float32.
-
-        The multiply runs in float32 for precision, but holding every dequantized weight there
-        costs 4 bytes per parameter: Krea-2's ~12 GB fp8 checkpoint peaked at ~50 GB of RAM before
-        the caller's later bf16 cast, which swaps a 32 GB machine during a cold load.
-        """
-        sd = {
-            "layer.weight": torch.tensor([2.0, 4.0]),
-            "layer.weight_scale": torch.tensor(0.5),
-        }
-        assert _dequantize_scaled_fp8(dict(sd), torch.bfloat16)["layer.weight"].dtype is torch.bfloat16
-        assert _dequantize_scaled_fp8(dict(sd), torch.float16)["layer.weight"].dtype is torch.float16
-
-    def test_dtype_is_required(self) -> None:
-        """No implicit bfloat16 fallback: on a float16-only device that would cost an extra rounding step."""
-        with pytest.raises(TypeError):
-            _dequantize_scaled_fp8({"layer.weight": torch.tensor([2.0])})  # type: ignore[call-arg]
-
-    def test_noop_without_scale_keys(self) -> None:
-        sd = {"layer.weight": torch.tensor([2.0, 4.0])}
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-        assert out is sd
-
-    def test_orphan_scale_key_is_dropped(self) -> None:
-        # A scale key with no matching weight is simply removed (nothing to multiply).
-        sd = {"other.weight": torch.tensor([1.0]), "layer.weight_scale": torch.tensor(0.5)}
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-        assert "layer.weight_scale" not in out
-        assert "other.weight" in out
-
-    def test_the_scale_weight_spelling_is_folded_too(self) -> None:
-        # Producers use both spellings. Reading only `.weight_scale` left the weight unscaled and
-        # dropped the key anyway, so the error was silent - off by exactly 1/weight_scale.
-        sd = {"layer.weight": torch.tensor([2.0, 4.0]), "layer.scale_weight": torch.tensor(0.5)}
-
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-
-        assert torch.equal(out["layer.weight"], torch.tensor([1.0, 2.0], dtype=torch.bfloat16))
-        assert "layer.scale_weight" not in out
-
-    def test_an_orphan_scale_weight_is_dropped_too(self) -> None:
-        sd = {"other.weight": torch.tensor([1.0]), "layer.scale_weight": torch.tensor(0.5)}
-
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-
-        assert "layer.scale_weight" not in out
-        assert "other.weight" in out
 
 
 class TestConvertKrea2NativeToDiffusers:
@@ -394,3 +340,83 @@ class TestConvertedShapesMatchRealKrea2Transformer:
         for name in table_keys:
             if name.startswith(("transformer_blocks.", "text_fusion.")):
                 assert expected[name][0] == 6, f"{name} expected 6 modulation rows, got {expected[name]}"
+
+
+class TestNativeConversionCarriesTheQuantizationSideChannel:
+    """Regression guard for scales orphaned by the native -> diffusers rename.
+
+    `_convert_krea2_native_to_diffusers` renames `.weight` keys by substring *and* renames five
+    more by whole-key equality. Neither carries a sibling scale: `.scale_weight` and `.input_scale`
+    do not contain `.weight`, and `last.linear.weight_scale` is not equal to `last.linear.weight`.
+    An orphaned scale is then dropped by `extract_fp8_scaled_layers` (no fp8 weight sits at the old
+    path any more) and the weight is left quantized but unscaled - off by exactly 1/weight_scale,
+    with nothing logged, because the layer never enters `fp8_layers` for
+    `warn_on_unattached_scales` to see.
+    """
+
+    @staticmethod
+    def _convert(sd: dict) -> dict:
+        detached = detach_layer_sidechannel(sd)
+        converted = _convert_krea2_native_to_diffusers(sd)
+        orphaned = reattach_layer_sidechannel(converted, detached, _remap_native_layer_paths(set(detached)))
+        return converted, orphaned
+
+    def test_every_spelling_and_rename_style_survives(self) -> None:
+        fp8 = torch.ones(4, 4).to(FP8_DTYPE)
+        sd = {
+            # substring rename, `.weight_scale` spelling
+            "blocks.0.attn.wq.weight": fp8.clone(),
+            "blocks.0.attn.wq.weight_scale": torch.tensor(0.5),
+            "blocks.0.attn.wq.input_scale": torch.tensor(0.25),
+            # substring rename, `.scale_weight` spelling
+            "blocks.0.attn.wk.weight": fp8.clone(),
+            "blocks.0.attn.wk.scale_weight": torch.tensor(0.5),
+            # whole-key-equality rename
+            "last.linear.weight": fp8.clone(),
+            "last.linear.weight_scale": torch.tensor(0.5),
+        }
+
+        converted, orphaned = self._convert(sd)
+        layers = extract_fp8_scaled_layers(converted)
+
+        assert set(layers) == {
+            "transformer_blocks.0.attn.to_q",
+            "transformer_blocks.0.attn.to_k",
+            "final_layer.linear",
+        }
+        assert orphaned == []
+        # The calibrated activation scale must come across too, or every forward pays an amax pass.
+        assert layers["transformer_blocks.0.attn.to_q"].input_scale is not None
+
+    def test_no_fp8_weight_is_left_without_its_scale(self) -> None:
+        """The property that actually matters, stated directly."""
+        fp8 = torch.ones(4, 4).to(FP8_DTYPE)
+        sd = {
+            "blocks.0.attn.wk.weight": fp8.clone(),
+            "blocks.0.attn.wk.scale_weight": torch.tensor(0.5),
+            "last.linear.weight": fp8.clone(),
+            "last.linear.weight_scale": torch.tensor(0.5),
+        }
+
+        converted, _ = self._convert(sd)
+        layers = extract_fp8_scaled_layers(converted)
+
+        unscaled = [
+            key
+            for key, value in converted.items()
+            if key.endswith(".weight")
+            and getattr(value, "dtype", None) is FP8_DTYPE
+            and key[: -len(".weight")] not in layers
+        ]
+        assert unscaled == []
+
+    def test_a_scale_on_a_dropped_module_is_reported(self) -> None:
+        """`last.down`/`last.up` have no diffusers counterpart, so their scales go too - loudly."""
+        sd = {
+            "last.down.weight": torch.ones(4, 4).to(FP8_DTYPE),
+            "last.down.weight_scale": torch.tensor(0.5),
+        }
+
+        _, orphaned = self._convert(sd)
+
+        assert orphaned == ["last.down"]
