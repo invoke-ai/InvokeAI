@@ -157,6 +157,34 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
 )
 
 
+def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
+    """The precision-sensitive modules a model declares for itself, as skip patterns.
+
+    Diffusers' `enable_layerwise_casting()` unions two class attributes before casting:
+    `_skip_layerwise_casting_patterns` and `_keep_in_fp32_modules`. We no longer call it (see
+    `_apply_fp8_layerwise_casting`), so we have to read both ourselves — this is not cosmetic.
+    Z-Image's `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to
+    it; with an fp8 weight the input becomes float8 before our pre-hook can restore the weight, and
+    `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
+    `['t_embedder', 'cap_embedder']` for that model.
+
+    `_keep_in_fp32_modules` protects nothing extra on any model we currently load — verified on
+    Krea-2, Wan 14B, Z-Image and FLUX.1. Wan's `time_embedder` sits under `condition_embedder`,
+    which its `_skip_layerwise_casting_patterns` already names; `scale_shift_table` is a bare
+    Parameter, not a castable layer; and Krea-2's entries are all `norm*`, already covered by
+    `_FP8_DEFAULT_SKIP_PATTERNS`. It is read anyway so the next model to declare one does not lose
+    it silently.
+    """
+    patterns: list[str] = []
+    for attr in ("_skip_layerwise_casting_patterns", "_keep_in_fp32_modules"):
+        declared = getattr(model, attr, None) or ()
+        # Diffusers stores these as lists of strings, but a subclass could set a bare string.
+        if isinstance(declared, str):
+            declared = (declared,)
+        patterns.extend(p for p in declared if isinstance(p, str) and p not in patterns)
+    return tuple(patterns)
+
+
 # The construction path is not thread-safe on its own; it monkey-patches process-global torch state
 # (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
 # _load_and_cache).
@@ -425,18 +453,11 @@ class ModelLoader(ModelLoaderBase):
         # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
         # `forward`, so `CustomLinear.forward` is still reached.
         if isinstance(model, torch.nn.Module):
-            # Diffusers models declare their own precision-sensitive modules in
-            # `_skip_layerwise_casting_patterns`, and `enable_layerwise_casting()` honors them. Since
-            # we no longer call it, we have to apply that list ourselves — it is not cosmetic. Z-Image's
-            # `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to it;
-            # with an fp8 weight the input becomes float8 before our pre-hook can restore the weight,
-            # and `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
-            # `['t_embedder', 'cap_embedder']` for that model.
             self._apply_fp8_to_nn_module(
                 model,
                 storage_dtype=storage_dtype,
                 compute_dtype=compute_dtype,
-                extra_skip_patterns=tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ()),
+                extra_skip_patterns=_model_declared_skip_patterns(model),
             )
         else:
             return model
@@ -464,8 +485,8 @@ class ModelLoader(ModelLoaderBase):
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
 
-        `extra_skip_patterns` carries the model's own declared exclusions (diffusers'
-        `_skip_layerwise_casting_patterns`), which are model-specific and cannot be inferred from
+        `extra_skip_patterns` carries the model's own declared exclusions (see
+        `_model_declared_skip_patterns`), which are model-specific and cannot be inferred from
         layer types or generic name patterns.
 
         Records the compute dtype on the model. After the cast, `model.dtype` reports the float8

@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.load.load_default import (
     _FP8_STORAGE_SUPPORTED,
     ModelLoader,
     _device_supports_fp8_storage,
+    _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     CustomLinear,
@@ -581,3 +582,58 @@ def test_device_supports_fp8_storage_is_cached_per_device():
     # xpu:1 has not been probed, so a failing probe there must be observed, not short-circuited.
     with patch("torch.zeros", side_effect=RuntimeError("no float8 on this device")):
         assert _device_supports_fp8_storage(torch.device("xpu", 1)) is False
+
+
+def test_model_declared_skip_patterns_unions_both_diffusers_attributes():
+    """`enable_layerwise_casting()` unions `_skip_layerwise_casting_patterns` with
+    `_keep_in_fp32_modules`. We replaced that call with our own hook-based path, so we have to read
+    both — otherwise a model that declares only the latter loses its exclusions silently.
+    """
+
+    class _Model(torch.nn.Module):
+        _skip_layerwise_casting_patterns = ["t_embedder"]
+        _keep_in_fp32_modules = ["time_embedder"]
+
+    assert _model_declared_skip_patterns(_Model()) == ("t_embedder", "time_embedder")
+
+
+def test_model_declared_skip_patterns_tolerates_missing_and_odd_declarations():
+    """Most models declare neither attribute; diffusers sets them to `None` on some. A bare string
+    is accepted too, so a subclass that writes one instead of a list isn't silently expanded into
+    per-character patterns."""
+
+    class _Bare(torch.nn.Module):
+        pass
+
+    class _Nulls(torch.nn.Module):
+        _skip_layerwise_casting_patterns = None
+        _keep_in_fp32_modules = None
+
+    class _Strings(torch.nn.Module):
+        _keep_in_fp32_modules = "time_embedder"
+
+    assert _model_declared_skip_patterns(_Bare()) == ()
+    assert _model_declared_skip_patterns(_Nulls()) == ()
+    assert _model_declared_skip_patterns(_Strings()) == ("time_embedder",)
+
+
+def test_keep_in_fp32_modules_are_not_cast():
+    """End-to-end through the cast: a module named only by `_keep_in_fp32_modules` keeps its
+    compute dtype."""
+
+    class _Model(torch.nn.Module):
+        _keep_in_fp32_modules = ["time_embedder"]
+
+        def __init__(self):
+            super().__init__()
+            self.time_embedder = torch.nn.Linear(4, 4)
+            self.attn = torch.nn.Linear(4, 4)
+
+    loader = _make_loader(device="cuda")
+    model = _Model().to(torch.bfloat16)
+
+    with patch.object(ModelLoader, "_should_use_fp8", return_value=True):
+        loader._apply_fp8_layerwise_casting(model, _make_config(ModelType.Main, fp8=True))
+
+    assert model.time_embedder.weight.dtype == torch.bfloat16
+    assert model.attn.weight.dtype == torch.float8_e4m3fn
