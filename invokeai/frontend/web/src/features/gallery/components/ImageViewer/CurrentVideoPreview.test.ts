@@ -21,7 +21,9 @@ describe('CurrentVideoPreview progress overlay', () => {
     expect(source).toMatch(
       /withProgress =\s+shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying/
     );
-    expect(source).toContain('SELECTED_ITEM_REVEAL_DURATION_MS');
+    // The reveal's timing constants live with the machine in the viewer context now; what this
+    // component owns is consulting the shared atom in its overlay gate, asserted above.
+    expect(source).toContain('revealMachine,');
   });
 
   it('tiles concurrent sessions instead of letting them overwrite each other (multi-GPU)', () => {

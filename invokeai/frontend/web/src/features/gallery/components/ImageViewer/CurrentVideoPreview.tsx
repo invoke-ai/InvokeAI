@@ -14,12 +14,7 @@ import { dndInputFix } from 'features/dnd/util';
 import VideoMetadataViewer from 'features/gallery/components/ImageMetadataViewer/VideoMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
-import {
-  selectLastSelectedItem,
-  selectSelectedBoardId,
-  selectSelection,
-} from 'features/gallery/store/gallerySelectors';
+import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
 import { isVideoName } from 'features/gallery/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
@@ -36,7 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiCopyBold, PiDownloadSimpleBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 import type { VideoDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_MEDIA_GRACE_MS, SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
@@ -88,7 +83,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
-    lastRenderedItemNameRef,
+    revealMachine,
     onLoadImage,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
@@ -107,7 +102,6 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // of letting the sessions overwrite each other's full-size preview. Mirrors CurrentImagePreview.
   const withTiledProgress = withProgress && activeProgressData.length > 1;
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
-  const selectedItemName = useAppSelector(selectLastSelectedItem);
   // One controller per mounted preview component; the previous-item ref inside it is the shared
   // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
 
@@ -123,14 +117,9 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // mounted and tested with real lifecycles. preload="metadata" plus the near-zero seek does not
   // prove a frame exists, so readiness comes from usePaintedItemName fed by onLoadedData.
   useSelectedItemReveal({
-    lastRenderedItemNameRef,
-    $isTemporarilyShowingSelectedImage,
-    marker: autoSwitchedImages,
-    durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
-    mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
+    revealMachine,
     renderedItemName: videoName,
-    isMediaReady,
-    selectedItemName: selectedItemName ?? null,
+    isMediaReady: isMediaReady,
     shouldShowProgressInViewer,
     hasProgressImage,
     isProgressImageResolving,
