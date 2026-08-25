@@ -24,20 +24,21 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  useAnimaCompatibleVAEModels,
   useAnimaInpaintControlNetModels,
   useAnimaQwen3EncoderModels,
-  useAnimaVAEModels,
 } from 'services/api/hooks/modelsByType';
 import type { ControlNetModelConfig, Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
- * Anima VAE Model Select - uses Anima-base VAE models (QwenImage/Wan 2.1 VAE)
+ * Anima VAE Model Select - Anima-base VAE models (QwenImage/Wan 2.1 VAE) plus the other VAEs the Anima
+ * model loader accepts: FLUX VAEs and 16-channel Wan VAEs (see isAnimaCompatibleVAEModelConfig).
  */
 const ParamAnimaVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const animaVaeModel = useAppSelector(selectAnimaVaeModel);
-  const [modelConfigs, { isLoading }] = useAnimaVAEModels();
+  const [modelConfigs, { isLoading }] = useAnimaCompatibleVAEModels();
 
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {

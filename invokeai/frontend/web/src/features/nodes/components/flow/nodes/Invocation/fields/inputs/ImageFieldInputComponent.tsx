@@ -14,6 +14,7 @@ import { memo, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { isImageMissingError } from 'services/api/util/imageErrors';
 import { $isConnected } from 'services/events/stores';
 
 import type { FieldComponentProps } from './types';
@@ -24,7 +25,7 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   const dispatch = useAppDispatch();
   const isConnected = useStore($isConnected);
 
-  const { currentData: imageDTO, isError } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
+  const { currentData: imageDTO, error } = useGetImageDTOQuery(field.value?.image_name ?? skipToken);
   const handleReset = useCallback(() => {
     dispatch(
       fieldImageValueChanged({
@@ -45,10 +46,14 @@ const ImageFieldInputComponent = (props: FieldComponentProps<ImageFieldInputInst
   );
 
   useEffect(() => {
-    if (isConnected && isError) {
+    // Cleared only on a confirmed 404. A 403 is a permission decision that can be
+    // reversed — a board flipped back to Shared — and the image behind it still
+    // exists; a 5xx or a dropped connection says nothing at all. Dropping the
+    // field is silent and has no undo. See `isImageMissingError`.
+    if (isConnected && isImageMissingError(error)) {
       handleReset();
     }
-  }, [handleReset, isConnected, isError]);
+  }, [handleReset, isConnected, error]);
 
   const onUpload = useCallback(
     (imageDTO: ImageDTO) => {

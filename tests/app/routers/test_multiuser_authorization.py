@@ -65,6 +65,13 @@ def client():
     return TestClient(app)
 
 
+def _mock_urls() -> MagicMock:
+    """A urls service whose getters return real strings, so ImageDTO validates."""
+    urls = MagicMock()
+    urls.get_image_url.return_value = "http://test.invalid/image.png"
+    return urls
+
+
 @pytest.fixture
 def mock_services() -> InvocationServices:
     from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
@@ -110,7 +117,12 @@ def mock_services() -> InvocationServices:
         performance_statistics=InvocationStatsService(),
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
-        urls=None,  # type: ignore
+        # Real enough for ImageService.get_dto to build a DTO. With None it raised
+        # AttributeError for *every* image, so any route resolving a DTO silently took its
+        # not-found path — which made board_images' batch-delete authorization untestable:
+        # every name was skipped before the ownership check ran, and the test passed no
+        # matter what the route did. The returns must be strings; ImageDTO validates them.
+        urls=_mock_urls(),
         workflow_records=SqliteWorkflowRecordsStorage(db=db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
@@ -174,6 +186,11 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
 
     mock_board_images = MagicMock()
     mock_board_images.get_all_board_image_names_for_board.return_value = []
+    # The real facade returns the scoped DELETE's row count, and the routes classify a zero-row
+    # miss as not-removed. A bare MagicMock return only passed the old `== 0` check by accident;
+    # under `> 0` it is a TypeError. One row deleted is the honest default for a mock whose
+    # remove is expected to succeed; tests that stage the miss override this per-call.
+    mock_board_images.remove_image_from_board.return_value = 1
     mock_invoker.services.board_images = mock_board_images
 
     mock_workflow_thumbnails = MagicMock()
@@ -377,7 +394,14 @@ class TestBoardImageMutationAuth:
     def test_non_owner_cannot_batch_add_other_users_images_to_own_board(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
-        """Same attack via the batch endpoint."""
+        """Same attack via the batch endpoint.
+
+        Batch add skips foreign names instead of re-raising the first 403 — same rationale as
+        test_non_owner_cannot_star_image: re-raising mid-batch discarded the partial successes,
+        so the client never learned which images HAD moved. Only the response shape changes.
+        The attack itself must still fail: the victim's image must not move, and must not be
+        advertised as added.
+        """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "victim-batch-img", user1.user_id)
@@ -389,7 +413,443 @@ class TestBoardImageMutationAuth:
             json={"board_id": attacker_board, "image_names": ["victim-batch-img"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["added_images"] == []
+        # An auth skip is not a failure — it must not be reported (and toasted) as one.
+        assert body["failed_images"] == []
+        # `board_images` is a MagicMock in this fixture, so asserting on board_image_records
+        # would pass no matter what the route did. Assert the move was never attempted.
+        mock_invoker.services.board_images.add_image_to_board.assert_not_called()
+
+    def test_batch_add_keeps_partial_successes_when_one_name_is_foreign(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """The point of the skip: the attacker's own image still moves, and is reported.
+
+        Before, the first foreign name re-raised and discarded the payload for every image
+        that had already been moved in the same request, so the client never invalidated
+        their caches and the UI kept showing them on their old board.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "victim-mixed-img", user1.user_id)
+        _save_image(mock_invoker, "own-mixed-img", user2.user_id)
+
+        board_id = _create_board(client, user2_token, "Mixed Batch Board")
+        mock_invoker.services.board_images.add_image_to_board.reset_mock()
+
+        # Foreign name first, so the old `raise` would abort before reaching the owned one.
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": board_id, "image_names": ["victim-mixed-img", "own-mixed-img"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["added_images"] == ["own-mixed-img"]
+        assert body["failed_images"] == []
+        assert board_id in body["affected_boards"]
+        # Exactly one move attempted, and only for the caller's own image.
+        assert [
+            call.kwargs["image_name"] for call in mock_invoker.services.board_images.add_image_to_board.call_args_list
+        ] == ["own-mixed-img"]
+
+    def test_non_owner_cannot_batch_remove_images_from_foreign_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """Batch remove skips names on boards the caller cannot write, instead of re-raising.
+
+        The guarantee is unchanged: the image stays on the board and is not advertised as
+        removed. Only the response shape changes.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "victim-remove-img", user1.user_id)
+        board_id = _create_board(client, user1_token, "User1 Private Remove Board")
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "victim-remove-img")
+        mock_invoker.services.board_images.remove_image_from_board.reset_mock()
+
+        r = client.post(
+            "/api/v1/board_images/batch/delete",
+            json={"image_names": ["victim-remove-img"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["removed_images"] == []
+        # An auth skip is not a failure — it must not be reported (and toasted) as one.
+        assert body["failed_images"] == []
+        mock_invoker.services.board_images.remove_image_from_board.assert_not_called()
+
+    def test_batch_remove_keeps_partial_successes_when_one_name_is_foreign(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """The point of the skip, on the remove side: the caller's own image still comes off."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "victim-rm-mixed", user1.user_id)
+        _save_image(mock_invoker, "own-rm-mixed", user2.user_id)
+        victim_board = _create_board(client, user1_token, "User1 Board For Remove Mix")
+        own_board = _create_board(client, user2_token, "User2 Board For Remove Mix")
+        mock_invoker.services.board_image_records.add_image_to_board(victim_board, "victim-rm-mixed")
+        mock_invoker.services.board_image_records.add_image_to_board(own_board, "own-rm-mixed")
+        mock_invoker.services.board_images.remove_image_from_board.reset_mock()
+
+        # Foreign name first, so the old `raise` would abort before reaching the owned one.
+        r = client.post(
+            "/api/v1/board_images/batch/delete",
+            json={"image_names": ["victim-rm-mixed", "own-rm-mixed"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["removed_images"] == ["own-rm-mixed"]
+        assert body["failed_images"] == []
+        assert own_board in body["affected_boards"]
+        assert victim_board not in body["affected_boards"]
+        assert [
+            call.kwargs["image_name"]
+            for call in mock_invoker.services.board_images.remove_image_from_board.call_args_list
+        ] == ["own-rm-mixed"]
+
+    def test_batch_remove_decides_board_write_access_once_per_name_and_cheaply(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """Two invariants that pull against each other, asserted together.
+
+        Skipping removed the early abort that used to cap an unauthorized batch at one check, so
+        the decision is now taken for every name -- caching it per board would let a permission
+        revoked mid-batch keep working until the request ends (see the revocation test below).
+
+        Which is only affordable because the decision reads the board *record*: one indexed
+        SELECT. Through boards.get_dto() it would be six queries -- three of them COUNT
+        aggregates over the board's contents -- per name, synchronously, on the event loop, for
+        a 1000-name batch. So get_dto must not appear in this path at all.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Board Perms")
+        names = [f"victim-perm-{index}" for index in range(5)]
+        for name in names:
+            _save_image(mock_invoker, name, user1.user_id)
+            mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
+
+        get_dto_spy = MagicMock(side_effect=mock_invoker.services.boards.get_dto)
+        monkeypatch.setattr(mock_invoker.services.boards, "get_dto", get_dto_spy)
+        record_spy = MagicMock(side_effect=mock_invoker.services.board_records.get)
+        monkeypatch.setattr(mock_invoker.services.board_records, "get", record_spy)
+
+        r = client.post(
+            "/api/v1/board_images/batch/delete",
+            json={"image_names": names},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_201_CREATED
+        assert r.json()["removed_images"] == []
+        assert record_spy.call_count == len(names)
+        assert get_dto_spy.call_count == 0
+
+    def test_batch_remove_stops_when_board_write_access_is_revoked_mid_batch(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """A contributor's write access ends the moment the board stops being public.
+
+        Public boards accept contributions from anyone, so user2 may empty user1's public board.
+        Nothing about that decision holds for the rest of a 1000-name batch: user1 can make the
+        board private while it is still running. Caching the first `True` would remove every
+        remaining name on an answer that is no longer true, and none of it is undone.
+        """
+        from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Public Board Revoked")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        names = [f"revoke-rm-{index}" for index in range(3)]
+        for name in names:
+            _save_image(mock_invoker, name, user1.user_id)
+            mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
+
+        def _revoke_after_first_removal(image_name: str, board_id: str) -> int:
+            mock_invoker.services.board_records.update(board_id, BoardChanges(board_visibility=BoardVisibility.Private))
+            # One row removed: a side_effect's return value overrides the mock's return_value,
+            # and the route classifies anything else as a miss.
+            return 1
+
+        mock_invoker.services.board_images.remove_image_from_board.reset_mock()
+        mock_invoker.services.board_images.remove_image_from_board.side_effect = _revoke_after_first_removal
+
+        r = client.post(
+            "/api/v1/board_images/batch/delete",
+            json={"image_names": names},
+            headers=_auth(user2_token),
+        )
+
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["removed_images"] == [names[0]]
+        # The rest are an authorization skip, not a failure: absent from both lists.
+        assert body["failed_images"] == []
+        assert mock_invoker.services.board_images.remove_image_from_board.call_count == 1
+
+    def test_batch_add_stops_when_board_write_access_is_revoked_mid_batch(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """The same window on the add side, where the target board is checked before the loop.
+
+        The refused names are reported as failed, not skipped: the destination is the whole
+        request's problem, and skipping empties the rest of the batch into a 201 with empty
+        lists, which the client reads as success and clears the user's selection over. The
+        loop must still stop *issuing adds* the moment access is gone.
+        """
+        from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
+
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "User1 Public Board Add Revoked")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        names = [f"revoke-add-{index}" for index in range(3)]
+        for name in names:
+            _save_image(mock_invoker, name, user2.user_id)
+
+        def _revoke_after_first_add(board_id: str, image_name: str) -> None:
+            mock_invoker.services.board_records.update(board_id, BoardChanges(board_visibility=BoardVisibility.Private))
+
+        mock_invoker.services.board_images.add_image_to_board.reset_mock()
+        mock_invoker.services.board_images.add_image_to_board.side_effect = _revoke_after_first_add
+
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": board_id, "image_names": names},
+            headers=_auth(user2_token),
+        )
+
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["added_images"] == [names[0]]
+        assert set(body["failed_images"]) == set(names[1:])
+        assert mock_invoker.services.board_images.add_image_to_board.call_count == 1
+
+    def test_batch_add_skips_an_image_deleted_after_its_ownership_check(
+        self, client: TestClient, mock_invoker: Invoker, user2_token: str
+    ):
+        """A name deleted mid-batch is a skip, not a failure -- even here, where it arrives
+        as a bare foreign-key error.
+
+        board_images.image_name references images.image_name, so an image deleted between the
+        ownership check and the insert fails the INSERT with sqlite3.IntegrityError. Nothing in
+        that exception says "gone", so without the record probe the name is reported (and
+        toasted) as a storage failure for an image the user themselves just deleted.
+        """
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        names = ["fk-ok", "fk-vanished"]
+        for name in names:
+            _save_image(mock_invoker, name, user2.user_id)
+        board_id = _create_board(client, user2_token, "User2 FK Race Board")
+
+        def _delete_then_insert(board_id: str, image_name: str) -> None:
+            if image_name == "fk-vanished":
+                mock_invoker.services.image_records.delete(image_name)
+            # The real storage, so the foreign key fires for real rather than being simulated.
+            mock_invoker.services.board_image_records.add_image_to_board(board_id, image_name)
+
+        mock_invoker.services.board_images.add_image_to_board.reset_mock()
+        mock_invoker.services.board_images.add_image_to_board.side_effect = _delete_then_insert
+
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": board_id, "image_names": names},
+            headers=_auth(user2_token),
+        )
+
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["added_images"] == ["fk-ok"]
+        # Absent from both lists: not moved by us, and not a failure either.
+        assert body["failed_images"] == []
+
+    def test_batch_add_reports_a_failure_it_could_not_probe(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user2_token: str
+    ):
+        """The probe's own failure path: an unreadable record must not become a skip.
+
+        The insert failure is classified by asking whether the image record is still there, so
+        the probe decides whether a name is reported. If the probe cannot answer — the same
+        locked database that broke the insert — the only safe answer is "still there": a skip
+        claims the user's own concurrent delete caused this, and says nothing at all.
+        """
+        import sqlite3
+
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        _save_image(mock_invoker, "unprobeable", user2.user_id)
+        board_id = _create_board(client, user2_token, "User2 Unprobeable Board")
+
+        def _fail(board_id: str, image_name: str) -> None:
+            raise RuntimeError("storage is on fire")
+
+        mock_invoker.services.board_images.add_image_to_board.reset_mock()
+        mock_invoker.services.board_images.add_image_to_board.side_effect = _fail
+        monkeypatch.setattr(
+            mock_invoker.services.image_records,
+            "get",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": board_id, "image_names": ["unprobeable"]},
+            headers=_auth(user2_token),
+        )
+
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["added_images"] == []
+        assert body["failed_images"] == ["unprobeable"]
+
+    @pytest.mark.parametrize("route", ["add", "remove"])
+    def test_batch_routes_report_a_name_whose_board_check_hit_a_storage_error(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user2_token: str, route: str
+    ):
+        """A name we could not decide about must be reported, never silently dropped.
+
+        Board write access is now decided once per name, off board_records.get(). That read used
+        to answer a locked or unreadable database with BoardRecordNotFoundException — the same
+        exception a board that simply does not exist raises — which the routes turn into a 404
+        and then skip. A disk error mid-batch would therefore drop names out of the response
+        entirely: absent from added/removed, absent from failed_images, no toast, and the client
+        re-rendering them as moved until the next refresh. That is exactly the outcome
+        failed_images exists to prevent, so the storage error has to stay distinguishable.
+        """
+        import sqlite3
+
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        names = ["decide-ok", "decide-broken"]
+        for name in names:
+            _save_image(mock_invoker, name, user2.user_id)
+        board_id = _create_board(client, user2_token, "User2 Board Check Failure")
+        if route == "remove":
+            for name in names:
+                mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
+
+        real_get = mock_invoker.services.board_records.get
+        calls = {"n": 0}
+        # One decision per name, plus — on the add route only — the up-front check that answers
+        # a wholly unauthorized request with a 403 before the loop starts. Either way the last
+        # decision is the one taken for "decide-broken".
+        failing_call = 3 if route == "add" else 2
+
+        def _fail_on_the_last_decision(requested_board_id: str):
+            calls["n"] += 1
+            if calls["n"] == failing_call:
+                raise sqlite3.OperationalError("database is locked")
+            return real_get(requested_board_id)
+
+        monkeypatch.setattr(mock_invoker.services.board_records, "get", _fail_on_the_last_decision)
+        mock_invoker.services.board_images.add_image_to_board.reset_mock()
+        mock_invoker.services.board_images.remove_image_from_board.reset_mock()
+
+        if route == "add":
+            r = client.post(
+                "/api/v1/board_images/batch",
+                json={"board_id": board_id, "image_names": names},
+                headers=_auth(user2_token),
+            )
+            moved_key = "added_images"
+        else:
+            r = client.post(
+                "/api/v1/board_images/batch/delete",
+                json={"image_names": names},
+                headers=_auth(user2_token),
+            )
+            moved_key = "removed_images"
+
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body[moved_key] == ["decide-ok"]
+        assert body["failed_images"] == ["decide-broken"]
+
+    def test_batch_remove_only_touches_the_board_it_authorized_against(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """Deciding freshly is not enough — the write has to be scoped to what was decided.
+
+        The route reads the image's board, authorizes against *that* board, then removes. An
+        unscoped `DELETE ... WHERE image_name = ?` follows the image if it is moved in between,
+        so a decision taken about a public board could be applied to a private one: user2 is
+        authorized against public P, user1 moves the image to private Q, and the delete lands on
+        Q. The predicate belongs on the write.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        public_board = _create_board(client, user1_token, "User1 Public Source")
+        _set_board_visibility(client, user1_token, public_board, "public")
+        private_board = _create_board(client, user1_token, "User1 Private Destination")
+        _save_image(mock_invoker, "moving-target", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(public_board, "moving-target")
+
+        # The image moves to the private board between the route's board read and its delete.
+        real_get_dto = mock_invoker.services.images.get_dto
+
+        def _move_after_reading(image_name: str):
+            dto = real_get_dto(image_name)
+            mock_invoker.services.board_image_records.add_image_to_board(private_board, image_name)
+            return dto
+
+        monkeypatch.setattr(mock_invoker.services.images, "get_dto", _move_after_reading)
+        # The real storage, so the scoping is exercised rather than asserted on a mock.
+        mock_invoker.services.board_images.remove_image_from_board.side_effect = (
+            mock_invoker.services.board_image_records.remove_image_from_board
+        )
+
+        r = client.post(
+            "/api/v1/board_images/batch/delete",
+            json={"image_names": ["moving-target"]},
+            headers=_auth(user2_token),
+        )
+
+        assert r.status_code == status.HTTP_201_CREATED
+        # The image is still on the private board: user2 was never authorized against it.
+        assert mock_invoker.services.board_image_records.get_board_for_image("moving-target") == private_board
+
+    def test_batch_add_still_reports_a_genuine_storage_failure(
+        self, client: TestClient, mock_invoker: Invoker, user2_token: str
+    ):
+        """The other half of the probe: a name whose record is still there stays a failure.
+
+        Without this the skip above could be written as a blanket `continue` and nothing would
+        notice -- a move that silently reverted on reload is exactly what failed_images exists
+        to surface.
+        """
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        names = ["storage-ok", "storage-broken"]
+        for name in names:
+            _save_image(mock_invoker, name, user2.user_id)
+        board_id = _create_board(client, user2_token, "User2 Storage Failure Board")
+
+        def _fail_one(board_id: str, image_name: str) -> None:
+            if image_name == "storage-broken":
+                raise RuntimeError("storage is on fire")
+
+        mock_invoker.services.board_images.add_image_to_board.reset_mock()
+        mock_invoker.services.board_images.add_image_to_board.side_effect = _fail_one
+
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": board_id, "image_names": names},
+            headers=_auth(user2_token),
+        )
+
+        assert r.status_code == status.HTTP_201_CREATED
+        body = r.json()
+        assert body["added_images"] == ["storage-ok"]
+        assert body["failed_images"] == ["storage-broken"]
 
 
 # ===========================================================================
@@ -403,6 +863,139 @@ class TestImageReadAuth:
     def test_get_image_dto_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/images/i/some-image")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_deleted_image_reads_as_gone_rather_than_denied(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """A deleted image answers 404 even to a non-admin, and the clients depend on it.
+
+        The ownership decision rests on `images.user_id`, which is gone with the row, so
+        nothing above the refusal can tell a deleted image from a foreign one -- both used to
+        come back 403. The two mean opposite things to a client holding a reference: gone is
+        permanent and the reference should go with it, denied is reversible and it must not.
+        Only the refusal path pays for the distinction.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-doomed", user1.user_id)
+        mock_invoker.services.image_records.delete("user1-doomed")
+
+        r = client.get("/api/v1/images/i/user1-doomed", headers=_auth(user1_token))
+
+        assert r.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_unreadable_storage_does_not_read_as_a_deleted_image(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str
+    ):
+        """The DTO route's 404 is the one clients destroy references on, so only absence earns it.
+
+        The route ended `except Exception: raise HTTPException(404)`, so any failure inside
+        `get_dto` -- the board lookup, the URL service, not just a missing row -- answered the
+        same 404 that tells a workflow field its image is gone. The caller here owns the image
+        and it is still there; the board lookup is what breaks.
+        """
+        import sqlite3
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-unreadable", user1.user_id)
+        monkeypatch.setattr(
+            mock_invoker.services.board_image_records,
+            "get_board_for_image",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        # Uncaught in the route, so a 500 in production; the test client re-raises instead of
+        # rendering it. Either way it must not be the 404 that clears the user's reference.
+        with pytest.raises(sqlite3.OperationalError):
+            client.get("/api/v1/images/i/user1-unreadable", headers=_auth(user1_token))
+
+    def test_revoking_access_to_a_live_image_stays_a_denial(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """The other half, and the one with teeth: a reversible refusal must not read as gone.
+
+        A shared board flipped back to Private refuses every image on it, and every one of
+        them still exists. The clients drop a workflow field or a reference image on a 404, so
+        answering one here would destroy work that restoring the permission could not bring
+        back.
+        """
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Formerly Shared Board")
+        _set_board_visibility(client, user1_token, board_id, "shared")
+        _save_image(mock_invoker, "user1-still-here", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-still-here")
+        assert client.get("/api/v1/images/i/user1-still-here", headers=_auth(user2_token)).status_code == (
+            status.HTTP_200_OK
+        )
+
+        _set_board_visibility(client, user1_token, board_id, "private")
+
+        r = client.get("/api/v1/images/i/user1-still-here", headers=_auth(user2_token))
+
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_unreadable_board_does_not_read_as_unavailable(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """A storage error must not reach the client wearing the deleted image's answer.
+
+        `assert_image_read_access` used to catch every exception from the board lookup and
+        fall through to the same 403 a deleted image gets. Since the clients read that 403 as
+        "gone, drop your reference", a locked database would have taken every workflow field
+        and reference image pointing at a shared board's images down with it. Only a board
+        positively known to be gone may still answer 403.
+        """
+        import sqlite3
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Shared Read Board")
+        _set_board_visibility(client, user1_token, board_id, "shared")
+        _save_image(mock_invoker, "user1-shared-read", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-shared-read")
+
+        # Patched only after the setup above used the real store. user2 is neither admin nor
+        # direct owner, so the decision reaches the board lookup and cannot complete.
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        # The storage error leaves the route uncaught, which is a 500 in production; the test
+        # client re-raises unhandled server exceptions instead of rendering them. Either way the
+        # one thing that must not happen is a 403 -- the answer the clients act on destructively.
+        with pytest.raises(sqlite3.OperationalError):
+            client.get("/api/v1/images/i/user1-shared-read", headers=_auth(user2_token))
+
+    def test_vanished_board_still_reads_as_an_ordinary_refusal(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """The narrowed catch stays exactly that narrow, in both directions.
+
+        A dangling board_image row refuses the read, but the image itself is still there, so
+        the refusal is a 403 and not the 404 that would take the caller's reference with it.
+        """
+        from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Vanishing Read Board")
+        _set_board_visibility(client, user1_token, board_id, "shared")
+        _save_image(mock_invoker, "user1-read-board-gone", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-read-board-gone")
+
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=BoardRecordNotFoundException),
+        )
+
+        r = client.get("/api/v1/images/i/user1-read-board-gone", headers=_auth(user2_token))
+
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
     def test_get_image_metadata_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.get("/api/v1/images/i/some-image/metadata")
@@ -765,6 +1358,13 @@ class TestImageMutationAuth:
     def test_non_owner_cannot_star_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
+        """Batch star skips foreign items instead of re-raising the first 403.
+
+        Same rationale as test_non_owner_cannot_batch_delete_image: re-raising mid-batch
+        discarded the partial successes, so the client never learned which images HAD
+        changed. Only the response shape changes — the foreign image must still not be
+        starred, and must not be advertised as starred.
+        """
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-star-blocked", user1.user_id)
@@ -774,7 +1374,95 @@ class TestImageMutationAuth:
             json={"image_names": ["user1-star-blocked"]},
             headers=_auth(user2_token),
         )
-        assert r.status_code == status.HTTP_403_FORBIDDEN
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        assert body["starred_images"] == []
+        # An auth skip is not a failure — it must not be reported (and toasted) as one.
+        assert body["failed_images"] == []
+        assert mock_invoker.services.image_records.get("user1-star-blocked").starred is False
+
+    @pytest.mark.parametrize("route", ["star", "unstar"])
+    def test_star_reports_a_name_whose_board_lookup_hit_a_storage_error(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        user1_token: str,
+        user2_token: str,
+        route: str,
+    ):
+        """A database error during the board-ownership fallback must land in failed_images.
+
+        `assert_image_owner` used to catch every exception from the board lookup and fall
+        through to the 403, and the batch loops treat a 403 as a silent auth skip -- so a
+        locked database made the star quietly vanish from the response: not applied, not
+        reported, and nothing for the client to toast. Only a board positively known to be
+        gone may still answer 403; a lookup that cannot be decided must propagate into the
+        loop's storage-failure arm.
+        """
+        import sqlite3
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, f"User1 Public {route} Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        name = f"user1-{route}-undecidable"
+        _save_image(mock_invoker, name, user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, name)
+
+        # Patched only after the setup above used the real store. user2 is neither admin nor
+        # direct owner, so the decision reaches the board lookup and cannot complete.
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+        )
+
+        r = client.post(
+            f"/api/v1/images/{route}",
+            json={"image_names": [name]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        assert body[f"{route}red_images"] == []
+        assert body["failed_images"] == [name]
+
+    def test_star_still_skips_a_name_whose_board_is_positively_gone(
+        self, client: TestClient, mock_invoker: Invoker, monkeypatch: Any, user1_token: str, user2_token: str
+    ):
+        """The narrowed catch must stay exactly that narrow, in both directions.
+
+        A board positively known to be gone (a dangling board_image row) is the one lookup
+        outcome that may still answer the ordinary 403 -- an auth skip, absent from both
+        lists. An implementation that let BoardRecordNotFoundException propagate alongside
+        the storage errors would report it in failed_images and toast a failure for a name
+        whose only problem is that its board vanished mid-request.
+        """
+        from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        board_id = _create_board(client, user1_token, "User1 Vanishing Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        _save_image(mock_invoker, "user1-board-gone", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id, "user1-board-gone")
+
+        monkeypatch.setattr(
+            mock_invoker.services.board_records,
+            "get",
+            MagicMock(side_effect=BoardRecordNotFoundException),
+        )
+
+        r = client.post(
+            "/api/v1/images/star",
+            json={"image_names": ["user1-board-gone"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_200_OK
+        body = r.json()
+        assert body["starred_images"] == []
+        assert body["failed_images"] == []
 
     def test_non_owner_cannot_batch_delete_image(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
