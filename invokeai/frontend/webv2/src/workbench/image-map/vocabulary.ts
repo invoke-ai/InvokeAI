@@ -16,6 +16,7 @@ import {
 import { apiFetchJson } from '@platform/transport/http';
 import { queryOptions } from '@tanstack/react-query';
 
+import { clearImageLabels } from './imageLabelCache';
 import { refetchClusterLabels } from './imageMapStore';
 
 /** Mirrors the backend's VocabBuildState literal. */
@@ -142,6 +143,10 @@ const watchRebuild = (): void => {
         }
 
         if (body.state === 'ready') {
+          // The hover card's per-image tags are scored against this same
+          // vocabulary, so they go stale on exactly this event — and unlike
+          // the cluster labels, nothing else in the map's flow refetches them.
+          clearImageLabels();
           refetchClusterLabels();
         }
 

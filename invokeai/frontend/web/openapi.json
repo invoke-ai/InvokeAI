@@ -6576,6 +6576,68 @@
         }
       }
     },
+    "/api/v1/image_map/image_labels": {
+      "get": {
+        "tags": ["image_map"],
+        "summary": "Get Image Map Image Labels",
+        "description": "Labels one image with the vocabulary phrases most similar to its stored embedding.\n\nServes map hover cards, so it only covers images the index has embedded;\nan unindexed image (assets, intermediates, not-yet-indexed) is a 404\nrather than an on-demand embed \u2014 a hover must never queue encoder work.\nRequires the embedding model's text encoder, like /cluster_labels.",
+        "operationId": "get_image_map_image_labels",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The image to label",
+              "title": "Image Name"
+            },
+            "description": "The image to label"
+          },
+          {
+            "name": "top_k",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 10,
+              "minimum": 1,
+              "description": "Number of candidate labels",
+              "default": 3,
+              "title": "Top K"
+            },
+            "description": "Number of candidate labels"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageMapImageLabelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/image_map/refresh": {
       "post": {
         "tags": ["image_map"],
@@ -42269,6 +42331,32 @@
         "required": ["labels"],
         "title": "ImageMapClusterLabelsResponse",
         "description": "Automatic labels for the current user's visible clusters, keyed by cluster id."
+      },
+      "ImageMapImageLabelsResponse": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label",
+            "description": "Best-matching vocabulary phrase"
+          },
+          "alternates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Alternates",
+            "description": "Runner-up phrases"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Cosine similarity of the best phrase to the image's embedding"
+          }
+        },
+        "type": "object",
+        "required": ["label", "alternates", "score"],
+        "title": "ImageMapImageLabelsResponse",
+        "description": "The best vocabulary labels for one image."
       },
       "ImageMapPoint": {
         "properties": {
