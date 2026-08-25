@@ -58,7 +58,15 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     layers: {
       clearMask: vi.fn(),
       commitStructural: vi.fn(),
-      duplicateLayers: vi.fn(() => ({ duplicateIds: ['new-layer'], selectedLayerId: 'new-layer' })),
+      duplicateLayers: vi.fn(() =>
+        Promise.resolve<
+          { status: 'duplicated'; duplicateIds: string[]; selectedLayerId: string } | { status: 'not-ready' }
+        >({
+          duplicateIds: ['new-layer'],
+          selectedLayerId: 'new-layer',
+          status: 'duplicated',
+        })
+      ),
       mergeLayerDown: vi.fn(),
       nudgeSelectedLayer: vi.fn(),
     },
@@ -86,6 +94,7 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   hasSelectedStagedCandidate: false,
   hasStagingSlots: false,
   isInteractionLocked: false,
+  notifyLayerDuplicateFailed: vi.fn(),
   pasteFromClipboard,
   selectedLayerIds: ['a'],
   t: (key) => key,
@@ -296,6 +305,20 @@ describe('duplicate: lift vs whole layer', () => {
   it('duplicates every selected layer as one engine operation', () => {
     const engine = run('canvas.duplicateLayer', { selectedLayerIds: ['a', 'b'] });
     expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a', 'b']);
+  });
+
+  it.each(['declines', 'throws'] as const)('reports when whole-layer duplication %s', async (failure) => {
+    const engine = createEngine();
+    if (failure === 'declines') {
+      engine.layers.duplicateLayers.mockImplementation(() => Promise.resolve({ status: 'not-ready' }));
+    } else {
+      engine.layers.duplicateLayers.mockImplementation(() => Promise.reject(new Error('rejected')));
+    }
+    const notifyLayerDuplicateFailed = vi.fn();
+
+    executeCanvasHotkeyCommand('canvas.duplicateLayer', contextOf({ engine, notifyLayerDuplicateFailed }));
+
+    await vi.waitFor(() => expect(notifyLayerDuplicateFailed).toHaveBeenCalledOnce());
   });
 });
 

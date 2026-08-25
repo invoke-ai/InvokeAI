@@ -56,10 +56,12 @@ const createSelectionPixelOptions = () => ({
   getFillColor: () => '#000',
   history: {} as never,
   invalidateLayer: vi.fn(),
+  isRasterCacheReady: () => true,
   isGestureActive: () => false,
   layers: {} as never,
   markDirty: vi.fn(),
   notifyPainted: vi.fn(),
+  requestRasterization: vi.fn(),
 });
 
 const createFloatingSelectionOptions = () => ({

@@ -122,6 +122,7 @@ interface Harness {
   dispatched: CanvasProjectMutation[];
   strokes: StrokeCommittedEvent[];
   painted: string[];
+  requestLayerRasterization: ReturnType<typeof vi.fn>;
   createdIds: string[];
 }
 
@@ -137,6 +138,7 @@ const createHarness = (
   const painted: string[] = [];
   const createdIds: string[] = [];
   const beginPixelEdit = transaction === undefined ? null : vi.fn(() => transaction);
+  const requestLayerRasterization = vi.fn();
   let idCounter = 0;
 
   const ctx: ToolContext = {
@@ -161,6 +163,7 @@ const createHarness = (
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted: (layerId) => painted.push(layerId),
+    requestLayerRasterization,
     setLayerTransformOverride: vi.fn(),
     setOverlayCursor: vi.fn(),
     stores,
@@ -168,7 +171,7 @@ const createHarness = (
     viewport: null as never,
   };
 
-  return { backend, beginPixelEdit, createdIds, ctx, dispatched, layers, painted, strokes };
+  return { backend, beginPixelEdit, createdIds, ctx, dispatched, layers, painted, requestLayerRasterization, strokes };
 };
 
 const cacheOps = (surface: StubRasterSurface): string[] => surface.callLog.map((entry) => entry.op);
@@ -228,6 +231,29 @@ describe('brush tool: stroke into an existing paint layer', () => {
     expect(ops).toContain('getImageData');
     expect(ops).toContain('drawImage');
     expect(lastCompositeOp(cacheSurface(h, 'paint1'))).toBe('source-over');
+  });
+
+  it('waits for a persisted paint source cache instead of painting over transparent pixels', () => {
+    const layer = paintLayer('paint1');
+    if (layer.type !== 'raster' || layer.source.type !== 'paint') {
+      throw new Error('expected a raster paint layer');
+    }
+    layer.source.bitmap = { height: 10, imageName: 'persisted-paint', width: 10 };
+    const h = createHarness(makeDoc([layer], layer.id));
+    const brush = createBrushTool();
+
+    down(brush, h.ctx, pointer(5, 5));
+    up(brush, h.ctx, pointer(5, 5, { buttons: 0 }));
+    expect(h.strokes).toHaveLength(0);
+    expect(h.layers.peek(layer.id)).toBeUndefined();
+    expect(h.requestLayerRasterization).toHaveBeenCalledWith(layer.id);
+
+    const entry = h.layers.getOrCreateRect(layer.id, { height: 10, width: 10, x: 0, y: 0 });
+    h.layers.publishPixels(layer.id);
+    expect(entry.stale).toBe(false);
+    down(brush, h.ctx, pointer(5, 5));
+    up(brush, h.ctx, pointer(5, 5, { buttons: 0 }));
+    expect(h.strokes).toHaveLength(1);
   });
 });
 
@@ -493,6 +519,28 @@ describe('transparency lock', () => {
 });
 
 describe('mask strokes are forced opaque', () => {
+  it('waits for a persisted mask cache instead of replacing its coverage', () => {
+    const layer = inpaintMaskLayer('mask1');
+    if (layer.type !== 'inpaint_mask') {
+      throw new Error('expected an inpaint mask');
+    }
+    layer.mask.bitmap = { height: 10, imageName: 'persisted-mask', width: 10 };
+    const h = createHarness(makeDoc([layer], layer.id));
+    const eraser = createEraserTool();
+
+    down(eraser, h.ctx, pointer(5, 5));
+    up(eraser, h.ctx, pointer(5, 5, { buttons: 0 }));
+    expect(h.strokes).toHaveLength(0);
+    expect(h.layers.peek(layer.id)).toBeUndefined();
+    expect(h.requestLayerRasterization).toHaveBeenCalledWith(layer.id);
+
+    h.layers.getOrCreateRect(layer.id, { height: 10, width: 10, x: 0, y: 0 });
+    h.layers.publishPixels(layer.id);
+    down(eraser, h.ctx, pointer(5, 5));
+    up(eraser, h.ctx, pointer(5, 5, { buttons: 0 }));
+    expect(h.strokes).toHaveLength(1);
+  });
+
   it('composites a mask stroke at globalAlpha 1 even when the brush opacity is 0.5', () => {
     const doc = makeDoc([inpaintMaskLayer('mask1')], 'mask1');
     const h = createHarness(doc);

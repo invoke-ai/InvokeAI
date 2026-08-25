@@ -69,6 +69,7 @@ export interface CanvasHotkeyContext {
   readonly dispatch: CanvasProjectMutationDispatch;
   readonly copySelection: (cut: boolean) => void;
   readonly pasteFromClipboard: () => void;
+  readonly notifyLayerDuplicateFailed: () => void;
   readonly t: (key: string) => string;
 }
 
@@ -239,14 +240,27 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     if (engine?.interaction.get('hasSelection')) {
       engine.selection.liftSelectionToLayer();
     } else if (engine && selectedLayer) {
-      const result = engine.layers.duplicateLayers(ctx.selectedLayerIds);
-      if (result) {
-        publishLayerPanelSelection({
-          primaryId: result.selectedLayerId,
-          projectId: engine.projectId,
-          selectedIds: result.duplicateIds,
+      void engine.layers
+        .duplicateLayers(ctx.selectedLayerIds)
+        .then((result) => {
+          if (result.status === 'duplicated') {
+            publishLayerPanelSelection({
+              primaryId: result.selectedLayerId,
+              projectId: engine.projectId,
+              selectedIds: result.duplicateIds,
+            });
+            return;
+          }
+          if (result.status === 'busy') {
+            return;
+          }
+          ctx.notifyLayerDuplicateFailed();
+        })
+        .catch(() => {
+          // The engine keeps rejected transactions atomic; route both rejection
+          // and preflight refusal through the same user-facing command feedback.
+          ctx.notifyLayerDuplicateFailed();
         });
-      }
     }
   } else if (commandId === 'canvas.mergeDown') {
     // Gate on the SAME predicate the layers panel's context menu uses to

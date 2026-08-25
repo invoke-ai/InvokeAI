@@ -507,4 +507,24 @@ describe('createHistory: failure-atomic replay', () => {
     history.undo();
     expect(log).toEqual(['undo:newest', 'undo:middle']);
   });
+
+  it('disposes entries whenever stack ownership permanently ends', () => {
+    const disposed: string[] = [];
+    const entry = (label: string) => ({
+      ...makeEntry(label, []),
+      dispose: () => disposed.push(label),
+    });
+    const history = createHistory({ maxEntries: 1 });
+
+    history.push(entry('evicted'));
+    history.push(entry('redo-cleared'));
+    expect(disposed).toEqual(['evicted']);
+    history.undo();
+    history.push(entry('amended'));
+    expect(disposed).toEqual(['evicted', 'redo-cleared']);
+    history.amendLast(entry('cleared'));
+    expect(disposed).toEqual(['evicted', 'redo-cleared', 'amended']);
+    history.clear();
+    expect(disposed).toEqual(['evicted', 'redo-cleared', 'amended', 'cleared']);
+  });
 });

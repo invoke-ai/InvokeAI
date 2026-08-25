@@ -114,6 +114,8 @@ export interface ToolContext {
   beginTransformSession?(layerId: string): void;
   /** Prepares direct or materializing pixel editing for a selected control or raster-image layer. */
   beginPixelEdit?(layerId: string): PixelEditTransaction | null;
+  /** Starts reserved source materialization when an offscreen durable paint target is not ready yet. */
+  requestLayerRasterization?(layerId: string): void;
   /** Updates the active transform session's live transform (drag or numeric edit). */
   updateTransformSession?(transform: LayerTransform): void;
   /**

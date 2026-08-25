@@ -330,23 +330,33 @@ const LayerMenu = ({
     [t]
   );
 
-  const handleDuplicate = useCallback(() => {
+  const handleDuplicate = useCallback(async () => {
     if (engine) {
       const panelSelection = readLayerPanelSelection(projectId, document.selectedLayerId);
       const sourceIds = panelSelection.selectedIds.includes(layer.id) ? panelSelection.selectedIds : [layer.id];
-      const result = engine.layers.duplicateLayers(sourceIds);
-      if (result) {
-        publishLayerPanelSelection({
-          primaryId: result.selectedLayerId,
-          projectId,
-          selectedIds: result.duplicateIds,
-        });
+      try {
+        const result = await engine.layers.duplicateLayers(sourceIds);
+        if (result.status === 'duplicated') {
+          publishLayerPanelSelection({
+            primaryId: result.selectedLayerId,
+            projectId,
+            selectedIds: result.duplicateIds,
+          });
+          return;
+        }
+        if (result.status === 'busy') {
+          return;
+        }
+      } catch {
+        // A rejected engine transaction leaves the document unchanged; report
+        // the failure through the menu instead of leaking an event exception.
       }
+      notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.copyFailed'));
       return;
     }
     const { forward, inverse } = duplicateLayerActions(layer.id, createLayerId());
     applyStructural(engine, dispatch, t('widgets.layers.actions.duplicate'), forward, inverse);
-  }, [dispatch, document.selectedLayerId, engine, layer.id, projectId, t]);
+  }, [dispatch, document.selectedLayerId, engine, layer.id, notify, projectId, t]);
 
   const handleDelete = useCallback(() => {
     const { forward, inverse } = deleteLayerActions(layer, index);

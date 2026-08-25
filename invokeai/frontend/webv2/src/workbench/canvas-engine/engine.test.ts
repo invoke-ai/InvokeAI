@@ -2913,6 +2913,8 @@ const createSpyBitmapStore = (): BitmapStore & {
     discardLayer: vi.fn(),
     dispose: vi.fn(),
     flushPendingUploads: vi.fn(() => Promise.resolve()),
+    hasPendingClear: () => false,
+    hasPendingWork: () => false,
     isSelfEcho: () => false,
     markLayerDirty: vi.fn<(layerId: string) => void>(),
     releaseSuspendedLayer,
@@ -6812,7 +6814,11 @@ describe('mergeVisibleRasterLayers', () => {
     };
   };
 
-  const setup = (doc: CanvasDocumentContractV2) => {
+  const setup = (
+    doc: CanvasDocumentContractV2,
+    pendingClearIds: ReadonlySet<string> = new Set(),
+    pendingWorkIds: ReadonlySet<string> = new Set()
+  ) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -6835,8 +6841,12 @@ describe('mergeVisibleRasterLayers', () => {
     };
     let panelSelectedIds = doc.selectedLayerId ? [doc.selectedLayerId] : [];
     const selectionChanges: { primaryId: string | null; selectedIds: readonly string[] }[] = [];
+    const bitmapStore = createSpyBitmapStore();
+    bitmapStore.hasPendingClear = (layerId) => pendingClearIds.has(layerId);
+    bitmapStore.hasPendingWork = (layerId) => pendingWorkIds.has(layerId);
     const engine = createCanvasEngine({
       backend,
+      bitmapStore,
       getSelectedLayerIds: () => panelSelectedIds,
       imageResolver: () => Promise.resolve(new Blob()),
       mutationPort,
@@ -6851,6 +6861,7 @@ describe('mergeVisibleRasterLayers', () => {
     const overlay = createFakeCanvas();
     engine.surface.attach(screen.element, overlay.element);
     return {
+      bitmapStore,
       engine,
       getPanelSelectedIds: () => panelSelectedIds,
       raf,
@@ -6873,9 +6884,12 @@ describe('mergeVisibleRasterLayers', () => {
     raf.flush();
     setPanelSelectedIds(['upper', 'below']);
 
-    const result = engine.layers.duplicateLayers(['upper', 'below']);
-    expect(result).not.toBeNull();
-    const [upperCopyId, belowCopyId] = result!.duplicateIds;
+    const result = await engine.layers.duplicateLayers(['upper', 'below']);
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    const [upperCopyId, belowCopyId] = result.duplicateIds;
     expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([
       upperCopyId,
       'upper',
@@ -6916,13 +6930,18 @@ describe('mergeVisibleRasterLayers', () => {
     setPanelSelectedIds(['upper', 'below']);
 
     setRejectMutations(true);
-    expect(() => engine.layers.duplicateLayers(['upper', 'below'])).toThrow('Canvas document mutation was rejected');
+    await expect(engine.layers.duplicateLayers(['upper', 'below'])).rejects.toThrow(
+      'Canvas document mutation was rejected'
+    );
     expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
     expect(selectionChanges).toHaveLength(0);
     expect(engine.stores.canUndo.get()).toBe(false);
 
     setRejectMutations(false);
-    const result = engine.layers.duplicateLayers(['upper', 'below'])!;
+    const result = await engine.layers.duplicateLayers(['upper', 'below']);
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
     expect(getPanelSelectedIds()).toEqual(result.duplicateIds);
     expect(selectionChanges).toHaveLength(1);
 
@@ -6942,6 +6961,107 @@ describe('mergeVisibleRasterLayers', () => {
     expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
     expect(selectionChanges).toHaveLength(2);
     expect(engine.stores.canRedo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('installs duplicate pixels before the new selected layer can be edited', async () => {
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const { bitmapStore, engine, raf } = setup(twoPaintDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    const result = await engine.layers.duplicateLayers(['upper']);
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    bitmapStore.markLayerDirty.mockClear();
+
+    engine.selection.selectAll();
+    engine.selection.fillSelection();
+
+    expect(bitmapStore.markLayerDirty).toHaveBeenCalledWith(result.duplicateIds[0]);
+    expect(bitmapStore.markLayerDirty).not.toHaveBeenCalledWith('upper');
+
+    engine.history.undo();
+    const restored = await engine.exports.exportLayerPixels(result.duplicateIds[0]!);
+    expect(restored.status).toBe('ok');
+    engine.history.undo();
+    engine.history.redo();
+    const redone = await engine.exports.exportLayerPixels(result.duplicateIds[0]!);
+    expect(redone.status).toBe('ok');
+    if (restored.status === 'ok' && redone.status === 'ok') {
+      expect(redone.surface).not.toBe(restored.surface);
+      expect(redone.rect).toEqual({ height: 40, width: 40, x: 0, y: 0 });
+    }
+    engine.lifecycle.dispose();
+  });
+
+  it('duplicates pending empty paint as empty instead of resurrecting its stale durable bitmap', async () => {
+    const { engine } = setup(twoPaintDoc(), new Set(['upper']));
+
+    const result = await engine.layers.duplicateLayers(['upper']);
+
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    const duplicate = engine.document.getDocument()!.layers.find((layer) => layer.id === result.duplicateIds[0]);
+    expect(duplicate).toMatchObject({ source: { bitmap: null, type: 'paint' }, type: 'raster' });
+    engine.lifecycle.dispose();
+  });
+
+  it('duplicates a pending empty mask without its stale durable bitmap', async () => {
+    const mask = maskLayer('pending-mask');
+    mask.mask = {
+      ...mask.mask,
+      bitmap: { height: 20, imageName: 'stale-mask', width: 20 },
+      offset: { x: 4, y: 5 },
+    };
+    const doc = { ...twoPaintDoc(), layers: [mask], selectedLayerId: mask.id };
+    const { engine } = setup(doc, new Set([mask.id]));
+
+    const result = await engine.layers.duplicateLayers([mask.id]);
+
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    const duplicate = engine.document.getDocument()!.layers.find((layer) => layer.id === result.duplicateIds[0]);
+    expect(duplicate).toMatchObject({
+      mask: { bitmap: null, fill: mask.mask.fill, offset: { x: 0, y: 0 } },
+      type: 'inpaint_mask',
+    });
+    engine.lifecycle.dispose();
+  });
+
+  it('duplicates a disabled persisted layer without waiting for a cache it cannot receive', async () => {
+    const doc = twoPaintDoc();
+    doc.layers = doc.layers.map((layer) => (layer.id === 'upper' ? { ...layer, isEnabled: false } : layer));
+    const { engine, surfaces } = setup(doc);
+
+    const result = await engine.layers.duplicateLayers(['upper']);
+
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    expect(surfaces).toHaveLength(0);
+    const original = doc.layers.find((layer) => layer.id === 'upper');
+    if (original?.type !== 'raster') {
+      throw new Error('expected a raster source');
+    }
+    const duplicate = engine.document.getDocument()!.layers.find((layer) => layer.id === result.duplicateIds[0]);
+    expect(duplicate).toMatchObject({ isEnabled: false, source: original.source, type: 'raster' });
     engine.lifecycle.dispose();
   });
 
@@ -7049,9 +7169,132 @@ describe('mergeVisibleRasterLayers', () => {
     engine.lifecycle.dispose();
   });
 
-  it('declines oversized duplicate and merge batches before unbounded transaction copies', async () => {
+  it('duplicates clean persisted layers with one immediately paintable cache copy each', async () => {
     const size = 4096;
     const layers = ['top', 'middle', 'bottom'].map((id): CanvasLayerContract => ({
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      name: id,
+      opacity: 1,
+      source: { bitmap: { height: size, imageName: `${id}-bmp`, width: size }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    }));
+    const doc: CanvasDocumentContractV2 = {
+      ...twoPaintDoc(),
+      height: size,
+      layers,
+      selectedLayerId: 'top',
+      width: size,
+    };
+    const { engine, raf, surfaces } = setup(doc);
+
+    const result = await engine.layers.duplicateLayers(layers.map((layer) => layer.id));
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    // Each first-use source allocates one cache and one rasterization scratch;
+    // the transaction then allocates exactly one immediately-live copy.
+    expect(surfaces).toHaveLength(layers.length * 3);
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(
+      layers.flatMap((layer, index) => [result.duplicateIds[index], layer.id])
+    );
+    const afterDuplicate = surfaces.length;
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    // A reference-only copy would allocate both a visible cache and a
+    // rasterization scratch surface here, after the transaction reservation was
+    // gone. Prepared caches make this frame allocation-free.
+    // The frame may lazily create its single checkerboard tile, but it must not
+    // rebuild any of the already-prepared duplicate layer caches.
+    expect(surfaces).toHaveLength(afterDuplicate + 1);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('reports a concurrent duplicate as busy while first-use source preparation is in flight', async () => {
+    const { engine } = setup(twoPaintDoc());
+
+    const first = engine.layers.duplicateLayers(['upper']);
+    expect(await engine.layers.duplicateLayers(['upper'])).toEqual({ status: 'busy' });
+    expect((await first).status).toBe('duplicated');
+
+    engine.lifecycle.dispose();
+  });
+
+  it('redoes a clean duplicate after cooldown evicts the original cache', async () => {
+    const size = 4096;
+    const layers = ['top', 'upper-middle', 'lower-middle', 'bottom'].map((id): CanvasLayerContract => ({
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      name: id,
+      opacity: 1,
+      source: { bitmap: { height: size, imageName: `${id}-bmp`, width: size }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 10_000, y: 10_000 },
+      type: 'raster',
+    }));
+    const doc: CanvasDocumentContractV2 = {
+      ...twoPaintDoc(),
+      height: size,
+      layers,
+      selectedLayerId: 'top',
+      width: size,
+    };
+    const { engine, surfaces } = setup(doc);
+    const result = await engine.layers.duplicateLayers(layers.map((layer) => layer.id));
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    const duplicateId = result.duplicateIds[0]!;
+
+    engine.history.undo();
+    expect(await engine.lifecycle.beginCooldown()).toBe('cooled');
+    engine.lifecycle.activate();
+    const beforeRedo = surfaces.length;
+    engine.history.redo();
+    await flushMicrotasks();
+
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(
+      layers.flatMap((layer, index) => [result.duplicateIds[index], layer.id])
+    );
+    // Redo warms each offscreen reference sequentially: one cache plus one
+    // scratch surface per duplicate, never four simultaneous 128 MiB reserves.
+    expect(surfaces).toHaveLength(beforeRedo + layers.length * 2);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(duplicateId);
+    engine.lifecycle.dispose();
+  });
+
+  it('retains an immutable snapshot only for live pixels that are not durable yet', async () => {
+    const { engine, raf, surfaces } = setup(twoPaintDoc(), new Set(), new Set(['upper']));
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const beforeDuplicate = surfaces.length;
+
+    const result = await engine.layers.duplicateLayers(['upper']);
+
+    expect(result.status).toBe('duplicated');
+    if (result.status !== 'duplicated') {
+      throw new Error(`unexpected duplicate result: ${result.status}`);
+    }
+    expect(surfaces).toHaveLength(beforeDuplicate + 2);
+    engine.history.undo();
+    const beforeRedo = surfaces.length;
+    engine.history.redo();
+    expect(surfaces).toHaveLength(beforeRedo + 1);
+    expect(engine.exports.hasExportableLayerContent(result.duplicateIds[0]!)).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('declines oversized duplicate and merge batches before unbounded transaction copies', async () => {
+    const size = 4096;
+    const layers = ['top', 'upper-middle', 'middle', 'lower-middle', 'bottom'].map((id): CanvasLayerContract => ({
       blendMode: 'normal',
       id,
       isEnabled: true,
@@ -7075,7 +7318,7 @@ describe('mergeVisibleRasterLayers', () => {
     raf.flush();
     const afterRasterization = surfaces.length;
 
-    expect(engine.layers.duplicateLayers(layers.map((layer) => layer.id))).toBeNull();
+    expect(await engine.layers.duplicateLayers(layers.map((layer) => layer.id))).toEqual({ status: 'over-budget' });
     expect(surfaces).toHaveLength(afterRasterization);
     expect(await engine.layers.mergeSelectedRasterLayers(layers.map((layer) => layer.id))).toBe('over-budget');
     expect(engine.document.getDocument()!.layers).toEqual(layers);

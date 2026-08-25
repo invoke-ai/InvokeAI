@@ -176,6 +176,18 @@ afterEach(() => {
 });
 
 describe('createBitmapStore', () => {
+  it('reports whether a layer still has pixels that are not represented by its persisted ref', async () => {
+    const h = createHarness();
+
+    expect(h.store.hasPendingWork(LAYER)).toBe(false);
+    h.store.markLayerDirty(LAYER);
+    expect(h.store.hasPendingWork(LAYER)).toBe(true);
+
+    await h.store.flushPendingUploads();
+    expect(h.store.hasPendingWork(LAYER)).toBe(false);
+    h.store.dispose();
+  });
+
   it('debounces a burst of strokes into a single flush', async () => {
     const h = createHarness();
 
@@ -1615,6 +1627,7 @@ describe('truthful extent: trimming and clearing', () => {
     h.store.markLayerDirty(LAYER);
     await vi.advanceTimersByTimeAsync(1500);
     await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    expect(h.store.hasPendingClear(LAYER)).toBe(true);
     h.store.dispose();
   });
 
