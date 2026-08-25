@@ -44,6 +44,6 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     return false;
   }
 
-  submitResolvedInvocation({ commands, models, owner, prepareCanvasInvocation: prepareCanvas, project, route });
+  void submitResolvedInvocation({ commands, models, owner, prepareCanvasInvocation: prepareCanvas, project, route });
   return true;
 };

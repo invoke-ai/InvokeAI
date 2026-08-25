@@ -26,7 +26,8 @@
  *    notice — the app never gets stuck.
  *
  * A module-scoped in-flight guard drops an invoke while a prior prepare for the
- * same project is still running (the Invoke hotkey can be mashed).
+ * same project is still running. The active Ctrl+Enter/topbar path also holds a
+ * shallower user-facing guard from the instant the command begins.
  */
 
 import type { GenerateModelConfig } from '@features/generation/contracts';
@@ -463,7 +464,9 @@ export interface PrepareCanvasInvocationArgs {
 
 /**
  * Resolves the active project's engine and runs the canvas-invoke orchestrator.
- * Fire-and-track: the caller does not await it (the Invoke command stays sync).
+ * The returned promise settles after the graph is dispatched or a failure is
+ * reported, allowing the active command to keep its preparing acknowledgement
+ * live for the complete pre-queue window. Other callers may still fire-and-track.
  */
 export const prepareCanvasInvocation = async (args: PrepareCanvasInvocationArgs): Promise<void> => {
   const owner = args.owner ?? captureAccountScope();

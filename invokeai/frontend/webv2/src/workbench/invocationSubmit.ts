@@ -47,10 +47,11 @@ export interface SubmitResolvedInvocationDeps {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
   /**
    * The async canvas-invoke entry point, injected for testability. The real
-   * implementation is fire-and-track (its returned promise is intentionally not
-   * awaited); a canvas source never dispatches `submitResolvedInvocationSnapshot`.
+   * implementation resolves after preparation has either queued the graph or
+   * reported a failure; a canvas source never dispatches
+   * `submitResolvedInvocationSnapshot`.
    */
-  prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => unknown;
+  prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
   /** Localizes a control-layer rejection notice; defaults to the English validation sentence. */
   formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
 }
@@ -104,7 +105,7 @@ const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<Parse
   }
 };
 
-export const submitResolvedInvocation = ({
+export const submitResolvedInvocation = async ({
   commands,
   formatControlLayerError,
   models,
@@ -112,7 +113,7 @@ export const submitResolvedInvocation = ({
   prepareCanvasInvocation,
   project,
   route,
-}: SubmitResolvedInvocationDeps): void => {
+}: SubmitResolvedInvocationDeps): Promise<void> => {
   if (!isAccountScopeCurrent(owner)) {
     return;
   }
@@ -122,39 +123,38 @@ export const submitResolvedInvocation = ({
   // Only a prompt with dynamic syntax pays for a round trip; every other Invoke
   // stays on the synchronous path it has always taken.
   if (expandableSettings) {
-    void resolveExpandedPrompts(expandableSettings).then((expansion) => {
-      if (!isAccountScopeCurrent(owner)) {
-        return;
-      }
+    const expansion = await resolveExpandedPrompts(expandableSettings);
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
 
-      // Submitting the authored text would put the literal `{a|b}` or `__name__`
-      // in front of the model, so a prompt that could not be expanded does not
-      // generate at all. The Invoke button gates on the same state; this covers
-      // the hotkey and graph-preview paths, which never see it.
-      if (expansion === null || expansion.error) {
-        commands.notifications.add({
-          kind: 'error',
-          message: expansion?.error ?? undefined,
-          title: EXPANSION_FAILED_TITLE,
-        });
-        return;
-      }
+    // Submitting the authored text would put the literal `{a|b}` or `__name__`
+    // in front of the model, so a prompt that could not be expanded does not
+    // generate at all. The Invoke button gates on the same state; this covers
+    // the hotkey and graph-preview paths, which never see it.
+    if (expansion === null || expansion.error) {
+      commands.notifications.add({
+        kind: 'error',
+        message: expansion?.error ?? undefined,
+        title: EXPANSION_FAILED_TITLE,
+      });
+      return;
+    }
 
-      dispatchResolvedInvocation(
-        { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
-        expansion.prompts.length > 0 ? expansion.prompts : undefined
-      );
-    });
+    await dispatchResolvedInvocation(
+      { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
+      expansion.prompts.length > 0 ? expansion.prompts : undefined
+    );
     return;
   }
 
-  dispatchResolvedInvocation(
+  await dispatchResolvedInvocation(
     { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
     undefined
   );
 };
 
-const dispatchResolvedInvocation = (
+const dispatchResolvedInvocation = async (
   {
     commands,
     formatControlLayerError,
@@ -165,14 +165,15 @@ const dispatchResolvedInvocation = (
     route,
   }: SubmitResolvedInvocationDeps,
   positivePrompts: string[] | undefined
-): void => {
+): Promise<void> => {
   if (route.sourceId === 'canvas') {
     // The canvas graph is composited + compiled asynchronously outside the
-    // reducer; fire-and-track (the orchestrator records any failure notice and
-    // guards against concurrent invokes internally). The resolved destination is
-    // threaded through so a Canvas source can still land its output in the
-    // Gallery (durable, non-intermediate) instead of canvas staging.
-    prepareCanvasInvocation({
+    // reducer. Awaiting it lets the active submission coordinator hold its
+    // immediate acknowledgement/duplicate guard through the whole preparation.
+    // The orchestrator records any failure notice and keeps its own guard for
+    // direct/preview callers. The resolved destination is threaded through so a
+    // Canvas source can still land its output in the Gallery.
+    await prepareCanvasInvocation({
       compositing: readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')),
       destination: route.destination,
       commands,

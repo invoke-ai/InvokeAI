@@ -13,6 +13,8 @@ import type { SubmitResolvedInvocationDeps } from './invocationSubmit';
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands, WorkbenchQueries } from './workbenchStore';
 
+import { beginCanvasInvocationPreparation, endCanvasInvocationPreparation } from './canvasInvocationPreparation';
+import { createDeferredResource } from './deferredResource';
 import { isInvocationRouteValid, resolveInvocationRoute } from './invocation';
 import { submitResolvedInvocation } from './invocationSubmit';
 
@@ -32,15 +34,29 @@ export interface ActiveInvocationSubmissionRuntime {
   loadPrepareCanvasInvocation: () => Promise<{
     prepareCanvasInvocation: SubmitResolvedInvocationDeps['prepareCanvasInvocation'];
   }>;
-  submit: (args: SubmitResolvedInvocationDeps) => void;
+  submit: (args: SubmitResolvedInvocationDeps) => Promise<void> | void;
 }
+
+type CanvasInvocationModule = {
+  prepareCanvasInvocation: SubmitResolvedInvocationDeps['prepareCanvasInvocation'];
+};
+
+const canvasInvocationModule = createDeferredResource<CanvasInvocationModule>(
+  () => import('./widgets/canvas/invoke/prepareCanvasInvocation')
+);
+
+const loadCanvasInvocationModule = (): Promise<CanvasInvocationModule> =>
+  canvasInvocationModule.getStatus() === 'failed' ? canvasInvocationModule.retry() : canvasInvocationModule.load();
+
+/** Warms the canvas-only invocation chunk without adding it to the eager workbench bundle. */
+export const preloadCanvasInvocation = (): void => canvasInvocationModule.preload();
 
 const runtime: ActiveInvocationSubmissionRuntime = {
   assertCurrent: assertAccountScopeCurrent,
   capture: captureAccountScope,
   flushDrafts: flushGenerateDrafts,
   isCurrent: isAccountScopeCurrent,
-  loadPrepareCanvasInvocation: () => import('./widgets/canvas/invoke/prepareCanvasInvocation'),
+  loadPrepareCanvasInvocation: loadCanvasInvocationModule,
   submit: submitResolvedInvocation,
 };
 
@@ -50,23 +66,32 @@ export const submitActiveInvocation = async (
 ): Promise<void> => {
   const owner = activeRuntime.capture();
   activeRuntime.flushDrafts();
+  const snapshot = queries.getSnapshot();
+  const invocation = destinationOverride
+    ? { ...snapshot.activeProject.invocation, destination: destinationOverride }
+    : snapshot.activeProject.invocation;
+  const models = getModels();
+  const route = resolveInvocationRoute(snapshot.activeProject, 'global', invocation, models);
+
+  if (!isInvocationRouteValid(route) || snapshot.backendConnection.status !== 'connected') {
+    return;
+  }
+
+  const projectId = snapshot.activeProject.id;
+  const isCanvasSubmission = route.sourceId === 'canvas';
+  const preparationLease = isCanvasSubmission ? beginCanvasInvocationPreparation(projectId) : null;
+
+  if (isCanvasSubmission && !preparationLease) {
+    return;
+  }
 
   try {
-    const { prepareCanvasInvocation } = await activeRuntime.loadPrepareCanvasInvocation();
+    const prepareCanvasInvocation = isCanvasSubmission
+      ? (await activeRuntime.loadPrepareCanvasInvocation()).prepareCanvasInvocation
+      : () => Promise.resolve();
 
     activeRuntime.assertCurrent(owner);
-    const snapshot = queries.getSnapshot();
-    const invocation = destinationOverride
-      ? { ...snapshot.activeProject.invocation, destination: destinationOverride }
-      : snapshot.activeProject.invocation;
-    const models = getModels();
-    const route = resolveInvocationRoute(snapshot.activeProject, 'global', invocation, models);
-
-    if (!isInvocationRouteValid(route) || snapshot.backendConnection.status !== 'connected') {
-      return;
-    }
-
-    activeRuntime.submit({
+    await activeRuntime.submit({
       commands,
       formatControlLayerError,
       models,
@@ -81,5 +106,9 @@ export const submitActiveInvocation = async (
     }
 
     throw error;
+  } finally {
+    if (preparationLease) {
+      endCanvasInvocationPreparation(preparationLease);
+    }
   }
 };

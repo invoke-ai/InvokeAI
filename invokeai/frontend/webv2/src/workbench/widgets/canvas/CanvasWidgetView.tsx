@@ -4,6 +4,8 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
@@ -77,6 +79,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const operation = useCanvasOperation(engine);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
+
+  // Canvas invocation stays code-split from the rest of the workbench, but the
+  // canvas being mounted is a strong intent signal. Warm it while the user edits
+  // instead of making the first Ctrl+Enter pay the chunk download/evaluation.
+  useMountEffect(preloadCanvasInvocation);
 
   // Right-click on the canvas surface: hit-test the layer under the cursor and
   // open either the shared per-layer menu or the global empty-space menu at the

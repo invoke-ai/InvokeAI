@@ -389,6 +389,39 @@ describe('submitResolvedInvocation', () => {
     });
   });
 
+  it('settles only after canvas preparation finishes so the active invoke guard stays held', async () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
+    );
+    const commands = createWorkbenchStore().commands;
+    let releasePreparation = (): void => undefined;
+    const preparation = new Promise<void>((resolve) => {
+      releasePreparation = resolve;
+    });
+    const prepareCanvasInvocation = vi.fn(() => preparation);
+    const route = routeFor(project, { ...project.invocation, destination: 'canvas', sourceId: 'canvas' });
+    let settled = false;
+
+    const submission = submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    }).then(() => {
+      settled = true;
+    });
+
+    expect(prepareCanvasInvocation).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    releasePreparation();
+    await submission;
+    expect(settled).toBe(true);
+  });
+
   it('dispatches submitResolvedInvocationSnapshot for a non-canvas source and never prepares the canvas', () => {
     const project = getActiveProject(
       createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })

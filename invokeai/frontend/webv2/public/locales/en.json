@@ -323,6 +323,7 @@
       "expandingPrompts": "Expanding prompts…",
       "invoke": "Invoke",
       "noNodes": "No nodes in graph",
+      "preparing": "Preparing canvas generation…",
       "unavailable": "Invoke unavailable: {{reason}}",
       "unrunnable": "route is not runnable",
       "unableToQueue": "Unable to queue"
