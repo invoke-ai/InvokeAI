@@ -332,14 +332,37 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
     return scale
 
 
+# OCP Microscaling (MXFP8) stores its per-block scale as an E8M0 exponent: byte ``v`` encodes
+# ``2^(v-127)``, and 0xFF is NaN. safetensors has no E8M0 dtype, so producers write it as ``uint8``.
+_E8M0_BIAS = 127
+_E8M0_NAN = 255
+
+
+def _decode_mx_scale(scale: torch.Tensor) -> torch.Tensor:
+    """Decode an E8M0 exponent scale to a linear multiplier.
+
+    Reading the raw bytes as linear values is not a rounding error: a typical MXFP8 Krea-2 layer
+    stores exponents around 115, i.e. a true scale of ``2^-12`` (~2.4e-4), so taking 115.0 at face
+    value inflates the weights by roughly 470,000x. The model still loads and still produces an
+    image — a garbage one. Gate on the dtype rather than on the declared ``format``: the metadata is
+    optional, and no other producer writes an integer weight scale.
+    """
+    decoded = torch.pow(2.0, scale.float() - _E8M0_BIAS)
+    return decoded.masked_fill(scale == _E8M0_NAN, float("nan"))
+
+
 def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:
     """Canonical float32 form of a weight scale, preserving its layout.
+
+    An integer scale is an E8M0 exponent (MXFP8) and is decoded first; see :func:`_decode_mx_scale`.
 
     Per-tensor scales become 0-d and per-output-channel scales 1-D, so downstream code can branch on
     ``numel()``. A scale with more than one dimension is *block-wise* — one entry per block of
     weight elements — and is returned with its shape intact: flattening it destroys the block
     geometry that :func:`expand_weight_scale` needs to line it back up with the weight.
     """
+    if not scale.is_floating_point():
+        scale = _decode_mx_scale(scale)
     scale = scale.float()
     if scale.numel() == 1:
         return scale.reshape(())

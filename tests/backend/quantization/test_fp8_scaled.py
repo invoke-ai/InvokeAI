@@ -8,6 +8,7 @@ import torch
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
     Fp8ScaledLayer,
+    _normalize_weight_scale,
     attach_fp8_scales,
     cast_state_dict,
     count_fp8_weights,
@@ -983,3 +984,73 @@ class TestProbeFailureCaching:
             with mock.patch("torch._scaled_mm", side_effect=AssertionError("must not be probed again")):
                 assert device_supports_fp8_matmul(device) is False
         reset_fp8_matmul_support_cache()
+
+
+class TestMxfp8E8m0Scales:
+    """OCP Microscaling stores its block scale as an E8M0 *exponent* in a `uint8` tensor.
+
+    safetensors has no E8M0 dtype, so producers write `U8`. Reading those bytes as linear values is
+    not a rounding error: a real MXFP8 Krea-2 layer
+    (`krea2TurboOfficialComfy_krea2TurboMxfp8.safetensors`, `blocks.0.attn.wk`) stores exponents
+    112-120, so taking 115.0 at face value instead of `2**-12` inflates the weights by ~470,000x.
+    The model loads and generates - garbage.
+
+    Before block-wise scales were expanded at all, such a file died on a shape mismatch. Expanding
+    them turned a loud failure into a silent one unless the encoding is decoded too, which is why
+    these two belong together.
+    """
+
+    def test_the_exponent_is_decoded_not_taken_at_face_value(self) -> None:
+        # 115 -> 2**(115-127) == 2**-12; 127 -> 1.0
+        scale = torch.tensor([115, 127, 130], dtype=torch.uint8)
+
+        decoded = _normalize_weight_scale(scale)
+
+        assert torch.allclose(decoded, torch.tensor([2.0**-12, 1.0, 8.0]))
+
+    def test_the_reserved_nan_encoding_is_preserved(self) -> None:
+        """0xFF is E8M0's NaN. Decoding it as 2**128 would silently produce inf weights."""
+        decoded = _normalize_weight_scale(torch.tensor([255, 127], dtype=torch.uint8))
+
+        assert torch.isnan(decoded[0])
+        assert decoded[1] == 1.0
+
+    def test_a_float_scale_is_left_alone(self) -> None:
+        """Only integer scales are exponents; a float scale is already a multiplier."""
+        scale = torch.tensor([0.25, 0.5], dtype=torch.float32)
+
+        assert torch.equal(_normalize_weight_scale(scale), scale)
+
+    def test_a_block_wise_e8m0_scale_dequantizes_to_the_right_magnitude(self) -> None:
+        """End-to-end over the shape *and* the encoding, at MXFP8's 32-element block size."""
+        weight = torch.full((4, 64), 2.0).to(FP8_DTYPE)
+        # one exponent per 32 elements -> (4, 2); 2**(125-127) = 0.25
+        scale = torch.full((4, 2), 125, dtype=torch.uint8)
+        sd = {"lin.weight": weight, "lin.weight_scale": scale}
+
+        layers = extract_fp8_scaled_layers(sd)
+        assert tuple(layers["lin"].weight_scale.shape) == (4, 2)
+
+        dequantize_fp8_scaled(sd, layers, torch.bfloat16)
+
+        assert sd["lin.weight"].shape == (4, 64)
+        assert torch.allclose(sd["lin.weight"].float(), torch.full((4, 64), 0.5))
+
+    def test_an_mx_layer_is_never_left_quantized(self) -> None:
+        """`_scaled_mm` cannot apply a block scale outside Blackwell, so it must be widened at load
+        rather than failing inside the kernel mid-generation."""
+
+        class _Model(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lin = torch.nn.Linear(64, 4, bias=False)
+
+        sd = {
+            "lin.weight": torch.full((4, 64), 2.0).to(FP8_DTYPE),
+            "lin.weight_scale": torch.full((4, 2), 125, dtype=torch.uint8),
+        }
+
+        kept = split_fp8_scaled_layers(sd, extract_fp8_scaled_layers(sd), torch.bfloat16, model=_Model())
+
+        assert kept == {}
+        assert sd["lin.weight"].dtype is torch.bfloat16
