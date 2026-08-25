@@ -23,6 +23,7 @@ import torch
 from invokeai.backend.model_manager.load.load_default import (
     _FP8_PROBE_FAILURE_REPORTED,
     _FP8_STORAGE_SUPPORTED,
+    _QUANTIZED_MODEL_FORMATS,
     ModelLoader,
     _device_supports_fp8_storage,
 )
@@ -32,7 +33,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
 def _make_loader(device: str = "cuda") -> ModelLoader:
@@ -57,7 +58,7 @@ def _make_config(model_type: ModelType, fp8: bool, base: BaseModelType = BaseMod
     )
 
 
-def _make_quantized_config(fmt: str = "gguf_quantized"):
+def _make_quantized_config(fmt: ModelFormat = ModelFormat.GGUFQuantized):
     """A config carrying a quantized `format`, which `_make_config` deliberately omits."""
     config = _make_config(ModelType.Main, fp8=True)
     config.format = fmt
@@ -411,19 +412,39 @@ def test_anima_transformer_declares_t_embedder_skip():
     assert model.blocks.weight.dtype == torch.float16
 
 
-@pytest.mark.parametrize("fmt", ["gguf_quantized", "bnb_quantized_nf4b", "bnb_quantized_int8b"])
-def test_should_use_fp8_excludes_quantized_formats(fmt: str):
+@pytest.mark.parametrize(
+    "fmt",
+    [
+        ModelFormat.GGUFQuantized,
+        ModelFormat.BnbQuantizednf4b,
+        ModelFormat.BnbQuantizedLlmInt8b,
+        ModelFormat.SDNQQuantized,
+    ],
+)
+def test_should_use_fp8_excludes_quantized_formats(fmt: ModelFormat):
     """Already-quantized weights must never be re-encoded as FP8.
 
-    Every quantized-format loader reaches `_apply_fp8_layerwise_casting`, and casting there is not
-    a no-op: GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly` at load time, and
-    bnb NF4 corrupts silently (`bnb.nn.LinearNF4` subclasses `nn.Linear`, so its packed uint8
-    payload is cast to float8 and inference then returns finite garbage).
+    Casting them is not a no-op: GGUF raises `Operation changed the dtype of GGMLTensor
+    unexpectedly`, and bnb NF4 corrupts silently (`bnb.nn.LinearNF4` subclasses `nn.Linear`, so its
+    packed uint8 payload is cast to float8 and inference then returns finite garbage).
+
+    Parametrized over `ModelFormat` members rather than raw strings: `_QUANTIZED_MODEL_FORMATS`
+    holds strings, so testing it with strings would pass even if the enum values drifted.
     """
     loader = _make_loader(device="cuda")
     config = _make_config(ModelType.Main, fp8=True)
     config.format = fmt
     assert loader._should_use_fp8(config) is False
+
+
+def test_quantized_format_set_matches_the_taxonomy():
+    """Every entry in `_QUANTIZED_MODEL_FORMATS` must still name a real `ModelFormat` value.
+
+    The set is declared as raw strings to keep `load_default` free of a taxonomy import at module
+    scope, so nothing else stops a rename in `ModelFormat` from silently disabling the check —
+    `config.format` would simply never match again, and FP8 would be re-enabled for that format.
+    """
+    assert _QUANTIZED_MODEL_FORMATS <= {fmt.value for fmt in ModelFormat}
 
 
 def test_apply_fp8_skips_quantized_params_regardless_of_format():
