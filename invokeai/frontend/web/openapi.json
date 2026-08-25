@@ -4941,6 +4941,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "minimum": 0,
               "description": "The page offset",
               "default": 0,
               "title": "Offset"
@@ -4953,6 +4954,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 1000,
+              "minimum": 0,
               "description": "The number of images per page",
               "default": 10,
               "title": "Limit"
@@ -12642,10 +12645,18 @@
             "type": "array",
             "title": "Added Images",
             "description": "The image names that were added to the board"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of authorized images that could not be added"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "added_images"],
+        "required": ["affected_boards", "added_images", "failed_images"],
         "title": "AddImagesToBoardResult"
       },
       "AddInvocation": {
@@ -16149,9 +16160,11 @@
           },
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The names of the images to add"
           }
@@ -16244,9 +16257,11 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The list of names of images to delete"
           }
@@ -16273,9 +16288,11 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 255
                 },
-                "type": "array"
+                "type": "array",
+                "maxItems": 1000
               },
               {
                 "type": "null"
@@ -16321,9 +16338,11 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "Object containing list of image names to fetch DTOs for"
           }
@@ -16431,9 +16450,11 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The names of the images to remove"
           }
@@ -16471,9 +16492,11 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The list of names of images to star"
           }
@@ -16486,9 +16509,11 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
+            "maxItems": 1000,
             "title": "Image Names",
             "description": "The list of names of images to unstar"
           }
@@ -24213,7 +24238,7 @@
           }
         },
         "type": "object",
-        "required": ["affected_boards", "deleted_images"],
+        "required": ["affected_boards", "deleted_images", "failed_images"],
         "title": "DeleteImagesResult"
       },
       "DeleteOrphanedModelsRequest": {
@@ -77444,10 +77469,18 @@
             "type": "array",
             "title": "Removed Images",
             "description": "The image names that were removed from their board"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of authorized images that could not be removed"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "removed_images"],
+        "required": ["affected_boards", "removed_images", "failed_images"],
         "title": "RemoveImagesFromBoardResult"
       },
       "RemoveVideosFromBoardResult": {
@@ -82180,10 +82213,18 @@
             "type": "array",
             "title": "Starred Images",
             "description": "The names of the images that were starred"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of images that were not starred"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "starred_images"],
+        "required": ["affected_boards", "starred_images", "failed_images"],
         "title": "StarredImagesResult"
       },
       "StarredVideosResult": {
@@ -86935,10 +86976,18 @@
             "type": "array",
             "title": "Unstarred Images",
             "description": "The names of the images that were unstarred"
+          },
+          "failed_images": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Failed Images",
+            "description": "The names of images that were not unstarred"
           }
         },
         "type": "object",
-        "required": ["affected_boards", "unstarred_images"],
+        "required": ["affected_boards", "unstarred_images", "failed_images"],
         "title": "UnstarredImagesResult"
       },
       "UnstarredVideosResult": {
