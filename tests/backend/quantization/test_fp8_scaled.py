@@ -1,3 +1,4 @@
+import contextlib
 import logging
 from unittest import mock
 
@@ -930,17 +931,41 @@ class TestNonFloatTensorsAreNotCast:
         assert predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=False) == 4 * 8
 
 
+@contextlib.contextmanager
+def _probe_on_cpu():
+    """Let `_probe_fp8_matmul` run its allocations on CPU so the caching policy can be tested.
+
+    The probe allocates real tensors on the device *before* it reaches `torch._scaled_mm`. On a
+    CPU-only runner that allocation raises first, the mocked matmul never runs, and the test
+    measures the wrong thing — it passed on a CUDA box and failed on CI for exactly this reason.
+    float8 tensors are allocatable on CPU, so dropping the device argument is enough.
+    """
+    real_zeros, real_ones = torch.zeros, torch.ones
+
+    def on_cpu(real):
+        def alloc(*args, **kwargs):
+            kwargs.pop("device", None)
+            return real(*args, **kwargs)
+
+        return alloc
+
+    with (
+        mock.patch("torch.cuda.is_available", return_value=True),
+        mock.patch("torch.cuda.get_device_capability", return_value=(8, 9)),
+        mock.patch("torch.cuda.current_device", return_value=0),
+        mock.patch("torch.zeros", on_cpu(real_zeros)),
+        mock.patch("torch.ones", on_cpu(real_ones)),
+    ):
+        yield
+
+
 class TestProbeFailureCaching:
     """The probe runs during a model load, i.e. under real VRAM pressure."""
 
     def test_an_allocation_failure_is_not_cached(self) -> None:
         reset_fp8_matmul_support_cache()
         device = torch.device("cuda", 0)
-        with (
-            mock.patch("torch.cuda.is_available", return_value=True),
-            mock.patch("torch.cuda.get_device_capability", return_value=(8, 9)),
-            mock.patch("torch.cuda.current_device", return_value=0),
-        ):
+        with _probe_on_cpu():
             with mock.patch("torch._scaled_mm", side_effect=torch.OutOfMemoryError("transient")):
                 assert device_supports_fp8_matmul(device) is False
             # A momentary OOM must not disable fp8 for the rest of the process.
@@ -951,11 +976,7 @@ class TestProbeFailureCaching:
     def test_a_genuine_unsupported_op_is_cached(self) -> None:
         reset_fp8_matmul_support_cache()
         device = torch.device("cuda", 0)
-        with (
-            mock.patch("torch.cuda.is_available", return_value=True),
-            mock.patch("torch.cuda.get_device_capability", return_value=(8, 9)),
-            mock.patch("torch.cuda.current_device", return_value=0),
-        ):
+        with _probe_on_cpu():
             with mock.patch("torch._scaled_mm", side_effect=RuntimeError("not supported on this device")):
                 assert device_supports_fp8_matmul(device) is False
             # No second probe: the answer cannot change at runtime.
