@@ -144,6 +144,7 @@ interface HarnessOptions {
   projectId?: string;
   dispatch?: ReturnType<typeof vi.fn<(action: WorkbenchAction) => void>>;
   models?: RunCanvasInvocationDeps['models'];
+  outputOnlyMaskedRegions?: boolean;
 }
 
 const makeHarness = (options: HarnessOptions = {}): Harness => {
@@ -252,7 +253,10 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
 
   const deps: RunCanvasInvocationDeps = {
     composeForGeneration: (composeOptions) => composeForGeneration(host, composeOptions),
-    compositing: DEFAULT_CANVAS_COMPOSITING,
+    compositing: {
+      ...DEFAULT_CANVAS_COMPOSITING,
+      outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
+    },
     destination: options.destination ?? 'canvas',
     commands: {
       generation: {
@@ -1044,7 +1048,7 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     expect(submitted[0]?.graph.label).toBe('SD 1.5 inpaint');
     const nodes = submitted[0]!.graph.backendGraph!.nodes;
     expect(nodes.create_gradient_mask?.type).toBe('create_gradient_mask');
-    expect(nodes.canvas_output?.type).toBe('invokeai_img_blend');
+    expect(nodes.canvas_output?.type).toBe('apply_mask_to_image');
     // The gradient mask consumes the uploaded grayscale mask (base upload is composite-1).
     expect((nodes.create_gradient_mask?.mask as { image_name?: string } | undefined)?.image_name).toBeDefined();
     expect(harness.notices()).toHaveLength(0);
@@ -1064,8 +1068,21 @@ describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
     const nodes = submitted[0]!.graph.backendGraph!.nodes;
     expect(nodes.infill?.type).toBe('infill_lama');
     expect(nodes.image_alpha_to_mask?.type).toBe('tomask');
-    expect(nodes.canvas_output?.type).toBe('invokeai_img_blend');
+    expect(nodes.canvas_output?.type).toBe('apply_mask_to_image');
     expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('composites the generated region over the source when masked-only output is disabled', async () => {
+    const doc = docWithLayers([rasterLayer('base'), inpaintMaskLayer('mask')]);
+    const harness = makeHarness({ document: doc, outputOnlyMaskedRegions: false });
+
+    await runCanvasInvocation(harness.deps);
+
+    const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+    expect(nodes.canvas_output).toMatchObject({
+      layer_base: expect.objectContaining({ image_name: expect.any(String) }),
+      type: 'invokeai_img_blend',
+    });
   });
 });
 

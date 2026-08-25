@@ -5,12 +5,14 @@ import type {
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/contracts';
 
+import { reorderSelectionWithinGroupsByKind } from '@workbench/canvasLayerOps';
 import { describe, expect, it } from 'vitest';
 
 import {
   getGroupPosition,
   groupLayers,
   LAYER_GROUP_ORDER,
+  reorderSelectionWithinGroup,
   reorderWithinGroup,
   reorderWithinGroupByKind,
 } from './layerGroups';
@@ -130,6 +132,26 @@ describe('reorderWithinGroup', () => {
   });
 });
 
+describe('reorderSelectionWithinGroup', () => {
+  const layers = [inpaint('i1'), raster('r1'), regional('g1'), raster('r2'), raster('r3'), raster('r4')];
+
+  it('drags selected members of the active group as one ordered block', () => {
+    expect(reorderSelectionWithinGroup(layers, 'r1', 'r4', ['r1', 'r3'])).toEqual(['i1', 'r2', 'g1', 'r4', 'r1', 'r3']);
+  });
+
+  it('moves the selected block toward the front', () => {
+    expect(reorderSelectionWithinGroup(layers, 'r3', 'r1', ['r2', 'r3'])).toEqual(['i1', 'r2', 'g1', 'r3', 'r1', 'r4']);
+  });
+
+  it('falls back to a single-layer drag when the active row is not selected', () => {
+    expect(reorderSelectionWithinGroup(layers, 'r1', 'r3', ['r2', 'r4'])).toEqual(['i1', 'r2', 'g1', 'r3', 'r1', 'r4']);
+  });
+
+  it('does not reorder when the block is dropped on one of its own members', () => {
+    expect(reorderSelectionWithinGroup(layers, 'r1', 'r3', ['r1', 'r3'])).toBeNull();
+  });
+});
+
 describe('reorderWithinGroupByKind', () => {
   const layers = [inpaint('i1'), raster('r1'), regional('g1'), raster('r2'), raster('r3')];
 
@@ -166,5 +188,48 @@ describe('reorderWithinGroupByKind', () => {
 
   it('returns null for an absent id', () => {
     expect(reorderWithinGroupByKind(layers, 'ghost', 'front')).toBeNull();
+  });
+});
+
+describe('reorderSelectionWithinGroupsByKind', () => {
+  const layers = [
+    inpaint('i1'),
+    raster('r1'),
+    regional('g1'),
+    raster('r2'),
+    inpaint('i2'),
+    raster('r3'),
+    regional('g2'),
+    raster('r4'),
+  ];
+
+  it('moves selected layers forward one place independently in each group', () => {
+    expect(reorderSelectionWithinGroupsByKind(layers, ['i2', 'r2', 'r4', 'g2'], 'forward')).toEqual([
+      'i2',
+      'r2',
+      'g2',
+      'r1',
+      'i1',
+      'r4',
+      'g1',
+      'r3',
+    ]);
+  });
+
+  it('moves selected layers to the back of their own groups while preserving their order', () => {
+    expect(reorderSelectionWithinGroupsByKind(layers, ['i1', 'r1', 'r3', 'g1'], 'back')).toEqual([
+      'i2',
+      'r2',
+      'g2',
+      'r4',
+      'i1',
+      'r1',
+      'g1',
+      'r3',
+    ]);
+  });
+
+  it('returns null when every selected layer is already at the requested boundary', () => {
+    expect(reorderSelectionWithinGroupsByKind(layers, ['i1', 'r1', 'g1'], 'front')).toBeNull();
   });
 });

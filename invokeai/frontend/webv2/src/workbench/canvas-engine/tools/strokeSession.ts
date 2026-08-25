@@ -459,7 +459,21 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     strokeCtx.clearRect(refresh.x, refresh.y, refresh.width, refresh.height);
     strokeCtx.fillStyle = color;
 
-    if (pressureOpacity) {
+    const tapPoint = points.length === 1 ? points[0] : undefined;
+    const isSubpixelTap =
+      tapPoint !== undefined && bounds.width > 0 && bounds.width < 1 && bounds.height > 0 && bounds.height < 1;
+
+    if (isSubpixelTap) {
+      // Skia can quantize a filled path smaller than one pixel to zero coverage,
+      // making a valid minimum-size click disappear completely. Represent the
+      // dab as coverage in the containing pixel instead: the alpha is the area
+      // of the requested elliptical outline, so this remains a genuinely
+      // sub-pixel mark rather than silently inflating it to a 1px brush.
+      strokeCtx.globalCompositeOperation = 'source-over';
+      const pressureAlpha = pressureOpacity ? (getPressureBands([tapPoint])[0]?.alpha ?? 1) : 1;
+      strokeCtx.globalAlpha = Math.min(1, ((Math.PI * bounds.width * bounds.height) / 4) * pressureAlpha);
+      strokeCtx.fillRect(Math.floor(tapPoint.x), Math.floor(tapPoint.y), 1, 1);
+    } else if (pressureOpacity) {
       // Each band replaces its own footprint rather than blending into it: punch the band's
       // outline out of whatever is already there, then fill it at the band's alpha. Blending
       // would compound alpha wherever bands overlap — the exact darkening the single

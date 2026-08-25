@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import type { ResizeBboxParams } from './bboxHitTest';
 
 import {
+  BBOX_HANDLES,
   BBOX_HANDLE_HIT_PX,
   bboxEquals,
   bboxHandleAt,
@@ -114,9 +115,25 @@ describe('resizeBbox — free (unconstrained)', () => {
     expect(out).toEqual(rect(0, 0, 112, 100));
   });
 
-  it('bypasses snapping when snap is false (alt held)', () => {
-    const out = resize({ constrain: false, dx: 13, dy: 0, grid: 8, handle: 'e', ratio: 1, snap: false, start });
-    expect(out).toEqual(rect(0, 0, 113, 100));
+  it('uses whole-pixel edge snapping when model-grid snap is false', () => {
+    const out = resize({ constrain: false, dx: 13.4, dy: 13.6, grid: 8, handle: 'se', ratio: 1, snap: false, start });
+    expect(out).toEqual(rect(0, 0, 113, 114));
+  });
+
+  it('keeps the fixed corner anchored while pixel-snapping at negative coordinates', () => {
+    const negativeStart = rect(-20, -10, 96, 96);
+    const out = resize({
+      constrain: false,
+      dx: 0.5,
+      dy: 0.5,
+      grid: 8,
+      handle: 'nw',
+      ratio: 1,
+      snap: false,
+      start: negativeStart,
+    });
+    expect(out).toEqual(rect(-19, -9, 95, 95));
+    expect(bboxHandlePoint(out, 'se')).toEqual(bboxHandlePoint(negativeStart, 'se'));
   });
 
   it('clamps to a minimum of one grid cell when collapsing an edge', () => {
@@ -171,6 +188,49 @@ describe('resizeBbox — symmetric (mirrored across the center)', () => {
     // East edge follows the pointer to 110, west mirrors to -10; center stays at 50.
     expect(out).toEqual(rect(-10, 0, 120, 100));
     expect(out.x + out.width / 2).toBe(50);
+  });
+
+  it('pixel-snaps a half-pixel symmetric resize without shifting the center', () => {
+    const pixelStart = rect(16, 16, 96, 96);
+    const out = resize({
+      constrain: false,
+      dx: 0.5,
+      dy: 0,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: false,
+      start: pixelStart,
+      symmetric: true,
+    });
+    expect(out).toEqual(rect(15, 16, 98, 96));
+    expect(out.x + out.width / 2).toBe(64);
+
+    const shrinking = resize({
+      constrain: false,
+      dx: -0.5,
+      dy: 0,
+      grid: 8,
+      handle: 'e',
+      ratio: 1,
+      snap: false,
+      start: pixelStart,
+      symmetric: true,
+    });
+    expect(shrinking).toEqual(pixelStart);
+
+    const minimum = resize({
+      constrain: false,
+      dx: 1,
+      dy: 0,
+      grid: 0,
+      handle: 'w',
+      ratio: 1,
+      snap: false,
+      start: rect(0, 0, 2, 2),
+      symmetric: true,
+    });
+    expect(minimum).toEqual(rect(0, 0, 2, 2));
   });
 
   it('mirrors a shrink as well as a grow', () => {
@@ -285,14 +345,67 @@ describe('resizeBbox — symmetric (mirrored across the center)', () => {
     expect(out.height).toBe(100);
     expect(out.y).toBe(0);
   });
+
+  it('keeps bypassed resize geometry pixel-aligned across every handle and constraint mode', () => {
+    const pixelStart = rect(-21, 13, 95, 96);
+    const startRight = pixelStart.x + pixelStart.width;
+    const startBottom = pixelStart.y + pixelStart.height;
+    const centerX = pixelStart.x + pixelStart.width / 2;
+    const centerY = pixelStart.y + pixelStart.height / 2;
+
+    for (const handle of BBOX_HANDLES) {
+      for (const constrain of [false, true]) {
+        for (const symmetric of [false, true]) {
+          const out = resize({
+            constrain,
+            dx: 13.4,
+            dy: -7.6,
+            grid: 8,
+            handle,
+            ratio: 1.7,
+            snap: false,
+            start: pixelStart,
+            symmetric,
+          });
+
+          expect([out.x, out.y, out.width, out.height].every(Number.isInteger)).toBe(true);
+          if (symmetric) {
+            expect(out.x + out.width / 2).toBe(centerX);
+            expect(out.y + out.height / 2).toBe(centerY);
+          } else {
+            if (handle.includes('w')) {
+              expect(out.x + out.width).toBe(startRight);
+            }
+            if (handle.includes('e')) {
+              expect(out.x).toBe(pixelStart.x);
+            }
+            if (handle.includes('n')) {
+              expect(out.y + out.height).toBe(startBottom);
+            }
+            if (handle.includes('s')) {
+              expect(out.y).toBe(pixelStart.y);
+            }
+          }
+        }
+      }
+    }
+  });
 });
 
 describe('moveBbox', () => {
   it('translates and snaps the origin to the grid', () => {
     expect(moveBbox(rect(10, 10, 100, 100), 5, 5, 8, true)).toEqual(rect(16, 16, 100, 100));
   });
-  it('bypasses snap when snap is false', () => {
+  it('uses whole-pixel snapping when model-grid snap is false', () => {
     expect(moveBbox(rect(10, 10, 100, 100), 5, 5, 8, false)).toEqual(rect(15, 15, 100, 100));
+    expect(moveBbox(rect(10, 10, 100, 100), 5.4, 5.6, 8, false)).toEqual(rect(15, 16, 100, 100));
+  });
+  it('normalizes a fractional untouched axis to a whole pixel', () => {
+    expect(moveBbox(rect(10.25, 11.75, 100, 100), 5.4, 0, 8, false)).toEqual(rect(16, 12, 100, 100));
+    expect(moveBbox(rect(-10.25, -11.75, 100, 100), -5.4, 0, 8, false)).toEqual(rect(-16, -12, 100, 100));
+  });
+  it('does not snap an unchanged axis from an off-grid origin', () => {
+    expect(moveBbox(rect(10, 11, 100, 100), 5, 0, 8, true)).toEqual(rect(16, 11, 100, 100));
   });
 });
 

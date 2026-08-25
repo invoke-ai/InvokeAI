@@ -76,7 +76,7 @@ const isMaskLayer = (layer: CanvasLayerContract): boolean =>
   layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
 
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
-const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
+const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget | null => {
   const doc = ctx.getDocument();
   if (!doc) {
     return null;
@@ -98,6 +98,24 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
     };
   }
 
+  if (selected?.type === 'raster' && selected.source.type === 'image' && tool === 'eraser') {
+    // Erasing is a destructive pixel edit, so materialize the image into an
+    // undoable paint layer in place. A locked/disabled/unready image refuses the
+    // transaction; never spawn a new layer over the selected image.
+    if (selected.isLocked || !selected.isEnabled || selected.isTransparencyLocked) {
+      return null;
+    }
+    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
+    if (!transaction) {
+      return null;
+    }
+    return {
+      cancel: transaction.cancel,
+      commit: transaction.commitStroke,
+      layerId: transaction.layerId,
+    };
+  }
+
   if (selected && isMaskLayer(selected)) {
     // The selection is a mask: paint the stroke into its alpha stencil cache
     // (brush adds coverage, eraser removes — the shared stroke session handles
@@ -116,7 +134,7 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   }
 
   if (selected?.type === 'control') {
-    const transaction = ctx.beginControlPixelEdit?.(selected.id) ?? null;
+    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
     if (!transaction) {
       return null;
     }
@@ -131,6 +149,7 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   // fresh paint layer (inserted on top and selected by the reducer) and paint
   // into it. This is the single allowed gesture-start dispatch.
   const layerId = ctx.createLayerId();
+  const previousSelectedLayerId = doc.selectedLayerId;
   const layer: CanvasRasterLayerContractV2 = {
     blendMode: 'normal',
     id: layerId,
@@ -151,7 +170,18 @@ const resolveTarget = (ctx: ToolContext): PaintTarget | null => {
   const entry = ctx.layers.getOrCreateRect(layerId, { height: 0, width: 0, x: 0, y: 0 });
   entry.stale = false;
   return {
-    cancel: () => undefined,
+    // The dispatch above happens at pointer-DOWN, before any pixel exists, and sits
+    // outside history (the stroke's composed entry owns the create+paint pair), so it
+    // needs a real rollback like the control branch's. Reached whenever
+    // `strokeSession.commit()` returns null — every point clipped away by the
+    // generation frame or the selection — plus pointercancel and a mid-drag switch.
+    cancel: () => {
+      ctx.layers.delete(layerId);
+      ctx.dispatch({ ids: [layerId], type: 'removeCanvasLayers' });
+      // The reducer's nearest-neighbour fallback would otherwise select whatever sits
+      // at the top, not what the user had selected when the gesture began.
+      ctx.dispatch({ id: previousSelectedLayerId, type: 'setCanvasSelectedLayer' });
+    },
     commit: (event) => ctx.emitStrokeCommitted(event),
     createdLayer: { index: 0, layer },
     layerId,
@@ -211,7 +241,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       if (session || (input.buttons & PRIMARY_BUTTON) === 0) {
         return;
       }
-      const resolvedTarget = resolveTarget(ctx);
+      const resolvedTarget = resolveTarget(ctx, spec.id);
       updateCursorRing(ctx, input);
       if (!resolvedTarget) {
         return;

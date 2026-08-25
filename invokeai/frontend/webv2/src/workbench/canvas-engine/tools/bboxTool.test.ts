@@ -109,17 +109,100 @@ describe('bbox tool: move gesture', () => {
     expect(h.previewOf()).toBeNull();
   });
 
-  it('bypasses snapping while alt is held', () => {
+  it('bypasses model-grid snapping while alt is held but stays on whole pixels', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();
     down(tool, h.ctx, pointer(60, 60, { alt: true }));
-    move(tool, h.ctx, pointer(75, 75, { alt: true }));
-    up(tool, h.ctx, pointer(75, 75, { alt: true }));
-    expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 31, y: 31 }, type: 'setCanvasBbox' });
+    move(tool, h.ctx, pointer(75.4, 75.6, { alt: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 31, y: 32 });
+
+    up(tool, h.ctx, pointer(75.4, 75.6, { alt: true }));
+    expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 31, y: 32 }, type: 'setCanvasBbox' });
+  });
+
+  it('keeps the live frame on whole pixels when grid snapping is disabled', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+    h.ctx.stores.snapToGrid.set(false);
+
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(75.4, 75.6));
+
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 31, y: 32 });
+  });
+
+  it('constrains movement to the dominant axis while shift is held', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(91, 69, { shift: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 48, y: 16 });
+    up(tool, h.ctx, pointer(91, 69, { shift: true }));
+
+    expect(h.commits[0]?.forward).toEqual({ bbox: { height: 96, width: 96, x: 48, y: 16 }, type: 'setCanvasBbox' });
+  });
+
+  it('resamples the shift-constrained axis during a drag', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(69, 91, { shift: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 16, y: 48 });
+    move(tool, h.ctx, pointer(91, 69, { shift: true }));
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 48, y: 16 });
+  });
+
+  it('normalizes a fractional origin on the shift-locked axis', () => {
+    const doc = makeDoc();
+    doc.bbox = { ...bbox, x: 16.25, y: 16.75 };
+    const h = createHarness(doc);
+    const tool = createBboxTool();
+    h.ctx.stores.snapToGrid.set(false);
+
+    down(tool, h.ctx, pointer(60, 60));
+    move(tool, h.ctx, pointer(75.4, 60, { shift: true }));
+
+    expect(h.previewOf()).toEqual({ height: 96, width: 96, x: 32, y: 17 });
   });
 });
 
 describe('bbox tool: resize gesture', () => {
+  it.each([
+    ['grid snapping is disabled', false, false],
+    ['Alt bypasses the model grid', true, true],
+  ])('keeps the live frame on whole pixels when %s', (_label, snapToGrid, alt) => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+    h.ctx.stores.snapToGrid.set(snapToGrid);
+
+    down(tool, h.ctx, pointer(112, 112, { alt }));
+    move(tool, h.ctx, pointer(130.4, 130.6, { alt }));
+
+    expect(h.previewOf()).toEqual({ height: 115, width: 114, x: 16, y: 16 });
+    up(tool, h.ctx, pointer(130.4, 130.6, { alt }));
+    expect(h.commits[0]?.forward).toEqual({
+      bbox: { height: 115, width: 114, x: 16, y: 16 },
+      type: 'setCanvasBbox',
+    });
+  });
+
+  it('pixel-snaps a high-zoom NW resize without moving the fixed SE corner', () => {
+    const h = createHarness(makeDoc());
+    const tool = createBboxTool();
+    h.ctx.stores.snapToGrid.set(false);
+    const moved = pointer(15.5, 15.5);
+    moved.screenPoint = { x: 12, y: 12 };
+
+    down(tool, h.ctx, pointer(16, 16));
+    move(tool, h.ctx, moved);
+
+    const preview = h.previewOf();
+    expect(preview).toEqual({ height: 96, width: 96, x: 16, y: 16 });
+    expect(preview && { x: preview.x + preview.width, y: preview.y + preview.height }).toEqual({ x: 112, y: 112 });
+  });
+
   it('resizes from the SE handle and commits the grid-snapped frame', () => {
     const h = createHarness(makeDoc());
     const tool = createBboxTool();

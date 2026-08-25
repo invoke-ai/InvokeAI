@@ -29,8 +29,10 @@ export type FilterParamSpec =
 
 /** One filter's identity, defaults, and node-arg projection. */
 export interface FilterDefinition {
-  /** The filter id (equals the backend node `type`). */
+  /** The persisted/UI filter id. */
   type: string;
+  /** Backend node type when this definition is a named preset. */
+  nodeType?: string;
   /** Ordered parameter specs (also the default-settings source). */
   params: readonly FilterParamSpec[];
 }
@@ -46,8 +48,9 @@ export const buildFilterDefaults = (definition: FilterDefinition): Record<string
 
 /**
  * The supported filters, in the legacy display order of the required set
- * (`features/controlLayers/store/filters.ts`). Each id equals its backend node
- * `type`; params carry legacy defaults + ranges.
+ * (`features/controlLayers/store/filters.ts`), plus named presets that improve
+ * discoverability. Params carry legacy defaults + ranges; a preset may project
+ * its UI id to a different backend node type.
  */
 export const CONTROL_FILTERS: readonly FilterDefinition[] = [
   {
@@ -102,6 +105,11 @@ export const CONTROL_FILTERS: readonly FilterDefinition[] = [
       { default: false, key: 'scribble', kind: 'boolean' },
     ],
     type: 'pidi_edge_detection',
+  },
+  {
+    nodeType: 'hed_edge_detection',
+    params: [],
+    type: 'scribble_edge_detection',
   },
   {
     params: [{ default: 256, integer: true, key: 'scale_factor', kind: 'number', max: 4096, min: 0, step: 1 }],
@@ -306,7 +314,8 @@ export interface FilterGraphResult {
 export const buildFilterGraph = (
   filterType: string,
   imageName: string,
-  settings?: Record<string, unknown>
+  settings?: Record<string, unknown>,
+  input?: { height: number; preserveTransparency?: boolean; width: number }
 ): FilterGraphResult => {
   const definition = FILTERS_BY_TYPE.get(filterType);
   if (!definition) {
@@ -318,7 +327,7 @@ export const buildFilterGraph = (
     id: FILTER_NODE_ID,
     image: { image_name: imageName },
     is_intermediate: true,
-    type: definition.type,
+    type: definition.nodeType ?? definition.type,
     use_cache: true,
     ...resolved,
   };
@@ -335,7 +344,9 @@ export const buildFilterGraph = (
     });
   };
 
-  if (filterType === 'adjust_image') {
+  if (filterType === 'scribble_edge_detection') {
+    graph.nodes[FILTER_NODE_ID] = { ...node, scribble: true };
+  } else if (filterType === 'adjust_image') {
     const { channel, scale_values: scaleValues, value } = resolved;
     graph.nodes[FILTER_NODE_ID] = scaleValues
       ? {
@@ -412,6 +423,59 @@ export const buildFilterGraph = (
       use_cache: false,
     };
     edge('control_filter_seed', 'value', FILTER_NODE_ID, 'seed');
+  }
+
+  const canRestoreSourceAlpha =
+    input?.preserveTransparency === true &&
+    filterType !== 'adjust_image' &&
+    filterType !== 'img_blur' &&
+    filterType !== 'spandrel_filter';
+  if (canRestoreSourceAlpha) {
+    // Most control preprocessors convert RGBA to RGB. Transparent erased pixels
+    // then become black, producing an opaque black region (and false boundary
+    // edges). Composite over white before processing, then restore the source
+    // alpha so the processed control retains the user's erased holes.
+    delete graph.nodes[FILTER_NODE_ID]!.image;
+    graph.nodes.control_filter_background = {
+      color: { a: 255, b: 255, g: 255, r: 255 },
+      height: input.height,
+      id: 'control_filter_background',
+      is_intermediate: true,
+      mode: 'RGBA',
+      type: 'blank_image',
+      use_cache: true,
+      width: input.width,
+    };
+    graph.nodes.control_filter_flatten = {
+      crop: true,
+      id: 'control_filter_flatten',
+      image: { image_name: imageName },
+      is_intermediate: true,
+      type: 'img_paste',
+      use_cache: true,
+      x: 0,
+      y: 0,
+    };
+    graph.nodes.control_filter_source_alpha = {
+      id: 'control_filter_source_alpha',
+      image: { image_name: imageName },
+      invert: false,
+      is_intermediate: true,
+      type: 'tomask',
+      use_cache: true,
+    };
+    graph.nodes.control_filter_restore_alpha = {
+      id: 'control_filter_restore_alpha',
+      invert_mask: false,
+      is_intermediate: true,
+      type: 'apply_mask_to_image',
+      use_cache: true,
+    };
+    edge('control_filter_background', 'image', 'control_filter_flatten', 'base_image');
+    edge('control_filter_flatten', 'image', FILTER_NODE_ID, 'image');
+    edge(FILTER_NODE_ID, 'image', 'control_filter_restore_alpha', 'image');
+    edge('control_filter_source_alpha', 'image', 'control_filter_restore_alpha', 'mask');
+    return { graph, outputNodeId: 'control_filter_restore_alpha' };
   }
 
   return {

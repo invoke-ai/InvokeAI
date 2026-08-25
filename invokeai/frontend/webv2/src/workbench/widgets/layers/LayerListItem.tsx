@@ -13,6 +13,8 @@ import { EyeIcon, EyeOffIcon, LockIcon, LockOpenIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { LayerSelectionModifiers } from './layerGroups';
+
 import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
 import {
   CanvasLayerContextMenu,
@@ -35,6 +37,7 @@ const ROW_SELECTION_FOCUS = {
   outlineColor: 'accent.solid',
   outlineOffset: '-2px',
 };
+const LAYER_ROW_BACKGROUND_TRANSITION = 'background min(40ms, var(--wb-motion-duration-fast)) ease-out';
 const VISIBILITY_DOT_BASE = {
   borderRadius: 'full',
   borderWidth: '1px',
@@ -82,9 +85,11 @@ interface LayerListItemProps {
   editingLocked: boolean;
   engine: LayerListItemEngine | null;
   index: number;
+  isPrimarySelected: boolean;
   isSelected: boolean;
   layer: CanvasLayerContract;
   layers: readonly CanvasLayerContract[];
+  onSelect: (layerId: string, modifiers: LayerSelectionModifiers) => void;
 }
 
 export const getLayerListItemInteractionState = (editingLocked: boolean) => ({
@@ -100,9 +105,11 @@ export const LayerListItem = ({
   editingLocked,
   engine,
   index,
+  isPrimarySelected,
   isSelected,
   layer,
   layers,
+  onSelect,
 }: LayerListItemProps) => {
   const { t } = useTranslation();
   const interaction = getLayerListItemInteractionState(editingLocked);
@@ -125,11 +132,20 @@ export const LayerListItem = ({
     [isDragging, transform, transition]
   );
 
-  const handleSelect = useCallback(() => {
-    if (interaction.canSelect && !isSelected) {
-      dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+  const handleSelect = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (interaction.canSelect) {
+        onSelect(layer.id, { additive: event.metaKey || event.ctrlKey, range: event.shiftKey });
+      }
+    },
+    [interaction.canSelect, layer.id, onSelect]
+  );
+
+  const selectForContextMenu = useCallback(() => {
+    if (!isSelected) {
+      onSelect(layer.id, { additive: false, range: false });
     }
-  }, [dispatch, interaction.canSelect, isSelected, layer.id]);
+  }, [isSelected, layer.id, onSelect]);
 
   const patchBase = useCallback(
     (label: string, forward: Partial<CanvasLayerContract>, inverse: Partial<CanvasLayerContract>) => {
@@ -211,11 +227,11 @@ export const LayerListItem = ({
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       if (!isSelected) {
-        dispatch({ id: layer.id, type: 'setCanvasSelectedLayer' });
+        selectForContextMenu();
       }
       setContextMenuTarget(createLayerMenuTargetFromContextEvent(layer.id, event));
     },
-    [dispatch, isSelected, layer.id]
+    [isSelected, layer.id, selectForContextMenu]
   );
 
   const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
@@ -250,11 +266,14 @@ export const LayerListItem = ({
       <Row
         {...sortableRowListeners}
         active={isSelected ? 'muted' : undefined}
+        borderStartColor={isPrimarySelected ? 'accent.solid' : 'transparent'}
+        borderStartWidth="2px"
         cursor={isDragging ? 'grabbing' : 'default'}
         display="flex"
         gap="1.5"
         p="1.5"
         position="relative"
+        transition={LAYER_ROW_BACKGROUND_TRANSITION}
         onContextMenu={handleContextMenu}
       >
         {/*
@@ -268,8 +287,10 @@ export const LayerListItem = ({
         <chakra.button
           ref={setActivatorNodeRef}
           {...sortableAttributes}
+          aria-current={isPrimarySelected ? 'true' : undefined}
           aria-label={t('widgets.layers.actions.select', { name: layer.name })}
           aria-pressed={isSelected}
+          data-primary={isPrimarySelected || undefined}
           cursor={isDragging ? 'grabbing' : undefined}
           inset="0"
           position="absolute"
@@ -368,7 +389,13 @@ export const LayerListItem = ({
             >
               {layer.isLocked ? <LockIcon /> : <LockOpenIcon />}
             </IconButton>
-            <Box display="flex" flexShrink="0" onClick={stopPropagation} onPointerDown={stopPropagation}>
+            <Box
+              display="flex"
+              flexShrink="0"
+              onClick={stopPropagation}
+              onContextMenu={stopPropagation}
+              onPointerDown={stopPropagation}
+            >
               <LayerPropertiesPopover dispatch={dispatch} engine={engine} layer={layer} />
             </Box>
             <Box display="flex" flexShrink="0" onPointerDown={stopPropagation}>

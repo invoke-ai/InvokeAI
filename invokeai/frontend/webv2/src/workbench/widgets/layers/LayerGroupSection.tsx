@@ -17,7 +17,7 @@ import { ChevronDownIcon, EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIco
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { LayerGroupKey } from './layerGroups';
+import type { LayerGroupKey, LayerSelectionModifiers } from './layerGroups';
 
 import { groupAddItemId } from './addLayerMenu';
 import { LAYER_KEYBOARD_SENSOR_OPTIONS } from './layerDndConfig';
@@ -29,7 +29,7 @@ import {
   planGroupHiddenToggle,
   planGroupVisibilityToggle,
 } from './layerGroupActions';
-import { reorderWithinGroup } from './layerGroups';
+import { reorderSelectionWithinGroup } from './layerGroups';
 import { LayerListItem, type LayerListItemEngine } from './LayerListItem';
 import { applyStructural } from './layerOps';
 import { getPsdExportNoticeKey } from './psdExportNotice';
@@ -47,7 +47,9 @@ interface LayerGroupSectionProps {
   groupLayers: readonly CanvasLayerContract[];
   isCollapsed: boolean;
   layers: readonly CanvasLayerContract[];
+  onSelectLayer: (layerId: string, modifiers: LayerSelectionModifiers) => void;
   onToggleCollapse: (groupKey: LayerGroupKey) => void;
+  selectedIds: readonly string[];
   selectedLayerId: string | null;
 }
 
@@ -66,7 +68,9 @@ export const LayerGroupSection = ({
   groupLayers,
   isCollapsed,
   layers,
+  onSelectLayer,
   onToggleCollapse,
+  selectedIds,
   selectedLayerId,
 }: LayerGroupSectionProps) => {
   const { t } = useTranslation();
@@ -94,7 +98,7 @@ export const LayerGroupSection = ({
       if (!over) {
         return;
       }
-      const next = reorderWithinGroup(layers, String(active.id), String(over.id));
+      const next = reorderSelectionWithinGroup(layers, String(active.id), String(over.id), selectedIds);
       if (!next) {
         return;
       }
@@ -106,7 +110,7 @@ export const LayerGroupSection = ({
         { orderedIds: layers.map((layer) => layer.id), type: 'reorderCanvasLayers' }
       );
     },
-    [dispatch, editingLocked, engine, layers, t]
+    [dispatch, editingLocked, engine, layers, selectedIds, t]
   );
 
   const handleToggleCollapse = useCallback(() => onToggleCollapse(groupKey), [groupKey, onToggleCollapse]);
@@ -179,9 +183,11 @@ export const LayerGroupSection = ({
                     editingLocked={editingLocked}
                     engine={engine}
                     index={globalIndexById.get(layer.id) ?? 0}
-                    isSelected={layer.id === selectedLayerId}
+                    isPrimarySelected={layer.id === selectedLayerId}
+                    isSelected={selectedIds.includes(layer.id)}
                     layer={layer}
                     layers={layers}
+                    onSelect={onSelectLayer}
                   />
                 ))}
               </Stack>
@@ -263,6 +269,8 @@ const GroupActions = ({
     void engine.layers.mergeVisibleRasterLayers().then((result) => {
       if (result === 'not-ready') {
         toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
+      } else if (result === 'over-budget') {
+        toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
       }
     });
   }, [engine, t]);

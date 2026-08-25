@@ -1,5 +1,6 @@
 import type { CanvasImageRef, CanvasLayerSourceContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { PaintCacheTrim } from '@workbench/canvas-engine/render/paintCacheTrim';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
@@ -79,6 +80,10 @@ const drainUntil = async (predicate: () => boolean, maxTicks = 50): Promise<void
 
 interface HarnessOptions {
   encodeSurface?: (surface: RasterSurface) => Promise<Blob>;
+  getLayerSurface?: (
+    surface: RasterSurface,
+    offset: { x: number; y: number }
+  ) => { surface: RasterSurface; offset: { x: number; y: number } } | null;
   hashBlob?: (blob: Blob) => Promise<string>;
   uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
   maxUploadAttempts?: number;
@@ -88,6 +93,10 @@ interface HarnessOptions {
   /** The layer-local content-rect origin the surface sits at (default 0,0). */
   offset?: { x: number; y: number };
   sleep?: (ms: number) => Promise<void>;
+  /** Absent ⇒ the seam is not wired at all, i.e. no trimming (the default). */
+  trimLayerPixels?: (layerId: string) => PaintCacheTrim;
+  clearBitmap?: (layerId: string) => boolean;
+  getAuthoritativeLayerSource?: (layerId: string) => CanvasLayerSourceContract | null;
   /** Overrides the debounce/backoff timer seam (default: real fake timers via `vi`). */
   timers?: BitmapStoreTimers;
 }
@@ -112,14 +121,21 @@ const createHarness = (options: HarnessOptions = {}) => {
       Promise.resolve({ height: 10, imageName: `img-${uploadSeq++}`, width: 10 })
     );
   const dispatch = vi.fn((_action: CanvasProjectMutation) => true);
+  const clearBitmap = options.clearBitmap ? vi.fn(options.clearBitmap) : undefined;
+  const trimLayerPixels = options.trimLayerPixels ? vi.fn(options.trimLayerPixels) : undefined;
 
   const store = createBitmapStore({
     debounceMs: 1500,
     dispatch,
     encodeSurface,
+    ...(clearBitmap ? { clearBitmap } : {}),
+    ...(trimLayerPixels ? { trimLayerPixels } : {}),
+    ...(options.getAuthoritativeLayerSource
+      ? { getAuthoritativeLayerSource: options.getAuthoritativeLayerSource }
+      : {}),
     failureBackoffMs: options.failureBackoffMs,
     getLayerSource: () => source,
-    getLayerSurface: () => ({ offset, surface }),
+    getLayerSurface: () => (options.getLayerSurface ? options.getLayerSurface(surface, offset) : { offset, surface }),
     // Deterministic content hash: the encoded blob's own text.
     hashBlob: options.hashBlob ?? ((blob) => blob.text()),
     maxConsecutiveFailures: options.maxConsecutiveFailures,
@@ -133,8 +149,10 @@ const createHarness = (options: HarnessOptions = {}) => {
   });
 
   return {
+    clearBitmap,
     dispatch,
     encodeSurface,
+    trimLayerPixels,
     setEncoded: (value: string) => {
       encoded = value;
     },
@@ -1480,5 +1498,342 @@ describe('createBitmapStore', () => {
 
       h.store.dispose();
     });
+  });
+});
+
+describe('truthful extent: trimming and clearing', () => {
+  /** A paint source already pointing at an uploaded bitmap. */
+  const withBitmap: CanvasLayerSourceContract = {
+    bitmap: { contentHash: 'h', height: 10, imageName: 'img-old', width: 10 },
+    offset: { x: 0, y: 0 },
+    type: 'paint',
+  };
+  const noSurface = (): null => null;
+
+  it('clears the ref instead of uploading when the trim finds no visible pixels', async () => {
+    const h = createHarness({ getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    // A transparent PNG must never be encoded or uploaded.
+    expect(h.encodeSurface).not.toHaveBeenCalled();
+    expect(h.uploadImage).not.toHaveBeenCalled();
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    expect(h.dispatch.mock.calls[0][0]).toEqual({
+      id: LAYER,
+      source: { bitmap: null, type: 'paint' },
+      type: 'updateCanvasLayerSource',
+    });
+    h.store.dispose();
+  });
+
+  it('prefers the injected clearBitmap seam over the default dispatch', async () => {
+    const h = createHarness({ clearBitmap: () => true, getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    expect(h.clearBitmap).toHaveBeenCalledWith(LAYER);
+    expect(h.dispatch).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+
+  it('does not dispatch when the document already holds no bitmap', async () => {
+    const h = createHarness({ getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
+    // Default source is `{ bitmap: null }` — the clear would be a no-op.
+
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    expect(h.dispatch).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+
+  it('drops a stale self-echo entry when the document already holds no bitmap', async () => {
+    let erased = false;
+    const h = createHarness({
+      getLayerSurface: (surface, offset) => (erased ? null : { offset, surface }),
+      trimLayerPixels: () => (erased ? 'emptied' : 'kept'),
+    });
+
+    h.store.markLayerDirty(LAYER);
+    await h.store.flushPendingUploads();
+    const applied = (h.dispatch.mock.calls[0][0] as { source: { bitmap: CanvasImageRef } }).source.bitmap;
+    expect(h.store.isSelfEcho(LAYER, { bitmap: applied, type: 'paint' })).toBe(true);
+
+    erased = true;
+    h.setSource({ bitmap: null, type: 'paint' });
+    h.store.markLayerDirty(LAYER);
+    await h.store.flushPendingUploads();
+
+    expect(h.store.isSelfEcho(LAYER, { bitmap: applied, type: 'paint' })).toBe(false);
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    h.store.dispose();
+  });
+
+  it('drops the self-echo entry, so a later undo re-dispatching the old name is not mistaken for an echo', async () => {
+    let erased = false;
+    const h = createHarness({
+      getLayerSurface: (surface, offset) => (erased ? null : { offset, surface }),
+      trimLayerPixels: () => (erased ? 'emptied' : 'kept'),
+    });
+
+    // First flush establishes `lastApplied` for the uploaded image.
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+    const applied = (h.dispatch.mock.calls[0][0] as { source: { bitmap: CanvasImageRef } }).source.bitmap;
+    expect(h.store.isSelfEcho(LAYER, { bitmap: applied, type: 'paint' })).toBe(true);
+
+    // Now the layer is erased and the trim empties it.
+    erased = true;
+    h.setSource({ bitmap: applied, offset: { x: 0, y: 0 }, type: 'paint' });
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    expect(h.store.isSelfEcho(LAYER, { bitmap: applied, type: 'paint' })).toBe(false);
+    h.store.dispose();
+  });
+
+  it('requeues as a failure when the clear is rejected', async () => {
+    const onError = vi.fn();
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: noSurface,
+      onError,
+      trimLayerPixels: () => 'emptied',
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    h.store.dispose();
+  });
+
+  it('retries a rejected clear after the trim has already collapsed the cache', async () => {
+    let cacheEmpty = false;
+    let clearAttempts = 0;
+    const h = createHarness({
+      clearBitmap: () => {
+        clearAttempts += 1;
+        return clearAttempts === 2;
+      },
+      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      trimLayerPixels: () => {
+        if (cacheEmpty) {
+          return 'kept';
+        }
+        cacheEmpty = true;
+        return 'emptied';
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(h.clearBitmap).toHaveBeenCalledTimes(2);
+    expect(h.encodeSurface).not.toHaveBeenCalled();
+    expect(h.uploadImage).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+
+  it('cancels a pending clear when a new stroke restores visible pixels', async () => {
+    let cacheEmpty = false;
+    let trimmedOnce = false;
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      trimLayerPixels: () => {
+        if (!trimmedOnce) {
+          trimmedOnce = true;
+          cacheEmpty = true;
+          return 'emptied';
+        }
+        return 'kept';
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    cacheEmpty = false;
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(h.clearBitmap).toHaveBeenCalledOnce();
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('cancels a pending clear when visible pixels are restored without a new dirty mark', async () => {
+    let cacheEmpty = false;
+    let trimmedOnce = false;
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      trimLayerPixels: () => {
+        if (!trimmedOnce) {
+          trimmedOnce = true;
+          cacheEmpty = true;
+          return 'emptied';
+        }
+        return 'kept';
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    // A cache re-rasterization may restore pixels without going through
+    // markLayerDirty(). The pending clear must respect the fresh trim/surface
+    // verdict instead of deleting those visible pixels from the document.
+    cacheEmpty = false;
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(h.clearBitmap).toHaveBeenCalledOnce();
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('lets a surface restored during trim cancel a pending clear in the same flush', async () => {
+    let cacheEmpty = true;
+    let primedPendingClear = false;
+    let restoreDuringTrim = false;
+    const h = createHarness({
+      clearBitmap: () => false,
+      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      trimLayerPixels: () => {
+        if (!primedPendingClear) {
+          primedPendingClear = true;
+          return 'emptied';
+        }
+        if (restoreDuringTrim) {
+          cacheEmpty = false;
+          return 'emptied';
+        }
+        return 'kept';
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    restoreDuringTrim = true;
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(h.clearBitmap).toHaveBeenCalledOnce();
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('reports a throwing trim as a typed persistence failure and keeps it retryable', async () => {
+    const error = new Error('alpha readback failed');
+    const onError = vi.fn();
+    const h = createHarness({
+      onError,
+      trimLayerPixels: () => {
+        throw error;
+      },
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+
+    expect(h.trimLayerPixels).toHaveBeenCalledTimes(2);
+    // Both attempts advance the shared breaker; only the streak's first failure
+    // is reported (the second is a silent continuation, not a fresh problem).
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenNthCalledWith(1, error, LAYER, { consecutiveFailures: 1, willRetry: true });
+    expect(h.encodeSurface).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+
+  it('treats a throwing clear that nevertheless landed as success', async () => {
+    let cleared = false;
+    const onError = vi.fn();
+    const h = createHarness({
+      clearBitmap: () => {
+        cleared = true;
+        throw new Error('mirror notified synchronously and threw');
+      },
+      getAuthoritativeLayerSource: () => (cleared ? { bitmap: null, type: 'paint' } : withBitmap),
+      onError,
+      trimLayerPixels: () => 'emptied',
+    });
+    h.setSource(withBitmap);
+
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    expect(onError).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+
+  it('waits through a transient trim deferral without reporting persistence failure', async () => {
+    let busy = true;
+    const sleep = vi.fn(() => {
+      busy = false;
+      return Promise.resolve();
+    });
+    const h = createHarness({ sleep, trimLayerPixels: () => (busy ? 'deferred' : 'kept') });
+
+    h.store.markLayerDirty(LAYER);
+    await expect(h.store.flushPendingUploads()).resolves.toBeUndefined();
+
+    expect(sleep).toHaveBeenCalled();
+    expect(h.trimLayerPixels).toHaveBeenCalledTimes(2);
+    expect(h.uploadImage).toHaveBeenCalledTimes(1);
+    expect(h.dispatch).toHaveBeenCalledTimes(1);
+    h.store.dispose();
+  });
+
+  it('persists the POST-trim offset, proving the surface is re-read after trimming', async () => {
+    // The trim moves the cache origin; the flush must carry the new one.
+    const h = createHarness({
+      offset: { x: 10, y: 10 },
+      trimLayerPixels: () => {
+        h.setOffset({ x: 34, y: 41 });
+        return 'trimmed';
+      },
+    });
+
+    h.store.markLayerDirty(LAYER);
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    expect(h.dispatch.mock.calls[0][0]).toMatchObject({
+      source: { offset: { x: 34, y: 41 }, type: 'paint' },
+    });
+    h.store.dispose();
+  });
+
+  it('never trims a layer whose source has converted away from paint', async () => {
+    const h = createHarness({ trimLayerPixels: () => 'emptied' });
+    h.store.markLayerDirty(LAYER);
+    h.setSource({ height: 10, kind: 'rect', fill: '#fff', stroke: null, strokeWidth: 0, type: 'shape', width: 10 });
+
+    await vi.advanceTimersByTimeAsync(1500);
+    await h.store.flushPendingUploads();
+
+    // Trimming a parametric-backed cache would break the compositor's rect invariant.
+    expect(h.trimLayerPixels).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    h.store.dispose();
   });
 });

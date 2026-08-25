@@ -51,7 +51,7 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
  */
 export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
-  const { blockingReasons, invoke, isValid } = state;
+  const { blockingReasons, invoke, isPreparing, isValid } = state;
   const shortcutBinding = useTopbarShortcutBinding('app.invoke');
   const shortcutParts = shortcutBinding?.parts ?? null;
   const tooltipContent = useMemo(
@@ -76,32 +76,37 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   }, []);
   const handleBlur = useCallback(() => setIsFocused(false), []);
   const handleClick = useCallback(() => void invoke(), [invoke]);
+  const canInvoke = isValid && !isPreparing;
 
-  const iconMode = getInvokeIconMode({
-    hasOpenWork,
-    isHovered: isHovered || isFocused,
-    progress: getDeterminateProgressFraction(runningProgress?.percentage),
-  });
+  const iconMode = isPreparing
+    ? ({ mode: 'progress', value: null } as const)
+    : getInvokeIconMode({
+        hasOpenWork,
+        isHovered: isHovered || isFocused,
+        progress: getDeterminateProgressFraction(runningProgress?.percentage),
+      });
 
   return (
     <Tooltip content={tooltipContent} contentProps={TOOLTIP_CONTENT_PROPS} openDelay={200} showArrow>
       <Button
-        aria-disabled={!isValid}
+        aria-disabled={!canInvoke}
         aria-keyshortcuts={shortcutBinding?.aria}
         aria-label={
-          isValid
+          canInvoke
             ? t('topbar.invoke.invoke')
-            : t('topbar.invoke.unavailable', {
-                reason: blockingReasons[0] ?? t('topbar.invoke.unrunnable'),
-              })
+            : isPreparing
+              ? t('topbar.invoke.preparing')
+              : t('topbar.invoke.unavailable', {
+                  reason: blockingReasons[0] ?? t('topbar.invoke.unrunnable'),
+                })
         }
         colorPalette="brand"
-        cursor={isValid ? undefined : 'not-allowed'}
+        cursor={canInvoke ? undefined : 'not-allowed'}
         flexShrink={0}
-        opacity={isValid ? undefined : 0.55}
+        opacity={canInvoke ? undefined : 0.55}
         size="xs"
         onBlur={handleBlur}
-        onClick={isValid ? handleClick : undefined}
+        onClick={canInvoke ? handleClick : undefined}
         onFocus={handleFocus}
         onPointerEnter={handlePointerEnter}
         onPointerLeave={handlePointerLeave}
@@ -132,7 +137,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
 
 const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[] | null; state: InvocationState }) => {
   const { t } = useTranslation();
-  const { batchCount, blockingReasons, invocation, isValid, promptExpansion } = state;
+  const { batchCount, blockingReasons, invocation, isPreparing, isValid, promptExpansion } = state;
   const destination = getDestinationLabel(invocation.destination);
   const promptCount = promptExpansion.count;
   const summary =
@@ -146,7 +151,11 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
     <Stack gap="1.5" minW="14rem" p="2">
       <HStack justify="space-between">
         <Text fontSize="xs" fontWeight="800">
-          {isValid ? t('topbar.invoke.addToQueue') : t('topbar.invoke.unableToQueue')}
+          {isPreparing
+            ? t('topbar.invoke.preparing')
+            : isValid
+              ? t('topbar.invoke.addToQueue')
+              : t('topbar.invoke.unableToQueue')}
         </Text>
         {shortcutParts ? (
           <Kbd size="sm" variant="subtle">
@@ -158,7 +167,11 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
         {summary}
       </Text>
       <Separator borderColor="border.subtle" />
-      {blockingReasons.length > 0 ? (
+      {isPreparing ? (
+        <Text color="fg.muted" fontSize="xs">
+          {t('topbar.invoke.preparing')}
+        </Text>
+      ) : blockingReasons.length > 0 ? (
         <Stack gap="1">
           {blockingReasons.map((reason) => (
             <HStack key={reason} align="start" gap="1.5">

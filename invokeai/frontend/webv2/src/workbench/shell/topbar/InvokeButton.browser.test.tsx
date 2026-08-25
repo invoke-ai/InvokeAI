@@ -7,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import type { InvocationState } from './useInvocationState';
 import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 
 // Isolates the regression this file exists to catch: the icon slot must swap
@@ -44,24 +45,26 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const makeInvocationState = () => ({
+const makeInvocationState = (overrides: Partial<InvocationState> = {}): InvocationState => ({
   batchCount: 1,
   blockingReasons: [],
   invocation,
   invoke: vi.fn(() => Promise.resolve()),
+  isPreparing: false,
   isValid: true,
   placedTypeIds: new Set<never>(),
   promptExpansion: { count: 1, error: null, isDynamic: false, isError: false, isLoading: false, prompts: [] },
   sourceValues: {},
   sources: [],
   visibleTypeIds: new Set<never>(),
+  ...overrides,
 });
 
-const renderInvokeButton = async () => {
+const renderInvokeButton = async (overrides: Partial<InvocationState> = {}) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const state = makeInvocationState();
+  const state = makeInvocationState(overrides);
 
   await act(() =>
     root?.render(
@@ -71,7 +74,7 @@ const renderInvokeButton = async () => {
     )
   );
 
-  return host.querySelector('button') as HTMLButtonElement;
+  return { button: host.querySelector('button') as HTMLButtonElement, state };
 };
 
 const hasProgressRing = (button: HTMLButtonElement): boolean => button.querySelector('[role="progressbar"]') !== null;
@@ -91,13 +94,13 @@ afterEach(async () => {
 
 describe('InvokeButton icon slot', () => {
   it('shows the progress ring while a batch runs and nothing is hovered or keyboard-focused', async () => {
-    const button = await renderInvokeButton();
+    const { button } = await renderInvokeButton();
 
     expect(hasProgressRing(button)).toBe(true);
   });
 
   it('does not treat a mouse-click focus as keyboard focus: the ring returns once the pointer leaves', async () => {
-    const button = await renderInvokeButton();
+    const { button } = await renderInvokeButton();
 
     await act(() => userEvent.click(button));
     // A plain click focuses the button (mousedown does that natively) but must
@@ -112,12 +115,26 @@ describe('InvokeButton icon slot', () => {
   });
 
   it('suppresses the ring for real keyboard focus (:focus-visible) the same as hover', async () => {
-    const button = await renderInvokeButton();
+    const { button } = await renderInvokeButton();
 
     await act(() => userEvent.tab());
 
     expect(document.activeElement).toBe(button);
     expect(button.matches(':focus-visible')).toBe(true);
     expect(hasProgressRing(button)).toBe(false);
+  });
+
+  it('acknowledges canvas preparation immediately and ignores a second click', async () => {
+    harness.summary.total = 0;
+    const invoke = vi.fn(() => Promise.resolve());
+    const { button } = await renderInvokeButton({ invoke, isPreparing: true });
+
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+    expect(button.getAttribute('aria-label')).toBe('topbar.invoke.preparing');
+    expect(hasProgressRing(button)).toBe(true);
+
+    await act(() => button.click());
+
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

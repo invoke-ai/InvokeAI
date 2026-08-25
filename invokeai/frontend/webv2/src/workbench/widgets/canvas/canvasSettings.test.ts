@@ -5,6 +5,7 @@ import {
   CANVAS_CHECKERBOARD_KEY,
   CANVAS_CLIP_TO_BBOX_KEY,
   CANVAS_INVERT_BRUSH_SCROLL_KEY,
+  CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY,
   CANVAS_RULE_OF_THIRDS_KEY,
   CANVAS_SETTING_SECTIONS,
   CANVAS_SETTINGS,
@@ -31,6 +32,8 @@ const DEFAULTS = {
   // Off by default, matching legacy — strokes are unclipped until asked.
   [CANVAS_CLIP_TO_BBOX_KEY]: false,
   [CANVAS_INVERT_BRUSH_SCROLL_KEY]: false,
+  // Legacy default: keep the generation result transparent outside the mask.
+  [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: true,
   [CANVAS_RULE_OF_THIRDS_KEY]: false,
   [CANVAS_SHOW_BBOX_KEY]: true,
   [CANVAS_SHOW_GRID_KEY]: false,
@@ -50,6 +53,7 @@ describe('canvasSettings persistence mapping', () => {
       [CANVAS_CHECKERBOARD_KEY]: false,
       [CANVAS_CLIP_TO_BBOX_KEY]: true,
       [CANVAS_INVERT_BRUSH_SCROLL_KEY]: true,
+      [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: false,
       [CANVAS_RULE_OF_THIRDS_KEY]: true,
       [CANVAS_SHOW_BBOX_KEY]: false,
       [CANVAS_SHOW_GRID_KEY]: true,
@@ -61,6 +65,7 @@ describe('canvasSettings persistence mapping', () => {
       [CANVAS_CHECKERBOARD_KEY]: false,
       [CANVAS_CLIP_TO_BBOX_KEY]: true,
       [CANVAS_INVERT_BRUSH_SCROLL_KEY]: true,
+      [CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY]: false,
       [CANVAS_RULE_OF_THIRDS_KEY]: true,
       [CANVAS_SHOW_BBOX_KEY]: false,
       [CANVAS_SHOW_GRID_KEY]: true,
@@ -84,11 +89,12 @@ describe('canvasSettings persistence mapping', () => {
     }
   });
 
-  it('gives every engine-backed store a distinct store id (React-consumed settings have none)', () => {
+  it('gives every engine-backed store a distinct store id (other frontend-consumed settings have none)', () => {
     const stores = CANVAS_SETTINGS.map((s) => s.store).filter((s): s is NonNullable<typeof s> => s !== undefined);
     expect(new Set(stores).size).toBe(stores.length);
-    // showProgressOnCanvas is consumed React-side and intentionally has no store.
+    // These are consumed outside the engine and intentionally have no store.
     expect(settingByKey(CANVAS_SHOW_PROGRESS_KEY).store).toBeUndefined();
+    expect(settingByKey(CANVAS_OUTPUT_ONLY_MASKED_REGIONS_KEY).store).toBeUndefined();
   });
 });
 

@@ -103,8 +103,11 @@ const createGenerateValues = (
   ...overrides,
 });
 
-const getActiveProject = (values: GenerateWidgetValues) => {
-  const state = workbenchReducer(createInitialWorkbenchState(), { type: 'setGenerateSettings', values });
+const getActiveProject = (values: GenerateWidgetValues, canvasValues?: Record<string, unknown>) => {
+  let state = workbenchReducer(createInitialWorkbenchState(), { type: 'setGenerateSettings', values });
+  if (canvasValues) {
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: canvasValues, widgetId: 'canvas' });
+  }
   const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
 
   expect(project).toBeDefined();
@@ -364,7 +367,8 @@ describe('submitResolvedInvocation', () => {
 
   it('routes a canvas source through prepareCanvasInvocation and does not dispatch a resolved snapshot', () => {
     const project = getActiveProject(
-      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae }),
+      { outputOnlyMaskedRegions: false }
     );
     const commands = createWorkbenchStore().commands;
     const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
@@ -379,9 +383,43 @@ describe('submitResolvedInvocation', () => {
     // The resolved destination rides through so a Canvas source can target the Gallery.
     expect(prepareCanvasInvocation.mock.calls[0]?.[0]).toMatchObject({
       destination: 'gallery',
+      compositing: expect.objectContaining({ outputOnlyMaskedRegions: false }),
       owner,
       projectId: project.id,
     });
+  });
+
+  it('settles only after canvas preparation finishes so the active invoke guard stays held', async () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae })
+    );
+    const commands = createWorkbenchStore().commands;
+    let releasePreparation = (): void => undefined;
+    const preparation = new Promise<void>((resolve) => {
+      releasePreparation = resolve;
+    });
+    const prepareCanvasInvocation = vi.fn(() => preparation);
+    const route = routeFor(project, { ...project.invocation, destination: 'canvas', sourceId: 'canvas' });
+    let settled = false;
+
+    const submission = submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    }).then(() => {
+      settled = true;
+    });
+
+    expect(prepareCanvasInvocation).toHaveBeenCalledTimes(1);
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    releasePreparation();
+    await submission;
+    expect(settled).toBe(true);
   });
 
   it('dispatches submitResolvedInvocationSnapshot for a non-canvas source and never prepares the canvas', () => {

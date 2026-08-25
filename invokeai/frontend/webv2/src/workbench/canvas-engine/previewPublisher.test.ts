@@ -48,10 +48,50 @@ beforeEach(() => {
 });
 
 describe('staged previews', () => {
+  it('prefetches unseen candidate bytes so first selection does not start another full-image request', async () => {
+    const publisher = build();
+
+    publisher.preloadStagedPreview('next.png');
+    await vi.waitFor(() => expect(resolveImage).toHaveBeenCalledOnce());
+    expect(decodeBlob).not.toHaveBeenCalled();
+
+    publisher.setStagedPreview({ imageName: 'next.png' });
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
+
+    expect(resolveImage).toHaveBeenCalledOnce();
+    expect(decodeBlob).toHaveBeenCalledOnce();
+  });
+
+  it('coalesces repeated in-flight decodes during rapid candidate cycling', async () => {
+    const releases: Array<() => void> = [];
+    decodeBlob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve({ decodedHeight: 8, decodedWidth: 8, surface: surface() }));
+        })
+    );
+    const publisher = build();
+    publisher.setStagedPreview({ imageName: 'a.png' });
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(1));
+    publisher.setStagedPreview({ imageName: 'b.png' });
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
+    publisher.setStagedPreview({ imageName: 'a.png' });
+    await Promise.resolve();
+
+    expect(decodeBlob).toHaveBeenCalledTimes(2);
+    expect(resolveImage).toHaveBeenCalledTimes(2);
+
+    releases[0]?.();
+    releases[1]?.();
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
+
+    expect(previews.getStaged()).toMatchObject({ height: 8, width: 8 });
+  });
+
   it('decodes an image-name input and publishes it', async () => {
     build().setStagedPreview({ imageName: 'staged.png' });
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
-    expect(resolveImage).toHaveBeenCalledWith('staged.png');
+    expect(resolveImage).toHaveBeenCalledWith('staged.png', expect.any(AbortSignal));
     expect(previews.getStaged()).toMatchObject({ height: 8, width: 8 });
     expect(invalidateAll).toHaveBeenCalled();
   });
@@ -85,10 +125,53 @@ describe('staged previews', () => {
     );
     const publisher = build();
     publisher.setStagedPreview({ imageName: 'first.png' });
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
     publisher.setStagedPreview({ imageName: 'second.png' });
     release?.();
     await vi.waitFor(() => expect(previews.getStaged()).toMatchObject({ width: 8 }));
     expect(previews.getStaged()).not.toMatchObject({ width: 1 });
+  });
+
+  it('does not publish a decode that was invalidated while in flight', async () => {
+    let release: (() => void) | undefined;
+    decodeBlob.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ decodedHeight: 8, decodedWidth: 8, surface: surface() });
+        })
+    );
+    const publisher = build();
+    publisher.setStagedPreview({ imageName: 'cooling.png' });
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
+
+    publisher.clearStagedPreview();
+    release?.();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(previews.getStaged()).toBeNull();
+  });
+
+  it('drops in-flight decode coalescing state when the cache is cleared', async () => {
+    const releases: Array<() => void> = [];
+    decodeBlob.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releases.push(() => resolve({ decodedHeight: 8, decodedWidth: 8, surface: surface() }));
+        })
+    );
+    const publisher = build();
+    publisher.setStagedPreview({ imageName: 'candidate.png' });
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
+
+    publisher.clearStagedPreview();
+    publisher.clearStagedPreviewCache();
+    publisher.setStagedPreview({ imageName: 'candidate.png' });
+    await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
+
+    releases.forEach((release) => release());
+    await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
+    expect(resolveImage).toHaveBeenCalledTimes(2);
   });
 
   it('leaves a prior preview standing when a later decode fails', async () => {

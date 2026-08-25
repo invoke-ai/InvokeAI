@@ -119,12 +119,17 @@ describe('useVirtualizer scroll element remount', () => {
 
     // The state a programmatic scroll leaves behind: the element has moved,
     // the intent is recorded, and the cached offset is still stale because no
-    // scroll event has been delivered yet. Staged and committed in one
-    // synchronous block so the commit — and with it the reconciliation — runs
-    // before the browser can deliver that event, which is the ordering every
-    // scrollToIndex call site in this app produces.
+    // scroll event has been delivered yet. Model that pre-event boundary with
+    // an own scrollTop value instead of the native setter: Chromium is then
+    // unable to race the assertion by legitimately delivering the pending
+    // read-back event and consuming the intent before React's concurrent
+    // commit settles.
     await act(() => {
-      scroller!.scrollTop = 400 * ROW_HEIGHT;
+      Object.defineProperty(scroller, 'scrollTop', {
+        configurable: true,
+        value: 400 * ROW_HEIGHT,
+        writable: true,
+      });
       internals.scrollOffset = 0;
       internals._intendedScrollOffset = 400 * ROW_HEIGHT;
       root?.render(<VirtualList count={1000} isListMounted />);

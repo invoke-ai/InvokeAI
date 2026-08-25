@@ -9,9 +9,12 @@
  * - **Pointer-move** updates an engine-transient preview rect (via
  *   `stores.bboxPreview`) that the overlay renders — it never dispatches. Sizes
  *   and positions snap to the model grid (`stores.bboxGrid`); hold **alt** to
- *   bypass snapping. Corner/edge resize preserves the aspect ratio when the lock
- *   is active (`stores.bboxOptions`); **shift** toggles the constraint on for an
- *   unlocked frame (a locked ratio stays locked). **Ctrl** (⌘ on macOS) mirrors
+ *   bypass model-grid snapping. Bypassed movement and resize still stay aligned
+ *   to whole document pixels. While moving, **shift** constrains the frame to the
+ *   dominant horizontal or vertical axis. Corner/edge resize preserves the
+ *   aspect ratio when the lock is active (`stores.bboxOptions`); **shift**
+ *   toggles the constraint on for an unlocked frame (a locked ratio stays
+ *   locked). **Ctrl** (⌘ on macOS) mirrors
  *   the resize across the frame's center, so the opposite edge moves too and the
  *   center holds; it composes with both snapping and the aspect constraint.
  *   Modifiers are sampled per pointer sample, so a mid-drag press takes effect on
@@ -25,6 +28,8 @@
  */
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
+
+import { constrainMoveDelta } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { Tool, ToolContext } from './tool';
 
@@ -83,12 +88,14 @@ const nextBboxFor = (
 ): Rect => {
   const grid = ctx.stores.bboxGrid.get();
   // Snap to the model grid unless Alt bypasses it or the snap-to-grid setting is off.
+  // The geometry helpers still apply baseline whole-pixel alignment in either bypass case.
   const snap = !modifiers.alt && ctx.stores.snapToGrid.get();
   const dx = point.x - state.startDoc.x;
   const dy = point.y - state.startDoc.y;
 
   if (state.target === 'move') {
-    return moveBbox(state.startBbox, dx, dy, grid, snap);
+    const delta = constrainMoveDelta({ x: dx, y: dy }, modifiers.shift);
+    return moveBbox(state.startBbox, delta.x, delta.y, grid, snap);
   }
 
   const options = ctx.stores.bboxOptions.get();

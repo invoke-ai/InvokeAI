@@ -143,6 +143,33 @@ describe('isDocumentSnapshotCurrent', () => {
 });
 
 describe('captureRasterSnapshot', () => {
+  it('holds and releases the purpose-built trim guard around live pixel capture', async () => {
+    let resolveRasterize!: (result: ExportLayerPixelsResult) => void;
+    const rasterizeLayerPixels = vi.fn(
+      () =>
+        new Promise<ExportLayerPixelsResult>((resolve) => {
+          resolveRasterize = resolve;
+        })
+    );
+    const releaseTrimPin = vi.fn();
+    const pinForTrim = vi.fn(() => ({ release: releaseTrimPin }));
+    const guarded = makeHarness({ pinForTrim, rasterizeLayerPixels });
+    const capture = createRasterSnapshotCapture(guarded.deps);
+    const snapshot = capture.captureDocumentSnapshot()!;
+
+    const pending = capture.captureRasterSnapshot(snapshot, ['a']);
+    expect(pinForTrim).toHaveBeenCalledWith('a', 0);
+    expect(releaseTrimPin).not.toHaveBeenCalled();
+
+    const pixels = okPixels('a');
+    if (pixels.status === 'ok') {
+      guarded.currentGuards.add(pixels.guard);
+    }
+    resolveRasterize(pixels);
+    await expect(pending).resolves.toMatchObject({ status: 'ok' });
+    expect(releaseTrimPin).toHaveBeenCalledOnce();
+  });
+
   it('detaches a surface per layer and reports the empty ones separately', async () => {
     harness.state.canvas = canvasState(['a', 'b']);
     harness.rasterize.mockImplementation((layerId: string) => {

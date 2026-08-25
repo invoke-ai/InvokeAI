@@ -4,15 +4,22 @@ import type { MouseEvent as ReactMouseEvent } from 'react';
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
-import { createLayerId } from '@workbench/canvasLayerOps';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
+import { readLayerPanelSelection } from '@workbench/workbenchStore';
 import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -64,6 +71,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const canvasDispatch = useCanvasProjectMutationDispatch();
   const queries = useWorkbenchQueries();
   const engine = useCanvasEngine();
+  const projectId = useActiveProjectId();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
@@ -71,6 +79,11 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const operation = useCanvasOperation(engine);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
+
+  // Canvas invocation stays code-split from the rest of the workbench, but the
+  // canvas being mounted is a strong intent signal. Warm it while the user edits
+  // instead of making the first Ctrl+Enter pay the chunk download/evaluation.
+  useMountEffect(preloadCanvasInvocation);
 
   // Right-click on the canvas surface: hit-test the layer under the cursor and
   // open either the shared per-layer menu or the global empty-space menu at the
@@ -100,8 +113,8 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       return;
     }
     for (const setting of CANVAS_SETTINGS) {
-      // Only engine-backed settings feed a store; React-consumed ones (e.g.
-      // showProgressOnCanvas, read below) have no store and are skipped here.
+      // Only engine-backed settings feed a store; settings consumed elsewhere
+      // in the frontend have no store and are skipped here.
       if (setting.store) {
         engine.interaction.set(setting.store, settings[setting.key]);
       }
@@ -264,14 +277,20 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [engine, isInteractionLocked]);
 
   /* eslint-disable react/react-compiler -- imperative engine payload is mutable by design */
-  const acceptStagedImage = useCallback(() => {
-    if (selectedSlot?.kind === 'candidate') {
-      engine?.layers.commitStagedImage({
-        candidate: selectedSlot.candidate,
-        selectedImageIndex: stagingArea.selectedImageIndex,
-      });
-    }
-  }, [engine, selectedSlot, stagingArea.selectedImageIndex]);
+  const commitSelectedStagedImage = useCallback(
+    (continueStaging: boolean) => {
+      if (selectedSlot?.kind === 'candidate') {
+        engine?.layers.commitStagedImage({
+          candidate: selectedSlot.candidate,
+          continueStaging,
+          selectedImageIndex: stagingArea.selectedImageIndex,
+        });
+      }
+    },
+    [engine, selectedSlot, stagingArea.selectedImageIndex]
+  );
+  const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
+  const saveStagedImageAndContinue = useCallback(() => commitSelectedStagedImage(true), [commitSelectedStagedImage]);
   /* eslint-enable react/react-compiler */
   const cancelQueueItem = useCallback((queueItemId: string) => queue.cancel(undefined, queueItemId), [queue]);
   const cycleStagedImage = useCallback(
@@ -285,6 +304,10 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const discardSelectedStagedImage = useCallback(
     () => canvasDispatch({ type: 'discardSelectedStagedImage' }),
     [canvasDispatch]
+  );
+  const preloadStagedCandidate = useCallback(
+    (imageName: string) => engine?.previews.preloadStagedPreview(imageName),
+    [engine]
   );
   const selectStagedImage = useCallback(
     (imageIndex: number) => canvasDispatch({ imageIndex, type: 'setStagedImageIndex' }),
@@ -343,9 +366,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [engine]);
 
   const executeCanvasHotkey = useEffectEvent((commandId: string) => {
+    const selectedLayerIds = readLayerPanelSelection(projectId, document.selectedLayerId).selectedIds;
     executeCanvasHotkeyCommand(commandId, {
       copySelection,
-      createLayerId,
       dispatch: canvasDispatch,
       document,
       engine,
@@ -353,6 +376,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       hasStagingSlots,
       isInteractionLocked,
       pasteFromClipboard,
+      selectedLayerIds,
       t,
     });
   });
@@ -508,7 +532,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 onCycle={cycleStagedImage}
                 onDiscardAll={discardAllStagedImages}
                 onDiscardSelected={discardSelectedStagedImage}
+                onPreloadCandidate={preloadStagedCandidate}
                 onSelectImage={selectStagedImage}
+                onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}
                 onToggleThumbnails={toggleStagingThumbnails}
                 onToggleVisibility={toggleStagingVisibility}

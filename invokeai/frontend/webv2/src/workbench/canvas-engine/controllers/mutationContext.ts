@@ -147,7 +147,14 @@ export const createCanvasMutationContext = (
     }
 
     if (origin === 'user') {
-      deps.commitEdit({ kind: 'mutation', mutation: action });
+      try {
+        deps.commitEdit({ kind: 'mutation', mutation: action });
+      } catch {
+        // Reducer and mirror acceptance are the transaction boundary. Routing
+        // the resulting edit intent is ancillary after that point; surfacing an
+        // observer failure would invite callers to roll back only their cache
+        // half and split it from the accepted document contract.
+      }
     }
   };
 

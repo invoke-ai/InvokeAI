@@ -3,6 +3,7 @@ import { DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/laye
 export type RasterBackgroundPurpose =
   | 'background-snapshot'
   | 'invocation-composite'
+  | 'layer-operation'
   | 'thumbnail'
   | 'raster-export'
   | 'psd-export';

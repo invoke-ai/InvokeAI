@@ -28,6 +28,51 @@ type WorkbenchAction = __WorkbenchReducerActionInternal;
 type ActionPayload<Type extends WorkbenchAction['type']> = Omit<Extract<WorkbenchAction, { type: Type }>, 'type'>;
 type WorkbenchDispatch = (action: WorkbenchAction) => void;
 
+/** Event-time bridge from the transient Layers-panel selection to canvas-wide hotkeys. */
+export interface LayerPanelSelectionSnapshot {
+  primaryId: string | null;
+  projectId: string;
+  selectedIds: readonly string[];
+}
+
+let activeLayerPanelSelection: LayerPanelSelectionSnapshot = { primaryId: null, projectId: '', selectedIds: [] };
+
+export const publishLayerPanelSelection = (selection: LayerPanelSelectionSnapshot): void => {
+  activeLayerPanelSelection = {
+    primaryId: selection.primaryId,
+    projectId: selection.projectId,
+    selectedIds: [...selection.selectedIds],
+  };
+};
+
+export const resetLayerPanelSelection = (projectId: string, primaryId: string | null): void => {
+  activeLayerPanelSelection = { primaryId, projectId, selectedIds: primaryId ? [primaryId] : [] };
+};
+
+const reconcileLayerPanelSelection = (project: Project): void => {
+  const { layers, selectedLayerId } = project.canvas.document;
+  if (activeLayerPanelSelection.projectId !== project.id || activeLayerPanelSelection.primaryId !== selectedLayerId) {
+    resetLayerPanelSelection(project.id, selectedLayerId);
+    return;
+  }
+  const existing = new Set(layers.map((layer) => layer.id));
+  const selectedIds = activeLayerPanelSelection.selectedIds.filter((id) => existing.has(id));
+  if (selectedLayerId && !selectedIds.includes(selectedLayerId)) {
+    selectedIds.push(selectedLayerId);
+  }
+  if (
+    selectedIds.length !== activeLayerPanelSelection.selectedIds.length ||
+    selectedIds.some((id, index) => id !== activeLayerPanelSelection.selectedIds[index])
+  ) {
+    activeLayerPanelSelection = { ...activeLayerPanelSelection, selectedIds };
+  }
+};
+
+export const readLayerPanelSelection = (projectId: string, primaryId: string | null): LayerPanelSelectionSnapshot =>
+  activeLayerPanelSelection.projectId === projectId && activeLayerPanelSelection.primaryId === primaryId
+    ? activeLayerPanelSelection
+    : { primaryId, projectId, selectedIds: primaryId ? [primaryId] : [] };
+
 type MechanicalCommand<Type extends WorkbenchAction['type']> = keyof ActionPayload<Type> extends never
   ? () => void
   : (payload: ActionPayload<Type>) => void;
@@ -654,6 +699,17 @@ export const createWorkbenchStore = (
       previousState.activeProjectId !== nextState.activeProjectId
     ) {
       invalidateLayoutPresetActivation();
+    }
+
+    const activeProject = getActiveProject(nextState);
+    if (action.type === 'hydrateWorkbench') {
+      resetLayerPanelSelection(activeProject.id, activeProject.canvas.document.selectedLayerId);
+    } else {
+      // Panel-originated primary changes publish before dispatch and therefore
+      // survive this reconciliation. Any external primary change, project
+      // switch, or layer removal collapses/filter stale secondaries here at the
+      // always-live store boundary, even while the Layers widget is unmounted.
+      reconcileLayerPanelSelection(activeProject);
     }
 
     setSnapshotState(nextState);

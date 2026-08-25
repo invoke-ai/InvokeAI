@@ -15,7 +15,6 @@ import type { RegionalGuidanceInput } from './addRegionalGuidance';
 import type { CanvasCompileMode, CanvasCompositingSettings, Rect } from './types';
 
 import { compileCanvasGraph } from './compileCanvasGraph';
-import { DEFAULT_CANVAS_COMPOSITING } from './types';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -97,6 +96,18 @@ const COMPONENT_OVERRIDES: Partial<Record<string, Partial<GenerateSettings>>> = 
 
 const bbox: Rect = { height: 1024, width: 768, x: 128, y: 64 };
 
+const COMPOSITING_FIXTURE: CanvasCompositingSettings = {
+  coherenceEdgeSize: 16,
+  coherenceMinDenoise: 0,
+  coherenceMode: 'Gaussian Blur',
+  infillColorValue: { a: 1, b: 0, g: 0, r: 0 },
+  infillMethod: 'lama',
+  infillPatchmatchDownscaleSize: 1,
+  infillTileSize: 32,
+  maskBlur: 16,
+  outputOnlyMaskedRegions: false,
+};
+
 const compile = (
   model: GenerateModelConfig,
   mode: CanvasCompileMode,
@@ -109,6 +120,7 @@ const compile = (
     compositing?: Partial<CanvasCompositingSettings>;
     strength?: number;
     destination?: 'canvas' | 'gallery';
+    outputOnlyMaskedRegions?: boolean;
     controlLayers?: readonly ControlLayerGraphInput[];
     regionalGuidance?: readonly RegionalGuidanceInput[];
   } = {}
@@ -117,9 +129,11 @@ const compile = (
     bbox: overrides.bbox ?? bbox,
     compositeImageName:
       'compositeImageName' in overrides ? (overrides.compositeImageName ?? null) : 'canvas-composite.png',
-    compositing: overrides.compositing
-      ? { ...DEFAULT_CANVAS_COMPOSITING, ...overrides.compositing }
-      : DEFAULT_CANVAS_COMPOSITING,
+    compositing: {
+      ...COMPOSITING_FIXTURE,
+      outputOnlyMaskedRegions: overrides.outputOnlyMaskedRegions ?? false,
+      ...overrides.compositing,
+    },
     controlLayers: overrides.controlLayers,
     regionalGuidance: overrides.regionalGuidance,
     destination: overrides.destination ?? 'canvas',
@@ -447,10 +461,118 @@ describe('compileCanvasGraph', () => {
       );
     });
 
-    it('rejects off-grid bbox dimensions', () => {
-      expect(() => compile(flux2Model, 'txt2img', { bbox: { height: 888, width: 1024, x: 0, y: 0 } })).toThrow(
-        'Generate height must be a multiple of 16.'
+    it('rejects fractional bbox dimensions before emitting backend resize fields', () => {
+      expect(() => compile(flux2Model, 'txt2img', { bbox: { height: 888, width: 1024.5, x: 0, y: 0 } })).toThrow(
+        'Canvas bounding box dimensions must be whole pixels.'
       );
+    });
+
+    it('processes an off-grid bbox on the model grid and resizes the output back to the bbox', () => {
+      const { backendGraph } = compile(flux2Model, 'txt2img', {
+        bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      });
+
+      expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 896, width: 1024 });
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        height: 888,
+        type: 'img_resize',
+        width: 1025,
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_processing_output');
+      expect(getNodeByType(backendGraph, 'core_metadata')).toMatchObject({ height: 888, width: 1025 });
+      expect(getEdge(backendGraph, 'canvas_output', 'metadata')?.source.node_id).toBe(
+        getNodeByType(backendGraph, 'core_metadata')?.id
+      );
+    });
+
+    it('does not silently upscale a small grid-valid bbox to the model optimal area', () => {
+      const { backendGraph } = compile(sd1Model, 'txt2img', {
+        bbox: { height: 64, width: 64, x: 0, y: 0 },
+      });
+
+      expect(backendGraph.nodes.noise).toMatchObject({ height: 64, width: 64 });
+      expect(backendGraph.nodes.canvas_processing_output).toBeUndefined();
+      expect(backendGraph.nodes.canvas_output?.type).toBe('l2i');
+    });
+
+    it('resizes an off-grid img2img source before processing and restores the bbox footprint', () => {
+      const { backendGraph } = compile(flux2Model, 'img2img', {
+        bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      });
+
+      expect(backendGraph.nodes.canvas_resize_initial_to_processing).toMatchObject({
+        height: 896,
+        type: 'img_resize',
+        width: 1024,
+      });
+      expect(getEdge(backendGraph, 'canvas_i2l', 'image')?.source.node_id).toBe('canvas_resize_initial_to_processing');
+      expect(backendGraph.nodes.canvas_output).toMatchObject({ height: 888, type: 'img_resize', width: 1025 });
+    });
+
+    it('resizes off-grid inpaint inputs for processing, then composites at the exact bbox size', () => {
+      const { backendGraph } = compile(flux2Model, 'inpaint', {
+        bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      });
+
+      expect(backendGraph.nodes.canvas_resize_initial_to_processing).toMatchObject({ height: 896, width: 1024 });
+      expect(backendGraph.nodes.canvas_resize_mask_to_processing).toMatchObject({ height: 896, width: 1024 });
+      expect(backendGraph.nodes.canvas_resize_generated_to_bbox).toMatchObject({ height: 888, width: 1025 });
+      expect(backendGraph.nodes.canvas_resize_output_mask_to_bbox).toMatchObject({ height: 888, width: 1025 });
+      expect(getEdge(backendGraph, 'canvas_output', 'layer_upper')?.source.node_id).toBe(
+        'canvas_resize_generated_to_bbox'
+      );
+      expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('canvas_resize_output_mask_to_bbox');
+    });
+
+    it('resizes the combined off-grid outpaint mask for processing, then composites at the bbox size', () => {
+      const { backendGraph } = compile(flux2Model, 'outpaint', {
+        bbox: { height: 888, width: 1025, x: 0, y: 0 },
+      });
+
+      expect(backendGraph.nodes.canvas_resize_initial_to_processing).toMatchObject({ height: 896, width: 1024 });
+      expect(backendGraph.nodes.canvas_resize_outpaint_mask_to_processing).toMatchObject({
+        height: 896,
+        width: 1024,
+      });
+      expect(backendGraph.nodes.canvas_resize_generated_to_bbox).toMatchObject({ height: 888, width: 1025 });
+      expect(backendGraph.nodes.canvas_resize_output_mask_to_bbox).toMatchObject({ height: 888, width: 1025 });
+    });
+
+    it.each(['inpaint', 'outpaint'] as const)(
+      'resizes an off-grid %s noise mask before applying it to the processing image',
+      (mode) => {
+        const { backendGraph } = compile(flux2Model, mode, {
+          bbox: { height: 888, width: 1025, x: 0, y: 0 },
+          noiseMaskImageName: 'noise-mask.png',
+        });
+
+        expect(backendGraph.nodes.canvas_resize_noise_mask_to_processing).toMatchObject({
+          height: 896,
+          image: { image_name: 'noise-mask.png' },
+          type: 'img_resize',
+          width: 1024,
+        });
+        expect(getEdge(backendGraph, 'add_inpaint_noise', 'mask')?.source.node_id).toBe(
+          'canvas_resize_noise_mask_to_processing'
+        );
+        expect(getEdge(backendGraph, 'add_inpaint_noise', 'image')?.source.node_id).toBe(
+          mode === 'inpaint' ? 'canvas_resize_initial_to_processing' : 'infill'
+        );
+      }
+    );
+
+    it('keeps an off-grid masked-only output transparent at the exact bbox size', () => {
+      const { backendGraph } = compile(flux2Model, 'inpaint', {
+        bbox: { height: 888, width: 1025, x: 0, y: 0 },
+        outputOnlyMaskedRegions: true,
+      });
+
+      expect(backendGraph.nodes.canvas_output).toMatchObject({
+        invert_mask: true,
+        type: 'apply_mask_to_image',
+      });
+      expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_resize_generated_to_bbox');
+      expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('canvas_resize_output_mask_to_bbox');
     });
 
     it('surfaces missing-component validation for the bbox-sized settings', () => {
@@ -459,6 +581,7 @@ describe('compileCanvasGraph', () => {
         compileCanvasGraph({
           bbox,
           compositeImageName: null,
+          compositing: COMPOSITING_FIXTURE,
           destination: 'canvas',
           mode: 'txt2img',
           model: fluxModel,
@@ -530,6 +653,34 @@ describe('compileCanvasGraph — inpaint per base', () => {
       (edge) => edge.source.node_id === metadata.id && edge.destination.field === 'metadata'
     );
     expect(metaEdge?.destination.node_id).toBe('canvas_output');
+  });
+
+  it('outputs only the generated mask region with transparency when requested', () => {
+    const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: true });
+
+    const output = backendGraph.nodes.canvas_output;
+    expect(output?.type).toBe('apply_mask_to_image');
+    expect(output?.invert_mask).toBe(true);
+    expect(output?.is_intermediate).toBe(true);
+    expect(backendGraph.nodes.canvas_l2i?.is_intermediate).toBe(true);
+    expect(getEdge(backendGraph, 'canvas_output', 'image')?.source.node_id).toBe('canvas_l2i');
+    expect(getEdge(backendGraph, 'canvas_output', 'mask')?.source.node_id).toBe('expand_mask');
+    expect(output?.layer_base).toBeUndefined();
+
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    const metaEdge = backendGraph.edges.find(
+      (edge) => edge.source.node_id === metadata.id && edge.destination.field === 'metadata'
+    );
+    expect(metaEdge?.destination.node_id).toBe('canvas_output');
+  });
+
+  it('composites the generated mask region over the initial image when masked-only output is disabled', () => {
+    const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: false });
+
+    expect(backendGraph.nodes.canvas_output).toMatchObject({
+      layer_base: { image_name: 'canvas-composite.png' },
+      type: 'invokeai_img_blend',
+    });
   });
 
   it('wires a UNet edge into create_gradient_mask only for SD-family models', () => {

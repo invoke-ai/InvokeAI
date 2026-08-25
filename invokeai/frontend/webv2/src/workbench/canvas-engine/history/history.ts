@@ -82,6 +82,8 @@ export interface History {
   clear(): void;
   /** Current retained bytes across undo and redo stacks. */
   byteSize(): number;
+  /** Whether one entry can remain undoable after normal oldest-entry eviction. */
+  canRetain(bytes: number): boolean;
   /** Evicts oldest entries until retained bytes are at or below `budgetBytes`. */
   trimToBytes(budgetBytes: number): void;
   /** Subscribes to any change in `canUndo`/`canRedo`. Returns an unsubscribe function. */
@@ -316,6 +318,7 @@ export const createHistory = (opts: CreateHistoryOptions = {}): History => {
   return {
     amendLast,
     byteSize: () => undoBytes + redoBytes,
+    canRetain: (bytes) => Number.isFinite(bytes) && Math.max(0, Math.ceil(bytes)) <= byteBudget,
     canRedo: () => redoStack.length > 0,
     canUndo: () => undoStack.length > 0,
     clear,

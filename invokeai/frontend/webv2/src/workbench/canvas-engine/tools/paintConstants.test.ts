@@ -10,19 +10,19 @@ describe('clampBrushSize', () => {
     expect(clampBrushSize(1_000_000)).toBe(MAX_BRUSH_SIZE);
   });
 
-  it('rounds to the nearest integer', () => {
-    expect(clampBrushSize(50.6)).toBe(51);
-    expect(clampBrushSize(50.4)).toBe(50);
+  it('retains hundredth-pixel precision for sub-pixel brushes', () => {
+    expect(clampBrushSize(0.126)).toBe(0.13);
+    expect(clampBrushSize(0.124)).toBe(0.12);
   });
 });
 
 describe('stepBrushSize', () => {
   it('grows by SIZE_STEP_FACTOR for direction +1', () => {
-    expect(stepBrushSize(50, 1)).toBe(Math.round(50 * (1 + SIZE_STEP_FACTOR)));
+    expect(stepBrushSize(50, 1)).toBeCloseTo(50 * (1 + SIZE_STEP_FACTOR));
   });
 
   it('shrinks by SIZE_STEP_FACTOR for direction -1', () => {
-    expect(stepBrushSize(50, -1)).toBe(Math.round(50 * (1 - SIZE_STEP_FACTOR)));
+    expect(stepBrushSize(50, -1)).toBe(50 * (1 - SIZE_STEP_FACTOR));
   });
 
   it('clamps growth at MAX_BRUSH_SIZE', () => {
@@ -40,5 +40,9 @@ describe('stepBrushSize', () => {
       expect(next).toBeGreaterThanOrEqual(size);
       size = next;
     }
+  });
+
+  it('grows away from the new sub-pixel minimum', () => {
+    expect(stepBrushSize(MIN_BRUSH_SIZE, 1)).toBe(0.11);
   });
 });

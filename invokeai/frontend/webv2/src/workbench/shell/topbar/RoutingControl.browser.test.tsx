@@ -45,6 +45,7 @@ const BASE_STATE = {
     sourceLocked: false,
   },
   invoke: NOOP_INVOKE,
+  isPreparing: false,
   isValid: true,
   placedTypeIds: new Set(['generate']),
   promptExpansion: {},

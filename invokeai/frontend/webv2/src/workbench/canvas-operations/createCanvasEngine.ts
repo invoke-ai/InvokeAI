@@ -168,8 +168,11 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   });
 
-  const syncEditingLock = (): void =>
-    core.stores.documentEditingLocked.set(controller.getSnapshot().status === 'active');
+  const syncEditingLock = (): void => {
+    const operation = controller.getSnapshot();
+    core.stores.documentEditingLocked.set(operation.status === 'active');
+    core.stores.documentEditingLayerId.set(operation.status === 'active' ? operation.identity.layerId : null);
+  };
   const unsubscribeEditingLock = controller.subscribe(syncEditingLock);
   const syncSamInteraction = (): void => {
     const session = stores.samSession.get();
@@ -277,6 +280,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     filterCoordinator.dispose();
     selectObjectCoordinator.dispose();
     controller.dispose();
+    core.stores.documentEditingLayerId.set(null);
     core.stores.documentEditingLocked.set(false);
     host.setSamInteraction(null);
   };

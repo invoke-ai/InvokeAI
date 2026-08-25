@@ -994,6 +994,39 @@ describe('createCanvasEngine', () => {
     expect(second?.isCurrent()).toBe(false);
   });
 
+  it('aborts staged preview prefetches on cooldown and refetches after reactivation', async () => {
+    const doc = makeDoc();
+    const { store } = createFakeStore(doc);
+    let firstSignal: AbortSignal | undefined;
+    const imageResolver = vi
+      .fn<(imageName: string, signal?: AbortSignal) => Promise<Blob>>()
+      .mockImplementationOnce((_imageName, signal) => {
+        firstSignal = signal;
+        return new Promise<Blob>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      })
+      .mockResolvedValueOnce(new Blob(['after-reactivation']));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver,
+      projectId: 'p1',
+      store,
+    });
+
+    engine.previews.preloadStagedPreview('candidate.png');
+    expect(imageResolver).toHaveBeenCalledOnce();
+
+    await expect(engine.lifecycle.beginCooldown()).resolves.toBe('cooled');
+    expect(firstSignal?.aborted).toBe(true);
+
+    engine.lifecycle.activate();
+    engine.previews.setStagedPreview({ imageName: 'candidate.png' });
+    await vi.waitFor(() => expect(imageResolver).toHaveBeenCalledTimes(2));
+
+    engine.lifecycle.dispose();
+  });
+
   it('retains base pixels when cooldown persistence fails', async () => {
     const doc = makeDoc();
     const { store } = createFakeStore(doc);
@@ -2635,6 +2668,9 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     // both leave the same final version number. Tracking call count/timing does.
     const thumbnailListener = vi.fn();
     const unsubscribe = engine.stores.thumbnailVersion.subscribeKey('a', thumbnailListener);
+    const contentListener = vi.fn();
+    const unsubscribeContent = engine.interaction.subscribe('rasterContentEpoch', contentListener);
+    expect(engine.interaction.get('rasterContentEpoch')).toBe(0);
 
     // Frame 1: dispatches the first rasterize for imageName 'a'; it stays in flight
     // (the deferred is never auto-resolved).
@@ -2657,6 +2693,8 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     raf.flush();
     expect(thumbnailListener).toHaveBeenCalledTimes(1);
     expect(engine.stores.thumbnailVersion.get('a')).toBe(2);
+    expect(contentListener).toHaveBeenCalledTimes(1);
+    expect(engine.interaction.get('rasterContentEpoch')).toBe(1);
 
     // The older decode resolves afterwards. It may finish its isolated scratch
     // draw, but it must neither publish nor notify subscribers.
@@ -2664,9 +2702,11 @@ describe('ensureLayerCaches: edit-during-rasterize race', () => {
     await flushMicrotasks();
     raf.flush();
     expect(thumbnailListener).toHaveBeenCalledTimes(1);
+    expect(contentListener).toHaveBeenCalledTimes(1);
     expect(resolver).toHaveBeenCalledTimes(2);
 
     unsubscribe();
+    unsubscribeContent();
     engine.lifecycle.dispose();
   });
 });
@@ -2714,8 +2754,8 @@ interface ControlPaintHarnessOptions {
   pixelWrites?: { enabled: boolean };
 }
 
-const createControlPaintHarness = (
-  overrides: ControlPaintHarnessOverrides,
+const createPixelEditHarness = (
+  layer: CanvasControlLayerContract | CanvasRasterLayerContractV2,
   options: ControlPaintHarnessOptions = {}
 ) => {
   const raf = createControllableRaf();
@@ -2731,28 +2771,6 @@ const createControlPaintHarness = (
     }
   );
 
-  const { source, ...layerOverrides } = overrides;
-  const layer: CanvasControlLayerContract = {
-    adapter: {
-      beginEndStepPct: [0.1, 0.9],
-      controlMode: 'more_control',
-      kind: 'controlnet',
-      model: 'control-model',
-      weight: 0.7,
-    },
-    blendMode: 'screen',
-    filter: { settings: { low: 10 }, type: 'canny' },
-    id: 'control',
-    isEnabled: true,
-    isLocked: false,
-    name: 'Control',
-    opacity: 0.6,
-    source,
-    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-    type: 'control',
-    withTransparencyEffect: true,
-    ...layerOverrides,
-  };
   const document: CanvasDocumentContractV2 = {
     background: 'transparent',
     bbox: { height: 100, width: 100, x: 0, y: 0 },
@@ -2822,6 +2840,55 @@ const createControlPaintHarness = (
     store,
     strokes,
   };
+};
+
+const createControlPaintHarness = (
+  overrides: ControlPaintHarnessOverrides,
+  options: ControlPaintHarnessOptions = {}
+) => {
+  const { source, ...layerOverrides } = overrides;
+  const layer: CanvasControlLayerContract = {
+    adapter: {
+      beginEndStepPct: [0.1, 0.9],
+      controlMode: 'more_control',
+      kind: 'controlnet',
+      model: 'control-model',
+      weight: 0.7,
+    },
+    blendMode: 'screen',
+    filter: { settings: { low: 10 }, type: 'canny' },
+    id: 'control',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Control',
+    opacity: 0.6,
+    source,
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'control',
+    withTransparencyEffect: true,
+    ...layerOverrides,
+  };
+  return createPixelEditHarness(layer, options);
+};
+
+const createRasterImageEraserHarness = (
+  overrides: Partial<Omit<CanvasRasterLayerContractV2, 'source' | 'type'>> = {},
+  options: ControlPaintHarnessOptions = {}
+) => {
+  const layer: CanvasRasterLayerContractV2 = {
+    adjustments: { brightness: 0.1, contrast: 0.2, saturation: -0.1 },
+    blendMode: 'screen',
+    id: 'image',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Image',
+    opacity: 0.6,
+    source: { image: { height: 10, imageName: 'raster-image', width: 20 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 2, scaleY: 3, x: 7, y: 11 },
+    type: 'raster',
+    ...overrides,
+  };
+  return createPixelEditHarness(layer, options);
 };
 
 const createControlSelectionHarness = (overrides: ControlPaintHarnessOverrides) => {
@@ -2965,7 +3032,154 @@ const putImageDataCalls = (surfaces: StubRasterSurface[]): { image: unknown; x: 
       .map((entry) => ({ image: entry.args[0], x: entry.args[1], y: entry.args[2] }))
   );
 
-describe('engine-owned control pixel editing', () => {
+describe('engine-owned pixel editing', () => {
+  it('materializes an image layer plus eraser stroke as one reversible edit', async () => {
+    const h = createRasterImageEraserHarness();
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument()!.layers[0]);
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }));
+
+    const after = structuredClone(h.engine.document.getDocument()!.layers[0]);
+    expect(h.engine.document.getDocument()!.layers).toHaveLength(1);
+    expect(after).toMatchObject({
+      id: 'image',
+      source: { type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    });
+    expect(after).not.toHaveProperty('adjustments');
+    expect(h.strokes).toHaveLength(1);
+    expect(h.strokes[0]).toMatchObject({ layerId: 'image', tool: 'eraser' });
+    expect(h.bitmapStore.suspendLayer).toHaveBeenCalledWith('image');
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('image');
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+
+    h.engine.history.undo();
+    expect(h.engine.document.getDocument()!.layers[0]).toEqual(before);
+    expect(h.engine.stores.canRedo.get()).toBe(true);
+
+    h.engine.history.redo();
+    expect(h.engine.document.getDocument()!.layers[0]).toEqual(after);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('persists and releases a materialized image erase when a thumbnail observer throws', async () => {
+    const h = createRasterImageEraserHarness();
+    await h.publishInitialCache();
+    const unsubscribe = h.engine.stores.thumbnailVersion.subscribe(() => {
+      throw new Error('thumbnail observer failed');
+    });
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }))).not.toThrow();
+    expect(h.engine.document.getDocument()!.layers[0]).toMatchObject({ source: { type: 'paint' }, type: 'raster' });
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('image');
+    expect(h.bitmapStore.markLayerDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
+    );
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+
+    unsubscribe();
+    h.engine.lifecycle.dispose();
+  });
+
+  it('rolls a byte-identical image-layer erase back without converting the layer', async () => {
+    const h = createRasterImageEraserHarness({}, { pixelWrites: { enabled: false } });
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'image');
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointerup', pointerAt(25, 25, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    const restored = await h.engine.exports.exportLayerPixels('image', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('rolls a cancelled image-layer erase back without converting the layer', async () => {
+    const h = createRasterImageEraserHarness();
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument());
+    const beforeCache = await snapshotLayerCache(h.engine, 'image');
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(25, 25));
+    h.overlay.fire('pointercancel', pointerAt(25, 25, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    const restored = await h.engine.exports.exportLayerPixels('image', { includeDisabled: true });
+    expect(restored.status).toBe('ok');
+    if (restored.status === 'ok') {
+      expect(restored.surface).toBe(beforeCache.surface);
+      expect(restored.rect).toEqual(beforeCache.rect);
+      expect(restored.guard.cacheVersion).toBe(beforeCache.version);
+    }
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('does not erase or auto-create while an image-layer cache is still loading', () => {
+    const h = createRasterImageEraserHarness();
+    h.raf.flush();
+    const before = structuredClone(h.engine.document.getDocument());
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    expect(h.engine.document.getDocument()!.layers).toHaveLength(1);
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.suspendLayer).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
+  it.each([
+    ['locked', { isLocked: true }],
+    ['disabled', { isEnabled: false }],
+    ['transparency locked', { isTransparencyLocked: true }],
+  ] as const)('does not erase or auto-create over a %s image layer', async (_scenario, overrides) => {
+    const h = createRasterImageEraserHarness(overrides);
+    await h.publishInitialCache();
+    const before = structuredClone(h.engine.document.getDocument());
+
+    h.engine.tools.setTool('eraser');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+
+    expect(h.engine.document.getDocument()).toEqual(before);
+    expect(h.strokes).toHaveLength(0);
+    expect(h.bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    expect(h.engine.stores.canUndo.get()).toBe(false);
+    h.engine.lifecycle.dispose();
+  });
+
   it('brushes an empty control in place and never creates a raster layer', () => {
     const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
     h.engine.tools.setTool('brush');
@@ -2983,6 +3197,27 @@ describe('engine-owned control pixel editing', () => {
       h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
     );
     expect(h.engine.stores.canUndo.get()).toBe(true);
+    h.engine.lifecycle.dispose();
+  });
+
+  it('persists and releases a direct control stroke when a thumbnail observer throws', () => {
+    const h = createControlPaintHarness({ source: { bitmap: null, type: 'paint' } });
+    const unsubscribe = h.engine.stores.thumbnailVersion.subscribe(() => {
+      throw new Error('thumbnail observer failed');
+    });
+    h.engine.tools.setTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointermove', pointerAt(40, 40));
+
+    expect(() => h.overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }))).not.toThrow();
+    expect(h.bitmapStore.markLayerDirty).toHaveBeenCalledWith('control');
+    expect(h.bitmapStore.markLayerDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      h.bitmapStore.releaseSuspendedLayer.mock.invocationCallOrder[0]!
+    );
+    expect(h.bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    expect(h.engine.stores.canUndo.get()).toBe(true);
+
+    unsubscribe();
     h.engine.lifecycle.dispose();
   });
 
@@ -6569,11 +6804,25 @@ describe('mergeVisibleRasterLayers', () => {
     return { ...base, layers: [upper, maskLayer('mid-mask'), below] };
   };
 
+  const selectedMergeDoc = (): CanvasDocumentContractV2 => {
+    const doc = interleavedDoc();
+    return {
+      ...doc,
+      layers: doc.layers.map((layer) => (layer.id === 'upper' ? { ...layer, blendMode: 'normal' as const } : layer)),
+    };
+  };
+
   const setup = (doc: CanvasDocumentContractV2) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
     const { projectId, store } = createReducerBackedStore(doc);
+    const baseMutationPort = createTestMutationPort(store, projectId);
+    let rejectMutations = false;
+    const mutationPort: CanvasProjectMutationPort = {
+      ...baseMutationPort,
+      dispatch: (mutation, origin) => (rejectMutations ? false : baseMutationPort.dispatch(mutation, origin)),
+    };
     const base = createTestStubRasterBackend();
     const surfaces: StubRasterSurface[] = [];
     const backend: StubRasterBackend = {
@@ -6584,17 +6833,255 @@ describe('mergeVisibleRasterLayers', () => {
         return surface;
       },
     };
+    let panelSelectedIds = doc.selectedLayerId ? [doc.selectedLayerId] : [];
+    const selectionChanges: { primaryId: string | null; selectedIds: readonly string[] }[] = [];
     const engine = createCanvasEngine({
       backend,
+      getSelectedLayerIds: () => panelSelectedIds,
       imageResolver: () => Promise.resolve(new Blob()),
+      mutationPort,
       projectId,
+      setSelectedLayerIds: (primaryId, selectedIds) => {
+        panelSelectedIds = [...selectedIds];
+        selectionChanges.push({ primaryId, selectedIds: [...selectedIds] });
+      },
       store,
     });
     const screen = createFakeCanvas();
     const overlay = createFakeCanvas();
     engine.surface.attach(screen.element, overlay.element);
-    return { engine, raf, store, surfaces };
+    return {
+      engine,
+      getPanelSelectedIds: () => panelSelectedIds,
+      raf,
+      selectionChanges,
+      setRejectMutations: (reject: boolean) => {
+        rejectMutations = reject;
+      },
+      setPanelSelectedIds: (selectedIds: readonly string[]) => {
+        panelSelectedIds = [...selectedIds];
+      },
+      store,
+      surfaces,
+    };
   };
+
+  it('duplicates a selected batch directly above each source with live caches and one undo step', async () => {
+    const { engine, getPanelSelectedIds, raf, setPanelSelectedIds } = setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+
+    const result = engine.layers.duplicateLayers(['upper', 'below']);
+    expect(result).not.toBeNull();
+    const [upperCopyId, belowCopyId] = result!.duplicateIds;
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([
+      upperCopyId,
+      'upper',
+      'mid-mask',
+      belowCopyId,
+      'below',
+    ]);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(upperCopyId);
+    expect(getPanelSelectedIds()).toEqual([upperCopyId, belowCopyId]);
+    expect(engine.exports.hasExportableLayerContent(upperCopyId!)).toBe(true);
+    expect(engine.exports.hasExportableLayerContent(belowCopyId!)).toBe(true);
+
+    engine.history.undo();
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual(['upper', 'mid-mask', 'below']);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe('upper');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+
+    engine.history.redo();
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([
+      upperCopyId,
+      'upper',
+      'mid-mask',
+      belowCopyId,
+      'below',
+    ]);
+    expect(engine.exports.hasExportableLayerContent(upperCopyId!)).toBe(true);
+    expect(engine.exports.hasExportableLayerContent(belowCopyId!)).toBe(true);
+    expect(getPanelSelectedIds()).toEqual([upperCopyId, belowCopyId]);
+    engine.lifecycle.dispose();
+  });
+
+  it('publishes duplicate multi-selection only after successful initial, undo, and redo transactions', async () => {
+    const { engine, getPanelSelectedIds, raf, selectionChanges, setPanelSelectedIds, setRejectMutations } =
+      setup(interleavedDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+
+    setRejectMutations(true);
+    expect(() => engine.layers.duplicateLayers(['upper', 'below'])).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(0);
+    expect(engine.stores.canUndo.get()).toBe(false);
+
+    setRejectMutations(false);
+    const result = engine.layers.duplicateLayers(['upper', 'below'])!;
+    expect(getPanelSelectedIds()).toEqual(result.duplicateIds);
+    expect(selectionChanges).toHaveLength(1);
+
+    setRejectMutations(true);
+    expect(() => engine.history.undo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(result.duplicateIds);
+    expect(selectionChanges).toHaveLength(1);
+    expect(engine.stores.canUndo.get()).toBe(true);
+
+    setRejectMutations(false);
+    engine.history.undo();
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+
+    setRejectMutations(true);
+    expect(() => engine.history.redo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('merges rasters separated only by another layer group and restores them on undo', async () => {
+    const { engine, getPanelSelectedIds, raf, setPanelSelectedIds } = setup(selectedMergeDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+    const before = engine.document.getDocument()!;
+
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('merged');
+    const merged = engine.document.getDocument()!.layers[0]!;
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([merged.id, 'mid-mask']);
+    expect(merged).toMatchObject({ name: 'upper merged', type: 'raster' });
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(merged.id);
+    expect(getPanelSelectedIds()).toEqual([merged.id]);
+
+    engine.history.undo();
+    expect(engine.document.getDocument()!.layers).toEqual(before.layers);
+    expect(engine.document.getDocument()!.selectedLayerId).toBe(before.selectedLayerId);
+    expect(engine.exports.hasExportableLayerContent('upper')).toBe(true);
+    expect(engine.exports.hasExportableLayerContent('below')).toBe(true);
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+
+    engine.history.redo();
+    expect(engine.document.getDocument()!.layers.map((layer) => layer.id)).toEqual([merged.id, 'mid-mask']);
+    expect(engine.exports.hasExportableLayerContent(merged.id)).toBe(true);
+    expect(getPanelSelectedIds()).toEqual([merged.id]);
+    engine.lifecycle.dispose();
+  });
+
+  it('publishes merge selection only after successful initial, undo, and redo transactions', async () => {
+    const { engine, getPanelSelectedIds, raf, selectionChanges, setPanelSelectedIds, setRejectMutations } =
+      setup(selectedMergeDoc());
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    setPanelSelectedIds(['upper', 'below']);
+
+    setRejectMutations(true);
+    await expect(engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).rejects.toThrow(
+      'Canvas document mutation was rejected'
+    );
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(0);
+    expect(engine.stores.canUndo.get()).toBe(false);
+
+    setRejectMutations(false);
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('merged');
+    const resultId = engine.document.getDocument()!.selectedLayerId!;
+    expect(getPanelSelectedIds()).toEqual([resultId]);
+    expect(selectionChanges).toHaveLength(1);
+
+    setRejectMutations(true);
+    expect(() => engine.history.undo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual([resultId]);
+    expect(selectionChanges).toHaveLength(1);
+
+    setRejectMutations(false);
+    engine.history.undo();
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+
+    setRejectMutations(true);
+    expect(() => engine.history.redo()).toThrow('Canvas document mutation was rejected');
+    expect(getPanelSelectedIds()).toEqual(['upper', 'below']);
+    expect(selectionChanges).toHaveLength(2);
+    expect(engine.stores.canRedo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses to merge across an unselected raster because that would reorder the composite', async () => {
+    const doc = selectedMergeDoc();
+    const middle: CanvasRasterLayerContractV2 = {
+      ...(doc.layers.find((layer) => layer.id === 'below') as CanvasRasterLayerContractV2),
+      id: 'middle-raster',
+      name: 'middle-raster',
+      source: { bitmap: { height: 50, imageName: 'middle-bmp', width: 50 }, type: 'paint' },
+    };
+    const upper = doc.layers.find((layer) => layer.id === 'upper')!;
+    const below = doc.layers.find((layer) => layer.id === 'below')!;
+    const withRasterGap = { ...doc, layers: [upper, middle, below] };
+    const { engine, raf } = setup(withRasterGap);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('nothing');
+    expect(engine.document.getDocument()!.layers).toEqual(withRasterGap.layers);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('refuses selected non-normal blend modes instead of changing their backdrop interaction', async () => {
+    const doc = interleavedDoc();
+    const { engine, raf } = setup(doc);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    expect(await engine.layers.mergeSelectedRasterLayers(['upper', 'below'])).toBe('nothing');
+    expect(engine.document.getDocument()!.layers).toEqual(doc.layers);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
+
+  it('declines oversized duplicate and merge batches before unbounded transaction copies', async () => {
+    const size = 4096;
+    const layers = ['top', 'middle', 'bottom'].map((id): CanvasLayerContract => ({
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      name: id,
+      opacity: 1,
+      source: { bitmap: { height: size, imageName: `${id}-bmp`, width: size }, type: 'paint' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster',
+    }));
+    const doc: CanvasDocumentContractV2 = {
+      ...twoPaintDoc(),
+      height: size,
+      layers,
+      selectedLayerId: 'top',
+      width: size,
+    };
+    const { engine, raf, surfaces } = setup(doc);
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+    const afterRasterization = surfaces.length;
+
+    expect(engine.layers.duplicateLayers(layers.map((layer) => layer.id))).toBeNull();
+    expect(surfaces).toHaveLength(afterRasterization);
+    expect(await engine.layers.mergeSelectedRasterLayers(layers.map((layer) => layer.id))).toBe('over-budget');
+    expect(engine.document.getDocument()!.layers).toEqual(layers);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    engine.lifecycle.dispose();
+  });
 
   it('waits for contributor rasterization before applying one atomic insertion', async () => {
     const { engine, raf } = setup(interleavedDoc());
@@ -7231,11 +7718,12 @@ const selectedImageDoc = (
 });
 
 describe('nudgeSelectedLayer', () => {
-  const setup = (doc: CanvasDocumentContractV2) => {
+  const setup = (doc: CanvasDocumentContractV2, selectedLayerIds?: readonly string[]) => {
     const { store } = createFakeStore(doc);
     const dispatch = store.dispatch as Mock;
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
+      getSelectedLayerIds: () => selectedLayerIds ?? (doc.selectedLayerId ? [doc.selectedLayerId] : []),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -7283,6 +7771,31 @@ describe('nudgeSelectedLayer', () => {
       id: 'a',
       patch: { transform: { x: 0, y: 0 } },
       type: 'updateCanvasLayer',
+    });
+    engine.lifecycle.dispose();
+  });
+
+  it('nudges every selected layer together and undoes the batch atomically', () => {
+    const doc = selectedImageDoc();
+    const second = { ...rasterLayer('b'), transform: { ...rasterLayer('b').transform, x: 10, y: 20 } };
+    const { dispatch, engine } = setup({ ...doc, layers: [doc.layers[0]!, second] }, ['a', 'b']);
+
+    engine.layers.nudgeSelectedLayer(3, -2);
+    expect(dispatch).toHaveBeenNthCalledWith(1, {
+      type: 'setCanvasLayerPositions',
+      updates: [
+        { id: 'a', x: 3, y: -2 },
+        { id: 'b', x: 13, y: 18 },
+      ],
+    });
+
+    engine.history.undo();
+    expect(dispatch).toHaveBeenNthCalledWith(2, {
+      type: 'setCanvasLayerPositions',
+      updates: [
+        { id: 'a', x: 0, y: 0 },
+        { id: 'b', x: 10, y: 20 },
+      ],
     });
     engine.lifecycle.dispose();
   });
@@ -7651,7 +8164,7 @@ describe('setStagedPreview', () => {
     await flushMicrotasks();
     raf.flush();
 
-    expect(resolver).toHaveBeenCalledWith('staged-candidate');
+    expect(resolver).toHaveBeenCalledWith('staged-candidate', expect.any(AbortSignal));
     // The decoded (stub, 0-sized) surface is drawn at the current bbox origin.
     expect(stagedDraws(screen.surface).at(-1)!.slice(1, 3)).toEqual([5, 7]);
 
@@ -11995,6 +12508,7 @@ describe('guarded filter previews', () => {
       }
 
       expect(engine.stores.documentEditingLocked.get()).toBe(true);
+      expect(engine.stores.documentEditingLayerId.get()).toBe('L');
       engine.history.undo();
       expect(
         engine.layers.applyStructuralPreview({ id: 'L', patch: { opacity: 0.2 }, type: 'updateCanvasLayer' })
@@ -12026,6 +12540,7 @@ describe('guarded filter previews', () => {
         operation?.cancel();
       }
       expect(engine.stores.documentEditingLocked.get()).toBe(false);
+      expect(engine.stores.documentEditingLayerId.get()).toBeNull();
       engine.history.undo();
       expect(engine.document.getDocument()!.layers[0]?.name).toBe('L');
       engine.lifecycle.dispose();
@@ -12580,7 +13095,8 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
       .spyOn(canvasApplicationPort, 'uploadImage')
       .mockResolvedValue({ height: 40, imageName: 'persisted-before-mirror-refresh.png', width: 60 });
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      // The trim reads alpha to decide a layer still has content; declare it does.
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: reducer.projectId,
       reportError,
@@ -12621,6 +13137,110 @@ describe('document mirror wiring: prop vs source change (paint-pixel survival)',
 
     unsubscribeStroke();
     unsubscribeThrower();
+    engine.lifecycle.dispose();
+    uploadImage.mockRestore();
+  });
+
+  it('defers paint-cache trimming while a guarded canvas operation owns the layer', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reducer = createReducerBackedStore(paintDoc());
+    const uploadImage = vi
+      .spyOn(canvasApplicationPort, 'uploadImage')
+      .mockResolvedValue({ height: 40, imageName: 'persisted-after-operation.png', width: 60 });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    expect(getCanvasOperations(engine).startFilterOperation('paint1')).toBe('started');
+    expect(getCanvasOperations(engine).setFilterOperationAutoProcess(false)).toBe('updated');
+
+    let barrierSettled = false;
+    const barrier = engine.lifecycle.flushPendingUploads().then(() => {
+      barrierSettled = true;
+    });
+    await flushMicrotasks();
+    expect(barrierSettled).toBe(false);
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({ status: 'active' });
+
+    getCanvasOperations(engine).cancelFilterOperation();
+    await expect(barrier).resolves.toBeUndefined();
+    expect(uploadImage).toHaveBeenCalledOnce();
+
+    engine.lifecycle.dispose();
+    uploadImage.mockRestore();
+  });
+
+  it('persists once a raster snapshot has detached the pixels it needs', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reducer = createReducerBackedStore(paintDoc());
+    const uploadImage = vi
+      .spyOn(canvasApplicationPort, 'uploadImage')
+      .mockResolvedValue({ height: 40, imageName: 'persisted-after-snapshot.png', width: 60 });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend({ readbackAlpha: 255 }),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    raf.flush();
+    await flushMicrotasks();
+    raf.flush();
+
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    const documentSnapshot = engine.document.captureSnapshot();
+    if (!documentSnapshot) {
+      throw new Error('expected a document snapshot');
+    }
+    const capture = engine.exports.captureRasterSnapshot(documentSnapshot, ['paint1']);
+
+    const captured = await capture;
+    expect(captured.status).toBe('ok');
+    if (captured.status === 'ok') {
+      captured.snapshot.release();
+    }
+    await expect(engine.lifecycle.flushPendingUploads()).resolves.toBeUndefined();
+    expect(uploadImage).toHaveBeenCalledOnce();
+
     engine.lifecycle.dispose();
     uploadImage.mockRestore();
   });

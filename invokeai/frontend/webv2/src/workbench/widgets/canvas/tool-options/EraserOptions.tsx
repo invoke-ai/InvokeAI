@@ -1,108 +1,36 @@
-import type { NumberInput as ChakraNumberInput, SliderValueChangeDetails } from '@chakra-ui/react';
-
-import { HStack, NumberInput, Text } from '@chakra-ui/react';
-import { Slider } from '@platform/ui';
-import { MAX_BRUSH_SIZE, MIN_BRUSH_SIZE } from '@workbench/canvas-engine/api';
+import { HStack } from '@chakra-ui/react';
 import { useEraserOptions } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ToolOptionsComponentProps } from './ToolOptionsBar';
 
-/** Same rationale as `BrushOptions`: the slider tops out below `MAX_BRUSH_SIZE`; the numeric input reaches the full range. */
-const SLIDER_MAX_SIZE = 600;
-
-const formatSizePx = (value: number): string => `${Math.round(value)}px`;
-const formatOpacityPercent = (value: number): string => `${Math.round(value)}%`;
+import { clampBrushSize, PaintSizeOpacityControls } from './BrushOptions';
 
 /** Eraser tool options: size (slider + numeric) and opacity. */
 export const EraserOptions = ({ engine }: ToolOptionsComponentProps) => {
   const { t } = useTranslation();
   const options = useEraserOptions(engine);
 
-  const sizeAriaLabel = useMemo(() => [t('widgets.canvas.toolOptions.eraserSize')], [t]);
-  const opacityAriaLabel = useMemo(() => [t('widgets.canvas.toolOptions.opacity')], [t]);
-  const sliderValue = useMemo(() => [Math.min(options.size, SLIDER_MAX_SIZE)], [options.size]);
-  const opacityValue = useMemo(() => [Math.round(options.opacity * 100)], [options.opacity]);
-  const numberInputValue = useMemo(() => String(Math.round(options.size)), [options.size]);
-
   const setSize = useCallback(
-    (size: number) => engine.interaction.set('eraserOptions', { ...options, size }),
+    (size: number) => engine.interaction.set('eraserOptions', { ...options, size: clampBrushSize(size) }),
     [engine, options]
   );
 
-  const onSliderSizeChange = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
-      if (next !== undefined && Number.isFinite(next)) {
-        setSize(next);
-      }
-    },
-    [setSize]
-  );
-
-  const onNumberSizeChange = useCallback(
-    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
-      if (Number.isFinite(valueAsNumber)) {
-        setSize(valueAsNumber);
-      }
-    },
-    [setSize]
-  );
-
-  const onOpacityChange = useCallback(
-    ({ value }: SliderValueChangeDetails) => {
-      const next = value[0];
-      if (next !== undefined && Number.isFinite(next)) {
-        engine.interaction.set('eraserOptions', { ...options, opacity: next / 100 });
-      }
-    },
+  const setOpacity = useCallback(
+    (opacity: number) => engine.interaction.set('eraserOptions', { ...options, opacity }),
     [engine, options]
   );
 
   return (
     <HStack align="center" gap="3">
-      <HStack align="center" gap="1.5">
-        <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.size')}
-        </Text>
-        <Slider
-          aria-label={sizeAriaLabel}
-          formatValue={formatSizePx}
-          max={SLIDER_MAX_SIZE}
-          min={MIN_BRUSH_SIZE}
-          size="sm"
-          value={sliderValue}
-          w="7rem"
-          onValueChange={onSliderSizeChange}
-        />
-        <NumberInput.Root
-          max={MAX_BRUSH_SIZE}
-          min={MIN_BRUSH_SIZE}
-          size="xs"
-          value={numberInputValue}
-          w="4.5rem"
-          onValueChange={onNumberSizeChange}
-        >
-          <NumberInput.Control />
-          <NumberInput.Input aria-label={t('widgets.canvas.toolOptions.eraserSize')} fontSize="xs" />
-        </NumberInput.Root>
-      </HStack>
-      <HStack align="center" gap="1.5">
-        <Text color="fg.muted" fontSize="2xs">
-          {t('widgets.canvas.toolOptions.opacity')}
-        </Text>
-        <Slider
-          aria-label={opacityAriaLabel}
-          formatValue={formatOpacityPercent}
-          max={100}
-          min={0}
-          size="sm"
-          value={opacityValue}
-          w="6rem"
-          onValueChange={onOpacityChange}
-        />
-      </HStack>
+      <PaintSizeOpacityControls
+        opacity={options.opacity}
+        setOpacity={setOpacity}
+        setSize={setSize}
+        size={options.size}
+        sizeLabel={t('widgets.canvas.toolOptions.eraserSize')}
+      />
     </HStack>
   );
 };

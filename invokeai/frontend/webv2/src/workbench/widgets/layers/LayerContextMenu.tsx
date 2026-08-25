@@ -20,7 +20,8 @@ import { deleteLayerActions, duplicateLayerActions } from '@workbench/canvasLaye
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { useCanvasDocumentEditingLocked, useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { publishLayerPanelSelection, readLayerPanelSelection } from '@workbench/workbenchStore';
 import {
   ArrowRightLeftIcon,
   ArrowUpDownIcon,
@@ -208,6 +209,7 @@ const LayerMenu = ({
   showGroupLabels,
 }: LayerMenuProps) => {
   const { t } = useTranslation();
+  const projectId = useActiveProjectId();
   const { widgets } = useWorkbenchCommands();
   const notify = useNotify();
   const base = useSelectedModelBase();
@@ -311,10 +313,16 @@ const LayerMenu = ({
 
   const getActionLabel = useCallback(
     (id: LayerContextActionId) => {
+      if (id === 'duplicate') {
+        const panelSelection = readLayerPanelSelection(projectId, document.selectedLayerId);
+        if (panelSelection.selectedIds.includes(layer.id) && panelSelection.selectedIds.length > 1) {
+          return t('widgets.layers.actions.duplicateSelected');
+        }
+      }
       const action = actions.find((entry) => entry.id === id);
       return action ? t(action.labelKey, { defaultValue: action.defaultLabel }) : id;
     },
-    [actions, t]
+    [actions, document.selectedLayerId, layer.id, projectId, t]
   );
 
   const makeStatusError = useCallback(
@@ -323,9 +331,22 @@ const LayerMenu = ({
   );
 
   const handleDuplicate = useCallback(() => {
+    if (engine) {
+      const panelSelection = readLayerPanelSelection(projectId, document.selectedLayerId);
+      const sourceIds = panelSelection.selectedIds.includes(layer.id) ? panelSelection.selectedIds : [layer.id];
+      const result = engine.layers.duplicateLayers(sourceIds);
+      if (result) {
+        publishLayerPanelSelection({
+          primaryId: result.selectedLayerId,
+          projectId,
+          selectedIds: result.duplicateIds,
+        });
+      }
+      return;
+    }
     const { forward, inverse } = duplicateLayerActions(layer.id, createLayerId());
     applyStructural(engine, dispatch, t('widgets.layers.actions.duplicate'), forward, inverse);
-  }, [dispatch, engine, layer.id, t]);
+  }, [dispatch, document.selectedLayerId, engine, layer.id, projectId, t]);
 
   const handleDelete = useCallback(() => {
     const { forward, inverse } = deleteLayerActions(layer, index);

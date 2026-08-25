@@ -47,6 +47,8 @@ export interface CreateRasterSnapshotCaptureDeps {
     layerId: string,
     options: { includeDisabled?: boolean; signal?: AbortSignal }
   ) => Promise<ExportLayerPixelsResult>;
+  /** Guards paint-cache trimming while snapshot capture reads live layer pixels. */
+  readonly pinForTrim?: (layerId: string, generation: number) => { release(): void };
 }
 
 export interface RasterSnapshotCapture {
@@ -146,6 +148,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
     }
     const reservationLeases: { release(): void }[] = [reservation.lease];
     const pinLeases = uniqueLayerIds.map((layerId) => memory.pin(layerId, captureLifecycleGeneration));
+    const trimPinLeases = uniqueLayerIds.map((layerId) => deps.pinForTrim?.(layerId, captureLifecycleGeneration));
     const layerSurfaces = new Map<string, { rect: Rect; surface: RasterSurface }>();
     const emptyLayerIds = new Set<string>();
     const capturedGuards: LayerExportGuard[] = [];
@@ -242,6 +245,9 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       }
       for (const lease of pinLeases) {
         lease.release();
+      }
+      for (const lease of trimPinLeases) {
+        lease?.release();
       }
     }
   };

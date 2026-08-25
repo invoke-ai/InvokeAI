@@ -1,4 +1,5 @@
 import type {
+  CanvasControlLayerContract,
   CanvasDocumentContractV2,
   CanvasImageRef,
   CanvasLayerContract,
@@ -10,7 +11,7 @@ import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.t
 import type { Rect } from '@workbench/canvas-operations/generationContracts';
 
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { planComposites } from '@workbench/canvas-operations/generationCompositePlan';
+import { planComposites, planControlComposites } from '@workbench/canvas-operations/generationCompositePlan';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExecuteCompositePlanDeps } from './compositeForGeneration';
@@ -18,6 +19,7 @@ import type { ExecuteCompositePlanDeps } from './compositeForGeneration';
 import {
   createCompositeDedupeCache,
   executeCompositePlan,
+  executeControlComposite,
   executeMaskComposite,
   toGrayscaleMaskPixels,
 } from './compositeForGeneration';
@@ -37,6 +39,21 @@ const rasterLayer = (
   source: { image: imageRef(id), type: 'image' },
   transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
   type: 'raster',
+  ...overrides,
+});
+
+const controlLayer = (id: string, overrides: Partial<CanvasControlLayerContract> = {}): CanvasControlLayerContract => ({
+  adapter: { beginEndStepPct: [0, 1], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 1 },
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { image: imageRef(id), type: 'image' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'control',
+  withTransparencyEffect: true,
   ...overrides,
 });
 
@@ -264,6 +281,24 @@ describe('executeCompositePlan — upload + dedupe', () => {
     expect(harness.uploadImage).toHaveBeenCalledTimes(1);
     expect(resultB.base.reusedUpload).toBe(true);
     expect(resultB.base.imageName).toBe('uploaded-1');
+  });
+});
+
+describe('executeControlComposite', () => {
+  it('flattens transparent control pixels over black without a CPU readback', async () => {
+    const readImageData = vi.fn(() => uniformImageData(100, 100, 0));
+    const harness = makeHarness(readImageData);
+    const control = planControlComposites(makeDoc([controlLayer('control')]), BBOX)[0];
+    expect(control).toBeDefined();
+
+    await executeControlComposite(control!.entry, harness.deps);
+
+    const target = harness.createdTargets[0]!;
+    expect(target.callLog).toContainEqual({ args: ['globalCompositeOperation', 'destination-over'], op: 'set' });
+    expect(target.callLog).toContainEqual({ args: ['fillStyle', 'black'], op: 'set' });
+    expect(target.callLog).toContainEqual({ args: [0, 0, 100, 100], op: 'fillRect' });
+    expect(readImageData).not.toHaveBeenCalled();
+    expect(harness.encodeSurface).toHaveBeenCalledWith(target);
   });
 });
 

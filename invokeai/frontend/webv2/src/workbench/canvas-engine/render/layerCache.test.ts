@@ -301,6 +301,111 @@ describe('growToRect (paint caches grow with strokes)', () => {
   });
 });
 
+describe('shrinkToRect (paint caches trim back to their visible pixels)', () => {
+  /** A published 40x40 cache at (10,10) — the shape a chunk-padded stroke leaves. */
+  const published = () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    const entry = store.growToRect('L', { height: 40, width: 40, x: 10, y: 10 });
+    store.publishPixels('L');
+    return { entry, store };
+  };
+
+  it('returns undefined for a layer with no cache', () => {
+    const store = createLayerCacheStore(createTestStubRasterBackend());
+    expect(store.shrinkToRect('missing', { height: 1, width: 1, x: 0, y: 0 })).toBeUndefined();
+  });
+
+  it('crops to the target rect with a NEGATIVE blit offset, preserving surface identity', () => {
+    const { entry, store } = published();
+    const trimmed = store.shrinkToRect('L', { height: 10, width: 10, x: 25, y: 30 });
+
+    expect(trimmed).toBe(entry);
+    expect(trimmed?.rect).toEqual({ height: 10, width: 10, x: 25, y: 30 });
+    expect(trimmed?.surface).toBe(entry.surface);
+    // Old origin (10,10) minus new origin (25,30) = (-15,-20), in one GPU blit.
+    const log = (entry.surface as StubRasterSurface).callLog;
+    expect(log.filter((e) => e.op === 'resizePreserving').map((e) => e.args)).toEqual([[10, 10, -15, -20]]);
+    expect(log.map((e) => e.op)).not.toContain('getImageData');
+    expect(log.map((e) => e.op)).not.toContain('putImageData');
+  });
+
+  it('collapses to a zero-rect surface via resize (not a blit) for an empty target', () => {
+    const { entry, store } = published();
+    const emptied = store.shrinkToRect('L', { height: 0, width: 0, x: 0, y: 0 });
+
+    expect(emptied?.rect).toEqual({ height: 0, width: 0, x: 10, y: 10 });
+    expect(emptied?.surface.width).toBe(0);
+    expect(emptied?.surface.height).toBe(0);
+    const resizes = (entry.surface as StubRasterSurface).callLog.filter((e) => e.op === 'resize');
+    expect(resizes.map((e) => e.args)).toEqual([[0, 0]]);
+  });
+
+  it('keeps the ENTRY alive when collapsed, so an undo can re-grow into it', () => {
+    const { store } = published();
+    store.shrinkToRect('L', { height: 0, width: 0, x: 0, y: 0 });
+
+    expect(store.peek('L')).toBeDefined();
+    const regrown = store.growToRect('L', { height: 8, width: 8, x: 12, y: 14 });
+    expect(regrown.rect).toEqual({ height: 8, width: 8, x: 12, y: 14 });
+  });
+
+  it('CLAMPS a request reaching outside the extent and never grows the cache', () => {
+    const { store } = published();
+    const clamped = store.shrinkToRect('L', { height: 400, width: 400, x: -100, y: -100 });
+    // Intersection with [10,50)² is the whole current extent → a no-op.
+    expect(clamped?.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
+
+    const partial = store.shrinkToRect('L', { height: 100, width: 100, x: 30, y: 30 });
+    expect(partial?.rect).toEqual({ height: 20, width: 20, x: 30, y: 30 });
+  });
+
+  it('is a no-op — no resize, no version bump, no notify — when the rect already matches', () => {
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
+    const entry = store.growToRect('L', { height: 40, width: 40, x: 10, y: 10 });
+    store.publishPixels('L');
+    onVersionChange.mockClear();
+    const versionBefore = entry.version;
+    const logLength = (entry.surface as StubRasterSurface).callLog.length;
+
+    const again = store.shrinkToRect('L', { height: 40, width: 40, x: 10, y: 10 });
+    expect(again).toBe(entry);
+    expect(again?.version).toBe(versionBefore);
+    expect((entry.surface as StubRasterSurface).callLog.length).toBe(logLength);
+    expect(onVersionChange).not.toHaveBeenCalled();
+  });
+
+  it('bumps the version even when no pixels were ever published', () => {
+    // A shrink destroys pixels, so an in-flight rasterization job must invalidate.
+    const onVersionChange = vi.fn();
+    const store = createLayerCacheStore(createTestStubRasterBackend(), { onVersionChange });
+    const entry = store.getOrCreateRect('L', { height: 40, width: 40, x: 0, y: 0 });
+    expect(entry.hasPublishedPixels).toBe(false);
+    const versionBefore = entry.version;
+
+    store.shrinkToRect('L', { height: 10, width: 10, x: 0, y: 0 });
+    expect(entry.version).toBe(versionBefore + 1);
+    expect(onVersionChange).toHaveBeenCalledWith('L');
+  });
+
+  it('leaves stale and hasPublishedPixels untouched — the surviving pixels are still fresh', () => {
+    const { entry, store } = published();
+    store.shrinkToRect('L', { height: 10, width: 10, x: 10, y: 10 });
+    expect(entry.stale).toBe(false);
+    expect(entry.hasPublishedPixels).toBe(true);
+  });
+
+  it('drops the damage trail, since every recorded surface-local rect is now void', () => {
+    const { entry, store } = published();
+    const version = entry.version;
+    store.publishPixels('L', { height: 4, width: 4, x: 0, y: 0 });
+    expect(store.damageSince('L', version)).not.toBeNull();
+
+    store.shrinkToRect('L', { height: 10, width: 10, x: 20, y: 20 });
+    expect(store.damageSince('L', version)).toBeNull();
+  });
+});
+
 describe('damageSince', () => {
   const seeded = () => {
     const store = createLayerCacheStore(createTestStubRasterBackend());

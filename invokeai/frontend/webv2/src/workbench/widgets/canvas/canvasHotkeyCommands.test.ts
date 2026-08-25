@@ -47,6 +47,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     ...interaction,
   };
   const engine = {
+    projectId: 'project',
     history: { redo: vi.fn(), undo: vi.fn() },
     interaction: {
       get: vi.fn((key: string) => state[key]),
@@ -57,6 +58,7 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
     layers: {
       clearMask: vi.fn(),
       commitStructural: vi.fn(),
+      duplicateLayers: vi.fn(() => ({ duplicateIds: ['new-layer'], selectedLayerId: 'new-layer' })),
       mergeLayerDown: vi.fn(),
       nudgeSelectedLayer: vi.fn(),
     },
@@ -78,7 +80,6 @@ let pasteFromClipboard: Mock<() => void>;
 
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
   copySelection,
-  createLayerId: () => 'new-layer',
   dispatch,
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
   engine: createEngine(),
@@ -86,6 +87,7 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   hasStagingSlots: false,
   isInteractionLocked: false,
   pasteFromClipboard,
+  selectedLayerIds: ['a'],
   t: (key) => key,
   ...overrides,
 });
@@ -191,6 +193,7 @@ describe('layer reorder', () => {
     (commandId) => {
       const engine = run(commandId, {
         document: documentOf([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')], 'b'),
+        selectedLayerIds: ['b'],
       });
       expect(engine.layers.commitStructural).toHaveBeenCalledWith(
         'widgets.canvas.commands.reorderLayer',
@@ -213,6 +216,25 @@ describe('layer reorder', () => {
   it('is a no-op without an engine', () => {
     expect(() => executeCanvasHotkeyCommand('canvas.layerForward', contextOf({ engine: null }))).not.toThrow();
   });
+
+  it('moves the full multi-selection within each layer type group', () => {
+    const layers = [
+      rasterLayer('c1', { type: 'control' }),
+      rasterLayer('r1'),
+      rasterLayer('c2', { type: 'control' }),
+      rasterLayer('r2'),
+    ];
+    const engine = run('canvas.layerForward', {
+      document: documentOf(layers, 'c2'),
+      selectedLayerIds: ['c2', 'r2'],
+    });
+
+    expect(engine.layers.commitStructural).toHaveBeenCalledWith(
+      'widgets.canvas.commands.reorderLayer',
+      { orderedIds: ['c2', 'r2', 'c1', 'r1'], type: 'reorderCanvasLayers' },
+      { orderedIds: ['c1', 'r1', 'c2', 'r2'], type: 'reorderCanvasLayers' }
+    );
+  });
 });
 
 describe('delete: pixels vs layer', () => {
@@ -232,6 +254,26 @@ describe('delete: pixels vs layer', () => {
     );
   });
 
+  it('deletes the full Layers-panel selection as one history edit', () => {
+    const layers = [rasterLayer('a'), rasterLayer('b'), rasterLayer('c')];
+    const engine = run('canvas.deleteSelected', { document: documentOf(layers, 'a'), selectedLayerIds: ['a', 'c'] });
+
+    expect(engine.layers.commitStructural).toHaveBeenCalledWith(
+      'widgets.canvas.commands.deleteLayer',
+      { ids: ['a', 'c'], type: 'removeCanvasLayers' },
+      expect.objectContaining({ orderedIds: ['a', 'b', 'c'], selectedLayerId: 'a' })
+    );
+  });
+
+  it('does not delete when any selected layer is locked', () => {
+    const engine = run('canvas.deleteSelected', {
+      document: documentOf([rasterLayer('a'), rasterLayer('b', { isLocked: true })], 'a'),
+      selectedLayerIds: ['a', 'b'],
+    });
+
+    expect(engine.layers.commitStructural).not.toHaveBeenCalled();
+  });
+
   it('does nothing with neither a selection nor a selected layer', () => {
     const engine = run('canvas.deleteSelected', { document: documentOf([rasterLayer('a')], null) });
     expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
@@ -246,13 +288,14 @@ describe('duplicate: lift vs whole layer', () => {
     expect(engine.layers.commitStructural).not.toHaveBeenCalled();
   });
 
-  it('duplicates the whole layer with no pixel selection, using the injected id', () => {
+  it('duplicates the whole layer with no pixel selection', () => {
     const engine = run('canvas.duplicateLayer');
-    expect(engine.layers.commitStructural).toHaveBeenCalledWith(
-      'widgets.canvas.commands.duplicateLayer',
-      { newId: 'new-layer', sourceId: 'a', type: 'duplicateCanvasLayer' },
-      { ids: ['new-layer'], type: 'removeCanvasLayers' }
-    );
+    expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a']);
+  });
+
+  it('duplicates every selected layer as one engine operation', () => {
+    const engine = run('canvas.duplicateLayer', { selectedLayerIds: ['a', 'b'] });
+    expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a', 'b']);
   });
 });
 

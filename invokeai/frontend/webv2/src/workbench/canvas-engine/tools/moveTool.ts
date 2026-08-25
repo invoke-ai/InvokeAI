@@ -1,5 +1,5 @@
 /**
- * The move tool: drag to move the SELECTED layer, or the selected PIXELS.
+ * The move tool: drag to move the SELECTED layer group, or the selected PIXELS.
  *
  * Interaction contract:
  * - **The layers panel is the sole authority on which layer is active.** The move
@@ -16,11 +16,11 @@
  *   deselect, tool switch — one undo entry for the whole move) or cancelled
  *   (Escape). This is the Photoshop feel: ants present and the press inside them
  *   moves pixels; otherwise the press moves the layer.
- * - **Drag anywhere else**: moves the document's `selectedLayerId`, when that
- *   layer is enabled and unlocked. Hidden/locked layers are never dragged, and a
- *   press over empty space still drags the selected layer (the grab point is
- *   irrelevant). Pointer-move only sets a transient transform override (live
- *   preview) — it never dispatches.
+ * - **Drag anywhere else**: moves every panel-selected layer together, when all
+ *   are enabled and unlocked. The document's `selectedLayerId` remains the
+ *   primary target and a stale selection falls back to that layer alone.
+ *   Pointer-move only sets transient transform overrides (live preview) — it
+ *   never dispatches.
  * - **`shift`** constrains motion to the dominant axis, for both modes.
  * - **Snap**: with the snap-to-grid setting on, a LAYER drag lands its origin on
  *   the model grid (the one the overlay draws); hold **alt** to bypass. Moving
@@ -63,7 +63,10 @@ export const constrainDelta = (dx: number, dy: number, shift: boolean): Vec2 => 
 
 /** Which thing this gesture moves. */
 type DragMode =
-  | { kind: 'layer'; targetId: string; origin: { x: number; y: number } }
+  | {
+      kind: 'layer';
+      targets: readonly { id: string; origin: { x: number; y: number }; primary: boolean }[];
+    }
   | { kind: 'float'; layerId: string; origin: LayerTransform }
   | { kind: 'none' };
 
@@ -80,7 +83,9 @@ export const createMoveTool = (): Tool => {
 
   const clearOverride = (ctx: ToolContext): void => {
     if (state?.mode.kind === 'layer') {
-      ctx.setLayerTransformOverride(state.mode.targetId, null);
+      for (const target of state.mode.targets) {
+        ctx.setLayerTransformOverride(target.id, null);
+      }
     }
   };
 
@@ -92,11 +97,17 @@ export const createMoveTool = (): Tool => {
    * The drag target is the document's selected layer, and nothing else — the
    * press point plays no part in choosing it.
    */
-  const selectedDraggableLayer = (ctx: ToolContext): CanvasLayerContract | null => {
+  const selectedDraggableLayers = (ctx: ToolContext): readonly CanvasLayerContract[] => {
     const doc = ctx.getDocument();
     const selectedId = doc?.selectedLayerId;
-    const selected = doc && selectedId ? doc.layers.find((layer) => layer.id === selectedId) : undefined;
-    return selected && isDraggable(selected) ? selected : null;
+    if (!doc || !selectedId) {
+      return [];
+    }
+    const requested = new Set(ctx.getSelectedLayerIds?.() ?? [selectedId]);
+    const selected = doc.layers.filter((layer) => requested.has(layer.id));
+    return requested.has(selectedId) && selected.length === requested.size && selected.every(isDraggable)
+      ? selected
+      : [];
   };
 
   /**
@@ -108,17 +119,25 @@ export const createMoveTool = (): Tool => {
     if (existing) {
       return { kind: 'float', layerId: existing.layerId, origin: { ...existing.transform } };
     }
-    const layer = selectedDraggableLayer(ctx);
-    if (!layer) {
+    const layers = selectedDraggableLayers(ctx);
+    const primary = layers.find((layer) => layer.id === ctx.getDocument()?.selectedLayerId);
+    if (!primary) {
       return { kind: 'none' };
     }
-    if (ctx.isPointInSelection?.(point) && ctx.liftFloatingSelection?.(layer.id)) {
+    if (ctx.isPointInSelection?.(point) && ctx.liftFloatingSelection?.(primary.id)) {
       const lifted = ctx.getFloatingSelection?.();
       if (lifted) {
         return { kind: 'float', layerId: lifted.layerId, origin: { ...lifted.transform } };
       }
     }
-    return { kind: 'layer', origin: { x: layer.transform.x, y: layer.transform.y }, targetId: layer.id };
+    return {
+      kind: 'layer',
+      targets: layers.map((layer) => ({
+        id: layer.id,
+        origin: { x: layer.transform.x, y: layer.transform.y },
+        primary: layer === primary,
+      })),
+    };
   };
 
   /** The constrained document-space delta from the gesture start to `input`. */
@@ -144,7 +163,15 @@ export const createMoveTool = (): Tool => {
   const applyDelta = (ctx: ToolContext, current: GestureState, input: PointerInput): void => {
     const delta = deltaFor(current, input);
     if (current.mode.kind === 'layer') {
-      ctx.setLayerTransformOverride(current.mode.targetId, nextLayerPosition(ctx, current.mode.origin, input, delta));
+      const primary = current.mode.targets.find((target) => target.primary)!;
+      const primaryNext = nextLayerPosition(ctx, primary.origin, input, delta);
+      const effectiveDelta = { x: primaryNext.x - primary.origin.x, y: primaryNext.y - primary.origin.y };
+      for (const target of current.mode.targets) {
+        ctx.setLayerTransformOverride(target.id, {
+          x: target.origin.x + effectiveDelta.x,
+          y: target.origin.y + effectiveDelta.y,
+        });
+      }
       return;
     }
     if (current.mode.kind === 'float') {
@@ -231,23 +258,48 @@ export const createMoveTool = (): Tool => {
         return;
       }
 
-      const origin = current.mode.origin;
-      const next = nextLayerPosition(ctx, origin, input, deltaFor(current, input));
+      const primary = current.mode.targets.find((target) => target.primary)!;
+      const primaryNext = nextLayerPosition(ctx, primary.origin, input, deltaFor(current, input));
+      const effectiveDelta = { x: primaryNext.x - primary.origin.x, y: primaryNext.y - primary.origin.y };
 
-      if (next.x === origin.x && next.y === origin.y) {
+      if (effectiveDelta.x === 0 && effectiveDelta.y === 0) {
         // Nothing moved — either a zero-delta drag, or a drag whose snapped
         // result landed back on the origin. Drop the preview, commit nothing.
-        ctx.setLayerTransformOverride(current.mode.targetId, null);
+        for (const target of current.mode.targets) {
+          ctx.setLayerTransformOverride(target.id, null);
+        }
         return;
       }
 
-      ctx.commitStructural(
-        'Move layer',
-        { id: current.mode.targetId, patch: { transform: { x: next.x, y: next.y } }, type: 'updateCanvasLayer' },
-        { id: current.mode.targetId, patch: { transform: { x: origin.x, y: origin.y } }, type: 'updateCanvasLayer' }
-      );
+      const next = current.mode.targets.map((target) => ({
+        id: target.id,
+        x: target.origin.x + effectiveDelta.x,
+        y: target.origin.y + effectiveDelta.y,
+      }));
+      if (current.mode.targets.length === 1) {
+        ctx.commitStructural(
+          'Move layer',
+          { id: primary.id, patch: { transform: { x: primaryNext.x, y: primaryNext.y } }, type: 'updateCanvasLayer' },
+          {
+            id: primary.id,
+            patch: { transform: { x: primary.origin.x, y: primary.origin.y } },
+            type: 'updateCanvasLayer',
+          }
+        );
+      } else {
+        ctx.commitStructural(
+          'Move layers',
+          { type: 'setCanvasLayerPositions', updates: next },
+          {
+            type: 'setCanvasLayerPositions',
+            updates: current.mode.targets.map((target) => ({ id: target.id, ...target.origin })),
+          }
+        );
+      }
       // The committed transform now flows through the mirror; drop the preview.
-      ctx.setLayerTransformOverride(current.mode.targetId, null);
+      for (const target of current.mode.targets) {
+        ctx.setLayerTransformOverride(target.id, null);
+      }
     },
   };
 };

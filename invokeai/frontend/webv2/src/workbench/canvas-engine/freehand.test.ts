@@ -105,6 +105,14 @@ describe('strokeOutlinePolygon', () => {
     expect(strokeOutlinePolygon([], { size: 20 })).toEqual([]);
   });
 
+  it('keeps a sub-pixel tap near the requested diameter', () => {
+    const bounds = polygonBounds(strokeOutlinePolygon([{ pressure: 0.5, x: 10, y: 10 }], { last: true, size: 0.1 }));
+    expect(bounds.width).toBeGreaterThan(0);
+    expect(bounds.width).toBeLessThan(0.2);
+    expect(bounds.height).toBeGreaterThan(0);
+    expect(bounds.height).toBeLessThan(0.2);
+  });
+
   it('produces a closed, non-degenerate outline around a straight line', () => {
     const polygon = strokeOutlinePolygon(horizontalLine(0.5), { size: 20, thinning: 0 });
     expect(polygon.length).toBeGreaterThan(2);

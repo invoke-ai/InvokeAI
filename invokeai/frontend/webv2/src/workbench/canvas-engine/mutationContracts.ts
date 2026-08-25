@@ -60,6 +60,7 @@ export type CanvasProjectMutation =
   | {
       type: 'commitStagedImage';
       candidateFingerprint: string;
+      continueStaging: boolean;
       event: ProjectEvent;
       layer: CanvasRasterLayerContractV2;
       selectedImageIndex: number;
@@ -67,6 +68,7 @@ export type CanvasProjectMutation =
   | {
       type: 'rollbackStagedImageCommit';
       event: ProjectEvent;
+      continueStaging: boolean;
       layer: CanvasRasterLayerContractV2;
       selectedLayerId: string | null;
       stagingArea: CanvasStagingAreaContractV2;
@@ -84,7 +86,10 @@ export type CanvasProjectMutation =
       add?: { index: number; layers: readonly CanvasLayerContract[] };
       removeIds?: readonly string[];
       enabledUpdates: readonly { id: string; isEnabled: boolean }[];
-      selectedLayerId: string | null;
+      lockedUpdates?: readonly { id: string; isLocked: boolean }[];
+      orderedIds?: readonly string[];
+      /** Omit to preserve the current selection, repairing it if that layer is removed. */
+      selectedLayerId?: string | null;
     }
   | { type: 'removeCanvasLayers'; ids: string[] }
   | { type: 'duplicateCanvasLayer'; sourceId: string; newId: string }
@@ -92,6 +97,7 @@ export type CanvasProjectMutation =
   | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
   | { type: 'replaceCanvasLayer'; layerId: string; layer: CanvasLayerContract }
   | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
+  | { type: 'setCanvasLayerPositions'; updates: readonly { id: string; x: number; y: number }[] }
   | { type: 'setCanvasLayersHidden'; updates: readonly { id: string; isHidden: boolean }[] }
   | { type: 'updateCanvasLayerSource'; id: string; source: CanvasLayerSourceContract }
   | { type: 'updateCanvasLayerConfig'; id: string; config: CanvasLayerConfigPatch }

@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_MODEL_GRID, gridSizeForModelBase } from './bboxGrid';
 
 describe('gridSizeForModelBase', () => {
-  it('maps flux-family and sd-3 bases to a 16px grid', () => {
-    for (const base of ['flux', 'flux2', 'sd-3', 'qwen-image', 'z-image']) {
+  it('maps every 16px generation base to a 16px canvas grid', () => {
+    for (const base of ['flux', 'flux2', 'sd-3', 'qwen-image', 'z-image', 'ideogram-4', 'krea-2', 'wan']) {
       expect(gridSizeForModelBase(base)).toBe(16);
     }
   });

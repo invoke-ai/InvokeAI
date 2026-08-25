@@ -1,18 +1,18 @@
 /**
- * Canvas compositing settings — the infill / coherence / mask-blur knobs a
- * canvas inpaint or outpaint invoke exposes.
+ * Canvas compositing settings — the infill / coherence / mask-blur knobs and
+ * output-compositing policy used by canvas inpaint and outpaint invocations.
  *
  * Like {@link import('./canvasStrength').readCanvasDenoisingStrength}, these
  * values are persisted per-project inside the canvas widget's own state values
  * (`widgetInstances['canvas'].state.values`), so they survive reloads and ride
- * along in queue snapshots. The generate widget's compositing section
- * (`widgets/generate/GenerateCanvasCompositingSection`) reads/writes them, and
- * `prepareCanvasInvocation` reads them back — defaulted + clamped — to thread
- * into the pure graph compiler.
+ * along in queue snapshots. The generate widget's compositing section owns the
+ * numeric controls; the canvas settings menu owns the masked-only output flag.
+ * `prepareCanvasInvocation` reads them together — defaulted + clamped — and
+ * threads one generation-facing contract into the pure graph compiler.
  *
- * Defaults mirror the legacy params slice (`features/controlLayers/store/types.ts`
- * `getInitialParamsState`): infill `lama`, mask blur 16, coherence Gaussian Blur
- * / edge 16 / min-denoise 0. Pure data + a reader; no React, no engine.
+ * Defaults mirror the legacy params/canvas-settings slices: infill `lama`, mask
+ * blur 16, coherence Gaussian Blur / edge 16 / min-denoise 0, and masked-only
+ * output enabled. Pure data + a reader; no React, no engine.
  */
 
 /** The infill methods the outpaint graph can request (legacy `zInfillMethod`). */
@@ -39,6 +39,8 @@ export interface CanvasCompositingSettings {
   coherenceMode: CanvasCoherenceMode;
   coherenceMinDenoise: number;
   coherenceEdgeSize: number;
+  /** Preserve transparency outside the generated mask instead of compositing over the source image. */
+  outputOnlyMaskedRegions: boolean;
 }
 
 /** Persisted keys inside the canvas widget's `state.values`. */
@@ -51,9 +53,10 @@ export const CANVAS_COMPOSITING_KEYS = {
   infillPatchmatchDownscaleSize: 'infillPatchmatchDownscaleSize',
   infillTileSize: 'infillTileSize',
   maskBlur: 'maskBlur',
+  outputOnlyMaskedRegions: 'outputOnlyMaskedRegions',
 } as const;
 
-/** Legacy-parity defaults (`getInitialParamsState`). */
+/** Legacy-parity compositing and output defaults. */
 export const DEFAULT_CANVAS_COMPOSITING: CanvasCompositingSettings = {
   coherenceEdgeSize: 16,
   coherenceMinDenoise: 0,
@@ -63,6 +66,7 @@ export const DEFAULT_CANVAS_COMPOSITING: CanvasCompositingSettings = {
   infillPatchmatchDownscaleSize: 1,
   infillTileSize: 32,
   maskBlur: 16,
+  outputOnlyMaskedRegions: true,
 };
 
 /** Inclusive UI/value bounds for the numeric compositing knobs. */
@@ -110,6 +114,7 @@ export const readCanvasCompositingSettings = (
   const d = DEFAULT_CANVAS_COMPOSITING;
   const coherenceMode = v[CANVAS_COMPOSITING_KEYS.coherenceMode];
   const infillMethod = v[CANVAS_COMPOSITING_KEYS.infillMethod];
+  const outputOnlyMaskedRegions = v[CANVAS_COMPOSITING_KEYS.outputOnlyMaskedRegions];
   return {
     coherenceEdgeSize: clampInt(
       v[CANVAS_COMPOSITING_KEYS.coherenceEdgeSize],
@@ -129,5 +134,7 @@ export const readCanvasCompositingSettings = (
     ),
     infillTileSize: clampInt(v[CANVAS_COMPOSITING_KEYS.infillTileSize], 16, 256, d.infillTileSize),
     maskBlur: clampInt(v[CANVAS_COMPOSITING_KEYS.maskBlur], 0, CANVAS_MASK_BLUR_MAX, d.maskBlur),
+    outputOnlyMaskedRegions:
+      typeof outputOnlyMaskedRegions === 'boolean' ? outputOnlyMaskedRegions : d.outputOnlyMaskedRegions,
   };
 };

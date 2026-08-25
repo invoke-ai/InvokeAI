@@ -190,7 +190,7 @@ export const DEFAULT_BBOX_OPTIONS: BboxToolOptions = {
 };
 
 /** Smallest and largest brush/eraser diameters (document units) the size step clamps to. */
-export const MIN_BRUSH_SIZE = 1;
+export const MIN_BRUSH_SIZE = 0.1;
 export const MAX_BRUSH_SIZE = 2000;
 
 /** Sensible starting brush options. */
@@ -406,6 +406,8 @@ export interface EngineStores {
   cursor: ScalarStore<string>;
   thumbnailVersion: KeyedVersionStore;
   thumbnailStatus: KeyedThumbnailStatusStore;
+  /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
+  rasterContentEpoch: ScalarStore<number>;
   /** Brush tool options (size / color / opacity / pressure). */
   brushOptions: ScalarStore<BrushOptions>;
   /** Eraser tool options (size / opacity). */
@@ -549,6 +551,8 @@ export interface EngineStores {
   snapToGrid: ScalarStore<boolean>;
   /** Whether an engine-owned operation currently excludes ordinary document edits. */
   documentEditingLocked: ScalarStore<boolean>;
+  /** The layer targeted by that operation, or null when no operation is active. */
+  documentEditingLayerId: ScalarStore<string | null>;
 }
 
 const brushOptionsEqual = (a: BrushOptions, b: BrushOptions): boolean =>
@@ -671,6 +675,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   checkerColors: createScalarStore<CheckerColors>({ ...DEFAULT_CHECKER_COLORS }, checkerColorsEqual),
   cursor: createScalarStore<string>('default'),
   eraserOptions: createScalarStore<EraserOptions>({ ...DEFAULT_ERASER_OPTIONS }, eraserOptionsEqual),
+  documentEditingLayerId: createScalarStore<string | null>(null),
   documentEditingLocked: createScalarStore<boolean>(false),
   hasFloatingSelection: createScalarStore<boolean>(false),
   hasSelection: createScalarStore<boolean>(false),
@@ -684,6 +689,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   lassoPreview: createScalarStore<readonly Vec2[] | null>(null),
   marqueeOptions: createScalarStore<MarqueeToolOptions>({ ...DEFAULT_MARQUEE_OPTIONS }, marqueeOptionsEqual),
   marqueePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
+  rasterContentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),

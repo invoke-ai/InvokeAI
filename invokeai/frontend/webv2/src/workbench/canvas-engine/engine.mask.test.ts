@@ -240,7 +240,11 @@ const pointerAt = (x: number, y: number, buttons = 1): Partial<PointerEvent> =>
     timeStamp: 0,
   }) as Partial<PointerEvent>;
 
-const setupEngine = (doc: CanvasDocumentContractV2) => {
+/**
+ * `readbackAlpha` overrides the stub's opaque readback when a test needs to model
+ * transparent pixels explicitly. See `StubRasterBackendOptions`.
+ */
+const setupEngine = (doc: CanvasDocumentContractV2, options: { readbackAlpha?: number } = {}) => {
   const raf = createControllableRaf();
   vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
   vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -256,7 +260,7 @@ const setupEngine = (doc: CanvasDocumentContractV2) => {
 
   const reactive = createReactiveStore(doc);
   const engine = createCanvasEngine({
-    backend: createTestStubRasterBackend(),
+    backend: createTestStubRasterBackend(options),
     imageResolver: () => Promise.resolve(new Blob()),
     projectId: 'p1',
     store: reactive.store,
@@ -328,7 +332,7 @@ describe('inpaint mask painting', () => {
   });
 
   it('persists the mask via updateCanvasLayerConfig (bitmap + offset) after a stroke flush', async () => {
-    const { dispatch, engine, overlay } = setupEngine(maskDoc());
+    const { dispatch, engine, overlay } = setupEngine(maskDoc(), { readbackAlpha: 255 });
     engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(50, 50));

@@ -12,9 +12,9 @@ export const PRESSURE_THINNING = 0.5;
 /** Fraction to grow/shrink the brush/eraser diameter per size-step notch (ctrl+wheel or `[`/`]`). */
 export const SIZE_STEP_FACTOR = 0.1;
 
-/** Clamps a brush/eraser diameter to `[MIN_BRUSH_SIZE, MAX_BRUSH_SIZE]`, rounded to the nearest integer. */
+/** Clamps a brush/eraser diameter while retaining hundredth-pixel precision. */
 export const clampBrushSize = (value: number): number =>
-  Math.max(MIN_BRUSH_SIZE, Math.min(MAX_BRUSH_SIZE, Math.round(value)));
+  Math.max(MIN_BRUSH_SIZE, Math.min(MAX_BRUSH_SIZE, Math.round(value * 100) / 100));
 
 /**
  * Steps a brush/eraser diameter by one notch: `+1` grows by `SIZE_STEP_FACTOR`,

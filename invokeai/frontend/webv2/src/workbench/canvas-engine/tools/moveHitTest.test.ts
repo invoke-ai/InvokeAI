@@ -257,3 +257,46 @@ describe('live cache rect (freshly-painted, not-yet-flushed content)', () => {
     expect(hitTestLayer(layer, doc([layer]), { x: 5, y: 5 }, liveRect)).toBe(true);
   });
 });
+
+describe('a layer erased to nothing behaves exactly like a brand-new one', () => {
+  /**
+   * The reported bug: an erased layer kept a full-size transparent bitmap, so it still
+   * drew a movable, transformable outline around nothing. The paint-cache trim now
+   * clears it to `{ bitmap: null }` — a freshly-added layer's source — so every
+   * affordance derived from `hittableLayerRect` disappears. Pinning that equivalence
+   * is why the fix needs no change to the overlay or the tools.
+   */
+  it('reports no hittable extent once its bitmap has been cleared', () => {
+    const erased = paintLayer('erased');
+    const fresh = paintLayer('fresh');
+
+    expect(hittableLayerSize(erased, doc([erased]))).toBeNull();
+    expect(hittableLayerSize(erased, doc([erased]))).toEqual(hittableLayerSize(fresh, doc([fresh])));
+  });
+
+  it('draws no move outline, even under a non-identity transform', () => {
+    const erased: CanvasLayerContract = {
+      ...paintLayer('erased'),
+      transform: { rotation: 0.6, scaleX: 2.5, scaleY: 1.75, x: 40, y: 25 },
+    };
+    expect(layerOutlineCorners(erased, doc([erased]))).toBeNull();
+    expect(layerOutlineCorners(erased, doc([erased]), { x: 10, y: 10 })).toBeNull();
+  });
+
+  it('cannot be grabbed anywhere it used to cover', () => {
+    const erased = paintLayer('erased');
+    for (const point of [
+      { x: 0, y: 0 },
+      { x: 20, y: 20 },
+      { x: 60, y: 40 },
+    ]) {
+      expect(hitTestLayer(erased, doc([erased]), point)).toBe(false);
+    }
+  });
+
+  it('applies to a cleared MASK too, since masks share the paint path', () => {
+    const erased = maskLayer('erased-mask');
+    expect(hittableLayerSize(erased, doc([erased]))).toBeNull();
+    expect(layerOutlineCorners(erased, doc([erased]))).toBeNull();
+  });
+});

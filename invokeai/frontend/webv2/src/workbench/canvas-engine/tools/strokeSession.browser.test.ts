@@ -6,12 +6,12 @@ import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { createStrokeSession } from '@workbench/canvas-engine/tools/strokeSession';
 import { describe, expect, it, vi } from 'vitest';
 
-const pointer = (x: number, y: number): PointerInput => ({
+const pointer = (x: number, y: number, pressure = 0.5): PointerInput => ({
   buttons: 1,
   documentPoint: { x, y },
   modifiers: { alt: false, ctrl: false, meta: false, shift: false },
   pointerType: 'mouse',
-  pressure: 0.5,
+  pressure,
   screenPoint: { x, y },
   timeStamp: 0,
 });
@@ -60,6 +60,67 @@ const paint = (
  * orders of magnitude above this.
  */
 const ROUNDING_TOLERANCE = 6;
+
+const tapCoverage = (
+  composite: 'source-over' | 'destination-out',
+  options: { pressure?: number; pressureOpacity?: boolean; size?: number } = {}
+): { max: number; sum: number } => {
+  const backend = createDomRasterBackend();
+  const layers = createLayerCacheStore(backend);
+  const entry = layers.getOrCreate('L', 32, 32);
+  if (composite === 'destination-out') {
+    entry.surface.ctx.fillStyle = '#000';
+    entry.surface.ctx.fillRect(0, 0, 32, 32);
+    layers.publishPixels('L');
+  }
+  const ctx = {
+    backend,
+    createPath2D: (d?: string) => new Path2D(d),
+    emitStrokeCommitted: vi.fn(),
+    invalidate: vi.fn(),
+    layers,
+    notifyLayerPainted: vi.fn(),
+  } as unknown as ToolContext;
+  const session = createStrokeSession({
+    color: '#3b82f6',
+    composite,
+    ctx,
+    layerId: 'L',
+    opacity: 1,
+    pressureOpacity: options.pressureOpacity ?? false,
+    size: options.size ?? 0.1,
+    thinning: 0,
+    tool: composite === 'source-over' ? 'brush' : 'eraser',
+  });
+  session.addPoints([pointer(16.5, 16.5, options.pressure)]);
+  const event = session.commit()!;
+  let max = 0;
+  let sum = 0;
+  for (let index = 3; index < event.afterImageData.data.length; index += 4) {
+    const coverage = Math.abs(event.afterImageData.data[index]! - event.beforeImageData.data[index]!);
+    max = Math.max(max, coverage);
+    sum += coverage;
+  }
+  return { max, sum };
+};
+
+describe('sub-pixel taps', () => {
+  it.each(['source-over', 'destination-out'] as const)('keeps a 0.1px %s tap sub-pixel', (composite) => {
+    const coverage = tapCoverage(composite);
+    expect(coverage.max).toBeGreaterThan(0);
+    expect(coverage.sum).toBeGreaterThan(0);
+    expect(coverage.max).toBeLessThan(64);
+    expect(coverage.sum).toBeLessThan(128);
+  });
+
+  it('honors pressure-driven opacity for a sub-pixel tap', () => {
+    const light = tapCoverage('source-over', { pressure: 0, pressureOpacity: true, size: 0.9 });
+    const heavy = tapCoverage('source-over', { pressure: 1, pressureOpacity: true, size: 0.9 });
+
+    expect(light.sum).toBeGreaterThan(0);
+    expect(heavy.sum).toBeGreaterThan(light.sum * 8);
+  });
+});
 
 const sweep = (): PointerInput[] => {
   const points: PointerInput[] = [];

@@ -205,6 +205,7 @@ class LineartEdgeDetector:
         device = get_effective_device(self.model)
 
         np_image = pil_to_np(image)
+        height, width = np_image.shape[:2]
 
         with torch.no_grad():
             np_image = torch.from_numpy(np_image).float().to(device)
@@ -213,6 +214,8 @@ class LineartEdgeDetector:
             line = self.model(np_image)[0][0]
 
             line = line.cpu().numpy()
+            if line.shape != (height, width):
+                line = cv2.resize(line, (width, height), interpolation=cv2.INTER_LINEAR)
             line = (line * 255.0).clip(0, 255).astype(np.uint8)
 
         detected_map = 255 - line

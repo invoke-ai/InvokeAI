@@ -11,7 +11,7 @@ import type { Project } from '@workbench/projectContracts';
 
 import { isHideableLayer } from '@workbench/canvas-engine/api';
 
-import { normalizeCanvasDocumentControlAdapters } from './canvasMigration';
+import { normalizeCanvasDocumentContract } from './canvasMigration';
 import {
   getCanvasStagingCandidateFingerprint,
   getCanvasStagingSlotCount,
@@ -41,6 +41,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'restoreCanvasSnapshot',
   'saveCanvasSnapshot',
   'setCanvasBbox',
+  'setCanvasLayerPositions',
   'setCanvasLayersEnabled',
   'setCanvasLayersHidden',
   'setCanvasSelectedLayer',
@@ -152,14 +153,36 @@ const setCanvasLayersHidden = (
   return changed ? { ...document, layers } : document;
 };
 
+const setCanvasLayerPositions = (
+  document: CanvasDocumentContractV2,
+  updates: readonly { id: string; x: number; y: number }[]
+): CanvasDocumentContractV2 => {
+  const positions = new Map(updates.map((update) => [update.id, update]));
+  if (
+    positions.size !== updates.length ||
+    updates.some(
+      (update) => !layerExists(document.layers, update.id) || !Number.isFinite(update.x) || !Number.isFinite(update.y)
+    )
+  ) {
+    return document;
+  }
+  let changed = false;
+  const layers = document.layers.map((layer) => {
+    const position = positions.get(layer.id);
+    if (!position || (layer.transform.x === position.x && layer.transform.y === position.y)) {
+      return layer;
+    }
+    changed = true;
+    return { ...layer, transform: { ...layer.transform, x: position.x, y: position.y } };
+  });
+  return changed ? { ...document, layers } : document;
+};
+
 const applyLayerStackMutation = (
   document: CanvasDocumentContractV2,
   mutation: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }>
 ): CanvasDocumentContractV2 => {
   const currentIds = new Set(document.layers.map((layer) => layer.id));
-  if (mutation.add && (mutation.removeIds?.length ?? 0) > 0) {
-    return document;
-  }
   const removeIds = new Set(mutation.removeIds ?? []);
   if ([...removeIds].some((id) => !currentIds.has(id))) {
     return document;
@@ -170,7 +193,7 @@ const applyLayerStackMutation = (
   }
   if (mutation.add) {
     for (const layer of mutation.add.layers) {
-      if (projectedIds.has(layer.id)) {
+      if (currentIds.has(layer.id) || projectedIds.has(layer.id)) {
         return document;
       }
       projectedIds.add(layer.id);
@@ -178,7 +201,14 @@ const applyLayerStackMutation = (
   }
   if (
     mutation.enabledUpdates.some((update) => !projectedIds.has(update.id)) ||
-    (mutation.selectedLayerId !== null && !projectedIds.has(mutation.selectedLayerId))
+    (mutation.lockedUpdates?.some((update) => !projectedIds.has(update.id)) ?? false) ||
+    (mutation.orderedIds !== undefined &&
+      (mutation.orderedIds.length !== projectedIds.size ||
+        new Set(mutation.orderedIds).size !== mutation.orderedIds.length ||
+        mutation.orderedIds.some((id) => !projectedIds.has(id)))) ||
+    (mutation.selectedLayerId !== undefined &&
+      mutation.selectedLayerId !== null &&
+      !projectedIds.has(mutation.selectedLayerId))
   ) {
     return document;
   }
@@ -193,22 +223,50 @@ const applyLayerStackMutation = (
     layers = layers.filter((layer) => !removeIds.has(layer.id));
     changed = true;
   }
+  if (mutation.orderedIds) {
+    const orderChanged = layers.some((layer, index) => layer.id !== mutation.orderedIds?.[index]);
+    if (orderChanged) {
+      const byId = new Map(layers.map((layer) => [layer.id, layer]));
+      layers = mutation.orderedIds.map((id) => byId.get(id)!);
+      changed = true;
+    }
+  }
   const enabledById = new Map(mutation.enabledUpdates.map((update) => [update.id, update.isEnabled]));
-  let enabledChanged = false;
+  const lockedById = new Map(mutation.lockedUpdates?.map((update) => [update.id, update.isLocked]) ?? []);
+  let baseChanged = false;
   const nextLayers = layers.map((layer) => {
     const isEnabled = enabledById.get(layer.id);
-    if (isEnabled === undefined || isEnabled === layer.isEnabled) {
+    const isLocked = lockedById.get(layer.id);
+    const enabledChanged = isEnabled !== undefined && isEnabled !== layer.isEnabled;
+    const lockedChanged = isLocked !== undefined && isLocked !== layer.isLocked;
+    if (!enabledChanged && !lockedChanged) {
       return layer;
     }
-    enabledChanged = true;
+    baseChanged = true;
     changed = true;
-    return { ...layer, isEnabled };
+    return {
+      ...layer,
+      ...(enabledChanged ? { isEnabled: isEnabled as boolean } : {}),
+      ...(lockedChanged ? { isLocked: isLocked as boolean } : {}),
+    };
   });
-  if (enabledChanged) {
+  if (baseChanged) {
     layers = nextLayers;
   }
-  changed ||= document.selectedLayerId !== mutation.selectedLayerId;
-  return changed ? { ...document, layers, selectedLayerId: mutation.selectedLayerId } : document;
+  const selectedLayerId =
+    mutation.selectedLayerId === undefined
+      ? document.selectedLayerId !== null && layers.some((layer) => layer.id === document.selectedLayerId)
+        ? document.selectedLayerId
+        : (layers[0]?.id ?? null)
+      : mutation.selectedLayerId;
+  changed ||= document.selectedLayerId !== selectedLayerId;
+  return changed
+    ? {
+        ...document,
+        layers,
+        selectedLayerId,
+      }
+    : document;
 };
 
 const addLayer = (document: CanvasDocumentContractV2, layer: CanvasLayerContract, index = 0) => {
@@ -376,6 +434,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       if (project.canvas.document.layers.some((candidate) => candidate.id === layer.id)) {
         return project;
       }
+      const selectedLayerId = mutation.continueStaging ? project.canvas.document.selectedLayerId : layer.id;
       return {
         ...project,
         canvas: {
@@ -383,19 +442,25 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           document: {
             ...project.canvas.document,
             layers: [layer, ...project.canvas.document.layers],
-            selectedLayerId: layer.id,
+            selectedLayerId,
           },
-          stagingArea: clearStagingArea(project.canvas.stagingArea),
+          stagingArea: mutation.continueStaging
+            ? project.canvas.stagingArea
+            : clearStagingArea(project.canvas.stagingArea),
         },
         events: [mutation.event, ...project.events],
       };
     }
     case 'rollbackStagedImageCommit': {
+      const expectedSelectedLayerId = mutation.continueStaging ? mutation.selectedLayerId : mutation.layer.id;
+      const stagingMatchesCommit = mutation.continueStaging
+        ? project.canvas.stagingArea === mutation.stagingArea
+        : project.canvas.stagingArea.pendingImages.length === 0;
       if (
-        project.canvas.document.selectedLayerId !== mutation.layer.id ||
+        project.canvas.document.selectedLayerId !== expectedSelectedLayerId ||
         project.canvas.document.layers[0] !== mutation.layer ||
         project.events[0] !== mutation.event ||
-        project.canvas.stagingArea.pendingImages.length !== 0
+        !stagingMatchesCommit
       ) {
         return project;
       }
@@ -533,6 +598,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       );
     case 'setCanvasLayersEnabled':
       return updateCanvasDocument(project, (document) => setCanvasLayersEnabled(document, mutation.updates));
+    case 'setCanvasLayerPositions':
+      return updateCanvasDocument(project, (document) => setCanvasLayerPositions(document, mutation.updates));
     case 'setCanvasLayersHidden':
       return updateCanvasDocument(project, (document) => setCanvasLayersHidden(document, mutation.updates));
     case 'updateCanvasLayerSource':
@@ -623,7 +690,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
     case 'replaceCanvasDocument':
       return setCanvasState(project, {
         ...project.canvas,
-        document: repairSelectedLayerId(normalizeCanvasDocumentControlAdapters(structuredClone(mutation.document))),
+        document: repairSelectedLayerId(normalizeCanvasDocumentContract(structuredClone(mutation.document))),
         documentRevision: project.canvas.documentRevision + 1,
         stagingArea: clearStagingArea(project.canvas.stagingArea),
       });
@@ -634,7 +701,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
           ...project.canvas.snapshots,
           {
             createdAt: mutation.createdAt,
-            document: normalizeCanvasDocumentControlAdapters(structuredClone(project.canvas.document)),
+            document: normalizeCanvasDocumentContract(structuredClone(project.canvas.document)),
             id: mutation.id,
             name: mutation.name,
           },
@@ -645,7 +712,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       return snapshot
         ? setCanvasState(project, {
             ...project.canvas,
-            document: repairSelectedLayerId(normalizeCanvasDocumentControlAdapters(structuredClone(snapshot.document))),
+            document: repairSelectedLayerId(normalizeCanvasDocumentContract(structuredClone(snapshot.document))),
             documentRevision: project.canvas.documentRevision + 1,
           })
         : project;

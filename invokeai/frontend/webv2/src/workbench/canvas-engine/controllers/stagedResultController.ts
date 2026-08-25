@@ -89,34 +89,43 @@ export class StagedResultController<Permit, Owner = symbol> {
       return { status: 'busy' };
     }
 
-    const layer = createLayer(o.createLayerId(), `Layer ${canvas.document.layers.length + 1}`, options.candidate);
+    const continueStaging = options.continueStaging === true;
+    const layer = {
+      ...createLayer(o.createLayerId(), `Layer ${canvas.document.layers.length + 1}`, options.candidate),
+      isEnabled: !continueStaging,
+    };
     const event: ProjectEvent = {
       createdAt: o.now(),
       id: o.createEventId(),
-      summary: `Accepted ${options.candidate.imageName} into a new raster layer`,
+      summary: continueStaging
+        ? `Saved ${options.candidate.imageName} as a disabled raster layer while continuing staging`
+        : `Accepted ${options.candidate.imageName} into a new raster layer`,
       type: 'canvas-layer-accepted',
     };
     const previousSelectedLayerId = canvas.document.selectedLayerId;
     const previousLayers = canvas.document.layers;
     const acceptedLayers = [layer, ...previousLayers];
-    const previousStagingArea = structuredClone(canvas.stagingArea);
+    const previousStagingArea = canvas.stagingArea;
+    const acceptedSelectedLayerId = continueStaging ? previousSelectedLayerId : layer.id;
     const hasPreviousLayerStack = (document: CanvasDocumentContractV2 | null): boolean =>
       document?.selectedLayerId === previousSelectedLayerId &&
       document.layers.length === previousLayers.length &&
       document.layers.every((current, index) => current === previousLayers[index]);
     const hasAcceptedLayerStack = (document: CanvasDocumentContractV2 | null): boolean =>
-      document?.selectedLayerId === layer.id &&
+      document?.selectedLayerId === acceptedSelectedLayerId &&
       document.layers.length === acceptedLayers.length &&
       document.layers.every((current, index) => current === acceptedLayers[index]);
     const isCommitted = (next: CanvasStateContractV2 | null): boolean =>
-      next?.document.selectedLayerId === layer.id &&
+      next?.document.selectedLayerId === acceptedSelectedLayerId &&
       next.document.layers.some((current) => current === layer) &&
-      next.stagingArea.pendingImages.length === 0 &&
-      next.stagingArea.pendingImageIds.length === 0 &&
-      next.stagingArea.selectedImageIndex === 0 &&
-      !next.stagingArea.isVisible;
+      (continueStaging
+        ? next.stagingArea === previousStagingArea
+        : next.stagingArea.pendingImages.length === 0 &&
+          next.stagingArea.pendingImageIds.length === 0 &&
+          next.stagingArea.selectedImageIndex === 0 &&
+          !next.stagingArea.isVisible);
     const isMirrored = (): boolean =>
-      o.getDocument()?.selectedLayerId === layer.id &&
+      o.getDocument()?.selectedLayerId === acceptedSelectedLayerId &&
       o.getDocument()?.layers.some((current) => current === layer) === true;
 
     try {
@@ -124,6 +133,7 @@ export class StagedResultController<Permit, Owner = symbol> {
       o.dispatchPrepared(
         {
           candidateFingerprint,
+          continueStaging,
           event,
           layer,
           selectedImageIndex: options.selectedImageIndex,
@@ -136,6 +146,7 @@ export class StagedResultController<Permit, Owner = symbol> {
       if (isCommitted(o.getCanvasState())) {
         o.dispatchPrepared(
           {
+            continueStaging,
             event,
             layer,
             selectedLayerId: previousSelectedLayerId,
@@ -172,7 +183,7 @@ export class StagedResultController<Permit, Owner = symbol> {
     const addAcceptedLayer: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }> = {
       add: { index: 0, layers: [layer] },
       enabledUpdates: [],
-      selectedLayerId: layer.id,
+      selectedLayerId: acceptedSelectedLayerId,
       type: 'applyCanvasLayerStackMutation',
     };
     const removeAcceptedLayer: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }> = {
@@ -183,7 +194,7 @@ export class StagedResultController<Permit, Owner = symbol> {
     };
     o.history.push({
       bytes: 256,
-      label: 'Accept staged image',
+      label: continueStaging ? 'Save staged image as disabled layer' : 'Accept staged image',
       redo: () =>
         applyLayerStack(
           addAcceptedLayer,

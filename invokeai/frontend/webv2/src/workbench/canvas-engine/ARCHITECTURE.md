@@ -52,7 +52,7 @@ Current extracted ownership includes:
 - `RasterExportController`: guarded layer rasterization, transformed copies, encoding, reservations, and pin leases.
 - `PsdExportController`: immutable PSD planning, snapshot capture, reservation, execution, and cancellation.
 - `StagedResultController`: guarded staged-candidate acceptance and its history entry.
-- `ControlPixelController`, `SelectionImageController`, and `LayerMutationController`: atomic pixel/document publication at their respective boundaries.
+- `PixelEditController`, `SelectionImageController`, and `LayerMutationController`: atomic pixel/document publication at their respective boundaries. The pixel editor materializes control layers and raster-image layers in place before destructive edits, keeping conversion plus pixels in one undoable transaction.
 - `MaskResultController`, `FilterResultController`, and `GeneratedResultController`: guarded application-result adoption through narrow host ports.
 
 Controller-local tests instantiate these boundaries with fakes. Integration tests in `engine.test.ts` cover composition, document routing, and cross-controller invariants.
@@ -104,6 +104,8 @@ Reservations and cache pins are idempotent leases. Cancellable preparation work 
 
 `DecodedBitmapPool` replaces permanent decoded-image caching. `acquire(imageName, decode, signal)` coalesces concurrent decodes for the same image and returns a short-lived `DecodedBitmapLease`. Each rasterizer releases its lease in `finally`. The bitmap closes after the final lease, a pending decode is aborted when all interested callers cancel, and disposal aborts pending work and closes every resolved bitmap. Pool byte changes feed `decodedBytes`, so decoded images participate in the same budget as surfaces.
 
+Staged results use a separate compressed-Blob cache rather than retaining a decoded surface for every candidate. Once a candidate's thumbnail settles, the UI asks the engine to prefetch its full-resolution bytes with at most two full-image requests in flight. Selecting a queued candidate promotes it immediately and preempts stale work, while completed/in-flight requests and concurrent decodes of the same image are coalesced. The per-engine cache is LRU-bounded to 24 entries and 64 MiB, retries a failed selected request once as foreground demand, and releases outstanding work on engine cooldown or disposal.
+
 ## Derived surfaces and invalidation
 
 Every display-only pixel effect uses `DerivedSurfaceCache`. A slot is identified by layer ID and effect kind, and guarded by source surface identity, monotonic source version, and a deterministic parameter key. Reuse is safe only when every guard matches. Source replacement therefore cannot publish or reuse a surface produced for an older preview.
@@ -117,6 +119,8 @@ Application operations acquire one exclusive lease from `CanvasEditGate`. A leas
 Staged-result acceptance is engine-owned. The UI enables Accept from interaction capabilities, but `StagedResultController` remains authoritative. It captures a document-edit permit, rejects an active gesture, and verifies the selected candidate's stable key immediately before dispatch.
 
 The initial `commitStagedImage` mutation atomically inserts the new raster layer, selects it, clears staging, and records the project event. The controller verifies both the reducer postcondition and the document mirror before pushing exactly one engine-history entry. It returns `busy`, `stale`, or `missing` without changing staging or history when any guard fails.
+
+The continue-staging variant uses the same guarded transaction but inserts the candidate as a disabled raster layer, preserves the exact staging-area state and current layer selection, and keeps the staged preview active. This lets users bank candidates without visually doubling the preview or ending comparison. Undo and redo affect only the banked layer after the initial transaction.
 
 Undo removes the accepted layer and restores the prior selection. Redo restores the identical layer and selection without recreating the event or staging candidate. The history entry uses failure-atomic replay, and a successful commit uses the normal history `push`, which clears any previous redo stack. Undo intentionally does not return the accepted candidate to staging.
 

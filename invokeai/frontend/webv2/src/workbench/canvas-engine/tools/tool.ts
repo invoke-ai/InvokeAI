@@ -61,7 +61,7 @@ export interface PixelEditPatch {
   after: ImageData;
 }
 
-export interface ControlPixelEditTransaction {
+export interface PixelEditTransaction {
   readonly layerId: string;
   commitPatch(label: string, patch: PixelEditPatch): void;
   commitStroke(event: StrokeCommittedEvent): void;
@@ -88,6 +88,8 @@ export interface ToolContext {
   viewport: Viewport;
   /** The current mirrored document, or `null` when none is available. */
   getDocument(): CanvasDocumentContractV2 | null;
+  /** Selected layer ids from the Layers panel, including the document's primary layer. */
+  getSelectedLayerIds?(): readonly string[];
   /** Requests a re-render for the given flags. */
   invalidate(payload: InvalidatePayload): void;
   /** Reducer bridge. Painting tools use it for the single gesture-start `addCanvasLayer`. */
@@ -110,8 +112,8 @@ export interface ToolContext {
    * on activate / when a layer is clicked. Absent in minimal test harnesses.
    */
   beginTransformSession?(layerId: string): void;
-  /** Prepares direct or transactional pixel editing for a selected control layer. */
-  beginControlPixelEdit?(layerId: string): ControlPixelEditTransaction | null;
+  /** Prepares direct or materializing pixel editing for a selected control or raster-image layer. */
+  beginPixelEdit?(layerId: string): PixelEditTransaction | null;
   /** Updates the active transform session's live transform (drag or numeric edit). */
   updateTransformSession?(transform: LayerTransform): void;
   /**

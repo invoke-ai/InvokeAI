@@ -88,6 +88,7 @@
     "autoRoutePolicy.ts": "workbench",
     "bootWidgetPreload.ts": "workbench",
     "canvasDimsSync.ts": "workbench",
+    "canvasInvocationPreparation.ts": "workbench",
     "canvasLayerContent.ts": "workbench",
     "canvasLayerOps.ts": "workbench",
     "canvasMigration.ts": "workbench",

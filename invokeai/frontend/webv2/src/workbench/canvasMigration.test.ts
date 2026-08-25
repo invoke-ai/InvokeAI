@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createEmptyCanvasDocumentV2,
   createEmptyCanvasStateV2,
   createNewCanvasStateV2,
   DEFAULT_CANVAS_DOCUMENT_HEIGHT,
@@ -453,6 +454,38 @@ describe('migrateCanvasStateToV2', () => {
     // re-derivation from a (nonexistent) placement would not preserve.
     expect(migrated.document.layers[0]).toEqual(v2Canvas.document.layers[0]);
     expect(migrated.stagingArea.autoSwitchMode).toBe('latest');
+  });
+
+  it('normalizes persisted bbox geometry to whole pixels in documents and snapshots', () => {
+    const state = createEmptyCanvasStateV2();
+    const document = {
+      ...state.document,
+      bbox: { height: 12.6, width: 12.4, x: -3.4, y: -3.6 },
+      height: 511.6,
+      width: 512.4,
+    };
+
+    const migrated = migrateCanvasStateToV2({
+      ...state,
+      document,
+      snapshots: [{ createdAt: 'now', document, id: 'fractional-bbox', name: 'Fractional bbox' }],
+    });
+
+    expect(migrated.document.bbox).toEqual({ height: 13, width: 12, x: -3, y: -4 });
+    expect({ height: migrated.document.height, width: migrated.document.width }).toEqual({ height: 512, width: 512 });
+    expect(migrated.snapshots[0]?.document.bbox).toEqual({ height: 13, width: 12, x: -3, y: -4 });
+  });
+
+  it('creates and migrates whole-pixel document dimensions', () => {
+    const created = createEmptyCanvasDocumentV2(512.4, 511.6);
+    const migrated = migrateCanvasStateToV2({ height: 511.6, layers: [], width: 512.4 });
+
+    expect(created).toMatchObject({ bbox: { height: 512, width: 512, x: 0, y: 0 }, height: 512, width: 512 });
+    expect(migrated.document).toMatchObject({
+      bbox: { height: 512, width: 512, x: 0, y: 0 },
+      height: 512,
+      width: 512,
+    });
   });
 
   it('preserves the progress canvas staging auto-switch mode', () => {

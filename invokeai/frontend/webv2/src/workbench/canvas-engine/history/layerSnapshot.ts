@@ -1,10 +1,10 @@
-import type { CanvasControlLayerContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import type { HistoryEntry } from './history';
 
 export interface LayerPixelSnapshot {
-  layer: CanvasControlLayerContract;
+  layer: CanvasControlLayerContract | CanvasRasterLayerContractV2;
   rect: Rect;
   /** Null represents the exact pixel state of a zero-width or zero-height cache. */
   pixels: ImageData | null;

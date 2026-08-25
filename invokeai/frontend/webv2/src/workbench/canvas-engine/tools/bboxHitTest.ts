@@ -15,7 +15,7 @@
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { type AspectAnchor, constrainAspect, snapToGrid } from '@workbench/canvas-engine/math/snapping';
+import { type AspectAnchor, constrainAspect, snapMovedPoint, snapToGrid } from '@workbench/canvas-engine/math/snapping';
 
 /** The eight resize handles: four corners + four edge midpoints. */
 export type BboxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -98,15 +98,13 @@ export const bboxTargetAt = (
 /** Minimum bbox side (document px): one grid cell, but never below 1px. */
 export const bboxMinSize = (grid: number): number => Math.max(1, grid);
 
-/** Translates `start` by a document-space delta, snapping the origin to `grid` unless bypassed. */
+/**
+ * Translates `start` by a document-space delta. Model-grid snapping may be
+ * bypassed, but the origin always lands on whole document pixels.
+ */
 export const moveBbox = (start: Rect, dx: number, dy: number, grid: number, snap: boolean): Rect => {
-  let x = start.x + dx;
-  let y = start.y + dy;
-  if (snap) {
-    x = snapToGrid(x, grid);
-    y = snapToGrid(y, grid);
-  }
-  return { height: start.height, width: start.width, x, y };
+  const moved = snapMovedPoint({ x: start.x, y: start.y }, { x: dx, y: dy }, snap ? grid : 1);
+  return { height: start.height, width: start.width, x: Math.round(moved.x), y: Math.round(moved.y) };
 };
 
 export interface ResizeBboxParams {
@@ -259,6 +257,115 @@ const centerRectOn = (rect: Rect, centerX: number, centerY: number): Rect => ({
   y: centerY - rect.height / 2,
 });
 
+/** A whole-pixel span whose center is held exactly. */
+const centeredPixelSpan = (
+  center: number,
+  desiredSize: number,
+  previousSize: number,
+  minimumSize: number
+): { size: number; start: number } => {
+  const doubledCenter = Math.round(center * 2);
+  const requiredParity = ((doubledCenter % 2) + 2) % 2;
+  const minimum = Math.max(1, Math.ceil(minimumSize));
+  const rounded = Math.max(minimum, Math.round(desiredSize));
+  let lower = rounded;
+  while (((lower % 2) + 2) % 2 !== requiredParity) {
+    lower -= 1;
+  }
+  let upper = rounded;
+  while (((upper % 2) + 2) % 2 !== requiredParity || upper < minimum) {
+    upper += 1;
+  }
+
+  let size: number;
+  if (lower < minimum) {
+    size = upper;
+  } else {
+    const lowerDistance = Math.abs(desiredSize - lower);
+    const upperDistance = Math.abs(upper - desiredSize);
+    size =
+      lowerDistance === upperDistance
+        ? desiredSize >= previousSize
+          ? upper
+          : lower
+        : lowerDistance < upperDistance
+          ? lower
+          : upper;
+  }
+
+  return { size, start: (doubledCenter - size) / 2 };
+};
+
+/** A whole-pixel span mirrored around `center`, derived from its dragged edge. */
+const mirroredPixelSpan = (
+  center: number,
+  movedEdge: number,
+  movesStart: boolean,
+  previousSize: number,
+  minimumSize: number
+): { size: number; start: number } => {
+  const moved = Math.round(movedEdge);
+  const opposite = Math.round(center * 2) - moved;
+  const span = movesStart ? { size: opposite - moved, start: moved } : { size: moved - opposite, start: opposite };
+  return span.size >= minimumSize ? span : centeredPixelSpan(center, minimumSize, previousSize, minimumSize);
+};
+
+/**
+ * Quantizes a model-grid-bypassed resize without breaking its fixed anchor or
+ * center. The persisted bbox is canonicalized to integer pixels at hydration,
+ * so every fixed edge and doubled center is already integral here.
+ */
+const pixelAlignResize = (rect: Rect, p: ResizeBboxParams): Rect => {
+  const startRight = p.start.x + p.start.width;
+  const startBottom = p.start.y + p.start.height;
+  const centerX = p.start.x + p.start.width / 2;
+  const centerY = p.start.y + p.start.height / 2;
+  const min = bboxMinSize(p.grid);
+  const widthMin = hasWest(p.handle) || hasEast(p.handle) ? min : 1;
+  const heightMin = p.constrain && isCornerHandle(p.handle) ? 1 : hasNorth(p.handle) || hasSouth(p.handle) ? min : 1;
+
+  if (p.symmetric) {
+    const horizontal =
+      hasWest(p.handle) || hasEast(p.handle)
+        ? mirroredPixelSpan(
+            centerX,
+            hasWest(p.handle) ? rect.x : rect.x + rect.width,
+            hasWest(p.handle),
+            p.start.width,
+            widthMin
+          )
+        : centeredPixelSpan(centerX, rect.width, p.start.width, 1);
+    const vertical =
+      hasNorth(p.handle) || hasSouth(p.handle)
+        ? mirroredPixelSpan(
+            centerY,
+            hasNorth(p.handle) ? rect.y : rect.y + rect.height,
+            hasNorth(p.handle),
+            p.start.height,
+            heightMin
+          )
+        : centeredPixelSpan(centerY, rect.height, p.start.height, 1);
+    return { height: vertical.size, width: horizontal.size, x: horizontal.start, y: vertical.start };
+  }
+
+  let left = hasWest(p.handle) ? Math.round(rect.x) : p.start.x;
+  let right = hasEast(p.handle) ? Math.round(rect.x + rect.width) : startRight;
+  let top = hasNorth(p.handle) ? Math.round(rect.y) : p.start.y;
+  let bottom = hasSouth(p.handle) ? Math.round(rect.y + rect.height) : startBottom;
+
+  if (p.constrain && (p.handle === 'e' || p.handle === 'w')) {
+    const vertical = centeredPixelSpan(centerY, rect.height, p.start.height, 1);
+    top = vertical.start;
+    bottom = vertical.start + vertical.size;
+  } else if (p.constrain && (p.handle === 'n' || p.handle === 's')) {
+    const horizontal = centeredPixelSpan(centerX, rect.width, p.start.width, 1);
+    left = horizontal.start;
+    right = horizontal.start + horizontal.size;
+  }
+
+  return { height: bottom - top, width: right - left, x: left, y: top };
+};
+
 /**
  * Resizes `start` for a handle drag. Applies (in order) the delta to the moved
  * edge(s), grid snapping (unless bypassed), min-size clamping, and — when
@@ -272,11 +379,14 @@ const centerRectOn = (rect: Rect, centerX: number, centerY: number): Rect => ({
  * min-size clamping and the aspect constraint all keep applying unchanged.
  */
 export const resizeBbox = (p: ResizeBboxParams): Rect => {
-  if (!p.symmetric) {
-    return resizeAnchored(p);
-  }
-  const doubled = resizeAnchored({ ...p, dx: p.dx * 2, dy: p.dy * 2 });
-  return centerRectOn(doubled, p.start.x + p.start.width / 2, p.start.y + p.start.height / 2);
+  const resized = p.symmetric
+    ? centerRectOn(
+        resizeAnchored({ ...p, dx: p.dx * 2, dy: p.dy * 2 }),
+        p.start.x + p.start.width / 2,
+        p.start.y + p.start.height / 2
+      )
+    : resizeAnchored(p);
+  return p.snap ? resized : pixelAlignResize(resized, p);
 };
 
 /** Re-fits `rect` to `ratio`, keeping its center fixed, then snaps to `grid` and clamps min size. */

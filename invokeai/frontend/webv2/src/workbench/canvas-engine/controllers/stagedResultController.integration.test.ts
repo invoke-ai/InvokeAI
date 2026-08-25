@@ -62,6 +62,7 @@ describe('staged result project-port integration', () => {
     const selected = { ...candidate, placement: { ...candidate.placement, x: 90 } };
     store.commands.canvas.appendStagingCandidate({ candidate: first, projectId });
     store.commands.canvas.appendStagingCandidate({ candidate: selected, projectId });
+    store.commands.canvas.apply(projectId, { imageIndex: 1, type: 'setStagedImageIndex' });
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
@@ -77,29 +78,71 @@ describe('staged result project-port integration', () => {
     engine.lifecycle.dispose();
   });
 
-  it('rolls back the exact layer, event, selection, and staging when initial mirror acceptance fails', () => {
+  it('banks a disabled layer without changing the staged session or current layer selection', () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
+    const currentLayerId = store.getState().projects[0]!.canvas.document.selectedLayerId;
     store.commands.canvas.appendStagingCandidate({ candidate, projectId });
-    const before = structuredClone(store.getState().projects.find((project) => project.id === projectId)!);
-    const rejectingPort = createMirrorRejectingPort(store, projectId);
-    rejectingPort.arm('commitStagedImage');
+    const stagedBefore = store.getState().projects[0]!.canvas.stagingArea;
     const engine = createCanvasEngine({
       backend: createTestStubRasterBackend(),
       imageResolver: () => Promise.resolve(new Blob()),
-      mutationPort: rejectingPort.port,
+      mutationPort: createCanvasProjectMutationPort(store, projectId),
       projectId,
       reportError: () => undefined,
     });
 
-    expect(engine.layers.commitStagedImage(selection)).toEqual({
-      status: 'stale',
-    });
-    expect(store.getState().projects.find((project) => project.id === projectId)).toEqual(before);
-    expect(engine.document.getDocument()).toEqual(before.canvas.document);
-    expect(engine.stores.canUndo.get()).toBe(false);
+    const result = engine.layers.commitStagedImage({ ...selection, continueStaging: true });
+
+    expect(result.status).toBe('committed');
+    if (result.status !== 'committed') {
+      throw new Error('expected commit');
+    }
+    const projectAfterSave = store.getState().projects[0]!;
+    const savedLayer = projectAfterSave.canvas.document.layers[0]!;
+    expect(savedLayer).toMatchObject({ id: result.layerId, isEnabled: false, type: 'raster' });
+    expect(projectAfterSave.canvas.document.selectedLayerId).toBe(currentLayerId);
+    expect(projectAfterSave.canvas.stagingArea).toBe(stagedBefore);
+    expect(projectAfterSave.canvas.stagingArea.pendingImages).toEqual([candidate]);
+    expect(projectAfterSave.canvas.stagingArea.isVisible).toBe(true);
+
+    engine.history.undo();
+    expect(store.getState().projects[0]!.canvas.document.layers).not.toContain(savedLayer);
+    expect(store.getState().projects[0]!.canvas.stagingArea).toBe(stagedBefore);
+
+    engine.history.redo();
+    expect(store.getState().projects[0]!.canvas.document.layers[0]).toBe(savedLayer);
+    expect(store.getState().projects[0]!.canvas.document.selectedLayerId).toBe(currentLayerId);
+    expect(store.getState().projects[0]!.canvas.stagingArea).toBe(stagedBefore);
     engine.lifecycle.dispose();
   });
+
+  it.each([false, true])(
+    'rolls back the exact layer, event, selection, and staging when initial mirror acceptance fails (continue: %s)',
+    (continueStaging) => {
+      const store = createWorkbenchStore();
+      const projectId = store.getState().activeProjectId;
+      store.commands.canvas.appendStagingCandidate({ candidate, projectId });
+      const before = structuredClone(store.getState().projects.find((project) => project.id === projectId)!);
+      const rejectingPort = createMirrorRejectingPort(store, projectId);
+      rejectingPort.arm('commitStagedImage');
+      const engine = createCanvasEngine({
+        backend: createTestStubRasterBackend(),
+        imageResolver: () => Promise.resolve(new Blob()),
+        mutationPort: rejectingPort.port,
+        projectId,
+        reportError: () => undefined,
+      });
+
+      expect(engine.layers.commitStagedImage({ ...selection, continueStaging })).toEqual({
+        status: 'stale',
+      });
+      expect(store.getState().projects.find((project) => project.id === projectId)).toEqual(before);
+      expect(engine.document.getDocument()).toEqual(before.canvas.document);
+      expect(engine.stores.canUndo.get()).toBe(false);
+      engine.lifecycle.dispose();
+    }
+  );
 
   it('compensates a reducer-accepted undo when mirror acceptance fails and keeps history retryable', () => {
     const store = createWorkbenchStore();
