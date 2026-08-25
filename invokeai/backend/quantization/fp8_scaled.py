@@ -332,37 +332,39 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
     return scale
 
 
-# OCP Microscaling (MXFP8) stores its per-block scale as an E8M0 exponent: byte ``v`` encodes
-# ``2^(v-127)``, and 0xFF is NaN. safetensors has no E8M0 dtype, so producers write it as ``uint8``.
-_E8M0_BIAS = 127
-_E8M0_NAN = 255
+# OCP Microscaling (MXFP8) stores one E8M0 exponent per 32-element block. safetensors has no E8M0
+# dtype, so producers write the exponents as `uint8`.
+#
+# We refuse such checkpoints rather than guessing at them. Decoding the byte as `2**(v-127)` and
+# expanding it 32-wide is *not* sufficient, established against a real file: the MXFP8 and the
+# scaled-fp8 build of `krea2TurboOfficialComfy` share all 174 bf16 tensors bit-for-bit, so the
+# scaled build is an exact reference for the same weights -- and against it the decoded weights
+# reach a correlation of only 0.60, producing pure noise end to end. The measured per-block scale
+# has no monotonic relation to the byte (112 and 116 yield the same true scale), which points at a
+# swizzled scale layout rather than a wrong exponent bias. Supporting it means implementing that
+# de-swizzle, not adding a constant.
+#
+# Refusing is the point: with the block-wise expansion in place, such a file otherwise *loads* and
+# generates a garbage image with nothing in the log.
+_MX_SCALE_DTYPES = (torch.uint8,)
 
 
-def _decode_mx_scale(scale: torch.Tensor) -> torch.Tensor:
-    """Decode an E8M0 exponent scale to a linear multiplier.
-
-    Reading the raw bytes as linear values is not a rounding error: a typical MXFP8 Krea-2 layer
-    stores exponents around 115, i.e. a true scale of ``2^-12`` (~2.4e-4), so taking 115.0 at face
-    value inflates the weights by roughly 470,000x. The model still loads and still produces an
-    image — a garbage one. Gate on the dtype rather than on the declared ``format``: the metadata is
-    optional, and no other producer writes an integer weight scale.
-    """
-    decoded = torch.pow(2.0, scale.float() - _E8M0_BIAS)
-    return decoded.masked_fill(scale == _E8M0_NAN, float("nan"))
+def _reject_mx_scale(path: str) -> None:
+    raise NotImplementedError(
+        f"'{path}' carries an MXFP8 (OCP Microscaling) block scale, which InvokeAI cannot decode "
+        "yet: the exponents are stored in a swizzled layout. Use the scaled-fp8 or bf16 build of "
+        "this checkpoint instead. Loading it anyway would produce a noise image, not a warning."
+    )
 
 
 def _normalize_weight_scale(scale: torch.Tensor) -> torch.Tensor:
     """Canonical float32 form of a weight scale, preserving its layout.
-
-    An integer scale is an E8M0 exponent (MXFP8) and is decoded first; see :func:`_decode_mx_scale`.
 
     Per-tensor scales become 0-d and per-output-channel scales 1-D, so downstream code can branch on
     ``numel()``. A scale with more than one dimension is *block-wise* — one entry per block of
     weight elements — and is returned with its shape intact: flattening it destroys the block
     geometry that :func:`expand_weight_scale` needs to line it back up with the weight.
     """
-    if not scale.is_floating_point():
-        scale = _decode_mx_scale(scale)
     scale = scale.float()
     if scale.numel() == 1:
         return scale.reshape(())
@@ -457,6 +459,8 @@ def extract_fp8_scaled_layers(
             # A scale without an fp8 weight means the weight was already dequantized (or the key
             # naming does not line up). Applying the scale later would corrupt it, so drop it.
             continue
+        if getattr(scale, "dtype", None) in _MX_SCALE_DTYPES:
+            _reject_mx_scale(path)
         hints = layer_meta.get(path, {})
         layers[path] = Fp8ScaledLayer(
             weight_scale=_normalize_weight_scale(scale),
