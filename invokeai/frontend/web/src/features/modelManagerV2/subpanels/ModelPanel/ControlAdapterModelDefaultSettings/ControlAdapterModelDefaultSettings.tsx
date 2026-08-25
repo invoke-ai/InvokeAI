@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
 import type { ControlLoRAModelConfig, ControlNetModelConfig, T2IAdapterModelConfig } from 'services/api/types';
+import { isAnimaControlNetModelConfig } from 'services/api/types';
 
 export type ControlAdapterModelDefaultSettingsFormData = {
   preprocessor: FormField<string>;
@@ -21,6 +22,13 @@ export type ControlAdapterModelDefaultSettingsFormData = {
 type Props = {
   modelConfig: ControlNetModelConfig | T2IAdapterModelConfig | ControlLoRAModelConfig;
 };
+
+// Only offer FP8 storage where a loader actually applies it, so the toggle never renders as a
+// no-op. ControlLoRAs are patched into the base model rather than run standalone. Anima's LLLite
+// adapters go through `AnimaControlNetLLLiteModel`, which never calls the layerwise cast - at
+// 16-63MB per adapter there is nothing worth wiring up.
+const supportsFp8Storage = (modelConfig: Props['modelConfig']): boolean =>
+  modelConfig.type !== 'control_lora' && !isAnimaControlNetModelConfig(modelConfig);
 
 export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
@@ -91,7 +99,7 @@ export const ControlAdapterModelDefaultSettings = memo(({ modelConfig }: Props) 
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultPreprocessor control={control} name="preprocessor" />
-        {modelConfig.type !== 'control_lora' && <DefaultFp8StorageControlAdapter control={control} name="fp8Storage" />}
+        {supportsFp8Storage(modelConfig) && <DefaultFp8StorageControlAdapter control={control} name="fp8Storage" />}
       </SimpleGrid>
     </>
   );
