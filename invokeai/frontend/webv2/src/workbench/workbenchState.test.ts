@@ -3048,6 +3048,57 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(galleryValues.selectedImageName).toBe('image:gallery-image.png');
   });
 
+  it('releases a mid-board infinite window anchor when a result lands on the viewed board', () => {
+    // A deep reveal from the image map anchors the infinite window mid-board.
+    // New images land at the TOP of that listing, which the anchored window
+    // never covers — and an anchored window also suppresses the recents
+    // overlay and the queue placeholders, so without releasing the anchor the
+    // user would never see their own generation appear.
+    let state = primeGenerate();
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { page: 11, type: 'setGalleryPage' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    expect(getProjectWidgetValues(project, 'gallery').galleryPage).toBe(11);
+
+    state = workbenchReducer(state, {
+      images: [createImage('fresh.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').galleryPage).toBe(0);
+  });
+
+  it('leaves the window anchor alone when the result lands on a board that is not being viewed', () => {
+    // The anchor describes the viewed board's listing; a result arriving in
+    // some other board says nothing about where the user is looking.
+    let state = primeGenerate();
+
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { boardId: 'board-elsewhere', type: 'selectGalleryBoard' });
+    state = submitGenerate(state);
+
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0];
+
+    state = workbenchReducer(state, { boardId: 'board-viewed', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { page: 11, type: 'setGalleryPage' });
+    state = workbenchReducer(state, {
+      images: [createImage('elsewhere.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').galleryPage).toBe(11);
+  });
+
   it('preserves the destination board on freshly routed Gallery results', () => {
     let state = primeGenerate();
 

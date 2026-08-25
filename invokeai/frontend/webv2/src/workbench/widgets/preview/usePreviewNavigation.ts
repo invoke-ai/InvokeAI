@@ -209,7 +209,16 @@ export const usePreviewNavigation = ({
       },
       !shouldFollowLive && selectedImageQuery.paginationMode === 'paginated'
         ? { kind: 'anchor', offset: navigationAnchorPage * GALLERY_PAGE_SIZE }
-        : { kind: 'infinite' }
+        : {
+            kind: 'infinite',
+            // A selection deeper than the base window's reach (a deep reveal
+            // from the image map) anchors navigation at its own page —
+            // walking from offset 0 could never arrive at the cursor.
+            offset:
+              !shouldFollowLive && navigationAnchorPage * GALLERY_PAGE_SIZE >= GALLERY_MAX_ROWS
+                ? navigationAnchorPage * GALLERY_PAGE_SIZE
+                : 0,
+          }
     ),
     enabled: hasNavigationContext,
   });

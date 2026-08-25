@@ -237,6 +237,61 @@ describe('Gallery item query read model', () => {
     });
   });
 
+  it('anchors an infinite window at its offset, sharing the base key only at offset 0', async () => {
+    // A zero-offset window must keep the historical key so every existing
+    // consumer shares one cache entry; a deep window (a reveal past the base
+    // reach) is its own transient entry starting at its own page.
+    expect(galleryItemsInfiniteOptions(baseFilter, { kind: 'infinite', offset: 0 }).queryKey).toEqual(
+      galleryItemsInfiniteOptions(baseFilter).queryKey
+    );
+    expect(galleryItemsInfiniteOptions(baseFilter, { kind: 'infinite', offset: 6000 }).queryKey).not.toEqual(
+      galleryItemsInfiniteOptions(baseFilter).queryKey
+    );
+
+    const queryClient = createQueryClient();
+    backend.listGalleryItems.mockImplementation(({ offset }: { offset: number }) =>
+      Promise.resolve(createPage({ offset, total: 20_000 }))
+    );
+    const options = galleryItemsInfiniteOptions(baseFilter, { kind: 'infinite', offset: 6000 });
+    const observer = new InfiniteQueryObserver(queryClient, options);
+
+    try {
+      await observer.refetch();
+      expect(observer.getCurrentResult().data?.pageParams).toEqual([6000]);
+
+      // The GALLERY_MAX_ROWS reach applies from the anchor, not from 0.
+      for (let fetches = 0; fetches < 12; fetches += 1) {
+        await observer.fetchNextPage();
+      }
+
+      const pageParams = observer.getCurrentResult().data?.pageParams ?? [];
+
+      expect(pageParams[0]).toBe(6000);
+      expect(pageParams[pageParams.length - 1]).toBe(6000 + GALLERY_MAX_ROWS - GALLERY_PAGE_SIZE);
+    } finally {
+      observer.destroy();
+    }
+  });
+
+  it('never grows an anchored infinite window above its anchor, but still lets paginated anchors', () => {
+    // The grid shares the anchored entry and cannot request earlier pages
+    // itself, so a prepend would splice 60 items in above its viewport and
+    // shift the content under the user. Paginated consumers slice out the one
+    // page they want by pageParam, so prepending is invisible there — and
+    // Preview walks backwards through exactly that mechanism.
+    const page: GalleryItemsPage = { items: [], total: 20_000 };
+    const onePage = [page];
+    const anchored = galleryItemsInfiniteOptions(baseFilter, { kind: 'infinite', offset: 6000 });
+    const base = galleryItemsInfiniteOptions(baseFilter);
+    const paginated = galleryItemsInfiniteOptions(baseFilter, { kind: 'anchor', offset: 6000 });
+
+    expect(anchored.getPreviousPageParam?.(page, onePage, 6000, [6000])).toBeUndefined();
+    expect(anchored.getPreviousPageParam?.(page, onePage, 6060, [6060])).toBe(6000);
+    expect(base.getPreviousPageParam?.(page, onePage, 0, [0])).toBeUndefined();
+    expect(base.getPreviousPageParam?.(page, onePage, GALLERY_PAGE_SIZE, [GALLERY_PAGE_SIZE])).toBe(0);
+    expect(paginated.getPreviousPageParam?.(page, onePage, 6000, [6000])).toBe(6000 - GALLERY_PAGE_SIZE);
+  });
+
   it('does not create item-list cache entries for repeated invalidation events', async () => {
     const queryClient = createQueryClient();
     backend.listGalleryItems.mockResolvedValue(createPage({ count: 1, offset: 0, total: 1 }));

@@ -1,5 +1,7 @@
 import type { HydratedWorkbenchSnapshot, PersistedWorkbenchSnapshotV1 } from '@workbench/persistenceContracts';
-import type { WorkbenchState } from '@workbench/projectContracts';
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+
+import { getGalleryPage, getGallerySettings } from '@features/gallery/contracts';
 
 import { timeWorkbenchPerf } from './performanceMarks';
 
@@ -14,6 +16,37 @@ export interface WorkbenchPersistenceService {
 
 const isBrowser = (): boolean => typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 
+/**
+ * In infinite mode the gallery's `galleryPage` is not a page number but the
+ * anchor of a mid-board window, set by a reveal from the image map. That is a
+ * "you are here" position for the current session: restored a day later it
+ * would open the gallery stranded in the middle of a board, with no page
+ * control (the footer's is paginated-only) and no way back to the top short of
+ * switching boards. Paginated pages stay persisted — there the value really is
+ * the page the user was reading.
+ */
+const stripInfiniteWindowAnchor = (project: Project): Project => {
+  let didChange = false;
+  const widgetInstances = Object.fromEntries(
+    Object.entries(project.widgetInstances).map(([instanceId, instance]) => {
+      const values = instance.state.values;
+
+      if (
+        instance.typeId !== 'gallery' ||
+        getGallerySettings(values).paginationMode !== 'infinite' ||
+        getGalleryPage(values) === 0
+      ) {
+        return [instanceId, instance];
+      }
+
+      didChange = true;
+      return [instanceId, { ...instance, state: { ...instance.state, values: { ...values, galleryPage: 0 } } }];
+    })
+  );
+
+  return didChange ? { ...project, widgetInstances } : project;
+};
+
 export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchState => {
   const { errorLog: _legacyErrorLog, ...nextState } = state as WorkbenchState & { errorLog?: string[] };
 
@@ -24,7 +57,7 @@ export const stripTransientWorkbenchState = (state: WorkbenchState): WorkbenchSt
     // snapshots immediately and never let full-project undo entries consume
     // localStorage quota or grow across browser sessions.
     projects: nextState.projects.map((project) => ({
-      ...project,
+      ...stripInfiniteWindowAnchor(project),
       undoRedo: { future: [], past: [] },
     })),
   };
