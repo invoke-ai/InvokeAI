@@ -1359,16 +1359,24 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   // ---- Staged generation and filter previews ------------------------------
 
-  const { clearAllFilterPreviews, clearFilterPreview, clearStagedPreview, setGuardedFilterPreview, setStagedPreview } =
-    createPreviewPublisher({
-      decodeBlob: (blob, dimensions) => rasterController.decodeBlob(blob, dimensions),
-      getDocument: () => mirror.getDocument(),
-      invalidateAll: () => scheduler.invalidate({ all: true }),
-      invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
-      isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
-      previews: renderController.previews,
-      resolveImage: imageResolver,
-    });
+  const previewPublisher = createPreviewPublisher({
+    decodeBlob: (blob, dimensions) => rasterController.decodeBlob(blob, dimensions),
+    getDocument: () => mirror.getDocument(),
+    invalidateAll: () => scheduler.invalidate({ all: true }),
+    invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
+    isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
+    previews: renderController.previews,
+    resolveImage: imageResolver,
+  });
+  const {
+    clearAllFilterPreviews,
+    clearFilterPreview,
+    clearStagedPreview,
+    clearStagedPreviewCache,
+    preloadStagedPreview,
+    setGuardedFilterPreview,
+    setStagedPreview,
+  } = previewPublisher;
 
   // ---- Document mirror ----------------------------------------------------
 
@@ -1899,6 +1907,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     const generation = lifecycleGeneration;
     lifecycleState = 'cooling';
     editingController.cooldown();
+    clearStagedPreview();
+    clearStagedPreviewCache();
     detach();
     cancelAllLayerRasterizations();
     cooldownPromise = persistenceController.flush().then(
@@ -1909,7 +1919,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         layerCache.dispose();
         derivedSurfaceCache.dispose();
         renderController.previews.clearFilters();
-        clearStagedPreview();
         checkerboardTile = null;
         maskPatternTiles.clear();
         stores.thumbnailStatus.clear();
@@ -2433,6 +2442,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => historyController.dispose());
     cleanup.run(() => persistenceController.dispose());
     cleanup.run(() => mirror.dispose());
+    cleanup.run(() => previewPublisher.dispose());
     cleanup.run(() => renderController.dispose());
     cleanup.run(() => rasterController.dispose());
     cleanup.run(() => stores.thumbnailStatus.clear());
@@ -2813,6 +2823,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
   const previewCapability: CanvasEnginePreviewCapability = {
     ...layerController.previews,
+    preloadStagedPreview,
     setGuardedFilterPreview,
     setStagedPreview,
   };

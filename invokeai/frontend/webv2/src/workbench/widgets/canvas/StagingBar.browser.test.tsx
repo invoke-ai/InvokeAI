@@ -54,7 +54,8 @@ const interact = (action: () => void): Promise<void> =>
 const renderStagingBar = async (
   slotCount: number,
   selectedImageIndex = 0,
-  onSaveToLayerAndContinue: () => void = noop
+  onSaveToLayerAndContinue: () => void = noop,
+  onPreloadCandidate: (imageName: string) => void = noop
 ) => {
   const slots = Array.from({ length: slotCount }, (_, index) => makeSlot(index));
   const selectedSlot = slots[selectedImageIndex];
@@ -89,6 +90,7 @@ const renderStagingBar = async (
                   onCycle={noop}
                   onDiscardAll={noop}
                   onDiscardSelected={noop}
+                  onPreloadCandidate={onPreloadCandidate}
                   onSelectImage={noop}
                   onSaveToLayerAndContinue={onSaveToLayerAndContinue}
                   onSetAutoSwitch={noop}
@@ -177,6 +179,21 @@ describe('StagingBar thumbnail strip', () => {
     const trailingGap = bounds.right - thumbnails[1]!.getBoundingClientRect().right;
     expect(leadingGap).toBeGreaterThan(0);
     expect(Math.abs(leadingGap - trailingGap)).toBeLessThan(2);
+  });
+
+  it('warms full-resolution bytes for every candidate once its thumbnail settles', async () => {
+    const onPreloadCandidate = vi.fn();
+    await renderStagingBar(3, 0, noop, onPreloadCandidate);
+    const images = Array.from(document.querySelectorAll<HTMLImageElement>('img'));
+
+    await interact(() => {
+      images[0]?.dispatchEvent(new Event('error'));
+      images.slice(1).forEach((image) => image.dispatchEvent(new Event('load')));
+    });
+
+    expect(onPreloadCandidate).toHaveBeenCalledWith('image-0');
+    expect(onPreloadCandidate).toHaveBeenCalledWith('image-1');
+    expect(onPreloadCandidate).toHaveBeenCalledWith('image-2');
   });
 
   it('offers a split-button action that saves without ending staging', async () => {

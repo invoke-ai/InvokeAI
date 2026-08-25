@@ -305,6 +305,10 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
     () => canvasDispatch({ type: 'discardSelectedStagedImage' }),
     [canvasDispatch]
   );
+  const preloadStagedCandidate = useCallback(
+    (imageName: string) => engine?.previews.preloadStagedPreview(imageName),
+    [engine]
+  );
   const selectStagedImage = useCallback(
     (imageIndex: number) => canvasDispatch({ imageIndex, type: 'setStagedImageIndex' }),
     [canvasDispatch]
@@ -528,6 +532,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 onCycle={cycleStagedImage}
                 onDiscardAll={discardAllStagedImages}
                 onDiscardSelected={discardSelectedStagedImage}
+                onPreloadCandidate={preloadStagedCandidate}
                 onSelectImage={selectStagedImage}
                 onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}

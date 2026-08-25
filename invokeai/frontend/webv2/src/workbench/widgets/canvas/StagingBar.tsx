@@ -63,6 +63,7 @@ interface StagingBarProps {
   onCycle: (direction: -1 | 1) => void;
   onDiscardAll: () => void;
   onDiscardSelected: () => void;
+  onPreloadCandidate: (imageName: string) => void;
   onSelectImage: (imageIndex: number) => void;
   onSaveToLayerAndContinue: () => void;
   onSetAutoSwitch: (mode: AutoSwitchMode) => void;
@@ -96,6 +97,7 @@ export const StagingBar = ({
   onCycle,
   onDiscardAll,
   onDiscardSelected,
+  onPreloadCandidate,
   onSelectImage,
   onSaveToLayerAndContinue,
   onSetAutoSwitch,
@@ -159,6 +161,7 @@ export const StagingBar = ({
                     index={index}
                     isSelected={index === selectedImageIndex}
                     slot={slot}
+                    onPreloadCandidate={onPreloadCandidate}
                     onSelect={() => onSelectImage(index)}
                   />
                 ))}
@@ -367,12 +370,14 @@ const StagingThumbnail = ({
   index,
   isSelected,
   slot,
+  onPreloadCandidate,
   onSelect,
 }: {
   antialiasProgressImages: boolean;
   index: number;
   isSelected: boolean;
   slot: CanvasStagingSlot;
+  onPreloadCandidate: (imageName: string) => void;
   onSelect: () => void;
 }) => {
   const { t } = useTranslation();
@@ -386,6 +391,14 @@ const StagingThumbnail = ({
     },
     [isSelected]
   );
+  const preloadCandidate = useCallback(() => {
+    // Once a candidate's small thumbnail settles, warm its full bytes in the
+    // engine so cycling to it only pays the bitmap decode. The cache promotes a
+    // selected candidate out of the background queue when necessary.
+    if (slot.kind === 'candidate') {
+      onPreloadCandidate(slot.candidate.imageName);
+    }
+  }, [onPreloadCandidate, slot]);
 
   return (
     <Stack
@@ -410,6 +423,8 @@ const StagingThumbnail = ({
           alt={slot.candidate.imageName}
           src={slot.candidate.thumbnailUrl || galleryImageUrls.thumbnail(slot.candidate.imageName)}
           style={{ display: 'block', height: '100%', objectFit: 'cover', width: '100%' }}
+          onError={preloadCandidate}
+          onLoad={preloadCandidate}
         />
       ) : (
         <StagingPlaceholderThumbnail antialiasProgressImages={antialiasProgressImages} slot={slot} />

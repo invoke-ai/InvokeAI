@@ -994,6 +994,39 @@ describe('createCanvasEngine', () => {
     expect(second?.isCurrent()).toBe(false);
   });
 
+  it('aborts staged preview prefetches on cooldown and refetches after reactivation', async () => {
+    const doc = makeDoc();
+    const { store } = createFakeStore(doc);
+    let firstSignal: AbortSignal | undefined;
+    const imageResolver = vi
+      .fn<(imageName: string, signal?: AbortSignal) => Promise<Blob>>()
+      .mockImplementationOnce((_imageName, signal) => {
+        firstSignal = signal;
+        return new Promise<Blob>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+        });
+      })
+      .mockResolvedValueOnce(new Blob(['after-reactivation']));
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver,
+      projectId: 'p1',
+      store,
+    });
+
+    engine.previews.preloadStagedPreview('candidate.png');
+    expect(imageResolver).toHaveBeenCalledOnce();
+
+    await expect(engine.lifecycle.beginCooldown()).resolves.toBe('cooled');
+    expect(firstSignal?.aborted).toBe(true);
+
+    engine.lifecycle.activate();
+    engine.previews.setStagedPreview({ imageName: 'candidate.png' });
+    await vi.waitFor(() => expect(imageResolver).toHaveBeenCalledTimes(2));
+
+    engine.lifecycle.dispose();
+  });
+
   it('retains base pixels when cooldown persistence fails', async () => {
     const doc = makeDoc();
     const { store } = createFakeStore(doc);
@@ -8131,7 +8164,7 @@ describe('setStagedPreview', () => {
     await flushMicrotasks();
     raf.flush();
 
-    expect(resolver).toHaveBeenCalledWith('staged-candidate');
+    expect(resolver).toHaveBeenCalledWith('staged-candidate', expect.any(AbortSignal));
     // The decoded (stub, 0-sized) surface is drawn at the current bbox origin.
     expect(stagedDraws(screen.surface).at(-1)!.slice(1, 3)).toEqual([5, 7]);
 

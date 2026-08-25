@@ -400,6 +400,7 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
 }
 
 export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
+  preloadStagedPreview(imageName: string): void;
   setGuardedFilterPreview(
     layerId: string,
     input: FilterPreviewInput,

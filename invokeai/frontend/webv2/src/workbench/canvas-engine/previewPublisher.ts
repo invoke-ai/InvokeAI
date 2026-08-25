@@ -11,6 +11,8 @@ import type { ImageResolver } from '@workbench/canvas-engine/render/rasterizers'
 
 import { LayerFilterOutputDimensionError } from '@workbench/canvas-engine/filterError';
 
+import { createStagedPreviewBlobCache } from './stagedPreviewBlobCache';
+
 /** Outcome of a guarded filter publish, mirroring what the filter session reports upward. */
 export type FilterPreviewOutcome = 'shown' | 'missing' | 'stale';
 
@@ -37,6 +39,12 @@ export interface CreatePreviewPublisherDeps {
 export interface PreviewPublisher {
   /** Drops any staged preview and bumps the token so an in-flight decode is discarded. */
   clearStagedPreview(): void;
+  /** Releases staged fetch/decode coalescing state while keeping the publisher reusable. */
+  clearStagedPreviewCache(): void;
+  /** Releases cached staged-result bytes and aborts outstanding prefetches. */
+  dispose(): void;
+  /** Warms one full-resolution staged result without decoding it. */
+  preloadStagedPreview(imageName: string): void;
   /** Decodes and publishes a staged-generation preview; `null` clears. Never throws. */
   setStagedPreview(input: StagedPreviewInput | null): void;
   /** Drops one layer's filter preview and invalidates it. */
@@ -87,6 +95,8 @@ const dataUrlToBlob = (dataUrl: string): Blob => {
  */
 export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): PreviewPublisher => {
   const { previews } = deps;
+  const stagedPreviewBlobs = createStagedPreviewBlobCache(deps.resolveImage);
+  const stagedImageDecodes = new Map<string, ReturnType<CreatePreviewPublisherDeps['decodeBlob']>>();
 
   const clearStagedPreview = (): void => {
     if (previews.clearStaged()) {
@@ -94,11 +104,48 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
     }
   };
 
+  const clearStagedPreviewCache = (): void => {
+    stagedPreviewBlobs.clear();
+    stagedImageDecodes.clear();
+  };
+
+  const dispose = (): void => {
+    stagedPreviewBlobs.dispose();
+    stagedImageDecodes.clear();
+  };
+
   /** Decodes a preview input to a surface (imageName via resolver, dataUrl via the backend seam). */
-  const decodePreview = async (input: StagedPreviewInput): Promise<DecodedPreview> => {
+  const decodePreview = async (
+    input: StagedPreviewInput,
+    useStagedBlobCache = false,
+    isCurrent?: () => boolean
+  ): Promise<DecodedPreview> => {
     if ('imageName' in input) {
-      const blob = await deps.resolveImage(input.imageName);
-      const decoded = await deps.decodeBlob(blob);
+      const blob = useStagedBlobCache
+        ? await stagedPreviewBlobs.get(input.imageName)
+        : await deps.resolveImage(input.imageName);
+      // Blob resolution is an async boundary. A rapid selection change may
+      // supersede this request while it waits; do not spend a full bitmap
+      // decode on a candidate that can no longer be published.
+      if (isCurrent && !isCurrent()) {
+        throw new Error('Staged preview request was superseded before decode.');
+      }
+      let pendingDecode = useStagedBlobCache ? stagedImageDecodes.get(input.imageName) : undefined;
+      if (!pendingDecode) {
+        pendingDecode = deps.decodeBlob(blob);
+        if (useStagedBlobCache) {
+          stagedImageDecodes.set(input.imageName, pendingDecode);
+          const forget = (): void => {
+            if (stagedImageDecodes.get(input.imageName) === pendingDecode) {
+              stagedImageDecodes.delete(input.imageName);
+            }
+          };
+          // The awaiting caller owns rejection handling; this side chain only
+          // bounds the coalescing map to the lifetime of the decode.
+          void pendingDecode.then(forget, forget);
+        }
+      }
+      const decoded = await pendingDecode;
       return {
         height: decoded.decodedHeight,
         placement: input.placement ? { ...input.placement } : undefined,
@@ -181,6 +228,9 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
 
     clearFilterPreview,
     clearStagedPreview,
+    clearStagedPreviewCache,
+    dispose,
+    preloadStagedPreview: stagedPreviewBlobs.preload,
 
     setGuardedFilterPreview: (layerId, input, guard) => {
       const validate = (): FilterPreviewOutcome => {
@@ -202,7 +252,7 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
         return;
       }
       const token = previews.nextStagedToken();
-      decodePreview(input)
+      decodePreview(input, true, () => previews.isStagedTokenCurrent(token))
         .then((decoded) => {
           // A newer set/clear superseded this decode while it was in flight.
           if (previews.publishStaged(token, decoded)) {

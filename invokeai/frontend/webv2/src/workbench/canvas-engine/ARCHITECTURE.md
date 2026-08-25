@@ -104,6 +104,8 @@ Reservations and cache pins are idempotent leases. Cancellable preparation work 
 
 `DecodedBitmapPool` replaces permanent decoded-image caching. `acquire(imageName, decode, signal)` coalesces concurrent decodes for the same image and returns a short-lived `DecodedBitmapLease`. Each rasterizer releases its lease in `finally`. The bitmap closes after the final lease, a pending decode is aborted when all interested callers cancel, and disposal aborts pending work and closes every resolved bitmap. Pool byte changes feed `decodedBytes`, so decoded images participate in the same budget as surfaces.
 
+Staged results use a separate compressed-Blob cache rather than retaining a decoded surface for every candidate. Once a candidate's thumbnail settles, the UI asks the engine to prefetch its full-resolution bytes with at most two full-image requests in flight. Selecting a queued candidate promotes it immediately and preempts stale work, while completed/in-flight requests and concurrent decodes of the same image are coalesced. The per-engine cache is LRU-bounded to 24 entries and 64 MiB, retries a failed selected request once as foreground demand, and releases outstanding work on engine cooldown or disposal.
+
 ## Derived surfaces and invalidation
 
 Every display-only pixel effect uses `DerivedSurfaceCache`. A slot is identified by layer ID and effect kind, and guarded by source surface identity, monotonic source version, and a deterministic parameter key. Reuse is safe only when every guard matches. Source replacement therefore cannot publish or reuse a surface produced for an older preview.
