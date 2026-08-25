@@ -475,9 +475,11 @@ const ImageMapPlot = ({
             const clicked = points.find((point) => point.imageName === imageName);
             // The backend's cluster label names the filter chip when one has
             // arrived; the member count is the fallback (labels can be off,
-            // still loading, or missing for this cluster).
+            // still loading, or missing for this cluster). Only the primary
+            // phrase is used — the alternates belong to the hover card, which
+            // has room to show them.
             const label =
-              (clicked ? clusterLabelsRef.current?.[String(clicked.cluster)] : undefined) ??
+              (clicked ? clusterLabelsRef.current?.[String(clicked.cluster)]?.label : undefined) ??
               `${clusterNames.length} images`;
 
             selectCluster(imageName, clusterNames, label);
