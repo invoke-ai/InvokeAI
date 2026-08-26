@@ -64,6 +64,10 @@ class ImageMoveQueueActive(Exception):
     pass
 
 
+class UnreadableImageError(Exception):
+    pass
+
+
 class ImageMoveService:
     def __init__(
         self,
@@ -216,8 +220,7 @@ class ImageMoveService:
             try:
                 self.perform_filesystem_moves(job_id)
                 committed += self.commit_database_updates(job_id)
-                if self.get_job(job_id).state == "error":
-                    errors += 1
+                errors += self._count_job_errors(job_id)
             except Exception as e:
                 errors += 1
                 self.record_job_error_message(job_id, str(e))
@@ -244,14 +247,15 @@ class ImageMoveService:
                 self.complete_partial_filesystem_moves(job_id)
                 self.cleanup_empty_source_dirs(job_id)
                 committed += self.commit_database_updates(job_id)
-                if self.get_job(job_id).state == "error":
-                    errors += 1
             except Exception as e:
-                errors += 1
                 if self._is_unrecoverable_error(e):
                     self.mark_job_unrecoverable(job_id, str(e))
+                    errors += max(1, self._count_job_errors(job_id))
                 else:
+                    errors += 1
                     self.record_job_error_message(job_id, str(e))
+            else:
+                errors += self._count_job_errors(job_id)
         return ImageMoveResult(committed=committed, errors=errors)
 
     def plan_batch(self, last_image_name: str, limit: int) -> list[PlannedImageMove]:
@@ -625,15 +629,21 @@ class ImageMoveService:
             )
             moved_count = cast(int, cursor.fetchone()[0])
             cursor.execute(
-                "SELECT error_message FROM image_subfolder_move_items WHERE job_id = ? AND state = 'error' LIMIT 1;",
+                """--sql
+                SELECT error_message
+                FROM image_subfolder_move_items
+                WHERE job_id = ? AND state = 'error'
+                ORDER BY image_name;
+                """,
                 (job_id,),
             )
-            error_row = cursor.fetchone()
+            error_rows = cursor.fetchall()
+            error_messages = [cast(str, row[0]) for row in error_rows if row[0]]
             cursor.execute(
                 "UPDATE image_subfolder_move_items SET state = 'committed' WHERE job_id = ? AND state = 'moved';",
                 (job_id,),
             )
-            if error_row is None:
+            if not error_rows:
                 cursor.execute(
                     "UPDATE image_subfolder_move_jobs SET state = 'committed', error_message = NULL WHERE id = ?;",
                     (job_id,),
@@ -641,9 +651,17 @@ class ImageMoveService:
             else:
                 cursor.execute(
                     "UPDATE image_subfolder_move_jobs SET state = 'error', error_message = ? WHERE id = ?;",
-                    (error_row[0] or "One or more image move items could not be completed", job_id),
+                    ("\n".join(error_messages) or "One or more image move items could not be completed", job_id),
                 )
         return moved_count
+
+    def _count_job_errors(self, job_id: int) -> int:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE job_id = ? AND state = 'error';",
+                (job_id,),
+            )
+            return cast(int, cursor.fetchone()[0])
 
     def mark_item_moved(self, job_id: int, image_name: str) -> None:
         with self._db.transaction() as cursor:
@@ -807,12 +825,15 @@ class ImageMoveService:
 
     def _regenerate_thumbnail(self, image_path: Path, thumbnail_path: Path) -> None:
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(image_path) as image:
-            thumbnail = make_thumbnail(image)
-            with tempfile.NamedTemporaryFile(
-                dir=thumbnail_path.parent, prefix=f".{thumbnail_path.name}.", suffix=".tmp", delete=False
-            ) as temp_file:
-                temp_path = Path(temp_file.name)
+        try:
+            with Image.open(image_path) as image:
+                thumbnail = make_thumbnail(image)
+        except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as e:
+            raise UnreadableImageError(f"Unable to decode image {image_path}: {e}") from e
+        with tempfile.NamedTemporaryFile(
+            dir=thumbnail_path.parent, prefix=f".{thumbnail_path.name}.", suffix=".tmp", delete=False
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
             try:
                 thumbnail.save(temp_path, format="WEBP")
                 self._fsync_file(temp_path)
@@ -886,9 +907,7 @@ class ImageMoveService:
                 self._logger.debug("Unable to close directory fsync handle: %s: %s", path, e)
 
     def _is_unrecoverable_error(self, error: Exception) -> bool:
-        if isinstance(error, (UnidentifiedImageError, Image.DecompressionBombError)):
-            return True
-        if isinstance(error, OSError) and str(error).startswith("image file is truncated"):
+        if isinstance(error, UnreadableImageError):
             return True
         return isinstance(error, RuntimeError) and (
             str(error).startswith("Both old and new image files exist")

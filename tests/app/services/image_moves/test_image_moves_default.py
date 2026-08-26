@@ -12,6 +12,7 @@ from invokeai.app.services.image_files.image_files_disk import DiskImageFileStor
 from invokeai.app.services.image_moves.image_moves_default import (
     ImageMoveQueueActive,
     ImageMoveService,
+    UnreadableImageError,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
@@ -67,6 +68,13 @@ def _save_image(
         is_intermediate=is_intermediate,
     )
     service.image_files.save(Image.new("RGB", (16, 16), color), image_name=image_name, image_subfolder=subfolder)
+
+
+def _corrupt_png_idat(path: Path) -> None:
+    data = bytearray(path.read_bytes())
+    idat_data_offset = data.index(b"IDAT") + 4
+    data[idat_data_offset + 1] ^= 0xFF
+    path.write_bytes(data)
 
 
 def _service(tmp_path: Path, strategy: str = "date") -> tuple[ImageMoveService, SqliteImageRecordStorage]:
@@ -720,7 +728,9 @@ def test_startup_recovery_marks_truncated_image_error_without_retrying_forever(t
     job_id = service.create_move_job([move])
 
     with patch.object(
-        service, "_regenerate_thumbnail", side_effect=OSError("image file is truncated (0 bytes not processed)")
+        service,
+        "_regenerate_thumbnail",
+        side_effect=UnreadableImageError("image file is truncated (0 bytes not processed)"),
     ):
         recovered = service.startup_recovery()
 
@@ -734,6 +744,52 @@ def test_startup_recovery_marks_truncated_image_error_without_retrying_forever(t
     assert not move.new_path.exists()
 
 
+def test_move_all_images_marks_corrupt_idat_as_unrecoverable(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-corrupt-idat.png"
+    _save_image(service, records, image_name, "", "2024-09-16 11:12:13.000", "white")
+    move = service.plan_batch(last_image_name="", limit=100)[0]
+    move.old_thumbnail_path.unlink()
+    _corrupt_png_idat(move.old_path)
+
+    result = service.move_all_images()
+
+    assert result.committed == 0
+    assert result.errors == 1
+    assert service.is_maintenance_active() is False
+    assert service.get_latest_job().state == "error"
+    assert records.get(image_name).image_subfolder == ""
+    assert move.old_path.exists()
+    assert not move.new_path.exists()
+
+
+def test_move_all_images_counts_and_reports_each_unrecoverable_item(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_names = ["image-corrupt-a.png", "image-corrupt-b.png"]
+    for index, image_name in enumerate(image_names):
+        _save_image(
+            service,
+            records,
+            image_name,
+            "",
+            f"2024-09-{17 + index:02d} 11:12:13.000",
+            "white",
+        )
+
+    moves = service.plan_batch(last_image_name="", limit=100)
+    for move in moves:
+        move.old_thumbnail_path.unlink()
+        _corrupt_png_idat(move.old_path)
+
+    result = service.move_all_images()
+
+    assert result.committed == 0
+    assert result.errors == len(image_names)
+    error_message = service.get_latest_job().error_message or ""
+    assert all(image_name in error_message for image_name in image_names)
+    assert all(records.get(image_name).image_subfolder == "" for image_name in image_names)
+
+
 def test_startup_recovery_keeps_db_consistent_when_thumbnail_regeneration_fails(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-thumbnail-recovery.png"
@@ -744,7 +800,9 @@ def test_startup_recovery_keeps_db_consistent_when_thumbnail_regeneration_fails(
     job_id = service.create_move_job([move])
 
     with patch.object(
-        service, "_regenerate_thumbnail", side_effect=OSError("image file is truncated (0 bytes not processed)")
+        service,
+        "_regenerate_thumbnail",
+        side_effect=UnreadableImageError("image file is truncated (0 bytes not processed)"),
     ):
         recovered = service.startup_recovery()
 
@@ -767,7 +825,9 @@ def test_startup_recovery_reconciles_db_after_destination_thumbnail_failure(tmp_
     job_id = service.create_move_job([move])
 
     with patch.object(
-        service, "_regenerate_thumbnail", side_effect=OSError("image file is truncated (0 bytes not processed)")
+        service,
+        "_regenerate_thumbnail",
+        side_effect=UnreadableImageError("image file is truncated (0 bytes not processed)"),
     ):
         recovered = service.startup_recovery()
 
