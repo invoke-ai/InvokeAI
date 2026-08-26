@@ -659,7 +659,7 @@ class CopyImagesResult(BaseModel):
 @images_router.post("/copy", operation_id="copy_images_to_board", response_model=CopyImagesResult)
 def copy_images_to_board(
     current_user: CurrentUserOrDefault,
-    image_names: list[str] = Body(description="The names of the images to copy", max_length=MAX_COPY_BATCH_SIZE),
+    image_names: list[ImageName] = Body(description="The names of the images to copy", max_length=MAX_COPY_BATCH_SIZE),
     board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
 ) -> CopyImagesResult:
     """Copies images, optionally onto a board, and returns the new names.

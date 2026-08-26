@@ -211,10 +211,10 @@ def assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) 
     - The board visibility is Shared or Public.
     - The board is explicitly shared with the user.
     """
+    board = _get_board_record(board_id)
+
     if current_user.is_admin:
         return
-
-    board = _get_board_record(board_id)
 
     if board.user_id == current_user.user_id:
         return

@@ -867,11 +867,11 @@ def test_remove_video_from_board_succeeds_for_board_owner_of_non_owned_video(
     mock_invoker.services.video_records.get_user_id.return_value = user2.user_id
     mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
 
-    # _assert_board_write_access reads the board DTO to check ownership/visibility.
+    # _assert_board_write_access reads the lightweight board record to check ownership/visibility.
     fake_board = MagicMock()
     fake_board.user_id = user1.user_id
     fake_board.board_visibility = BoardVisibility.Private
-    with patch.object(mock_invoker.services.boards, "get_dto", return_value=fake_board):
+    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
         response = client.request(
             "DELETE",
             "/api/v1/videos/board",
@@ -902,7 +902,7 @@ def test_remove_video_from_board_rejects_third_party(
     fake_board.board_visibility = BoardVisibility.Private
 
     # user2 has no claim to either resource.
-    with patch.object(mock_invoker.services.boards, "get_dto", return_value=fake_board):
+    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
         response = client.request(
             "DELETE",
             "/api/v1/videos/board",

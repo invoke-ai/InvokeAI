@@ -17667,7 +17667,8 @@
         "properties": {
           "image_names": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 255
             },
             "type": "array",
             "maxItems": 1000,

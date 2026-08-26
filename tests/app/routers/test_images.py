@@ -48,19 +48,17 @@ def test_download_images_from_board_id_empty_image_name_list(
 ) -> None:
     expected_board_name = "test"
 
-    def mock_get(*args, **kwargs):
-        return BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
-
+    mock_get = MagicMock(
+        return_value=BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
+    )
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
-    mock_get_dto = MagicMock(return_value=object())
-    monkeypatch.setattr(mock_invoker.services.boards, "get_dto", mock_get_dto)
     prepare_download_images_test(monkeypatch, mock_invoker)
 
     response = client.post("/api/v1/images/download", json={"board_id": "test"})
     json_response = response.json()
     assert response.status_code == 202
     assert json_response["bulk_download_item_name"] == "test.zip"
-    mock_get_dto.assert_called_once_with(board_id="test")
+    mock_get.assert_called_once_with("test")
 
 
 def prepare_download_images_test(monkeypatch: Any, mock_invoker: Invoker) -> None:
@@ -352,6 +350,7 @@ def prepare_image_batch_test(monkeypatch: Any, mock_invoker: Invoker) -> MagicMo
     monkeypatch.setattr(mock_invoker.services, "images", images_service)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+    monkeypatch.setattr(mock_invoker.services.image_records, "exists", MagicMock(return_value=True))
     monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
 
     mock_deps = MockApiDependencies(mock_invoker)
@@ -604,6 +603,7 @@ def test_star_unstar_dedupes_repeated_names(
         "/api/v1/images/unstar",
         "/api/v1/images/images_by_names",
         "/api/v1/images/download",
+        "/api/v1/images/copy",
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
     ],
@@ -679,6 +679,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
     assert sorted(checked) == [
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
+        "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",
         "/api/v1/images/images_by_names",
