@@ -26,13 +26,19 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
-        """Gets an image's metadata'."""
+    def exists(self, image_name: str) -> bool:
+        """Reports whether the image row is present, without reading it.
+
+        Separate from `get` because the callers that need this are deciding whether something is
+        gone, and `get` cannot answer that alone: it also deserializes, so a row written by a
+        newer version -- an enum value this one does not know -- fails the same way a missing row
+        does. A storage error still propagates, because "could not look" is not "not there".
+        """
         pass
 
     @abstractmethod
-    def exists(self, image_name: str) -> bool:
-        """Returns whether an image record exists."""
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+        """Gets an image's metadata'."""
         pass
 
     @abstractmethod

@@ -181,6 +181,28 @@ def test_start_restores_staged_delete_when_record_still_exists(storage: DiskVide
     assert not list((tmp_path / "videos").glob(".delete_*"))
 
 
+def test_start_keeps_staged_delete_when_the_record_cannot_be_read(storage: DiskVideoFileStorage, tmp_path: Path):
+    """A database it merely could not read must not count as proof the delete committed.
+
+    The recovery decides between purging the staged files and restoring them by asking whether
+    the record is still there, so it needs that read to distinguish "gone" from "could not
+    look". `SqliteVideoRecordStorage.get` used to translate every sqlite3.Error into
+    VideoRecordNotFoundException, which made an unreadable database delete the user's video
+    files outright. Now the staged copy survives for a later attempt.
+    """
+    import sqlite3
+
+    source = _make_source(tmp_path)
+    storage.save(source_path=source, video_name=VIDEO_NAME, metadata='{"seed": 1}')
+    storage.stage_delete(VIDEO_NAME)
+    invoker = MagicMock()
+    invoker.services.video_records.get.side_effect = sqlite3.OperationalError("database is locked")
+
+    DiskVideoFileStorage(tmp_path / "videos").start(invoker)
+
+    assert list((tmp_path / "videos").glob(".delete_*")), "the staged files were destroyed"
+
+
 def test_start_purges_staged_delete_when_record_is_gone(storage: DiskVideoFileStorage, tmp_path: Path):
     from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 

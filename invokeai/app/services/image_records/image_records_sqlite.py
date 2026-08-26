@@ -206,19 +206,23 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._db = db
 
     def get(self, image_name: str) -> ImageRecord:
+        # A sqlite3.Error is deliberately NOT translated into ImageRecordNotFoundException.
+        # This used to be caught and re-raised as not-found, which made the exception mean
+        # "the row is absent, OR the database is locked/corrupt/unreadable". Callers that
+        # treat not-found as a benign outcome — the concurrent-deletion skips in the images
+        # and board_images batch routes — would then swallow a disk I/O error as a routine
+        # race and answer 200 with the name in no result list at all. Let the storage error
+        # propagate: ImageService logs it and the route reports it as a real failure.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    f"""--sql
-                    SELECT {IMAGE_DTO_COLS} FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                f"""--sql
+                SELECT {IMAGE_DTO_COLS} FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
         if not result:
             raise ImageRecordNotFoundException
@@ -240,20 +244,17 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             return cast(Optional[str], dict(result).get("user_id"))
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+        # See get(): a storage error must not masquerade as a missing row.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT metadata FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                """--sql
+                SELECT metadata FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
             if not result:
                 raise ImageRecordNotFoundException

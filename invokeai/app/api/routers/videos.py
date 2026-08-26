@@ -34,7 +34,11 @@ from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidato
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.video_records.video_records_common import VideoNamesResult, VideoRecordChanges
+from invokeai.app.services.video_records.video_records_common import (
+    VideoNamesResult,
+    VideoRecordChanges,
+    VideoRecordNotFoundException,
+)
 from invokeai.app.services.videos.videos_common import (
     AddVideosToBoardResult,
     DeleteVideosResult,
@@ -411,7 +415,9 @@ def get_video_dto(
     _assert_video_read_access(video_name, current_user)
     try:
         return ApiDependencies.invoker.services.videos.get_dto(video_name)
-    except Exception:
+    except VideoRecordNotFoundException:
+        # See get_image_dto: this is the 404 a workflow's video field drops its reference on,
+        # so only a genuinely missing record may produce it.
         raise HTTPException(status_code=404)
 
 

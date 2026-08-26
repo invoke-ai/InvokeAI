@@ -30,11 +30,12 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiCopyBold, PiDownloadSimpleBold, PiTrashSimpleBold, PiXBold } from 'react-icons/pi';
 import type { VideoDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
 import { ProgressIndicator } from './ProgressIndicator2';
+import { usePaintedItemName, useSelectedItemReveal } from './useSelectedItemReveal';
 import { VideoPlayButtonOverlay } from './VideoPlayButtonOverlay';
 
 type Props = {
@@ -68,6 +69,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   const videoName = videoDTO?.video_name ?? null;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const { isMediaReady, onPainted } = usePaintedItemName(videoName);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const activeTab = useAppSelector(selectActiveTab);
@@ -80,7 +82,7 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
-    lastRenderedItemNameRef,
+    revealMachine,
     onLoadImage,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
@@ -92,14 +94,15 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
   // `!isPlaying`: a reveal exposes the play button, and an explicit play is a stronger signal than
   // the click that triggered the reveal — never re-cover an actively-playing video with the opaque
   // overlay (its audio would keep running underneath, with the controls unreachable). The overlay
-  // returns when the user closes the player.
+  // returns when playback ends — whether the user closes the player or the video runs out.
   const withProgress =
     shouldShowProgressInViewer && hasProgressImage && !isTemporarilyShowingSelectedImage && !isPlaying;
   // When more than one session is generating concurrently (multi-GPU), tile their previews instead
   // of letting the sessions overwrite each other's full-size preview. Mirrors CurrentImagePreview.
   const withTiledProgress = withProgress && activeProgressData.length > 1;
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
-  const selectedVideoRevealTimeoutId = useRef(0);
+  // One controller per mounted preview component; the previous-item ref inside it is the shared
+  // one from the viewer context, so image <-> video clicks read as selection changes on both ends.
 
   // Whenever the selected video changes, drop back to the idle still + play overlay.
   useEffect(() => {
@@ -108,47 +111,18 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
 
   // Mid-generation gallery clicks: mirror CurrentImagePreview's temporary reveal. Without this,
   // the opaque progress overlay swallows every video-thumbnail click for the whole render — the
-  // selection changes underneath, but nothing visibly happens. Unlike the image path there is no
-  // preload step: the <video> renders immediately (first frame paints when metadata arrives), so
-  // the reveal is keyed directly off the selected video name. The previous-item ref is shared with
-  // CurrentImagePreview so an image -> video click still reads as a selection change.
-  useEffect(() => {
-    const previousRenderedItemName = lastRenderedItemNameRef.current;
-    lastRenderedItemNameRef.current = videoName;
-
-    window.clearTimeout(selectedVideoRevealTimeoutId.current);
-
-    if (!shouldShowProgressInViewer || !hasProgressImage || isProgressImageResolving || !videoName) {
-      $isTemporarilyShowingSelectedImage.set(false);
-      return;
-    }
-
-    if (previousRenderedItemName === null || previousRenderedItemName === videoName) {
-      return;
-    }
-
-    $isTemporarilyShowingSelectedImage.set(true);
-    selectedVideoRevealTimeoutId.current = window.setTimeout(() => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    }, SELECTED_ITEM_REVEAL_DURATION_MS);
-
-    return () => {
-      window.clearTimeout(selectedVideoRevealTimeoutId.current);
-    };
-  }, [
-    $isTemporarilyShowingSelectedImage,
+  // selection changes underneath, but nothing visibly happens. The sequencing lives in the
+  // controller (selectedItemReveal.ts); the effect wiring around it lives in the hook, where it is
+  // mounted and tested with real lifecycles. preload="metadata" plus the near-zero seek does not
+  // prove a frame exists, so readiness comes from usePaintedItemName fed by onLoadedData.
+  useSelectedItemReveal({
+    revealMachine,
+    renderedItemName: videoName,
+    isMediaReady: isMediaReady,
+    shouldShowProgressInViewer,
     hasProgressImage,
     isProgressImageResolving,
-    lastRenderedItemNameRef,
-    shouldShowProgressInViewer,
-    videoName,
-  ]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
+  });
 
   // Register the viewer's <video> as a drag source so users can drag the currently-displayed
   // video onto node fields (e.g. a Video Primitive's "Starting Video" input) directly from
@@ -185,25 +159,38 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
     );
   }, [videoDTO, store]);
 
-  const handleVideoError = useCallback(() => {
+  // Drop back to the idle still and tell the user, without touching the progress overlay. Used on
+  // its own for a rejected play(), where the media itself is fine.
+  const reportPlaybackFailure = useCallback(() => {
     setIsPlaying(false);
     // A restored session's <video> request can 401 before the media-cookie self-heal
     // completes; the URL version bumps and the element reloads once the cookie lands.
     // Surfacing an error toast for that transient window would be a false alarm.
     if (isMediaCookieSelfHealPending()) {
-      return;
+      return false;
     }
-    // A genuinely errored element will never fire onLoadedMetadata, which is what normally clears
-    // a pending post-render progress overlay — clear it here or it strands over the viewer.
-    // (onLoadImage is a no-op unless a resolve is actually pending.)
-    onLoadImage(videoDTO?.session_id ?? null);
     toast({
       id: 'VIDEO_PLAYBACK_FAILED',
       status: 'error',
       title: t('toast.videoPlaybackFailed'),
       description: t('toast.videoPlaybackFailedDesc'),
     });
-  }, [onLoadImage, t, videoDTO?.session_id]);
+    return true;
+  }, [t]);
+
+  const handleVideoError = useCallback(() => {
+    // The self-heal case reloads the element, which then fires onLoadedMetadata and ends any
+    // pending resolve on its own — so only a real element error takes the shortcut below.
+    if (!reportPlaybackFailure()) {
+      return;
+    }
+    // A genuinely errored element will never fire onLoadedMetadata, which is what normally ends
+    // this session's post-render "resolve" illusion — end it here instead of letting the overlay
+    // sit over the viewer for the whole resolve timeout. Attributed to this video's session, so
+    // the lifecycle ignores it if some other session's illusion is the one pending, and it is a
+    // no-op when none is.
+    onLoadImage(videoDTO?.session_id ?? null);
+  }, [onLoadImage, reportPlaybackFailure, videoDTO?.session_id]);
 
   const handlePlay = useCallback(() => {
     setIsPlaying(true);
@@ -218,9 +205,12 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         setIsPlaying(false);
         return;
       }
-      handleVideoError();
+      // Not a load failure: onLoadedMetadata has usually already fired, and the element is intact.
+      // Routing this through the error path would end whichever session's resolve illusion happens
+      // to be pending, for a user gesture unrelated to any render.
+      reportPlaybackFailure();
     });
-  }, [handleVideoError]);
+  }, [reportPlaybackFailure]);
 
   // Close: stop playback and drop back to the first-frame preview + play overlay. We
   // explicitly pause() because toggling React's `controls` prop hides the chrome but does
@@ -410,6 +400,8 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         playsInline
         controls={isPlaying}
         onLoadedMetadata={handleLoadedMetadata}
+        onLoadedData={onPainted}
+        onEnded={handleClose}
         onError={handleVideoError}
         style={{
           maxWidth: '100%',
@@ -420,7 +412,10 @@ export const CurrentVideoPreview = memo(({ videoDTO }: Props) => {
         }}
       />
       {!isPlaying && !withProgress && <VideoPlayButtonOverlay onClick={handlePlay} />}
-      {shouldShowItemDetails && !withProgress && (
+      {/* Gated on the states themselves, not on !withProgress: playing and revealing both turn
+          withProgress off, and the full-screen metadata panel would land exactly on top of the
+          playback controls / the just-revealed video, swallowing the interaction they exist for. */}
+      {shouldShowItemDetails && !isPlaying && !isTemporarilyShowingSelectedImage && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
           <VideoMetadataViewer video={videoDTO} />
         </Box>

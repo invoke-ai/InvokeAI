@@ -27,4 +27,74 @@ describe('IMAGE_METADATA_ACTION_HANDLERS', () => {
       expect(IMAGE_METADATA_ACTION_HANDLERS).toContain(handler);
     }
   });
+
+  it('includes every standalone-component handler for FLUX.1, Z-Image and Anima', () => {
+    // These bases keep their VAE / text encoder in dedicated params slots and write them to metadata,
+    // but the handlers were missing from this list — so the values were saved and gated correctly yet
+    // never rendered a row or a per-parameter recall button.
+    const handlers = [
+      ImageMetadataHandlers.Flux1VAEModel,
+      ImageMetadataHandlers.ZImageVAEModel,
+      ImageMetadataHandlers.ZImageQwen3EncoderModel,
+      ImageMetadataHandlers.ZImageQwen3SourceModel,
+      ImageMetadataHandlers.AnimaVAEModel,
+      ImageMetadataHandlers.AnimaQwen3EncoderModel,
+    ];
+    for (const handler of handlers) {
+      expect(IMAGE_METADATA_ACTION_HANDLERS).toContain(handler);
+    }
+  });
+
+  it('includes every MiniMax H3 metadata handler in the recall parameters UI', () => {
+    const handlers = [
+      ImageMetadataHandlers.MiniMaxH3DurationSeconds,
+      ImageMetadataHandlers.MiniMaxH3OutputMode,
+      ImageMetadataHandlers.MiniMaxH3TransformerModel,
+      ImageMetadataHandlers.MiniMaxH3TextEncoderModel,
+    ];
+    for (const handler of handlers) {
+      expect(IMAGE_METADATA_ACTION_HANDLERS).toContain(handler);
+    }
+  });
+
+  it('has no un-triaged handler missing from the recall parameters UI', () => {
+    // Guard against the list drifting behind the handler registry again: every new handler must either be
+    // listed above or be added here with a reason. The second group is a snapshot of pre-existing gaps —
+    // metadata that is written but has no recall row. Shrink it, don't grow it.
+    const intentionallyHidden = new Set<string>([
+      // Not per-parameter recallable by design.
+      'CreatedBy', // informational only
+      'ImageSize', // combined width+height, driven by the dedicated "recall size" action
+
+      // Known gaps, not triaged in this change.
+      'HiDiffusion',
+      'HiDiffusionRauNet',
+      'HiDiffusionWindowAttn',
+      'HiDiffusionT1Ratio',
+      'HiDiffusionT2Ratio',
+      'ZImageSeedVarianceEnabled',
+      'ZImageSeedVarianceStrength',
+      'ZImageSeedVarianceRandomizePercent',
+      'QwenImageVaeModel',
+      'QwenImageQwenVLEncoderModel',
+      'WanTransformerLowNoise',
+      'WanComponentSource',
+      'WanVaeModel',
+      'WanT5EncoderModel',
+      'WanGuidanceScaleLowNoise',
+      'GeminiTemperature',
+      'GeminiThinkingLevel',
+      'OpenaiQuality',
+      'OpenaiBackground',
+      'OpenaiInputFidelity',
+      'SeedreamWatermark',
+      'SeedreamOptimizePrompt',
+    ]);
+
+    const missing = Object.values(ImageMetadataHandlers)
+      .filter((handler) => !IMAGE_METADATA_ACTION_HANDLERS.includes(handler) && !intentionallyHidden.has(handler.type))
+      .map((handler) => handler.type);
+
+    expect(missing).toEqual([]);
+  });
 });
