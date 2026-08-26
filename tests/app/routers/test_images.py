@@ -49,7 +49,14 @@ def test_download_images_from_board_id_empty_image_name_list(
     expected_board_name = "test"
 
     mock_get = MagicMock(
-        return_value=BoardRecord(board_id="12345", board_name=expected_board_name, created_at="None", updated_at="None")
+        return_value=BoardRecord(
+            board_id="12345",
+            board_name=expected_board_name,
+            user_id="system",
+            created_at="None",
+            updated_at="None",
+            archived=False,
+        )
     )
     monkeypatch.setattr(mock_invoker.services.board_records, "get", mock_get)
     prepare_download_images_test(monkeypatch, mock_invoker)
