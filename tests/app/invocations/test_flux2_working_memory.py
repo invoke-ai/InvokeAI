@@ -10,7 +10,6 @@ The `MEASURED_*` tables below are peak *reserved* memory measured on CUDA in bf1
 quantity, including allocator overhead). Every estimate must stay an upper bound on them.
 """
 
-from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,6 +23,7 @@ from invokeai.app.invocations.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.backend.util.attention import (
     SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
     _diffusers_attention_dispatch,
+    _probe_sdpa_dispatch,
     _torch_sdpa_materializes_score_matrix,
     sdpa_score_matrix_bytes,
 )
@@ -40,13 +40,12 @@ FUSED = torch.device("cpu")
 
 
 @pytest.fixture(autouse=True)
-def _clear_dispatch_caches():
-    """Both probes are `lru_cache`d for the process; tests that fake one must not leak into the next."""
-    _diffusers_attention_dispatch.cache_clear()
-    _torch_sdpa_materializes_score_matrix.cache_clear()
+def _clear_probe_cache():
+    """The torch probe is `lru_cache`d for the process; a faked answer must not leak into the next
+    test. (The diffusers lookup is deliberately uncached -- see `_diffusers_attention_dispatch`.)"""
+    _probe_sdpa_dispatch.cache_clear()
     yield
-    _diffusers_attention_dispatch.cache_clear()
-    _torch_sdpa_materializes_score_matrix.cache_clear()
+    _probe_sdpa_dispatch.cache_clear()
 
 
 def _estimate(
@@ -389,7 +388,7 @@ class TestMaterializedScoreMatrixIsBudgeted:
         decode be admitted to a card that could not run it."""
         with patch("torch.ops.aten._fused_sdp_choice", side_effect=NotImplementedError("no MPS kernel")):
             materializing = self._vae_estimate("decode", 1024, device=FUSED)
-        _torch_sdpa_materializes_score_matrix.cache_clear()
+        _probe_sdpa_dispatch.cache_clear()
         fused = self._vae_estimate("decode", 1024, device=FUSED)
 
         tokens = 128 * 128
@@ -494,6 +493,24 @@ class TestSdpaBackendProbe:
             )
         assert estimated == 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
+    def test_disabling_the_fused_kernels_at_runtime_invalidates_the_probe(self):
+        """The torch probe *is* cached -- it allocates and runs a dispatch query -- but its answer
+        depends on switches callers can flip at runtime (`sdpa_kernel()`,
+        `torch.backends.cuda.enable_flash_sdp`). Those toggles are part of the cache key, so an
+        estimate priced after a switch does not inherit the answer from before it. No cache is
+        cleared between these calls on purpose."""
+        from torch.nn.attention import SDPBackend, sdpa_kernel
+
+        def estimate():
+            return sdpa_score_matrix_bytes(
+                device=torch.device("cpu"), dtype=torch.bfloat16, num_heads=1, head_dim=128, seq_len=4096
+            )
+
+        assert estimate() == 0
+        with sdpa_kernel([SDPBackend.MATH]):
+            assert estimate() == 4096 * 4096 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert estimate() == 0
+
     def test_the_probe_asks_torch_the_same_question_sdpa_does(self):
         """`_fused_sdp_choice` is the dispatch query `F.scaled_dot_product_attention` itself runs, so
         a `MATH` answer means the real forward materializes. Reimplementing the eligibility rules
@@ -502,7 +519,7 @@ class TestSdpaBackendProbe:
 
         with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.MATH)):
             assert _torch_sdpa_materializes_score_matrix("cpu", None, torch.bfloat16, 128, False)
-        _torch_sdpa_materializes_score_matrix.cache_clear()
+        _probe_sdpa_dispatch.cache_clear()
         with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.EFFICIENT_ATTENTION)):
             assert not _torch_sdpa_materializes_score_matrix("cpu", None, torch.bfloat16, 128, False)
 
@@ -562,25 +579,14 @@ class TestSdpaBackendProbe:
         assert estimate <= 2 * measured
 
 
-@contextmanager
 def _diffusers_backend(name):
-    """Force the process-wide diffusers attention backend, as `DIFFUSERS_ATTN_BACKEND` would.
-
-    The lookup is `lru_cache`d -- it is a process-wide setting read on every estimate -- so the
-    cache has to be dropped on the way in and on the way out, or the faked backend leaks into the
-    comparison the test makes against the real one.
-    """
+    """Force the process-wide diffusers attention backend, as `DIFFUSERS_ATTN_BACKEND` would."""
     from diffusers.models.attention_dispatch import AttentionBackendName
 
-    _diffusers_attention_dispatch.cache_clear()
-    try:
-        with patch(
-            "diffusers.models.attention_dispatch._AttentionBackendRegistry.get_active_backend",
-            return_value=(AttentionBackendName(name), None),
-        ):
-            yield
-    finally:
-        _diffusers_attention_dispatch.cache_clear()
+    return patch(
+        "diffusers.models.attention_dispatch._AttentionBackendRegistry.get_active_backend",
+        return_value=(AttentionBackendName(name), None),
+    )
 
 
 class TestDiffusersAttentionDispatchIsConsulted:
@@ -623,6 +629,45 @@ class TestDiffusersAttentionDispatchIsConsulted:
         with _diffusers_backend("_native_math"):
             forced_math = estimate()
         assert forced_math == estimate()
+
+    def test_a_backend_switch_is_not_masked_by_an_earlier_estimate(self):
+        """The active backend is mutable process state. Caching the first answer would keep
+        reserving zero for every later estimate in a long-lived process that has since switched to
+        `_native_math` -- the exact case this lookup exists to catch. Deliberately no cache is
+        cleared between the two calls here; the production code must not be holding one."""
+        native = _estimate(image_seq_len=4096, device=FUSED)
+        with _diffusers_backend("_native_math"):
+            after_switch = _estimate(image_seq_len=4096, device=FUSED)
+        back_to_native = _estimate(image_seq_len=4096, device=FUSED)
+
+        seq_len = 4096 + 512
+        assert after_switch - native == (
+            FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        )
+        assert back_to_native == native
+
+    def test_a_model_level_override_reaches_the_registry(self):
+        """Why the estimator does not need the model in hand: it is priced before the transformer is
+        loaded, and `set_attention_backend()` stamps its choice onto the process-wide registry as
+        well as onto the model's attention processors -- deliberately, "so that it propagates
+        gracefully throughout". If diffusers ever stops doing that, a per-model override could
+        disagree with the estimate, and this test is where that shows up."""
+        from diffusers.configuration_utils import ConfigMixin, register_to_config
+        from diffusers.models.attention_dispatch import _AttentionBackendRegistry
+        from diffusers.models.modeling_utils import ModelMixin
+
+        class _Tiny(ModelMixin, ConfigMixin):
+            @register_to_config
+            def __init__(self):
+                super().__init__()
+                self.lin = torch.nn.Linear(2, 2)
+
+        previous = _AttentionBackendRegistry._active_backend
+        try:
+            _Tiny().set_attention_backend("_native_math")
+            assert _diffusers_attention_dispatch() == "math"
+        finally:
+            _AttentionBackendRegistry._active_backend = previous
 
     def test_an_unreadable_dispatcher_is_budgeted_as_math(self):
         """`_AttentionBackendRegistry` is private; if diffusers moves it we lose the answer. The

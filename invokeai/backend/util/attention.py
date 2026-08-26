@@ -75,7 +75,15 @@ _DISPATCH_FUSED = "fused"
 _DISPATCH_MATH = "math"
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=1)
+def _warn_unknown_diffusers_dispatch() -> None:
+    """Say once per process that estimates are running blind. Rate-limited, not cached for truth."""
+    InvokeAILogger.get_logger(__name__).warning(
+        "Could not determine the active diffusers attention backend; budgeting working memory as if "
+        "attention materializes its score matrix. Estimates will be conservative."
+    )
+
+
 def _diffusers_attention_dispatch() -> str:
     """Report how the diffusers attention dispatcher will route a diffusers model's attention calls.
 
@@ -84,6 +92,18 @@ def _diffusers_attention_dispatch() -> str:
     `attention_backend()` context manager. Only the default `native` backend hands the call to
     torch; the others pin a specific kernel, and `_native_math` pins the materializing one. A
     torch-level probe alone would report "fused" for a user who has forced math.
+
+    Read live on every estimate, never cached: the active backend is mutable process state, and a
+    cached answer would keep reserving zero after a switch to `_native_math` -- the one case this
+    lookup exists to catch. It is a dict lookup against an already-imported module, priced once per
+    invocation.
+
+    Reading the process-wide backend also covers per-model overrides, which is why the estimate does
+    not need the model in hand (it is priced before the model is loaded). `set_attention_backend()`
+    stamps the choice onto the model's attention processors *and* calls
+    `_AttentionBackendRegistry.set_active_backend()` -- deliberately, "so that it propagates
+    gracefully throughout". `reset_attention_backend()` clears only the processors, leaving the
+    registry pinned, which errs towards over-reserving rather than under-reserving.
 
     Returns ``_DISPATCH_TORCH`` when torch decides, ``_DISPATCH_FUSED`` for a backend that never
     materializes the score matrix, or ``_DISPATCH_MATH`` when one is built -- including when we
@@ -98,10 +118,7 @@ def _diffusers_attention_dispatch() -> str:
         # A private diffusers attribute that moved, or a selected backend whose kernel failed to
         # register. Budget the materializing case, but say so: silently adding several GB to every
         # FLUX.2 estimate is not something that should pass unnoticed.
-        InvokeAILogger.get_logger(__name__).warning(
-            "Could not determine the active diffusers attention backend; budgeting working memory as if "
-            "attention materializes its score matrix. Estimates will be conservative."
-        )
+        _warn_unknown_diffusers_dispatch()
         return _DISPATCH_MATH
 
     if name == "native":
@@ -113,7 +130,21 @@ def _diffusers_attention_dispatch() -> str:
     return _DISPATCH_FUSED
 
 
-@lru_cache(maxsize=None)
+def _sdp_kernel_toggles() -> tuple[bool, ...]:
+    """The global switches that gate each fused SDPA kernel, as `_fused_sdp_choice` sees them.
+
+    `torch.backends.cuda.enable_flash_sdp(False)` and `sdpa_kernel([...])` flip these at runtime and
+    the dispatch answer flips with them, so they belong in the probe's cache key rather than being
+    baked into a permanent result.
+    """
+    cuda = torch.backends.cuda
+    return tuple(
+        bool(getattr(cuda, name)())
+        for name in ("flash_sdp_enabled", "mem_efficient_sdp_enabled", "math_sdp_enabled", "cudnn_sdp_enabled")
+        if hasattr(cuda, name)
+    )
+
+
 def _torch_sdpa_materializes_score_matrix(
     device_type: str, device_index: int | None, dtype: torch.dtype, head_dim: int, has_attn_mask: bool
 ) -> bool:
@@ -132,6 +163,21 @@ def _torch_sdpa_materializes_score_matrix(
     -> `@ V` that holds the score tensor as a real intermediate. The remaining causes (an allocation
     failure inside the probe, a torch that predates the op) leave us knowing nothing at all, and
     there the asymmetry decides: a shortfall costs an OOM, an over-estimate costs some residency.
+    """
+    return _probe_sdpa_dispatch(device_type, device_index, dtype, head_dim, has_attn_mask, _sdp_kernel_toggles())
+
+
+@lru_cache(maxsize=None)
+def _probe_sdpa_dispatch(
+    device_type: str,
+    device_index: int | None,
+    dtype: torch.dtype,
+    head_dim: int,
+    has_attn_mask: bool,
+    sdp_kernel_toggles: tuple[bool, ...],
+) -> bool:
+    """Cached body of the probe above. Every input torch's answer depends on is part of the key --
+    `sdp_kernel_toggles` is not read here, it is carried so a runtime change invalidates the entry.
     """
     try:
         device = torch.device(device_type) if device_index is None else torch.device(device_type, device_index)
