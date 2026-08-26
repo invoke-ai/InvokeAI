@@ -467,13 +467,16 @@ class ImageMoveService:
     def complete_partial_filesystem_moves(self, job_id: int) -> None:
         items = self._get_items(job_id, include_terminal=False)
         if not items:
-            raise ValueError(f"Image move job {job_id} has no items")
+            if self._get_items(job_id):
+                return
+            raise RuntimeError(f"Image move job {job_id} has no items")
         for item in items:
             try:
                 self._complete_partial_filesystem_move(job_id, item)
             except Exception as e:
                 if not self._is_unrecoverable_error(e):
                     raise
+                self._reconcile_destination_subfolder(item)
                 self.mark_item_unrecoverable(job_id, item.image_name, f"{item.image_name}: {e}")
                 self._logger.error("Image move skipped unrecoverable item %s: %s", item.image_name, e)
 
@@ -505,11 +508,21 @@ class ImageMoveService:
 
         old_thumbnail_exists = old_thumbnail_path.exists()
         new_thumbnail_exists = new_thumbnail_path.exists()
-        if old_exists and not new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
+        if (
+            old_exists
+            and not new_exists
+            and (
+                (not old_thumbnail_exists and not new_thumbnail_exists)
+                or (old_thumbnail_exists and new_thumbnail_exists)
+            )
+        ):
             # Generate the thumbnail while the source is still available. If this fails,
             # leave the source untouched so transient failures can be retried and corrupt
             # images can be repaired or removed by the operator.
             self._regenerate_thumbnail(old_path, new_thumbnail_path)
+
+        if not old_exists and new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
+            self._regenerate_thumbnail(new_path, new_thumbnail_path)
 
         if old_exists:
             new_path.parent.mkdir(parents=True, exist_ok=True)
@@ -521,7 +534,6 @@ class ImageMoveService:
         old_thumbnail_exists = old_thumbnail_path.exists()
         new_thumbnail_exists = new_thumbnail_path.exists()
         if old_thumbnail_exists and new_thumbnail_exists:
-            self._regenerate_thumbnail(new_path, new_thumbnail_path)
             old_thumbnail_path.unlink()
             self._fsync_dir(old_thumbnail_path.parent)
         elif old_thumbnail_exists and not new_thumbnail_exists:
@@ -535,6 +547,22 @@ class ImageMoveService:
 
         self.image_files.evict_cache_paths([old_path, new_path, old_thumbnail_path, new_thumbnail_path])
         self.mark_item_moved(job_id, item.image_name)
+
+    def _reconcile_destination_subfolder(self, item: PlannedImageMove) -> None:
+        old_path = self.image_files.get_path(item.image_name, image_subfolder=item.old_subfolder)
+        new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
+        if old_path.exists() or not new_path.exists():
+            return
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE images
+                SET image_subfolder = ?
+                WHERE image_name = ?
+                  AND image_subfolder = ?;
+                """,
+                (item.new_subfolder, item.image_name, item.old_subfolder),
+            )
 
     def cleanup_empty_source_dirs(self, job_id: int) -> None:
         for item in self._get_items(job_id):
