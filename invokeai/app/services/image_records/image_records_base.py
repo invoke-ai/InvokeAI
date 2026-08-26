@@ -42,11 +42,6 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def exists(self, image_name: str) -> bool:
-        """Returns whether an image record exists."""
-        pass
-
-    @abstractmethod
     def update(
         self,
         image_name: str,
