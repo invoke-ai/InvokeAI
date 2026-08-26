@@ -232,6 +232,46 @@ def test_move_recovers_existing_16_bit_destination_without_thumbnail(tmp_path: P
         image.close()
 
 
+def test_regenerate_thumbnail_closes_temp_file_before_writing(tmp_path: Path) -> None:
+    service, _records = _service(tmp_path, strategy="date")
+
+    class TrackingTempFile:
+        name = str(tmp_path / "thumbnail.tmp")
+
+        def __init__(self) -> None:
+            self.closed = False
+
+        def __enter__(self) -> "TrackingTempFile":
+            return self
+
+        def __exit__(self, *_args) -> None:
+            self.closed = True
+
+    temp_file = TrackingTempFile()
+    thumbnail = MagicMock()
+
+    def save(_path: Path, format: str) -> None:
+        assert temp_file.closed
+
+    thumbnail.save.side_effect = save
+    source_image = MagicMock()
+    source_image.__enter__.return_value = source_image
+
+    with (
+        patch("invokeai.app.services.image_moves.image_moves_default.Image.open", return_value=source_image),
+        patch("invokeai.app.services.image_moves.image_moves_default.make_thumbnail", return_value=thumbnail),
+        patch(
+            "invokeai.app.services.image_moves.image_moves_default.tempfile.NamedTemporaryFile", return_value=temp_file
+        ),
+        patch.object(service, "_fsync_file"),
+        patch.object(service, "_fsync_dir"),
+        patch("invokeai.app.services.image_moves.image_moves_default.os.replace"),
+    ):
+        service._regenerate_thumbnail(tmp_path / "source.png", tmp_path / "thumbnail.webp")
+
+    assert temp_file.closed
+
+
 def test_move_does_not_relocate_source_when_thumbnail_generation_fails(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "thumbnail-retry.png"

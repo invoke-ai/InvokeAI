@@ -834,14 +834,14 @@ class ImageMoveService:
             dir=thumbnail_path.parent, prefix=f".{thumbnail_path.name}.", suffix=".tmp", delete=False
         ) as temp_file:
             temp_path = Path(temp_file.name)
-            try:
-                thumbnail.save(temp_path, format="WEBP")
-                self._fsync_file(temp_path)
-                os.replace(temp_path, thumbnail_path)
-                self._fsync_file(thumbnail_path)
-                self._fsync_dir(thumbnail_path.parent)
-            finally:
-                temp_path.unlink(missing_ok=True)
+        try:
+            thumbnail.save(temp_path, format="WEBP")
+            self._fsync_file(temp_path)
+            os.replace(temp_path, thumbnail_path)
+            self._fsync_file(thumbnail_path)
+            self._fsync_dir(thumbnail_path.parent)
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     def _mark_missing_intermediate_moved(
         self,
