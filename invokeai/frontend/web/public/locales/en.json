@@ -3775,12 +3775,11 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "New model types: Qwen Image, Qwen Image Edit, Anima.",
-            "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
-            "Private and shared image boards and workflows in multiuser mode",
-            "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
-            "Custom node manager",
-            "Redesigned download queue"
+            "New model types: Krea.2-Turbo/Raw, Ideogram 4, Ernie",
+            "Video generation with Wan 2.2",
+            "Parallel generation on systems with multiple GPUs",
+            "Anima controlnets and inpainting mode",
+            "Performance improvements and bug fixes"
         ],
         "readReleaseNotes": "Read Release Notes",
         "readTheDocs": "Read the Docs",
