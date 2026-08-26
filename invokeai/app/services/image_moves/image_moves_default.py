@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal, Sequence, cast
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
@@ -215,8 +215,9 @@ class ImageMoveService:
             planned += len(moves)
             try:
                 self.perform_filesystem_moves(job_id)
-                self.commit_database_updates(job_id)
-                committed += len(moves)
+                committed += self.commit_database_updates(job_id)
+                if self.get_job(job_id).state == "error":
+                    errors += 1
             except Exception as e:
                 errors += 1
                 self.record_job_error_message(job_id, str(e))
@@ -242,8 +243,9 @@ class ImageMoveService:
             try:
                 self.complete_partial_filesystem_moves(job_id)
                 self.cleanup_empty_source_dirs(job_id)
-                self.commit_database_updates(job_id)
-                committed += len(self._get_items(job_id))
+                committed += self.commit_database_updates(job_id)
+                if self.get_job(job_id).state == "error":
+                    errors += 1
             except Exception as e:
                 errors += 1
                 if self._is_unrecoverable_error(e):
@@ -463,66 +465,76 @@ class ImageMoveService:
         self._set_job_state(job_id, "moved")
 
     def complete_partial_filesystem_moves(self, job_id: int) -> None:
-        items = self._get_items(job_id)
+        items = self._get_items(job_id, include_terminal=False)
         if not items:
             raise ValueError(f"Image move job {job_id} has no items")
         for item in items:
-            old_path = self.image_files.get_path(item.image_name, image_subfolder=item.old_subfolder)
-            new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
-            old_thumbnail_path = self.image_files.get_path(
-                item.image_name, thumbnail=True, image_subfolder=item.old_subfolder
-            )
-            new_thumbnail_path = self.image_files.get_path(
-                item.image_name, thumbnail=True, image_subfolder=item.new_subfolder
-            )
-            old_exists = old_path.exists()
-            new_exists = new_path.exists()
-            if old_exists and new_exists:
-                raise RuntimeError(f"Both old and new image files exist for {item.image_name}")
-            if not old_exists and not new_exists:
-                if item.is_intermediate:
-                    self._mark_missing_intermediate_moved(
-                        job_id=job_id,
-                        image_name=item.image_name,
-                        old_path=old_path,
-                        new_path=new_path,
-                        old_thumbnail_path=old_thumbnail_path,
-                        new_thumbnail_path=new_thumbnail_path,
-                    )
-                    continue
-                raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
+            try:
+                self._complete_partial_filesystem_move(job_id, item)
+            except Exception as e:
+                if not self._is_unrecoverable_error(e):
+                    raise
+                self.mark_item_unrecoverable(job_id, item.image_name, f"{item.image_name}: {e}")
+                self._logger.error("Image move skipped unrecoverable item %s: %s", item.image_name, e)
 
-            old_thumbnail_exists = old_thumbnail_path.exists()
-            new_thumbnail_exists = new_thumbnail_path.exists()
-            if old_exists and not new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
-                # Generate the thumbnail while the source is still available. If this fails,
-                # leave the source untouched so recovery can retry the complete operation.
-                self._regenerate_thumbnail(old_path, new_thumbnail_path)
+    def _complete_partial_filesystem_move(self, job_id: int, item: PlannedImageMove) -> None:
+        old_path = self.image_files.get_path(item.image_name, image_subfolder=item.old_subfolder)
+        new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
+        old_thumbnail_path = self.image_files.get_path(
+            item.image_name, thumbnail=True, image_subfolder=item.old_subfolder
+        )
+        new_thumbnail_path = self.image_files.get_path(
+            item.image_name, thumbnail=True, image_subfolder=item.new_subfolder
+        )
+        old_exists = old_path.exists()
+        new_exists = new_path.exists()
+        if old_exists and new_exists:
+            raise RuntimeError(f"Both old and new image files exist for {item.image_name}")
+        if not old_exists and not new_exists:
+            if item.is_intermediate:
+                self._mark_missing_intermediate_moved(
+                    job_id=job_id,
+                    image_name=item.image_name,
+                    old_path=old_path,
+                    new_path=new_path,
+                    old_thumbnail_path=old_thumbnail_path,
+                    new_thumbnail_path=new_thumbnail_path,
+                )
+                return
+            raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
 
-            if old_exists:
-                new_path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(old_path, new_path)
-                self._fsync_file(new_path)
-                self._fsync_dir(new_path.parent)
-                self._fsync_dir(old_path.parent)
+        old_thumbnail_exists = old_thumbnail_path.exists()
+        new_thumbnail_exists = new_thumbnail_path.exists()
+        if old_exists and not new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
+            # Generate the thumbnail while the source is still available. If this fails,
+            # leave the source untouched so transient failures can be retried and corrupt
+            # images can be repaired or removed by the operator.
+            self._regenerate_thumbnail(old_path, new_thumbnail_path)
 
-            old_thumbnail_exists = old_thumbnail_path.exists()
-            new_thumbnail_exists = new_thumbnail_path.exists()
-            if old_thumbnail_exists and new_thumbnail_exists:
-                self._regenerate_thumbnail(new_path, new_thumbnail_path)
-                old_thumbnail_path.unlink()
-                self._fsync_dir(old_thumbnail_path.parent)
-            elif old_thumbnail_exists and not new_thumbnail_exists:
-                new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(old_thumbnail_path, new_thumbnail_path)
-                self._fsync_file(new_thumbnail_path)
-                self._fsync_dir(new_thumbnail_path.parent)
-                self._fsync_dir(old_thumbnail_path.parent)
-            elif not new_thumbnail_exists:
-                self._regenerate_thumbnail(new_path, new_thumbnail_path)
+        if old_exists:
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(old_path, new_path)
+            self._fsync_file(new_path)
+            self._fsync_dir(new_path.parent)
+            self._fsync_dir(old_path.parent)
 
-            self.image_files.evict_cache_paths([old_path, new_path, old_thumbnail_path, new_thumbnail_path])
-            self.mark_item_moved(job_id, item.image_name)
+        old_thumbnail_exists = old_thumbnail_path.exists()
+        new_thumbnail_exists = new_thumbnail_path.exists()
+        if old_thumbnail_exists and new_thumbnail_exists:
+            self._regenerate_thumbnail(new_path, new_thumbnail_path)
+            old_thumbnail_path.unlink()
+            self._fsync_dir(old_thumbnail_path.parent)
+        elif old_thumbnail_exists and not new_thumbnail_exists:
+            new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(old_thumbnail_path, new_thumbnail_path)
+            self._fsync_file(new_thumbnail_path)
+            self._fsync_dir(new_thumbnail_path.parent)
+            self._fsync_dir(old_thumbnail_path.parent)
+        elif not new_thumbnail_exists:
+            self._regenerate_thumbnail(new_path, new_thumbnail_path)
+
+        self.image_files.evict_cache_paths([old_path, new_path, old_thumbnail_path, new_thumbnail_path])
+        self.mark_item_moved(job_id, item.image_name)
 
     def cleanup_empty_source_dirs(self, job_id: int) -> None:
         for item in self._get_items(job_id):
@@ -535,7 +547,7 @@ class ImageMoveService:
                 self.image_files.thumbnail_root,
             )
 
-    def commit_database_updates(self, job_id: int) -> None:
+    def commit_database_updates(self, job_id: int) -> int:
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
@@ -567,6 +579,7 @@ class ImageMoveService:
                 FROM image_subfolder_move_items AS item
                 LEFT JOIN images ON images.image_name = item.image_name
                 WHERE item.job_id = ?
+                  AND item.state = 'moved'
                   AND (
                     images.image_name IS NULL
                     OR images.deleted_at IS NOT NULL
@@ -579,13 +592,30 @@ class ImageMoveService:
             if invalid_count:
                 raise RuntimeError(f"Image move job {job_id} failed commit validation")
             cursor.execute(
-                "UPDATE image_subfolder_move_items SET state = 'committed' WHERE job_id = ?;",
+                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE job_id = ? AND state = 'moved';",
                 (job_id,),
             )
+            moved_count = cast(int, cursor.fetchone()[0])
             cursor.execute(
-                "UPDATE image_subfolder_move_jobs SET state = 'committed', error_message = NULL WHERE id = ?;",
+                "SELECT error_message FROM image_subfolder_move_items WHERE job_id = ? AND state = 'error' LIMIT 1;",
                 (job_id,),
             )
+            error_row = cursor.fetchone()
+            cursor.execute(
+                "UPDATE image_subfolder_move_items SET state = 'committed' WHERE job_id = ? AND state = 'moved';",
+                (job_id,),
+            )
+            if error_row is None:
+                cursor.execute(
+                    "UPDATE image_subfolder_move_jobs SET state = 'committed', error_message = NULL WHERE id = ?;",
+                    (job_id,),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE image_subfolder_move_jobs SET state = 'error', error_message = ? WHERE id = ?;",
+                    (error_row[0] or "One or more image move items could not be completed", job_id),
+                )
+        return moved_count
 
     def mark_item_moved(self, job_id: int, image_name: str) -> None:
         with self._db.transaction() as cursor:
@@ -599,6 +629,17 @@ class ImageMoveService:
             cursor.execute(
                 "UPDATE image_subfolder_move_jobs SET error_message = ? WHERE id = ?;",
                 (message, job_id),
+            )
+
+    def mark_item_unrecoverable(self, job_id: int, image_name: str, message: str) -> None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE image_subfolder_move_items
+                SET state = 'error', error_message = ?
+                WHERE job_id = ? AND image_name = ?;
+                """,
+                (message, job_id, image_name),
             )
 
     def mark_job_unrecoverable(self, job_id: int, message: str) -> None:
@@ -657,17 +698,18 @@ class ImageMoveService:
             return f"{timestamp.year}/{timestamp.month:02d}/{timestamp.day:02d}"
         raise ValueError(f"Unknown image subfolder strategy: {strategy}")
 
-    def _get_items(self, job_id: int) -> list[PlannedImageMove]:
+    def _get_items(self, job_id: int, include_terminal: bool = True) -> list[PlannedImageMove]:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+            query = """--sql
                 SELECT image_name, old_subfolder, new_subfolder, is_intermediate
                 FROM image_subfolder_move_items
                 WHERE job_id = ?
-                ORDER BY image_name;
-                """,
-                (job_id,),
-            )
+            """
+            params: tuple[object, ...] = (job_id,)
+            if not include_terminal:
+                query += " AND state NOT IN ('committed', 'error')"
+            query += " ORDER BY image_name;"
+            cursor.execute(query, params)
             rows = cursor.fetchall()
         return [
             PlannedImageMove(
@@ -816,6 +858,10 @@ class ImageMoveService:
                 self._logger.debug("Unable to close directory fsync handle: %s: %s", path, e)
 
     def _is_unrecoverable_error(self, error: Exception) -> bool:
+        if isinstance(error, (UnidentifiedImageError, Image.DecompressionBombError)):
+            return True
+        if isinstance(error, OSError) and str(error).startswith("image file is truncated"):
+            return True
         return isinstance(error, RuntimeError) and (
             str(error).startswith("Both old and new image files exist")
             or str(error).startswith("Neither old nor new image file exists")

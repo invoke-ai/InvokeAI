@@ -679,6 +679,61 @@ def test_startup_recovery_marks_error_when_neither_old_nor_new_full_size_file_ex
     assert _job_item_states(service, job_id) == {image_name: "error"}
 
 
+def test_startup_recovery_isolates_corrupt_image_and_commits_other_items(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    good_image_name = "image-a-good.png"
+    corrupt_image_name = "image-b-corrupt.png"
+    _save_image(service, records, good_image_name, "", "2024-09-10 11:12:13.000", "white")
+    _save_image(service, records, corrupt_image_name, "", "2024-09-11 11:12:13.000", "black")
+
+    moves = service.plan_batch(last_image_name="", limit=100)
+    corrupt_move = next(move for move in moves if move.image_name == corrupt_image_name)
+    corrupt_move.old_thumbnail_path.unlink()
+    corrupt_move.old_path.write_bytes(b"")
+    job_id = service.create_move_job(moves)
+
+    recovered = service.startup_recovery()
+
+    assert recovered.committed == 1
+    assert recovered.errors == 1
+    assert service.is_maintenance_active() is False
+    assert service.get_job(job_id).state == "error"
+    assert corrupt_image_name in (service.get_job(job_id).error_message or "")
+    assert _job_item_states(service, job_id) == {
+        good_image_name: "committed",
+        corrupt_image_name: "error",
+    }
+    assert records.get(good_image_name).image_subfolder == "2024/09/10"
+    assert records.get(corrupt_image_name).image_subfolder == ""
+    assert service.image_files.get_path(good_image_name, image_subfolder="2024/09/10").exists()
+    assert not service.image_files.get_path(good_image_name, image_subfolder="").exists()
+    assert corrupt_move.old_path.exists()
+    assert not corrupt_move.new_path.exists()
+
+
+def test_startup_recovery_marks_truncated_image_error_without_retrying_forever(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "image-truncated.png"
+    _save_image(service, records, image_name, "", "2024-09-12 11:12:13.000", "white")
+    move = service.plan_batch(last_image_name="", limit=100)[0]
+    move.old_thumbnail_path.unlink()
+    job_id = service.create_move_job([move])
+
+    with patch.object(
+        service, "_regenerate_thumbnail", side_effect=OSError("image file is truncated (0 bytes not processed)")
+    ):
+        recovered = service.startup_recovery()
+
+    assert recovered.committed == 0
+    assert recovered.errors == 1
+    assert service.is_maintenance_active() is False
+    assert service.get_job(job_id).state == "error"
+    assert _job_item_states(service, job_id) == {image_name: "error"}
+    assert records.get(image_name).image_subfolder == ""
+    assert move.old_path.exists()
+    assert not move.new_path.exists()
+
+
 def test_startup_recovery_keeps_job_recoverable_after_ordinary_exception(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-k.png"
