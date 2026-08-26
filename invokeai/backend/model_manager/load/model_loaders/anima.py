@@ -76,6 +76,38 @@ def _filter_non_model_keys(sd: dict) -> dict:
     }
 
 
+# Anima's fixed transformer architecture. Kept at module level so tests can instantiate the real
+# module graph (e.g. to pin `_skip_layerwise_casting_patterns` to actual dotted module paths)
+# without duplicating these values.
+ANIMA_TRANSFORMER_CONFIG = {
+    "max_img_h": 240,
+    "max_img_w": 240,
+    "max_frames": 1,
+    "in_channels": 16,
+    "out_channels": 16,
+    "patch_spatial": 2,
+    "patch_temporal": 1,
+    "concat_padding_mask": True,
+    "model_channels": 2048,
+    "num_blocks": 28,
+    "num_heads": 16,
+    "mlp_ratio": 4.0,
+    "crossattn_emb_channels": 1024,
+    "pos_emb_cls": "rope3d",
+    # Anima reuses the Cosmos-Predict2 2B Text2Image DiT, which trains with
+    # rope_scale=(t=1.0, h=4.0, w=4.0). The NTK-scaled spatial RoPE base is mandatory; omitting it
+    # (theta=10000 on all axes) shifts every step's velocity ~7% off and compounds into degraded
+    # images. Matches diffusers CosmosTransformer3DModel rope_scale via *_extrapolation_ratio.
+    "rope_h_extrapolation_ratio": 4.0,
+    "rope_w_extrapolation_ratio": 4.0,
+    "rope_t_extrapolation_ratio": 1.0,
+    "use_adaln_lora": True,
+    "adaln_lora_dim": 256,
+    "extra_per_block_abs_pos_emb": False,
+    "image_model": "anima",
+}
+
+
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class AnimaCheckpointModel(ModelLoader):
     """Class to load Anima transformer models from single-file checkpoints.
@@ -127,34 +159,7 @@ class AnimaCheckpointModel(ModelLoader):
 
         # Create an empty AnimaTransformer with Anima's default architecture parameters
         with accelerate.init_empty_weights():
-            model = AnimaTransformer(
-                max_img_h=240,
-                max_img_w=240,
-                max_frames=1,
-                in_channels=16,
-                out_channels=16,
-                patch_spatial=2,
-                patch_temporal=1,
-                concat_padding_mask=True,
-                model_channels=2048,
-                num_blocks=28,
-                num_heads=16,
-                mlp_ratio=4.0,
-                crossattn_emb_channels=1024,
-                pos_emb_cls="rope3d",
-                # Anima reuses the Cosmos-Predict2 2B Text2Image DiT, which trains with
-                # rope_scale=(t=1.0, h=4.0, w=4.0). The NTK-scaled spatial RoPE base is
-                # mandatory; omitting it (theta=10000 on all axes) shifts every step's
-                # velocity ~7% off and compounds into degraded images. Matches diffusers
-                # CosmosTransformer3DModel rope_scale via *_extrapolation_ratio.
-                rope_h_extrapolation_ratio=4.0,
-                rope_w_extrapolation_ratio=4.0,
-                rope_t_extrapolation_ratio=1.0,
-                use_adaln_lora=True,
-                adaln_lora_dim=256,
-                extra_per_block_abs_pos_emb=False,
-                image_model="anima",
-            )
+            model = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG)
 
         # Determine safe dtype
         target_device = TorchDevice.choose_torch_device()
