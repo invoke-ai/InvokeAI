@@ -45,6 +45,18 @@ describe('IMAGE_METADATA_ACTION_HANDLERS', () => {
     }
   });
 
+  it('includes every MiniMax H3 metadata handler in the recall parameters UI', () => {
+    const handlers = [
+      ImageMetadataHandlers.MiniMaxH3DurationSeconds,
+      ImageMetadataHandlers.MiniMaxH3OutputMode,
+      ImageMetadataHandlers.MiniMaxH3TransformerModel,
+      ImageMetadataHandlers.MiniMaxH3TextEncoderModel,
+    ];
+    for (const handler of handlers) {
+      expect(IMAGE_METADATA_ACTION_HANDLERS).toContain(handler);
+    }
+  });
+
   it('has no un-triaged handler missing from the recall parameters UI', () => {
     // Guard against the list drifting behind the handler registry again: every new handler must either be
     // listed above or be added here with a reason. The second group is a snapshot of pre-existing gaps —
