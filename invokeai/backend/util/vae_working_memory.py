@@ -129,10 +129,13 @@ def estimate_vae_working_memory_flux2(
 
     That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
-    512-wide head, and measured peak stays linear from 512 to 1536px). A build whose fused kernels
-    reject the head dim -- ROCm caps it at 128 -- drops to SDPA's ``math`` fallback and materializes
-    a (pixels/8)^2 score matrix on top of the linear term: ~3.5GB at 1024px and ~17GB at 1536px. We
-    ask torch which path applies rather than assuming, so the estimate is right on both.
+    512-wide head, and measured peak stays linear from 512 to 1536px). A build with no fused kernel
+    for the shapes -- ROCm caps the head dim at 128, MPS has no fused SDPA kernel at all -- drops to
+    SDPA's ``math`` fallback and materializes a (pixels/8)^2 score matrix on top of the linear term:
+    ~3.5GB at 1024px and ~17GB at 1536px. We ask torch which path applies rather than assuming, so
+    the estimate is right on both. (Unlike the transformer, this attention does not go through
+    diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
+    itself -- so torch's own answer is the whole answer here.)
 
     When tiling is enabled the peak is bounded by a single tile instead of the full image (measured
     ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap), and the score

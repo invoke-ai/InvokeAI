@@ -10,6 +10,7 @@ The `MEASURED_*` tables below are peak *reserved* memory measured on CUDA in bf1
 quantity, including allocator overhead). Every estimate must stay an upper bound on them.
 """
 
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -20,17 +21,32 @@ from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux
 from invokeai.app.invocations.flux2_denoise import FLUX2_MAX_ATTENTION_HEADS, Flux2DenoiseInvocation
 from invokeai.app.invocations.flux2_vae_decode import Flux2VaeDecodeInvocation
 from invokeai.app.invocations.flux2_vae_encode import Flux2VaeEncodeInvocation
-from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT, sdpa_score_matrix_bytes
+from invokeai.backend.util.attention import (
+    SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
+    _diffusers_attention_dispatch,
+    _torch_sdpa_materializes_score_matrix,
+    sdpa_score_matrix_bytes,
+)
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 
 MB = 1024**2
 GB = 1024**3
 
 # The measured tables in this module were all taken on CUDA, where SDPA runs a fused kernel and no
-# score matrix is materialized. `_sdpa_has_fused_kernel` reports non-CUDA devices as fused, so
-# passing a CPU device reproduces that regime without needing a GPU on the test runner. The
+# score matrix is materialized. torch reports its CPU flash kernel as eligible for every shape used
+# here, so passing a CPU device reproduces that regime without needing a GPU on the test runner. The
 # materializing regime gets its own class below.
 FUSED = torch.device("cpu")
+
+
+@pytest.fixture(autouse=True)
+def _clear_dispatch_caches():
+    """Both probes are `lru_cache`d for the process; tests that fake one must not leak into the next."""
+    _diffusers_attention_dispatch.cache_clear()
+    _torch_sdpa_materializes_score_matrix.cache_clear()
+    yield
+    _diffusers_attention_dispatch.cache_clear()
+    _torch_sdpa_materializes_score_matrix.cache_clear()
 
 
 def _estimate(
@@ -307,20 +323,20 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
 
 def _rocm_like_probe(device_type, device_index, dtype, head_dim, has_attn_mask):
-    """Stand in for `_sdpa_has_fused_kernel` on a build with ROCm's fused-kernel rules.
+    """Stand in for the torch probe on a build with ROCm's fused-kernel rules.
 
     ROCm's fused SDPA kernels cap the head dim at 128 and do not take an arbitrary additive mask;
     anything else falls through to the `math` fallback, which materializes the score matrix. CUDA's
     memory-efficient kernel accepts both -- verified on torch 2.7.1+cu128, where
-    `can_use_efficient_attention` is true for the VAE's 512-wide head and for a masked 128-wide
-    transformer head, and measured peak stays linear in both cases -- which is why the estimates
-    were linear to begin with.
+    `_fused_sdp_choice` reports the efficient kernel for the VAE's 512-wide head and for a masked
+    128-wide transformer head, and measured peak stays linear in both cases -- which is why the
+    estimates were linear to begin with.
     """
-    return head_dim <= 128 and not has_attn_mask
+    return head_dim > 128 or has_attn_mask
 
 
 def _materializing():
-    return patch("invokeai.backend.util.attention._sdpa_has_fused_kernel", side_effect=_rocm_like_probe)
+    return patch("invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", side_effect=_rocm_like_probe)
 
 
 # Any CUDA device object works here: the probe is patched out, so nothing is allocated on it.
@@ -365,6 +381,20 @@ class TestMaterializedScoreMatrixIsBudgeted:
         with _materializing():
             materializing = self._vae_estimate(operation, px, device=MATERIALIZING)
         assert materializing - fused == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+
+    def test_mps_style_dispatch_failure_reserves_the_vae_score_matrix(self):
+        """The MPS case end to end, through the real probe rather than a stand-in: on a device torch
+        cannot answer a dispatch query for, a 1024px decode has to come out ~3.5GB heavier than the
+        linear term. Reporting those devices as fused -- as this PR first did -- is what let the
+        decode be admitted to a card that could not run it."""
+        with patch("torch.ops.aten._fused_sdp_choice", side_effect=NotImplementedError("no MPS kernel")):
+            materializing = self._vae_estimate("decode", 1024, device=FUSED)
+        _torch_sdpa_materializes_score_matrix.cache_clear()
+        fused = self._vae_estimate("decode", 1024, device=FUSED)
+
+        tokens = 128 * 128
+        assert materializing - fused == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert materializing - fused > 3 * GB
 
     def test_vae_score_matrix_dominates_at_high_resolution(self):
         """The reviewer's case: a 1536px decode is ~9.6GB of linear activations on CUDA, and more
@@ -426,9 +456,10 @@ class TestMaterializedScoreMatrixIsBudgeted:
 class TestSdpaBackendProbe:
     """`sdpa_score_matrix_bytes` decides the term above, so its defaults are load-bearing."""
 
-    def test_non_cuda_devices_keep_the_fused_assumption(self):
-        """torch exposes no eligibility query outside CUDA/ROCm. Guessing `math` there would add
-        double-digit GB to every estimate on MPS and CPU on no evidence at all."""
+    def test_cpu_reports_its_fused_flash_kernel(self):
+        """torch ships a fused flash-attention CPU kernel that takes the VAE's 512-wide head and an
+        additive mask, so the CPU estimate stays linear -- and the rest of this module can use a CPU
+        device to stand in for the CUDA regime the constants were measured on."""
         assert (
             sdpa_score_matrix_bytes(
                 device=torch.device("cpu"),
@@ -440,6 +471,40 @@ class TestSdpaBackendProbe:
             )
             == 0
         )
+
+    def test_a_device_torch_cannot_answer_for_is_budgeted_as_math(self):
+        """MPS is the case that matters: torch registers `_fused_sdp_choice` for CPU, CUDA/ROCm and
+        XPU only, and it is exactly the devices it cannot answer for that have no fused SDPA kernel
+        either. A 1024px FLUX.2 VAE decode there materializes 16384^2 scores, ~3.5GB the estimate
+        used to omit entirely."""
+        with patch("torch.ops.aten._fused_sdp_choice", side_effect=NotImplementedError("no MPS kernel")):
+            estimated = sdpa_score_matrix_bytes(
+                device=torch.device("cpu"), dtype=torch.bfloat16, num_heads=1, head_dim=512, seq_len=16384
+            )
+        assert estimated == 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert estimated > 3 * GB
+
+    def test_a_failed_probe_is_budgeted_as_math(self):
+        """A probe that cannot allocate, or a torch without the op, leaves us knowing nothing. The
+        old code read that as "fused" and reserved zero; the shortfall it hides is an OOM, so the
+        unknown answer has to be the expensive one."""
+        with patch("torch.empty", side_effect=torch.cuda.OutOfMemoryError("probe could not allocate")):
+            estimated = sdpa_score_matrix_bytes(
+                device=torch.device("cpu"), dtype=torch.bfloat16, num_heads=1, head_dim=512, seq_len=16384
+            )
+        assert estimated == 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+
+    def test_the_probe_asks_torch_the_same_question_sdpa_does(self):
+        """`_fused_sdp_choice` is the dispatch query `F.scaled_dot_product_attention` itself runs, so
+        a `MATH` answer means the real forward materializes. Reimplementing the eligibility rules
+        instead would go stale with every torch release."""
+        from torch.nn.attention import SDPBackend
+
+        with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.MATH)):
+            assert _torch_sdpa_materializes_score_matrix("cpu", None, torch.bfloat16, 128, False)
+        _torch_sdpa_materializes_score_matrix.cache_clear()
+        with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.EFFICIENT_ATTENTION)):
+            assert not _torch_sdpa_materializes_score_matrix("cpu", None, torch.bfloat16, 128, False)
 
     def test_empty_sequences_cost_nothing(self):
         with _materializing():
@@ -495,3 +560,75 @@ class TestSdpaBackendProbe:
         estimate = num_heads * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert estimate >= measured
         assert estimate <= 2 * measured
+
+
+@contextmanager
+def _diffusers_backend(name):
+    """Force the process-wide diffusers attention backend, as `DIFFUSERS_ATTN_BACKEND` would.
+
+    The lookup is `lru_cache`d -- it is a process-wide setting read on every estimate -- so the
+    cache has to be dropped on the way in and on the way out, or the faked backend leaks into the
+    comparison the test makes against the real one.
+    """
+    from diffusers.models.attention_dispatch import AttentionBackendName
+
+    _diffusers_attention_dispatch.cache_clear()
+    try:
+        with patch(
+            "diffusers.models.attention_dispatch._AttentionBackendRegistry.get_active_backend",
+            return_value=(AttentionBackendName(name), None),
+        ):
+            yield
+    finally:
+        _diffusers_attention_dispatch.cache_clear()
+
+
+class TestDiffusersAttentionDispatchIsConsulted:
+    """The FLUX.2 transformer does not call `F.scaled_dot_product_attention` -- it calls diffusers'
+    `dispatch_attention_fn`, which honours `DIFFUSERS_ATTN_BACKEND` and the `attention_backend()`
+    context manager. A user on `_native_math` materializes the score matrix on hardware where the
+    torch probe reports a fused kernel, so asking torch alone is not enough for the transformer.
+
+    The VAE is the other half of the same point: its mid-block attention goes through
+    `AttnProcessor2_0`, which calls `F.scaled_dot_product_attention` itself, so the diffusers
+    backend must *not* move its estimate.
+    """
+
+    def test_forced_math_backend_reaches_the_denoise_estimate(self):
+        with _diffusers_backend("_native_math"):
+            forced_math = _estimate(image_seq_len=4096, device=FUSED)
+        native = _estimate(image_seq_len=4096, device=FUSED)
+        seq_len = 4096 + 512
+        assert forced_math - native == (
+            FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        )
+
+    def test_a_fused_backend_leaves_the_denoise_estimate_linear(self):
+        """`flash`, `sage`, `xformers` and friends exist precisely to avoid the score matrix; they
+        must not be taxed for it, on any device."""
+        with _diffusers_backend("flash"), _materializing():
+            forced_flash = _estimate(image_seq_len=4096, has_regional_mask=True, device=MATERIALIZING)
+        assert forced_flash == _estimate(image_seq_len=4096, has_regional_mask=True, device=FUSED)
+
+    def test_the_vae_estimate_ignores_the_diffusers_backend(self):
+        """`AttnProcessor2_0` bypasses the dispatcher, so the VAE's answer comes from torch alone."""
+
+        def estimate():
+            v = MagicMock(spec=AutoencoderKLFlux2)
+            v.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+            return estimate_vae_working_memory_flux2(
+                operation="decode", image_tensor=torch.zeros(1, 32, 128, 128), vae=v, device=FUSED
+            )
+
+        with _diffusers_backend("_native_math"):
+            forced_math = estimate()
+        assert forced_math == estimate()
+
+    def test_an_unreadable_dispatcher_is_budgeted_as_math(self):
+        """`_AttentionBackendRegistry` is private; if diffusers moves it we lose the answer. The
+        conservative reading is the materializing one, and it is logged rather than silent."""
+        with patch(
+            "diffusers.models.attention_dispatch._AttentionBackendRegistry.get_active_backend",
+            side_effect=AttributeError("moved"),
+        ):
+            assert _diffusers_attention_dispatch() == "math"
