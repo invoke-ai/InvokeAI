@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { clamp } from 'es-toolkit/compat';
+import { logout } from 'features/auth/store/authSlice';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import type {
   CroppableImageWithDims,
@@ -310,6 +311,13 @@ const slice = createSlice({
       }
       state.entities = next;
     },
+  },
+  extraReducers(builder) {
+    // See canvasSlice: reference images are both personal workspace state and a place
+    // deleted-image references live; a deliberate sign-out clears them for the next account.
+    // `sessionExpiredLogout` is deliberately not handled. Not undoable, so the reset alone is
+    // the whole job here.
+    builder.addCase(logout, () => getInitialRefImagesState());
   },
 });
 
