@@ -19,33 +19,33 @@
 
 **Files:** `invokeai/app/services/config/config_default.py`, `invokeai/app/api/dependencies.py`, `invokeai/app/api/routers/app_info.py`, `invokeai/app/services/external_generation/providers/__init__.py`, tests for config/API/provider registration.
 
-- [ ] Add `external_fal_api_key` and `external_fal_base_url` to provider config fields and API mapping.
-- [ ] Register `FalProvider` in service construction and export it.
-- [ ] Add tests proving fal appears in provider config/status APIs and secret redaction remains intact.
+- [x] Add `external_fal_api_key` and `external_fal_base_url` to provider config fields and API mapping.
+- [x] Register `FalProvider` in service construction and export it.
+- [x] Add tests proving fal appears in provider config/status APIs and secret redaction remains intact.
 
 ### Task 2: fal.ai REST adapter
 
 **Files:** `invokeai/app/services/external_generation/providers/fal.py`, `tests/app/services/external_generation/test_fal_provider.py`.
 
-- [ ] Write failing tests for configuration, queue submission, status polling, result parsing, image upload, Flux payload mapping, Kontext payload mapping, Fill mask inversion, HTTP errors, rate limits, and download size limits.
-- [ ] Implement upload initiation (`rest.fal.ai/storage/upload/initiate`), PUT upload, queue submit/status/result calls, bounded polling, HTTPS image download, and model-specific payload builders.
-- [ ] Parse fal image URL outputs and provider seed/request metadata without exposing credentials.
+- [x] Write failing tests for configuration, queue submission, status polling, result parsing, image upload, Flux payload mapping, Kontext payload mapping, Fill mask inversion, HTTP errors, rate limits, and download size limits.
+- [x] Implement upload initiation (`rest.fal.ai/storage/upload/initiate`), PUT upload, queue submit/status/result calls, bounded polling, HTTPS image download, and model-specific payload builders.
+- [x] Parse fal image URL outputs and provider seed/request metadata without exposing credentials.
 
 ### Task 3: Native invocation and curated models
 
 **Files:** `invokeai/app/invocations/external_image_generation.py`, `invokeai/backend/model_manager/starter_models.py`, `tests/app/invocations/test_external_image_generation.py`, `tests/backend/model_manager/test_starter_models.py` or focused tests.
 
-- [ ] Add `FalImageGenerationInvocation` with provider filter `fal`.
-- [ ] Add starter models for `fal-ai/flux/schnell`, `fal-ai/flux/dev`, `fal-ai/flux-pro/kontext`, and `fal-ai/flux-lora-fill` with accurate modes, image requirements, aspect ratios, seed/batch capabilities, and default settings.
-- [ ] Ensure external starter sync installs these models after fal credentials are configured.
+- [x] Add `FalImageGenerationInvocation` with provider filter `fal`.
+- [x] Add starter models for `fal-ai/flux/schnell`, `fal-ai/flux/dev`, `fal-ai/flux-pro/kontext`, and `fal-ai/flux-lora-fill` with accurate modes, image requirements, aspect ratios, seed/batch capabilities, and default settings.
+- [x] Ensure external starter sync installs these models after fal credentials are configured.
 
 ### Task 4: Canvas and frontend contract
 
 **Files:** `invokeai/frontend/web/src/features/nodes/util/graph/generation/buildExternalGraph.ts`, `invokeai/frontend/web/src/features/modelManagerV2/subpanels/AddModelPanel/ExternalProviders/ExternalProvidersForm.tsx`, locale files, generated OpenAPI/type files, frontend tests.
 
-- [ ] Map provider `fal` to `fal_image_generation` in Canvas graph construction.
-- [ ] Add fal provider ordering/icon fallback and localized provider wording.
-- [ ] Regenerate OpenAPI/type artifacts and test that the generated graph uses fal node for txt2img/img2img/inpaint.
+- [x] Map provider `fal` to `fal_image_generation` in Canvas graph construction.
+- [x] Add fal provider ordering/icon fallback and localized provider wording.
+- [x] Regenerate OpenAPI/type artifacts and test that the generated graph uses fal node for txt2img/img2img/inpaint.
 
 ### Task 5: Documentation, validation, and PR
 

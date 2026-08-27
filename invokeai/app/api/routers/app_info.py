@@ -1,4 +1,5 @@
 import locale
+import os
 import re
 from enum import Enum
 from importlib.metadata import distributions
@@ -101,6 +102,7 @@ class ExternalProviderConfigModel(BaseModel):
 
 
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
+    "fal": ("external_fal_api_key", "external_fal_base_url"),
     "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
@@ -421,9 +423,12 @@ def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
 
 def _build_external_provider_config(provider_id: str, config: InvokeAIAppConfig) -> ExternalProviderConfigModel:
     api_key_field, base_url_field = _get_external_provider_fields(provider_id)
+    api_key_configured = bool(getattr(config, api_key_field))
+    if provider_id == "fal" and not api_key_configured:
+        api_key_configured = bool(os.getenv("FAL_KEY") or os.getenv("FAL_API_KEY"))
     return ExternalProviderConfigModel(
         provider_id=provider_id,
-        api_key_configured=bool(getattr(config, api_key_field)),
+        api_key_configured=api_key_configured,
         base_url=getattr(config, base_url_field),
     )
 

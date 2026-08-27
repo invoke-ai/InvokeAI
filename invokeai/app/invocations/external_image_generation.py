@@ -349,3 +349,24 @@ class AlibabaCloudImageGenerationInvocation(BaseExternalImageGenerationInvocatio
         ui_model_format=[ModelFormat.ExternalApi],
         ui_model_provider_id=["alibabacloud"],
     )
+
+
+@invocation(
+    "fal_image_generation",
+    title="fal.ai Image Generation",
+    tags=["external", "generation", "fal", "fal.ai"],
+    category="image",
+    version="1.0.0",
+)
+class FalImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate or edit images using a fal.ai-hosted model."""
+
+    provider_id = "fal"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["fal"],
+    )

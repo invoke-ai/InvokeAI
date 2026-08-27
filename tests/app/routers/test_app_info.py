@@ -62,6 +62,8 @@ def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker,
 
 
 def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.delenv("FAL_API_KEY", raising=False)
     mock_store = Mock()
     mock_store.search_by_attr.return_value = []
     mock_install = Mock()
@@ -72,7 +74,7 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
 
-    for provider_id in ("gemini", "openai"):
+    for provider_id in ("fal", "gemini", "openai"):
         response = client.delete(f"/api/v1/app/external_providers/config/{provider_id}")
         assert response.status_code == 200
 
@@ -82,6 +84,9 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     openai_config = _get_provider_config(payload, "openai")
     assert openai_config["api_key_configured"] is False
     assert openai_config["base_url"] is None
+    fal_config = _get_provider_config(payload, "fal")
+    assert fal_config["api_key_configured"] is False
+    assert fal_config["base_url"] is None
 
     response = client.post(
         "/api/v1/app/external_providers/config/openai",
@@ -98,6 +103,15 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     openai_config = _get_provider_config(payload, "openai")
     assert openai_config["api_key_configured"] is True
     assert openai_config["base_url"] == "https://api.openai.test"
+
+    response = client.post(
+        "/api/v1/app/external_providers/config/fal",
+        json={"api_key": "fal-key", "base_url": "https://queue.fal.test"},
+    )
+    assert response.status_code == 200
+    fal_config = response.json()
+    assert fal_config["api_key_configured"] is True
+    assert fal_config["base_url"] == "https://queue.fal.test"
 
     config_path = get_config().config_file_path
     api_keys_path = get_config().api_keys_file_path
@@ -116,6 +130,12 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     assert payload["api_key_configured"] is False
     assert payload["base_url"] is None
 
+    response = client.delete("/api/v1/app/external_providers/config/fal")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["api_key_configured"] is False
+    assert payload["base_url"] is None
+
     file_config = load_and_migrate_config(config_path)
     api_keys = load_external_api_keys(api_keys_path)
     assert file_config.external_openai_api_key is None
@@ -123,6 +143,22 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     assert "external_openai_api_key" not in config_path.read_text()
     assert "external_openai_api_key" not in api_keys
     assert "external_openai_base_url" not in api_keys
+    assert "external_fal_api_key" not in api_keys
+    assert "external_fal_base_url" not in api_keys
+
+
+def test_fal_external_provider_config_reports_environment_key(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    monkeypatch.setenv("FAL_KEY", "environment-key")
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    response = client.get("/api/v1/app/external_providers/config")
+
+    assert response.status_code == 200
+    fal_config = _get_provider_config(response.json(), "fal")
+    assert fal_config["api_key_configured"] is True
 
 
 def test_reset_external_provider_config_removes_provider_models(
