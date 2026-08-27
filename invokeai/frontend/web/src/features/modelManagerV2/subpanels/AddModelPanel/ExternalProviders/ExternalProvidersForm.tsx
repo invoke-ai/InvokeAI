@@ -21,7 +21,7 @@ import type { ChangeEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { IconType } from 'react-icons';
-import { PiCheckBold, PiWarningBold } from 'react-icons/pi';
+import { PiCheckBold, PiCloudLightningBold, PiWarningBold } from 'react-icons/pi';
 import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiOpenai } from 'react-icons/si';
 import {
   useGetExternalProviderConfigsQuery,
@@ -31,12 +31,14 @@ import {
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 import type { ExternalProviderConfig, StarterModel } from 'services/api/types';
 
-const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'seedream', 'alibabacloud'];
+const PROVIDER_SORT_ORDER = ['fal', 'gemini', 'openai', 'seedream', 'alibabacloud'];
 
 function resolveProviderIcon(providerId: string): IconType | null {
   const provider = providerId.toLowerCase();
 
   switch (provider) {
+    case 'fal':
+      return PiCloudLightningBold;
     case 'openai':
       return SiOpenai;
     case 'gemini':
