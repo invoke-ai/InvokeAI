@@ -11,7 +11,8 @@ from invokeai.app.services.external_generation.errors import ExternalProviderReq
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGenerationRequest,
 )
-from invokeai.app.services.external_generation.providers.fal import FalProvider
+from invokeai.app.services.external_generation.providers.fal import FalProvider, build_schema_payload
+from invokeai.app.services.external_generation.providers.fal_catalog import FalEndpointKind, FalEndpointSchema
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
     ExternalImageSize,
@@ -86,6 +87,7 @@ def _request(
     mode: str = "txt2img",
     init_image: Image.Image | None = None,
     mask_image: Image.Image | None = None,
+    provider_options: dict[str, Any] | None = None,
 ) -> ExternalGenerationRequest:
     return ExternalGenerationRequest(
         model=model,
@@ -100,7 +102,38 @@ def _request(
         mask_image=mask_image,
         reference_images=[],
         metadata=None,
+        provider_options=provider_options,
     )
+
+
+def test_build_schema_payload_allows_declared_advanced_fields_and_overrides_common_values() -> None:
+    schema = FalEndpointSchema(
+        endpoint_id="fal-ai/custom",
+        kind=FalEndpointKind.TEXT_TO_IMAGE,
+        output_kind=FalEndpointKind.IMAGE_TO_IMAGE,
+        category="text-to-image",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string"},
+                "aspect_ratio": {"type": "string", "enum": ["1:1", "16:9"]},
+                "seed": {"type": "integer"},
+                "style": {"type": "string"},
+                "write_only_secret": {"type": "string", "writeOnly": True},
+            },
+        },
+        output_schema={},
+        common_fields={"prompt": "prompt", "aspect_ratio": "aspect_ratio", "seed": "seed"},
+        public_properties=("prompt", "aspect_ratio", "seed", "style"),
+    )
+    request = _request(
+        _model("fal-ai/custom", modes=["txt2img"]),
+        provider_options={"advanced": {"style": "cinematic", "seed": 999, "write_only_secret": "nope"}},
+    )
+
+    payload = build_schema_payload(request, schema, image_url=None, mask_url=None)
+
+    assert payload == {"style": "cinematic", "prompt": "A test prompt", "aspect_ratio": "1:1", "seed": 123}
 
 
 def test_fal_provider_reports_configuration_from_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -317,6 +350,49 @@ def test_fal_provider_retries_poll_rate_limit_without_resubmitting(monkeypatch: 
 
     assert submit_count == 1
     assert status_count == 2
+
+
+def test_fal_provider_parses_single_image_output_shape(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_fal_api_key="fal-key")
+    provider = FalProvider(config, logging.getLogger("test"))
+    request = _request(_model("fal-ai/upscale", modes=["img2img"]), mode="img2img")
+    monkeypatch.setattr(provider, "_download_image", lambda url: Image.new("RGB", (3, 3), color="green"))
+
+    result = provider._parse_result(
+        {"image": {"url": "https://cdn.test/upscaled.png"}, "seed": 22},
+        request,
+        request_id="upscale-1",
+    )
+
+    assert result.provider_request_id == "upscale-1"
+    assert result.images[0].image.size == (3, 3)
+    assert result.seed_used == 22
+
+
+def test_fal_provider_generic_media_returns_raw_video_result_without_downloading(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_fal_api_key="fal-key", external_fal_base_url="https://queue.test")
+    provider = FalProvider(config, logging.getLogger("test"))
+    post_payload: dict[str, Any] = {}
+
+    def fake_post(url: str, headers: dict[str, str], json: dict[str, Any], timeout: int) -> DummyResponse:
+        del headers, timeout
+        assert url == "https://queue.test/fal-ai/video"
+        post_payload.update(json)
+        return DummyResponse(json_data={"request_id": "video-request"})
+
+    def fake_get(url: str, headers: dict[str, str], timeout: int, stream: bool = False) -> DummyResponse:
+        del headers, timeout, stream
+        if url.endswith("/status"):
+            return DummyResponse(json_data={"status": "COMPLETED"})
+        return DummyResponse(json_data={"video": {"url": "https://cdn.test/video.mp4"}, "seed": 99})
+
+    monkeypatch.setattr("requests.post", fake_post)
+    monkeypatch.setattr("requests.get", fake_get)
+
+    result = provider.generate_generic("fal-ai/video", {"prompt": "A moving test"})
+
+    assert post_payload == {"prompt": "A moving test"}
+    assert result == {"video": {"url": "https://cdn.test/video.mp4"}, "seed": 99}
 
 
 def test_fal_provider_reports_queue_error(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -26,6 +26,10 @@ class ExternalProvider(ABC):
     def generate(self, request: ExternalGenerationRequest) -> ExternalGenerationResult:
         raise NotImplementedError
 
+    def generate_generic(self, model_id: str, payload: dict[str, object]) -> dict[str, object]:
+        """Submit provider-specific JSON for endpoints outside normalized image generation."""
+        raise NotImplementedError(f"Provider '{self.provider_id}' does not support generic media generation")
+
     def get_status(self) -> ExternalProviderStatus:
         return ExternalProviderStatus(provider_id=self.provider_id, configured=self.is_configured())
 
@@ -37,4 +41,8 @@ class ExternalGenerationServiceBase(ABC):
 
     @abstractmethod
     def get_provider_statuses(self) -> dict[str, ExternalProviderStatus]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def generate_generic(self, provider_id: str, model_id: str, payload: dict[str, object]) -> dict[str, object]:
         raise NotImplementedError

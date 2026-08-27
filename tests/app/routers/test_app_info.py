@@ -497,5 +497,160 @@ def test_reset_external_provider_config_rejects_non_admin_users(
     assert response.json()["detail"] == "Admin privileges required"
 
 
+def test_list_fal_catalog_models_without_exposing_credentials(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    monkeypatch.setenv("FAL_KEY", "secret-key")
+    mock_store = Mock()
+    mock_store.search_by_attr.return_value = []
+    mock_invoker.services.model_manager = Mock(store=mock_store)
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    class FakeCatalogClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "secret-key"
+
+        def list_models(self, **kwargs: Any) -> Any:
+            from invokeai.app.services.external_generation.providers.fal_catalog import FalCatalogModel, FalCatalogPage
+
+            return FalCatalogPage(
+                models=[
+                    FalCatalogModel(
+                        endpoint_id="fal-ai/test",
+                        display_name="Test model",
+                        description="Safe description",
+                        category="text-to-image",
+                        model_url="https://fal.ai/models/fal-ai/test",
+                        thumbnail_url="https://cdn.test/thumb.jpg",
+                        tags=("image",),
+                    )
+                ],
+                next_cursor="next",
+                has_more=True,
+            )
+
+    monkeypatch.setattr(app_info, "FalCatalogClient", FakeCatalogClient)
+    response = client.get("/api/v1/app/external_providers/fal/models?limit=10&search=test")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "models": [
+            {
+                "endpoint_id": "fal-ai/test",
+                "display_name": "Test model",
+                "description": "Safe description",
+                "category": "text-to-image",
+                "kind": "text-to-image",
+                "model_url": "https://fal.ai/models/fal-ai/test",
+                "thumbnail_url": "https://cdn.test/thumb.jpg",
+                "tags": ["image"],
+                "installed": False,
+            }
+        ],
+        "next_cursor": "next",
+        "has_more": True,
+    }
+    assert "secret-key" not in response.text
+
+
+def test_get_fal_endpoint_schema_requires_configured_key(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    monkeypatch.delenv("FAL_KEY", raising=False)
+    monkeypatch.delenv("FAL_API_KEY", raising=False)
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    response = client.get("/api/v1/app/external_providers/fal/models/fal-ai/test/schema")
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "fal.ai API key is not configured"
+
+
+def test_install_fal_image_model_from_catalog_schema(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    monkeypatch.setenv("FAL_KEY", "secret-key")
+    schema = _fake_fal_schema("fal-ai/test", "text-to-image")
+
+    class FakeCatalogClient:
+        def __init__(self, api_key: str) -> None:
+            assert api_key == "secret-key"
+
+        def get_schema(self, endpoint_id: str) -> Any:
+            assert endpoint_id == "fal-ai/test"
+            return schema
+
+    install = Mock()
+    mock_invoker.services.model_manager = Mock(install=install, store=Mock())
+    monkeypatch.setattr(app_info, "FalCatalogClient", FakeCatalogClient)
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    from invokeai.app.services.model_install.model_install_common import ExternalModelSource, ModelInstallJob
+
+    install.heuristic_import.return_value = ModelInstallJob(
+        id=1,
+        source=ExternalModelSource(provider_id="fal", provider_model_id="fal-ai/test"),
+        local_path=".",
+    )
+    response = client.post("/api/v1/app/external_providers/fal/models/install", json={"endpoint_id": "fal-ai/test"})
+
+    assert response.status_code == 201
+    install.heuristic_import.assert_called_once()
+    call = install.heuristic_import.call_args.kwargs
+    assert call["source"] == "external://fal/fal-ai/test"
+    assert call["config"].provider_id == "fal"
+    assert call["config"].provider_model_id == "fal-ai/test"
+    assert call["config"].capabilities.modes == ["txt2img"]
+
+
+def test_install_fal_video_model_requires_generic_media_node(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    monkeypatch.setenv("FAL_KEY", "secret-key")
+    schema = _fake_fal_schema("fal-ai/video", "image-to-video")
+
+    class FakeCatalogClient:
+        def __init__(self, api_key: str) -> None:
+            del api_key
+
+        def get_schema(self, endpoint_id: str) -> Any:
+            del endpoint_id
+            return schema
+
+    monkeypatch.setattr(app_info, "FalCatalogClient", FakeCatalogClient)
+    monkeypatch.setattr("invokeai.app.api.routers.app_info.ApiDependencies", MockApiDependencies(mock_invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    response = client.post("/api/v1/app/external_providers/fal/models/install", json={"endpoint_id": "fal-ai/video"})
+
+    assert response.status_code == 422
+    assert "generic media" in response.json()["detail"]
+
+
+def _fake_fal_schema(endpoint_id: str, category: str) -> Any:
+    from invokeai.app.services.external_generation.providers.fal_catalog import (
+        FalEndpointKind,
+        FalEndpointSchema,
+    )
+
+    kind = {
+        "text-to-image": FalEndpointKind.TEXT_TO_IMAGE,
+        "image-to-video": FalEndpointKind.IMAGE_TO_VIDEO,
+    }[category]
+    return FalEndpointSchema(
+        endpoint_id=endpoint_id,
+        kind=kind,
+        output_kind=kind,
+        category=category,
+        input_schema={"type": "object", "properties": {"prompt": {"type": "string"}}},
+        output_schema={},
+        common_fields={"prompt": "prompt"},
+        public_properties=("prompt",),
+    )
+
+
 def _get_provider_config(payload: list[dict[str, Any]], provider_id: str) -> dict[str, Any]:
     return next(item for item in payload if item["provider_id"] == provider_id)

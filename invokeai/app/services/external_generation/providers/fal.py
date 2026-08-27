@@ -4,6 +4,7 @@ import base64
 import io
 import os
 import time
+from logging import Logger
 from typing import Any
 
 import requests
@@ -15,6 +16,7 @@ from invokeai.app.services.external_generation.errors import (
     ExternalProviderRequestError,
 )
 from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
+from invokeai.app.services.external_generation.providers.fal_catalog import FalCatalogClient, FalEndpointSchema
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGeneratedImage,
     ExternalGenerationRequest,
@@ -48,6 +50,10 @@ class FalProvider(ExternalProvider):
 
     provider_id = "fal"
 
+    def __init__(self, app_config: InvokeAIAppConfig, logger: Logger) -> None:
+        super().__init__(app_config, logger)
+        self._schema_cache: dict[str, FalEndpointSchema] = {}
+
     def is_configured(self) -> bool:
         return bool(self._api_key())
 
@@ -65,8 +71,28 @@ class FalProvider(ExternalProvider):
             mask = ImageOps.invert(request.mask_image.convert("L"))
             mask_url = self._upload_image(mask, "mask.png", headers)
 
-        payload = self._build_payload(request, image_url=image_url, mask_url=mask_url)
         model_id = request.model.provider_model_id
+        schema = self._get_schema(model_id)
+        payload = (
+            build_schema_payload(request, schema, image_url=image_url, mask_url=mask_url)
+            if schema is not None
+            else self._build_payload(request, image_url=image_url, mask_url=mask_url)
+        )
+        result_payload, request_id = self._submit_queue(model_id, payload, headers)
+        return self._parse_result(result_payload, request, request_id=request_id)
+
+    def generate_generic(self, model_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Submit arbitrary JSON to a fal.ai endpoint and return its raw result."""
+        api_key = self._api_key()
+        if not api_key:
+            raise ExternalProviderRequestError("fal.ai API key is not configured")
+        headers = {"Authorization": f"Key {api_key}", "Content-Type": "application/json"}
+        result, _ = self._submit_queue(model_id, payload, headers)
+        return result
+
+    def _submit_queue(
+        self, model_id: str, payload: dict[str, Any], headers: dict[str, str]
+    ) -> tuple[dict[str, Any], str | None]:
         queue_url = f"{self._queue_base_url}/{model_id}"
         submit_response = self._request(
             "POST",
@@ -80,12 +106,21 @@ class FalProvider(ExternalProvider):
 
         request_id = submitted.get("request_id")
         if not isinstance(request_id, str) or not request_id:
-            if self._has_images(submitted):
-                return self._parse_result(submitted, request, request_id=None)
-            raise ExternalProviderRequestError("fal.ai queue response missing request_id")
+            return submitted, None
+        return self._wait_for_result(model_id, request_id, headers), request_id
 
-        result_payload = self._wait_for_result(model_id, request_id, headers)
-        return self._parse_result(result_payload, request, request_id=request_id)
+    def _get_schema(self, model_id: str) -> FalEndpointSchema | None:
+        if model_id in _FLUX_FILL_MODELS | _FLUX_KONTEXT_MODELS | _FLUX_TEXT_MODELS:
+            return None
+        cached = self._schema_cache.get(model_id)
+        if cached is not None:
+            return cached
+        api_key = self._api_key()
+        if not api_key:
+            return None
+        schema = FalCatalogClient(api_key).get_schema(model_id)
+        self._schema_cache[model_id] = schema
+        return schema
 
     def _api_key(self) -> str | None:
         return self._app_config.external_fal_api_key or os.getenv("FAL_KEY") or os.getenv("FAL_API_KEY")
@@ -135,8 +170,8 @@ class FalProvider(ExternalProvider):
             payload["image_size"] = _image_size_for_ratio(ratio)
             return payload
 
-        # Unknown external models get conservative common arguments. Curated models above
-        # use exact schemas; custom external model records can still use txt2img safely.
+        # Unknown models are schema-driven. This branch is retained for callers that use the provider
+        # directly with a model whose schema cannot be fetched yet.
         if image_url is not None:
             payload["image_url"] = image_url
         if mask_url is not None:
@@ -216,18 +251,12 @@ class FalProvider(ExternalProvider):
         *,
         request_id: str | None,
     ) -> ExternalGenerationResult:
-        image_items = payload.get("images")
-        if not isinstance(image_items, list):
-            data_items = payload.get("data")
-            image_items = data_items if isinstance(data_items, list) else []
-
+        image_items = _extract_image_items(payload)
         seed_value = payload.get("seed")
         seed = seed_value if isinstance(seed_value, int) else request.seed
         images: list[ExternalGeneratedImage] = []
         for item in image_items:
-            if not isinstance(item, dict):
-                continue
-            url = item.get("url") or item.get("image_url")
+            url = item if isinstance(item, str) else item.get("url") or item.get("image_url")
             if isinstance(url, str) and url:
                 images.append(ExternalGeneratedImage(image=self._download_image(url), seed=seed))
 
@@ -274,8 +303,7 @@ class FalProvider(ExternalProvider):
 
     @staticmethod
     def _has_images(payload: dict[str, Any]) -> bool:
-        images = payload.get("images")
-        return isinstance(images, list) and bool(images)
+        return bool(_extract_image_items(payload))
 
     @staticmethod
     def _parse_json(response: requests.Response, label: str) -> dict[str, Any]:
@@ -309,6 +337,21 @@ class FalProvider(ExternalProvider):
         if response.status_code in _RETRY_STATUS_CODES:
             raise ExternalProviderRequestError(f"{operation} failed with status {response.status_code}; retry later")
         raise ExternalProviderRequestError(f"{operation} failed with status {response.status_code}: {response.text}")
+
+
+def _extract_image_items(payload: dict[str, Any]) -> list[Any]:
+    for key in ("images", "data"):
+        value = payload.get(key)
+        if isinstance(value, list) and value:
+            return value
+    for key in ("image", "image_url"):
+        value = payload.get(key)
+        if isinstance(value, (str, dict)):
+            return [value]
+    image_urls = payload.get("image_urls")
+    if isinstance(image_urls, list):
+        return image_urls
+    return []
 
 
 def _encode_png(image: PILImageType) -> bytes:
@@ -358,4 +401,56 @@ def _retry_delay(response: requests.Response) -> float:
     return min(retry_after if retry_after is not None else _POLL_INTERVAL, 60.0)
 
 
-__all__ = ["FalProvider"]
+def build_schema_payload(
+    request: ExternalGenerationRequest,
+    schema: FalEndpointSchema,
+    *,
+    image_url: str | None,
+    mask_url: str | None,
+) -> dict[str, Any]:
+    """Build payload for one endpoint using only fields declared by its OpenAPI schema."""
+    properties = schema.input_schema.get("properties", {})
+    if not isinstance(properties, dict):
+        properties = {}
+    advanced = request.provider_options.get("advanced", {}) if request.provider_options else {}
+    payload = {
+        name: value
+        for name, value in advanced.items()
+        if name in schema.public_properties and name in properties
+    } if isinstance(advanced, dict) else {}
+
+    ratio = _select_aspect_ratio(request.width, request.height, request.model.capabilities.allowed_aspect_ratios)
+    common_values: dict[str, Any] = {
+        "prompt": request.prompt,
+        "seed": request.seed,
+        "num_images": request.num_images if request.num_images > 1 else None,
+        "width": request.width,
+        "height": request.height,
+        "aspect_ratio": ratio,
+        "image_size": request.image_size or _image_size_for_ratio(ratio),
+        "init_image": image_url,
+        "mask_image": mask_url,
+    }
+    for common_name, value in common_values.items():
+        field_name = schema.common_fields.get(common_name)
+        if not field_name or value is None:
+            continue
+        property_schema = properties.get(field_name)
+        if not isinstance(property_schema, dict):
+            continue
+        if common_name == "image_size" and not _value_is_allowed(value, property_schema):
+            continue
+        if common_name == "aspect_ratio" and not _value_is_allowed(value, property_schema):
+            continue
+        if common_name in {"init_image", "mask_image"} and property_schema.get("type") == "array":
+            value = [value]
+        payload[field_name] = value
+    return payload
+
+
+def _value_is_allowed(value: Any, property_schema: dict[str, Any]) -> bool:
+    allowed = property_schema.get("enum")
+    return not isinstance(allowed, list) or value in allowed
+
+
+__all__ = ["FalProvider", "build_schema_payload"]

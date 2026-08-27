@@ -13,6 +13,7 @@ from invokeai.app.services.external_generation.errors import (
     ExternalProviderNotConfiguredError,
     ExternalProviderNotFoundError,
     ExternalProviderRateLimitError,
+    ExternalProviderRequestError,
 )
 from invokeai.app.services.external_generation.external_generation_base import (
     ExternalGenerationServiceBase,
@@ -90,6 +91,17 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
 
     def get_provider_statuses(self) -> dict[str, ExternalProviderStatus]:
         return {provider_id: provider.get_status() for provider_id, provider in self._providers.items()}
+
+    def generate_generic(self, provider_id: str, model_id: str, payload: dict[str, object]) -> dict[str, object]:
+        provider = self._providers.get(provider_id)
+        if provider is None:
+            raise ExternalProviderRequestError(f"No external provider registered for '{provider_id}'")
+        if not provider.is_configured():
+            raise ExternalProviderRequestError(f"Provider '{provider_id}' is missing credentials")
+        try:
+            return provider.generate_generic(model_id, payload)
+        except NotImplementedError as exc:
+            raise ExternalProviderRequestError(str(exc)) from exc
 
     def _validate_request(self, request: ExternalGenerationRequest) -> None:
         capabilities = request.model.capabilities

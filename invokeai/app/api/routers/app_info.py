@@ -25,9 +25,17 @@ from invokeai.app.services.config.config_default import (
     load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
+from invokeai.app.services.external_generation.providers.fal_catalog import (
+    FalCatalogClient,
+    FalEndpointKind,
+    FalEndpointSchema,
+    classify_endpoint,
+)
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
-from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+from invokeai.app.services.model_records.model_records_base import ModelRecordChanges, UnknownModelException
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import logging
@@ -99,6 +107,39 @@ class ExternalProviderConfigModel(BaseModel):
     provider_id: str = Field(description="The external provider identifier")
     api_key_configured: bool = Field(description="Whether an API key is configured")
     base_url: str | None = Field(default=None, description="Optional base URL override")
+
+
+class FalCatalogModelResponse(BaseModel):
+    endpoint_id: str
+    display_name: str
+    description: str
+    category: str
+    kind: FalEndpointKind
+    model_url: str | None
+    thumbnail_url: str | None
+    tags: list[str]
+    installed: bool
+
+
+class FalCatalogResponse(BaseModel):
+    models: list[FalCatalogModelResponse]
+    next_cursor: str | None
+    has_more: bool
+
+
+class FalEndpointSchemaResponse(BaseModel):
+    endpoint_id: str
+    kind: FalEndpointKind
+    output_kind: FalEndpointKind
+    category: str
+    input_schema: dict[str, Any]
+    output_schema: dict[str, Any]
+    common_fields: dict[str, str]
+    public_properties: list[str]
+
+
+class FalModelInstallRequest(BaseModel):
+    endpoint_id: str = Field(min_length=1, max_length=512, description="fal.ai endpoint identifier")
 
 
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
@@ -515,3 +556,187 @@ def disable_invocation_cache(current_admin: AdminUserOrDefault) -> None:
 def get_invocation_cache_status(current_admin: AdminUserOrDefault) -> InvocationCacheStatus:
     """Clears the invocation cache"""
     return ApiDependencies.invoker.services.invocation_cache.get_status()
+
+
+@app_router.get(
+    "/external_providers/fal/models",
+    operation_id="list_fal_models",
+    status_code=200,
+    response_model=FalCatalogResponse,
+)
+def list_fal_models(
+    _: AdminUserOrDefault,
+    limit: int = 50,
+    cursor: str | None = None,
+    search: str | None = None,
+) -> FalCatalogResponse:
+    client = _get_fal_catalog_client()
+    try:
+        page = client.list_models(limit=limit, cursor=cursor, search=search)
+    except Exception as exc:
+        _raise_fal_catalog_http_error(exc)
+    installed = _get_installed_fal_models()
+    return FalCatalogResponse(
+        models=[
+            FalCatalogModelResponse(
+                endpoint_id=model.endpoint_id,
+                display_name=model.display_name,
+                description=model.description,
+                category=model.category,
+                kind=classify_endpoint(model.category, {}, endpoint_id=model.endpoint_id),
+                model_url=model.model_url,
+                thumbnail_url=model.thumbnail_url,
+                tags=list(model.tags),
+                installed=model.endpoint_id in installed,
+            )
+            for model in page.models
+        ],
+        next_cursor=page.next_cursor,
+        has_more=page.has_more,
+    )
+
+
+@app_router.get(
+    "/external_providers/fal/models/{endpoint_id:path}/schema",
+    operation_id="get_fal_model_schema",
+    status_code=200,
+    response_model=FalEndpointSchemaResponse,
+)
+def get_fal_model_schema(
+    _: AdminUserOrDefault,
+    endpoint_id: str = Path(description="fal.ai endpoint identifier"),
+) -> FalEndpointSchemaResponse:
+    client = _get_fal_catalog_client()
+    try:
+        schema = client.get_schema(endpoint_id)
+    except Exception as exc:
+        _raise_fal_catalog_http_error(exc)
+    return _fal_schema_to_response(schema)
+
+
+@app_router.post(
+    "/external_providers/fal/models/install",
+    operation_id="install_fal_model",
+    status_code=201,
+    response_model=ModelInstallJob,
+)
+def install_fal_model(
+    _: AdminUserOrDefault,
+    request: FalModelInstallRequest,
+) -> ModelInstallJob:
+    client = _get_fal_catalog_client()
+    try:
+        schema = client.get_schema(request.endpoint_id)
+    except Exception as exc:
+        _raise_fal_catalog_http_error(exc)
+
+    if schema.kind not in _FAL_NATIVE_IMAGE_KINDS:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"fal.ai endpoint '{request.endpoint_id}' is {schema.kind.value}; "
+                "use the fal.ai generic media invocation for this endpoint"
+            ),
+        )
+
+    config = ModelRecordChanges(
+        name=f"fal.ai {request.endpoint_id}",
+        description=f"Dynamic fal.ai endpoint ({schema.category}).",
+        provider_id="fal",
+        provider_model_id=request.endpoint_id,
+        source_url=f"https://fal.ai/models/{request.endpoint_id}",
+        capabilities=_fal_capabilities_from_schema(schema),
+    )
+    try:
+        return ApiDependencies.invoker.services.model_manager.install.heuristic_import(
+            source=f"external://fal/{request.endpoint_id}",
+            config=config,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=409, detail=f"Unable to install fal.ai model: {exc}") from exc
+
+
+_FAL_NATIVE_IMAGE_KINDS = {
+    FalEndpointKind.TEXT_TO_IMAGE,
+    FalEndpointKind.IMAGE_TO_IMAGE,
+    FalEndpointKind.INPAINT,
+    FalEndpointKind.UPSCALE,
+}
+
+
+def _fal_capabilities_from_schema(schema: FalEndpointSchema) -> ExternalModelCapabilities:
+    if schema.kind is FalEndpointKind.TEXT_TO_IMAGE:
+        modes = ["txt2img"]
+    elif schema.kind is FalEndpointKind.INPAINT:
+        modes = ["inpaint"]
+    else:
+        modes = ["img2img"]
+
+    properties = schema.input_schema.get("properties", {})
+    if not isinstance(properties, dict):
+        properties = {}
+    ratios = properties.get(schema.common_fields.get("aspect_ratio", ""), {})
+    allowed_ratios = ratios.get("enum") if isinstance(ratios, dict) else None
+    if not isinstance(allowed_ratios, list) or not all(isinstance(value, str) for value in allowed_ratios):
+        allowed_ratios = None
+
+    num_images_name = schema.common_fields.get("num_images", "")
+    num_images_schema = properties.get(num_images_name, {})
+    maximum = num_images_schema.get("maximum") if isinstance(num_images_schema, dict) else None
+    max_images = maximum if isinstance(maximum, int) and maximum > 0 else None
+
+    return ExternalModelCapabilities(
+        modes=modes,  # type: ignore[arg-type]
+        supports_reference_images="image_urls" in schema.common_fields.get("init_image", ""),
+        supports_negative_prompt="negative_prompt" in schema.common_fields,
+        supports_seed="seed" in schema.common_fields,
+        max_images_per_request=max_images,
+        allowed_aspect_ratios=allowed_ratios,
+        mask_format="binary" if "mask_image" in schema.common_fields else "none",
+        input_image_required_for=[modes[0]] if modes[0] != "txt2img" else None,  # type: ignore[list-item]
+    )
+
+
+def _get_fal_catalog_client() -> FalCatalogClient:
+    config = get_config()
+    api_key = config.external_fal_api_key or os.getenv("FAL_KEY") or os.getenv("FAL_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=409, detail="fal.ai API key is not configured")
+    return FalCatalogClient(api_key)
+
+
+def _get_installed_fal_models() -> set[str]:
+    models = ApiDependencies.invoker.services.model_manager.store.search_by_attr(
+        base_model=BaseModelType.External,
+        model_type=ModelType.ExternalImageGenerator,
+    )
+    return {
+        model.provider_model_id
+        for model in models
+        if isinstance(model, ExternalApiModelConfig)
+        and model.provider_id == "fal"
+        and model.provider_model_id
+    }
+
+
+def _fal_schema_to_response(schema: FalEndpointSchema) -> FalEndpointSchemaResponse:
+    return FalEndpointSchemaResponse(
+        endpoint_id=schema.endpoint_id,
+        kind=schema.kind,
+        output_kind=schema.output_kind,
+        category=schema.category,
+        input_schema=schema.input_schema,
+        output_schema=schema.output_schema,
+        common_fields=schema.common_fields,
+        public_properties=list(schema.public_properties),
+    )
+
+
+def _raise_fal_catalog_http_error(exc: Exception) -> None:
+    from invokeai.app.services.external_generation.errors import ExternalProviderRateLimitError, ExternalProviderRequestError
+
+    if isinstance(exc, ExternalProviderRateLimitError):
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    if isinstance(exc, ExternalProviderRequestError):
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    raise HTTPException(status_code=502, detail="fal.ai catalog request failed") from exc
