@@ -9,7 +9,7 @@ from typing import Any, Literal, Union
 
 import torch
 import yaml
-from fastapi import Body, HTTPException, Path
+from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -35,7 +35,11 @@ from invokeai.app.services.invocation_cache.invocation_cache_common import Invoc
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges, UnknownModelException
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
-from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelConfig,
+    ExternalModelCapabilities,
+    ExternalModelPanelSchema,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import logging
@@ -566,9 +570,9 @@ def get_invocation_cache_status(current_admin: AdminUserOrDefault) -> Invocation
 )
 def list_fal_models(
     _: AdminUserOrDefault,
-    limit: int = 50,
-    cursor: str | None = None,
-    search: str | None = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    cursor: str | None = Query(default=None, max_length=4096),
+    search: str | None = Query(default=None, max_length=200),
 ) -> FalCatalogResponse:
     client = _get_fal_catalog_client()
     try:
@@ -646,6 +650,7 @@ def install_fal_model(
         provider_model_id=request.endpoint_id,
         source_url=f"https://fal.ai/models/{request.endpoint_id}",
         capabilities=_fal_capabilities_from_schema(schema),
+        panel_schema=_fal_panel_schema_from_schema(schema),
     )
     try:
         return ApiDependencies.invoker.services.model_manager.install.heuristic_import(
@@ -662,6 +667,16 @@ _FAL_NATIVE_IMAGE_KINDS = {
     FalEndpointKind.INPAINT,
     FalEndpointKind.UPSCALE,
 }
+
+
+def _fal_panel_schema_from_schema(schema: FalEndpointSchema) -> ExternalModelPanelSchema:
+    prompts = [{"name": "reference_images"}] if "reference_images" in schema.common_fields else []
+    image_controls: list[dict[str, str]] = []
+    if any(name in schema.common_fields for name in ("width", "height", "aspect_ratio", "image_size")):
+        image_controls.append({"name": "dimensions"})
+    if "seed" in schema.common_fields:
+        image_controls.append({"name": "seed"})
+    return ExternalModelPanelSchema(prompts=prompts, image=image_controls)
 
 
 def _fal_capabilities_from_schema(schema: FalEndpointSchema) -> ExternalModelCapabilities:
@@ -684,10 +699,15 @@ def _fal_capabilities_from_schema(schema: FalEndpointSchema) -> ExternalModelCap
     num_images_schema = properties.get(num_images_name, {})
     maximum = num_images_schema.get("maximum") if isinstance(num_images_schema, dict) else None
     max_images = maximum if isinstance(maximum, int) and maximum > 0 else None
+    reference_name = schema.common_fields.get("reference_images", "")
+    reference_schema = properties.get(reference_name, {})
+    max_references = reference_schema.get("maxItems") if isinstance(reference_schema, dict) else None
+    max_references = max_references if isinstance(max_references, int) and max_references > 0 else None
 
     return ExternalModelCapabilities(
         modes=modes,  # type: ignore[arg-type]
-        supports_reference_images="image_urls" in schema.common_fields.get("init_image", ""),
+        supports_reference_images="reference_images" in schema.common_fields,
+        max_reference_images=max_references,
         supports_negative_prompt="negative_prompt" in schema.common_fields,
         supports_seed="seed" in schema.common_fields,
         max_images_per_request=max_images,
@@ -713,9 +733,7 @@ def _get_installed_fal_models() -> set[str]:
     return {
         model.provider_model_id
         for model in models
-        if isinstance(model, ExternalApiModelConfig)
-        and model.provider_id == "fal"
-        and model.provider_model_id
+        if isinstance(model, ExternalApiModelConfig) and model.provider_id == "fal" and model.provider_model_id
     }
 
 
@@ -733,7 +751,10 @@ def _fal_schema_to_response(schema: FalEndpointSchema) -> FalEndpointSchemaRespo
 
 
 def _raise_fal_catalog_http_error(exc: Exception) -> None:
-    from invokeai.app.services.external_generation.errors import ExternalProviderRateLimitError, ExternalProviderRequestError
+    from invokeai.app.services.external_generation.errors import (
+        ExternalProviderRateLimitError,
+        ExternalProviderRequestError,
+    )
 
     if isinstance(exc, ExternalProviderRateLimitError):
         raise HTTPException(status_code=429, detail=str(exc)) from exc

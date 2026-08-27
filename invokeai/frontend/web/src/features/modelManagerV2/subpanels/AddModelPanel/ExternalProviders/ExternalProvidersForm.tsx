@@ -25,11 +25,15 @@ import { PiCheckBold, PiCloudLightningBold, PiWarningBold } from 'react-icons/pi
 import { SiAlibabacloud, SiBytedance, SiGooglegemini, SiOpenai } from 'react-icons/si';
 import {
   useGetExternalProviderConfigsQuery,
+  useInstallFalModelMutation,
+  useLazyGetFalModelsQuery,
   useResetExternalProviderConfigMutation,
   useSetExternalProviderConfigMutation,
 } from 'services/api/endpoints/appInfo';
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
-import type { ExternalProviderConfig, StarterModel } from 'services/api/types';
+import type { ExternalProviderConfig, FalCatalogModel, StarterModel } from 'services/api/types';
+
+import { isFalNativeCanvasModel } from './falCatalog';
 
 const PROVIDER_SORT_ORDER = ['fal', 'gemini', 'openai', 'seedream', 'alibabacloud'];
 
@@ -347,8 +351,123 @@ const ProviderCard = memo(({ provider, onInstallModels, iconResolver }: Provider
           </Button>
         </Flex>
       </Flex>
+      {provider.provider_id === 'fal' && <FalModelCatalog isConfigured={provider.api_key_configured} />}
     </Card>
   );
 });
 
 ProviderCard.displayName = 'ProviderCard';
+
+type FalModelCatalogProps = {
+  isConfigured: boolean;
+};
+
+const FalModelCatalog = memo(({ isConfigured }: FalModelCatalogProps) => {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const [search, setSearch] = useState('');
+  const [fetchModels, { isFetching, isError }] = useLazyGetFalModelsQuery();
+  const [models, setModels] = useState<FalCatalogModel[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [installModel, { isLoading: isInstalling }] = useInstallFalModelMutation();
+
+  const loadModels = useCallback(
+    (append: boolean, cursor?: string | null) => {
+      if (!isConfigured) {
+        return Promise.resolve();
+      }
+      return fetchModels({ limit: 30, cursor: cursor ?? undefined, search: search.trim() || undefined })
+        .unwrap()
+        .then((result) => {
+          setModels((current) => (append ? [...current, ...result.models] : result.models));
+          setNextCursor(result.next_cursor);
+        })
+        .catch(() => undefined);
+    },
+    [fetchModels, isConfigured, search]
+  );
+
+  useEffect(() => {
+    setModels([]);
+    setNextCursor(null);
+    const timer = window.setTimeout(() => void loadModels(false), 300);
+    return () => window.clearTimeout(timer);
+  }, [loadModels]);
+
+  const handleInstall = useCallback(
+    (model: FalCatalogModel) => {
+      installModel({ endpoint_id: model.endpoint_id })
+        .unwrap()
+        .catch(() => {
+          toast({
+            id: `FAL_MODEL_INSTALL_FAILED_${model.endpoint_id}`,
+            title: t('modelManager.externalProviderSaveFailed'),
+            status: 'error',
+          });
+        });
+    },
+    [installModel, t, toast]
+  );
+
+  if (!isConfigured) {
+    return null;
+  }
+
+  return (
+    <Flex flexDir="column" gap={3} borderTopWidth="1px" pt={4}>
+      <Flex alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+        <Flex flexDir="column" gap={1}>
+          <Heading size="xs">{t('modelManager.externalFalCatalogTitle')}</Heading>
+          <Text variant="subtext">{t('modelManager.externalFalCatalogDescription')}</Text>
+        </Flex>
+        <Button variant="ghost" onClick={() => void loadModels(false)} isLoading={isFetching}>
+          {t('modelManager.externalFalCatalogRefresh')}
+        </Button>
+      </Flex>
+      <Input
+        placeholder={t('modelManager.externalFalCatalogSearch')}
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+      />
+      {isError && <Text color="base.300">{t('modelManager.externalFalCatalogLoadFailed')}</Text>}
+      {isFetching && models.length === 0 && <Text color="base.300">{t('modelManager.externalFalCatalogLoading')}</Text>}
+      {models.map((model) => {
+        const isCanvasModel = isFalNativeCanvasModel(model);
+        return (
+          <Flex key={model.endpoint_id} alignItems="center" justifyContent="space-between" gap={3} flexWrap="wrap">
+            <Flex flexDir="column" gap={1} minW={0}>
+              <Flex alignItems="center" gap={2} flexWrap="wrap">
+                <Text fontWeight="semibold">{model.display_name}</Text>
+                <Badge>{model.kind}</Badge>
+              </Flex>
+              <Text variant="subtext" noOfLines={1} title={model.endpoint_id}>
+                {model.endpoint_id}
+              </Text>
+            </Flex>
+            {isCanvasModel ? (
+              <Button
+                size="sm"
+                onClick={() => handleInstall(model)}
+                isDisabled={model.installed}
+                isLoading={isInstalling}
+              >
+                {model.installed
+                  ? t('modelManager.externalFalCatalogInstalled')
+                  : t('modelManager.externalFalCatalogInstall')}
+              </Button>
+            ) : (
+              <Badge colorScheme="gray">{t('modelManager.externalFalCatalogGeneric')}</Badge>
+            )}
+          </Flex>
+        );
+      })}
+      {nextCursor && (
+        <Button variant="ghost" onClick={() => void loadModels(true, nextCursor)} isLoading={isFetching}>
+          {t('common.loadMore')}
+        </Button>
+      )}
+    </Flex>
+  );
+});
+
+FalModelCatalog.displayName = 'FalModelCatalog';

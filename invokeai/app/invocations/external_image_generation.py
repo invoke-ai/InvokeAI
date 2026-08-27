@@ -363,6 +363,11 @@ class FalImageGenerationInvocation(BaseExternalImageGenerationInvocation):
 
     provider_id = "fal"
 
+    advanced_options: dict[str, Any] = InputField(
+        default={},
+        description="Additional JSON fields declared by the selected fal.ai endpoint",
+    )
+
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.main_model,
         ui_model_base=[BaseModelType.External],
@@ -370,3 +375,6 @@ class FalImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_format=[ModelFormat.ExternalApi],
         ui_model_provider_id=["fal"],
     )
+
+    def _build_provider_options(self) -> dict[str, Any] | None:
+        return {"advanced": self.advanced_options} if self.advanced_options else None

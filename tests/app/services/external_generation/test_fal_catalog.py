@@ -85,6 +85,10 @@ def test_classify_endpoint_keeps_unknown_categories_generic() -> None:
     assert classify_endpoint("speech-to-text", {}) is FalEndpointKind.GENERIC
     assert classify_endpoint("text-to-image", {}) is FalEndpointKind.TEXT_TO_IMAGE
     assert classify_endpoint("upscaling", {}) is FalEndpointKind.UPSCALE
+    assert (
+        classify_endpoint("image-to-image", {"properties": {"image_url": {}, "mask_url": {}}})
+        is FalEndpointKind.INPAINT
+    )
 
 
 def test_catalog_client_lists_pages_and_fetches_schema(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -116,7 +120,7 @@ def test_catalog_client_lists_pages_and_fetches_schema(monkeypatch: pytest.Monke
     monkeypatch.setattr("requests.get", fake_get)
     client = FalCatalogClient("test-key")
 
-    page = client.list_models(limit=10, cursor="old", search="test")
+    page = client.list_models(limit=10, cursor="old")
     schema = client.get_schema("fal-ai/test")
 
     assert page.next_cursor == "next"
@@ -125,9 +129,43 @@ def test_catalog_client_lists_pages_and_fetches_schema(monkeypatch: pytest.Monke
     assert page.models[0].display_name == "Test model"
     assert schema.kind is FalEndpointKind.IMAGE_TO_VIDEO
     assert calls[0][0] == "https://api.fal.ai/v1/models"
-    assert calls[0][1]["params"] == {"limit": 10, "cursor": "old", "search": "test"}
+    assert calls[0][1]["params"] == {"limit": 10, "cursor": "old"}
     assert calls[1][0] == "https://fal.ai/api/openapi/queue/openapi.json"
     assert calls[1][1]["params"] == {"endpoint_id": "fal-ai/test"}
+
+
+def test_catalog_client_filters_search_across_api_pages(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[dict[str, Any]] = []
+
+    def fake_get(url: str, **kwargs: Any) -> DummyResponse:
+        del url
+        calls.append(kwargs["params"])
+        if len(calls) == 1:
+            return DummyResponse(
+                json_data={
+                    "models": [
+                        {"endpoint_id": "fal-ai/other", "metadata": {"display_name": "Other"}},
+                    ],
+                    "next_cursor": "next",
+                    "has_more": True,
+                }
+            )
+        return DummyResponse(
+            json_data={
+                "models": [
+                    {"endpoint_id": "fal-ai/flux/schnell", "metadata": {"display_name": "Flux Schnell"}},
+                ],
+                "next_cursor": None,
+                "has_more": False,
+            }
+        )
+
+    monkeypatch.setattr("requests.get", fake_get)
+    page = FalCatalogClient("test-key").list_models(limit=1, search="flux")
+
+    assert [model.endpoint_id for model in page.models] == ["fal-ai/flux/schnell"]
+    assert calls == [{"limit": 100}, {"limit": 100, "cursor": "next"}]
+    assert page.has_more is False
 
 
 def test_catalog_client_rejects_non_object_schema(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,3 +1,4 @@
+import dataclasses
 import io
 import logging
 from collections.abc import Iterator
@@ -10,6 +11,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.errors import ExternalProviderRequestError
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGenerationRequest,
+    ExternalReferenceImage,
 )
 from invokeai.app.services.external_generation.providers.fal import FalProvider, build_schema_payload
 from invokeai.app.services.external_generation.providers.fal_catalog import FalEndpointKind, FalEndpointSchema
@@ -369,7 +371,95 @@ def test_fal_provider_parses_single_image_output_shape(monkeypatch: pytest.Monke
     assert result.seed_used == 22
 
 
-def test_fal_provider_generic_media_returns_raw_video_result_without_downloading(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fal_provider_generic_media_uploads_local_media_and_expands_placeholders(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    config = InvokeAIAppConfig(external_fal_api_key="fal-key")
+    provider = FalProvider(config, logging.getLogger("test"))
+    video_path = tmp_path / "input.mp4"
+    video_path.write_bytes(b"video")
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(provider, "_upload_image", lambda image, filename, headers: "https://cdn.test/image.png")
+    monkeypatch.setattr(
+        provider,
+        "_upload_file",
+        lambda path, filename, content_type, headers: "https://cdn.test/video.mp4",
+    )
+
+    def fake_submit(
+        model_id: str, payload: dict[str, Any], headers: dict[str, str]
+    ) -> tuple[dict[str, Any], str | None]:
+        del model_id, headers
+        captured.update(payload)
+        return payload, "request-5"
+
+    monkeypatch.setattr(provider, "_submit_queue", fake_submit)
+
+    result = provider.generate_generic(
+        "fal-ai/video",
+        {
+            "start_image_url": "${image_url}",
+            "video_url": "${video_url}",
+            "reference_image_urls": "${reference_image_urls}",
+        },
+        image=Image.new("RGB", (2, 2)),
+        reference_images=[Image.new("RGB", (2, 2))],
+        video_path=video_path,
+    )
+
+    assert captured == {
+        "start_image_url": "https://cdn.test/image.png",
+        "video_url": "https://cdn.test/video.mp4",
+        "reference_image_urls": ["https://cdn.test/image.png"],
+    }
+    assert result == captured
+
+
+def test_fal_provider_schema_payload_maps_init_and_reference_images() -> None:
+    schema = FalEndpointSchema(
+        endpoint_id="fal-ai/edit",
+        kind=FalEndpointKind.IMAGE_TO_IMAGE,
+        output_kind=FalEndpointKind.IMAGE_TO_IMAGE,
+        category="image-to-image",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string"},
+                "image_urls": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+        output_schema={},
+        common_fields={"prompt": "prompt", "reference_images": "image_urls"},
+        public_properties=("prompt", "image_urls"),
+    )
+    request = _request(_model("fal-ai/edit", modes=["img2img"]), mode="img2img")
+    request = dataclasses.replace(
+        request,
+        reference_images=[
+            ExternalReferenceImage(image=Image.new("RGB", (2, 2))),
+            ExternalReferenceImage(image=Image.new("RGB", (2, 2))),
+        ],
+    )
+
+    payload = build_schema_payload(
+        request,
+        schema,
+        image_url="https://cdn.test/init.png",
+        mask_url=None,
+        reference_urls=["https://cdn.test/ref-1.png", "https://cdn.test/ref-2.png"],
+    )
+
+    assert payload["image_urls"] == [
+        "https://cdn.test/init.png",
+        "https://cdn.test/ref-1.png",
+        "https://cdn.test/ref-2.png",
+    ]
+
+
+def test_fal_provider_generic_media_returns_raw_video_result_without_downloading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     config = InvokeAIAppConfig(external_fal_api_key="fal-key", external_fal_base_url="https://queue.test")
     provider = FalProvider(config, logging.getLogger("test"))
     post_payload: dict[str, Any] = {}
@@ -393,6 +483,14 @@ def test_fal_provider_generic_media_returns_raw_video_result_without_downloading
 
     assert post_payload == {"prompt": "A moving test"}
     assert result == {"video": {"url": "https://cdn.test/video.mp4"}, "seed": 99}
+
+
+def test_fal_provider_rejects_path_traversal_endpoint_id() -> None:
+    config = InvokeAIAppConfig(external_fal_api_key="fal-key")
+    provider = FalProvider(config, logging.getLogger("test"))
+
+    with pytest.raises(ExternalProviderRequestError, match="endpoint ID is invalid"):
+        provider.generate_generic("fal-ai/../secret", {})
 
 
 def test_fal_provider_reports_queue_error(monkeypatch: pytest.MonkeyPatch) -> None:

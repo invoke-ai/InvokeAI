@@ -25,15 +25,35 @@ Restart Invoke after manual configuration.
 
 ## Models
 
-The provider currently ships these curated models:
+Invoke exposes two fal.ai model paths:
+
+- **Native Canvas models** — image endpoints can be searched in the fal.ai
+  catalog and installed into Invoke's External Models list. Their endpoint
+  schema determines supported modes and common fields.
+- **Generic media endpoints** — every catalog endpoint can be called from the
+  `fal.ai Generic Media` node with its raw JSON schema. This covers text/video
+  generation, image-to-video, video-to-video, upscaling, audio, speech, 3D,
+  and new endpoints that fal.ai adds later.
+
+The provider keeps these curated image presets for quick setup:
 
 - `fal-ai/flux/schnell` — text to image
 - `fal-ai/flux/dev` — text to image
 - `fal-ai/flux-pro/kontext` — image to image and semantic edits
 - `fal-ai/flux-lora-fill` — masked inpainting
 
-When the API key is configured, Invoke adds these external model references to
-the model database. No model weights are downloaded.
+Use **Refresh** in the fal.ai catalog to load current endpoint metadata. No
+model weights are downloaded; installed entries are lightweight external
+references.
+
+## Generic media workflows
+
+Add the `fal.ai Generic Media` node in Workflow Editor. Set `model_id` to any
+fal.ai endpoint and paste the endpoint's JSON input into `input_json`. Local
+images, masks, and videos can be connected to the node and referenced with
+`${image_url}`, `${mask_url}`, and `${video_url}` placeholders. The node
+returns raw JSON, so endpoint-specific outputs remain available without
+waiting for a new Invoke release.
 
 ## Canvas
 
@@ -56,6 +76,5 @@ Every generation, upload, and result download uses remote services. Check the
 current model pricing and limits on its fal.ai model page before invoking.
 Automated tests do not submit inference requests.
 
-- https://fal.ai/models/fal-ai/flux/schnell
-- https://fal.ai/models/fal-ai/flux-pro/kontext
-- https://fal.ai/models/fal-ai/flux-lora-fill
+- https://fal.ai/models
+- https://fal.ai/docs/model-apis

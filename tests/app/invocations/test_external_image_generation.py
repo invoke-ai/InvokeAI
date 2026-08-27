@@ -89,6 +89,26 @@ def test_provider_specific_external_invocation_rejects_wrong_provider() -> None:
         invocation.invoke(context)
 
 
+def test_fal_invocation_forwards_advanced_schema_options() -> None:
+    model_config = _build_model().model_copy(update={"provider_id": "fal", "provider_model_id": "fal-ai/custom"})
+    model_field = ModelIdentifierField.from_config(model_config)
+    generated_image = Image.new("RGB", (16, 16), color="black")
+    context = _build_context(model_config, generated_image)
+
+    invocation = FalImageGenerationInvocation(
+        id="fal_node",
+        model=model_field,
+        mode="txt2img",
+        prompt="A prompt",
+        advanced_options={"style": "cinematic", "num_inference_steps": 4},
+    )
+
+    invocation.invoke(context)
+
+    request = context._services.external_generation.generate.call_args[0][0]
+    assert request.provider_options == {"advanced": {"style": "cinematic", "num_inference_steps": 4}}
+
+
 def test_fal_invocation_requires_fal_model() -> None:
     model_config = _build_model().model_copy(update={"provider_id": "fal", "provider_model_id": "fal-ai/flux/schnell"})
     model_field = ModelIdentifierField.from_config(model_config)

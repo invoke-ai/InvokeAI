@@ -603,7 +603,10 @@ def test_install_fal_image_model_from_catalog_schema(
     assert call["source"] == "external://fal/fal-ai/test"
     assert call["config"].provider_id == "fal"
     assert call["config"].provider_model_id == "fal-ai/test"
+    assert call["config"].source_url == "https://fal.ai/models/fal-ai/test"
     assert call["config"].capabilities.modes == ["txt2img"]
+    assert call["config"].panel_schema is not None
+    assert any(control.name == "dimensions" for control in call["config"].panel_schema.image)
 
 
 def test_install_fal_video_model_requires_generic_media_node(
@@ -645,10 +648,17 @@ def _fake_fal_schema(endpoint_id: str, category: str) -> Any:
         kind=kind,
         output_kind=kind,
         category=category,
-        input_schema={"type": "object", "properties": {"prompt": {"type": "string"}}},
+        input_schema={
+            "type": "object",
+            "properties": {
+                "prompt": {"type": "string"},
+                "width": {"type": "integer"},
+                "height": {"type": "integer"},
+            },
+        },
         output_schema={},
-        common_fields={"prompt": "prompt"},
-        public_properties=("prompt",),
+        common_fields={"prompt": "prompt", "width": "width", "height": "height"},
+        public_properties=("prompt", "width", "height"),
     )
 
 

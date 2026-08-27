@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import copy
-import os
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
 import requests
 
-from invokeai.app.services.external_generation.errors import ExternalProviderRateLimitError, ExternalProviderRequestError
+from invokeai.app.services.external_generation.errors import (
+    ExternalProviderRateLimitError,
+    ExternalProviderRequestError,
+)
 
 _DEFAULT_CATALOG_URL = "https://api.fal.ai"
 _DEFAULT_SCHEMA_URL = "https://fal.ai/api/openapi/queue/openapi.json"
@@ -79,11 +81,15 @@ class FalCatalogClient:
         cursor: str | None = None,
         search: str | None = None,
     ) -> FalCatalogPage:
-        params: dict[str, Any] = {"limit": min(max(limit, 1), _MAX_PAGE_SIZE)}
+        page_size = min(max(limit, 1), _MAX_PAGE_SIZE)
+        if search:
+            return self._search_models(search, limit=page_size, cursor=cursor)
+        return self._list_models_page(limit=page_size, cursor=cursor)
+
+    def _list_models_page(self, *, limit: int, cursor: str | None) -> FalCatalogPage:
+        params: dict[str, Any] = {"limit": limit}
         if cursor:
             params["cursor"] = cursor
-        if search:
-            params["search"] = search
 
         response = self._get(f"{self._catalog_url}/v1/models", params=params)
         payload = self._parse_object(response, "fal.ai catalog response")
@@ -116,6 +122,33 @@ class FalCatalogClient:
             models=models,
             next_cursor=next_cursor if isinstance(next_cursor, str) and next_cursor else None,
             has_more=bool(payload.get("has_more")),
+        )
+
+    def _search_models(self, search: str, *, limit: int, cursor: str | None) -> FalCatalogPage:
+        needle = search.casefold().strip()
+        if not needle:
+            return self._list_models_page(limit=limit, cursor=cursor)
+
+        matches: list[FalCatalogModel] = []
+        next_cursor = cursor
+        has_more = True
+        while has_more and len(matches) < limit:
+            page = self._list_models_page(limit=_MAX_PAGE_SIZE, cursor=next_cursor)
+            for model in page.models:
+                haystack = " ".join(
+                    [model.endpoint_id, model.display_name, model.description, model.category, *model.tags]
+                ).casefold()
+                if needle in haystack:
+                    matches.append(model)
+                    if len(matches) == limit:
+                        break
+            has_more = page.has_more and page.next_cursor is not None
+            next_cursor = page.next_cursor
+
+        return FalCatalogPage(
+            models=matches,
+            next_cursor=next_cursor if has_more else None,
+            has_more=has_more,
         )
 
     def get_schema(self, endpoint_id: str) -> FalEndpointSchema:
@@ -173,7 +206,10 @@ def normalize_openapi_schema(endpoint_id: str, document: dict[str, Any]) -> FalE
         (
             item.get("post")
             for path, item in paths.items()
-            if isinstance(path, str) and "/requests/" not in path and isinstance(item, dict) and isinstance(item.get("post"), dict)
+            if isinstance(path, str)
+            and "/requests/" not in path
+            and isinstance(item, dict)
+            and isinstance(item.get("post"), dict)
         ),
         None,
     )
@@ -191,7 +227,9 @@ def normalize_openapi_schema(endpoint_id: str, document: dict[str, Any]) -> FalE
     output_kind = _classify_output_schema(output_schema, fallback=kind)
     properties = request_schema["properties"]
     public_properties = tuple(
-        name for name, value in properties.items() if isinstance(name, str) and isinstance(value, dict) and not value.get("writeOnly")
+        name
+        for name, value in properties.items()
+        if isinstance(name, str) and isinstance(value, dict) and not value.get("writeOnly")
     )
 
     return FalEndpointSchema(
@@ -214,7 +252,13 @@ def classify_endpoint(category: str, schema: dict[str, Any], *, endpoint_id: str
     if normalized in {"text-to-image", "text2image", "text-to-img"}:
         return FalEndpointKind.TEXT_TO_IMAGE
     if normalized in {"image-to-image", "image-editing", "image-edit", "inpainting", "inpaint"}:
-        return FalEndpointKind.INPAINT if "inpaint" in normalized or "fill" in endpoint else FalEndpointKind.IMAGE_TO_IMAGE
+        properties = schema.get("properties", {})
+        has_mask = isinstance(properties, dict) and any("mask" in str(name).lower() for name in properties)
+        return (
+            FalEndpointKind.INPAINT
+            if "inpaint" in normalized or "inpaint" in endpoint or "fill" in endpoint or has_mask
+            else FalEndpointKind.IMAGE_TO_IMAGE
+        )
     if normalized in {"text-to-video", "text2video"}:
         return FalEndpointKind.TEXT_TO_VIDEO
     if normalized in {"image-to-video", "image2video"}:
@@ -258,12 +302,12 @@ def _find_common_fields(properties: dict[str, Any]) -> dict[str, str]:
         "negative_prompt": ("negative_prompt", "negative_prompt_text"),
         "init_image": (
             "image_url",
-            "image_urls",
             "input_image_url",
             "input_image",
             "start_image_url",
             "first_frame_url",
         ),
+        "reference_images": ("reference_image_urls", "reference_urls", "image_urls"),
         "mask_image": ("mask_url", "mask_image_url", "mask"),
         "init_video": ("video_url", "video_urls", "input_video_url"),
         "seed": ("seed",),
