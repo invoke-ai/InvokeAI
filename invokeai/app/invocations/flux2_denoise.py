@@ -481,9 +481,12 @@ class Flux2DenoiseInvocation(BaseInvocation):
             ref_image_seq_len=ref_image_seq_len,
             text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
             num_loras=len(self.transformer.loras),
-            # A batched latent/noise tensor is reachable through the API and custom graphs, and the
-            # reference latents get repeated to match it (`ensure_batch_size` below).
-            batch_size=b,
+            # Taken from `x`, not from `b`. `b` is the *noise* tensor's batch, which this node builds
+            # at 1 from width/height/seed even when the init latents carry more; the img2img preblend
+            # above then broadcasts the two, so `x` is the only thing that knows how many samples
+            # actually go through the transformer. Reference latents are repeated to match it
+            # (`ensure_batch_size` below), so they scale with it too.
+            batch_size=x.shape[0],
             # The mask itself is already allocated; only the additive bias built per forward is new.
             regional_attention_bias_bytes=(
                 regional_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()

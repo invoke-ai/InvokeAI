@@ -377,7 +377,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
     """The denoise node must hand its estimate to the cache, and that estimate must grow with the
     attached reference images -- the combination that #9500 was missing."""
 
-    def _run(self, num_ref_tokens: int, batch: int = 1):
+    def _run(self, num_ref_tokens: int, batch: int = 1, init_batch: int | None = None):
         """Drive `_run_diffusion` up to the transformer load and return the requested working memory."""
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -400,8 +400,12 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         ref_extension = MagicMock()
         ref_extension.ref_image_latents = torch.zeros(1, num_ref_tokens, 128)
 
+        if init_batch is not None:
+            # img2img: the node loads these, then preblends them with its own batch-1 noise.
+            context.tensors.load.return_value = torch.zeros(init_batch, 32, 128, 128)
+
         invocation = Flux2DenoiseInvocation.model_construct(
-            latents=None,
+            latents=MagicMock(latents_name="init") if init_batch is not None else None,
             noise=None,
             denoise_mask=None,
             denoising_start=0.0,
@@ -454,6 +458,19 @@ class TestFlux2DenoiseRequestsWorkingMemory:
     def test_a_batched_run_reserves_more_than_a_single_one(self):
         single = self._run(num_ref_tokens=0, batch=1)
         assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * int(0.4 * MB)
+
+    def test_a_batched_init_latent_beats_the_batch_1_noise_it_is_blended_with(self):
+        """img2img takes `x = t_0 * noise + (1 - t_0) * init_latents`, and this node builds its noise
+        at batch 1 from width/height/seed. Two batched init latents therefore broadcast up to a
+        two-sample `x` while the noise tensor -- the thing the batch used to be read from -- still
+        says 1. The reservation has to follow `x`."""
+        assert self._run(num_ref_tokens=0, init_batch=2) == _estimate(
+            image_seq_len=64 * 64, text_seq_len=512, batch_size=2
+        )
+
+    def test_the_blended_batch_is_read_after_the_broadcast(self):
+        single = self._run(num_ref_tokens=0, init_batch=1)
+        assert self._run(num_ref_tokens=0, init_batch=3) - single == 2 * (64 * 64 + 512) * int(0.4 * MB)
 
     def test_repeated_reference_latents_are_counted_per_sample(self):
         """`ensure_batch_size` repeats the reference latents across the batch, so their tokens scale
