@@ -251,6 +251,8 @@ def classify_endpoint(category: str, schema: dict[str, Any], *, endpoint_id: str
         return FalEndpointKind.UPSCALE
     if normalized in {"text-to-image", "text2image", "text-to-img"}:
         return FalEndpointKind.TEXT_TO_IMAGE
+    if "segment" in normalized or "segment" in endpoint:
+        return FalEndpointKind.IMAGE_TO_IMAGE
     if normalized in {"image-to-image", "image-editing", "image-edit", "inpainting", "inpaint"}:
         properties = schema.get("properties", {})
         has_mask = isinstance(properties, dict) and any("mask" in str(name).lower() for name in properties)

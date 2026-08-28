@@ -450,6 +450,31 @@ def _extract_image_items(payload: dict[str, Any]) -> list[Any]:
     image_urls = payload.get("image_urls")
     if isinstance(image_urls, list):
         return image_urls
+
+    # Segmentation and preprocessing endpoints use named mask/depth/image fields instead of `images`.
+    items: list[Any] = []
+    for key, value in payload.items():
+        key_lower = str(key).lower()
+        if any(term in key_lower for term in ("image", "mask", "depth", "normal", "matte")):
+            items.extend(_extract_media_items(value))
+    return items
+
+
+def _extract_media_items(value: Any) -> list[Any]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        if isinstance(value.get("url"), str) or isinstance(value.get("image_url"), str):
+            return [value]
+        items: list[Any] = []
+        for nested in value.values():
+            items.extend(_extract_media_items(nested))
+        return items
+    if isinstance(value, list):
+        items: list[Any] = []
+        for nested in value:
+            items.extend(_extract_media_items(nested))
+        return items
     return []
 
 

@@ -91,6 +91,17 @@ def test_classify_endpoint_keeps_unknown_categories_generic() -> None:
     )
 
 
+def test_classify_endpoint_keeps_segmentation_out_of_inpaint_mode() -> None:
+    assert (
+        classify_endpoint(
+            "image-to-image",
+            {"properties": {"image_url": {}, "min_mask_region_area": {}}},
+            endpoint_id="fal-ai/sam2/auto-segment",
+        )
+        is FalEndpointKind.IMAGE_TO_IMAGE
+    )
+
+
 def test_catalog_client_lists_pages_and_fetches_schema(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, dict[str, Any]]] = []
 

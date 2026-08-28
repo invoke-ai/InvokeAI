@@ -371,6 +371,24 @@ def test_fal_provider_parses_single_image_output_shape(monkeypatch: pytest.Monke
     assert result.seed_used == 22
 
 
+def test_fal_provider_parses_segmentation_mask_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_fal_api_key="fal-key")
+    provider = FalProvider(config, logging.getLogger("test"))
+    request = _request(_model("fal-ai/sam2/auto-segment", modes=["img2img"]), mode="img2img")
+    monkeypatch.setattr(provider, "_download_image", lambda url: Image.new("RGB", (3, 3), color="green"))
+
+    result = provider._parse_result(
+        {
+            "combined_mask": {"url": "https://cdn.test/combined-mask.png"},
+            "individual_masks": [{"url": "https://cdn.test/mask-1.png"}],
+        },
+        request,
+        request_id="segment-1",
+    )
+
+    assert len(result.images) == 2
+
+
 def test_fal_provider_generic_media_uploads_local_media_and_expands_placeholders(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Any
 ) -> None:
