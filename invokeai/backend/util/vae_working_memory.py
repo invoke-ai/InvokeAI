@@ -140,12 +140,20 @@ def estimate_vae_working_memory_flux2(
     When tiling is enabled the peak is bounded by a single tile instead of the full image (measured
     ~0.55GB flat at a 512px tile, from 1024px up to the 2024px reference-image cap), and the score
     matrix, if one is materialized at all, is bounded by the tile too.
+
+    Both terms are per sample. `vae.decode` takes whatever batch the latents carry, and a
+    ``LatentsField`` is not pinned to one, so the batch has to multiply through: measured at 1024px
+    decode, peak reserved is 4.23GB at batch 1, 7.96GB at batch 2 and 11.89GB at batch 3 -- linear,
+    and slightly sub-linear per sample, so multiplying the single-sample estimate stays an upper
+    bound. The score matrix is shaped (batch, heads, S, S), so it scales the same way. The encode
+    call sites all pass batch 1 today; the shared estimator does not assume it.
     """
     param = next(vae.parameters())
     element_size = param.element_size()
 
     # Encoding uses ~50% the working memory of decoding.
     scaling_constant = 2200 if operation == "decode" else 1100
+    batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
 
     if tile_size is not None:
         # Add 25% for tile overlap and the blending buffers, mirroring the SD1/SDXL estimate.
@@ -158,10 +166,12 @@ def estimate_vae_working_memory_flux2(
         working_memory = out_h * out_w * element_size * scaling_constant
         mid_block_seq_len = (out_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (out_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
 
+    working_memory *= batch_size
     working_memory += sdpa_score_matrix_bytes(
         device=device if device is not None else TorchDevice.choose_torch_device(),
         dtype=param.dtype,
-        num_heads=_FLUX2_VAE_MID_BLOCK_HEADS,
+        # The score matrix is (batch, heads, S, S); one head per sample prices the whole batch.
+        num_heads=_FLUX2_VAE_MID_BLOCK_HEADS * batch_size,
         head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
         seq_len=mid_block_seq_len,
     )

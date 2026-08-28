@@ -23,7 +23,6 @@ from invokeai.app.invocations.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.backend.util.attention import (
     SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
     _diffusers_attention_dispatch,
-    _probe_sdpa_dispatch,
     _torch_sdpa_materializes_score_matrix,
     sdpa_score_matrix_bytes,
 )
@@ -37,15 +36,6 @@ GB = 1024**3
 # here, so passing a CPU device reproduces that regime without needing a GPU on the test runner. The
 # materializing regime gets its own class below.
 FUSED = torch.device("cpu")
-
-
-@pytest.fixture(autouse=True)
-def _clear_probe_cache():
-    """The torch probe is `lru_cache`d for the process; a faked answer must not leak into the next
-    test. (The diffusers lookup is deliberately uncached -- see `_diffusers_attention_dispatch`.)"""
-    _probe_sdpa_dispatch.cache_clear()
-    yield
-    _probe_sdpa_dispatch.cache_clear()
 
 
 def _estimate(
@@ -177,6 +167,67 @@ class TestFlux2VaeWorkingMemoryEstimate:
             operation="encode", image_tensor=torch.zeros(1, 3, 2024, 2024), vae=self._mock_bf16_vae(), device=FUSED
         )
         assert estimates[0] < untiled / 4
+
+
+class TestFlux2VaeBatchIsBudgeted:
+    """`vae.decode` is handed whatever batch the latents carry, and a `LatentsField` is not pinned to
+    one. An estimate built from H and W alone gives a two-sample decode the same reservation as a
+    single one, so the cache admits it to a card that cannot run it -- the reservation is there, and
+    the OOM happens anyway.
+
+    Measured at 1024px on CUDA/bf16, peak reserved, each point in a fresh process: 4.23GB at batch 1,
+    7.96GB at batch 2, 11.89GB at batch 3. Linear, and slightly sub-linear per sample, so scaling the
+    single-sample estimate is an upper bound rather than a fit.
+    """
+
+    # (batch, measured peak reserved MB) for a 1024px decode.
+    MEASURED_DECODE_BATCH = [(1, 4229), (2, 7955), (3, 11889)]
+
+    def _decode_estimate(self, batch, px=1024, tile_size=None, device=FUSED):
+        vae = MagicMock(spec=AutoencoderKLFlux2)
+        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+        return estimate_vae_working_memory_flux2(
+            operation="decode",
+            image_tensor=torch.zeros(batch, 32, px // 8, px // 8),
+            vae=vae,
+            tile_size=tile_size,
+            device=device,
+        )
+
+    @pytest.mark.parametrize("batch, measured_mb", MEASURED_DECODE_BATCH)
+    def test_estimate_is_an_upper_bound_on_the_measured_batch_peak(self, batch, measured_mb):
+        estimate = self._decode_estimate(batch)
+        assert estimate >= measured_mb * MB
+        assert estimate <= 2 * measured_mb * MB
+
+    def test_estimate_scales_with_the_batch(self):
+        """The regression in one assertion: before this, all three of these were equal."""
+        single = self._decode_estimate(1)
+        assert self._decode_estimate(2) == 2 * single
+        assert self._decode_estimate(3) == 3 * single
+
+    def test_a_three_dimensional_tensor_is_one_sample(self):
+        """A bare `(C, H, W)` latent has no batch axis; `shape[0]` would read the channel count."""
+        vae = MagicMock(spec=AutoencoderKLFlux2)
+        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+        unbatched = estimate_vae_working_memory_flux2(
+            operation="decode", image_tensor=torch.zeros(32, 128, 128), vae=vae, device=FUSED
+        )
+        assert unbatched == self._decode_estimate(1)
+
+    def test_tiling_bounds_the_tile_not_the_batch(self):
+        """Tiling caps the spatial term at one tile, but every sample still runs through it."""
+        single = self._decode_estimate(1, px=1024, tile_size=512)
+        assert self._decode_estimate(3, px=1024, tile_size=512) == 3 * single
+
+    def test_the_score_matrix_scales_with_the_batch(self):
+        """It is shaped (batch, heads, S, S), so where it is materialized at all it scales too."""
+        tokens = 128 * 128
+        score = tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        linear = self._decode_estimate(1)  # fused: the spatial term on its own
+        with _materializing():
+            assert self._decode_estimate(1, device=MATERIALIZING) == linear + score
+            assert self._decode_estimate(3, device=MATERIALIZING) == 3 * (linear + score)
 
 
 class TestFlux2VaeInvocationsRequestWorkingMemory:
@@ -388,7 +439,6 @@ class TestMaterializedScoreMatrixIsBudgeted:
         decode be admitted to a card that could not run it."""
         with patch("torch.ops.aten._fused_sdp_choice", side_effect=NotImplementedError("no MPS kernel")):
             materializing = self._vae_estimate("decode", 1024, device=FUSED)
-        _probe_sdpa_dispatch.cache_clear()
         fused = self._vae_estimate("decode", 1024, device=FUSED)
 
         tokens = 128 * 128
@@ -493,21 +543,66 @@ class TestSdpaBackendProbe:
             )
         assert estimated == 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
-    def test_disabling_the_fused_kernels_at_runtime_invalidates_the_probe(self):
-        """The torch probe *is* cached -- it allocates and runs a dispatch query -- but its answer
-        depends on switches callers can flip at runtime (`sdpa_kernel()`,
-        `torch.backends.cuda.enable_flash_sdp`). Those toggles are part of the cache key, so an
-        estimate priced after a switch does not inherit the answer from before it. No cache is
-        cleared between these calls on purpose."""
+    def _cpu_estimate(self):
+        return sdpa_score_matrix_bytes(
+            device=torch.device("cpu"), dtype=torch.bfloat16, num_heads=1, head_dim=128, seq_len=4096
+        )
+
+    def test_disabling_the_fused_kernels_at_runtime_changes_the_answer(self):
+        """The probe is not cached, so an estimate priced after a runtime switch does not inherit the
+        answer from before it. Nothing is cleared between these calls on purpose."""
+        from torch.nn.attention import SDPBackend, sdpa_kernel
+
+        assert self._cpu_estimate() == 0
+        with sdpa_kernel([SDPBackend.MATH]):
+            assert self._cpu_estimate() == 4096 * 4096 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert self._cpu_estimate() == 0
+
+    def test_a_priority_reorder_changes_the_answer_with_every_flag_unchanged(self):
+        """`sdpa_kernel(..., set_priority=True)` puts `MATH` first while leaving all four enable
+        flags True, and torch takes the first eligible backend in that order. A cache keyed on the
+        flags -- which is what this probe used to have -- could not see the switch and would keep
+        reserving zero. Not caching at all is what makes that unrepresentable."""
+        from torch.nn.attention import SDPBackend, sdpa_kernel
+
+        math_first = [
+            SDPBackend.MATH,
+            SDPBackend.FLASH_ATTENTION,
+            SDPBackend.EFFICIENT_ATTENTION,
+            SDPBackend.CUDNN_ATTENTION,
+        ]
+        flags = ("flash_sdp_enabled", "mem_efficient_sdp_enabled", "math_sdp_enabled", "cudnn_sdp_enabled")
+
+        assert self._cpu_estimate() == 0
+        with sdpa_kernel(math_first, set_priority=True):
+            # The finding in one line: every flag a key could hold is still True in here.
+            assert all(getattr(torch.backends.cuda, name)() for name in flags if hasattr(torch.backends.cuda, name))
+            # CPU's chooser ignores the priority order, so stand in for the answer CUDA gives.
+            with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.MATH)):
+                assert self._cpu_estimate() == 4096 * 4096 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert self._cpu_estimate() == 0
+
+    @pytest.mark.skipif(not torch.cuda.is_available(), reason="only CUDA's chooser honours the priority order")
+    def test_this_build_reports_a_real_priority_reorder(self):
+        """The same case against the real dispatcher rather than a stand-in. Verified on torch
+        2.7.1+cu128: `_fused_sdp_choice` answers EFFICIENT outside and MATH inside."""
         from torch.nn.attention import SDPBackend, sdpa_kernel
 
         def estimate():
             return sdpa_score_matrix_bytes(
-                device=torch.device("cpu"), dtype=torch.bfloat16, num_heads=1, head_dim=128, seq_len=4096
+                device=torch.device("cuda"), dtype=torch.bfloat16, num_heads=1, head_dim=128, seq_len=4096
             )
 
         assert estimate() == 0
-        with sdpa_kernel([SDPBackend.MATH]):
+        with sdpa_kernel(
+            [
+                SDPBackend.MATH,
+                SDPBackend.FLASH_ATTENTION,
+                SDPBackend.EFFICIENT_ATTENTION,
+                SDPBackend.CUDNN_ATTENTION,
+            ],
+            set_priority=True,
+        ):
             assert estimate() == 4096 * 4096 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         assert estimate() == 0
 
@@ -519,7 +614,6 @@ class TestSdpaBackendProbe:
 
         with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.MATH)):
             assert _torch_sdpa_materializes_score_matrix("cpu", None, torch.bfloat16, 128, False)
-        _probe_sdpa_dispatch.cache_clear()
         with patch("torch.ops.aten._fused_sdp_choice", return_value=int(SDPBackend.EFFICIENT_ATTENTION)):
             assert not _torch_sdpa_materializes_score_matrix("cpu", None, torch.bfloat16, 128, False)
 

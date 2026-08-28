@@ -130,21 +130,6 @@ def _diffusers_attention_dispatch() -> str:
     return _DISPATCH_FUSED
 
 
-def _sdp_kernel_toggles() -> tuple[bool, ...]:
-    """The global switches that gate each fused SDPA kernel, as `_fused_sdp_choice` sees them.
-
-    `torch.backends.cuda.enable_flash_sdp(False)` and `sdpa_kernel([...])` flip these at runtime and
-    the dispatch answer flips with them, so they belong in the probe's cache key rather than being
-    baked into a permanent result.
-    """
-    cuda = torch.backends.cuda
-    return tuple(
-        bool(getattr(cuda, name)())
-        for name in ("flash_sdp_enabled", "mem_efficient_sdp_enabled", "math_sdp_enabled", "cudnn_sdp_enabled")
-        if hasattr(cuda, name)
-    )
-
-
 def _torch_sdpa_materializes_score_matrix(
     device_type: str, device_index: int | None, dtype: torch.dtype, head_dim: int, has_attn_mask: bool
 ) -> bool:
@@ -155,6 +140,12 @@ def _torch_sdpa_materializes_score_matrix(
     Eligibility depends on the dtype, the head dim and the presence of a mask, not on the sequence
     length, so a tiny probe answers for the real forward.
 
+    Not cached. The answer turns on global torch state a cache key cannot honestly enumerate: the
+    per-backend enable flags, but also the *priority order*, which `sdpa_kernel(..., set_priority=
+    True)` reorders while leaving every flag untouched -- measured, same flags, `EFFICIENT` before
+    and `MATH` inside. Each item added to such a key is one more thing to get wrong later, and the
+    probe costs ~6us against a multi-second forward, so it just runs every time.
+
     Anything that goes wrong reports the materializing path, which is both the conservative answer
     and, for the most common cause, the correct one: torch registers `_fused_sdp_choice` for CPU,
     CUDA/ROCm and XPU only, so the call raises on MPS -- and MPS is exactly where
@@ -163,21 +154,6 @@ def _torch_sdpa_materializes_score_matrix(
     -> `@ V` that holds the score tensor as a real intermediate. The remaining causes (an allocation
     failure inside the probe, a torch that predates the op) leave us knowing nothing at all, and
     there the asymmetry decides: a shortfall costs an OOM, an over-estimate costs some residency.
-    """
-    return _probe_sdpa_dispatch(device_type, device_index, dtype, head_dim, has_attn_mask, _sdp_kernel_toggles())
-
-
-@lru_cache(maxsize=None)
-def _probe_sdpa_dispatch(
-    device_type: str,
-    device_index: int | None,
-    dtype: torch.dtype,
-    head_dim: int,
-    has_attn_mask: bool,
-    sdp_kernel_toggles: tuple[bool, ...],
-) -> bool:
-    """Cached body of the probe above. Every input torch's answer depends on is part of the key --
-    `sdp_kernel_toggles` is not read here, it is carried so a runtime change invalidates the entry.
     """
     try:
         device = torch.device(device_type) if device_index is None else torch.device(device_type, device_index)
