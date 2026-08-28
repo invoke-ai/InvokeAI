@@ -481,6 +481,9 @@ class Flux2DenoiseInvocation(BaseInvocation):
             ref_image_seq_len=ref_image_seq_len,
             text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
             num_loras=len(self.transformer.loras),
+            # A batched latent/noise tensor is reachable through the API and custom graphs, and the
+            # reference latents get repeated to match it (`ensure_batch_size` below).
+            batch_size=b,
             # The mask itself is already allocated; only the additive bias built per forward is new.
             regional_attention_bias_bytes=(
                 regional_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
@@ -620,6 +623,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         ref_image_seq_len: int,
         text_seq_len: int,
         num_loras: int,
+        batch_size: int = 1,
         regional_attention_bias_bytes: int = 0,
         has_regional_attention_mask: bool = False,
         device: torch.device | None = None,
@@ -643,6 +647,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
         during the forward, and allocator slack across many steps). LoRA sidecar patches add an extra
         activation branch per patched layer, so we add a per-LoRA margin.
 
+        Batch multiplies the token count and nothing else. A batch of B is B independent sequences,
+        so it enters the linear term exactly as extra sequence does -- measured on the Klein geometry
+        with a reduced block count: 4608 tokens at B=1 peaks at 2570MB, the same 4608 at B=2 (9216
+        tokens) at 5126MB, and 9728 tokens at B=1 at 5584MB. Batch and sequence are interchangeable
+        to within the noise. Reference latents are repeated per sample (`ensure_batch_size`), so they
+        scale with it too, and the score matrix is shaped (batch, heads, S, S). The fixed base does
+        not scale -- it is about weights, not activations -- and neither does the regional bias, which
+        is built as (1, 1, S, S) and broadcast across the batch.
+
         The linear model holds only while attention runs on a fused kernel. Regional prompting is
         where that stops being a given: it hands the transformer a dense additive ``S x S`` bias,
         which flash attention never accepts and which ROCm's memory-efficient kernel rejects as
@@ -657,13 +670,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
         MB = 1024**2
         per_token_bytes = int(0.4 * MB)
         total_seq_len = image_seq_len + ref_image_seq_len + text_seq_len
-        estimated = total_seq_len * per_token_bytes
+        estimated = total_seq_len * batch_size * per_token_bytes
         estimated += int(1.0 * GB)
         estimated += regional_attention_bias_bytes
         estimated += sdpa_score_matrix_bytes(
             device=device if device is not None else TorchDevice.choose_torch_device(),
             dtype=dtype,
-            num_heads=FLUX2_MAX_ATTENTION_HEADS,
+            num_heads=FLUX2_MAX_ATTENTION_HEADS * batch_size,
             head_dim=FLUX2_ATTENTION_HEAD_DIM,
             seq_len=total_seq_len,
             has_attn_mask=has_regional_attention_mask,
@@ -672,7 +685,8 @@ class Flux2DenoiseInvocation(BaseInvocation):
             via_diffusers_dispatch=True,
         )
         if num_loras > 0:
-            estimated += int(0.5 * num_loras * GB)
+            # A sidecar branch is an activation, so it scales with the batch like the rest of them.
+            estimated += int(0.5 * num_loras * batch_size * GB)
         return estimated
 
     def _load_text_conditioning(

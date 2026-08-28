@@ -43,6 +43,7 @@ def _estimate(
     ref_image_seq_len=0,
     text_seq_len=512,
     num_loras=0,
+    batch_size=1,
     regional_bias=0,
     has_regional_mask=False,
     device=FUSED,
@@ -53,6 +54,7 @@ def _estimate(
         ref_image_seq_len=ref_image_seq_len,
         text_seq_len=text_seq_len,
         num_loras=num_loras,
+        batch_size=batch_size,
         regional_attention_bias_bytes=regional_bias,
         has_regional_attention_mask=has_regional_mask,
         device=device,
@@ -108,6 +110,75 @@ class TestFlux2DenoiseWorkingMemoryEstimate:
     def test_regional_attention_bias_is_added(self):
         base = _estimate(image_seq_len=4096)
         assert _estimate(image_seq_len=4096, regional_bias=123 * MB) - base == 123 * MB
+
+
+class TestFlux2DenoiseBatchIsBudgeted:
+    """A batch of B is B independent sequences, so it enters the linear term exactly as extra
+    sequence does. Measured on the Klein geometry (48 heads x 128, mlp 3.0) with a reduced block
+    count -- the constant is block-count independent -- peak reserved, each point in a fresh process:
+
+        B=1, 4608 tokens ->  2570MB      B=2, 4608 each (9216 total) ->  5126MB
+        B=1, 9728 tokens ->  5584MB      B=2, 9728 each (19456 total) -> 11120MB
+        B=1, 14336 tokens -> 8284MB      B=3, 4608 each (13824 total) ->  7656MB
+
+    Per *total* token that is 0.554-0.578MB across every row: batch and sequence are interchangeable.
+    (The absolute figure is not comparable to the Klein table elsewhere in this module -- a 3-block
+    stand-in amortizes per-forward overhead differently. Only the equivalence is being tested.)
+
+    Batched latents reach this node through the API and custom graphs, not the stock UI.
+    """
+
+    def test_batch_and_sequence_are_interchangeable(self):
+        """Two samples of 4608 tokens must cost what one sample of 9216 costs -- the measurement
+        above says 5126MB against 5584MB, equal to within the allocator's noise."""
+        assert _estimate(image_seq_len=4096, text_seq_len=512, batch_size=2) == _estimate(
+            image_seq_len=8704, text_seq_len=512, batch_size=1
+        )
+
+    @pytest.mark.parametrize("batch", [2, 3, 4])
+    def test_each_extra_sample_adds_exactly_its_own_tokens(self, batch):
+        single = _estimate(image_seq_len=4096)
+        assert _estimate(image_seq_len=4096, batch_size=batch) - single == (batch - 1) * (4096 + 512) * int(0.4 * MB)
+
+    def test_reference_tokens_scale_with_the_batch(self):
+        """`ensure_batch_size` repeats the reference latents across the batch."""
+        single = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
+        assert _estimate(image_seq_len=4096, ref_image_seq_len=12288, batch_size=2) - single == (
+            (4096 + 12288 + 512) * int(0.4 * MB)
+        )
+
+    def test_the_fixed_base_does_not_scale_with_the_batch(self):
+        """It covers transient weight casts and allocator slack -- properties of the weights, not of
+        how many samples run through them. Scaling it would add a GB per sample for nothing."""
+        deltas = {
+            _estimate(image_seq_len=4096, batch_size=b + 1) - _estimate(image_seq_len=4096, batch_size=b)
+            for b in (1, 2, 3)
+        }
+        assert deltas == {(4096 + 512) * int(0.4 * MB)}
+
+    def test_the_regional_bias_does_not_scale_with_the_batch(self):
+        """`get_joint_attention_kwargs` builds it as (1, 1, S, S) and lets SDPA broadcast it, so
+        there is exactly one of them however many samples are in flight."""
+        bias = (4096 + 512) ** 2 * 2
+        single = _estimate(image_seq_len=4096, regional_bias=bias, has_regional_mask=True)
+        double = _estimate(image_seq_len=4096, regional_bias=bias, has_regional_mask=True, batch_size=2)
+        assert double - single == (4096 + 512) * int(0.4 * MB)
+
+    def test_the_score_matrix_scales_with_the_batch(self):
+        """Where it is materialized at all it is shaped (batch, heads, S, S)."""
+        seq_len = 4096 + 512
+        with _materializing():
+            single = _estimate(image_seq_len=4096, has_regional_mask=True, device=MATERIALIZING)
+            double = _estimate(image_seq_len=4096, has_regional_mask=True, batch_size=2, device=MATERIALIZING)
+        assert double - single == (
+            seq_len * int(0.4 * MB) + FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        )
+
+    def test_the_lora_margin_scales_with_the_batch(self):
+        """A sidecar patch adds an activation branch, and activations are per sample."""
+        assert _estimate(image_seq_len=4096, num_loras=2, batch_size=3) - _estimate(
+            image_seq_len=4096, num_loras=0, batch_size=3
+        ) == 3 * int(1.0 * GB)
 
 
 class TestFlux2VaeWorkingMemoryEstimate:
@@ -306,7 +377,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
     """The denoise node must hand its estimate to the cache, and that estimate must grow with the
     attached reference images -- the combination that #9500 was missing."""
 
-    def _run(self, num_ref_tokens: int):
+    def _run(self, num_ref_tokens: int, batch: int = 1):
         """Drive `_run_diffusion` up to the transformer load and return the requested working memory."""
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -354,6 +425,9 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             patch.object(Flux2DenoiseInvocation, "_get_bn_stats", return_value=None),
             patch("invokeai.backend.util.devices.TorchDevice.choose_torch_device", return_value=torch.device("cpu")),
             patch("invokeai.app.invocations.flux2_denoise.Flux2RefImageExtension", return_value=ref_extension),
+            patch.object(
+                Flux2DenoiseInvocation, "_prepare_noise_tensor", return_value=torch.zeros(batch, 32, 128, 128)
+            ),
             pytest.raises(_StopBeforeLoad),
         ):
             invocation._run_diffusion(context)
@@ -370,6 +444,23 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         without_refs = self._run(num_ref_tokens=0)
         with_refs = self._run(num_ref_tokens=12288)
         assert with_refs - without_refs == 12288 * int(0.4 * MB)
+
+    def test_the_real_batch_reaches_the_reservation(self):
+        """A batched latent tensor is reachable through the API and custom graphs. The node has `b`
+        in hand at the estimate; before this it simply did not pass it, so a two-sample run reserved
+        one sample's worth and the cache admitted it to a card that could not run it."""
+        assert self._run(num_ref_tokens=0, batch=2) == _estimate(image_seq_len=64 * 64, text_seq_len=512, batch_size=2)
+
+    def test_a_batched_run_reserves_more_than_a_single_one(self):
+        single = self._run(num_ref_tokens=0, batch=1)
+        assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * int(0.4 * MB)
+
+    def test_repeated_reference_latents_are_counted_per_sample(self):
+        """`ensure_batch_size` repeats the reference latents across the batch, so their tokens scale
+        with it as well -- the worst case in #9500, doubled."""
+        single = self._run(num_ref_tokens=12288, batch=1)
+        double = self._run(num_ref_tokens=12288, batch=2)
+        assert double - single == (64 * 64 + 12288 + 512) * int(0.4 * MB)
 
 
 def _rocm_like_probe(device_type, device_index, dtype, head_dim, has_attn_mask):
