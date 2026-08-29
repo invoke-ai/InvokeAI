@@ -60,6 +60,11 @@ from invokeai.backend.util.devices import TorchDevice
 FLUX2_ATTENTION_HEAD_DIM = 128
 # The width the per-token constant below was measured on. Estimates scale off this.
 FLUX2_REFERENCE_HIDDEN_SIZE = 4096
+# Peak reserved activation bytes per attended token at the reference width. Measured slope between
+# 4608 and 9216 tokens: 0.3859 MB/tok on CUDA (RTX 4090, torch 2.7.1) and 0.4067 on ROCm (RX 9070
+# XT, gfx1201, torch 2.10). 0.42 is an upper bound on both -- it was 0.4, which the ROCm point
+# exceeds. The margin is deliberately small because this is the dominant term at every resolution.
+FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH = int(0.42 * 1024**2)
 # The widest variant, used when the config does not tell us which one this is -- over-reserving on
 # an unknown model beats under-reserving on the largest one.
 FLUX2_MAX_HIDDEN_SIZE = 6144
@@ -646,20 +651,24 @@ class Flux2DenoiseInvocation(BaseInvocation):
         FLUX.2 attention runs through SDPA without materializing the O(seq^2) score matrix, so the
         activation footprint scales *linearly* with the total attended sequence -- text tokens, image
         tokens, and reference-image tokens alike. Measured on the Klein 9B geometry in bf16 as peak
-        reserved memory, that slope is ~0.39 MB per token and holds from 1.5k to 28k tokens; it is
-        also independent of the block count (a no-grad forward frees each block's intermediates).
+        reserved memory, that slope holds from 1.5k to 28k tokens and is independent of the block
+        count (a no-grad forward frees each block's intermediates). It is *not* independent of the
+        build: 0.3859 MB/token on CUDA, 0.4067 on ROCm/gfx1201, so the constant is 0.42.
 
         It is *not* independent of the transformer's width, which is why ``hidden_size`` is a
         parameter rather than a constant. Measured slope between 4608 and 9216 tokens, block count
         and everything else held fixed:
 
-            3072 (Klein 4B) 0.291 MB/tok    4096 (Klein 9B) 0.386    6144 ([dev]) 0.555
+            CUDA          3072 (Klein 4B) 0.291 MB/tok   4096 (Klein 9B) 0.386   6144 ([dev]) 0.555
+            ROCm/gfx1201  3072            0.315           4096            0.407   6144         0.589
 
-        which is 0.755 / 1.000 / 1.438 against width ratios of 0.75 / 1.00 / 1.50 -- linear in width,
+        which is 0.755 / 1.000 / 1.438 on CUDA and 0.774 / 1.000 / 1.448 on ROCm, against width
+        ratios of 0.75 / 1.00 / 1.50 -- linear in width on both,
         and slightly sub-linear at the top so scaling by width stays an upper bound. Calibrating on
         Klein 9B alone would have under-reserved [dev] by a third: 1024x1024 with three 1024x1024
-        references is 16896 tokens, ~7.6GB reserved against ~10GB needed. The head count follows the
-        same width, so the score-matrix term gets the real one instead of the widest.
+        references is 16896 tokens, ~7.6GB reserved against ~10GB needed on both platforms. The head
+        count follows the same width, so the score-matrix term gets the real one instead of the
+        widest.
 
         The reference-image term is what makes this estimate necessary rather than merely nice to
         have: a 1024x1024 generation is 4096 image tokens (~1.7GB), but attaching three 1024x1024
@@ -691,8 +700,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         bias attached).
         """
         GB = 1024**3
-        MB = 1024**2
-        per_token_bytes = int(0.4 * MB * hidden_size / FLUX2_REFERENCE_HIDDEN_SIZE)
+        per_token_bytes = int(FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH * hidden_size / FLUX2_REFERENCE_HIDDEN_SIZE)
         total_seq_len = image_seq_len + ref_image_seq_len + text_seq_len
         estimated = total_seq_len * batch_size * per_token_bytes
         estimated += int(1.0 * GB)

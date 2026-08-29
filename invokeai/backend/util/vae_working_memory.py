@@ -130,15 +130,24 @@ def estimate_vae_working_memory_flux2(
     That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
     512-wide head, and measured peak stays linear from 512 to 1536px). A build with no fused kernel
-    for the shapes -- ROCm caps the head dim at 128 and reports ``math`` for this 512-wide one, MPS
-    has no fused SDPA kernel at all -- materializes a (pixels/8)^2 score matrix on top of the linear
-    term: ~3.7GB at 1024px and ~18GB at 1536px. We ask torch which path applies rather than assuming,
-    so the estimate is right on both.
+    for the shapes -- ROCm/gfx1100 reports ``math`` for this 512-wide head, though gfx1201 takes it
+    on flash, and MPS has no fused kernel at all -- materializes a (pixels/8)^2 score matrix on top
+    of the linear term: ~4.5GB at 1024px and ~21GB at 1536px. We ask torch which path applies rather
+    than assuming, so the estimate is right on all of them.
 
-    Known gap: the linear constants below were calibrated on CUDA, and on ROCm the same decode costs
-    more than they predict -- measured there at 768px, 3.78GB against 3.45GB estimated. 512px is
-    covered by the 3GB ``device_working_mem_gb`` floor and 1024px and up have margin, so the shortfall
-    is confined to the middle of the range and is ~0.33GB. Recalibrating for it needs ROCm hardware. (Unlike the transformer, this attention does not go through
+    KNOWN GAP -- the linear constants below are CUDA numbers and are short on AMD, by a lot and by an
+    amount that is not yet pinned down. Implied constant for decode, fitted by
+    ``scripts/calibrate_flux2_working_memory.py``: ~2180 on CUDA (which is what 2200 was fitted to),
+    ~2430 on ROCm/gfx1100, ~4300 on ROCm/gfx1201 at 512-1024px. The last of those means an 8.4GB
+    decode against a 4.3GB reservation. It is a conv-workspace difference (MIOpen vs cuDNN), not the
+    attention term -- it shows up on the *fused* path too.
+
+    Raising the constant to cover gfx1201 would double every CUDA reservation for nothing, and the
+    two AMD cards are 1.8x apart, so there is not yet one number to ship. The gfx1201 run also had
+    ``MIOPEN_FIND_MODE=2`` and ``PYTORCH_HIP_ALLOC_CONF=garbage_collection_threshold:0.7`` set, and
+    its series is non-monotonic above 1024px (peak *falls* as resolution rises), which is what a GC
+    threshold does to peak-reserved readings -- so those numbers need a clean re-run before anything
+    is fitted to them. Tracked rather than guessed at. (Unlike the transformer, this attention does not go through
     diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
     itself -- so torch's own answer is the whole answer here.)
 

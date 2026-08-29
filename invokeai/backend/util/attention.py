@@ -47,28 +47,30 @@ def auto_detect_slice_size(latents: torch.Tensor) -> str:
 # never materializes the O(S^2) score matrix, or the `math` fallback, which does. Which one runs is
 # not a property of FLUX.2 -- it is a property of the build, the device, the dtype, the head dim and
 # whether an attention mask was passed, and the rules differ per build in ways that are not worth
-# hard-coding. CUDA takes head dims well past 128 on its memory-efficient kernel; ROCm caps them at
-# 128 and drops to `math` above that; MPS has no fused SDPA kernel at all. (Masks are *not* a
-# reliable discriminator: a 128-wide masked head reports the memory-efficient kernel on gfx1100 too.)
-# A working-memory estimate that assumes the fused path is therefore only correct on the build it was
-# measured on, which is why the helpers below ask instead of assuming.
+# hard-coding. Measured, for the FLUX.2 VAE's 512-wide mid-block head: CUDA takes it on the
+# memory-efficient kernel, ROCm/gfx1100 drops to `math`, and ROCm/gfx1201 takes it on flash. Two
+# cards of the same vendor on the same torch disagree -- so "ROCm materializes" is not a fact to
+# hard-code either. Masks are not a discriminator anywhere measured. A working-memory estimate that
+# assumes the fused path is only correct on the build it was measured on, which is why the helpers
+# below ask instead of assuming.
 
 # Peak *reserved* bytes per element of the materialized score matrix, with `SDPBackend.MATH` forced,
 # each point in a fresh process. The same figures hold for bf16, fp16 and fp32 inputs, because the
 # fallback's softmax intermediates are fp32 regardless -- so this is an absolute byte count, not a
 # multiple of the element size.
 #
-#   heads  seq    head_dim   CUDA    ROCm (gfx1100, torch 2.10)
-#       1  4096        512   12.9    13.62
-#       1  8192        512   10.3    10.78
-#       1 16384        512    9.7     9.76
-#       4  4096        128     -     10.16
-#      48  4608        128     -      9.59
+#   heads  seq    head_dim   CUDA    gfx1100   gfx1201
+#       1  4096        512   12.88     13.62     16.38
+#       1  8192        512   10.28     10.78     13.47
+#       1 16384        512    9.71      9.76     11.99
+#       4  4096        128    9.97     10.16     12.84
+#      48  4608        128    9.58      9.59     11.69
 #
-# 14 is an upper bound on every measured point on both. It was 13, which held on CUDA but came in
-# 0.62 under ROCm's worst point -- 4.7MB on a GB-scale estimate, so not a memory bug, but it made
-# the pinned test red on ROCm and the docstring's "upper bound" claim false.
-SDPA_MATH_BYTES_PER_SCORE_ELEMENT = 14
+# 17 is an upper bound on every measured point on all three. Note how far apart the two ROCm cards
+# are: this is not a "CUDA number and a ROCm number", it is per-build, and the cost of guessing low
+# is an OOM the estimate exists to prevent. `scripts/calibrate_flux2_working_memory.py` reproduces
+# this table on any build.
+SDPA_MATH_BYTES_PER_SCORE_ELEMENT = 17
 
 # `_fused_sdp_choice` reports which kernel `F.scaled_dot_product_attention` would pick. These are
 # the answers that mean "a fused kernel"; `MATH` -- and `ERROR`, which torch returns when it cannot
@@ -201,9 +203,9 @@ def sdpa_score_matrix_bytes(
     """Bytes SDPA spends on a materialized score matrix for one attention call, 0 if fused.
 
     Add this to a working-memory estimate whose linear term was calibrated on a fused kernel. On
-    CUDA it is almost always 0; where the fused kernels are missing or reject the shapes -- ROCm
-    caps the head dim at 128, MPS ships no fused SDPA kernel at all -- it is the dominant term: a
-    1536px FLUX.2 VAE decode materializes 36864^2 scores, ~18GB of them.
+    CUDA it is almost always 0; where the build has no fused kernel for the shapes -- ROCm/gfx1100
+    for a 512-wide head, MPS for anything at all -- it is the dominant term: a 1536px FLUX.2 VAE
+    decode materializes 36864^2 scores, ~21GB of them.
 
     That is a large term to add on a probe, so it is logged when it fires: a user who suddenly sees
     their model pushed out of VRAM should be able to find out why from the log rather than by

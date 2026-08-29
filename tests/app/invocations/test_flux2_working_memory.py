@@ -19,6 +19,7 @@ from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux
 
 from invokeai.app.invocations.flux2_denoise import (
     FLUX2_ATTENTION_HEAD_DIM,
+    FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH,
     FLUX2_MAX_HIDDEN_SIZE,
     FLUX2_REFERENCE_HIDDEN_SIZE,
     Flux2DenoiseInvocation,
@@ -40,6 +41,13 @@ GB = 1024**3
 # `MEASURED_DENOISE` table was taken on Klein 9B, which is that default, so those rows are unmoved
 # by the width scaling.
 KLEIN_9B_HEADS = FLUX2_REFERENCE_HIDDEN_SIZE // FLUX2_ATTENTION_HEAD_DIM
+PER_TOKEN = FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH
+
+
+def _per_token(hidden):
+    """The estimator's per-token cost at a given width, as it computes it."""
+    return int(FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH * hidden / FLUX2_REFERENCE_HIDDEN_SIZE)
+
 
 # The measured tables in this module were all taken on CUDA, where SDPA runs a fused kernel and no
 # score matrix is materialized. torch reports its CPU flash kernel as eligible for every shape used
@@ -103,14 +111,14 @@ class TestFlux2DenoiseWorkingMemoryEstimate:
         tokens and cost the same per token, so they must enter the estimate."""
         without_refs = _estimate(image_seq_len=4096)
         with_refs = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
-        assert with_refs - without_refs == 12288 * int(0.4 * MB)
+        assert with_refs - without_refs == 12288 * PER_TOKEN
 
     def test_estimate_is_linear_in_total_sequence(self):
         """Attention runs through SDPA, so there is no O(seq^2) term to model -- image, reference and
         text tokens are interchangeable at the same per-token cost."""
         assert _estimate(image_seq_len=8192) == _estimate(image_seq_len=4096, ref_image_seq_len=4096)
         assert _estimate(image_seq_len=4096, text_seq_len=1024) - _estimate(image_seq_len=4096, text_seq_len=512) == (
-            512 * int(0.4 * MB)
+            512 * PER_TOKEN
         )
 
     def test_lora_margin_is_added_per_lora(self):
@@ -134,22 +142,37 @@ class TestTransformerWidthIsBudgeted:
     which is 0.755 / 1.000 / 1.438 of the Klein 9B slope against width ratios of 0.75 / 1.00 / 1.50.
     Linear, and sub-linear at the top, so scaling the constant by width stays an upper bound.
 
+    The same holds on ROCm/gfx1201, measured independently: 0.3147 / 0.4067 / 0.5890, i.e. ratios of
+    0.774 / 1.000 / 1.448. The absolute constant is per-build (which is why it is 0.42, not CUDA's
+    0.386); the width ratio is architectural and is the same on both.
+
     Calibrating on Klein 9B alone -- which this did -- silently under-reserved FLUX.2 [dev] by a
     third, and [dev] reaches the denoise node as a first-class path with its own loader and starter
     models. The head count follows the same width, so the score-matrix term gets the variant's real
     count rather than the widest.
     """
 
-    # (hidden size, measured MB per token)
-    MEASURED_WIDTH_SLOPE = [(3072, 0.2912), (4096, 0.3859), (6144, 0.5547)]
+    # (platform, hidden size, measured MB per token). Reproduce with
+    # `scripts/calibrate_flux2_working_memory.py --only denoise`.
+    MEASURED_WIDTH_SLOPE = [
+        ("cuda-4090", 3072, 0.2912),
+        ("cuda-4090", 4096, 0.3859),
+        ("cuda-4090", 6144, 0.5547),
+        ("rocm-gfx1201", 3072, 0.3147),
+        ("rocm-gfx1201", 4096, 0.4067),
+        ("rocm-gfx1201", 6144, 0.5890),
+    ]
 
     def _slope_per_token(self, hidden):
         short = _estimate(image_seq_len=4096, text_seq_len=512, hidden_size=hidden)
         long = _estimate(image_seq_len=8704, text_seq_len=512, hidden_size=hidden)
         return (long - short) / (9216 - 4608)
 
-    @pytest.mark.parametrize("hidden, measured_mb", MEASURED_WIDTH_SLOPE)
-    def test_the_estimate_upper_bounds_the_measured_slope(self, hidden, measured_mb):
+    @pytest.mark.parametrize("platform, hidden, measured_mb", MEASURED_WIDTH_SLOPE)
+    def test_the_estimate_upper_bounds_the_measured_slope(self, platform, hidden, measured_mb):
+        """The constant has to bound the worst build measured, not the one it was written on. It was
+        0.4, which is under the 0.4067 gfx1201 costs at the reference width; it is 0.42. The upper
+        guard keeps that from drifting into over-reservation, since this is the dominant term."""
         slope = self._slope_per_token(hidden)
         assert slope >= measured_mb * MB
         assert slope <= 1.25 * measured_mb * MB
@@ -199,13 +222,13 @@ class TestFlux2DenoiseBatchIsBudgeted:
     @pytest.mark.parametrize("batch", [2, 3, 4])
     def test_each_extra_sample_adds_exactly_its_own_tokens(self, batch):
         single = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, batch_size=batch) - single == (batch - 1) * (4096 + 512) * int(0.4 * MB)
+        assert _estimate(image_seq_len=4096, batch_size=batch) - single == (batch - 1) * (4096 + 512) * PER_TOKEN
 
     def test_reference_tokens_scale_with_the_batch(self):
         """`ensure_batch_size` repeats the reference latents across the batch."""
         single = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
         assert _estimate(image_seq_len=4096, ref_image_seq_len=12288, batch_size=2) - single == (
-            (4096 + 12288 + 512) * int(0.4 * MB)
+            (4096 + 12288 + 512) * PER_TOKEN
         )
 
     def test_the_fixed_base_does_not_scale_with_the_batch(self):
@@ -215,7 +238,7 @@ class TestFlux2DenoiseBatchIsBudgeted:
             _estimate(image_seq_len=4096, batch_size=b + 1) - _estimate(image_seq_len=4096, batch_size=b)
             for b in (1, 2, 3)
         }
-        assert deltas == {(4096 + 512) * int(0.4 * MB)}
+        assert deltas == {(4096 + 512) * PER_TOKEN}
 
     def test_the_regional_bias_does_not_scale_with_the_batch(self):
         """`get_joint_attention_kwargs` builds it as (1, 1, S, S) and lets SDPA broadcast it, so
@@ -223,7 +246,7 @@ class TestFlux2DenoiseBatchIsBudgeted:
         bias = (4096 + 512) ** 2 * 2
         single = _estimate(image_seq_len=4096, regional_bias=bias, has_regional_mask=True)
         double = _estimate(image_seq_len=4096, regional_bias=bias, has_regional_mask=True, batch_size=2)
-        assert double - single == (4096 + 512) * int(0.4 * MB)
+        assert double - single == (4096 + 512) * PER_TOKEN
 
     def test_the_score_matrix_scales_with_the_batch(self):
         """Where it is materialized at all it is shaped (batch, heads, S, S)."""
@@ -232,7 +255,7 @@ class TestFlux2DenoiseBatchIsBudgeted:
             single = _estimate(image_seq_len=4096, has_regional_mask=True, device=MATERIALIZING)
             double = _estimate(image_seq_len=4096, has_regional_mask=True, batch_size=2, device=MATERIALIZING)
         assert double - single == (
-            seq_len * int(0.4 * MB) + KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+            seq_len * PER_TOKEN + KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         )
 
     def test_the_lora_margin_scales_with_the_batch(self):
@@ -513,7 +536,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         """Three 1024x1024 references add 12288 tokens to a 1024x1024 generation's 4096."""
         without_refs = self._run(num_ref_tokens=0)
         with_refs = self._run(num_ref_tokens=12288)
-        assert with_refs - without_refs == 12288 * int(0.4 * MB)
+        assert with_refs - without_refs == 12288 * PER_TOKEN
 
     def test_the_real_batch_reaches_the_reservation(self):
         """A batched latent tensor is reachable through the API and custom graphs. The node has `b`
@@ -523,7 +546,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
     def test_a_batched_run_reserves_more_than_a_single_one(self):
         single = self._run(num_ref_tokens=0, batch=1)
-        assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * int(0.4 * MB)
+        assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * PER_TOKEN
 
     @pytest.mark.parametrize(
         "variant, hidden",
@@ -543,7 +566,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         tokens = 64 * 64 + 12288 + 512
         klein = self._run(num_ref_tokens=12288, variant="klein_9b")
         dev = self._run(num_ref_tokens=12288, variant="dev")
-        assert dev - klein == tokens * (int(0.4 * MB * 6144 / 4096) - int(0.4 * MB))
+        assert dev - klein == tokens * (_per_token(6144) - _per_token(4096))
         assert dev - klein > 2 * GB
 
     def test_an_unreadable_variant_falls_back_to_the_widest(self):
@@ -563,14 +586,14 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
     def test_the_blended_batch_is_read_after_the_broadcast(self):
         single = self._run(num_ref_tokens=0, init_batch=1)
-        assert self._run(num_ref_tokens=0, init_batch=3) - single == 2 * (64 * 64 + 512) * int(0.4 * MB)
+        assert self._run(num_ref_tokens=0, init_batch=3) - single == 2 * (64 * 64 + 512) * PER_TOKEN
 
     def test_repeated_reference_latents_are_counted_per_sample(self):
         """`ensure_batch_size` repeats the reference latents across the batch, so their tokens scale
         with it as well -- the worst case in #9500, doubled."""
         single = self._run(num_ref_tokens=12288, batch=1)
         double = self._run(num_ref_tokens=12288, batch=2)
-        assert double - single == (64 * 64 + 12288 + 512) * int(0.4 * MB)
+        assert double - single == (64 * 64 + 12288 + 512) * PER_TOKEN
 
 
 def _materializing_probe(device_type, device_index, dtype, head_dim, has_attn_mask):
@@ -850,22 +873,32 @@ class TestSdpaBackendProbe:
         )
         assert masked_bytes == (48 * 4608 * 4608 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT if materializes else 0)
 
-    # (heads, seq, head_dim, bytes per score element) measured with SDPBackend.MATH forced on
-    # ROCm 7.1 / torch 2.10 / gfx1100. The CUDA points live in the constant's own comment; the worst
-    # of either platform is ROCm's 13.62 at the smallest shape, which is why the constant is 14.
-    MEASURED_BYTES_PER_ELEMENT_ROCM = [
-        (1, 4096, 512, 13.62),
-        (1, 8192, 512, 10.78),
-        (1, 16384, 512, 9.76),
-        (4, 4096, 128, 10.16),
-        (48, 4608, 128, 9.59),
+    # (platform, heads, seq, head_dim, bytes per score element), SDPBackend.MATH forced, each point
+    # in a fresh process. Reproduce with `scripts/calibrate_flux2_working_memory.py --only sdpa`.
+    MEASURED_BYTES_PER_ELEMENT = [
+        ("cuda-4090", 1, 4096, 512, 12.88),
+        ("cuda-4090", 1, 8192, 512, 10.28),
+        ("cuda-4090", 1, 16384, 512, 9.71),
+        ("cuda-4090", 4, 4096, 128, 9.97),
+        ("cuda-4090", 48, 4608, 128, 9.58),
+        ("rocm-gfx1100", 1, 4096, 512, 13.62),
+        ("rocm-gfx1100", 1, 8192, 512, 10.78),
+        ("rocm-gfx1100", 1, 16384, 512, 9.76),
+        ("rocm-gfx1100", 4, 4096, 128, 10.16),
+        ("rocm-gfx1100", 48, 4608, 128, 9.59),
+        ("rocm-gfx1201", 1, 4096, 512, 16.38),
+        ("rocm-gfx1201", 1, 8192, 512, 13.47),
+        ("rocm-gfx1201", 1, 16384, 512, 11.99),
+        ("rocm-gfx1201", 4, 4096, 128, 12.84),
+        ("rocm-gfx1201", 48, 4608, 128, 11.69),
     ]
 
-    @pytest.mark.parametrize("num_heads, seq_len, head_dim, measured", MEASURED_BYTES_PER_ELEMENT_ROCM)
-    def test_the_constant_upper_bounds_every_measured_platform(self, num_heads, seq_len, head_dim, measured):
-        """13 held on CUDA and came in under ROCm's smallest shape. The shortfall was 4.7MB -- noise
-        against the GB-scale linear terms -- but it made the pinned bound below red on ROCm, and the
-        constant's "upper bound on every measured point" claim false."""
+    @pytest.mark.parametrize("platform, num_heads, seq_len, head_dim, measured", MEASURED_BYTES_PER_ELEMENT)
+    def test_the_constant_upper_bounds_every_measured_platform(self, platform, num_heads, seq_len, head_dim, measured):
+        """The constant has to bound the worst build anyone has measured, not the one it was written
+        on. It was 13 (CUDA's worst point rounded up), then 14 when gfx1100 came in at 13.62, and is
+        17 because gfx1201 costs 16.38 for the same shape. The spread between the two AMD cards is
+        wider than the gap between CUDA and either of them, so there is no "the ROCm number"."""
         assert SDPA_MATH_BYTES_PER_SCORE_ELEMENT >= measured
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="measures real peak reserved memory")
@@ -892,7 +925,13 @@ class TestSdpaBackendProbe:
             f"{estimate / num_heads / seq_len / seq_len:.2f} bytes/element measured here; "
             f"SDPA_MATH_BYTES_PER_SCORE_ELEMENT={SDPA_MATH_BYTES_PER_SCORE_ELEMENT} must be an upper bound"
         )
-        assert estimate <= 2 * measured
+        # Loose on purpose. The constant is the worst of three measured platforms (CUDA ~10
+        # bytes/element, gfx1100 ~10-14, gfx1201 ~12-16), so on any one of them it over-shoots by
+        # design; and this runs in-process, where the allocator may satisfy the forward from blocks
+        # it already holds and report a smaller delta than a fresh process would. The guard is here
+        # to catch an order-of-magnitude blunder, not to pin the calibration -- that is what
+        # `test_the_constant_upper_bounds_every_measured_platform` and the calibration script do.
+        assert estimate <= 3 * measured
 
 
 def _diffusers_backend(name):

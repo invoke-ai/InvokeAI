@@ -106,6 +106,19 @@ DENOISE_TEXT_TOKENS = 512
 
 DTYPES = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
 
+# Environment that materially changes a peak-*reserved* reading or which kernel runs. Reported in the
+# header so a pasted result cannot be ambiguous about it later.
+REPORTED_ENV_PREFIXES = (
+    "MIOPEN_",
+    "PYTORCH_CUDA_ALLOC_CONF",
+    "PYTORCH_HIP_ALLOC_CONF",
+    "FLASH_ATTENTION_",
+    "TORCH_ROCM_",
+    "MIGRAPHX_",
+    "HSA_",
+    "TORCH_BLAS_",
+)
+
 # `SDPBackend` is a pybind11 enum and is not iterable, so name it by hand.
 SDP_BACKEND_NAMES = {
     int(getattr(SDPBackend, name)): name
@@ -344,6 +357,50 @@ class _null_context:
         return False
 
 
+def _report_environment() -> None:
+    """Print the env vars that can move these numbers, and warn about the one that invalidates them.
+
+    ``garbage_collection_threshold`` makes the allocator release cached blocks once reserved memory
+    passes a fraction of the card -- which is precisely the quantity being measured here. A run with
+    it set reports a *lower* peak than the operation actually needs, and the giveaway is a series
+    that stops rising with resolution.
+    """
+    import os
+
+    interesting = {k: v for k, v in sorted(os.environ.items()) if k.startswith(REPORTED_ENV_PREFIXES)}
+    if interesting:
+        print("env: " + ", ".join(f"{k}={v}" for k, v in interesting.items()))
+    else:
+        print("env: none of the MIOpen / allocator / flash-attention overrides are set")
+    for key, value in interesting.items():
+        if "garbage_collection_threshold" in value:
+            print(
+                f"  WARNING: {key} sets garbage_collection_threshold. That releases cached blocks "
+                "once reserved memory crosses the threshold, so peak-reserved readings near the "
+                "card's capacity will read LOW. Re-run without it before fitting any constant."
+            )
+
+
+def _flag_non_monotonic(rows: list[dict]) -> None:
+    """Peak cannot fall as the input grows. If it does, the reading is not measuring what it claims."""
+    for operation in ("decode", "encode"):
+        for force_math in (False, True):
+            series = [
+                r for r in rows if r["operation"] == operation and r["force_math"] is force_math and not r.get("oom")
+            ]
+            series.sort(key=lambda r: r["px"])
+            for earlier, later in zip(series, series[1:], strict=False):
+                if later["reserved_delta"] < earlier["reserved_delta"]:
+                    print(
+                        f"  WARNING: {operation} peak FELL from {earlier['px']}px to {later['px']}px "
+                        f"({earlier['reserved_delta'] / GIB:.3f} -> {later['reserved_delta'] / GIB:.3f} GiB, "
+                        f"force_math={force_math}). Peak cannot decrease as the input grows; the larger "
+                        "points are being clipped (allocator GC threshold, or another process freeing "
+                        "memory). Do not fit a constant to this run."
+                    )
+                    break
+
+
 def _run_point(args: list[str]) -> dict | None:
     """Run one measurement in a fresh subprocess and return its JSON row."""
     proc = subprocess.run([sys.executable, __file__, "--single", *args], capture_output=True, text=True)
@@ -428,6 +485,7 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
                     f"{('yes' if row['covered'] else 'NO'):>8}"
                 )
     print("")
+    _flag_non_monotonic(rows)
     for operation, shipped in (("decode", 2200), ("encode", 1100)):
         for force_math in (False, True):
             ks = [
@@ -567,6 +625,7 @@ def main() -> None:
         f"torch {torch.__version__} | device {torch.cuda.get_device_name(0)} | "
         f"hip={torch.version.hip} | dtype={args.dtype}"
     )
+    _report_environment()
     pxs = [p for p in DEFAULT_VAE_PX if args.max_px is None or p <= args.max_px]
 
     rows: list[dict] = []
