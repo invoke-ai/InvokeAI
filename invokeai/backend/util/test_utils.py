@@ -13,7 +13,11 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, Su
 
 @pytest.fixture(scope="session")
 def torch_device():
-    return "cuda" if torch.cuda.is_available() else "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch, "xpu") and torch.xpu.is_available():
+        return "xpu"
+    return "cpu"
 
 
 def install_and_load_model(

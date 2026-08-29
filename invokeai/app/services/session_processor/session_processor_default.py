@@ -1,4 +1,5 @@
 import gc
+import time
 import traceback
 from contextlib import contextmanager, suppress
 from threading import BoundedSemaphore, Thread
@@ -6,6 +7,7 @@ from threading import Event as ThreadEvent
 from typing import Iterator, Optional
 
 import torch
+from starlette.concurrency import run_in_threadpool
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
@@ -14,6 +16,7 @@ from invokeai.app.services.events.events_common import (
     FastAPIEvent,
     QueueClearedEvent,
     QueueItemStatusChangedEvent,
+    UserAccessChangedEvent,
     register_events,
 )
 from invokeai.app.services.invocation_stats.invocation_stats_common import GESStatsNotFoundError
@@ -40,6 +43,103 @@ from invokeai.app.services.shared.invocation_context import InvocationContextDat
 from invokeai.app.util.profiler import Profiler
 from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
+
+# A failed owner lookup is retried before the item is refused, so that a transient error
+# — a busy-timeout on the shared SQLite connection under multi-GPU write contention, say —
+# does not cost the user their queued work. Both call sites run on a worker thread, so the
+# wait between attempts blocks nothing else.
+OWNER_LOOKUP_ATTEMPTS = 3
+OWNER_LOOKUP_RETRY_SECONDS = 0.25
+
+
+def queue_owner_is_active(
+    services: InvocationServices, queue_item: SessionQueueItem, *, unreadable_is_active: bool = False
+) -> bool:
+    """Whether the queue item's owner is still permitted to execute work.
+
+    Deactivating (or deleting) an account must also revoke its queued execution:
+    a queued graph consumes GPU time, reads media, and writes outputs on behalf of
+    its owner. Pending items are rejected at dequeue; running items are checked before
+    every node, so they stop at the next node boundary — and once more after the graph's
+    last node, so a one-node graph is not recorded as completed for an owner revoked while
+    it ran (and immediately mid-node for nodes with step callbacks, via the cancel event
+    set when the item is canceled).
+
+    The check is skipped entirely when multiuser mode is disabled.
+
+    The ``system`` user — which owns everything migrated from before multiuser support
+    (see migration_27) — is deliberately NOT special-cased. It has a real, active
+    database row, so it passes on its own merits. Exempting it here would only change
+    behaviour when the row is missing or inactive, and that is precisely the case where
+    this gate would then disagree with the save gates in `invocation_context`, which
+    have no such exemption: the item would burn GPU time and then fail at the first
+    `context.images.save()`. Better to reject it at dequeue.
+
+    A lookup that keeps failing is treated as *not* authorized, after
+    ``OWNER_LOOKUP_ATTEMPTS`` tries. Returning "active" on an unreadable database would
+    make unknown state executable: the account may well have been deactivated a moment
+    ago, and this gate is what stands between that and GPU time spent on its behalf.
+    Failing closed costs a still-valid user a cancellation instead — recoverable, since
+    canceled items can be retried, and only reachable when the database has been
+    unreadable across every attempt, by which point the instance has larger problems.
+
+    ``unreadable_is_active`` inverts only that last decision, for the one caller that runs
+    *after* the work rather than before it. Ahead of a node, failing closed spends nothing
+    and may save a GPU; after the graph's last node there is no execution left to refuse,
+    so the same failure would cancel a completed generation — destroying a valid user's
+    result over a transient busy-timeout, and, for a workflow-call child, taking the whole
+    parent chain with it. A genuinely revoked owner loses nothing by the difference: the
+    save gates in ``invocation_context`` re-read the record independently and have already
+    refused every write.
+
+    The exception is swallowed rather than raised for the same reason as before: this runs
+    between nodes on a path with no exception handling of its own, and letting it escape
+    would abandon the session without its normal teardown.
+    """
+    if not services.configuration.multiuser:
+        return True
+    for attempt in range(OWNER_LOOKUP_ATTEMPTS):
+        try:
+            user = services.users.get(queue_item.user_id)
+        except Exception:
+            services.logger.warning(
+                f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id} "
+                f"(attempt {attempt + 1}/{OWNER_LOOKUP_ATTEMPTS})",
+                exc_info=True,
+            )
+            if attempt + 1 < OWNER_LOOKUP_ATTEMPTS:
+                time.sleep(OWNER_LOOKUP_RETRY_SECONDS)
+            continue
+        return user is not None and user.is_active
+    if unreadable_is_active:
+        services.logger.warning(
+            f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id} after it finished; "
+            "letting the completed work stand"
+        )
+        return True
+    services.logger.error(
+        f"Could not verify owner {queue_item.user_id} of queue item {queue_item.item_id}; refusing execution"
+    )
+    return False
+
+
+def _set_torch_current_device(device: torch.device) -> None:
+    """Mirror a session-device pin onto torch's per-thread current device.
+
+    CUDA and XPU both track a current device per thread, and index-less allocations
+    (e.g. ``torch.zeros(2, device="xpu")``) resolve through it. Setting only the
+    session device would leave such allocations on whichever GPU the thread was last
+    pinned to -- for a borrowed idle GPU, that is the busy denoise device the offload
+    exists to protect.
+
+    Availability is checked first, mirroring TorchDevice.normalize: generation devices
+    can be configured (or, in tests, faked) for a backend this process cannot actually
+    initialise, and set_device would then fail or block on backend init.
+    """
+    if device.type == "cuda" and torch.cuda.is_available():
+        torch.cuda.set_device(device)
+    elif device.type == "xpu" and hasattr(torch, "xpu") and torch.xpu.is_available():
+        torch.xpu.set_device(device)
 
 
 class DefaultSessionRunner(SessionRunnerBase):
@@ -102,17 +202,47 @@ class DefaultSessionRunner(SessionRunnerBase):
             if invocation is None or self._is_canceled():
                 break
 
+            # Revalidate the owner before the node: an account deactivated mid-session
+            # must not execute further nodes.
+            if self._cancel_if_owner_revoked(queue_item):
+                break
+
             self.run_node(invocation, queue_item)
 
             # The session is complete if all invocations have been run or there is an error on the session.
             # At this time, the queue item may be canceled, but the object itself here won't be updated yet. We must
             # use the cancel event to check if the session is canceled.
-            if (
-                queue_item.session.is_complete()
-                or self._is_canceled()
-                or queue_item.status in ["failed", "canceled", "completed"]
-            ):
+            session_finished = queue_item.session.is_complete()
+            already_terminal = self._is_canceled() or queue_item.status in ["failed", "canceled", "completed"]
+            if session_finished or already_terminal:
+                # Last pass, so the check at the top will not run again — which leaves the
+                # node that just ran, the only node of a one-node graph, as the one node
+                # nothing re-checks. A revocation committed while it executed would
+                # otherwise let the item be recorded as completed.
+                #
+                # Deliberately narrow, because after a node the balance is the reverse of
+                # what it is before one: there is no execution left to refuse, only a
+                # finished result to destroy. So it runs only when the session finished its
+                # own work — `has_error()` sessions are `is_complete()` too, and cancelling
+                # one would overwrite its error and drag a workflow call's waiting parent
+                # down with it — and it does not fail closed (see `queue_owner_is_active`).
+                # A suspended workflow call is not `is_complete()`, so it is untouched here
+                # and re-checked when the parent resumes.
+                if session_finished and not already_terminal and not queue_item.session.has_error():
+                    self._cancel_if_owner_revoked(queue_item, unreadable_is_active=True)
                 break
+
+    def _cancel_if_owner_revoked(self, queue_item: SessionQueueItem, *, unreadable_is_active: bool = False) -> bool:
+        """Cancel the item if its owner may no longer execute work. Returns True if canceled."""
+        if queue_owner_is_active(self._services, queue_item, unreadable_is_active=unreadable_is_active):
+            return False
+        self._services.logger.warning(
+            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
+            "deleted, or could not be verified"
+        )
+        with suppress(SessionQueueItemNotFoundError):
+            self._services.session_queue.cancel_queue_item(queue_item.item_id)
+        return True
 
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
@@ -197,7 +327,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         native_device = TorchDevice.get_session_device()
         if (
             native_device is None
-            or native_device.type != "cuda"
+            or native_device.type not in ("cuda", "xpu")
             or not invocation.idle_gpu_offloadable
             or not self._services.configuration.offload_text_encoders_to_idle_gpus
         ):
@@ -217,20 +347,30 @@ class DefaultSessionRunner(SessionRunnerBase):
         # cache's .stats still points at whatever session last ran on that device — possibly an
         # already-summarized one — so without this swap the encoder's cache hits/misses would be
         # lost to (or corrupt) another session's numbers.
-        load = self._services.model_manager.load
-        native_cache = load.ram_cache if load is not None else None
-        TorchDevice.set_session_device(borrowed_device)
-        borrowed_cache = load.ram_cache if load is not None else None
-        saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
-        if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
-            borrowed_cache.stats = native_cache.stats
+        # Everything after the borrow succeeds must be inside the try: if re-pinning or the stats
+        # swap raises, the borrow lock has to be released anyway, or this GPU stays locked for the
+        # life of the process and can never be borrowed again.
+        native_cache = None
+        borrowed_cache = None
+        saved_borrowed_stats = None
         try:
+            load = self._services.model_manager.load
+            native_cache = load.ram_cache if load is not None else None
+            TorchDevice.set_session_device(borrowed_device)
+            _set_torch_current_device(borrowed_device)
+            borrowed_cache = load.ram_cache if load is not None else None
+            saved_borrowed_stats = borrowed_cache.stats if borrowed_cache is not None else None
+            if borrowed_cache is not None and native_cache is not None and borrowed_cache is not native_cache:
+                borrowed_cache.stats = native_cache.stats
             yield
         finally:
-            if borrowed_cache is not None and borrowed_cache is not native_cache:
-                borrowed_cache.stats = saved_borrowed_stats
-            TorchDevice.set_session_device(native_device)
-            GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
+            try:
+                if borrowed_cache is not None and borrowed_cache is not native_cache:
+                    borrowed_cache.stats = saved_borrowed_stats
+                TorchDevice.set_session_device(native_device)
+                _set_torch_current_device(native_device)
+            finally:
+                GENERATION_DEVICE_POOL.release_borrow(borrowed_device)
 
     def _on_before_run_session(self, queue_item: SessionQueueItem) -> None:
         """Called before a session is run.
@@ -470,6 +610,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         register_events(QueueClearedEvent, self._on_queue_cleared)
         register_events(BatchEnqueuedEvent, self._on_batch_enqueued)
         register_events(QueueItemStatusChangedEvent, self._on_queue_item_status_changed)
+        register_events(UserAccessChangedEvent, self._on_user_access_changed)
 
         devices = self._resolve_devices()
 
@@ -554,10 +695,13 @@ class DefaultSessionProcessor(SessionProcessorBase):
         payload = event[1]
         canceled = False
         for worker in self._workers:
+            # Bound to a local for the same reason as in `_on_queue_item_status_changed`:
+            # the worker thread can clear the field between two reads of it.
+            queue_item = worker.queue_item
             if (
-                worker.queue_item
-                and worker.queue_item.queue_id == payload.queue_id
-                and (payload.user_id is None or worker.queue_item.user_id == payload.user_id)
+                queue_item
+                and queue_item.queue_id == payload.queue_id
+                and (payload.user_id is None or queue_item.user_id == payload.user_id)
             ):
                 worker.cancel_event.set()
                 canceled = True
@@ -567,10 +711,80 @@ class DefaultSessionProcessor(SessionProcessorBase):
     async def _on_batch_enqueued(self, event: FastAPIEvent[BatchEnqueuedEvent]) -> None:
         self._poll_now()
 
+    async def _on_user_access_changed(self, event: FastAPIEvent[UserAccessChangedEvent]) -> None:
+        # If the owner of the currently running queue item was deactivated or deleted,
+        # cancel the item immediately. Canceling emits a QueueItemStatusChangedEvent,
+        # which sets the cancel event (see `_on_queue_item_status_changed`), stopping
+        # long-running nodes at their next step callback rather than waiting for the
+        # node to finish. Pending items are handled at dequeue.
+        event_data = event[1]
+        if event_data.is_active:
+            return
+        # A single user may have items running on several workers concurrently, so
+        # cancel every match rather than stopping at the first.
+        queue_items: list[SessionQueueItem] = []
+        for worker in self._workers:
+            queue_item = worker.queue_item
+            if queue_item is not None and queue_item.user_id == event_data.user_id:
+                queue_items.append(queue_item)
+        if not queue_items:
+            return
+
+        # Run the cancellations in a thread. `cancel_queue_item` walks the workflow-call
+        # chain and issues a transaction per item, all behind the process-wide SQLite lock;
+        # doing that inline would block the event loop — and with it every HTTP response,
+        # socket emission, and event dispatch, including the QueueItemStatusChangedEvents
+        # this cancellation depends on to reach the workers.
+        #
+        # The workers' cancel events are deliberately NOT set here. `cancel_queue_item`
+        # writes the row terminal before emitting, and `_process` relies on that ordering:
+        # a cancel event set while the row is still non-terminal is treated as a stale
+        # signal from a previous item and cleared (see the guard after dequeue), which
+        # would discard this cancellation.
+        # Re-read the owner at the point of decision rather than trusting the event alone.
+        # Handlers are dispatched as independent tasks, so a deactivate immediately
+        # followed by a reactivate can leave this one parked here while the second event
+        # has already come and gone (it returns early above) — cancelling then would kill
+        # a running item of an account the database says is active, with nothing to undo
+        # it.
+        #
+        # A failed read fails closed here too, and for a stronger reason than at the
+        # dequeue and between-node gates: this handler is the only thing that stops a
+        # *single-node* graph, which is checked once before it starts and never again.
+        # The event is itself evidence of a committed deactivation, so when the re-read
+        # cannot contradict it, the event stands.
+        def _cancel_all() -> None:
+            for item in queue_items:
+                if not self._invoker.services.configuration.multiuser:
+                    return
+                try:
+                    owner = self._invoker.services.users.get(item.user_id)
+                except Exception:
+                    self._invoker.services.logger.warning(
+                        f"Could not re-verify owner {item.user_id} of queue item {item.item_id}; "
+                        "honoring the access-changed event and canceling"
+                    )
+                else:
+                    if owner is not None and owner.is_active:
+                        continue
+                self._invoker.services.logger.warning(
+                    f"Canceling queue item {item.item_id}: owner {item.user_id} was deactivated or deleted"
+                )
+                with suppress(SessionQueueItemNotFoundError):
+                    self._invoker.services.session_queue.cancel_queue_item(item.item_id)
+
+        await run_in_threadpool(_cancel_all)
+
     async def _on_queue_item_status_changed(self, event: FastAPIEvent[QueueItemStatusChangedEvent]) -> None:
         # Find the worker (if any) currently running the item whose status changed.
         for worker in self._workers:
-            if worker.queue_item and worker.queue_item.item_id == event[1].item_id:
+            # Bound to a local: the worker thread can clear the field between the two reads
+            # a `worker.queue_item and worker.queue_item.x` test would make, and the
+            # AttributeError would escape this handler — which the event dispatcher runs in
+            # the same task as every other handler for this event, so the ones registered
+            # after it would be skipped.
+            queue_item = worker.queue_item
+            if queue_item and queue_item.item_id == event[1].item_id:
                 if event[1].status in ["completed", "failed", "canceled"]:
                     # When the queue item is canceled via HTTP, the status is set to "canceled" and this event is
                     # emitted. We respond by setting that worker's cancel event, which its session runner checks
@@ -597,6 +811,20 @@ class DefaultSessionProcessor(SessionProcessorBase):
             is_processing=any(worker.queue_item is not None for worker in self._workers),
         )
 
+    def get_running_queue_item_owners(self) -> set[str]:
+        # `worker.queue_item` is written by the worker thread and read here from the event
+        # loop, so it is bound to a local before being dereferenced — the field can go
+        # `None` between the two. `_workers` is rebound by `start()` rather than mutated
+        # after it, and iteration binds the list object, so it cannot change under this
+        # loop. The worst a race yields is the item that was running an instant ago, whose
+        # owner the caller re-reads from the database anyway.
+        owners: set[str] = set()
+        for worker in self._workers:
+            queue_item = worker.queue_item
+            if queue_item is not None:
+                owners.add(queue_item.user_id)
+        return owners
+
     def _is_queue_item_terminal(self, item_id: int) -> bool:
         """Return True if the queue item is already finished (canceled/failed/completed) or gone.
 
@@ -614,6 +842,21 @@ class DefaultSessionProcessor(SessionProcessorBase):
         image_moves = getattr(self._invoker.services, "image_moves", None)
         return image_moves is not None and image_moves.is_maintenance_active()
 
+    def _cancel_queue_item_if_owner_inactive(self, queue_item: SessionQueueItem) -> bool:
+        """Cancel a dequeued item whose owner is deactivated, deleted, or unverifiable.
+
+        Returns True if the item was rejected (canceled) and must not be executed.
+        """
+        if queue_owner_is_active(self._invoker.services, queue_item):
+            return False
+        self._invoker.services.logger.warning(
+            f"Canceling queue item {queue_item.item_id}: owner {queue_item.user_id} is deactivated, "
+            "deleted, or could not be verified"
+        )
+        with suppress(SessionQueueItemNotFoundError):
+            self._invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
+        return True
+
     def _process(
         self,
         worker: _SessionWorker,
@@ -626,20 +869,32 @@ class DefaultSessionProcessor(SessionProcessorBase):
             self._thread_semaphore.acquire()
 
             # Pin this worker thread to its device so all device-selecting code (TorchDevice.choose_torch_device,
-            # which nodes and the model loader consult) resolves to this GPU. CUDA's current device is per-thread.
+            # which nodes and the model loader consult) resolves to this GPU. CUDA's and XPU's current
+            # device are both per-thread.
             if worker.device is not None:
                 TorchDevice.set_session_device(worker.device)
 
             # torch.cuda.set_device() initializes CUDA on the device, which can permanently reserve
             # VRAM in an otherwise idle process (#9413). Defer the CUDA-side pin until this worker
             # claims its first queue item; the pin is per-thread and this thread persists, so pinning
-            # once before the first item is equivalent to pinning here.
-            cuda_pin_needed = worker.device is not None and worker.device.type == "cuda"
+            # once before the first item is equivalent to pinning here. torch.xpu.set_device() brings
+            # up a SYCL context with the same effect, so XPU is deferred on the same terms.
+            device_pin_needed = worker.device is not None and worker.device.type in ("cuda", "xpu")
 
             worker.cancel_event.clear()
 
             while not stop_event.is_set():
                 poll_now_event.clear()
+
+                # The previous item, if any, is finished with. Cleared here rather than
+                # after `run_queue_item` because the non-fatal error handler below needs it
+                # to fail the item, and it reaches this point by `continue`. Without this,
+                # a worker that finishes an item and then parks — paused, or waiting out
+                # image-move maintenance, both of which block before the dequeue below —
+                # goes on reporting that item as running for as long as it stays parked.
+                # `get_status` and `get_running_queue_item_owners` both read it.
+                worker.queue_item = None
+
                 try:
                     # Any unhandled exception in this block is a nonfatal processor error and will be handled.
                     # If we are paused, wait for resume event
@@ -673,9 +928,18 @@ class DefaultSessionProcessor(SessionProcessorBase):
                         poll_now_event.wait(self._polling_interval)
                         continue
 
-                    if cuda_pin_needed:
-                        torch.cuda.set_device(worker.device)
-                        cuda_pin_needed = False
+                    if device_pin_needed:
+                        assert worker.device is not None
+                        # Called directly rather than via _set_torch_current_device(): that helper
+                        # skips the pin when the backend reports unavailable, which is right for the
+                        # idle-GPU borrow (devices there can be configured or faked for a backend
+                        # this process cannot initialise) but would silently drop the pin this
+                        # deferral exists to perform.
+                        if worker.device.type == "cuda":
+                            torch.cuda.set_device(worker.device)
+                        else:
+                            torch.xpu.set_device(worker.device)
+                        device_pin_needed = False
 
                     # A cancellation can race the claim: it may have marked the row terminal before
                     # this worker recorded `queue_item`, so _on_queue_item_status_changed couldn't set
@@ -712,6 +976,12 @@ class DefaultSessionProcessor(SessionProcessorBase):
                                 f"Queue item {worker.queue_item.item_id} was canceled before it started; skipping."
                             )
                             continue
+
+                    # Reject items whose owner was deactivated or deleted while the item
+                    # was pending — no invocation may run and no output may be saved on
+                    # behalf of a revoked account.
+                    if self._cancel_queue_item_if_owner_inactive(worker.queue_item):
+                        continue
 
                     # GC-ing here can reduce peak memory usage of the invoke process by freeing allocated memory blocks.
                     # Most queue items take seconds to execute, so the relative cost of a GC is very small.

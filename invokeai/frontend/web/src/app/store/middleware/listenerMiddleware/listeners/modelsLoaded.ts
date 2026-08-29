@@ -3,6 +3,8 @@ import type { AppDispatch, AppStartListening, RootState } from 'app/store/store'
 import { controlLayerModelChanged, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { loraDeleted } from 'features/controlLayers/store/lorasSlice';
 import {
+  animaQwen3EncoderModelSelected,
+  animaVaeModelSelected,
   clipEmbedModelSelected,
   fluxVAESelected,
   krea2Qwen3VlEncoderModelSelected,
@@ -38,12 +40,14 @@ import type { Logger } from 'roarr';
 import { modelConfigsAdapterSelectors, modelsApi } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isAnimaCompatibleVAEModelConfig,
+  isAnimaQwen3EncoderModelConfig,
   isAnimaVAEModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
+  isFlux1VAEModelConfig,
   isFluxReduxModelConfig,
-  isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
   isNonFluxVAEModelConfig,
@@ -53,9 +57,11 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  selectPrimaryMainModelOptions,
 } from 'services/api/types';
 import type { JsonObject } from 'type-fest';
 
+import { getAnimaComponentUpdates } from './animaComponentSync';
 import { getKrea2ComponentUpdates } from './krea2ComponentSync';
 
 const log = logger('models');
@@ -84,6 +90,7 @@ export const addModelsLoadedListener = (startAppListening: AppStartListening) =>
 
       handleMainModels(models, state, dispatch, log);
       handleKrea2Components(models, state, dispatch, log);
+      handleAnimaComponents(models, state, dispatch, log);
       handleRefinerModels(models, state, dispatch, log);
       handleVAEModels(models, state, dispatch, log);
       handleLoRAModels(models, state, dispatch, log);
@@ -125,6 +132,29 @@ export const handleKrea2Components: ModelHandler = (models, state, dispatch) => 
   }
 };
 
+export const handleAnimaComponents: ModelHandler = (models, state, dispatch) => {
+  // Only reconcile while Anima is the selected base. Switching away nulls both slots (see the
+  // modelSelected listener), so there is nothing to validate then - but a session restored with Anima
+  // selected and the VAE since uninstalled lands here with a dangling key.
+  if (state.params.model?.base !== 'anima') {
+    return;
+  }
+
+  const updates = getAnimaComponentUpdates({
+    selectedVae: state.params.animaVaeModel,
+    selectedEncoder: state.params.animaQwen3EncoderModel,
+    nativeVaes: models.filter((model) => isAnimaVAEModelConfig(model)),
+    compatibleVaes: models.filter((model) => isAnimaCompatibleVAEModelConfig(model)),
+    availableEncoders: models.filter((model) => isAnimaQwen3EncoderModelConfig(model)),
+  });
+  if ('vae' in updates) {
+    dispatch(animaVaeModelSelected(updates.vae ? zModelIdentifierField.parse(updates.vae) : null));
+  }
+  if ('encoder' in updates) {
+    dispatch(animaQwen3EncoderModelSelected(updates.encoder ? zModelIdentifierField.parse(updates.encoder) : null));
+  }
+};
+
 type ModelHandler = (
   models: AnyModelConfig[],
   state: RootState,
@@ -132,11 +162,19 @@ type ModelHandler = (
   log: Logger<JsonObject>
 ) => undefined;
 
-const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
+export const handleMainModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedMainModel = state.params.model;
   const allMainModels = models.filter(isNonRefinerMainModelConfig).sort((a) => (a.base === 'sdxl' ? -1 : 1));
 
-  const firstModel = allMainModels[0];
+  // Availability and offerability are different questions, and conflating them here
+  // would be destructive. `selectPrimaryMainModelOptions` hides a Wan low-noise expert
+  // once its partner is installed — so if the *selected* model were tested against the
+  // filtered list, installing that partner would read as "your model vanished" and swap
+  // the user onto an unrelated model, firing the whole base-changed cascade (LoRAs
+  // disabled, VAE cleared, bbox resized) for an action that was just a file install.
+  // Keep the selection test on what exists; filter only what we may pick *for* them.
+  const selectableModels = selectPrimaryMainModelOptions(allMainModels);
+  const firstModel = selectableModels[0] ?? allMainModels[0];
 
   // If we have no models, we may need to clear the selected model
   if (!firstModel) {
@@ -473,9 +511,13 @@ const handleCLIPEmbedModels: ModelHandler = (models, state, dispatch, log) => {
   }
 };
 
-const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
+export const handleFLUXVAEModels: ModelHandler = (models, state, dispatch, log) => {
   const selectedFLUXVAEModel = state.params.fluxVAE;
-  const fluxVAEModels = models.filter((m) => isFluxVAEModelConfig(m));
+  // FLUX.1 VAEs only. `params.fluxVAE` feeds `flux_model_loader.vae_model` in the FLUX.1 branch of
+  // buildFLUXGraph - FLUX.2 uses `params.flux2VaeModel` instead - and the picker is built from
+  // `isFlux1VAEModelConfig`. Defaulting from the wider flux+flux2 pool put a FLUX.2 VAE into a slot the
+  // user could not see it in and that FLUX.1 cannot load.
+  const fluxVAEModels = models.filter((m) => isFlux1VAEModelConfig(m));
 
   // If the currently selected model is available, we don't need to do anything
   if (selectedFLUXVAEModel && fluxVAEModels.some((m) => m.key === selectedFLUXVAEModel.key)) {

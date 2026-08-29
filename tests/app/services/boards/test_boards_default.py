@@ -55,3 +55,105 @@ def test_board_listing_fetches_media_summaries_once(mock_invoker: Invoker) -> No
     mock_invoker.services.board_image_records.get_image_count_for_board.assert_not_called()
     mock_invoker.services.board_image_records.get_asset_count_for_board.assert_not_called()
     mock_invoker.services.board_video_records.get_video_count_for_board.assert_not_called()
+
+
+def test_admin_board_listing_batches_owner_lookup(mock_invoker: Invoker) -> None:
+    """Owner display names are fetched for the whole page in one call.
+
+    An admin listing used to issue one `users.get` per board — 50 boards meant 50 extra
+    queries for what is usually a handful of distinct owners.
+    """
+    owners = ["alice", "bob", "alice", "carol"] * 5
+    board_ids = [
+        mock_invoker.services.board_records.save(f"Board {index}", owner).board_id for index, owner in enumerate(owners)
+    ]
+    summaries = {
+        board_id: SimpleNamespace(
+            cover_image_name=None,
+            cover_video_name=None,
+            image_count=0,
+            video_count=0,
+            asset_count=0,
+        )
+        for board_id in board_ids
+    }
+    mock_invoker.services.gallery.get_board_media_summaries = MagicMock(return_value=summaries)  # type: ignore[attr-defined]
+    mock_invoker.services.users.get = MagicMock()  # type: ignore[method-assign]
+    mock_invoker.services.users.get_many = MagicMock(  # type: ignore[method-assign]
+        return_value={
+            name: SimpleNamespace(display_name=name.title(), email=f"{name}@example.com")
+            for name in ("alice", "bob", "carol")
+        }
+    )
+
+    result = mock_invoker.services.boards.get_all(
+        user_id="admin",
+        is_admin=True,
+        order_by=BoardRecordOrderBy.Name,
+        direction=SQLiteDirection.Ascending,
+    )
+
+    assert len(result) == len(board_ids)
+    assert {dto.owner_username for dto in result} == {"Alice", "Bob", "Carol"}
+    mock_invoker.services.users.get.assert_not_called()  # type: ignore[attr-defined]
+    mock_invoker.services.users.get_many.assert_called_once()  # type: ignore[attr-defined]
+
+
+def test_non_admin_board_listing_skips_owner_lookup(mock_invoker: Invoker) -> None:
+    """Non-admin listings don't show owner names, so they must not query for them at all."""
+    board_id = mock_invoker.services.board_records.save("Board", "user").board_id
+    mock_invoker.services.gallery.get_board_media_summaries = MagicMock(  # type: ignore[attr-defined]
+        return_value={
+            board_id: SimpleNamespace(
+                cover_image_name=None, cover_video_name=None, image_count=0, video_count=0, asset_count=0
+            )
+        }
+    )
+    mock_invoker.services.users.get = MagicMock()  # type: ignore[method-assign]
+    mock_invoker.services.users.get_many = MagicMock()  # type: ignore[method-assign]
+
+    result = mock_invoker.services.boards.get_all(
+        user_id="user",
+        is_admin=False,
+        order_by=BoardRecordOrderBy.Name,
+        direction=SQLiteDirection.Ascending,
+    )
+
+    assert [dto.owner_username for dto in result] == [None]
+    mock_invoker.services.users.get.assert_not_called()  # type: ignore[attr-defined]
+    mock_invoker.services.users.get_many.assert_not_called()  # type: ignore[attr-defined]
+
+
+def test_board_records_get_does_not_disguise_a_storage_error_as_not_found() -> None:
+    """A sqlite3.Error out of the SELECT must stay a sqlite3.Error.
+
+    Translating it made BoardRecordNotFoundException mean "no such board, OR the database is
+    unreadable", and the board-image batch routes cannot tell those apart: they decide write
+    access off this read once per name and treat not-found as a name to skip. A disk error would
+    then drop names out of the response silently — reported neither as moved nor as failed —
+    and the client would keep showing them as moved until the next refresh. Mirrors
+    test_image_records_get_does_not_disguise_a_storage_error_as_not_found.
+    """
+    import sqlite3
+    from contextlib import contextmanager
+    from typing import Any
+
+    import pytest
+
+    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+
+    storage = SqliteBoardRecordStorage.__new__(SqliteBoardRecordStorage)
+
+    class _Cursor:
+        def execute(self, *args: Any, **kwargs: Any) -> None:
+            raise sqlite3.OperationalError("database disk image is malformed")
+
+    class _Db:
+        @contextmanager
+        def transaction(self):
+            yield _Cursor()
+
+    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
+
+    with pytest.raises(sqlite3.OperationalError):
+        storage.get("board-1")

@@ -40,7 +40,7 @@ import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types'
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import type { Invocation } from 'services/api/types';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { isNonRefinerMainModelConfig, isSelfContainedSDNQPipeline } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
@@ -60,9 +60,19 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   const zImageQwen3EncoderModel = selectZImageQwen3EncoderModel(state);
   const zImageQwen3SourceModel = selectZImageQwen3SourceModel(state);
 
+  // An SDNQ-quantized Z-Image pipeline install is self-contained: it ships the VAE and Qwen3
+  // encoder (text_encoder + tokenizer) as submodels of the main model. In that case the
+  // z_image_model_loader falls back to the main model for those submodels, so no separate component
+  // source is required. A truthy submodels dict is not enough — a partial pipeline may expose only
+  // some submodels — so require every one the loader needs. Single-file / GGUF Z-Image models don't
+  // have submodels and still need a standalone VAE + Qwen3 (or Qwen3 Source).
+  const mainIsSelfContainedPipeline =
+    (model as { format?: unknown }).format === 'sdnq_quantized' && isSelfContainedSDNQPipeline(model);
+
   // Validate that we have the required models
-  const hasVaeSource = zImageVaeModel !== null || zImageQwen3SourceModel !== null;
-  const hasQwen3Source = zImageQwen3EncoderModel !== null || zImageQwen3SourceModel !== null;
+  const hasVaeSource = mainIsSelfContainedPipeline || zImageVaeModel !== null || zImageQwen3SourceModel !== null;
+  const hasQwen3Source =
+    mainIsSelfContainedPipeline || zImageQwen3EncoderModel !== null || zImageQwen3SourceModel !== null;
   assert(hasVaeSource, 'No VAE source: Set either VAE or Qwen3 Source model');
   assert(hasQwen3Source, 'No Qwen3 Encoder source: Set either Qwen3 Encoder or Qwen3 Source model');
 

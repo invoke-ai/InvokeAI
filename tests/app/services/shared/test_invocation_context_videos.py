@@ -65,3 +65,35 @@ def test_video_dto_allows_foreign_shared_video() -> None:
     videos.get_dto("shared.mp4")
 
     services.videos.get_dto.assert_called_once_with("shared.mp4")
+
+
+def test_video_read_rejects_deactivated_queue_user() -> None:
+    """A deactivated account keeps no queue-time privileges, even for its own videos."""
+    videos, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+    services.video_records.get_user_id.return_value = "queue-user"
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        videos.get_dto("own-video")
+
+    services.videos.get_dto.assert_not_called()
+
+
+def test_video_save_rejects_deactivated_queue_user() -> None:
+    """No output may be saved on behalf of a deactivated account — even uncategorized."""
+    videos, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = MagicMock(is_admin=False, is_active=False)
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)
+
+    services.videos.create.assert_not_called()
+
+
+def test_video_save_allows_active_queue_user_without_board() -> None:
+    videos, services = _make_interface(BoardVisibility.Private)
+    services.users.get.return_value = MagicMock(is_admin=False, is_active=True)
+
+    videos.save(Path("output.mp4"), width=64, height=64, duration=1.0)
+
+    services.videos.create.assert_called_once()

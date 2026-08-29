@@ -4,14 +4,14 @@ import { createRoot, type Root } from 'react-dom/client';
 import type { ListRange } from 'react-virtuoso';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useRangeBasedQueueItemFetching } from './useRangeBasedQueueItemFetching';
+import { getItemIdBatches, getUncachedItemIds, useRangeBasedQueueItemFetching } from './useRangeBasedQueueItemFetching';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
-  // Args of every getQueueItemDTOsByItemIds call, in order.
+  // Args of every getQueueItemSummariesByItemIds call, in order.
   queueFetches: [] as number[][],
-  // Item ids with a getQueueItem cache entry, as reported by selectCachedArgsForQuery.
+  // Item ids with a getQueueItemSummary cache entry, as reported by selectCachedArgsForQuery.
   cachedItemIds: [] as number[],
   // When true, a successful fetch upserts the requested ids into the cache, like the mutation's
   // onQueryStarted does. When false, requested ids never land in the cache.
@@ -46,12 +46,40 @@ vi.mock('services/api/endpoints/queue', () => {
   const result = [trigger];
   return {
     queueApi: { util: { selectCachedArgsForQuery: () => mocks.cachedItemIds } },
-    useGetQueueItemDTOsByItemIdsMutation: () => result,
+    useGetQueueItemSummariesByItemIdsMutation: () => result,
   };
 });
 
 const ITEM_IDS = [1, 2, 3];
 const THROTTLE_MS = 500;
+
+describe('queue item summary batching', () => {
+  it('sends nothing when there is nothing to fetch', () => {
+    expect(getItemIdBatches([])).toEqual([]);
+  });
+
+  it('keeps a request that is exactly at the backend limit in one batch', () => {
+    const batches = getItemIdBatches(Array.from({ length: 1000 }, (_, i) => i));
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toHaveLength(1000);
+  });
+
+  it('splits past the backend limit, which rejects larger batches with a 422', () => {
+    const itemIds = Array.from({ length: 2001 }, (_, i) => i);
+
+    const batches = getItemIdBatches(itemIds);
+
+    expect(batches.map((batch) => batch.length)).toEqual([1000, 1000, 1]);
+    // Every id is sent exactly once, in order — a dropped id means a row stuck on its placeholder.
+    expect(batches.flat()).toEqual(itemIds);
+  });
+
+  it('does not re-request ids while their bulk request is still in flight', () => {
+    const ranges = [{ startIndex: 0, endIndex: 2 }];
+
+    expect(getUncachedItemIds([11, 12, 13], [], ranges, new Set([12]))).toEqual([11, 13]);
+  });
+});
 
 describe('useRangeBasedQueueItemFetching', () => {
   let root: Root | null = null;
@@ -126,9 +154,9 @@ describe('useRangeBasedQueueItemFetching', () => {
   });
 
   it('stops re-requesting items that never land in the cache', async () => {
-    // A requested id the server does not return never gets a getQueueItem cache entry, so it is
-    // uncached on every pass. Pre-fix, that sustained the loop: the list re-requested such ids
-    // every ~500ms for as long as it was mounted.
+    // A requested id the server does not return never gets a getQueueItemSummary cache entry, so
+    // it is uncached on every pass. Pre-fix, that sustained the loop: the list re-requested such
+    // ids every ~500ms for as long as it was mounted.
     mocks.cacheLands = false;
     renderHook(ITEM_IDS, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
@@ -154,15 +182,13 @@ describe('useRangeBasedQueueItemFetching', () => {
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(THROTTLE_MS * 4);
 
-    // The initial failure produces a fetch at the leading and trailing edges of the throttle
-    // window, and the first backoff retry (1s) restores the ranges for at least one more pass.
     // Without the retry, clearing pendingRanges after the failed fetch still re-runs the effect
     // once, so the count caps at two — three or more requires the retry restoring the ranges.
     expect(mocks.queueFetches.length).toBeGreaterThanOrEqual(3);
     expect(mocks.cachedItemIds).toEqual([]);
 
     mocks.failFetches = false;
-    await advance(THROTTLE_MS * 4);
+    await advance(THROTTLE_MS * 8);
     expect(mocks.cachedItemIds).toEqual(ITEM_IDS);
 
     const fetchesAfterRecovery = mocks.queueFetches.length;

@@ -74,6 +74,9 @@ importers:
       framer-motion:
         specifier: ^11.18.2
         version: 11.18.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      html-to-image:
+        specifier: ^1.11.13
+        version: 1.11.13
       i18next:
         specifier: ^25.7.3
         version: 25.7.3(typescript@5.9.3)
@@ -298,8 +301,8 @@ importers:
         specifier: ^16.5.0
         version: 16.5.0
       happy-dom:
-        specifier: ^20.11.1
-        version: 20.11.1
+        specifier: ^20.11.6
+        version: 20.11.6
       knip:
         specifier: ^5.77.4
         version: 5.77.4(@types/node@22.19.3)(typescript@5.9.3)
@@ -341,7 +344,7 @@ importers:
         version: 1.8.1(eslint@9.39.2(jiti@2.6.1))(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
       vitest:
         specifier: ^4.1.5
-        version: 4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.1)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
+        version: 4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.6)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
 
 packages:
 
@@ -3087,8 +3090,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  happy-dom@20.11.1:
-    resolution: {integrity: sha512-XSt8tMzbW9ymE7687xztkO1ckR7qJNQ3LywY9vlYGhGi3zXrGBHuUo2Cl1ztZaICW+1eAGdkLbj6iwVqDT33kg==}
+  happy-dom@20.11.6:
+    resolution: {integrity: sha512-Hldbg8AdAa5a5oDcZpjqnGitp7JB0hqWmfv/8qr+kft4vzSD8BHsbdRfzYvL/0QcbKcURC/yyoygbeDQarPvYg==}
     engines: {node: '>=20.0.0'}
 
   has-bigints@1.1.0:
@@ -3136,6 +3139,9 @@ packages:
 
   html-parse-stringify@3.0.1:
     resolution: {integrity: sha512-KknJ50kTInJ7qIScF3jeaFRpMpE8/lfiTdzf/twXyPBLAGrLRTmkz3AdTnKeh40X8k9L2fdYwEp/42WGXIRGcg==}
+
+  html-to-image@1.11.13:
+    resolution: {integrity: sha512-cuOPoI7WApyhBElTTb9oqsawRvZ0rHhaHwghRLlTuffoD1B2aDemlCruLeZrUIIdvG7gs9xeELEPm6PhuASqrg==}
 
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
@@ -4944,8 +4950,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.21.1:
-    resolution: {integrity: sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==}
+  ws@8.21.3:
+    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -6840,7 +6846,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.1)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
+      vitest: 4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.6)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -6902,7 +6908,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.1)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
+      vitest: 4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.6)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -8041,7 +8047,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  happy-dom@20.11.1:
+  happy-dom@20.11.6:
     dependencies:
       '@types/node': 22.19.3
       '@types/whatwg-mimetype': 3.0.2
@@ -8049,7 +8055,7 @@ snapshots:
       buffer-image-size: 0.6.4
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
-      ws: 8.21.1
+      ws: 8.21.3
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -8095,6 +8101,8 @@ snapshots:
   html-parse-stringify@3.0.1:
     dependencies:
       void-elements: 3.1.0
+
+  html-to-image@1.11.13: {}
 
   https-proxy-agent@7.0.6(supports-color@10.2.2):
     dependencies:
@@ -9806,7 +9814,7 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
 
-  vitest@4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.1)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1)):
+  vitest@4.1.5(@types/node@22.19.3)(@vitest/coverage-v8@4.1.5)(@vitest/ui@4.1.5)(happy-dom@20.11.6)(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1)):
     dependencies:
       '@vitest/expect': 4.1.5
       '@vitest/mocker': 4.1.5(vite@8.0.11(@types/node@22.19.3)(esbuild@0.27.7)(jiti@2.6.1))
@@ -9832,7 +9840,7 @@ snapshots:
       '@types/node': 22.19.3
       '@vitest/coverage-v8': 4.1.5(vitest@4.1.5)
       '@vitest/ui': 4.1.5(vitest@4.1.5)
-      happy-dom: 20.11.1
+      happy-dom: 20.11.6
     transitivePeerDependencies:
       - msw
 
@@ -9923,7 +9931,7 @@ snapshots:
 
   ws@8.20.0: {}
 
-  ws@8.21.1: {}
+  ws@8.21.3: {}
 
   wsl-utils@0.1.0:
     dependencies:

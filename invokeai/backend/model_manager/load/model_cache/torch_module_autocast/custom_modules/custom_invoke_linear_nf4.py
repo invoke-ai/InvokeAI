@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.patches.layers.param_shape_utils import get_param_shape
 from invokeai.backend.quantization.bnb_nf4 import InvokeLinearNF4
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
 class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
@@ -22,7 +23,7 @@ class CustomInvokeLinearNF4(InvokeLinearNF4, CustomModuleMixin):
             tensor is not None
             and input.is_floating_point()
             and tensor.is_floating_point()
-            and not isinstance(tensor, GGMLTensor)
+            and not isinstance(tensor, (GGMLTensor, SDNQTensor))
             and tensor.dtype != input.dtype
         ):
             tensor = tensor.to(dtype=input.dtype)
