@@ -29,6 +29,10 @@ Takes your short prompt and expands it into a detailed, vivid description suitab
 
 Install by pasting the HuggingFace ID into the Model Manager. The model is automatically detected as a **Text LLM** type.
 
+### Reasoning ("thinking") models
+
+Reasoning models such as Qwen3 or the DeepSeek-R1 distills normally write out a chain of thought before their answer. Prompt expansion returns the generated text as-is, so that reasoning would end up in your prompt. InvokeAI therefore renders the chat template with thinking disabled, which makes these models answer directly. Models whose chat template does not support the switch are unaffected, and models that always reason (with no way to turn it off) are not suitable for prompt expansion.
+
 ## Image to Prompt
 
 Upload an image and generate a descriptive prompt from it using a vision-language model.

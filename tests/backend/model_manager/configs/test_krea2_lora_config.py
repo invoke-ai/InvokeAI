@@ -45,6 +45,42 @@ def _diffusion_model_transformer_only_lora() -> MagicMock:
     return mod
 
 
+def _kohya_transformer_only_lora() -> MagicMock:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "lora_unet_blocks_0_attn_wq.lora_down.weight": object(),
+        "lora_unet_blocks_0_attn_wq.lora_up.weight": object(),
+    }
+    return mod
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_kohya_transformer_only_lora(_raise_if_not_file) -> None:
+    """The converter understands the flattened kohya layout, so the override escape hatch must too.
+
+    Auto-detection can't reach a transformer-only kohya adapter: it has no `txtfusion` key, and the
+    gated-attention fallback looks for the dotted `.attn.wq.` spelling that flattening destroys.
+    """
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
+        _kohya_transformer_only_lora(), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
+    )
+
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_still_rejects_a_foreign_kohya_lora(_raise_if_not_file) -> None:
+    """The new `lora_unet_` entries are per-module, so another architecture's kohya LoRA is not swept in."""
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "lora_unet_double_blocks_0_img_attn_proj.lora_down.weight": object(),
+        "lora_unet_double_blocks_0_img_attn_proj.lora_up.weight": object(),
+    }
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
 def test_explicit_krea2_override_accepts_ambiguous_transformer_only_lora(_raise_if_not_file) -> None:
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(

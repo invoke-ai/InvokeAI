@@ -418,6 +418,7 @@
         "queueActionsMenu": "Queue Actions Menu",
         "queueEmpty": "Queue Empty",
         "queueItem": "Queue Item",
+        "queueItemLoadFailed": "This queue item could not be loaded.",
         "enqueueing": "Queueing Batch",
         "resume": "Resume",
         "resumeTooltip": "Resume Processor",
@@ -1549,6 +1550,8 @@
         "currentImageDescription": "Displays the current image in the Node Editor",
         "downloadWorkflow": "Download Workflow JSON",
         "downloadWorkflowError": "Error downloading workflow",
+        "downloadWorkflowImage": "Download Workflow Image",
+        "downloadWorkflowImageError": "Error downloading workflow image",
         "edge": "Edge",
         "edit": "Edit",
         "editMode": "Edit in Workflow Editor",
@@ -1792,7 +1795,11 @@
             "noFlux2DevVaeModelSelected": "No VAE selected. Non-diffusers FLUX.2 [dev] models require a standalone FLUX.2 VAE",
             "noFlux2DevMistralEncoderModelSelected": "No Mistral Encoder selected. Non-diffusers FLUX.2 [dev] models require a standalone Mistral text encoder",
             "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
-            "noWanComponentSourceSelected": "GGUF Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "noWanComponentSourceSelected": "Single-file Wan 2.2 models require a Diffusers Component Source for VAE/encoder",
+            "incompatibleWanVae": "The selected VAE does not match the Wan transformer. TI2V-5B needs the 48-channel Wan 2.2 VAE; A14B needs the 16-channel Wan 2.1 VAE.",
+            "incompatibleWanComponentSource": "The selected Component Source does not match the Wan transformer. Pick a Diffusers Wan model of the same family (TI2V-5B or A14B).",
+            "incompatibleWanLowNoiseExpert": "The Transformer (Low Noise) model is a different Wan variant from the main transformer. Both experts must be the same variant.",
+            "duplicateWanTransformer": "The same model is selected as both Transformer and Transformer (Low Noise). An A14B expert pair needs two different models.",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",
@@ -2049,6 +2056,11 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "downloadsInterrupted": "Your session ended while downloads were being prepared. Run the download again after signing in.",
+        "imagesFailedToDownload": "{{count}} image could not be prepared for download.",
+        "imagesFailedToDownload_other": "{{count}} images could not be prepared for download.",
+        "imagesFailedToUpdate": "{{count}} image could not be updated.",
+        "imagesFailedToUpdate_other": "{{count}} images could not be updated.",
         "imageStorageMaintenanceActive": "Image storage maintenance is active. Recover it before retrying the upload.",
         "videoUploaded": "Video Uploaded",
         "videoUploadFailed": "Video Upload Failed",
@@ -2695,7 +2707,7 @@
             "heading": "FP8 Storage",
             "paragraphs": [
                 "Stores model weights in FP8 format in VRAM, reducing memory usage by approximately 50% compared to FP16.",
-                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs."
+                "During inference, weights are cast layer-by-layer to the compute precision (FP16/BF16), so image quality is preserved. Works on all CUDA GPUs, and on Intel GPUs that support FP8 storage."
             ]
         }
     },
@@ -3765,12 +3777,11 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "New model types: Qwen Image, Qwen Image Edit, Anima.",
-            "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
-            "Private and shared image boards and workflows in multiuser mode",
-            "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
-            "Custom node manager",
-            "Redesigned download queue"
+            "New model types: Krea.2-Turbo/Raw, Ideogram 4, Ernie",
+            "Video generation with Wan 2.2",
+            "Parallel generation on systems with multiple GPUs",
+            "Anima controlnets and inpainting mode",
+            "Performance improvements and bug fixes"
         ],
         "readReleaseNotes": "Read Release Notes",
         "readTheDocs": "Read the Docs",

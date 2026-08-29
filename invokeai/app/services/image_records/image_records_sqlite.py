@@ -32,8 +32,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._db = db
 
     def get(self, image_name: str) -> ImageRecord:
-        # A query failure means the database is unavailable, not that the image is missing. Reporting
-        # it as "not found" makes callers (and the routes above them) delete live images from view.
+        # A sqlite3.Error is deliberately NOT translated into ImageRecordNotFoundException.
+        # This used to be caught and re-raised as not-found, which made the exception mean
+        # "the row is absent, OR the database is locked/corrupt/unreadable". Callers that
+        # treat not-found as a benign outcome — the concurrent-deletion skips in the images
+        # and board_images batch routes — would then swallow a disk I/O error as a routine
+        # race and answer 200 with the name in no result list at all. Let the storage error
+        # propagate: ImageService logs it and the route reports it as a real failure.
         with self._db.transaction() as cursor:
             cursor.execute(
                 f"""--sql
@@ -64,8 +69,19 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 return None
             return cast(Optional[str], dict(result).get("user_id"))
 
+    def exists(self, image_name: str) -> bool:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT 1 FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+            return cursor.fetchone() is not None
+
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
-        # As in get(): a query failure is a database fault, not a missing record.
+        # See get(): a storage error must not masquerade as a missing row.
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql

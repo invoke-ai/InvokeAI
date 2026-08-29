@@ -105,7 +105,14 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
 
     processor = DefaultSessionProcessor()
     processor._invoker = SimpleNamespace(  # type: ignore[attr-defined]
-        services=SimpleNamespace(session_queue=_RaceQueue(), logger=MagicMock(), image_moves=None)
+        services=SimpleNamespace(
+            session_queue=_RaceQueue(),
+            logger=MagicMock(),
+            image_moves=None,
+            # Single-user mode: the post-dequeue owner check short-circuits, keeping this
+            # test focused on the cancellation guard.
+            configuration=SimpleNamespace(multiuser=False),
+        )
     )
     processor._polling_interval = 0.001
     processor._thread_semaphore = BoundedSemaphore(1)
@@ -236,7 +243,14 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
     worker = _SessionWorker(device=torch.device("cuda:1"), runner=runner)
     processor = DefaultSessionProcessor()
     processor._invoker = SimpleNamespace(  # type: ignore[attr-defined]
-        services=SimpleNamespace(session_queue=_ClaimQueue(), logger=MagicMock(), image_moves=None)
+        services=SimpleNamespace(
+            session_queue=_ClaimQueue(),
+            logger=MagicMock(),
+            image_moves=None,
+            # Single-user mode: the post-dequeue owner check short-circuits, keeping this
+            # test focused on device pinning.
+            configuration=SimpleNamespace(multiuser=False),
+        )
     )
     processor._polling_interval = 0
     processor._thread_semaphore = BoundedSemaphore(1)
