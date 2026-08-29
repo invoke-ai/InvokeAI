@@ -36,6 +36,7 @@ from invokeai.backend.flux2.sampling_utils import (
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
+    time_shift_flux2,
     unpack_flux2,
 )
 from invokeai.backend.flux2.text_conditioning import Flux2TextConditioning
@@ -364,6 +365,14 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Compute mu for dynamic schedule shifting (used by FlowMatchEulerDiscreteScheduler)
         mu = compute_empirical_mu(image_seq_len=image_seq_len, num_steps=self.num_steps)
 
+        # img2img and inpainting step this schedule manually (see the scheduler setup below), while
+        # txt2img hands it to the scheduler, which applies the exponential shift from mu itself. Apply
+        # the same shift here so both paths follow one schedule -- and apply it before clipping, so
+        # denoising_start/end select a fraction of the schedule the model is actually run on.
+        uses_manual_euler = self.denoise_mask is not None or self.denoising_start > 1e-5
+        if uses_manual_euler:
+            timesteps = time_shift_flux2(timesteps, mu)
+
         # Clip the timesteps schedule based on denoising_start and denoising_end
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
 
@@ -438,9 +447,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
         num_steps = len(timesteps) - 1
         cfg_scale_list = [self.cfg_scale] * num_steps
 
-        # Check if we're doing inpainting (have a mask or a clipped schedule)
-        is_inpainting = self.denoise_mask is not None or self.denoising_start > 1e-5
-
         # Create scheduler with FLUX.2 Klein configuration
         # For inpainting/img2img, use manual Euler stepping to preserve the exact
         # clipped timestep schedule used for the initial latent/noise preblend.
@@ -450,7 +456,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # change the first effective timestep/sigma and break parity with the
         # preblend computed above.
         scheduler = None
-        if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
+        if self.scheduler in FLUX_SCHEDULER_MAP and not uses_manual_euler:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
             # FlowMatchHeunDiscreteScheduler only supports num_train_timesteps and shift parameters

@@ -162,6 +162,36 @@ def get_schedule_flux2(
     return sigmas_list
 
 
+def time_shift_flux2(sigmas: list[float], mu: float) -> list[float]:
+    """Apply the exponential schedule shift that the txt2img scheduler applies internally.
+
+    ``get_schedule_flux2()`` returns an unshifted linear schedule because the
+    FlowMatchEulerDiscreteScheduler used for txt2img shifts it itself from ``mu``. Code paths that
+    step the schedule manually (img2img, inpainting) must apply the shift themselves, otherwise they
+    run the model on a completely different sigma trajectory than txt2img does: with 9 steps the
+    shifted schedule bottoms out at sigma 0.485, the linear one at 0.111. A distilled model such as
+    FLUX.2 Klein is never trained at the low end of the linear schedule and leaves a grainy residue
+    there.
+
+    Mirrors diffusers' ``FlowMatchEulerDiscreteScheduler._time_shift_exponential`` with an exponent
+    of 1.0, which is how the scheduler invokes it::
+
+        sigma' = exp(mu) / (exp(mu) + (1 / sigma - 1))
+
+    Args:
+        sigmas: Unshifted sigma schedule, descending from 1.0 to 0.0.
+        mu: Shift parameter, as returned by ``compute_empirical_mu()``.
+
+    Returns:
+        The shifted schedule. The 1.0 and 0.0 endpoints are fixed points of the transform and are
+        passed through directly to avoid a division by zero.
+    """
+    exp_mu = math.exp(mu)
+    return [
+        1.0 if sigma >= 1.0 else 0.0 if sigma <= 0.0 else exp_mu / (exp_mu + (1.0 / sigma - 1.0)) for sigma in sigmas
+    ]
+
+
 def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device) -> torch.Tensor:
     """Generate tensor of image position ids for FLUX.2 with RoPE scaling.
 
