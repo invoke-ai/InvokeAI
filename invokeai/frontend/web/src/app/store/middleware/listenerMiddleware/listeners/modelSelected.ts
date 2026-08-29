@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { getWanComponentUpdates } from 'app/store/middleware/listenerMiddleware/listeners/wanComponentSync';
 import type { AppStartListening } from 'app/store/store';
 import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/controlLayers/store/canvasSlice';
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
@@ -22,6 +23,7 @@ import {
   vaeSelected,
   wanComponentSourceSelected,
   wanT5EncoderModelSelected,
+  wanTransformerLowNoiseSelected,
   wanVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
@@ -60,9 +62,10 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
+  selectAnimaCompatibleVAEModels,
   selectAnimaQwen3EncoderModels,
   selectAnimaVAEModels,
-  selectFluxVAEModels,
+  selectFlux1VAEModels,
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
   selectQwen3VLEncoderModels,
@@ -76,7 +79,12 @@ import {
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
-import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
+import {
+  isExternalApiModelConfig,
+  isFluxKontextModelConfig,
+  isFluxReduxModelConfig,
+  isWanSingleFileMainModelConfig,
+} from 'services/api/types';
 
 import { getKrea2ComponentUpdates } from './krea2ComponentSync';
 
@@ -169,7 +177,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             } else {
               // Fallback: try to set Qwen3 Encoder + VAE
               const availableQwen3Encoders = selectQwen3EncoderModels(state);
-              const availableFluxVAEs = selectFluxVAEModels(state);
+              // FLUX.1 VAEs only - the Z-Image VAE picker is built from `isFlux1VAEModelConfig` and
+              // Z-Image cannot use a FLUX.2 VAE, so a wider flux+flux2 pool would default the slot to
+              // a model the user can neither see in the picker nor generate with.
+              const availableFluxVAEs = selectFlux1VAEModels(state);
 
               if (availableQwen3Encoders.length > 0 && availableFluxVAEs.length > 0) {
                 const qwen3Encoder = availableQwen3Encoders[0];
@@ -217,11 +228,15 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (!hasValidConfig) {
             const availableQwen3Encoders = selectAnimaQwen3EncoderModels(state);
-            const availableAnimaVAEs = selectAnimaVAEModels(state);
+            const availableAnimaVAEs = selectAnimaCompatibleVAEModels(state);
 
             if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
               const qwen3Encoder = availableQwen3Encoders[0];
-              const fluxVAE = availableAnimaVAEs[0];
+              // Prefer a native Anima VAE. The compatible pool also contains FLUX and 16-channel Wan
+              // VAEs, which the Anima loader accepts as a *fallback* - anima_l2i decodes a FLUX VAE on a
+              // different code path entirely. The pool is ordered by model name, so picking [0] blindly
+              // would hand a FLUX VAE the default whenever it happens to sort first.
+              const animaVAE = selectAnimaVAEModels(state)[0] ?? availableAnimaVAEs[0];
 
               if (qwen3Encoder && !animaQwen3EncoderModel) {
                 dispatch(
@@ -234,14 +249,14 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                   })
                 );
               }
-              if (fluxVAE && !animaVaeModel) {
+              if (animaVAE && !animaVaeModel) {
                 dispatch(
                   animaVaeModelSelected({
-                    key: fluxVAE.key,
-                    hash: fluxVAE.hash,
-                    name: fluxVAE.name,
-                    base: fluxVAE.base,
-                    type: fluxVAE.type,
+                    key: animaVAE.key,
+                    hash: animaVAE.hash,
+                    name: animaVAE.name,
+                    base: animaVAE.base,
+                    type: animaVAE.type,
                   })
                 );
               }
@@ -619,50 +634,61 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
       }
 
-      // Wan 2.2: auto-default Component Source / standalone VAE / standalone T5 encoder
-      // when the new model is Wan. Runs on every Wan selection (including same-base
-      // switches like Diffusers Wan → GGUF Wan) so the user doesn't have to dig into
-      // Advanced when picking a GGUF main. Only sets fields that are currently empty
-      // and only does it for GGUF mains — Diffusers mains carry everything themselves.
+      // Wan 2.2: keep Component Source / standalone VAE / standalone T5 encoder in step
+      // with the selected main. Runs on every Wan selection (including same-base
+      // switches like Diffusers Wan → single-file Wan) so the user doesn't have to dig
+      // into Advanced when picking a single-file main.
+      //
+      // This both fills empty slots and re-points ones left over from a previous
+      // selection: nothing else clears them (paramsSlice carries all four across a base
+      // change and modelsLoaded has no Wan handler), and the loader validates them
+      // against the new variant.
       if (newBase === 'wan') {
         const modelConfigsResult = selectModelConfigsQuery(state);
         const newModelConfig = modelConfigsResult.data
           ? modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key)
           : null;
-        const isNewModelGGUF = newModelConfig?.type === 'main' && newModelConfig.format === 'gguf_quantized';
-        if (isNewModelGGUF) {
-          const { wanComponentSource, wanVaeModel, wanT5EncoderModel } = state.params;
-          // Match component source by variant family — A14B (t2v_a14b/i2v_a14b) and
-          // TI2V-5B use different VAEs (16-ch vs 48-ch); a mismatched component source
-          // would silently load the wrong VAE and produce broken images. The standalone
-          // VAE / encoder configs don't carry variant info, so those still go first-match.
-          const newVariant =
-            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
-              ? newModelConfig.variant
+        // Must stay in step with the readiness pre-flight: if that demands a VAE and
+        // encoder for this format but this doesn't offer to fill them, selecting the
+        // model immediately blocks Invoke with nothing populated.
+        if (newModelConfig) {
+          const { wanComponentSource, wanVaeModel, wanT5EncoderModel, wanTransformerLowNoise } = state.params;
+          const configFor = (identifier: { key: string } | null) =>
+            identifier && modelConfigsResult.data
+              ? (modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, identifier.key) ?? null)
               : null;
-          const a14bFamily = newVariant === 't2v_a14b' || newVariant === 'i2v_a14b';
-          if (!wanComponentSource) {
-            const availableWanDiffusers = selectWanDiffusersModels(state);
-            const matchingFamily = availableWanDiffusers.find((m) => {
-              const v = 'variant' in m && typeof m.variant === 'string' ? m.variant : null;
-              return a14bFamily ? v === 't2v_a14b' || v === 'i2v_a14b' : v === newVariant;
-            });
-            const diffusersModel = matchingFamily ?? availableWanDiffusers[0];
-            if (diffusersModel) {
-              dispatch(wanComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
-            }
+
+          const updates = getWanComponentUpdates({
+            mainConfig: newModelConfig,
+            isSingleFileMain: isWanSingleFileMainModelConfig(newModelConfig),
+            selectedVae: configFor(wanVaeModel),
+            selectedComponentSource: configFor(wanComponentSource),
+            selectedEncoder: configFor(wanT5EncoderModel),
+            selectedLowNoisePartner: configFor(wanTransformerLowNoise),
+            availableVaes: selectWanVAEModels(state),
+            availableDiffusers: selectWanDiffusersModels(state),
+            availableEncoders: selectWanT5EncoderModels(state),
+          });
+
+          if (updates.vae !== undefined) {
+            dispatch(wanVaeModelSelected(updates.vae && zModelIdentifierField.parse(updates.vae)));
           }
-          if (!wanVaeModel) {
-            const vae = selectWanVAEModels(state)[0];
-            if (vae) {
-              dispatch(wanVaeModelSelected(zModelIdentifierField.parse(vae)));
-            }
+          if (updates.componentSource !== undefined) {
+            dispatch(
+              wanComponentSourceSelected(
+                updates.componentSource && zModelIdentifierField.parse(updates.componentSource)
+              )
+            );
           }
-          if (!wanT5EncoderModel) {
-            const encoder = selectWanT5EncoderModels(state)[0];
-            if (encoder) {
-              dispatch(wanT5EncoderModelSelected(zModelIdentifierField.parse(encoder)));
-            }
+          if (updates.encoder !== undefined) {
+            dispatch(wanT5EncoderModelSelected(updates.encoder && zModelIdentifierField.parse(updates.encoder)));
+          }
+          if (updates.lowNoisePartner !== undefined) {
+            dispatch(
+              wanTransformerLowNoiseSelected(
+                updates.lowNoisePartner && zModelIdentifierField.parse(updates.lowNoisePartner)
+              )
+            );
           }
         }
       }

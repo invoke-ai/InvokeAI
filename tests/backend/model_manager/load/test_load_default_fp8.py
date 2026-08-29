@@ -20,14 +20,20 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import (
+    _FP8_PROBE_FAILURE_REPORTED,
+    _FP8_STORAGE_SUPPORTED,
+    _QUANTIZED_MODEL_FORMATS,
+    ModelLoader,
+    _device_supports_fp8_storage,
+)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     CustomLinear,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
 def _make_loader(device: str = "cuda") -> ModelLoader:
@@ -50,6 +56,52 @@ def _make_config(model_type: ModelType, fp8: bool, base: BaseModelType = BaseMod
         name="test",
         default_settings=SimpleNamespace(fp8_storage=fp8),
     )
+
+
+def _make_quantized_config(fmt: ModelFormat = ModelFormat.GGUFQuantized):
+    """A config carrying a quantized `format`, which `_make_config` deliberately omits."""
+    config = _make_config(ModelType.Main, fp8=True)
+    config.format = fmt
+    return config
+
+
+@pytest.mark.parametrize(
+    "config,submodel",
+    [
+        (_make_config(ModelType.VAE, fp8=True), None),
+        (_make_config(ModelType.LoRA, fp8=True), None),
+        # Z-Image used to be listed here. It is no longer excluded — see
+        # `test_should_use_fp8_allows_z_image` for why the exclusion became obsolete.
+        # A quantized model takes its place: its guard must also sit ahead of the device probe.
+        (_make_quantized_config(), None),
+        (_make_config(ModelType.Main, fp8=True), SubModelType.Tokenizer),
+        (_make_config(ModelType.Main, fp8=False), None),
+    ],
+)
+def test_should_use_fp8_does_not_probe_the_device_for_excluded_models(config, submodel):
+    """The device probe must run only for a model that actually wants FP8.
+
+    It allocates on the GPU, so probing before the exclusions fires it on the very first load of
+    any kind -- a tokenizer, a VAE, a scheduler -- and on API/install threads it forces XPU lazy
+    SYCL init on a thread that never generates.
+    """
+    loader = _make_loader("xpu")
+    probe_path = "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage"
+    with patch(probe_path) as mock_probe:
+        assert loader._should_use_fp8(config, submodel) is False
+    mock_probe.assert_not_called()
+
+
+def test_should_use_fp8_probes_the_device_when_fp8_is_requested():
+    loader = _make_loader("xpu")
+    probe_path = "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage"
+    config = _make_config(ModelType.Main, fp8=True)
+    with patch(probe_path, return_value=True) as mock_probe:
+        assert loader._should_use_fp8(config, None) is True
+    mock_probe.assert_called_once()
+    # An unsupported device still vetoes, just without probing on every unrelated load.
+    with patch(probe_path, return_value=False):
+        assert loader._should_use_fp8(config, None) is False
 
 
 def test_should_use_fp8_excludes_control_lora():
@@ -272,6 +324,173 @@ def test_apply_fp8_to_nn_module_skips_unsupported_layer_types():
     assert model.rms.scale.dtype == compute_dtype
 
 
+def test_apply_fp8_to_nn_module_honors_extra_skip_patterns():
+    """A model's own `_skip_layerwise_casting_patterns` must be applied on top of our defaults."""
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Linear(4, 4)
+            self.attn = torch.nn.Linear(4, 4)
+
+    storage_dtype = torch.float16
+    compute_dtype = torch.float32
+    model = _Model()
+    for p in model.parameters():
+        p.data = p.data.to(compute_dtype)
+
+    ModelLoader._apply_fp8_to_nn_module(
+        model, storage_dtype, compute_dtype, extra_skip_patterns=("t_embedder", "cap_embedder")
+    )
+
+    assert model.attn.weight.dtype == storage_dtype
+    assert model.t_embedder.weight.dtype == compute_dtype
+
+
+def test_apply_fp8_layerwise_casting_passes_model_declared_skip_patterns():
+    """Regression test for Z-Image + fp8 crashing with
+    `RuntimeError: "addmm_cuda" not implemented for 'Float8_e4m3fn'`.
+
+    Diffusers models declare precision-sensitive modules in `_skip_layerwise_casting_patterns`, and
+    `enable_layerwise_casting()` honors them. Our hook-based replacement must read that list too —
+    it is not redundant with `_FP8_DEFAULT_SKIP_PATTERNS`. `ZImageTransformer2DModel` declares
+    `['t_embedder', 'cap_embedder']` because `TimestepEmbedder.forward` reads
+    `self.mlp[0].weight.dtype` and casts its *input* to it: with an fp8 weight the input becomes
+    float8 before the pre-hook restores the weight, and `F.linear` has no float8 kernel.
+    """
+
+    class _FakeZImage(torch.nn.Module):
+        _skip_layerwise_casting_patterns = ["t_embedder", "cap_embedder"]
+
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 4))
+            self.cap_embedder = torch.nn.Linear(4, 4)
+            self.layers = torch.nn.Linear(4, 4)
+
+    loader = _make_loader(device="cuda")
+    model = _FakeZImage().to(torch.bfloat16)
+
+    with patch.object(ModelLoader, "_should_use_fp8", return_value=True):
+        loader._apply_fp8_layerwise_casting(model, _make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage))
+
+    # The declared modules keep their compute dtype...
+    assert model.t_embedder[0].weight.dtype == torch.bfloat16
+    assert model.cap_embedder.weight.dtype == torch.bfloat16
+    # ...while everything else is stored in fp8, so the toggle still saves VRAM.
+    assert model.layers.weight.dtype == torch.float8_e4m3fn
+
+
+def test_anima_transformer_declares_t_embedder_skip():
+    """Regression guard for Anima + FP8 rendering a heavily dithered image.
+
+    `AnimaTransformer.t_embedder` produces the `adaln_lora` conditioning consumed by every block,
+    so casting it to FP8 corrupts every token of every block — verified against a bf16 run at the
+    same seed/steps/CFG. None of the generic `_FP8_DEFAULT_SKIP_PATTERNS` match it (this
+    architecture doesn't use diffusers' module names), so the model has to declare it itself.
+    """
+    from invokeai.backend.anima.anima_transformer import AnimaTransformer
+
+    assert "t_embedder" in AnimaTransformer._skip_layerwise_casting_patterns
+
+    # And the declared patterns actually reach the cast, matched against dotted module paths.
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 4))
+            self.blocks = torch.nn.Linear(4, 4)
+
+    model = _Model().to(torch.float32)
+    ModelLoader._apply_fp8_to_nn_module(
+        model,
+        storage_dtype=torch.float16,
+        compute_dtype=torch.float32,
+        extra_skip_patterns=tuple(AnimaTransformer._skip_layerwise_casting_patterns),
+    )
+
+    assert model.t_embedder[0].weight.dtype == torch.float32
+    assert model.blocks.weight.dtype == torch.float16
+
+
+@pytest.mark.parametrize(
+    "fmt",
+    [
+        ModelFormat.GGUFQuantized,
+        ModelFormat.BnbQuantizednf4b,
+        ModelFormat.BnbQuantizedLlmInt8b,
+        ModelFormat.SDNQQuantized,
+    ],
+)
+def test_should_use_fp8_excludes_quantized_formats(fmt: ModelFormat):
+    """Already-quantized weights must never be re-encoded as FP8.
+
+    Casting them is not a no-op: GGUF raises `Operation changed the dtype of GGMLTensor
+    unexpectedly`, and bnb NF4 corrupts silently (`bnb.nn.LinearNF4` subclasses `nn.Linear`, so its
+    packed uint8 payload is cast to float8 and inference then returns finite garbage).
+
+    Parametrized over `ModelFormat` members rather than raw strings: `_QUANTIZED_MODEL_FORMATS`
+    holds strings, so testing it with strings would pass even if the enum values drifted.
+    """
+    loader = _make_loader(device="cuda")
+    config = _make_config(ModelType.Main, fp8=True)
+    config.format = fmt
+    assert loader._should_use_fp8(config) is False
+
+
+def test_quantized_format_set_matches_the_taxonomy():
+    """Every entry in `_QUANTIZED_MODEL_FORMATS` must still name a real `ModelFormat` value.
+
+    The set is declared as raw strings to keep `load_default` free of a taxonomy import at module
+    scope, so nothing else stops a rename in `ModelFormat` from silently disabling the check —
+    `config.format` would simply never match again, and FP8 would be re-enabled for that format.
+    """
+    assert _QUANTIZED_MODEL_FORMATS <= {fmt.value for fmt in ModelFormat}
+
+
+def test_apply_fp8_skips_quantized_params_regardless_of_format():
+    """Backstop behind the format check, for quantization the model's format does not reveal
+    (e.g. a `diffusers`-format checkpoint quantized by an external tool).
+
+    Both signals are covered: a non-floating-point payload (bnb's packed uint8) and a
+    `torch.Tensor` subclass (GGUF's `GGMLTensor`).
+    """
+
+    class _FakeQuantTensor(torch.Tensor):
+        """Stands in for GGMLTensor: a Tensor subclass carrying a quantized payload."""
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.packed = torch.nn.Linear(4, 4, bias=False)  # bnb-style uint8 payload
+            self.subclassed = torch.nn.Linear(4, 4, bias=False)  # GGUF-style tensor subclass
+            # NB: not `normal` — that would be caught by the `norm` skip pattern.
+            self.attn = torch.nn.Linear(4, 4, bias=False)
+
+    model = _Model().to(torch.bfloat16)
+    model.packed.weight = torch.nn.Parameter(torch.zeros(8, 1, dtype=torch.uint8), requires_grad=False)
+    model.subclassed.weight = torch.nn.Parameter(
+        torch.zeros(4, 4, dtype=torch.bfloat16).as_subclass(_FakeQuantTensor), requires_grad=False
+    )
+
+    ModelLoader._apply_fp8_to_nn_module(model, torch.float8_e4m3fn, torch.bfloat16)
+
+    assert model.packed.weight.dtype == torch.uint8
+    assert not model.packed._forward_pre_hooks, "a quantized layer must not get cast hooks either"
+    assert model.subclassed.weight.dtype == torch.bfloat16
+    assert not model.subclassed._forward_pre_hooks
+    # Control: an ordinary layer in the same model is still cast.
+    assert model.attn.weight.dtype == torch.float8_e4m3fn
+
+
+def test_should_use_fp8_allows_z_image():
+    """Z-Image was excluded while we used diffusers' `enable_layerwise_casting()` with the global
+    torch dtype (fp16) as compute dtype, which clashed with the model's bf16 weights. The compute
+    dtype now comes from the model itself, so the exclusion is obsolete.
+    """
+    loader = _make_loader(device="cuda")
+    assert loader._should_use_fp8(_make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage)) is True
+
+
 def test_wrap_forward_reaches_custom_linear_after_apply_custom_layers():
     """Production order: `_load_model` applies FP8 wrapping, THEN `ModelCache.put()` calls
     `apply_custom_layers_to_model` which constructs a NEW `CustomLinear` object via
@@ -387,3 +606,89 @@ def test_apply_fp8_layerwise_casting_uses_hook_path_for_model_mixin():
 
     mock_to_nn.assert_called_once()
     mock_enable.assert_not_called()
+
+
+# ===== _device_supports_fp8_storage probe ===================================
+# The probe gates FP8 storage in two places: the generic layerwise-casting path and the
+# Krea 2 Qwen3-VL encoder. It must never regress CUDA, and must not claim support on CPU.
+
+
+@pytest.fixture(autouse=True)
+def _clear_fp8_probe_cache():
+    _FP8_STORAGE_SUPPORTED.clear()
+    _FP8_PROBE_FAILURE_REPORTED.clear()
+    yield
+    _FP8_STORAGE_SUPPORTED.clear()
+    _FP8_PROBE_FAILURE_REPORTED.clear()
+
+
+def test_device_supports_fp8_storage_cuda_is_unconditional():
+    """CUDA is answered without probing, so the result holds on machines with no GPU."""
+    assert _device_supports_fp8_storage(torch.device("cuda")) is True
+
+
+def test_device_supports_fp8_storage_rejects_cpu():
+    assert _device_supports_fp8_storage(torch.device("cpu")) is False
+
+
+def test_device_supports_fp8_storage_xpu_probes_and_survives_failure():
+    """XPU float8 support is build/driver dependent, so a failing probe must return False
+    rather than propagate."""
+    with patch("torch.zeros", side_effect=RuntimeError("no float8 on this build")):
+        assert _device_supports_fp8_storage(torch.device("xpu")) is False
+
+
+class _RecordingTensor:
+    """Stands in for a tensor so the probe's cast sequence can be observed without a real GPU."""
+
+    def __init__(self, log: list, fail_on=None):
+        self._log = log
+        self._fail_on = fail_on
+
+    def to(self, target):
+        if self._fail_on is not None and target == self._fail_on:
+            raise RuntimeError(f"unsupported: {target}")
+        self._log.append(target)
+        return self
+
+
+def _probe_with_recorder(device: torch.device, fail_on=None) -> tuple[bool, list]:
+    log: list = []
+    with patch("torch.zeros", return_value=_RecordingTensor(log, fail_on)) as mock_zeros:
+        result = _device_supports_fp8_storage(device)
+    # The storage cast happens on CPU at runtime, so the probe must not allocate on the device.
+    assert mock_zeros.call_args.kwargs.get("device") is None
+    return result, log
+
+
+def test_device_supports_fp8_storage_mirrors_the_runtime_cast_sequence():
+    """At runtime the storage cast is CPU-side, the fp8 tensor is copied to the device, and the
+    pre-hook upcasts there. A probe that did all three on the device would pass on a build where
+    the fp8 host->device copy or one upcast target fails, then break at forward time."""
+    ok, log = _probe_with_recorder(torch.device("xpu", 1))
+    assert ok is True
+    assert log == [torch.float8_e4m3fn, torch.device("xpu", 1), torch.bfloat16, torch.float16]
+
+
+def test_device_supports_fp8_storage_rejects_a_build_missing_bf16_upcast():
+    """compute_dtype is bf16 for Krea-2/FLUX; fp16-only support must not report True."""
+    ok, _ = _probe_with_recorder(torch.device("xpu"), fail_on=torch.bfloat16)
+    assert ok is False
+
+
+def test_device_supports_fp8_storage_does_not_cache_failures():
+    """The probe runs during a model load, so a transient failure (e.g. the device is
+    momentarily full) must not disable FP8 for the lifetime of the process."""
+    with patch("torch.zeros", side_effect=torch.OutOfMemoryError("transient")):
+        assert _device_supports_fp8_storage(torch.device("xpu")) is False
+    ok, _ = _probe_with_recorder(torch.device("xpu"))
+    assert ok is True
+
+
+def test_device_supports_fp8_storage_is_cached_per_device():
+    """float8 support is a per-device property; one device's answer must not decide for another."""
+    ok, _ = _probe_with_recorder(torch.device("xpu", 0))
+    assert ok is True
+    # xpu:1 has not been probed, so a failing probe there must be observed, not short-circuited.
+    with patch("torch.zeros", side_effect=RuntimeError("no float8 on this device")):
+        assert _device_supports_fp8_storage(torch.device("xpu", 1)) is False

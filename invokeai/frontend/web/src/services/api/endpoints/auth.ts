@@ -103,7 +103,20 @@ export const authApi = api.injectEndpoints({
         method: 'POST',
       }),
     }),
-    getCurrentUser: build.query<MeResponse, void>({
+    /**
+     * Keyed by the bearer token the request will carry, which is why it takes an argument it
+     * never sends: the token travels in the `Authorization` header, read out of localStorage at
+     * send time, but it is what the answer is *about*, so it belongs in the cache key.
+     *
+     * Shared across logins, one entry outlives the token that produced it. A 401 for a token
+     * that has since been replaced stays readable under its replacement — and `ProtectedRoute`
+     * ends the session on a 401 from this query, so it would end a session on a stranger's
+     * failure. Nothing refetches it on its own to correct that: the argument never changed, the
+     * endpoint has no tags, and the API-state reset that a login normally triggers is skipped
+     * when the new token belongs to the same user. Keyed by token, the replacement session
+     * simply reads a different entry, and asking for it is what fetches it.
+     */
+    getCurrentUser: build.query<MeResponse, string>({
       query: () => 'api/v1/auth/me',
     }),
     setup: build.mutation<SetupResponse, SetupRequest>({

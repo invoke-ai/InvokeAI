@@ -1,7 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from invokeai.app.services.gallery.gallery_common import BoardMediaSummary, GalleryItem, GalleryItemNamesResult
+from invokeai.app.services.gallery.gallery_common import (
+    BoardMediaSummary,
+    GalleryItem,
+    GalleryItemNames,
+    GalleryItemNamesResult,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -44,6 +49,27 @@ class GalleryServiceABC(ABC):
         created_date: Optional[str] = None,
     ) -> GalleryItemNamesResult:
         """Returns ordered (kind, name) refs for optimistic UI / virtualized lists.
+
+        Deprecated — use :meth:`get_item_names`, which returns the same order without building
+        a model per row.
+        """
+        pass
+
+    @abstractmethod
+    def get_item_names(
+        self,
+        starred_first: bool = True,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_date: Optional[str] = None,
+    ) -> GalleryItemNames:
+        """Returns the ordered flat name list for optimistic UI / virtualized lists.
 
         `created_date` restricts the result to items created on the given ISO date — used by
         date-based virtual boards.

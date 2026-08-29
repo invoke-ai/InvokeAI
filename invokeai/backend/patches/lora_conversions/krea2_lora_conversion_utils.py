@@ -5,6 +5,9 @@ Published LoRAs (e.g. krea/Krea-2-LoRA-*) are diffusers PEFT format: keys like
 ``transformer.<module>.lora_A.weight`` / ``lora_B.weight``. The distinctive Krea-2 module is the
 ``text_fusion`` stage, which we use to disambiguate from Qwen-Image / Z-Image LoRAs (which otherwise
 share the ``transformer.transformer_blocks.`` prefix).
+
+Two other key layouts are normalized onto that one before conversion: the native (ComfyUI) module naming,
+and the kohya / LyCORIS layout that additionally flattens the module path into ``lora_unet_<path>``.
 """
 
 import re
@@ -14,6 +17,11 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.kohya_key_utils import (
+    INDEX_PLACEHOLDER,
+    ParsingTree,
+    insert_periods_into_kohya_key,
+)
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     KREA2_LORA_QWEN3VL_PREFIX,
     KREA2_LORA_TRANSFORMER_PREFIX,
@@ -94,13 +102,140 @@ def _maybe_convert_native_krea2_state_dict(
         return state_dict
     converted_state_dict: Dict[str, torch.Tensor] = {}
     for key, value in state_dict.items():
-        converted_key = _native_krea2_key_to_diffusers(key) if _looks_like_native_krea2_key(key) else key
+        # `.pt`/`.ckpt` sources can carry non-string keys. They are never native Krea-2 keys, but the
+        # substring tests in `_looks_like_native_krea2_key` raise TypeError rather than returning False.
+        is_native = isinstance(key, str) and _looks_like_native_krea2_key(key)
+        converted_key = _native_krea2_key_to_diffusers(key) if is_native else key
         if converted_key in converted_state_dict:
             raise ValueError(
                 f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}'. "
                 "This mixed layout is unsupported - refusing to silently drop one of the layers."
             )
         converted_state_dict[converted_key] = value
+    return converted_state_dict
+
+
+# --- Kohya / LyCORIS (flattened) -> native key mapping ---------------------------------------------------------
+# sd-scripts and LyCORIS flatten the module path (``path.replace(".", "_")``) and prefix it with
+# ``lora_unet_``, e.g. ``lora_unet_blocks_6_attn_wv.lora_down.weight``. Flattening is lossy — nothing in the key
+# records where a '_' used to be a '.' — so we reconstruct the dotted path against the native module vocabulary
+# below and accept it only if it lands on a leaf. A key we cannot reconstruct with certainty is left untouched
+# rather than rewritten into a plausible-looking key that matches no module.
+_KREA2_KOHYA_PREFIX = "lora_unet_"
+
+# Native Krea-2 transformer/text-fusion block leaves. Only the Linears are listed: the non-Linear natives
+# (``mod.lin``, ``prenorm``/``postnorm``, ``attn.qknorm.*``, ``last.norm``/``last.modulation``) have no Linear
+# counterpart in the diffusers layout — ``mod.lin`` for instance is folded into the ``scale_shift_table``
+# parameter — so an adapter targeting them cannot be applied, and renaming it anyway would turn "unsupported"
+# into a silent no-op.
+_NATIVE_KREA2_BLOCK_SUBTREE: ParsingTree = {
+    "attn": {"wq": {}, "wk": {}, "wv": {}, "wo": {}, "gate": {}},
+    "mlp": {"gate": {}, "up": {}, "down": {}},
+}
+
+# Parsing tree for the native (ComfyUI) Krea-2 module layout, i.e. the keys the renames above understand.
+# Walking it resolves the flattened form's only real ambiguity — ``layerwise_blocks`` / ``refiner_blocks`` are
+# the native components that themselves contain an underscore.
+_KREA2_NATIVE_KOHYA_PARSING_TREE: ParsingTree = {
+    "blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+    "txtfusion": {
+        "layerwise_blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+        "refiner_blocks": {INDEX_PLACEHOLDER: _NATIVE_KREA2_BLOCK_SUBTREE},
+        "projector": {},
+    },
+    "first": {},
+    # Literal indices rather than INDEX_PLACEHOLDER: these are ``nn.Sequential`` stages, and only the
+    # positions listed in ``_NATIVE_KREA2_TOP_LEVEL_RENAMES`` hold a Linear — the rest are activations with
+    # no weights. Accepting any index would rewrite e.g. ``lora_unet_tmlp_1`` into ``tmlp.1.*``, which the
+    # native pass then does not recognize, leaving a half-converted key instead of the untouched original.
+    "tmlp": {"0": {}, "2": {}},
+    "tproj": {"1": {}},
+    "txtmlp": {"1": {}, "3": {}},
+    "last": {"linear": {}},
+}
+
+
+def _kohya_module_path_is_leaf(module_path: str, parsing_tree: ParsingTree) -> bool:
+    """True if a dotted module path walks the tree all the way to a leaf.
+
+    ``insert_periods_into_kohya_key`` only rejects *leftover* tokens, so a prefix of a real path (e.g.
+    ``blocks.0.attn``) parses cleanly without naming a module. Requiring a leaf rejects those.
+    """
+    subtree = parsing_tree
+    for component in module_path.split("."):
+        # Mirror ``insert_periods_into_kohya_key``'s precedence: an exact match wins over the index
+        # placeholder. Without that, a numeric component would always be looked up as INDEX_PLACEHOLDER and
+        # a tree enumerating the specific indices it accepts (``tmlp`` below) could never reach its leaves.
+        if component in subtree:
+            subtree = subtree[component]
+        elif component.isnumeric() and INDEX_PLACEHOLDER in subtree:
+            subtree = subtree[INDEX_PLACEHOLDER]
+        else:
+            return False
+    return not subtree
+
+
+def _unflatten_kohya_krea2_module_path(flat_path: str) -> str | None:
+    """Reconstruct a dotted native Krea-2 module path from its kohya-flattened form.
+
+    Returns ``None`` when the reconstruction is not a native module path this converter can map, in which case
+    the caller must leave the key alone.
+    """
+    try:
+        module_path = insert_periods_into_kohya_key(flat_path, _KREA2_NATIVE_KOHYA_PARSING_TREE)
+    except ValueError:
+        # Tokens left over: not a native Krea-2 module path.
+        return None
+    return module_path if _kohya_module_path_is_leaf(module_path, _KREA2_NATIVE_KOHYA_PARSING_TREE) else None
+
+
+def _maybe_convert_kohya_krea2_state_dict(
+    state_dict: Dict[str, torch.Tensor],
+) -> Dict[str, torch.Tensor]:
+    """Rewrite kohya/LyCORIS flattened Krea-2 keys to the dotted native layout, leaving all others untouched."""
+    # Whether a module can be converted is a property of the *module*, not of each key on its own. A LyCORIS
+    # module (``lokr_w1``, ``hada_w1_a``, ``diff``) has to stay verbatim — see below — but LyCORIS also saves
+    # a sibling ``.alpha`` (and ``.dora_scale`` for the weight-decomposed variants), whose suffix this
+    # converter *does* recognize. Deciding per key rewrites that sibling alone and splits one module across
+    # two layer groups: the rewritten ``.alpha`` ends up in a group by itself, and ``_get_lora_layer_values``
+    # aborts the whole adapter on ``{'alpha'}`` (the ``.dora_scale`` variant dies in ``DoRALayer`` instead).
+    # So collect each flattened module's suffixes first and convert only modules where *all* of them convert.
+    suffixes_by_flat_path: dict[str, set[str]] = {}
+    for key in state_dict:
+        if isinstance(key, str) and key.startswith(_KREA2_KOHYA_PREFIX):
+            flat_path, _, weight_suffix = key[len(_KREA2_KOHYA_PREFIX) :].lstrip("_").partition(".")
+            suffixes_by_flat_path.setdefault(flat_path, set()).add(f".{weight_suffix}")
+    fully_convertible_flat_paths = {
+        flat_path
+        for flat_path, suffixes in suffixes_by_flat_path.items()
+        if all(suffix in _SUFFIX_TO_VALUE_KEY for suffix in suffixes)
+    }
+
+    converted_state_dict: Dict[str, torch.Tensor] = {}
+    source_keys: dict[str, str] = {}
+    for key, value in state_dict.items():
+        converted_key = key
+        if isinstance(key, str) and key.startswith(_KREA2_KOHYA_PREFIX):
+            # The flattened module path runs up to the first '.'; the weight suffix (``lora_down.weight``,
+            # ``alpha``, ...) follows it. Some writers emit a doubled separator after the prefix.
+            flat_path, dot, weight_suffix = key[len(_KREA2_KOHYA_PREFIX) :].lstrip("_").partition(".")
+            module_path = _unflatten_kohya_krea2_module_path(flat_path)
+            # Only rewrite when ``_group_by_layer`` can split the suffix back off. Un-flattening introduces
+            # dots into the module path, and the grouper's fallback for an unknown suffix is a blind
+            # ``rsplit(".", 2)`` — on a dotted path that cuts *inside the module name*, fusing two modules
+            # into one bogus layer that aborts the whole load. LyCORIS suffixes such as ``.lokr_w1`` or
+            # ``.hada_w1_a`` hit exactly that. Flattened, they have no interior dot and group harmlessly,
+            # so leaving them verbatim keeps them at the pre-existing warn-and-skip behaviour.
+            if module_path is not None and flat_path in fully_convertible_flat_paths:
+                converted_key = f"{module_path}{dot}{weight_suffix}"
+        if converted_key in converted_state_dict:
+            raise ValueError(
+                f"Krea-2 LoRA has conflicting layers that normalize to the same target '{converted_key}' "
+                f"(from '{source_keys[converted_key]}' and '{key}'). This mixed layout is unsupported - "
+                "refusing to silently drop one of the layers."
+            )
+        converted_state_dict[converted_key] = value
+        source_keys[converted_key] = str(key)
     return converted_state_dict
 
 
@@ -125,7 +260,9 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
     as ``alpha=rank`` internally (the common diffusers default).
     """
     layers: dict[str, BaseLayerPatch] = {}
-    # Normalize native (ComfyUI) naming to the diffusers layout so the rest of the converter is layout-agnostic.
+    # Normalize the kohya/LyCORIS flattened naming (``lora_unet_blocks_6_attn_wv``) to the dotted native layout,
+    # then the native (ComfyUI) naming to the diffusers layout, so the rest of the converter is layout-agnostic.
+    state_dict = _maybe_convert_kohya_krea2_state_dict(state_dict)
     state_dict = _maybe_convert_native_krea2_state_dict(state_dict)
     grouped_state_dict = _group_by_layer(state_dict)
 
@@ -188,8 +325,9 @@ def _get_lora_layer_values(
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if "dora_scale" in layer_dict:
-            values["dora_scale"] = layer_dict["dora_scale"]
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         if "alpha" in layer_dict:
             values["alpha"] = layer_dict["alpha"]
         if alpha is not None:
@@ -198,17 +336,22 @@ def _get_lora_layer_values(
     return layer_dict
 
 
-# Maps each recognized weight-key suffix to the canonical value-key used downstream. The PEFT/diffusers DoRA
-# magnitude is published as ``<layer>.lora_magnitude_vector.weight``; it is the same thing InvokeAI stores as
-# ``dora_scale``, so mapping it here lets a standard Diffusers DoRA adapter (A/B + magnitude) load as a
-# DoRALayer instead of being split into a bogus, unrecognized layer.
+# Maps each recognized weight-key suffix to the canonical value-key used downstream.
+#
+# DoRA magnitudes come in two orientations that must not be mixed up (see ``DoRALayer``):
+#   - ``.dora_scale`` (LyCORIS/kohya) indexes the *input* dim  -> value key ``dora_scale``
+#   - ``.lora_magnitude_vector.weight`` (PEFT/diffusers) and ``.magnitude`` (ai-toolkit) index the *output*
+#     dim -> value key ``dora_magnitude``
+# Mapping them here lets a DoRA adapter (A/B + magnitude) load as a DoRALayer instead of being split into a
+# bogus, unrecognized layer.
 _SUFFIX_TO_VALUE_KEY = {
     ".lora_A.weight": "lora_A.weight",
     ".lora_B.weight": "lora_B.weight",
     ".lora_down.weight": "lora_down.weight",
     ".lora_up.weight": "lora_up.weight",
     ".dora_scale": "dora_scale",
-    ".lora_magnitude_vector.weight": "dora_scale",
+    ".lora_magnitude_vector.weight": "dora_magnitude",
+    ".magnitude": "dora_magnitude",
     ".alpha": "alpha",
 }
 

@@ -52,7 +52,7 @@ import { getConnectorDeletionSpliceConnections } from 'features/nodes/store/util
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
-import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
+import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS, WORKFLOW_GRID_SIZE } from 'features/nodes/types/constants';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { buildConnectorNode } from 'features/nodes/util/node/buildConnectorNode';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -88,7 +88,7 @@ const nodeTypes = {
 // TODO: can we support reactflow? if not, we could style the attribution so it matches the app
 const proOptions: ProOptions = { hideAttribution: true };
 
-const snapGrid: [number, number] = [25, 25];
+const snapGrid: [number, number] = [WORKFLOW_GRID_SIZE, WORKFLOW_GRID_SIZE];
 
 const selectCancelConnection = (state: ReactFlowState) => state.cancelConnection;
 

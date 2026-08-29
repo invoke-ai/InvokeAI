@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useGetGenerationDeviceOptionsQuery } from 'services/api/endpoints/appInfo';
 
 type ProgressDeviceLabel = {
-  /** The CUDA device index, shown in the center of the progress circle (e.g. `0`). */
+  /** The GPU device index, shown in the center of the progress circle (e.g. `0`). */
   index: number;
   /** The human-readable device name and number, shown on hover (e.g. `"AMD Radeon PRO W7900 #1"`). */
   name: string;
@@ -14,8 +14,8 @@ type ProgressDeviceLabel = {
  * Resolve a device string (e.g. `"cuda:0"`) to the GPU index + name used to annotate progress
  * previews.
  *
- * Returns `null` when there is nothing to show: the device is not a CUDA GPU, or only a single GPU
- * is available (single-GPU setups show neither the index nor the hover tooltip).
+ * Returns `null` when there is nothing to show: the device is not an indexed GPU, or only a single
+ * GPU is available (single-GPU setups show neither the index nor the hover tooltip).
  */
 export const useProgressDeviceLabel = (device: string | null | undefined): ProgressDeviceLabel | null => {
   const { data: deviceOptions } = useGetGenerationDeviceOptionsQuery();
