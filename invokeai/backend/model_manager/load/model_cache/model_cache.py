@@ -68,15 +68,20 @@ class _AbandonedHolderRelease(NamedTuple):
     `hold_epoch` is the CacheRecord.first_use_holds_epoch the hold was armed under; a release
     from before a dead-worker zeroing sweep must not decrement a hold armed after it.
 
-    The record is referenced WEAKLY. Only the worker drains this queue, and an item enqueued as
-    the worker is dying is never drained at all: _dispatch_deferred's liveness gate is
-    unsynchronized, so a finalizer that read the worker slot just before it was retired still
-    enqueues against a thread that is alive only because it is unwinding. A strong reference
-    would pin that record — and through it the model's whole CPU state dict — for the life of the
-    process, while the store and the budget both report the bytes as released. Resolving weakly
-    costs nothing: while the release still matters the record is the live occupant of its key in
-    _cached_models, which holds it strongly; a record that has already been dropped from there is
-    exactly the case _release_abandoned_holder's identity check no-ops anyway.
+    The record is referenced WEAKLY. Only a worker drains this queue, and an item can outlive
+    every chance to be drained: _dispatch_deferred's liveness gate is unsynchronized, so a
+    finalizer that read the worker slot just before it was retired still enqueues against a thread
+    that is alive only because it is unwinding, and on a shut-down cache no replacement worker is
+    guaranteed to start and drain it. A strong reference would pin that record — and through it
+    the model's whole CPU state dict — for the life of the process, while the store and the budget
+    both report the bytes as released.
+
+    Resolving weakly costs nothing. While the release still has work to do, the record is the live
+    occupant of its key in _cached_models, which holds it strongly; and a record already dropped
+    from there is one _release_abandoned_holder can do nothing useful for — everything past its
+    identity check is gated on live occupancy, and the hold decrement above that check is inert on
+    a detached record, since a detached record is never re-attached (put() mints a fresh
+    CacheRecord) and every reader of first_use_holds is itself gated on occupancy.
     """
 
     cache_entry_ref: "weakref.ReferenceType[CacheRecord]"
@@ -635,13 +640,18 @@ class ModelCache:
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
             self._timeout_timer = None
-        # If the worker died before this shutdown and neither its own dying recovery nor a later
-        # admission cleared what it stranded, the surviving shields would make the sweep below
-        # stale-retain their records forever: the wrappers' finalizer releases were (or will be)
-        # dropped by the dead-thread dispatch check, and no unlock() is coming for a never-locked
-        # holder. Lift them now so the sweep can evict those records (see
-        # _recover_stranded_shields for the trade this takes).
-        if self._deferred_work_thread is not None and not self._deferred_work_thread.is_alive():
+        # If no live worker remains, the shields it was carrying releases for have nothing left to
+        # lift them and would make the sweep below stale-retain their records forever: the
+        # wrappers' finalizer releases were (or will be) dropped by the dispatch check, and no
+        # unlock() is coming for a never-locked holder. Lift them now so the sweep can evict those
+        # records (see _recover_stranded_shields for the trade this takes).
+        #
+        # The condition is "no live worker", not "a dead thread still in the slot": a worker that
+        # ran its own dying recovery retires the slot, and an empty slot means just as surely that
+        # nothing is left to carry a release. Keying on the dead thread would skip this lift in
+        # exactly the case the dying recovery deliberately leaves for it — a grace it declined to
+        # touch because the cache was still live at the time.
+        if self._deferred_work_thread is None or not self._deferred_work_thread.is_alive():
             self._recover_stranded_shields()
         # Evict the resident records now rather than merely releasing their shared-store
         # references. Releasing while retaining the records would make the accounting lie two
@@ -948,10 +958,13 @@ class ModelCache:
         """
         if self._deferred_work_thread is not None and self._deferred_work_thread.is_alive():
             return
-        if self._deferred_work_thread is not None:
-            # The previous worker died unexpectedly (and without running its own recovery — a fork,
-            # or a death raced by this call); recover the shields it stranded.
-            self._recover_stranded_shields()
+        # No worker is running. Recover unconditionally rather than only when a dead thread is
+        # still in the slot: the previous worker may have died without running its own recovery (a
+        # fork, or a death this call raced), or its recovery may have failed partway through and
+        # retired the slot on the way out. The sweep is idempotent and costs nothing on a cache
+        # that has no shields standing, so re-running it at every worker start is what makes a
+        # failed recovery retryable.
+        self._recover_stranded_shields()
         thread = threading.Thread(
             target=_run_deferred_work,
             args=(weakref.ref(self), self._deferred_work_queue),
@@ -1000,8 +1013,11 @@ class ModelCache:
         The liveness gate is deliberately unsynchronized (a finalizer must not take the cache
         lock), so it is only advisory: a caller that read the slot just before a dying worker
         retired it still enqueues against a thread that is alive only because it is unwinding, and
-        that item is then never drained. _AbandonedHolderRelease therefore holds its record weakly,
-        so a stranded item pins nothing.
+        and that item may never be drained — no replacement worker is guaranteed to start on a
+        shut-down cache. _AbandonedHolderRelease therefore holds its record weakly, so a stranded
+        item pins nothing. (One that IS drained later, by a replacement worker, is harmless: the
+        epoch bump from the recovery blocks its hold decrement, and its record is by then either
+        gone or past the point where clearing an orphaned grace matters.)
         """
         thread = self._deferred_work_thread
         if thread is None or not thread.is_alive():
@@ -1056,14 +1072,21 @@ class ModelCache:
         path if an eviction actually races its lock, which is recoverable; a permanently shielded
         record is not.
         """
+        dropped: list[tuple[str, int]] = []
         for entry in self._cached_models.values():
             if entry.first_use_holds > 0:
-                self._logger.warning(
-                    f"Dropping {entry.first_use_holds} first-use hold(s) on cache entry {entry.key}: the "
-                    "deferred-work thread died, so their releases may have been lost."
-                )
+                dropped.append((entry.key, entry.first_use_holds))
                 entry.first_use_holds = 0
                 entry.first_use_holds_epoch += 1
+        # Report only once every record is actually unshielded. A logging handler that raises is
+        # one of the ways the worker dies in the first place (see _ensure_deferred_worker), and
+        # logging inside the loop would let that same handler abort this sweep partway through,
+        # leaving the records it had not reached shielded with nothing left to unshield them.
+        for key, count in dropped:
+            self._logger.warning(
+                f"Dropping {count} first-use hold(s) on cache entry {key}: the deferred-work thread died, "
+                "so their releases may have been lost."
+            )
 
     def _recover_stranded_shields(self) -> None:
         """Lift the first-use shields whose release depended on a deferred worker that is gone.
@@ -1111,8 +1134,14 @@ class ModelCache:
                 self._delete_cache_entry(entry)
                 evicted += 1
         if evicted:
-            gc.collect()
-            TorchDevice.empty_cache()
+            try:
+                gc.collect()
+                TorchDevice.empty_cache()
+            except Exception:
+                # Deferrable housekeeping: empty_cache() can raise from a sick CUDA context after
+                # an eviction, and this runs in a dying worker's last frame. The eviction itself
+                # is already done and must not be undone by a failure to hand memory back.
+                self._logger.exception("Error releasing device memory after a stranded-record eviction")
 
     @synchronized
     def _recover_from_dead_worker(self, worker: threading.Thread) -> None:
@@ -2005,9 +2034,11 @@ class ModelCache:
                     return
                 self._budget_reconcile_pending.set()
             models_cleared = 0
-            # Acquire immediately before the try: a BaseException delivered between the two would
-            # leak the RLock, and a cache lock owned by a thread that is unwinding blocks every
-            # other thread for the life of the process.
+            # Acquire immediately before the try: a BaseException delivered between the two leaks
+            # the RLock, and a cache lock owned by a thread that is unwinding blocks every other
+            # thread for the life of the process. This narrows that window to the interpreter's
+            # own check between acquire() returning and SETUP_FINALLY rather than closing it —
+            # inherent to acquiring a lock without `with`, which the blocking flag rules out here.
             if not self._lock.acquire(blocking=blocking):
                 # Contended (non-blocking caller only): the holder releases through a reconcile
                 # hook, which re-runs this reconcile with the flag still set.

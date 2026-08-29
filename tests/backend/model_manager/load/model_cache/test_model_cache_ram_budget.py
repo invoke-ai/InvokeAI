@@ -852,6 +852,97 @@ def test_queued_abandonment_release_does_not_pin_its_record(mock_logger):
         unblock.set()
 
 
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_shutdown_lifts_a_grace_the_dying_worker_left_standing(mock_logger):
+    """The dying worker deliberately leaves a live cache's admission grace alone — the sweep at the
+    top of the next put() is still its backstop. shutdown() is where that backstop runs out, and it
+    must lift the grace even though the dying worker retired the worker slot on its way out. Keying
+    that lift on a dead thread still sitting in the slot would skip exactly the case the dying
+    recovery handed to it, stranding the record, its shared-store reference and its budget bytes
+    for the life of the process."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("resident", DummyModule())
+    resident = _use_and_release(cache, "resident")
+
+    # A load admitted and then cancelled before get(): no wrapper is ever built, so no finalizer
+    # will ever exist to release this grace.
+    cache.put("orphan", DummyModule())
+    orphan = cache._cached_models["orphan"]
+    assert orphan.awaiting_first_use
+
+    _kill_worker_abnormally(cache, resident)
+    assert cache._deferred_work_thread is None, "premise broken: the dying worker kept the slot"
+    assert orphan.awaiting_first_use, "the grace was lifted while the next put() was still its backstop"
+
+    cache.shutdown()
+    assert "orphan" not in cache._cached_models, "shutdown() stale-retained a grace nothing can release"
+    assert store.refcount("orphan") == 0
+    assert budget.total_in_use() == 0
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_worker_start_retries_a_recovery_that_failed_partway(mock_logger):
+    """A dying worker's recovery can itself fail — a logging handler that raises is one of the ways
+    the worker dies in the first place — and it has already retired the worker slot by then. The
+    next worker start must re-run the recovery rather than key on a dead thread still sitting in
+    the slot, or the hold it never reached stays shielded for good."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+    record = loaded_model._cache_record
+    assert record.first_use_holds == 1
+
+    with patch.object(cache, "_clear_stranded_first_use_holds", side_effect=RuntimeError("logging handler blew up")):
+        _kill_worker_abnormally(cache, record)
+    assert record.first_use_holds == 1, "premise broken: the recovery did not fail"
+    assert cache._deferred_work_thread is None
+
+    # The next worker start re-runs the recovery.
+    cache.put("next", DummyModule())
+    assert record.first_use_holds == 0, "a recovery that failed partway was never retried"
+
+    # And with the hold gone, the record settles instead of being shielded for good.
+    del loaded_model
+    cache.shutdown()
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+
+
+def test_hold_recovery_unshields_every_record_before_reporting_any(mock_logger):
+    """A logging handler that raises is one of the ways the deferred worker dies in the first
+    place, so the recovery must unshield every record before it reports any of them. Logging inside
+    the loop would let that same handler abort the sweep partway, leaving the records it never
+    reached shielded with nothing left to unshield them."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        wrappers = []
+        for key in ("a", "b"):
+            cache.put(key, DummyModule())
+            _use_and_release(cache, key)
+            wrappers.append(LoadedModelWithoutConfig(cache_record=cache.get(key), cache=cache))
+        assert all(w._cache_record.first_use_holds == 1 for w in wrappers)
+
+        raising_logger = MagicMock()
+        raising_logger.getEffectiveLevel.return_value = logging.INFO
+        raising_logger.warning.side_effect = RuntimeError("logging handler blew up")
+        with patch.object(cache, "_logger", raising_logger):
+            with pytest.raises(RuntimeError):
+                cache._clear_stranded_first_use_holds()
+
+        assert [w._cache_record.first_use_holds for w in wrappers] == [0, 0], (
+            "a raising log handler aborted the sweep partway, leaving a record shielded for good"
+        )
+    finally:
+        cache.shutdown()
+
+
 def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
     """A cache dropped without shutdown() must not strand its shared-weights references:
     the store's refcount and bytes — and therefore the budget total — must return to zero once the
