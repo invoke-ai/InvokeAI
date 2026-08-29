@@ -63,12 +63,12 @@ export const useRangeBasedImageFetching = ({
   const { onFetchFailure, resetRetryBudget } = useBoundedRangeRetry(restoreFailedRanges);
 
   const fetchItems = useCallback(
-    (ranges: ListRange[], allNames: string[]) => {
+    (ranges: ListRange[], allNames: string[], handledPendingRanges: ListRange[]) => {
       if (!enabled) {
         // Clear here too, for the same reason as the clear at the end of this callback: returning
         // early while disabled let ranges pile up until `enabled` flipped, so the first enabled
         // pass scanned every range reported during the disabled window instead of the viewport.
-        setPendingRanges(EMPTY_ARRAY);
+        setPendingRanges((prev) => (prev === handledPendingRanges ? EMPTY_ARRAY : prev));
         return;
       }
       const state = store.getState();
@@ -106,7 +106,14 @@ export const useRangeBasedImageFetching = ({
       // render loop, running as fast as the throttle allows, for as long as the grid is
       // mounted and with no user input. Setting state to the value it already holds makes
       // React bail out instead.
-      setPendingRanges(EMPTY_ARRAY);
+      //
+      // Clear only if `pendingRanges` is still the array this pass consumed. An absolute
+      // `setPendingRanges(EMPTY_ARRAY)` silently discards a restore dispatched in the same React
+      // batch: a backoff timer and the throttle's trailing edge can expire in the same event-loop
+      // turn, the absolute update runs last and wins, the final state equals the base, React bails
+      // out of the re-render, and the restored ranges are gone with nothing left to re-report
+      // them. The identity check makes the clear a no-op whenever the state has moved on.
+      setPendingRanges((prev) => (prev === handledPendingRanges ? EMPTY_ARRAY : prev));
     },
     [enabled, getImageDTOsByNames, onFetchFailure, resetRetryBudget, store]
   );
@@ -126,7 +133,7 @@ export const useRangeBasedImageFetching = ({
 
   useEffect(() => {
     const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
-    throttledFetchItems(combinedRanges, imageNames);
+    throttledFetchItems(combinedRanges, imageNames, pendingRanges);
   }, [imageNames, lastRange, pendingRanges, throttledFetchItems]);
 
   return {

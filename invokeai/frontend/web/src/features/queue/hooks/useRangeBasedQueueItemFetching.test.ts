@@ -303,6 +303,69 @@ describe('useRangeBasedQueueItemFetching', () => {
     await advance(THROTTLE_MS * 4);
 
     expect(mocks.cachedItemIds).toEqual(ITEM_IDS);
+
+    // And the heal must settle. Restoring the parked ranges without emptying the parked set would
+    // make every later success restore them again — success -> restore -> fetch -> success — a
+    // loop that the cache assertion alone cannot see.
+    const fetchesAfterHeal = mocks.queueFetches.length;
+    await advance(30_000);
+    expect(mocks.queueFetches.length).toBe(fetchesAfterHeal);
+  });
+
+  it('empties the parked set when it heals, even if the rows never reach the cache', async () => {
+    // The parked set is handed to the restore and cleared in one step. Restoring without clearing
+    // it looks harmless while the rows do land in the cache — the follow-up pass finds nothing to
+    // request — but a name the server never returns is uncached on every pass, so every success
+    // would restore the same parked ranges again: success -> restore -> request -> success.
+    $isConnected.set(true);
+    mocks.failFetches = true;
+    renderHook(ITEM_IDS, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    $isConnected.set(false);
+    await advance(35_000);
+
+    // The backend answers again, but these rows never land in the cache (deleted, or filtered out
+    // for this user).
+    mocks.failFetches = false;
+    mocks.cacheLands = false;
+    act(() => {
+      $isConnected.set(true);
+    });
+    await advance(THROTTLE_MS * 4);
+
+    const fetchesAfterHeal = mocks.queueFetches.length;
+    await advance(60_000);
+    expect(mocks.queueFetches.length).toBe(fetchesAfterHeal);
+  });
+
+  it('does not turn a flapping socket into a request stream', async () => {
+    // Review finding: re-arming on every reconnect made the budget per-reconnect rather than
+    // per-outage. A socket that keeps completing a handshake while REST stays broken — a
+    // crash-looping container, uvicorn accepting connections before startup finishes, a proxy
+    // routing the websocket to a healthy replica and REST to a sick one — would then pin the
+    // backoff at its shortest delay for as long as the flapping lasted. The re-arm is now floored
+    // at one per RETRY_REARM_COOLDOWN_MS (60s) and only fires when there is something parked.
+    $isConnected.set(true);
+    mocks.failFetches = true;
+    renderHook(ITEM_IDS, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+
+    // Five minutes of flapping every 5s, REST failing throughout, no user input.
+    for (let i = 0; i < 60; i++) {
+      act(() => {
+        $isConnected.set(false);
+      });
+      await advance(2_500);
+      act(() => {
+        $isConnected.set(true);
+      });
+      await advance(2_500);
+    }
+
+    // Design intent with no flapping at all is 12 requests (one bounded streak). Five minutes of
+    // flapping buys at most five re-arms, each worth another bounded streak. Pre-fix this ran at
+    // the flap rate and measured 240.
+    expect(mocks.queueFetches.length).toBeLessThanOrEqual(80);
   });
 
   it('does not schedule a retry for a fetch that rejects after unmount', async () => {
@@ -359,33 +422,37 @@ describe('useRangeBasedQueueItemFetching', () => {
     expect(mocks.queueFetches.flat().sort((a, b) => a - b)).toEqual([4, 5, 6, 7, 8, 9]);
   });
 
-  it('recovers a range that failed while the user was scrolling elsewhere', async () => {
-    // Review finding on the original retry: the catch (`prev.length > 0 ? prev : ranges`) dropped
-    // the failed range whenever another range had been reported in the meantime — rows the user
-    // had scrolled past stayed blank placeholders. The retry now merges the failed ranges with
-    // whatever is pending instead of choosing one side, so both ranges end up fetched with no
-    // further user input.
-    const itemIds = [1, 2, 3, 4, 5, 6, 7, 8, 9];
-    mocks.failFetches = true;
-    renderHook(itemIds, true);
-    scrollTo({ startIndex: 0, endIndex: 2 });
-    // The fetches for the failed range land at t=500 (throttle edges), scheduling the 1s backoff
-    // retry for t=1500.
-    await advance(1_250);
+  // Review finding: pinned to a single delay, this passed only on a lucky phase of the
+  // throttle/backoff alignment. Sweeping it covers the batch in which the backoff retry and the
+  // throttle's trailing edge land together — the interleaving in which an absolute clear discards
+  // the restore.
+  it.each([500, 600, 750, 1_000, 1_250])(
+    'recovers a range that failed while the user was scrolling elsewhere (scroll at t=%dms)',
+    async (delayBeforeScroll) => {
+      // Review finding on the original retry: the catch (`prev.length > 0 ? prev : ranges`)
+      // dropped the failed range whenever another range had been reported in the meantime — rows
+      // the user had scrolled past stayed blank placeholders. The retry now merges the failed
+      // ranges with whatever is pending instead of choosing one side, and the clear only fires
+      // when the pending state is still the array the pass consumed, so both ranges end up
+      // fetched with no further user input.
+      const itemIds = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+      mocks.failFetches = true;
+      renderHook(itemIds, true);
+      scrollTo({ startIndex: 0, endIndex: 2 });
+      await advance(delayBeforeScroll);
 
-    // The backend recovers, and the user scrolls to a disjoint range. The first report fires on
-    // the throttle's leading edge (t=1250); the second lands in pendingRanges and stays there
-    // until the trailing edge (t=1750) — so the backoff retry at t=1500 finds a non-empty
-    // pendingRanges and must merge into it rather than pick a side.
-    mocks.failFetches = false;
-    scrollTo({ startIndex: 6, endIndex: 8 });
-    scrollTo({ startIndex: 6, endIndex: 8 });
-    await advance(3_000);
+      // The backend recovers and the user scrolls to a disjoint range while the backoff retry for
+      // the failed range is still pending.
+      mocks.failFetches = false;
+      scrollTo({ startIndex: 6, endIndex: 8 });
+      scrollTo({ startIndex: 6, endIndex: 8 });
+      await advance(10_000);
 
-    // Both the failed range (1-3) and the new one (7-9) land, with no user input beyond the one
-    // scroll — and nothing outside the reported ranges is fetched.
-    expect([...mocks.cachedItemIds].sort((a, b) => a - b)).toEqual([1, 2, 3, 7, 8, 9]);
-  });
+      // Both the failed range and the new one land, with no user input beyond the one scroll —
+      // and nothing outside the reported ranges is fetched.
+      expect([...mocks.cachedItemIds].sort((a, b) => a - b)).toEqual([1, 2, 3, 7, 8, 9]);
+    }
+  );
 
   it('still fetches for new ranges after settling', async () => {
     const itemIds = [1, 2, 3, 4, 5, 6];

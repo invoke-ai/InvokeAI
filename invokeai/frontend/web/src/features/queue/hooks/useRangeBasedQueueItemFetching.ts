@@ -75,12 +75,12 @@ export const useRangeBasedQueueItemFetching = ({
   const { onFetchFailure, resetRetryBudget } = useBoundedRangeRetry(restoreFailedRanges);
 
   const fetchQueueItems = useCallback(
-    (ranges: ListRange[], itemIds: number[]) => {
+    (ranges: ListRange[], itemIds: number[], handledPendingRanges: ListRange[]) => {
       if (!enabled) {
         // Clear here too, for the same reason as the unconditional clear below: returning early
         // while disabled let ranges pile up until `enabled` flipped, so the first enabled pass
         // scanned every range reported during the disabled window instead of the viewport.
-        setPendingRanges(EMPTY_ARRAY);
+        setPendingRanges((prev) => (prev === handledPendingRanges ? EMPTY_ARRAY : prev));
         return;
       }
       const cachedItemIds = queueApi.util.selectCachedArgsForQuery(store.getState(), 'getQueueItemSummary');
@@ -114,7 +114,14 @@ export const useRangeBasedQueueItemFetching = ({
       // re-arms the throttle, which calls this again. The old early return happened to prevent
       // that while everything was cached, so the loop only ran while items were genuinely
       // uncached; clearing on both paths means the stable reference is now what stops it.
-      setPendingRanges(EMPTY_ARRAY);
+      //
+      // Clear only if `pendingRanges` is still the array this pass consumed. An absolute
+      // `setPendingRanges(EMPTY_ARRAY)` silently discards a restore dispatched in the same React
+      // batch: a backoff timer and the throttle's trailing edge can expire in the same event-loop
+      // turn, the absolute update runs last and wins, the final state equals the base, React bails
+      // out of the re-render, and the restored ranges are gone with nothing left to re-report
+      // them. The identity check makes the clear a no-op whenever the state has moved on.
+      setPendingRanges((prev) => (prev === handledPendingRanges ? EMPTY_ARRAY : prev));
     },
     [enabled, getQueueItemSummariesByItemIds, onFetchFailure, resetRetryBudget, store]
   );
@@ -134,7 +141,7 @@ export const useRangeBasedQueueItemFetching = ({
 
   useEffect(() => {
     const combinedRanges = lastRange ? [...pendingRanges, lastRange] : pendingRanges;
-    throttledFetchQueueItems(combinedRanges, itemIds);
+    throttledFetchQueueItems(combinedRanges, itemIds, pendingRanges);
   }, [itemIds, lastRange, pendingRanges, throttledFetchQueueItems]);
 
   return {

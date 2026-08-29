@@ -1,10 +1,18 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { ListRange } from 'react-virtuoso';
 import { $isConnected } from 'services/events/stores';
 
 const RETRY_INITIAL_DELAY_MS = 1_000;
 const RETRY_MAX_DELAY_MS = 16_000;
 const RETRY_MAX_ATTEMPTS = 5;
+/**
+ * Floor on how often a socket reconnect may re-arm an exhausted budget. A reconnect is evidence
+ * the backend is answering, but the socket and the REST API can disagree: a proxy can route the
+ * websocket to a healthy replica while REST hits a sick one, and a crash-looping container
+ * completes a handshake on every restart. Without this floor the budget would be per-reconnect
+ * rather than per-outage, and a flapping socket would turn the bounded retry back into a stream.
+ */
+const RETRY_REARM_COOLDOWN_MS = 60_000;
 
 /**
  * Merge overlapping or adjacent ranges into a minimal, sorted, disjoint set.
@@ -63,10 +71,14 @@ interface UseBoundedRangeRetryReturn {
  * backend is answering again: a successful fetch, a fresh range report from the user, or a socket
  * reconnect. The reconnect signal is what covers the case the retry budget cannot — a restart that
  * takes longer than the ~31s schedule, where an idle user is watching a gallery whose `imageNames`
- * never change and so has no other reason to re-run the fetch effect.
+ * never change and so has no other reason to re-run the fetch effect. Success and user input are
+ * self-limiting signals; a reconnect is not, so it re-arms at most once per
+ * RETRY_REARM_COOLDOWN_MS and only when there is something parked to heal.
  *
  * `restoreRanges` is invoked with the coalesced union of every range that failed since the last
- * retry. It is read through a ref, so it does not need to be referentially stable.
+ * retry. It is read through a ref, so an unstable callback cannot churn `onFetchFailure`; the ref
+ * is updated in a layout effect, so a restore firing between render and commit still sees the
+ * previous render's closure.
  */
 export const useBoundedRangeRetry = (
   restoreRanges: (failedRanges: ListRange[]) => void
@@ -77,13 +89,21 @@ export const useBoundedRangeRetry = (
     abandonedRanges: ListRange[];
     timeoutId: ReturnType<typeof setTimeout> | null;
     isMounted: boolean;
-  }>({ attempts: 0, failedRanges: [], abandonedRanges: [], timeoutId: null, isMounted: true });
+    lastRearmAt: number;
+  }>({
+    attempts: 0,
+    failedRanges: [],
+    abandonedRanges: [],
+    timeoutId: null,
+    isMounted: true,
+    lastRearmAt: 0,
+  });
 
   // Read `restoreRanges` through a ref so an unstable callback cannot churn `onFetchFailure` (and
   // through it the caller's fetch callback, its throttle, and the effect that drives it) on every
   // render. The hook's contract shouldn't depend on the caller remembering to useCallback.
   const restoreRangesRef = useRef(restoreRanges);
-  useEffect(() => {
+  useLayoutEffect(() => {
     restoreRangesRef.current = restoreRanges;
   }, [restoreRanges]);
 
@@ -105,19 +125,27 @@ export const useBoundedRangeRetry = (
     };
   }, []);
 
-  const restoreAbandonedRanges = useCallback(() => {
+  const takeAbandonedRanges = useCallback((): ListRange[] | null => {
+    const state = stateRef.current;
+    if (!state.isMounted || state.abandonedRanges.length === 0) {
+      return null;
+    }
+    const abandonedRanges = state.abandonedRanges;
+    state.abandonedRanges = [];
+    return abandonedRanges;
+  }, []);
+
+  const resetRetryBudget = useCallback(() => {
     const state = stateRef.current;
     if (!state.isMounted) {
       return;
     }
     state.attempts = 0;
-    if (state.abandonedRanges.length === 0) {
-      return;
+    const abandonedRanges = takeAbandonedRanges();
+    if (abandonedRanges) {
+      restoreRangesRef.current(abandonedRanges);
     }
-    const abandonedRanges = state.abandonedRanges;
-    state.abandonedRanges = [];
-    restoreRangesRef.current(abandonedRanges);
-  }, []);
+  }, [takeAbandonedRanges]);
 
   useEffect(() => {
     // A reconnect means the backend is answering again. Nothing else re-arms an exhausted budget
@@ -129,9 +157,23 @@ export const useBoundedRangeRetry = (
       if (!isConnected) {
         return;
       }
-      restoreAbandonedRanges();
+      const state = stateRef.current;
+      // Unlike a success or a scroll, reconnects are not self-limiting — see the cooldown's note.
+      // Both guards matter: re-arming with nothing parked would zero `attempts` mid-streak, so a
+      // socket flapping faster than the backoff would pin the delay at 1s indefinitely.
+      const now = Date.now();
+      if (now - state.lastRearmAt < RETRY_REARM_COOLDOWN_MS) {
+        return;
+      }
+      const abandonedRanges = takeAbandonedRanges();
+      if (!abandonedRanges) {
+        return;
+      }
+      state.lastRearmAt = now;
+      state.attempts = 0;
+      restoreRangesRef.current(abandonedRanges);
     });
-  }, [restoreAbandonedRanges]);
+  }, [takeAbandonedRanges]);
 
   const onFetchFailure = useCallback((ranges: ListRange[]) => {
     const state = stateRef.current;
@@ -162,5 +204,5 @@ export const useBoundedRangeRetry = (
     }, delay);
   }, []);
 
-  return { onFetchFailure, resetRetryBudget: restoreAbandonedRanges };
+  return { onFetchFailure, resetRetryBudget };
 };
