@@ -12,8 +12,10 @@ from fastapi.responses import StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image as PILImage
 from pydantic import BaseModel, Field, StringConstraints, ValidationError
+from python_multipart.exceptions import MultipartParseError
 from python_multipart.multipart import MultipartParser, parse_options_header
 from starlette.concurrency import run_in_threadpool
+from starlette.requests import ClientDisconnect
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
@@ -60,8 +62,8 @@ MAX_UPLOAD_REQUEST_SIZE = MAX_UPLOAD_SIZE + 10 * 1024 * 1024
 # The `metadata` form field is a stringified JSON dict; it is buffered in memory while the
 # body streams, so it gets its own (generous) cap.
 MAX_UPLOAD_METADATA_SIZE = 1024 * 1024
-# Global bound on concurrent video uploads — each in-flight upload can hold up to two
-# copies of the file in temp storage (the multipart spool + the route's own tmp file).
+# Global bound on concurrent video uploads — each in-flight upload holds one full-size copy
+# of the file in temp storage until probe/thumbnail/create finish with it.
 MAX_CONCURRENT_VIDEO_UPLOADS = 2
 # Per-user bound (multiuser mode only): keeps one tenant's slow uploads from holding
 # every global slot and starving the other users into 429s.
@@ -205,6 +207,12 @@ class _VideoUploadStreamParser:
         self.metadata: Optional[str] = None
         self.file_size = 0
         self.saw_file_part = False
+        # `MultipartParser.finalize()` is a no-op that does NOT check the parser reached its
+        # end state, so a body that stops after the file bytes — truncated upload, aborted
+        # client, or the parser's own silent `max_size` truncation — would otherwise look
+        # exactly like a complete one and get probed and persisted. `on_end` fires only when
+        # the closing `--boundary--` is parsed, so it is the proof of a complete body.
+        self.saw_end = False
 
     @property
     def callbacks(self) -> dict[str, object]:
@@ -216,6 +224,7 @@ class _VideoUploadStreamParser:
             "on_header_value": self._on_header_value,
             "on_header_end": self._on_header_end,
             "on_headers_finished": self._on_headers_finished,
+            "on_end": self._on_end,
         }
 
     def _on_part_begin(self) -> None:
@@ -284,24 +293,44 @@ class _VideoUploadStreamParser:
         self._metadata_chunks = []
         self._metadata_size = 0
 
+    def _on_end(self) -> None:
+        self.saw_end = True
+
 
 async def _stream_video_upload(request: Request, destination: BinaryIO) -> _VideoUploadStreamParser:
     """Streams the request body through the multipart parser into `destination`."""
     media_type, options = parse_options_header(request.headers.get("content-type", ""))
     boundary = options.get(b"boundary")
-    if media_type != b"multipart/form-data" or boundary is None:
+    # Content-Type is case-insensitive (RFC 7231) and parse_options_header preserves case.
+    if media_type.lower() != b"multipart/form-data" or boundary is None:
         raise HTTPException(status_code=422, detail="Expected a multipart/form-data video upload")
 
     parser_state = _VideoUploadStreamParser(destination)
     # max_size is the pre-parse ingress cap the middleware already enforces; repeating it
-    # here bounds the parser itself for any path that reaches it directly.
+    # here bounds the parser itself for any path that reaches it directly. The parser
+    # silently *truncates* past it rather than erroring, so on such a path the body would
+    # look short rather than rejected — the saw_end check below is what catches that.
     parser = MultipartParser(boundary, parser_state.callbacks, max_size=MAX_UPLOAD_REQUEST_SIZE)
-    async for chunk in request.stream():
-        # Parsing writes to disk, so it belongs in the thread pool alongside the rest of
-        # the blocking upload work.
-        await run_in_threadpool(parser.write, chunk)
-    await run_in_threadpool(parser.finalize)
+    try:
+        async for chunk in request.stream():
+            # Parsing writes to disk, so it belongs in the thread pool alongside the rest of
+            # the blocking upload work.
+            await run_in_threadpool(parser.write, chunk)
+        await run_in_threadpool(parser.finalize)
+    except MultipartParseError as error:
+        # A malformed body is the client's fault, not a server error.
+        raise HTTPException(status_code=422, detail="Malformed multipart body") from error
+    except ClientDisconnect as error:
+        # The client went away, or VideoUploadLimitASGIMiddleware cut it off for exceeding the
+        # ingress cap, the idle timeout or the duration cap. Left to propagate this surfaces as
+        # a 500 raised above the middleware, which both misreports a client-side abort as a
+        # server fault and bypasses the middleware's connection-close handling.
+        raise HTTPException(status_code=400, detail="Upload ended before the body was complete") from error
 
+    if not parser_state.saw_end:
+        # No closing boundary: the body was truncated. Proceeding would probe and persist a
+        # partial file whenever the truncated bytes happen to survive the MP4 checks.
+        raise HTTPException(status_code=422, detail="Incomplete multipart body")
     if not parser_state.saw_file_part:
         raise HTTPException(status_code=422, detail="Expected a video file in the upload")
     return parser_state
@@ -407,6 +436,9 @@ async def upload_video(
     if board_id is not None:
         from invokeai.app.services.board_records.board_records_common import BoardVisibility
 
+        # This rejects before any of the body is read. VideoUploadLimitASGIMiddleware is what
+        # keeps that from becoming a quota hole: it closes the connection when the app
+        # answers early, so the client's in-flight upload dies with the response.
         try:
             board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
         except Exception:
