@@ -403,6 +403,59 @@ class TestSaveDeleteRoundTrip:
 
         assert list(disk_storage.image_root.glob(".delete_*"))
 
+    def test_startup_purges_restored_files_whose_record_vanished_during_recovery(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        """Recovery re-checks the record after restoring, exactly as rollback_delete() does.
+
+        Another Invoke sharing the output folder can delete the record while the files sit staged;
+        its purge finds nothing, and restoring them afterwards would strand them with no record and
+        no journal left to find them by (JPPhoto, PR #9361 round 4).
+        """
+        image_name = "raced.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        # Present when recovery first looks, gone by the time the files are back.
+        invoker.services.image_records.exists.side_effect = [True, False]
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert not disk_storage.get_path(image_name).exists()
+        assert not disk_storage.get_path(image_name, thumbnail=True).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_keeps_the_journal_when_the_recheck_cannot_read_the_record_store(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        """A fault on the post-restore re-check keeps the files and the journal for the next start."""
+        image_name = "kept.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        invoker.services.image_records.exists.side_effect = [True, RuntimeError("database is locked")]
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert disk_storage.get_path(image_name).exists()
+        assert disk_storage.get_path(image_name, thumbnail=True).exists()
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_does_not_recheck_a_pending_journal_that_restored_nothing(self, disk_storage: DiskImageFileStorage):
+        """Only a restore can strand files; a journal that moved nothing costs one lookup."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="pending.png")
+        disk_storage.begin_delete([("pending.png", "")])
+
+        invoker = MagicMock()
+        invoker.services.image_records.exists.side_effect = [True, AssertionError("unexpected re-check")]
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert disk_storage.get_path("pending.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
 
 class TestPendingDeleteJournal:
     """begin_delete() writes the journal that makes records-first deletion recoverable.

@@ -299,6 +299,33 @@ def test_delete_image_not_found_returns_404(
     assert response.json()["detail"] == "Image not found"
 
 
+def test_delete_image_deleted_mid_request_returns_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    """An image deleted between the DTO lookup and the service delete is gone, not a server fault.
+
+    Answering 500 here sent the client a failure toast for a postcondition that already held
+    (JPPhoto, PR #9361 round 4).
+    """
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+    real_get_dto = mock_invoker.services.images.get_dto
+
+    def get_dto_then_lose_the_race(image_name: str):
+        dto = real_get_dto(image_name)
+        # Another request completes its delete before this one reaches the service.
+        mock_invoker.services.image_records.delete(image_name)
+        return dto
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", get_dto_then_lose_the_race)
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Image not found"
+    assert list(storage.image_root.glob(".delete_*")) == []
+
+
 def test_delete_image_lookup_failure_returns_500_not_404(
     monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
 ) -> None:

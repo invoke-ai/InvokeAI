@@ -248,6 +248,10 @@ def delete_image(
     board_id = image_dto.board_id or "none"
     try:
         ApiDependencies.invoker.services.images.delete(image_name)
+    except ImageRecordNotFoundException:
+        # Another request deleted the image between the lookup above and the service call. The
+        # image is gone, which is what the client asked for — answer as the lookup would have.
+        raise HTTPException(status_code=404, detail="Image not found")
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete image")
 

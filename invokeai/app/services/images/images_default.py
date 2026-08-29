@@ -346,6 +346,9 @@ class ImageService(ImageServiceABC):
                 # behind and startup recovery purges the leftover files.
                 self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
             self._on_deleted(image_name)
+        except ImageRecordNotFoundException:
+            # Already deleted by another request; nothing here failed, so nothing to log.
+            raise
         except ImageRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete image record")
             raise

@@ -482,17 +482,29 @@ class DiskImageFileStorage(ImageFileStorageBase):
                     continue
                 with open(manifest_path, encoding="utf-8") as manifest:
                     data = json.load(manifest)
+                records = self.__invoker.services.image_records
                 for image_name, image_subfolder in self.__manifest_images(data):
-                    if self.__invoker.services.image_records.exists(image_name):
+                    if records.exists(image_name):
                         # Put back whatever stage_delete() moved aside. Only a single-image journal
                         # ever holds staged files, at indices 0 and 1; a pending-delete journal
                         # moves nothing, so these lookups simply find nothing to restore.
+                        restored = False
                         for index, source in enumerate(self.__delete_candidates(image_name, image_subfolder)):
                             staged = journal_dir / str(index)
                             if staged.exists():
                                 source.parent.mkdir(parents=True, exist_ok=True)
                                 staged.replace(source)
-                        continue
+                                restored = True
+                        # Re-check after a restore, for the same reason rollback_delete() does:
+                        # another Invoke sharing this output folder may have deleted the record
+                        # while the files sat staged, and its own purge found nothing to remove.
+                        # Every deleter purges only after its record is committed as gone, so a
+                        # record still present cannot have been purged before this restore, and a
+                        # record now absent means the files must go — this journal is the last
+                        # thing that can find them. A record-store fault here propagates and keeps
+                        # the journal, like every other lookup in this loop.
+                        if not restored or records.exists(image_name):
+                            continue
                     self.__purge_files(image_name, image_subfolder)
                 shutil.rmtree(journal_dir, ignore_errors=True)
             except Exception as error:
