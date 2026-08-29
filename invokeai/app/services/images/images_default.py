@@ -290,43 +290,39 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete(self, image_name: str):
-        # Stage the file deletion first so a database failure can be rolled back by
-        # restoring the files, keeping the record and files consistent either way.
-        token: object | None = None
-        record_deleted = False
+        # Record first, files second, with a durable journal spanning the two. Deleting the record
+        # first means a database failure leaves the image completely intact, and the only state
+        # that can outlive this call is a file nothing references — which the journal lets startup
+        # recovery find and purge. Nothing is ever moved aside and put back, so a concurrent
+        # deleter of the same image cannot resurrect files whose record has already been removed.
         try:
             record = self.__invoker.services.image_records.get(image_name)
-            token = self.__invoker.services.image_files.stage_delete(image_name, image_subfolder=record.image_subfolder)
-            self.__invoker.services.image_records.delete(image_name)
-            record_deleted = True
+            token = self.__invoker.services.image_files.begin_delete([(image_name, record.image_subfolder)])
+            try:
+                self.__invoker.services.image_records.delete(image_name)
+            except Exception:
+                # The image is still live: drop the journal and leave its files alone.
+                try:
+                    self.__invoker.services.image_files.abandon_delete(token)
+                except Exception as cleanup_error:
+                    self.__invoker.services.logger.error(
+                        f"Failed to discard the delete journal for {image_name}: {cleanup_error}"
+                    )
+                raise
             try:
                 self.__invoker.services.image_files.commit_delete(token)
             except Exception as cleanup_error:
-                # The record is gone; a failed purge only leaves a staging directory
-                # behind, which startup recovery will clean up. Not a delete failure.
-                self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
+                # The record is committed as gone, so the delete succeeded. The journal stays
+                # behind and startup recovery purges the leftover files.
+                self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
             self._on_deleted(image_name)
         except ImageRecordDeleteException:
-            if token is not None:
-                try:
-                    self.__invoker.services.image_files.rollback_delete(token)
-                except Exception as rollback_error:
-                    self.__invoker.services.logger.error(
-                        f"Failed to restore staged image files for {image_name}: {rollback_error}"
-                    )
             self.__invoker.services.logger.error("Failed to delete image record")
             raise
         except ImageFileDeleteException:
             self.__invoker.services.logger.error("Failed to delete image file")
             raise
         except Exception as e:
-            if token is not None and not record_deleted:
-                try:
-                    self.__invoker.services.image_files.rollback_delete(token)
-                except Exception as rollback_error:
-                    self.__invoker.services.logger.error(
-                        f"Failed to restore staged image files for {image_name}: {rollback_error}"
-                    )
             self.__invoker.services.logger.error("Problem deleting image record and file")
             raise e
 
@@ -386,40 +382,52 @@ class ImageService(ImageServiceABC):
             raise e
 
     def delete_intermediates(self) -> int:
-        # Records first, files second. An earlier revision staged every file, then conditionally
-        # deleted the records, then restored the files of any image that had been promoted out of
-        # intermediate status mid-operation. That restore is unfixably racy: while a promoted
-        # image's files sit in our staging directory, a concurrent single-image or board delete can
-        # stage-empty (it finds no files to move) and then remove the record; our restore then puts
-        # the files back with no record referencing them and no staging dir to recover from —
-        # permanent orphans (JPPhoto, PR #9361).
+        # Records first, files second, with a durable journal spanning the two. An earlier revision
+        # staged every file, then conditionally deleted the records, then restored the files of any
+        # image that had been promoted out of intermediate status mid-operation. That restore is
+        # unfixably racy: while a promoted image's files sit in a staging directory, a concurrent
+        # single-image or board delete can stage-empty (it finds no files to move) and then remove
+        # the record; the restore then puts the files back with no record referencing them and no
+        # journal to recover from — permanent orphans (JPPhoto, PR #9361).
         #
-        # Deleting the records first removes that hazard entirely: the conditional DELETE is atomic
-        # and tells us exactly which rows it removed, and we only ever touch the files of rows that
-        # are already gone. A promoted image is never deleted and its files are never staged, so a
-        # concurrent delete of it operates on real files in the output folder and stays consistent.
+        # Deleting the records first removes that hazard: the conditional DELETE is atomic and
+        # reports exactly which rows it removed, and only the files of already-deleted rows are
+        # touched. A promoted image is never deleted and its files are never moved, so a concurrent
+        # delete of it operates on real files in the output folder and stays consistent. The
+        # journal covers the window the reordering opens: if this process dies, or the filesystem
+        # fails, between the commit and the purge, startup recovery finishes the purge for every
+        # journalled image whose record is gone.
         try:
             image_name_subfolder_pairs = self.__invoker.services.image_records.get_intermediates()
+            if not image_name_subfolder_pairs:
+                return 0
             subfolders = dict(image_name_subfolder_pairs)
-            # Conditional on the row still being an intermediate: an image promoted between the
-            # snapshot above and this call keeps both its record and its files. Returns exactly the
-            # names this call removed (already-absent and promoted rows are excluded).
-            deleted_image_names = self.__invoker.services.image_records.delete_intermediates_by_names(
-                list(subfolders.keys())
-            )
-            # The records are committed as gone; purge each file best-effort. A filesystem failure
-            # here orphans that file (nothing references it) but must neither abort the remaining
-            # purges nor undo the committed deletions, so failures are logged and skipped rather
-            # than raised.
-            for image_name in deleted_image_names:
+            token = self.__invoker.services.image_files.begin_delete(list(subfolders.items()))
+            try:
+                # Conditional on the row still being an intermediate: an image promoted between the
+                # snapshot above and this call keeps both its record and its files. Returns exactly
+                # the names this call removed (already-absent and promoted rows are excluded).
+                deleted_image_names = self.__invoker.services.image_records.delete_intermediates_by_names(
+                    list(subfolders.keys())
+                )
+            except Exception:
                 try:
-                    self.__invoker.services.image_files.delete(
-                        image_name, image_subfolder=subfolders.get(image_name, "")
-                    )
+                    self.__invoker.services.image_files.abandon_delete(token)
                 except Exception as cleanup_error:
                     self.__invoker.services.logger.error(
-                        f"Failed to purge intermediate image files for {image_name}: {cleanup_error}"
+                        f"Failed to discard the intermediates delete journal: {cleanup_error}"
                     )
+                raise
+            try:
+                # Only the names whose records this call removed are purged; a promoted image keeps
+                # its files. The journal still lists it, which is harmless — recovery re-checks
+                # every entry against the record store and skips the ones that survived.
+                self.__invoker.services.image_files.commit_delete(token, image_names=deleted_image_names)
+            except Exception as cleanup_error:
+                # The records are committed as gone, so the deletion succeeded. A file that could
+                # not be purged keeps its journal entry and is retried at the next startup; it must
+                # neither fail the operation nor undo the committed deletions.
+                self.__invoker.services.logger.error(f"Failed to purge intermediate image files: {cleanup_error}")
             for image_name in deleted_image_names:
                 self._on_deleted(image_name)
             return len(deleted_image_names)

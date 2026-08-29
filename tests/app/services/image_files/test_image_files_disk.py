@@ -7,10 +7,18 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
-from invokeai.app.services.image_files.image_files_common import ImageFileSaveException
+from invokeai.app.services.image_files.image_files_common import ImageFileDeleteException, ImageFileSaveException
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
-from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.util.thumbnails import get_thumbnail_name
+
+
+def _restart(storage: DiskImageFileStorage, record_exists: bool) -> DiskImageFileStorage:
+    """Simulates a restart over the same output folder, running journal recovery."""
+    invoker = MagicMock()
+    invoker.services.image_records.exists.return_value = record_exists
+    restarted = DiskImageFileStorage(storage.image_root)
+    restarted.start(invoker)
+    return restarted
 
 
 @pytest.fixture
@@ -359,23 +367,166 @@ class TestSaveDeleteRoundTrip:
         image_name = "recover.png"
         disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
         image_path = disk_storage.get_path(image_name)
+        thumbnail_path = disk_storage.get_path(image_name, thumbnail=True)
         disk_storage.stage_delete(image_name)
 
-        invoker = MagicMock()
-        invoker.services.image_records.get.return_value = object()
-        restarted = DiskImageFileStorage(disk_storage.image_root)
-        restarted.start(invoker)
+        _restart(disk_storage, record_exists=True)
 
         assert image_path.exists()
+        assert thumbnail_path.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
 
     def test_startup_purges_staged_files_when_record_was_deleted(self, disk_storage: DiskImageFileStorage):
         image_name = "purge.png"
         disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        image_path = disk_storage.get_path(image_name)
+        disk_storage.stage_delete(image_name)
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not image_path.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_leaves_the_journal_when_the_record_store_is_unreadable(self, disk_storage: DiskImageFileStorage):
+        """A database fault must not decide an image's fate; the journal is retried next startup."""
+        image_name = "unreadable.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
         disk_storage.stage_delete(image_name)
 
         invoker = MagicMock()
-        invoker.services.image_records.get.side_effect = ImageRecordNotFoundException
+        invoker.services.image_records.exists.side_effect = RuntimeError("database is locked")
         restarted = DiskImageFileStorage(disk_storage.image_root)
         restarted.start(invoker)
 
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestPendingDeleteJournal:
+    """begin_delete() writes the journal that makes records-first deletion recoverable.
+
+    Nothing is moved, so a failure can only ever leave files nothing references — and the journal
+    is what lets the next startup find and purge exactly those.
+    """
+
+    def test_begin_delete_leaves_the_files_in_place(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+
+        disk_storage.begin_delete([("live.png", "")])
+
+        assert disk_storage.get_path("live.png").exists()
+        assert disk_storage.get_path("live.png", thumbnail=True).exists()
+        assert len(list(disk_storage.image_root.glob(".delete_*"))) == 1
+
+    def test_begin_delete_rejects_an_unusable_name_before_writing_a_journal(
+        self, disk_storage: DiskImageFileStorage, tmp_path: Path
+    ):
+        """The caller deletes records straight after this returns, so a bad name must fail here."""
+        with pytest.raises(ValueError, match="Invalid image name"):
+            disk_storage.begin_delete([("ok.png", ""), ("../evil.png", "")])
+
+        assert not list(tmp_path.glob(".delete_*"))
+
+    def test_commit_purges_the_files_and_drops_the_journal(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png")
+        token = disk_storage.begin_delete([("gone.png", "")])
+
+        disk_storage.commit_delete(token)
+
+        assert not disk_storage.get_path("gone.png").exists()
+        assert not disk_storage.get_path("gone.png", thumbnail=True).exists()
         assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_commit_purges_only_the_named_images(self, disk_storage: DiskImageFileStorage):
+        """The journal lists every candidate; only the records that were really deleted are purged."""
+        for name in ("deleted.png", "promoted.png"):
+            disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=name)
+        token = disk_storage.begin_delete([("deleted.png", ""), ("promoted.png", "")])
+
+        disk_storage.commit_delete(token, image_names=["deleted.png"])
+
+        assert not disk_storage.get_path("deleted.png").exists()
+        assert disk_storage.get_path("promoted.png").exists()
+        assert disk_storage.get_path("promoted.png", thumbnail=True).exists()
+
+    def test_commit_keeps_the_journal_when_a_file_cannot_be_purged(self, disk_storage: DiskImageFileStorage):
+        """One unremovable file must not abort the other purges, and must not discard the journal:
+        the entry has to survive so the next startup can retry it."""
+        for name in ("bad.png", "good.png"):
+            disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=name)
+        token = disk_storage.begin_delete([("bad.png", ""), ("good.png", "")])
+        bad_path = disk_storage.get_path("bad.png")
+        real_unlink = Path.unlink
+
+        def unlink(self: Path, missing_ok: bool = False):
+            if self == bad_path:
+                raise OSError("device busy")
+            return real_unlink(self, missing_ok=missing_ok)
+
+        with patch.object(Path, "unlink", unlink), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert bad_path.exists()
+        # The failure did not stop the rest of the purge...
+        assert not disk_storage.get_path("good.png").exists()
+        # ...and the journal is still there for startup recovery to finish.
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not bad_path.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_abandon_keeps_the_files_and_drops_the_journal(self, disk_storage: DiskImageFileStorage):
+        """The record delete failed, so the image is still live and must be left completely alone."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="kept.png")
+        token = disk_storage.begin_delete([("kept.png", "")])
+
+        disk_storage.abandon_delete(token)
+
+        assert disk_storage.get_path("kept.png").exists()
+        assert disk_storage.get_path("kept.png", thumbnail=True).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_purges_journalled_files_whose_record_is_gone(self, disk_storage: DiskImageFileStorage):
+        """The crash window records-first opens: records committed as deleted, purge never ran."""
+        for name in ("orphan.png", "survivor.png"):
+            disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=name)
+        disk_storage.begin_delete([("orphan.png", ""), ("survivor.png", "")])
+
+        invoker = MagicMock()
+        invoker.services.image_records.exists.side_effect = lambda name: name == "survivor.png"
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert not disk_storage.get_path("orphan.png").exists()
+        assert not disk_storage.get_path("orphan.png", thumbnail=True).exists()
+        # The record survived, so this one was never deleted and keeps its files.
+        assert disk_storage.get_path("survivor.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_rollback_purges_instead_of_restoring_when_the_record_is_gone(self, disk_storage: DiskImageFileStorage):
+        """A staged delete that fails must not resurrect files another request has already
+        unreferenced. Restoring them would strand them with no record and no journal to find
+        them by (JPPhoto, PR #9361)."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="raced.png")
+        token = disk_storage.stage_delete("raced.png")
+        # Meanwhile another request deleted the record.
+        disk_storage._DiskImageFileStorage__invoker.services.image_records.exists.return_value = False
+
+        disk_storage.rollback_delete(token)
+
+        assert not disk_storage.get_path("raced.png").exists()
+        assert not disk_storage.get_path("raced.png", thumbnail=True).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_rollback_restores_when_the_record_store_cannot_be_read(self, disk_storage: DiskImageFileStorage):
+        """An unreadable database must never cost a live image its files."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="kept.png")
+        token = disk_storage.stage_delete("kept.png")
+        records = disk_storage._DiskImageFileStorage__invoker.services.image_records
+        records.exists.side_effect = RuntimeError("database is locked")
+
+        disk_storage.rollback_delete(token)
+
+        assert disk_storage.get_path("kept.png").exists()
+        assert disk_storage.get_path("kept.png", thumbnail=True).exists()

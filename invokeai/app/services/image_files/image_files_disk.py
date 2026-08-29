@@ -6,6 +6,7 @@ import shutil
 import tempfile
 import threading
 import zlib
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
@@ -32,8 +33,25 @@ _PNG_RLE_MAX_SAMPLE_SIZE_PERCENT = 102
 
 @dataclass
 class _StagedDelete:
+    """Files moved aside by ``stage_delete()``, restorable until the token is committed."""
+
     directory: Path
     files: list[tuple[Path, Path]]
+    image_name: str
+    image_subfolder: str
+
+
+@dataclass
+class _PendingDelete:
+    """A durable record of an intent to purge files, written before the records are deleted.
+
+    Nothing is moved: the journal directory names the images whose files are about to become
+    unreferenced. Startup recovery reconciles any journal that outlives its operation by asking the
+    record store which of its images are really gone.
+    """
+
+    directory: Path
+    images: list[tuple[str, str]]
 
 
 def _get_png_size(image: PILImageType, compress_type: Optional[int] = None) -> int:
@@ -89,7 +107,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
-        self.__recover_staged_deletes()
+        self.__recover_pending_deletes()
 
     @property
     def image_root(self) -> Path:
@@ -202,10 +220,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.commit_delete(token)
 
     def stage_delete(self, image_name: str, image_subfolder: str = "") -> _StagedDelete:
-        candidates = [
-            self.get_path(image_name, image_subfolder=image_subfolder),
-            self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
-        ]
+        candidates = self.__delete_candidates(image_name, image_subfolder)
         staging_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
         staged: list[tuple[Path, Path]] = []
         try:
@@ -220,7 +235,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
                     destination = staging_dir / str(index)
                     source.replace(destination)
                     staged.append((source, destination))
-            return _StagedDelete(directory=staging_dir, files=staged)
+            return _StagedDelete(
+                directory=staging_dir, files=staged, image_name=image_name, image_subfolder=image_subfolder
+            )
         except Exception as e:
             for source, destination in reversed(staged):
                 if destination.exists():
@@ -229,13 +246,74 @@ class DiskImageFileStorage(ImageFileStorageBase):
             shutil.rmtree(staging_dir, ignore_errors=True)
             raise ImageFileDeleteException from e
 
-    def commit_delete(self, token: object) -> None:
+    def begin_delete(self, images: Sequence[tuple[str, str]]) -> _PendingDelete:
+        """Durably records the intent to purge these images' files, before their records are deleted.
+
+        Callers delete the records first and purge afterwards, so the only inconsistency that can
+        outlive a crash or a storage failure is a file nobody references. The journal written here
+        is what makes that recoverable: ``__recover_pending_deletes()`` asks the record store about
+        every image it names, purges the ones whose record is gone, and leaves the rest untouched.
+        """
+        # Resolve every path up front. A name that cannot be turned into a path must fail here,
+        # while the caller can still abort — not after it has deleted the records.
+        for image_name, image_subfolder in images:
+            self.__delete_candidates(image_name, image_subfolder)
+        journal_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
+        try:
+            entries = [
+                {"image_name": image_name, "image_subfolder": image_subfolder} for image_name, image_subfolder in images
+            ]
+            manifest_path = journal_dir / "manifest.json"
+            with open(manifest_path, "w", encoding="utf-8") as manifest:
+                manifest.write(json.dumps({"version": 2, "images": entries}))
+                manifest.flush()
+                os.fsync(manifest.fileno())
+            # Fsync the directory too: without it a crash can leave a journal directory whose
+            # manifest entry never reached the disk, which recovery cannot act on.
+            self.__fsync_directory(journal_dir)
+            return _PendingDelete(directory=journal_dir, images=[(name, subfolder) for name, subfolder in images])
+        except Exception as e:
+            shutil.rmtree(journal_dir, ignore_errors=True)
+            raise ImageFileDeleteException from e
+
+    def abandon_delete(self, token: object) -> None:
+        """Drops a pending-delete journal without purging anything.
+
+        Used when the record deletion failed: the images are still live, so their files must stay.
+        """
+        if not isinstance(token, _PendingDelete):
+            raise ImageFileDeleteException("Invalid pending-delete token")
+        shutil.rmtree(token.directory, ignore_errors=True)
+
+    def commit_delete(self, token: object, image_names: Optional[Collection[str]] = None) -> None:
+        if isinstance(token, _PendingDelete):
+            self.__commit_pending_delete(token, image_names)
+            return
         if not isinstance(token, _StagedDelete):
             raise ImageFileDeleteException("Invalid staged-delete token")
         try:
             shutil.rmtree(token.directory)
         except Exception as e:
             raise ImageFileDeleteException from e
+
+    def __commit_pending_delete(self, token: _PendingDelete, image_names: Optional[Collection[str]]) -> None:
+        # ``image_names`` narrows the purge to the records that were actually deleted; the journal
+        # still lists every candidate, which is harmless because recovery re-checks each one against
+        # the record store and skips any that survived.
+        selected = image_names if image_names is None else set(image_names)
+        failures: list[str] = []
+        for image_name, image_subfolder in token.images:
+            if selected is not None and image_name not in selected:
+                continue
+            try:
+                self.__purge_files(image_name, image_subfolder)
+            except OSError as e:
+                failures.append(f"{image_name}: {e}")
+        if failures:
+            # Leave the journal in place so the next startup retries every entry whose record is
+            # gone. Removing it here would turn a transient storage error into a permanent orphan.
+            raise ImageFileDeleteException(f"Failed to purge deleted image files: {'; '.join(failures)}")
+        shutil.rmtree(token.directory, ignore_errors=True)
 
     def rollback_delete(self, token: object) -> None:
         if not isinstance(token, _StagedDelete):
@@ -245,9 +323,55 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 if destination.exists():
                     source.parent.mkdir(parents=True, exist_ok=True)
                     destination.replace(source)
+            # While these files sat in the staging directory another request may have deleted the
+            # record; restoring them would leave files nothing references and no journal to find
+            # them by. Re-check now that the files are back: every deleter purges an image's files
+            # only *after* its record is committed as gone, so a record still present here cannot
+            # have been purged before this restore, and a record already absent means the purge
+            # either found nothing or is still to come — either way the files must go.
+            self.__purge_if_record_absent(token.image_name, token.image_subfolder)
             shutil.rmtree(token.directory, ignore_errors=True)
         except Exception as e:
             raise ImageFileDeleteException from e
+
+    def __delete_candidates(self, image_name: str, image_subfolder: str) -> list[Path]:
+        return [
+            self.get_path(image_name, image_subfolder=image_subfolder),
+            self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
+        ]
+
+    def __purge_files(self, image_name: str, image_subfolder: str) -> None:
+        """Removes an image's file and thumbnail. Missing files are not an error."""
+        for path in self.__delete_candidates(image_name, image_subfolder):
+            with self.__cache_lock:
+                self.__cache.pop(path, None)
+            path.unlink(missing_ok=True)
+
+    def __purge_if_record_absent(self, image_name: str, image_subfolder: str) -> None:
+        try:
+            record_exists = self.__invoker.services.image_records.exists(image_name)
+        except Exception as e:
+            # A storage fault must never destroy a live image's files. Keep them: a stale file is
+            # recoverable at the next startup, a deleted one is not.
+            InvokeAILogger.get_logger().error(f"Could not confirm whether {image_name} still exists: {e}")
+            return
+        if record_exists:
+            return
+        self.__purge_files(image_name, image_subfolder)
+
+    @staticmethod
+    def __fsync_directory(directory: Path) -> None:
+        try:
+            dir_fd = os.open(directory, os.O_RDONLY)
+        except OSError:
+            # Windows cannot open a directory for fsync; the manifest write above is all we get.
+            return
+        try:
+            os.fsync(dir_fd)
+        except OSError:
+            pass
+        finally:
+            os.close(dir_fd)
 
     def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
         base_folder = self.__thumbnails_folder if thumbnail else self.__output_folder
@@ -315,36 +439,51 @@ class DiskImageFileStorage(ImageFileStorageBase):
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
 
-    def __recover_staged_deletes(self) -> None:
+    def __recover_pending_deletes(self) -> None:
+        """Reconciles every delete journal left behind by an interrupted or failed deletion.
+
+        One rule covers both journal shapes, and the record store decides it: an image whose record
+        survives was never really deleted, so anything staged for it is put back and the journal
+        dropped; an image whose record is gone is an orphan, so its files are purged wherever the
+        interrupted operation left them.
+        """
         logger = InvokeAILogger.get_logger()
-        for staging_dir in self.__output_folder.glob(".delete_*"):
-            manifest_path = staging_dir / "manifest.json"
+        for journal_dir in sorted(self.__output_folder.glob(".delete_*")):
+            manifest_path = journal_dir / "manifest.json"
             if not manifest_path.is_file():
-                if not any(staging_dir.iterdir()):
-                    staging_dir.rmdir()
+                # mkdtemp() ran but the manifest never landed, so this directory names nothing and
+                # there is nothing to reconcile. Only remove it when it is empty.
+                if not any(journal_dir.iterdir()):
+                    journal_dir.rmdir()
                 continue
             try:
                 with open(manifest_path, encoding="utf-8") as manifest:
                     data = json.load(manifest)
-                image_name = data["image_name"]
-                image_subfolder = data.get("image_subfolder", "")
-                candidates = [
-                    self.get_path(image_name, image_subfolder=image_subfolder),
-                    self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
-                ]
-                token = _StagedDelete(
-                    directory=staging_dir,
-                    files=[(source, staging_dir / str(index)) for index, source in enumerate(candidates)],
-                )
-                self.__invoker.services.image_records.get(image_name)
-                self.rollback_delete(token)
+                for image_name, image_subfolder in self.__manifest_images(data):
+                    if self.__invoker.services.image_records.exists(image_name):
+                        # Put back whatever stage_delete() moved aside. Only a single-image journal
+                        # ever holds staged files, at indices 0 and 1; a pending-delete journal
+                        # moves nothing, so these lookups simply find nothing to restore.
+                        for index, source in enumerate(self.__delete_candidates(image_name, image_subfolder)):
+                            staged = journal_dir / str(index)
+                            if staged.exists():
+                                source.parent.mkdir(parents=True, exist_ok=True)
+                                staged.replace(source)
+                        continue
+                    self.__purge_files(image_name, image_subfolder)
+                shutil.rmtree(journal_dir, ignore_errors=True)
             except Exception as error:
-                from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+                # Includes a record-store fault: leave the journal for the next startup rather than
+                # guess. Retrying is always safe; both branches above are idempotent.
+                logger.error(f"Failed to recover image deletion journal {journal_dir}: {error}")
 
-                if isinstance(error, ImageRecordNotFoundException):
-                    shutil.rmtree(staging_dir, ignore_errors=True)
-                else:
-                    logger.error(f"Failed to recover staged image deletion {staging_dir}: {error}")
+    @staticmethod
+    def __manifest_images(data: dict) -> list[tuple[str, str]]:
+        """Reads both journal shapes: a pending delete lists many images, a staged delete names one."""
+        entries = data.get("images")
+        if entries is None:
+            return [(data["image_name"], data.get("image_subfolder", ""))]
+        return [(entry["image_name"], entry.get("image_subfolder", "")) for entry in entries]
 
     def __get_cache(self, image_name: Path) -> Optional[PILImageType]:
         with self.__cache_lock:

@@ -138,6 +138,10 @@ Additionally, each image has a context menu (right-click or Ctrl+click) with pow
   Selecting **Delete Image** will remove the image entirely from your InvokeAI installation. This action cannot be undone.
 :::
 
+:::note
+A deletion removes the image's gallery record first and its files immediately afterwards. If the record cannot be removed, the image is left completely untouched — it stays in the gallery with its files intact. If Invoke is interrupted, or the storage refuses the delete, after the record is gone, the leftover files are noted in a journal and cleaned up the next time Invoke starts. The same applies to **Clear Intermediates**.
+:::
+
 ---
 
 ## Videos in the Gallery
