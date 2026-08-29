@@ -103,12 +103,49 @@ def estimate_vae_working_memory_flux(
 
 # The FLUX.2 VAE runs one attention block at the bottom of the encoder and one at the top of the
 # decoder, on the 8x-downsampled grid. Both are single-head, with the head dim set to the block
-# width: 512 for the stock VAE and 384 for the small-decoder variant. The distinction does not
-# matter here -- what matters is that both sit far above the 128 head dim ROCm's fused SDPA kernels
-# accept, so only the value's side of that limit is load-bearing.
+# width: 512 for the stock VAE and 384 for the small-decoder variant. Either way it is far past the
+# 128 head dim some builds cap their fused SDPA kernels at, so whether the score matrix is
+# materialized is a per-build question -- `sdpa_score_matrix_bytes` asks rather than assumes.
 _FLUX2_VAE_MID_BLOCK_HEADS = 1
 _FLUX2_VAE_MID_BLOCK_HEAD_DIM = 512
 _FLUX2_VAE_SPATIAL_COMPRESSION = 8
+
+# Peak reserved bytes per output pixel per element byte, per conv backend and operation. Fitted with
+# `scripts/calibrate_flux2_working_memory.py --only vae`, which reproduces this table on any build:
+#
+#                                     decode   encode   encode/decode
+#   cuDNN   RTX 4090, torch 2.7.1       2185     1072       0.49
+#   MIOpen  RX 9070 XT, torch 2.10      3453     2688       0.78
+#   MIOpen  RX 7900 XTX, torch 2.10    ~2433        -          -
+#
+# MIOpen's convolution workspaces are simply larger than cuDNN's. This is not the attention term --
+# it shows up identically on the fused path, and the implied constants are flat across resolution on
+# both backends, so the linear model itself holds. And the "encoding costs half of decoding" ratio
+# the other estimators in this module use turns out to be a cuDNN property rather than an
+# architectural one, which is why the two operations carry their own numbers here instead of a ratio.
+#
+# Shipping the MIOpen numbers everywhere would add ~60% to every cuDNN decode for nothing, so the
+# constant follows the backend. The two AMD cards differ by 1.4x, so the MIOpen column is fitted to
+# the larger and over-reserves on the smaller; that is the safe direction.
+#
+# Caveat for AMD users: `MIOPEN_FIND_MODE=2` selects convolution algorithms heuristically instead of
+# by benchmark, and measured a uniform 1.28x more memory at every resolution. It is not the default
+# and is not budgeted for here -- raise `device_working_mem_gb` if you set it.
+_FLUX2_VAE_SCALING_CONSTANTS: dict[str, dict[str, int]] = {
+    "cudnn": {"decode": 2200, "encode": 1100},
+    "miopen": {"decode": 3500, "encode": 2750},
+}
+
+
+def _flux2_vae_scaling_constant(operation: Literal["encode", "decode"], device: torch.device) -> int:
+    """Pick the pixel-area constant for the convolution backend this device will actually use.
+
+    A HIP build reports ``device.type == "cuda"``, so the torch build -- not the device string -- is
+    what separates MIOpen from cuDNN. MPS and CPU are unmeasured and take the cuDNN column; on MPS
+    that pairs with a score-matrix term the probe always charges there, so the total is not thin.
+    """
+    is_rocm = device.type == "cuda" and torch.version.hip is not None
+    return _FLUX2_VAE_SCALING_CONSTANTS["miopen" if is_rocm else "cudnn"][operation]
 
 
 def estimate_vae_working_memory_flux2(
@@ -120,12 +157,16 @@ def estimate_vae_working_memory_flux2(
 ) -> int:
     """Estimate the working memory required to encode or decode with the FLUX.2 (32-channel) VAE.
 
-    Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE.
-    Measured on CUDA/bf16 as peak *reserved* memory (the conservative quantity, including allocator
-    overhead), the implied constants are ~2170 (decode) and ~1070 (encode) bytes per pixel per
-    element byte, flat across 512-1536px; the constants below round those up and match the FLUX.1
-    ones. For reference, decoding 1024x1024 peaks at ~4.3GB and 1536x1536 at ~9.6GB -- far above the
-    default ``device_working_mem_gb``, which is why this estimate must be passed to the model cache.
+    Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE, and
+    the implied constant is flat across 512-1536px on every backend measured. What is *not* constant
+    is the constant itself: MIOpen's convolution workspaces cost ~1.6x cuDNN's for a decode and ~2.4x
+    for an encode, so it is looked up per backend -- see ``_FLUX2_VAE_SCALING_CONSTANTS`` for the
+    fitted table and the caveats. Peak *reserved* memory is what is measured throughout, the
+    conservative quantity that includes allocator overhead.
+
+    For reference, decoding 1024x1024 peaks at ~4.3GB on cuDNN and ~6.6GB on MIOpen, and 1536x1536 at
+    ~9.6GB -- far above the default ``device_working_mem_gb``, which is why this estimate must be
+    passed to the model cache.
 
     That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
@@ -135,19 +176,8 @@ def estimate_vae_working_memory_flux2(
     of the linear term: ~4.5GB at 1024px and ~21GB at 1536px. We ask torch which path applies rather
     than assuming, so the estimate is right on all of them.
 
-    KNOWN GAP -- the linear constants below are CUDA numbers and are short on AMD, by a lot and by an
-    amount that is not yet pinned down. Implied constant for decode, fitted by
-    ``scripts/calibrate_flux2_working_memory.py``: ~2180 on CUDA (which is what 2200 was fitted to),
-    ~2430 on ROCm/gfx1100, ~4300 on ROCm/gfx1201 at 512-1024px. The last of those means an 8.4GB
-    decode against a 4.3GB reservation. It is a conv-workspace difference (MIOpen vs cuDNN), not the
-    attention term -- it shows up on the *fused* path too.
-
-    Raising the constant to cover gfx1201 would double every CUDA reservation for nothing, and the
-    two AMD cards are 1.8x apart, so there is not yet one number to ship. The gfx1201 run also had
-    ``MIOPEN_FIND_MODE=2`` and ``PYTORCH_HIP_ALLOC_CONF=garbage_collection_threshold:0.7`` set, and
-    its series is non-monotonic above 1024px (peak *falls* as resolution rises), which is what a GC
-    threshold does to peak-reserved readings -- so those numbers need a clean re-run before anything
-    is fitted to them. Tracked rather than guessed at. (Unlike the transformer, this attention does not go through
+    The two terms are independent: a build can have a fused kernel and still need the larger
+    convolution constant, which is exactly what gfx1201 does. (Unlike the transformer, this attention does not go through
     diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
     itself -- so torch's own answer is the whole answer here.)
 
@@ -165,8 +195,8 @@ def estimate_vae_working_memory_flux2(
     param = next(vae.parameters())
     element_size = param.element_size()
 
-    # Encoding uses ~50% the working memory of decoding.
-    scaling_constant = 2200 if operation == "decode" else 1100
+    device = device if device is not None else TorchDevice.choose_torch_device()
+    scaling_constant = _flux2_vae_scaling_constant(operation, device)
     batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
 
     if tile_size is not None:
@@ -182,7 +212,7 @@ def estimate_vae_working_memory_flux2(
 
     working_memory *= batch_size
     working_memory += sdpa_score_matrix_bytes(
-        device=device if device is not None else TorchDevice.choose_torch_device(),
+        device=device,
         dtype=param.dtype,
         # The score matrix is (batch, heads, S, S); one head per sample prices the whole batch.
         num_heads=_FLUX2_VAE_MID_BLOCK_HEADS * batch_size,

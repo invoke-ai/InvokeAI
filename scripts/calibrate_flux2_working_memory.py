@@ -67,7 +67,10 @@ from invokeai.app.invocations.flux2_denoise import (
 from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
 from invokeai.backend.model_manager.taxonomy import Flux2VariantType
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT, sdpa_score_matrix_bytes
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
+from invokeai.backend.util.vae_working_memory import (
+    _flux2_vae_scaling_constant,
+    estimate_vae_working_memory_flux2,
+)
 
 GIB = 1024**3
 MIB = 1024**2
@@ -452,7 +455,9 @@ def report_sdpa(shapes: list[tuple[int, int, int]], dtype_name: str) -> list[dic
 
 
 def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[dict]:
-    print("\n=== 3. VAE linear constants (2200 decode / 1100 encode) ===")
+    decode_k = _flux2_vae_scaling_constant("decode", torch.device("cuda"))
+    encode_k = _flux2_vae_scaling_constant("encode", torch.device("cuda"))
+    print(f"\n=== 3. VAE linear constants (this build selects {decode_k} decode / {encode_k} encode) ===")
     print("`implied_k` backs the score-matrix term out, so it is comparable to those literals; fit the")
     print("constant on the rows whose `math` column matches what this build really does (section 1).")
     print("`covered` is the question that matters: is the shipped estimate an upper bound here?")
@@ -486,7 +491,9 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
                 )
     print("")
     _flag_non_monotonic(rows)
-    for operation, shipped in (("decode", 2200), ("encode", 1100)):
+    for operation in ("decode", "encode"):
+        # Compare against the column this build actually selects, not against a hard-coded number.
+        shipped = _flux2_vae_scaling_constant(operation, torch.device("cuda"))
         for force_math in (False, True):
             ks = [
                 r["implied_linear_constant"]

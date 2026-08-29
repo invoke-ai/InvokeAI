@@ -32,7 +32,10 @@ from invokeai.backend.util.attention import (
     _torch_sdpa_materializes_score_matrix,
     sdpa_score_matrix_bytes,
 )
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
+from invokeai.backend.util.vae_working_memory import (
+    _FLUX2_VAE_SCALING_CONSTANTS,
+    estimate_vae_working_memory_flux2,
+)
 
 MB = 1024**2
 GB = 1024**3
@@ -322,6 +325,90 @@ class TestFlux2VaeWorkingMemoryEstimate:
             operation="encode", image_tensor=torch.zeros(1, 3, 2024, 2024), vae=self._mock_bf16_vae(), device=FUSED
         )
         assert estimates[0] < untiled / 4
+
+
+class TestVaeConstantsFollowTheConvBackend:
+    """The pixel-area constant is not one number. MIOpen's convolution workspaces cost far more than
+    cuDNN's for the same decode, and the gap is not the attention term -- it is identical on the
+    fused path. Fitted with `scripts/calibrate_flux2_working_memory.py --only vae`, peak reserved,
+    each point in a fresh process:
+
+                                  decode           encode
+        cuDNN  RTX 4090      2180 2185 2165   1072 1063 1061
+        MIOpen RX 9070 XT    3453 3369 3368   2687 2688 2688
+
+    Flat across 512/768/1024px on both, so the linear model holds; only the coefficient moves. Note
+    the encode column: cuDNN's is half its decode, MIOpen's is four fifths, so "encoding costs half
+    of decoding" -- the ratio the other estimators in the module use -- is a cuDNN property, not an
+    architectural one.
+    """
+
+    # (backend, operation, px, measured GiB)
+    MEASURED = [
+        ("cudnn", "decode", 512, 1.064),
+        ("cudnn", "decode", 768, 2.400),
+        ("cudnn", "decode", 1024, 4.229),
+        ("cudnn", "encode", 512, 0.523),
+        ("cudnn", "encode", 768, 1.168),
+        ("cudnn", "encode", 1024, 2.072),
+        ("miopen", "decode", 512, 1.686),
+        ("miopen", "decode", 768, 3.701),
+        ("miopen", "decode", 1024, 6.578),
+        ("miopen", "encode", 512, 1.312),
+        ("miopen", "encode", 768, 2.953),
+        ("miopen", "encode", 1024, 5.250),
+    ]
+
+    @pytest.mark.parametrize("backend, operation, px, measured_gib", MEASURED)
+    def test_the_constant_upper_bounds_its_own_backend(self, backend, operation, px, measured_gib):
+        """Each column has to bound the hardware it was fitted on. Before this the cuDNN column was
+        used everywhere, leaving a 2.3 GiB shortfall on a 1024px MIOpen decode."""
+        constant = _FLUX2_VAE_SCALING_CONSTANTS[backend][operation]
+        estimate = px * px * 2 * constant  # bf16 element size
+        assert estimate >= measured_gib * GB
+        assert estimate <= 1.3 * measured_gib * GB
+
+    def test_the_cudnn_constant_would_not_cover_miopen(self):
+        """The regression this guards: a 1024px MIOpen decode needs 6.58 GiB and the cuDNN constant
+        reserves 4.30. That is the same class of shortfall #9500 reports, one backend over."""
+        cudnn = _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        assert 1024 * 1024 * 2 * cudnn < 6.578 * GB
+
+    def test_the_encode_ratio_is_not_architectural(self):
+        """cuDNN's encode is half its decode; MIOpen's is four fifths. A shared ratio cannot express
+        both, which is why the table carries the two operations separately."""
+        ratios = {
+            backend: consts["encode"] / consts["decode"] for backend, consts in _FLUX2_VAE_SCALING_CONSTANTS.items()
+        }
+        assert ratios["cudnn"] == pytest.approx(0.50, abs=0.02)
+        assert ratios["miopen"] == pytest.approx(0.79, abs=0.03)
+
+    def test_a_rocm_build_selects_the_miopen_column(self):
+        """A HIP build reports `device.type == "cuda"`, so the torch build is the discriminator."""
+        vae = MagicMock(spec=AutoencoderKLFlux2)
+        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+        latents = torch.zeros(1, 32, 128, 128)
+
+        def estimate():
+            v = MagicMock(spec=AutoencoderKLFlux2)
+            v.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+            return estimate_vae_working_memory_flux2(
+                operation="decode", image_tensor=latents, vae=v, device=torch.device("cuda")
+            )
+
+        with (
+            patch("torch.version.hip", "7.1.25424"),
+            patch("invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", return_value=False),
+        ):
+            rocm = estimate()
+        with (
+            patch("torch.version.hip", None),
+            patch("invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", return_value=False),
+        ):
+            cuda = estimate()
+
+        assert rocm > cuda
+        assert rocm / cuda == pytest.approx(3500 / 2200, rel=1e-3)
 
 
 class TestFlux2VaeBatchIsBudgeted:
