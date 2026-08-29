@@ -1,8 +1,12 @@
+import http.server
 import io
 import logging
-from typing import Any, Iterator
+import socket
+import threading
+from typing import Any, Generator, Iterator
 
 import pytest
+import requests
 from PIL import Image
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
@@ -14,6 +18,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.image_utils import encode_image_base64
 from invokeai.app.services.external_generation.providers import alibabacloud as alibabacloud_module
 from invokeai.app.services.external_generation.providers.alibabacloud import AlibabaCloudProvider
+from invokeai.app.util import ssrf
 from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 
@@ -278,6 +283,186 @@ def test_download_image_rejects_unsafe_provider_url(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(ExternalProviderRequestError, match="unsafe image URL"):
         provider._download_image("http://127.0.0.1/internal.png")
+
+
+# ------------- The guard itself, exercised end to end against a real socket -------------
+#
+# The stubbed test above pins the error translation, but it cannot fail if the guard is
+# removed: it patches `requests.Session.get` to raise, which a plain unguarded Session
+# does just as happily. These tests connect to a real listener instead, so the only thing
+# that can stop the download is the socket-level peer check.
+
+
+class _LoopbackImageHandler(http.server.BaseHTTPRequestHandler):
+    """Serves a valid PNG, so a successful fetch is indistinguishable from a real one."""
+
+    def do_GET(self):  # noqa: N802
+        body = _png_bytes(_make_image("red"))
+        self.send_response(200)
+        self.send_header("Content-Type", "image/png")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+@pytest.fixture
+def loopback_image_server() -> Generator[tuple[str, int], None, None]:
+    """A loopback HTTP server, bound to whichever family `localhost` resolves to here.
+
+    Following `localhost` rather than hard-coding 127.0.0.1 keeps the hostname-based tests
+    below working on images where `localhost` is IPv6-only; otherwise they would fail on a
+    connection refused rather than on the guard. Yields the matching host literal and port.
+    """
+    family, _socktype, _proto, _canonname, sockaddr = socket.getaddrinfo(
+        "localhost", 0, family=socket.AF_UNSPEC, type=socket.SOCK_STREAM
+    )[0]
+    server_cls = type("_LoopbackImageServer", (http.server.HTTPServer,), {"address_family": family})
+    srv = server_cls(sockaddr[:2], _LoopbackImageHandler)
+    host = f"[{sockaddr[0]}]" if family == socket.AF_INET6 else sockaddr[0]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        yield host, srv.server_address[1]
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+@pytest.fixture
+def loopback_tls_port() -> Generator[int, None, None]:
+    """A bare TCP listener that accepts and immediately hangs up, speaking no TLS.
+
+    The peer check runs in `_new_conn()`, before the handshake, so an `https://` URL is
+    refused here without any certificate machinery. If the HTTPS guard were missing the
+    handshake would be attempted and fail with an `SSLError` instead, which is what makes
+    this a real test of the https path rather than of a class name.
+    """
+    srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(8)
+    srv.settimeout(0.25)
+    stop = threading.Event()
+
+    def accept_and_close() -> None:
+        while not stop.is_set():
+            try:
+                conn, _addr = srv.accept()
+            except OSError:  # timeout, or the socket closed under us
+                continue
+            conn.close()
+
+    thread = threading.Thread(target=accept_and_close, daemon=True)
+    thread.start()
+    try:
+        yield srv.getsockname()[1]
+    finally:
+        stop.set()
+        thread.join(timeout=2)
+        srv.close()
+
+
+def _unsafe_in_chain(exc: BaseException) -> bool:
+    seen: BaseException | None = exc
+    while seen is not None:
+        if isinstance(seen, UnsafeDownloadURLException):
+            return True
+        seen = seen.__cause__ or seen.__context__
+    return False
+
+
+def test_download_image_refuses_live_loopback_server(loopback_image_server: tuple[str, int]) -> None:
+    """A provider-supplied URL pointing at a live internal service must not be fetched.
+
+    The port is open and serving a real PNG, so the TCP connect succeeds and the peer
+    check is the only thing that can refuse it. Reverting `_download_image` to any
+    unguarded client fails here.
+    """
+    host, port = loopback_image_server
+    provider = _provider()
+
+    with pytest.raises(ExternalProviderRequestError, match="unsafe image URL") as excinfo:
+        provider._download_image(f"http://{host}:{port}/internal.png")
+    assert _unsafe_in_chain(excinfo.value)
+
+
+def test_download_image_refuses_loopback_over_https(loopback_tls_port: int) -> None:
+    """The https path must be guarded too — DashScope hands back https URLs in practice.
+
+    Asserting that `_GuardedHTTPSConnectionPool` is installed only checks a class name;
+    this actually drives a connection through it. Pointing the https guard back at
+    urllib3's stock `HTTPSConnection` reopens the fetch and is caught here and nowhere else.
+    """
+    provider = _provider()
+
+    with pytest.raises(ExternalProviderRequestError, match="unsafe image URL") as excinfo:
+        provider._download_image(f"https://127.0.0.1:{loopback_tls_port}/internal.png")
+    assert _unsafe_in_chain(excinfo.value)
+
+
+def test_download_image_blocks_loopback_reached_via_hostname(loopback_image_server: tuple[str, int]) -> None:
+    """A hostname, not just an IP literal, must be caught — and caught at the socket.
+
+    `_download_image` does no up-front URL inspection, so nothing resolves the host before
+    `requests` does. That is what makes this rebinding-resistant: the address the guard
+    judges is the one the client actually connected to, not one from an earlier lookup
+    that an attacker controlling the zone could answer differently.
+    """
+    _host, port = loopback_image_server
+    provider = _provider()
+
+    with pytest.raises(ExternalProviderRequestError, match="unsafe image URL") as excinfo:
+        provider._download_image(f"http://localhost:{port}/internal.png")
+    assert _unsafe_in_chain(excinfo.value)
+
+
+def test_download_image_blocks_percent_encoded_loopback_host(loopback_image_server: tuple[str, int]) -> None:
+    """`requests` decodes unreserved percent-escapes in the host before connecting.
+
+    `%6cocalhost` is not `localhost` to any check that reads the URL string, but it is the
+    host `requests` actually dials, so only the socket check catches it.
+    """
+    _host, port = loopback_image_server
+    provider = _provider()
+
+    with pytest.raises(ExternalProviderRequestError, match="unsafe image URL") as excinfo:
+        provider._download_image(f"http://%6cocalhost:{port}/internal.png")
+    assert _unsafe_in_chain(excinfo.value)
+
+
+def test_download_image_session_is_guarded_and_ignores_ambient_proxies(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The session `_download_image` builds must be guarded *and* keep resolution in-process.
+
+    Asserted against the session actually used rather than against `build_guarded_session`
+    being called by name, so hand-rolling an equivalent session fails here too. The proxy
+    half matters because a plain `requests.Session` carrying the guarded adapter still
+    honours ambient `*_PROXY` variables — which hands destination resolution to the proxy
+    and leaves the peer check inspecting the proxy instead of the target.
+    """
+    provider = _provider()
+    for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+        monkeypatch.setenv(var, "http://198.51.100.9:8080")
+
+    used: list[requests.Session] = []
+
+    def capture(session: requests.Session, url: str, *_args: Any, **_kwargs: Any) -> DummyResponse:
+        used.append(session)
+        image_bytes = _png_bytes(_make_image("green"))
+        return DummyResponse(ok=True, content=image_bytes, headers={"Content-Length": str(len(image_bytes))})
+
+    monkeypatch.setattr("requests.Session.get", capture)
+    provider._download_image("https://example.invalid/ok.png")
+
+    assert len(used) == 1
+    session = used[0]
+    for prefix in ("http://", "https://"):
+        adapter = session.get_adapter(prefix + "example.invalid")
+        assert isinstance(adapter, ssrf.SsrfGuardedAdapter)
+        assert adapter.poolmanager.pool_classes_by_scheme["http"] is ssrf._GuardedHTTPConnectionPool
+        assert adapter.poolmanager.pool_classes_by_scheme["https"] is ssrf._GuardedHTTPSConnectionPool
+    settings = session.merge_environment_settings("https://example.invalid/ok.png", {}, None, None, None)
+    assert settings["proxies"] == {}
 
 
 def test_poll_task_first_call_no_initial_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
