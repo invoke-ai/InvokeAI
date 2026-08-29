@@ -3,7 +3,6 @@ from typing import Optional
 import torch
 from PIL import Image
 
-# Import SAM2 components - these should be available in transformers 4.56.0+
 from transformers.models.sam2 import Sam2Model
 from transformers.models.sam2.processing_sam2 import Sam2Processor
 
@@ -19,7 +18,7 @@ class SegmentAnything2Pipeline(RawModel):
 
         Args:
             sam2_model: The SAM2 model
-            sam2_processor: The SAM2 processor (can be Sam2Processor or Sam2VideoProcessor)
+            sam2_processor: The SAM2 processor used to preprocess inputs and post-process masks
         """
         self._sam2_model = sam2_model
         self._sam2_processor = sam2_processor
