@@ -18,7 +18,6 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 
 
@@ -49,16 +48,20 @@ class Flux2VaeEncodeInvocation(BaseInvocation):
         """
         # See the decode node: FLUX.2 VAE activations are multi-GB, so the cache needs the estimate to
         # free room rather than discovering the shortfall as an OOM.
+        # Use the VAE's intended compute device for both the probe and the encode, matching the
+        # decode node. `choose_torch_device()` disagrees for a cpu_only VAE, which would both ask the
+        # dispatch probe about the wrong device and push the tensors onto a device the weights are
+        # not on (see #9373, and the same note in the decode node).
+        device = vae_info.compute_device
         estimated_working_memory = estimate_vae_working_memory_flux2(
             operation="encode",
             image_tensor=image_tensor,
             vae=vae_info.model,
-            device=TorchDevice.choose_torch_device(),
+            device=device,
         )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
-            device = TorchDevice.choose_torch_device()
             image_tensor = image_tensor.to(device=device, dtype=vae_dtype)
 
             # Encode using diffusers API

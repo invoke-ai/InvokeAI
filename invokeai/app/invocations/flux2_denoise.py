@@ -39,6 +39,7 @@ from invokeai.backend.flux2.sampling_utils import (
     unpack_flux2,
 )
 from invokeai.backend.flux2.text_conditioning import Flux2TextConditioning
+from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_size
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
@@ -52,12 +53,16 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import FLUXCo
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 
-# FLUX.2 attention geometry. The head dim is 128 across every variant; the head count follows the
-# hidden size (Klein 4B: 24, Klein 9B: 32, FLUX.2 dev: 48). Only the head dim decides which SDPA
-# kernel is eligible; the head count scales the `math` fallback's score matrix, and since the
-# working-memory estimate is computed before the transformer is loaded, we use the largest.
+# FLUX.2 attention geometry. The head dim is 128 across every variant and the head count follows
+# the hidden size (Klein 4B: 3072/24, Klein 9B: 4096/32, [dev] 6144/48), so the width is the single
+# number that describes both. Only the head dim decides which SDPA kernel is eligible; the head
+# count scales the `math` fallback's score matrix.
 FLUX2_ATTENTION_HEAD_DIM = 128
-FLUX2_MAX_ATTENTION_HEADS = 48
+# The width the per-token constant below was measured on. Estimates scale off this.
+FLUX2_REFERENCE_HIDDEN_SIZE = 4096
+# The widest variant, used when the config does not tell us which one this is -- over-reserving on
+# an unknown model beats under-reserving on the largest one.
+FLUX2_MAX_HIDDEN_SIZE = 6144
 
 
 @invocation(
@@ -487,6 +492,9 @@ class Flux2DenoiseInvocation(BaseInvocation):
             # actually go through the transformer. Reference latents are repeated to match it
             # (`ensure_batch_size` below), so they scale with it too.
             batch_size=x.shape[0],
+            # Activation cost per token scales with the transformer's width, and [dev] is 1.5x
+            # Klein 9B. Fall back to the widest variant when the config cannot tell us.
+            hidden_size=flux2_hidden_size(getattr(transformer_config, "variant", None)) or FLUX2_MAX_HIDDEN_SIZE,
             # The mask itself is already allocated; only the additive bias built per forward is new.
             regional_attention_bias_bytes=(
                 regional_attn_mask.numel() * torch.empty((), dtype=inference_dtype).element_size()
@@ -627,6 +635,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         text_seq_len: int,
         num_loras: int,
         batch_size: int = 1,
+        hidden_size: int = FLUX2_REFERENCE_HIDDEN_SIZE,
         regional_attention_bias_bytes: int = 0,
         has_regional_attention_mask: bool = False,
         device: torch.device | None = None,
@@ -638,8 +647,19 @@ class Flux2DenoiseInvocation(BaseInvocation):
         activation footprint scales *linearly* with the total attended sequence -- text tokens, image
         tokens, and reference-image tokens alike. Measured on the Klein 9B geometry in bf16 as peak
         reserved memory, that slope is ~0.39 MB per token and holds from 1.5k to 28k tokens; it is
-        also independent of the block count (a no-grad forward frees each block's intermediates), so
-        the constant applies to both the 4B and 9B variants.
+        also independent of the block count (a no-grad forward frees each block's intermediates).
+
+        It is *not* independent of the transformer's width, which is why ``hidden_size`` is a
+        parameter rather than a constant. Measured slope between 4608 and 9216 tokens, block count
+        and everything else held fixed:
+
+            3072 (Klein 4B) 0.291 MB/tok    4096 (Klein 9B) 0.386    6144 ([dev]) 0.555
+
+        which is 0.755 / 1.000 / 1.438 against width ratios of 0.75 / 1.00 / 1.50 -- linear in width,
+        and slightly sub-linear at the top so scaling by width stays an upper bound. Calibrating on
+        Klein 9B alone would have under-reserved [dev] by a third: 1024x1024 with three 1024x1024
+        references is 16896 tokens, ~7.6GB reserved against ~10GB needed. The head count follows the
+        same width, so the score-matrix term gets the real one instead of the widest.
 
         The reference-image term is what makes this estimate necessary rather than merely nice to
         have: a 1024x1024 generation is 4096 image tokens (~1.7GB), but attaching three 1024x1024
@@ -661,17 +681,18 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         The linear model holds only while attention runs on a fused kernel. Regional prompting is
         where that stops being a given: it hands the transformer a dense additive ``S x S`` bias,
-        which flash attention never accepts and which ROCm's memory-efficient kernel rejects as
-        well, leaving the ``math`` fallback and its materialized ``heads x S x S`` score matrix. The
-        device decides too -- MPS has no fused SDPA kernel at all -- and so does the diffusers
-        attention backend this build dispatches through. ``sdpa_score_matrix_bytes`` asks all three
-        and adds the score matrix only where it is really built: on CUDA with the stock backend the
-        memory-efficient kernel takes the bias and the term is zero (verified: peak stays linear
-        with the bias attached).
+        which flash attention never accepts, leaving whatever else the build has -- and if that is
+        the ``math`` fallback, a materialized ``heads x S x S`` score matrix. Whether a mask forces
+        that is build-specific and not worth predicting: CUDA's memory-efficient kernel takes it, and
+        so does ROCm's on gfx1100. The device decides too (MPS has no fused SDPA kernel at all), and
+        so does the diffusers attention backend this build dispatches through.
+        ``sdpa_score_matrix_bytes`` asks all three and adds the score matrix only where it is really
+        built: on CUDA with the stock backend the term is zero (verified: peak stays linear with the
+        bias attached).
         """
         GB = 1024**3
         MB = 1024**2
-        per_token_bytes = int(0.4 * MB)
+        per_token_bytes = int(0.4 * MB * hidden_size / FLUX2_REFERENCE_HIDDEN_SIZE)
         total_seq_len = image_seq_len + ref_image_seq_len + text_seq_len
         estimated = total_seq_len * batch_size * per_token_bytes
         estimated += int(1.0 * GB)
@@ -679,7 +700,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         estimated += sdpa_score_matrix_bytes(
             device=device if device is not None else TorchDevice.choose_torch_device(),
             dtype=dtype,
-            num_heads=FLUX2_MAX_ATTENTION_HEADS * batch_size,
+            num_heads=(hidden_size // FLUX2_ATTENTION_HEAD_DIM) * batch_size,
             head_dim=FLUX2_ATTENTION_HEAD_DIM,
             seq_len=total_seq_len,
             has_attn_mask=has_regional_attention_mask,

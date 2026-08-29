@@ -4,6 +4,7 @@ Utility routine used for autodetection of optimal slice size
 for attention mechanism.
 """
 
+import threading
 import warnings
 from functools import lru_cache
 
@@ -45,21 +46,29 @@ def auto_detect_slice_size(latents: torch.Tensor) -> str:
 # SDPA computes attention one of two ways: a fused kernel (flash / memory-efficient / cuDNN) that
 # never materializes the O(S^2) score matrix, or the `math` fallback, which does. Which one runs is
 # not a property of FLUX.2 -- it is a property of the build, the device, the dtype, the head dim and
-# whether an attention mask was passed. CUDA's memory-efficient kernel accepts head dims well past
-# 128 and arbitrary additive masks; ROCm's fused kernels reject both; MPS has no fused SDPA kernel
-# at all. A working-memory estimate that assumes the fused path is therefore only correct on the
-# build it was measured on, which is why the helpers below ask instead of assuming.
+# whether an attention mask was passed, and the rules differ per build in ways that are not worth
+# hard-coding. CUDA takes head dims well past 128 on its memory-efficient kernel; ROCm caps them at
+# 128 and drops to `math` above that; MPS has no fused SDPA kernel at all. (Masks are *not* a
+# reliable discriminator: a 128-wide masked head reports the memory-efficient kernel on gfx1100 too.)
+# A working-memory estimate that assumes the fused path is therefore only correct on the build it was
+# measured on, which is why the helpers below ask instead of assuming.
 
-# Peak *reserved* bytes per element of the materialized score matrix, measured on CUDA with
-# `SDPBackend.MATH` forced, each point in a fresh process: 12.9 bytes/element at 4k tokens, 10.3 at
-# 8k, 9.7 at 16k -- and the same figures for bf16, fp16 and fp32 inputs, because the fallback's
-# softmax intermediates are fp32 regardless. So this is an absolute byte count, not a multiple of
-# the element size. 13 is an upper bound on every measured point from 4k tokens up; below that it
-# can fall a couple of MB short of the allocator's rounding, which is noise next to the GB-scale
-# linear terms this is added to. It is a CUDA measurement standing in for every materializing
-# backend -- no other was available to calibrate against -- but the intermediates it prices (an
-# fp32 score matrix and its softmax) have the same shape wherever the fallback runs.
-SDPA_MATH_BYTES_PER_SCORE_ELEMENT = 13
+# Peak *reserved* bytes per element of the materialized score matrix, with `SDPBackend.MATH` forced,
+# each point in a fresh process. The same figures hold for bf16, fp16 and fp32 inputs, because the
+# fallback's softmax intermediates are fp32 regardless -- so this is an absolute byte count, not a
+# multiple of the element size.
+#
+#   heads  seq    head_dim   CUDA    ROCm (gfx1100, torch 2.10)
+#       1  4096        512   12.9    13.62
+#       1  8192        512   10.3    10.78
+#       1 16384        512    9.7     9.76
+#       4  4096        128     -     10.16
+#      48  4608        128     -      9.59
+#
+# 14 is an upper bound on every measured point on both. It was 13, which held on CUDA but came in
+# 0.62 under ROCm's worst point -- 4.7MB on a GB-scale estimate, so not a memory bug, but it made
+# the pinned test red on ROCm and the docstring's "upper bound" claim false.
+SDPA_MATH_BYTES_PER_SCORE_ELEMENT = 14
 
 # `_fused_sdp_choice` reports which kernel `F.scaled_dot_product_attention` would pick. These are
 # the answers that mean "a fused kernel"; `MATH` -- and `ERROR`, which torch returns when it cannot
@@ -69,6 +78,9 @@ _FUSED_SDP_CHOICES = frozenset(
     for name in ("FLASH_ATTENTION", "EFFICIENT_ATTENTION", "CUDNN_ATTENTION", "OVERRIDEABLE")
     if hasattr(SDPBackend, name)
 )
+
+# Guards the process-global warning filter list that `catch_warnings` swaps; see the probe below.
+_WARNING_FILTER_LOCK = threading.Lock()
 
 _DISPATCH_TORCH = "torch"
 _DISPATCH_FUSED = "fused"
@@ -159,10 +171,15 @@ def _torch_sdpa_materializes_score_matrix(
         device = torch.device(device_type) if device_index is None else torch.device(device_type, device_index)
         q = torch.empty((1, 1, 8, head_dim), device=device, dtype=dtype)
         mask = torch.empty((1, 1, 8, 8), device=device, dtype=dtype) if has_attn_mask else None
-        with warnings.catch_warnings():
+        with _WARNING_FILTER_LOCK, warnings.catch_warnings():
             # When no fused kernel is eligible, torch re-runs every check in debug mode to warn why
             # each one was rejected. That is the case we are deliberately probing for; we do not
             # want a wall of warnings every time an estimate is priced.
+            #
+            # `catch_warnings` swaps the process-global filter list, and this probe is deliberately
+            # uncached, so with concurrent session workers two estimates could interleave their
+            # enter/exit and leave a stale filter set behind. The lock makes the swap atomic against
+            # other probes; it costs nothing at ~6us of hold time.
             warnings.simplefilter("ignore")
             choice = int(torch.ops.aten._fused_sdp_choice(q, q, q, mask, 0.0, False))
     except Exception:
@@ -185,9 +202,12 @@ def sdpa_score_matrix_bytes(
 
     Add this to a working-memory estimate whose linear term was calibrated on a fused kernel. On
     CUDA it is almost always 0; where the fused kernels are missing or reject the shapes -- ROCm
-    caps the head dim at 128 and does not take arbitrary additive masks, MPS ships no fused SDPA
-    kernel at all -- it is the dominant term: a 1536px FLUX.2 VAE decode materializes 36864^2
-    scores, ~17GB of them.
+    caps the head dim at 128, MPS ships no fused SDPA kernel at all -- it is the dominant term: a
+    1536px FLUX.2 VAE decode materializes 36864^2 scores, ~18GB of them.
+
+    That is a large term to add on a probe, so it is logged when it fires: a user who suddenly sees
+    their model pushed out of VRAM should be able to find out why from the log rather than by
+    reading this file.
 
     Set ``via_diffusers_dispatch`` for attention that runs inside a diffusers model (the FLUX.2
     transformer does; the FLUX.2 VAE's mid-block attention does not -- it still reaches
@@ -205,9 +225,25 @@ def sdpa_score_matrix_bytes(
         if dispatch == _DISPATCH_FUSED:
             return 0
         if dispatch == _DISPATCH_MATH:
-            return score_matrix_bytes
+            return _log_and_return(score_matrix_bytes, device, head_dim, "the diffusers backend")
         # _DISPATCH_TORCH: diffusers forwards to `F.scaled_dot_product_attention`, so torch decides.
 
     if not _torch_sdpa_materializes_score_matrix(device.type, device.index, dtype, head_dim, has_attn_mask):
         return 0
+    return _log_and_return(score_matrix_bytes, device, head_dim, "this torch build")
+
+
+@lru_cache(maxsize=None)
+def _log_score_matrix_reservation(device_type: str, head_dim: int, reason: str, gib: str) -> None:
+    """Announce the materializing path once per (device, head dim, reason). It is the difference
+    between a model that stays resident and one that does not, and nothing else in the log says so.
+    """
+    InvokeAILogger.get_logger(__name__).info(
+        f"SDPA materializes its attention score matrix on {device_type} for head_dim={head_dim} "
+        f"({reason}), so working-memory estimates reserve an extra ~{gib} GiB for it."
+    )
+
+
+def _log_and_return(score_matrix_bytes: int, device: torch.device, head_dim: int, reason: str) -> int:
+    _log_score_matrix_reservation(device.type, head_dim, reason, f"{score_matrix_bytes / 1024**3:.1f}")
     return score_matrix_bytes

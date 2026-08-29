@@ -130,10 +130,15 @@ def estimate_vae_working_memory_flux2(
     That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
     512-wide head, and measured peak stays linear from 512 to 1536px). A build with no fused kernel
-    for the shapes -- ROCm caps the head dim at 128, MPS has no fused SDPA kernel at all -- drops to
-    SDPA's ``math`` fallback and materializes a (pixels/8)^2 score matrix on top of the linear term:
-    ~3.5GB at 1024px and ~17GB at 1536px. We ask torch which path applies rather than assuming, so
-    the estimate is right on both. (Unlike the transformer, this attention does not go through
+    for the shapes -- ROCm caps the head dim at 128 and reports ``math`` for this 512-wide one, MPS
+    has no fused SDPA kernel at all -- materializes a (pixels/8)^2 score matrix on top of the linear
+    term: ~3.7GB at 1024px and ~18GB at 1536px. We ask torch which path applies rather than assuming,
+    so the estimate is right on both.
+
+    Known gap: the linear constants below were calibrated on CUDA, and on ROCm the same decode costs
+    more than they predict -- measured there at 768px, 3.78GB against 3.45GB estimated. 512px is
+    covered by the 3GB ``device_working_mem_gb`` floor and 1024px and up have margin, so the shortfall
+    is confined to the middle of the range and is ~0.33GB. Recalibrating for it needs ROCm hardware. (Unlike the transformer, this attention does not go through
     diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
     itself -- so torch's own answer is the whole answer here.)
 

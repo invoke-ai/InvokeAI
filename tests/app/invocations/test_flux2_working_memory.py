@@ -17,7 +17,12 @@ import torch
 import torch.nn.functional as F
 from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux2
 
-from invokeai.app.invocations.flux2_denoise import FLUX2_MAX_ATTENTION_HEADS, Flux2DenoiseInvocation
+from invokeai.app.invocations.flux2_denoise import (
+    FLUX2_ATTENTION_HEAD_DIM,
+    FLUX2_MAX_HIDDEN_SIZE,
+    FLUX2_REFERENCE_HIDDEN_SIZE,
+    Flux2DenoiseInvocation,
+)
 from invokeai.app.invocations.flux2_vae_decode import Flux2VaeDecodeInvocation
 from invokeai.app.invocations.flux2_vae_encode import Flux2VaeEncodeInvocation
 from invokeai.backend.util.attention import (
@@ -30,6 +35,11 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
 
 MB = 1024**2
 GB = 1024**3
+
+# The estimator's default width, and the head count that follows from it. The suite's pinned
+# `MEASURED_DENOISE` table was taken on Klein 9B, which is that default, so those rows are unmoved
+# by the width scaling.
+KLEIN_9B_HEADS = FLUX2_REFERENCE_HIDDEN_SIZE // FLUX2_ATTENTION_HEAD_DIM
 
 # The measured tables in this module were all taken on CUDA, where SDPA runs a fused kernel and no
 # score matrix is materialized. torch reports its CPU flash kernel as eligible for every shape used
@@ -44,6 +54,7 @@ def _estimate(
     text_seq_len=512,
     num_loras=0,
     batch_size=1,
+    hidden_size=FLUX2_REFERENCE_HIDDEN_SIZE,
     regional_bias=0,
     has_regional_mask=False,
     device=FUSED,
@@ -55,6 +66,7 @@ def _estimate(
         text_seq_len=text_seq_len,
         num_loras=num_loras,
         batch_size=batch_size,
+        hidden_size=hidden_size,
         regional_attention_bias_bytes=regional_bias,
         has_regional_attention_mask=has_regional_mask,
         device=device,
@@ -110,6 +122,55 @@ class TestFlux2DenoiseWorkingMemoryEstimate:
     def test_regional_attention_bias_is_added(self):
         base = _estimate(image_seq_len=4096)
         assert _estimate(image_seq_len=4096, regional_bias=123 * MB) - base == 123 * MB
+
+
+class TestTransformerWidthIsBudgeted:
+    """Per-token activation cost is linear in the transformer's hidden width, not only in the token
+    count. Measured slope between 4608 and 9216 tokens on CUDA/bf16, block count and everything else
+    held fixed, each point in a fresh process:
+
+        3072 (Klein 4B) 0.2912 MB/tok    4096 (Klein 9B) 0.3859    6144 ([dev]) 0.5547
+
+    which is 0.755 / 1.000 / 1.438 of the Klein 9B slope against width ratios of 0.75 / 1.00 / 1.50.
+    Linear, and sub-linear at the top, so scaling the constant by width stays an upper bound.
+
+    Calibrating on Klein 9B alone -- which this did -- silently under-reserved FLUX.2 [dev] by a
+    third, and [dev] reaches the denoise node as a first-class path with its own loader and starter
+    models. The head count follows the same width, so the score-matrix term gets the variant's real
+    count rather than the widest.
+    """
+
+    # (hidden size, measured MB per token)
+    MEASURED_WIDTH_SLOPE = [(3072, 0.2912), (4096, 0.3859), (6144, 0.5547)]
+
+    def _slope_per_token(self, hidden):
+        short = _estimate(image_seq_len=4096, text_seq_len=512, hidden_size=hidden)
+        long = _estimate(image_seq_len=8704, text_seq_len=512, hidden_size=hidden)
+        return (long - short) / (9216 - 4608)
+
+    @pytest.mark.parametrize("hidden, measured_mb", MEASURED_WIDTH_SLOPE)
+    def test_the_estimate_upper_bounds_the_measured_slope(self, hidden, measured_mb):
+        slope = self._slope_per_token(hidden)
+        assert slope >= measured_mb * MB
+        assert slope <= 1.25 * measured_mb * MB
+
+    def test_the_slope_is_linear_in_width(self):
+        klein_9b = self._slope_per_token(4096)
+        assert self._slope_per_token(3072) == pytest.approx(0.75 * klein_9b, rel=0.01)
+        assert self._slope_per_token(6144) == pytest.approx(1.50 * klein_9b, rel=0.01)
+
+    @pytest.mark.parametrize("hidden, heads", [(3072, 24), (4096, 32), (6144, 48)])
+    def test_the_score_matrix_uses_the_variants_real_head_count(self, hidden, heads):
+        """It used to charge 48 heads for every variant. On a materializing backend that is a third
+        too much on Klein 9B and double on Klein 4B -- and on MPS, where the probe always takes the
+        materializing branch, that term lands on every single estimate."""
+        seq_len = 4096 + 512
+        fused = _estimate(image_seq_len=4096, has_regional_mask=True, hidden_size=hidden)
+        with _materializing():
+            materializing = _estimate(
+                image_seq_len=4096, has_regional_mask=True, hidden_size=hidden, device=MATERIALIZING
+            )
+        assert materializing - fused == heads * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
 
 class TestFlux2DenoiseBatchIsBudgeted:
@@ -171,7 +232,7 @@ class TestFlux2DenoiseBatchIsBudgeted:
             single = _estimate(image_seq_len=4096, has_regional_mask=True, device=MATERIALIZING)
             double = _estimate(image_seq_len=4096, has_regional_mask=True, batch_size=2, device=MATERIALIZING)
         assert double - single == (
-            seq_len * int(0.4 * MB) + FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+            seq_len * int(0.4 * MB) + KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         )
 
     def test_the_lora_margin_scales_with_the_batch(self):
@@ -377,7 +438,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
     """The denoise node must hand its estimate to the cache, and that estimate must grow with the
     attached reference images -- the combination that #9500 was missing."""
 
-    def _run(self, num_ref_tokens: int, batch: int = 1, init_batch: int | None = None):
+    def _run(self, num_ref_tokens: int, batch: int = 1, init_batch: int | None = None, variant="klein_9b"):
         """Drive `_run_diffusion` up to the transformer load and return the requested working memory."""
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -390,8 +451,13 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
         context = MagicMock()
         context.models.load.return_value = transformer_info
+        from invokeai.backend.model_manager.taxonomy import Flux2VariantType
+
         context.models.get_config.return_value = MagicMock(
-            base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Checkpoint
+            base=BaseModelType.Flux2,
+            type=ModelType.Main,
+            format=ModelFormat.Checkpoint,
+            variant=Flux2VariantType(variant) if variant is not None else None,
         )
         context.conditioning.load.return_value = ConditioningFieldData(
             conditionings=[FLUXConditioningInfo(clip_embeds=torch.zeros(1, 768), t5_embeds=torch.zeros(1, 512, 12288))]
@@ -459,6 +525,33 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         single = self._run(num_ref_tokens=0, batch=1)
         assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * int(0.4 * MB)
 
+    @pytest.mark.parametrize(
+        "variant, hidden",
+        [("klein_4b", 3072), ("klein_4b_base", 3072), ("klein_9b", 4096), ("klein_9b_base", 4096), ("dev", 6144)],
+    )
+    def test_the_variants_width_reaches_the_reservation(self, variant, hidden):
+        """Per-token cost is linear in the transformer's width, so the reservation has to know which
+        variant it is loading. Calibrating on Klein 9B alone under-reserved [dev] by a third. Base
+        variants share their distilled twin's geometry."""
+        assert self._run(num_ref_tokens=0, variant=variant) == _estimate(
+            image_seq_len=64 * 64, text_seq_len=512, hidden_size=hidden
+        )
+
+    def test_dev_reserves_half_again_what_klein_9b_does(self):
+        """The blocker in one assertion: 1024x1024 with three 1024x1024 references is 16896 tokens,
+        where the difference is ~3GB."""
+        tokens = 64 * 64 + 12288 + 512
+        klein = self._run(num_ref_tokens=12288, variant="klein_9b")
+        dev = self._run(num_ref_tokens=12288, variant="dev")
+        assert dev - klein == tokens * (int(0.4 * MB * 6144 / 4096) - int(0.4 * MB))
+        assert dev - klein > 2 * GB
+
+    def test_an_unreadable_variant_falls_back_to_the_widest(self):
+        """Over-reserving on a model we cannot identify beats under-reserving on the largest one."""
+        assert self._run(num_ref_tokens=0, variant=None) == _estimate(
+            image_seq_len=64 * 64, text_seq_len=512, hidden_size=FLUX2_MAX_HIDDEN_SIZE
+        )
+
     def test_a_batched_init_latent_beats_the_batch_1_noise_it_is_blended_with(self):
         """img2img takes `x = t_0 * noise + (1 - t_0) * init_latents`, and this node builds its noise
         at batch 1 from width/height/seed. Two batched init latents therefore broadcast up to a
@@ -480,21 +573,22 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         assert double - single == (64 * 64 + 12288 + 512) * int(0.4 * MB)
 
 
-def _rocm_like_probe(device_type, device_index, dtype, head_dim, has_attn_mask):
-    """Stand in for the torch probe on a build with ROCm's fused-kernel rules.
+def _materializing_probe(device_type, device_index, dtype, head_dim, has_attn_mask):
+    """A synthetic stand-in for the torch probe, so both regimes can be exercised without hardware.
 
-    ROCm's fused SDPA kernels cap the head dim at 128 and do not take an arbitrary additive mask;
-    anything else falls through to the `math` fallback, which materializes the score matrix. CUDA's
-    memory-efficient kernel accepts both -- verified on torch 2.7.1+cu128, where
-    `_fused_sdp_choice` reports the efficient kernel for the VAE's 512-wide head and for a masked
-    128-wide transformer head, and measured peak stays linear in both cases -- which is why the
-    estimates were linear to begin with.
+    It reports `math` for a head dim above 128 -- which is what ROCm really does, gfx1100 answers
+    MATH for the VAE's 512-wide head -- and also for an additive mask, which is *not* a hardware
+    claim: gfx1100 reports the memory-efficient kernel for a masked 128-wide head, same as CUDA.
+    The mask leg is here only to drive the masked branch of the estimator; which builds take it is
+    the probe's business, not this module's.
     """
     return head_dim > 128 or has_attn_mask
 
 
 def _materializing():
-    return patch("invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", side_effect=_rocm_like_probe)
+    return patch(
+        "invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", side_effect=_materializing_probe
+    )
 
 
 # Any CUDA device object works here: the probe is patched out, so nothing is allocated on it.
@@ -595,9 +689,7 @@ class TestMaterializedScoreMatrixIsBudgeted:
                 has_regional_mask=True,
                 device=MATERIALIZING,
             )
-        assert materializing - fused == (
-            FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        )
+        assert materializing - fused == (KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
         assert materializing - fused > 50 * bias_bytes
 
     def test_denoise_without_a_regional_mask_is_unaffected(self):
@@ -736,9 +828,11 @@ class TestSdpaBackendProbe:
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="asks the real CUDA/ROCm dispatcher")
     def test_this_build_reports_its_own_dispatch(self):
-        """On CUDA both shapes are fused and this whole term is zero -- the fix is a no-op for the
-        hardware the constants were measured on. On ROCm the same call reports the fallback and the
-        term appears. Either answer is correct; the point is that it comes from torch."""
+        """The head dim is the discriminator that actually holds: CUDA's memory-efficient kernel
+        takes the VAE's 512-wide head, ROCm caps at 128 and reports `math` for it. Masks are not a
+        discriminator -- gfx1100 reports the memory-efficient kernel for a masked 128-wide head just
+        as CUDA does -- so the masked case only has to agree with whatever torch says, which is the
+        whole point of asking it."""
         vae_bytes = sdpa_score_matrix_bytes(
             device=torch.device("cuda"), dtype=torch.bfloat16, num_heads=1, head_dim=512, seq_len=16384
         )
@@ -750,12 +844,29 @@ class TestSdpaBackendProbe:
             seq_len=4608,
             has_attn_mask=True,
         )
-        if torch.version.hip is None:
-            assert vae_bytes == 0
-            assert masked_bytes == 0
-        else:
-            assert vae_bytes > 0
-            assert masked_bytes > 0
+        assert vae_bytes == (0 if torch.version.hip is None else 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
+        materializes = _torch_sdpa_materializes_score_matrix(
+            "cuda", torch.device("cuda").index, torch.bfloat16, 128, True
+        )
+        assert masked_bytes == (48 * 4608 * 4608 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT if materializes else 0)
+
+    # (heads, seq, head_dim, bytes per score element) measured with SDPBackend.MATH forced on
+    # ROCm 7.1 / torch 2.10 / gfx1100. The CUDA points live in the constant's own comment; the worst
+    # of either platform is ROCm's 13.62 at the smallest shape, which is why the constant is 14.
+    MEASURED_BYTES_PER_ELEMENT_ROCM = [
+        (1, 4096, 512, 13.62),
+        (1, 8192, 512, 10.78),
+        (1, 16384, 512, 9.76),
+        (4, 4096, 128, 10.16),
+        (48, 4608, 128, 9.59),
+    ]
+
+    @pytest.mark.parametrize("num_heads, seq_len, head_dim, measured", MEASURED_BYTES_PER_ELEMENT_ROCM)
+    def test_the_constant_upper_bounds_every_measured_platform(self, num_heads, seq_len, head_dim, measured):
+        """13 held on CUDA and came in under ROCm's smallest shape. The shortfall was 4.7MB -- noise
+        against the GB-scale linear terms -- but it made the pinned bound below red on ROCm, and the
+        constant's "upper bound on every measured point" claim false."""
+        assert SDPA_MATH_BYTES_PER_SCORE_ELEMENT >= measured
 
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="measures real peak reserved memory")
     @pytest.mark.parametrize("num_heads, seq_len, head_dim", [(1, 4096, 512), (4, 4096, 128)])
@@ -777,7 +888,10 @@ class TestSdpaBackendProbe:
         measured = torch.cuda.max_memory_reserved() - before
 
         estimate = num_heads * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        assert estimate >= measured
+        assert estimate >= measured, (
+            f"{estimate / num_heads / seq_len / seq_len:.2f} bytes/element measured here; "
+            f"SDPA_MATH_BYTES_PER_SCORE_ELEMENT={SDPA_MATH_BYTES_PER_SCORE_ELEMENT} must be an upper bound"
+        )
         assert estimate <= 2 * measured
 
 
@@ -807,9 +921,7 @@ class TestDiffusersAttentionDispatchIsConsulted:
             forced_math = _estimate(image_seq_len=4096, device=FUSED)
         native = _estimate(image_seq_len=4096, device=FUSED)
         seq_len = 4096 + 512
-        assert forced_math - native == (
-            FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        )
+        assert forced_math - native == (KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
 
     def test_a_fused_backend_leaves_the_denoise_estimate_linear(self):
         """`flash`, `sage`, `xformers` and friends exist precisely to avoid the score matrix; they
@@ -843,9 +955,7 @@ class TestDiffusersAttentionDispatchIsConsulted:
         back_to_native = _estimate(image_seq_len=4096, device=FUSED)
 
         seq_len = 4096 + 512
-        assert after_switch - native == (
-            FLUX2_MAX_ATTENTION_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        )
+        assert after_switch - native == (KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
         assert back_to_native == native
 
     def test_a_model_level_override_reaches_the_registry(self):

@@ -60,3 +60,23 @@ def flux2_variant_from_vec_dim(dim: int) -> Flux2VariantType | None:
 def flux2_variant_from_hidden_size(dim: int) -> Flux2VariantType | None:
     """Return the distilled FLUX.2 variant for a transformer hidden_size, or ``None`` if unrecognized."""
     return _HIDDEN_SIZE_TO_VARIANT.get(dim)
+
+
+# Base variants share their distilled twin's architecture (see the module docstring); only the
+# weights differ, so they resolve to the same geometry.
+_BASE_TO_DISTILLED: dict[Flux2VariantType, Flux2VariantType] = {
+    Flux2VariantType.Klein4BBase: Flux2VariantType.Klein4B,
+    Flux2VariantType.Klein9BBase: Flux2VariantType.Klein9B,
+}
+
+
+def flux2_hidden_size(variant: Flux2VariantType | None) -> int | None:
+    """Return the transformer hidden size for a variant, or ``None`` if unrecognized.
+
+    The forward direction of :func:`flux2_variant_from_hidden_size`. Callers that size activations
+    need this: the per-token activation cost scales with the transformer's width, so Klein 4B, Klein
+    9B and [dev] (3072 / 4096 / 6144) do not cost the same per token.
+    """
+    if variant is None:
+        return None
+    return _HIDDEN_SIZE.get(_BASE_TO_DISTILLED.get(variant, variant))
