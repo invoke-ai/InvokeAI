@@ -248,8 +248,9 @@ def _get_lora_layer_values(
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if "dora_scale" in layer_dict:
-            values["dora_scale"] = layer_dict["dora_scale"]
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         if "alpha" in layer_dict:
             values["alpha"] = layer_dict["alpha"]
         if alpha is not None:
@@ -258,17 +259,22 @@ def _get_lora_layer_values(
     return layer_dict
 
 
-# Maps each recognized weight-key suffix to the canonical value-key used downstream. The PEFT/diffusers DoRA
-# magnitude is published as ``<layer>.lora_magnitude_vector.weight``; it is the same thing InvokeAI stores as
-# ``dora_scale``, so mapping it here lets a standard Diffusers DoRA adapter (A/B + magnitude) load as a
-# DoRALayer instead of being split into a bogus, unrecognized layer.
+# Maps each recognized weight-key suffix to the canonical value-key used downstream.
+#
+# DoRA magnitudes come in two orientations that must not be mixed up (see ``DoRALayer``):
+#   - ``.dora_scale`` (LyCORIS/kohya) indexes the *input* dim  -> value key ``dora_scale``
+#   - ``.lora_magnitude_vector.weight`` (PEFT/diffusers) and ``.magnitude`` (ai-toolkit) index the *output*
+#     dim -> value key ``dora_magnitude``
+# Mapping them here lets a DoRA adapter (A/B + magnitude) load as a DoRALayer instead of being split into a
+# bogus, unrecognized layer.
 _SUFFIX_TO_VALUE_KEY = {
     ".lora_A.weight": "lora_A.weight",
     ".lora_B.weight": "lora_B.weight",
     ".lora_down.weight": "lora_down.weight",
     ".lora_up.weight": "lora_up.weight",
     ".dora_scale": "dora_scale",
-    ".lora_magnitude_vector.weight": "dora_scale",
+    ".lora_magnitude_vector.weight": "dora_magnitude",
+    ".magnitude": "dora_magnitude",
     ".alpha": "alpha",
 }
 
