@@ -221,11 +221,19 @@ def reattach_layer_sidechannel(
     destination in the converted state dict — usually because the converter drops that module
     outright — so its scale is dropped with it. Returning them rather than swallowing them lets the
     caller say so: a *silently* dropped scale is exactly the failure this pair exists to prevent.
+
+    A destination counts as present when *any* tensor sits under it, not specifically a
+    ``<path>.weight``. Requiring that name assumes every quantizable module stores its parameter as
+    ``weight``, which is not true of the norms: a producer that quantizes them (the
+    "quantizes everything" class documented in :func:`can_stay_quantized`) writes ``<path>.scale``,
+    and the guard would reject the destination for the wrong reason and drop a scale it could have
+    placed.
     """
+    present_modules = {key.rsplit(".", 1)[0] for key in sd if isinstance(key, str) and "." in key}
     orphaned: list[str] = []
     for path, entries in detached.items():
         destination = path_map.get(path, path)
-        if f"{destination}.weight" not in sd:
+        if destination not in present_modules:
             orphaned.append(path)
             continue
         for suffix, value in entries:
@@ -323,10 +331,20 @@ def _usable_input_scale(scale: torch.Tensor | None) -> torch.Tensor | None:
 
     Non-finite and non-positive scales are rejected for the same reason: they cannot be a valid
     divisor, and using one would produce inf/NaN activations instead of a slightly worse image.
+
+    A multi-element ``input_scale`` is dropped rather than raising. ``scaled_mm_linear`` scales the
+    activations by a single value, so there is nothing to do with a per-channel or per-block
+    activation scale, and the dynamic per-forward ``amax`` path is a correct fallback. Reshaping it
+    to a scalar unconditionally turned such a checkpoint into a `RuntimeError: shape '[]' is invalid
+    for input of size N` at load time -- the one malformed side-channel in this module that neither
+    skipped nor explained itself.
     """
     if scale is None:
         return None
-    scale = scale.float().reshape(())
+    scale = scale.float()
+    if scale.numel() != 1:
+        return None
+    scale = scale.reshape(())
     if not torch.isfinite(scale) or scale <= 0 or scale.item() == 1.0:
         return None
     return scale
@@ -615,6 +633,18 @@ def full_precision_hints_respected() -> bool:
         return True
 
 
+# Wordings torch uses when `_scaled_mm` is genuinely unavailable on the hardware, as opposed to
+# having failed under load. Kept narrow on purpose: anything not matched here is treated as
+# transient and re-probed, which is the safe direction (see `_probe_fp8_matmul`).
+_UNSUPPORTED_MM_MARKERS = ("compute capability", "not supported", "no kernel image", "not implemented")
+
+
+def _is_definitive_unsupported_error(exc: BaseException) -> bool:
+    """Whether ``exc`` says the device cannot do fp8 matmul at all, rather than not right now."""
+    message = str(exc).lower()
+    return any(marker in message for marker in _UNSUPPORTED_MM_MARKERS)
+
+
 def _probe_fp8_matmul(index: int) -> bool | None:
     """Run one minimal ``_scaled_mm`` on device ``index`` and report whether it worked.
 
@@ -625,11 +655,21 @@ def _probe_fp8_matmul(index: int) -> bool | None:
     capability gate is to *fall back* rather than raise mid-generation, so it must not itself be a
     guess. The probe is one 16x16 matmul, run once per device and cached.
 
-    Returns ``None`` when the probe could not be *carried out* — an allocation failure rather than
-    an unsupported operation. The probe runs during a model load, i.e. under real VRAM pressure, and
-    caching a momentary OOM as "this GPU cannot do fp8" would disable the fp8 matmul for the rest of
-    the process. Same reasoning as `_device_supports_fp8_storage`, which also refuses to cache a
-    transient failure.
+    Returns ``None`` when the probe could not be *carried out* rather than having established that
+    the operation is unsupported. The probe runs during a model load, i.e. under real VRAM pressure
+    and alongside whatever else the driver is doing, and caching a momentary failure as "this GPU
+    cannot do fp8" would disable the fp8 matmul for the rest of the process. Same reasoning as
+    `_device_supports_fp8_storage`, which also refuses to cache a transient failure.
+
+    A ``RuntimeError`` is therefore treated as inconclusive *unless* it names the support
+    constraint. Listing the transient wordings instead would be the wrong way round: an OOM and a
+    cuBLAS workspace failure are only two of the ways a loaded machine can fail this call, and every
+    wording not on such a list would be cached as permanent. The definitive answer has one stable
+    shape — torch says the op needs a given compute capability — so match that and treat the open
+    set as inconclusive.
+
+    An inconclusive answer costs one 16x16 matmul on the next load; a wrongly cached one costs the
+    fp8 path for the lifetime of the process.
     """
     try:
         device = torch.device("cuda", index)
@@ -641,11 +681,10 @@ def _probe_fp8_matmul(index: int) -> bool | None:
     except torch.OutOfMemoryError:
         return None
     except RuntimeError as e:
-        # cuBLAS reports a failed workspace allocation as a plain RuntimeError, not an OOM.
-        if "out of memory" in str(e).lower() or "ALLOC_FAILED" in str(e):
-            return None
-        return False
+        return False if _is_definitive_unsupported_error(e) else None
     except Exception:
+        # Not a RuntimeError: a missing op or a rejected dtype, i.e. structural rather than
+        # situational. Those do not become true on a less busy machine.
         return False
     return True
 

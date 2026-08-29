@@ -38,8 +38,10 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.fp8_scaled import (
+    TRANSFORMER_KEY_PREFIXES,
     attach_fp8_scales,
     cast_state_dict,
+    expand_weight_scale,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
@@ -204,6 +206,13 @@ def _read_gguf_metadata_int(path: Path, key: str) -> int | None:
     return int(value) if isinstance(value, (int, float)) else None
 
 
+# Wrapper prefixes this loader strips from the state dict. Kept as a named constant because the
+# `_quantization_metadata` header names its layers *before* the strip, so the hints have to be
+# re-keyed with exactly the same list -- see `_load_text_encoder`. Restating it there would be a
+# second copy free to drift.
+MISTRAL_KEY_PREFIXES = ("text_encoder.", "language_model.")
+
+
 def _strip_known_prefixes(sd: dict[str, Any]) -> dict[str, Any]:
     """Strip wrapper prefixes used by some FLUX.2 single-file redistributions.
 
@@ -217,7 +226,7 @@ def _strip_known_prefixes(sd: dict[str, Any]) -> dict[str, Any]:
             out[key] = value
             continue
         new_key = key
-        for prefix in ("text_encoder.", "language_model."):
+        for prefix in MISTRAL_KEY_PREFIXES:
             if new_key.startswith(prefix):
                 new_key = new_key[len(prefix) :]
                 break
@@ -375,13 +384,10 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.
     dequantized = 0
     for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
         weight = sd[weight_key].float()
-        scale = sd[scale_key].float()
-        if scale.shape != weight.shape and scale.numel() > 1:
-            for dim in range(len(weight.shape)):
-                if dim < len(scale.shape) and scale.shape[dim] != weight.shape[dim]:
-                    block = weight.shape[dim] // scale.shape[dim]
-                    if block > 1:
-                        scale = scale.repeat_interleave(block, dim=dim)
+        # `expand_weight_scale` rather than a local broadcast: a per-output-channel scale is 1-D of
+        # length `out`, and `(out, in) * (out,)` aligns on the *last* axis, so it scales input
+        # channels instead of output channels -- wrong on a square weight, a shape error otherwise.
+        scale = expand_weight_scale(weight, sd[scale_key].float())
         result = weight * scale
         sd[weight_key] = result.to(target_dtype) if target_dtype is not None else result
         dequantized += 1
@@ -949,8 +955,13 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         keep_fp8 = should_keep_fp8_weights(target_device)
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
+            # This loader strips its own wrapper prefixes on top of the generic ones, so the hints
+            # need both lists. With only the generic tuple, a `language_model.`-prefixed
+            # redistribution keeps its hint names while the sd keys lose the prefix, and every
+            # `full_precision_matrix_mult` is silently ignored.
             header_hints = strip_layer_path_prefix(
-                parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+                parse_quantization_metadata(read_safetensors_metadata(model_path, logger)),
+                prefixes=(*MISTRAL_KEY_PREFIXES, *TRANSFORMER_KEY_PREFIXES),
             )
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
             fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)

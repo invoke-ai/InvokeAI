@@ -39,6 +39,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
+    expand_weight_scale,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
@@ -551,11 +552,15 @@ class ZImageCheckpointModel(ModelLoader):
         skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
         # Scaled layers that the cast would dequantize anyway are folded here, scale applied, so
         # `cast_state_dict` never strips a scale it cannot put back.
-        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
-
+        # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
+        # subset through fp32, so reserving afterwards lets that transient peak land on an
+        # unreserved cache. The prediction is unaffected by the split -- it applies the same
+        # `can_stay_quantized` predicate, so those layers are already counted at `dtype.itemsize`.
         self._ram_cache.make_room(
             predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
         )
+
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
         kept = cast_state_dict(
             sd,
             model_dtype,
@@ -1079,16 +1084,12 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
             # as PyTorch doesn't support direct type promotion for Float8 types
             weight_float = weight.float()
-            scale = scale.float()
-            if scale.shape != weight_float.shape and scale.numel() > 1:
-                # Block-wise quantization: need to expand scale to match weight shape
-                # Find which dimension differs and repeat scale along that dimension
-                for dim in range(len(weight_float.shape)):
-                    if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
-                        block_size = weight_float.shape[dim] // scale.shape[dim]
-                        if block_size > 1:
-                            # Repeat scale along this dimension to match weight shape
-                            scale = scale.repeat_interleave(block_size, dim=dim)
+            # `expand_weight_scale` handles all three layouts (per-tensor, per-output-channel,
+            # block-wise). The local loop it replaces left a 1-D per-channel scale untouched, and
+            # `(out, in) * (out,)` then broadcasts on the *last* axis -- scaling input channels
+            # instead of output channels, which is wrong on a square weight and a shape error on
+            # any other.
+            scale = expand_weight_scale(weight_float, scale.float())
             # Multiply in float32 for precision, but store the compute dtype immediately so the
             # *whole model* is never materialized in float32. Keeping every dequantized weight as
             # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs

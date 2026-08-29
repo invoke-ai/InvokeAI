@@ -25,7 +25,6 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.fp8_scaled import (
-    FP8_DTYPE,
     attach_fp8_scales,
     cast_state_dict,
     dequantize_fp8_scaled,
@@ -380,7 +379,9 @@ class Krea2CheckpointModel(ModelLoader):
             path_map = _remap_native_layer_paths({*detached, *layer_hints})
             orphaned = reattach_layer_sidechannel(sd, detached, path_map)
             if orphaned:
-                self._logger.debug(
+                # INFO, not DEBUG: a dropped scale leaves its weight off by 1/weight_scale with no
+                # other symptom, so the one line that mentions it must be visible by default.
+                self._logger.info(
                     f"Krea-2: dropped quantization side-channel for {len(orphaned)} module(s) with no "
                     f"diffusers counterpart (e.g. {orphaned[0]})."
                 )
@@ -404,11 +405,15 @@ class Krea2CheckpointModel(ModelLoader):
         # *without* it and `attach_fp8_scales` would then skip them for no longer being fp8 —
         # a weight silently off by 1/weight_scale. Krea-2's `time_embed.linear_1/linear_2` are
         # ordinary quantized Linears in a ComfyUI export and match the model's `time_embed` pattern.
-        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
-
+        # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
+        # subset through fp32, so reserving afterwards lets that transient peak land on an
+        # unreserved cache. The prediction is unaffected by the split -- it applies the same
+        # `can_stay_quantized` predicate, so those layers are already counted at `dtype.itemsize`.
         self._ram_cache.make_room(
             predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
         )
+
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
         # A checkpoint with raw fp8 weights (fp8 tensors and no weight_scale) yields no fp8_layers at
         # all, but its weights are still usable on the tensor cores, so the same `keep_fp8` covers
         # both kinds.
@@ -709,15 +714,25 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         with accelerate.init_empty_weights():
             model = Qwen3VLModel._from_config(te_config)
 
-        # fp8 weights keep their own (1-byte) footprint; everything else lands in model_dtype.
-        new_sd_size = sum(
-            ten.nelement() * (ten.element_size() if ten.dtype == FP8_DTYPE else model_dtype.itemsize)
-            for ten in sd.values()
-        )
-        self._ram_cache.make_room(new_sd_size)
-        for k in sd.keys():
-            if sd[k].dtype is not FP8_DTYPE:
-                sd[k] = sd[k].to(model_dtype)
+        # Same ordering contract as every other loader in this series: split *before* the cast.
+        # A per-key `if dtype is not FP8_DTYPE` cast looks equivalent and is not — it keeps every
+        # fp8 tensor quantized, including the ones that must not stay:
+        #
+        #  - a 1-D fp8 norm (checkpoints that "quantize everything" ship these) would keep its
+        #    scale as an unused buffer on a non-Linear and the forward would compute on the raw
+        #    fp8 codes, i.e. off by 1/weight_scale with nothing logged;
+        #  - an e5m2 scaled weight would be cast *without* its scale, since only e4m3fn is spared;
+        #  - a block-wise scale would reach `scaled_mm_linear` unchecked and raise mid-generation.
+        #
+        # `split_fp8_scaled_layers` applies exactly those filters and dequantizes the affected
+        # layers *with* their scale, so what remains is what the matmul can actually consume.
+        keep_fp8 = should_keep_fp8_weights(target_device)
+        # Reserve before the split: it dequantizes its unusable subset through fp32, so reserving
+        # afterwards lets that transient peak land on an unreserved cache. The prediction is
+        # unaffected -- it applies the same `can_stay_quantized` predicate.
+        self._ram_cache.make_room(predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model))
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model)
+        cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model)
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Qwen3-VL encoder checkpoint")

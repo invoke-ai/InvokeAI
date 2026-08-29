@@ -15,8 +15,10 @@ from invokeai.backend.quantization.fp8_scaled import (
     dequantize_weight,
     detach_layer_sidechannel,
     device_supports_fp8_matmul,
+    expand_weight_scale,
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
+    is_matmul_usable_scale,
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
@@ -592,6 +594,17 @@ class TestScaledMm:
 class TestCustomLinearIntegration:
     """The fp8 matmul must be opt-in and must degrade to the dequantized path, never raise."""
 
+    @pytest.fixture(autouse=True)
+    def _restore_matmul_override(self):
+        """Clear the override after each test, rather than leaving it pinned to ``False``.
+
+        These tests reset with ``set_fp8_matmul_enabled(False)``, which is not the neutral state --
+        it is an explicit "off" that outlives the class and silently overrides the config for
+        anything that runs later in the same process.
+        """
+        yield
+        set_fp8_matmul_enabled(None)
+
     def _module(self, device: torch.device, in_f=64, out_f=128, device_autocasting: bool = False):
         from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
             apply_custom_layers_to_model,
@@ -1024,3 +1037,136 @@ class TestMxfp8IsRefused:
         layers = extract_fp8_scaled_layers(sd)
 
         assert tuple(layers["lin"].weight_scale.shape) == (4, 2)
+
+
+class TestNonScalarInputScale:
+    """A multi-element ``input_scale`` is dropped, not raised on.
+
+    `scaled_mm_linear` scales activations by one value, so there is nothing to do with a
+    per-channel or per-block activation scale -- but reshaping it to a scalar unconditionally
+    turned such a checkpoint into a shape error at load time. Every other malformed side-channel in
+    this module is either skipped or refused with an actionable message; this one was neither.
+    """
+
+    def _sd(self, input_scale: torch.Tensor) -> dict[str, torch.Tensor]:
+        return {
+            "blocks.0.attn.weight": torch.zeros(16, 16, dtype=torch.float32).to(FP8_DTYPE),
+            "blocks.0.attn.weight_scale": torch.tensor(2.0),
+            "blocks.0.attn.input_scale": input_scale,
+        }
+
+    def test_a_per_channel_input_scale_does_not_abort_the_load(self) -> None:
+        layers = extract_fp8_scaled_layers(self._sd(torch.full((16,), 0.5)))
+
+        assert set(layers) == {"blocks.0.attn"}
+        # Dropped, so the forward falls back to the dynamic amax path -- which is correct.
+        assert layers["blocks.0.attn"].input_scale is None
+        # The weight scale is unaffected by the unusable activation scale.
+        assert layers["blocks.0.attn"].weight_scale is not None
+
+    def test_a_scalar_input_scale_is_still_kept(self) -> None:
+        layers = extract_fp8_scaled_layers(self._sd(torch.tensor(0.5)))
+
+        assert layers["blocks.0.attn"].input_scale is not None
+
+
+class TestMatmulUsableScale:
+    """`is_matmul_usable_scale` decides what may reach `_scaled_mm` un-dequantized."""
+
+    def test_a_per_tensor_scale_is_usable(self) -> None:
+        assert is_matmul_usable_scale(torch.zeros(32, 16), torch.tensor(2.0)) is True
+
+    def test_a_per_output_channel_scale_is_usable(self) -> None:
+        assert is_matmul_usable_scale(torch.zeros(32, 16), torch.full((32,), 2.0)) is True
+
+    def test_a_one_dimensional_scale_of_the_wrong_length_is_not(self) -> None:
+        """The branch that keeps a mislabelled scale out of the kernel.
+
+        A 1-D scale whose length is not the row count is neither per-tensor nor
+        per-output-channel. Letting it through raises inside `_scaled_mm` mid-generation instead of
+        dequantizing the layer up front, which is the whole point of asking.
+        """
+        assert is_matmul_usable_scale(torch.zeros(32, 16), torch.full((16,), 2.0)) is False
+
+    def test_a_block_wise_scale_is_not(self) -> None:
+        assert is_matmul_usable_scale(torch.zeros(32, 16), torch.full((4, 2), 2.0)) is False
+
+
+class TestReattachToNonWeightDestination:
+    """The reattach guard must not assume every module stores its parameter as ``weight``.
+
+    A producer that quantizes norms -- the "quantizes everything" class this module documents --
+    writes ``<path>.scale``. Testing for ``<destination>.weight`` rejects such a destination for the
+    wrong reason and drops a scale it could have placed, with only a log line to show for it.
+    """
+
+    def test_a_destination_whose_tensor_is_not_named_weight_still_receives_its_scale(self) -> None:
+        sd = {"blocks.0.norm_q.scale": torch.zeros(16, dtype=torch.float32).to(FP8_DTYPE)}
+        detached = {"blocks.0.qnorm": [(".weight_scale", torch.tensor(2.0))]}
+
+        orphaned = reattach_layer_sidechannel(sd, detached, {"blocks.0.qnorm": "blocks.0.norm_q"})
+
+        assert orphaned == []
+        assert "blocks.0.norm_q.weight_scale" in sd
+
+    def test_a_destination_absent_from_the_state_dict_is_still_reported(self) -> None:
+        sd = {"blocks.0.attn.weight": torch.zeros(4, 4)}
+        detached = {"blocks.0.dropped": [(".weight_scale", torch.tensor(2.0))]}
+
+        orphaned = reattach_layer_sidechannel(sd, detached, {})
+
+        assert orphaned == ["blocks.0.dropped"]
+        assert not [k for k in sd if k.endswith(".weight_scale")]
+
+
+class TestProbeTransientFailures:
+    """Only a definitively unsupported device may be cached; everything else re-probes.
+
+    Listing the transient wordings is the wrong way round: an OOM and a cuBLAS workspace failure
+    are two of the ways a loaded machine can fail this call, and any wording not on the list would
+    be cached as permanent -- reproducing the failure the OOM branch was written to avoid.
+    """
+
+    def test_an_unrecognized_runtime_error_is_not_cached(self) -> None:
+        reset_fp8_matmul_support_cache()
+        device = torch.device("cuda", 0)
+        with _probe_on_cpu():
+            with mock.patch("torch._scaled_mm", side_effect=RuntimeError("CUDA driver reset")):
+                assert device_supports_fp8_matmul(device) is False
+            # Inconclusive, so the next load re-probes rather than the process losing fp8.
+            with mock.patch("torch._scaled_mm", return_value=torch.zeros(1)):
+                assert device_supports_fp8_matmul(device) is True
+        reset_fp8_matmul_support_cache()
+
+    def test_a_capability_error_is_cached(self) -> None:
+        reset_fp8_matmul_support_cache()
+        device = torch.device("cuda", 0)
+        message = "torch._scaled_mm is only supported on CUDA devices with compute capability >= 8.9"
+        with _probe_on_cpu():
+            with mock.patch("torch._scaled_mm", side_effect=RuntimeError(message)):
+                assert device_supports_fp8_matmul(device) is False
+            with mock.patch("torch._scaled_mm", side_effect=AssertionError("must not be probed again")):
+                assert device_supports_fp8_matmul(device) is False
+        reset_fp8_matmul_support_cache()
+
+
+class TestExpandWeightScaleAxis:
+    """A per-output-channel scale must scale rows, not columns.
+
+    `(out, in) * (out,)` broadcasts on the *last* axis, so a bare multiply scales input channels --
+    wrong on a square weight, a shape error on any other. Both legacy folds used to do exactly that.
+    """
+
+    def test_a_per_channel_scale_lines_up_with_the_rows(self) -> None:
+        weight = torch.ones(3, 2)
+        scale = torch.tensor([1.0, 2.0, 3.0])
+
+        result = weight * expand_weight_scale(weight, scale)
+
+        assert torch.equal(result, torch.tensor([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]]))
+
+    def test_a_non_square_weight_no_longer_raises(self) -> None:
+        weight = torch.ones(4, 2)
+
+        # Without the expansion this is a broadcast error, not merely a wrong number.
+        assert (weight * expand_weight_scale(weight, torch.arange(4, dtype=torch.float32))).shape == (4, 2)

@@ -770,13 +770,17 @@ class FluxCheckpointModel(ModelLoader):
         skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
         # Scaled layers that the cast would dequantize anyway are folded here, scale applied, so
         # `cast_state_dict` never strips a scale that can no longer be put back.
-        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, torch.bfloat16, model=model, skip_patterns=skip_patterns)
-
+        # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
+        # subset through fp32, so reserving afterwards lets that transient peak land on an
+        # unreserved cache. The prediction is unaffected by the split -- it applies the same
+        # `can_stay_quantized` predicate, so those layers are already counted at `dtype.itemsize`.
         self._ram_cache.make_room(
             predict_cast_state_dict_size(
                 sd, torch.bfloat16, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns
             )
         )
+
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, torch.bfloat16, model=model, skip_patterns=skip_patterns)
         # Everything else is cast to bfloat16, the only dtype currently supported for inference.
         kept = cast_state_dict(sd, torch.bfloat16, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
         model.load_state_dict(sd, assign=True)
