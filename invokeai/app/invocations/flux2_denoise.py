@@ -40,7 +40,7 @@ from invokeai.backend.flux2.sampling_utils import (
 )
 from invokeai.backend.flux2.text_conditioning import Flux2TextConditioning
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
     convert_bfl_lora_patch_to_diffusers,
 )
@@ -609,7 +609,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             out.append(Flux2TextConditioning(txt_embeddings=info.t5_embeds, mask=mask_processed))
         return out
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply.
 
         Converts BFL-format LoRA keys to diffusers format if needed, since FLUX.2 Klein
@@ -620,8 +620,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
             converted = convert_bfl_lora_patch_to_diffusers(lora_info.model)
-            yield (converted, lora.weight)
-            del lora_info
+            yield (converted, lora.weight, lora_info.model_in_ram())
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         """Build a callback for step progress updates."""

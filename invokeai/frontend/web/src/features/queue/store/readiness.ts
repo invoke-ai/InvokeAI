@@ -8,7 +8,11 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  isValidKrea2RebalanceWeights,
+  selectMainModelConfig,
+  selectParamsSlice,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
@@ -34,13 +38,13 @@ import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
 import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
-import { getGridSize } from 'features/parameters/util/optimalDimension';
+import { getGridSize, getPidScale } from 'features/parameters/util/optimalDimension';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
+import { selectFlux2DevDiffusersModels, selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainOrExternalModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
@@ -117,6 +121,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
       isConnected,
       model,
@@ -126,6 +131,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -136,6 +142,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
       (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
     );
+    const hasFlux2DevDiffusersSource = selectFlux2DevDiffusersModels(store.getState()).length > 0;
     const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
       isConnected,
       model,
@@ -151,6 +158,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       loras,
       hasFlux2DiffusersVaeSource,
       hasFlux2DiffusersQwen3Source,
+      hasFlux2DevDiffusersSource,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -247,6 +255,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   dynamicPrompts: DynamicPromptsState;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -257,6 +266,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     dynamicPrompts,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -287,17 +297,68 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (!params.fluxVAE) {
       reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
     }
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+    }
   }
 
   if (model?.base === 'flux2' && model.format !== 'diffusers') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
-    if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+    // Non-diffusers FLUX.2 models need standalone VAE + text encoder unless a Diffusers
+    // pipeline of the matching variant family is installed to extract from.
+    if ('variant' in model && model.variant === 'dev') {
+      // FLUX.2 [dev]: needs FLUX.2 VAE + Mistral text encoder.
+      if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+      }
+      if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+      }
+    } else {
+      // FLUX.2 Klein: needs FLUX.2 VAE + Qwen3 text encoder (variant-matched).
+      if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+      }
+      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+      }
     }
-    if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-      reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+  }
+
+  if (model?.base === 'flux2' && params.pidMode !== 'off') {
+    // PiD decode (any FLUX.2 format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+  }
+
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode needs the decoder + Gemma-2 encoder, and is not compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
     }
   }
 
@@ -308,6 +369,16 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     const hasEncoderSource = params.qwenImageQwenVLEncoderModel !== null || params.qwenImageComponentSource !== null;
     if (!hasVaeSource || !hasEncoderSource) {
       reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
+    }
+  }
+
+  if (model?.base === 'qwen-image' && params.pidMode !== 'off') {
+    // PiD decode (any Qwen-Image format) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
     }
   }
 
@@ -335,6 +406,36 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (!hasQwen3Source) {
       reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
     }
+    // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+    }
+  }
+
+  if (model?.base === 'krea-2' && model.format !== 'diffusers') {
+    // Non-diffusers Krea-2 (single-file checkpoint / GGUF) ships only the transformer, so a standalone
+    // VAE and Qwen3-VL encoder must be selected. Diffusers models bundle them, so they're optional there.
+    if (!params.krea2VaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2VaeModelSelected') });
+    }
+    if (!params.krea2Qwen3VlEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
+    }
+  }
+
+  if (
+    model?.base === 'krea-2' &&
+    params.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(params.krea2RebalanceWeights)
+  ) {
+    // The rebalance weights are free text forwarded straight to the backend; block generation before an
+    // invalid string (wrong count / nonnumeric / nan / inf) reaches the failing _parse_weights().
+    reasons.push({ content: i18n.t('parameters.invoke.krea2RebalanceWeightsInvalid') });
   }
 
   if (model?.base === 'anima') {
@@ -520,6 +621,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsSelectingObject: boolean;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
+  hasFlux2DevDiffusersSource: boolean;
 }) => {
   const {
     isConnected,
@@ -536,6 +638,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsSelectingObject,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
+    hasFlux2DevDiffusersSource,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -584,7 +687,23 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
 
     const { bbox } = canvas;
-    const gridSize = getGridSize('flux');
+    // In PiD native mode the bbox is the 4x target, so it must snap to a larger grid (16 * 4) for bbox / 4 to land
+    // on the FLUX grid. getPidScale returns 1 for off/fit, leaving the normal 16px grid.
+    const gridSize = getGridSize('flux', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      // PiD decodes at 4x the generation resolution; "Scale Before Processing" would inflate the generation
+      // size and blow up the decode. Require it to be off (None) so generation == bbox.
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
@@ -628,20 +747,44 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'flux2') {
-    // Non-diffusers FLUX.2 Klein models require standalone VAE and Qwen3 Encoder
-    // unless a diffusers flux2 model is available to extract them from.
-    // VAE is shared across variants, but Qwen3 encoder requires a variant-matching diffusers model.
+    // Non-diffusers FLUX.2 models need standalone VAE + text encoder unless a Diffusers
+    // pipeline of the matching variant family is installed to extract from.
     if (model.format !== 'diffusers') {
-      if (!params.kleinVaeModel && !hasFlux2DiffusersVaeSource) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
-      }
-      if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
-        reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+      if ('variant' in model && model.variant === 'dev') {
+        if (!params.flux2VaeModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevVaeModelSelected') });
+        }
+        if (!params.flux2DevMistralEncoderModel && !hasFlux2DevDiffusersSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2DevMistralEncoderModelSelected') });
+        }
+      } else {
+        if (!params.flux2VaeModel && !hasFlux2DiffusersVaeSource) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinVaeModelSelected') });
+        }
+        if (!params.kleinQwen3EncoderModel && !hasFlux2DiffusersQwen3Source) {
+          reasons.push({ content: i18n.t('parameters.invoke.noFlux2KleinQwen3EncoderModelSelected') });
+        }
       }
     }
 
     const { bbox } = canvas;
-    const gridSize = getGridSize('flux'); // FLUX.2 uses same grid size as FLUX.1
+    // FLUX.2 uses the same 16px grid as FLUX.1. In PiD native mode the bbox is the 4x target, so it must snap to
+    // a larger grid (16 * 4) for bbox / 4 to land on the FLUX grid. getPidScale returns 1 for off/fit.
+    const gridSize = getGridSize('flux2', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      // PiD decodes at 4x the generation resolution; "Scale Before Processing" would inflate the generation
+      // size and blow up the decode. Require it to be off (None) so generation == bbox.
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
@@ -681,6 +824,79 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
           }),
         });
       }
+    }
+  }
+
+  if (model?.base === 'sd-3' && params.pidMode !== 'off') {
+    // PiD decode on the Canvas: needs the decoder + Gemma-2 encoder, and "Scale Before Processing" must be off
+    // (PiD decodes at 4x the generation resolution; scaling would inflate the generation size and blow up the decode).
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (canvas.bbox.scaleMethod !== 'none') {
+      reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+    }
+    // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+    // bbox/4 to land on the SD3 grid; without this a 1040px bbox silently becomes a 256px generation.
+    const gridSize = getGridSize('sd-3', getPidScale(params.pidMode));
+    if (canvas.bbox.rect.width % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+          model: 'SD3',
+          width: canvas.bbox.rect.width,
+          multiple: gridSize,
+        }),
+      });
+    }
+    if (canvas.bbox.rect.height % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+          model: 'SD3',
+          height: canvas.bbox.rect.height,
+          multiple: gridSize,
+        }),
+      });
+    }
+  }
+
+  if (model?.base === 'sdxl' && params.pidMode !== 'off') {
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, "Scale Before Processing" off, and not
+    // compatible with the SDXL Refiner.
+    if (!params.pidDecoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+    }
+    if (!params.gemma2EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.pidIncompatibleWithRefiner') });
+    }
+    if (canvas.bbox.scaleMethod !== 'none') {
+      reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+    }
+    // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+    // bbox/4 to land on the SDXL grid; without this a 1040px bbox silently becomes a 256px generation.
+    const gridSize = getGridSize('sdxl', getPidScale(params.pidMode));
+    if (canvas.bbox.rect.width % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+          model: 'SDXL',
+          width: canvas.bbox.rect.width,
+          multiple: gridSize,
+        }),
+      });
+    }
+    if (canvas.bbox.rect.height % gridSize !== 0) {
+      reasons.push({
+        content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+          model: 'SDXL',
+          height: canvas.bbox.rect.height,
+          multiple: gridSize,
+        }),
+      });
     }
   }
 
@@ -731,7 +947,21 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
 
   if (model?.base === 'qwen-image') {
     const { bbox } = canvas;
-    const gridSize = getGridSize('qwen-image');
+    // In PiD native mode the bbox is the 4x target, so it must snap to a larger grid (16 * 4) for bbox / 4 to land
+    // on the Qwen grid. getPidScale returns 1 for off/fit, leaving the normal 16px grid.
+    const gridSize = getGridSize('qwen-image', getPidScale(params.pidMode));
+
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+    }
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {
@@ -766,6 +996,52 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
         reasons.push({
           content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
             model: 'Qwen Image Edit',
+            height: bbox.scaledSize.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
+  if (model?.base === 'ernie-image') {
+    // ERNIE-Image requires bbox dimensions that are multiples of 16 (enforced by ernie_image_denoise).
+    const { bbox } = canvas;
+    const gridSize = getGridSize('ernie-image');
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'ERNIE-Image',
+            width: bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'ERNIE-Image',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'ERNIE-Image',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'ERNIE-Image',
             height: bbox.scaledSize.height,
             multiple: gridSize,
           }),
@@ -854,6 +1130,60 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     if (!hasQwen3Source) {
       reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
     }
+    // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
+    if (params.pidMode !== 'off') {
+      if (!params.pidDecoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noPidDecoderModelSelected') });
+      }
+      if (!params.gemma2EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noGemma2EncoderModelSelected') });
+      }
+      if (canvas.bbox.scaleMethod !== 'none') {
+        reasons.push({ content: i18n.t('parameters.invoke.pidScaleBeforeProcessingMustBeOff') });
+      }
+      // Native mode generates at bbox/4, so the bbox must be a multiple of the PiD-scaled grid (grid*4) for
+      // bbox/4 to land on the grid; without this a 1040px bbox silently becomes a 256px generation.
+      const gridSize = getGridSize('z-image', getPidScale(params.pidMode));
+      if (canvas.bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Z-Image',
+            width: canvas.bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (canvas.bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Z-Image',
+            height: canvas.bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
+  if (model?.base === 'krea-2' && model.format !== 'diffusers') {
+    // Non-diffusers Krea-2 (single-file checkpoint / GGUF) ships only the transformer, so a standalone
+    // VAE and Qwen3-VL encoder must be selected. Diffusers models bundle them, so they're optional there.
+    if (!params.krea2VaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2VaeModelSelected') });
+    }
+    if (!params.krea2Qwen3VlEncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noKrea2Qwen3VlEncoderModelSelected') });
+    }
+  }
+
+  if (
+    model?.base === 'krea-2' &&
+    params.krea2RebalanceEnabled &&
+    !isValidKrea2RebalanceWeights(params.krea2RebalanceWeights)
+  ) {
+    // The rebalance weights are free text forwarded straight to the backend; block generation before an
+    // invalid string (wrong count / nonnumeric / nan / inf) reaches the failing _parse_weights().
+    reasons.push({ content: i18n.t('parameters.invoke.krea2RebalanceWeightsInvalid') });
   }
 
   if (model?.base === 'anima') {
