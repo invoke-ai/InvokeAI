@@ -234,6 +234,46 @@ class Flux2DenoiseInvocation(BaseInvocation):
         bn_std = bn_std.to(x.device, x.dtype)
         return x * bn_std + bn_mean
 
+    def _prepare_normalized_start_latents(
+        self,
+        init_latents_packed: torch.Tensor,
+        noise_packed: Optional[torch.Tensor],
+        t_0: float,
+        bn_mean: Optional[torch.Tensor],
+        bn_std: Optional[torch.Tensor],
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Build the img2img/inpainting start latents in the transformer's BN-normalized space.
+
+        Only the init latents are normalized. The noise must NOT be: it is already N(0, 1),
+        exactly the distribution the transformer expects in normalized space. The rectified-flow
+        preblend is therefore computed *from* the normalized operands rather than by normalizing
+        the raw mixture -- normalizing the mixture would divide its noise term by bn_std (~1.77 for
+        the FLUX.2 VAE) as well, so the sample would carry only ~57% of the noise implied by the
+        timestep it is handed to the transformer with. The model then over-denoises and flattens
+        fine detail into posterized patches, progressively worse at higher denoise strengths
+        (see #8964).
+
+        Args:
+            init_latents_packed: Packed, un-normalized init latents of shape (B, seq, 128).
+            noise_packed: Packed N(0, 1) noise of shape (B, seq, 128). Required if add_noise.
+            t_0: First timestep of the clipped schedule.
+            bn_mean: BN running mean of shape (128,), or None if the VAE exposes no BN stats.
+            bn_std: BN running std of shape (128,), or None if the VAE exposes no BN stats.
+
+        Returns:
+            Tuple of (start latents, normalized init latents), both of shape (B, seq, 128).
+        """
+        if bn_mean is not None and bn_std is not None:
+            init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
+
+        if self.add_noise:
+            assert noise_packed is not None
+            x = t_0 * noise_packed + (1.0 - t_0) * init_latents_packed
+        else:
+            x = init_latents_packed
+
+        return x, init_latents_packed
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
         latents = self._run_diffusion(context)
@@ -366,30 +406,19 @@ class Flux2DenoiseInvocation(BaseInvocation):
         noise_packed = pack_flux2(noise) if noise is not None else None
         x = pack_flux2(x)
 
-        # BN normalization for img2img/inpainting:
-        # - The init_latents from VAE encode are NOT BN-normalized
-        # - The transformer operates in BN-normalized space
-        # - We must normalize x, init_latents, AND noise for InpaintExtension
-        # - Output MUST be denormalized after denoising before VAE decode
-        #
-        # This ensures that:
-        # 1. x starts in the correct normalized space for the transformer
-        # 2. When InpaintExtension merges intermediate_latents with noised_init_latents,
-        #    both are in the same scale/space (noise and init_latents must be in same space
-        #    for the linear interpolation: noised = noise * t + init * (1-t))
-        if bn_mean is not None and bn_std is not None:
-            if init_latents_packed is not None:
-                init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
-                # Also normalize noise for InpaintExtension - it's used to compute
-                # noised_init_latents = noise * t + init_latents * (1-t)
-                # Both operands must be in the same normalized space
-                if noise_packed is not None:
-                    noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
-            # For img2img/inpainting, x is computed from init_latents and must also be normalized
-            # For txt2img, x is pure noise (already N(0,1)) - normalizing it would be incorrect
-            # We detect img2img by checking if init_latents was provided
-            if init_latents is not None:
-                x = self._bn_normalize(x, bn_mean, bn_std)
+        # The init latents from VAE encode are NOT BN-normalized, but the transformer operates in
+        # BN-normalized space, so the img2img/inpainting start latents are rebuilt there. The noise
+        # is left untouched -- see _prepare_normalized_start_latents. pack_flux2 is a pure rearrange,
+        # so blending before or after packing is equivalent. Output is denormalized again below,
+        # after denoising, before it goes to the VAE.
+        if init_latents_packed is not None:
+            x, init_latents_packed = self._prepare_normalized_start_latents(
+                init_latents_packed=init_latents_packed,
+                noise_packed=noise_packed,
+                t_0=timesteps[0],
+                bn_mean=bn_mean,
+                bn_std=bn_std,
+            )
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
