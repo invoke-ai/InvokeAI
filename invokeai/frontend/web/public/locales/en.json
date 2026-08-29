@@ -1550,6 +1550,8 @@
         "currentImageDescription": "Displays the current image in the Node Editor",
         "downloadWorkflow": "Download Workflow JSON",
         "downloadWorkflowError": "Error downloading workflow",
+        "downloadWorkflowImage": "Download Workflow Image",
+        "downloadWorkflowImageError": "Error downloading workflow image",
         "edge": "Edge",
         "edit": "Edit",
         "editMode": "Edit in Workflow Editor",
@@ -2054,6 +2056,11 @@
         "imageSavingFailed": "Image Saving Failed",
         "imageUploaded": "Image Uploaded",
         "imageUploadFailed": "Image Upload Failed",
+        "downloadsInterrupted": "Your session ended while downloads were being prepared. Run the download again after signing in.",
+        "imagesFailedToDownload": "{{count}} image could not be prepared for download.",
+        "imagesFailedToDownload_other": "{{count}} images could not be prepared for download.",
+        "imagesFailedToUpdate": "{{count}} image could not be updated.",
+        "imagesFailedToUpdate_other": "{{count}} images could not be updated.",
         "imageStorageMaintenanceActive": "Image storage maintenance is active. Recover it before retrying the upload.",
         "videoUploaded": "Video Uploaded",
         "videoUploadFailed": "Video Upload Failed",
@@ -3770,12 +3777,11 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "New model types: Qwen Image, Qwen Image Edit, Anima.",
-            "Support for hosted models: Gemini (Nano Banana), GPT Image, Qwen, Seedream, Wan",
-            "Private and shared image boards and workflows in multiuser mode",
-            "Canvas lasso tool, save/restore function, and the ability to hide those pesky preview tiles",
-            "Custom node manager",
-            "Redesigned download queue"
+            "New model types: Krea.2-Turbo/Raw, Ideogram 4, Ernie",
+            "Video generation with Wan 2.2",
+            "Parallel generation on systems with multiple GPUs",
+            "Anima controlnets and inpainting mode",
+            "Performance improvements and bug fixes"
         ],
         "readReleaseNotes": "Read Release Notes",
         "readTheDocs": "Read the Docs",

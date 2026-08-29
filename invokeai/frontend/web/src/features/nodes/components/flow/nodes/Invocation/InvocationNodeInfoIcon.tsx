@@ -15,7 +15,7 @@ interface Props {
 export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
   return (
     <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
-      <Icon as={PiInfoBold} display="block" boxSize={4} w={8} />
+      <Icon as={PiInfoBold} data-node-info-icon="true" display="block" boxSize={4} w={8} />
     </Tooltip>
   );
 });
