@@ -14,6 +14,7 @@ from invokeai.backend.image_util.segment_anything.shared import (
     SAMPointLabel,
 )
 
+
 def test_segment_anything_pipeline_segment():
     width = 96
     height = 64

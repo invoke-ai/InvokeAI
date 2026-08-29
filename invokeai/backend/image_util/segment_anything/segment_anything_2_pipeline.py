@@ -2,7 +2,6 @@ from typing import Optional
 
 import torch
 from PIL import Image
-
 from transformers.models.sam2 import Sam2Model
 from transformers.models.sam2.processing_sam2 import Sam2Processor
 

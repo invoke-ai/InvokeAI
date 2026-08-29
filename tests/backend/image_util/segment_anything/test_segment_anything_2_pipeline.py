@@ -8,12 +8,12 @@ from transformers.models.sam2.processing_sam2 import Sam2Processor
 from invokeai.backend.image_util.segment_anything.segment_anything_2_pipeline import (
     SegmentAnything2Pipeline,
 )
-
 from invokeai.backend.image_util.segment_anything.shared import (
     SAMInput,
     SAMPoint,
     SAMPointLabel,
 )
+
 
 def test_segment_anything_2_pipeline_segment():
     width = 96
