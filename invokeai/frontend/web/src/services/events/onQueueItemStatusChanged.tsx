@@ -61,6 +61,18 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
       })
     );
 
+    // The list rows render from summaries, which are a separate cache. The tag invalidation below
+    // would refresh them too, but only after a round trip — mirror the write so a row's status
+    // flips as immediately as the detail view's does. The summary carries no error or sequence
+    // fields, so only the status and timestamps apply.
+    dispatch(
+      queueApi.util.updateQueryData('getQueueItemSummary', item_id, (draft) => {
+        draft.status = status;
+        draft.started_at = started_at;
+        draft.completed_at = completed_at;
+      })
+    );
+
     // Optimistically update the listAllQueueItems cache for this destination so the canvas
     // staging area immediately reflects status changes without waiting for a tag-based refetch
     if (destination) {

@@ -32,10 +32,10 @@ export type GetQueueItemIdsResult =
   paths['/api/v1/queue/{queue_id}/item_ids']['get']['responses']['200']['content']['application/json'];
 export type GetQueueItemIdsArgs = NonNullable<paths['/api/v1/queue/{queue_id}/item_ids']['get']['parameters']['query']>;
 
-export type GetQueueItemDTOsByItemIdsResult =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['responses']['200']['content']['application/json'];
-export type GetQueueItemDTOsByItemIdsArgs =
-  paths['/api/v1/queue/{queue_id}/items_by_ids']['post']['requestBody']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsResult =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['responses']['200']['content']['application/json'];
+export type GetQueueItemSummariesByItemIdsArgs =
+  paths['/api/v1/queue/{queue_id}/item_summaries_by_ids']['post']['requestBody']['content']['application/json'];
 
 export type InputFieldJSONSchemaExtra = S['InputFieldJSONSchemaExtra'];
 export type OutputFieldJSONSchemaExtra = S['OutputFieldJSONSchemaExtra'];
@@ -290,13 +290,6 @@ export const isNonFluxVAEModelConfig = (
   );
 };
 
-export const isFluxVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
-  return (
-    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
-    (config.base === 'flux' || config.base === 'flux2')
-  );
-};
-
 export const isFlux1VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
@@ -311,10 +304,50 @@ export const isFlux2VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+export const isWanVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'wan'
+  );
+};
+
 export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
     config.base === 'anima'
+  );
+};
+
+/**
+ * Wan VAEs whose latent geometry matches Anima's, i.e. `AutoencoderKLWan` with 16 latent channels
+ * (Wan 2.1 / A14B). The 48-channel TI2V-5B VAE (`Wan2.2-VAE`) is the same class but a different
+ * latent space, so it must stay out.
+ *
+ * Submodels are excluded deliberately: a main model's bundled `vae` carries no `latent_channels` of
+ * its own, so its geometry cannot be verified from the config.
+ */
+const isAnimaCompatibleWanVAEModelConfig = (config: AnyModelConfig): config is VAEModelConfig => {
+  return isWanVAEModelConfig(config, true) && 'latent_channels' in config && config.latent_channels === 16;
+};
+
+/**
+ * VAEs the Anima model loader accepts, gated on the backend's latent geometry rather than on base
+ * alone. `AnimaModelLoaderInvocation.vae_model` carries no `ui_model_base`, and both `anima_l2i` and
+ * `anima_i2l` branch explicitly on `FluxAutoEncoder` (4D decode, no Wan denormalisation) beside
+ * `AutoencoderKLWan` - so an Anima-base VAE, a FLUX VAE and a 16-channel Wan VAE are all supported,
+ * not merely tolerated.
+ *
+ * Kept separate from `isAnimaVAEModelConfig`, which stays base-driven because Krea-2 draws its
+ * own VAE pool from it and must not be offered FLUX or Wan VAEs.
+ */
+export const isAnimaCompatibleVAEModelConfig = (
+  config: AnyModelConfig,
+  excludeSubmodels?: boolean
+): config is VAEModelConfig => {
+  return (
+    isAnimaVAEModelConfig(config, excludeSubmodels) ||
+    isFlux1VAEModelConfig(config, excludeSubmodels) ||
+    isAnimaCompatibleWanVAEModelConfig(config)
   );
 };
 
@@ -325,13 +358,6 @@ export const isQwenImageVAEModelConfig = (
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
     config.base === 'qwen-image'
-  );
-};
-
-export const isWanVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
-  return (
-    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
-    config.base === 'wan'
   );
 };
 
@@ -920,6 +946,6 @@ export type OffsetPaginatedResults_GalleryItem_ = S['OffsetPaginatedResults_Gall
 export type ListGalleryItemsArgs = NonNullable<paths['/api/v1/gallery/items/']['get']['parameters']['query']>;
 export type ListGalleryItemsResponse =
   paths['/api/v1/gallery/items/']['get']['responses']['200']['content']['application/json'];
-export type GetGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/items/names']['get']['parameters']['query']>;
-export type GetGalleryItemNamesResult =
-  paths['/api/v1/gallery/items/names']['get']['responses']['200']['content']['application/json'];
+export type ListGalleryItemNamesArgs = NonNullable<paths['/api/v1/gallery/item_names']['get']['parameters']['query']>;
+export type ListGalleryItemNamesResult =
+  paths['/api/v1/gallery/item_names']['get']['responses']['200']['content']['application/json'];

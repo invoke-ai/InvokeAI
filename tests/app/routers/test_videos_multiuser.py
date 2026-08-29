@@ -11,7 +11,6 @@ same fixture pattern as test_boards_multiuser. The storage-level user_id
 filter is covered separately in tests/app/services/video_records.
 """
 
-import asyncio
 import inspect
 from pathlib import Path
 from typing import Any
@@ -256,6 +255,112 @@ def test_delete_videos_from_list_dedupes_repeated_names(client: TestClient, mock
     # The service must have been asked to delete each unique name exactly once.
     delete_calls = [call.args[0] for call in mock_invoker.services.videos.delete.call_args_list]
     assert sorted(delete_calls) == ["dup.mp4", "other.mp4"]
+
+
+def test_deleted_video_reads_as_gone_rather_than_denied(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    """A deleted video answers 404 even to a non-admin, and the clients depend on it.
+
+    The ownership decision rests on ``videos.user_id``, which is gone with the row, so nothing
+    above the refusal can tell a deleted video from a foreign one -- both used to come back 403.
+    A workflow's video field drops its reference on a 404, so the two answers have to differ.
+    """
+    mock_invoker.services.video_records.get_user_id.return_value = None
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = None
+    mock_invoker.services.video_records.exists = MagicMock(return_value=False)
+
+    response = client.get(
+        "/api/v1/videos/i/gone.mp4",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_unreadable_storage_does_not_read_as_a_deleted_video(
+    client: TestClient, mock_invoker: Invoker, admin_token: str
+):
+    """The DTO route's 404 is the one clients destroy references on, so only absence earns it.
+
+    The route ended ``except Exception: raise HTTPException(404)``, so any failure inside
+    ``get_dto`` answered the same 404 that tells a workflow field its video is gone.
+    """
+    import sqlite3
+
+    mock_invoker.services.videos.get_dto = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
+
+    # Uncaught in the route, so a 500 in production; the test client re-raises instead of
+    # rendering it. Either way it must not be the 404 that clears the user's reference.
+    with pytest.raises(sqlite3.OperationalError):
+        client.get("/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"})
+
+
+def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    """A reversible refusal must not read as gone.
+
+    A shared board flipped back to Private refuses every video on it, and every one of them
+    still exists. Answering 404 would clear the workflow fields pointing at them, and restoring
+    the permission would not bring those back.
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
+    private_board = MagicMock()
+    private_board.board_visibility = BoardVisibility.Private
+    mock_invoker.services.board_records.get = MagicMock(return_value=private_board)
+    # The video itself is untouched, which is what makes this a denial rather than a 404.
+    mock_invoker.services.video_records.exists = MagicMock(return_value=True)
+
+    response = client.get(
+        "/api/v1/videos/i/still-here.mp4",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_unreadable_board_does_not_read_as_unavailable_for_videos(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """A storage error must not reach the client wearing the deleted video's answer.
+
+    ``_assert_video_read_access`` used to catch every exception from the board lookup and fall
+    through to the same 403 a deleted video gets. Since the clients read that 403 as "gone, drop
+    your reference", a locked database would have taken every workflow field pointing at a
+    shared board's videos down with it.
+    """
+    import sqlite3
+
+    mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
+    mock_invoker.services.board_records.get = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
+
+    # The storage error leaves the route uncaught, which is a 500 in production; the test client
+    # re-raises unhandled server exceptions instead of rendering them. Either way the one thing
+    # that must not happen is a 403 -- the answer the clients act on destructively.
+    with pytest.raises(sqlite3.OperationalError):
+        client.get("/api/v1/videos/i/shared.mp4", headers={"Authorization": f"Bearer {user1_token}"})
+
+
+def test_vanished_board_still_reads_as_an_ordinary_refusal_for_videos(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    """The narrowed catch stays exactly that narrow, in both directions."""
+    from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+
+    mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
+    mock_invoker.services.board_records.get = MagicMock(side_effect=BoardRecordNotFoundException)
+    # The video itself is still there, so the refusal is a denial and not the 404 that would
+    # take the caller's reference with it.
+    mock_invoker.services.video_records.exists = MagicMock(return_value=True)
+
+    response = client.get(
+        "/api/v1/videos/i/board-gone.mp4",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
 def test_video_batch_rejects_too_many_or_overlong_names() -> None:
@@ -675,12 +780,13 @@ def test_get_video_thumbnail_closes_file_before_route_returns(
     mock_invoker.services.videos.get_path.return_value = str(thumbnail_path)
     current_user = MagicMock(is_admin=True)
 
-    async def get_thumbnail_after_delete() -> bytes:
-        response = await get_video_thumbnail(current_user=current_user, video_name="video.mp4")
-        thumbnail_path.unlink()
-        return bytes(response.body)
+    # The route is `def`, not `async def`, so that its synchronous file read runs in the
+    # threadpool instead of on the event loop. Deleting the file straight after it returns is
+    # what proves the handle was closed before the response was built.
+    response = get_video_thumbnail(current_user=current_user, video_name="video.mp4")
+    thumbnail_path.unlink()
 
-    assert asyncio.run(get_thumbnail_after_delete()) == b"thumbnail-data"
+    assert bytes(response.body) == b"thumbnail-data"
 
 
 @pytest.mark.parametrize(
