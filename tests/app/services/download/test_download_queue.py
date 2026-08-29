@@ -532,22 +532,41 @@ def test_production_queue_uses_guarded_session_by_default() -> None:
 
 
 def test_caller_supplied_session_requires_explicit_trust() -> None:
+    config = InvokeAIAppConfig(allow_private_download_urls=False)
     session = Session()
-    with pytest.raises(ValueError, match="requests_session_is_trusted=True"):
-        DownloadQueueService(
+    try:
+        with pytest.raises(ValueError, match="requests_session_is_trusted=True"):
+            DownloadQueueService(
+                app_config=config,
+                requests_session=session,
+            )
+    finally:
+        session.close()
+
+
+def test_caller_supplied_guarded_session_does_not_require_attestation() -> None:
+    session = ssrf.build_guarded_session()
+    try:
+        queue = DownloadQueueService(
             app_config=InvokeAIAppConfig(allow_private_download_urls=False),
             requests_session=session,
         )
+        assert queue._requests is session
+    finally:
+        session.close()
 
 
 def test_caller_supplied_session_accepts_explicit_trust() -> None:
     session = Session()
-    queue = DownloadQueueService(
-        app_config=InvokeAIAppConfig(allow_private_download_urls=False),
-        requests_session=session,
-        requests_session_is_trusted=True,
-    )
-    assert queue._requests is session
+    try:
+        queue = DownloadQueueService(
+            app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+            requests_session=session,
+            requests_session_is_trusted=True,
+        )
+        assert queue._requests is session
+    finally:
+        session.close()
 
 
 def test_production_queue_allows_explicit_private_download_opt_in() -> None:
