@@ -2,6 +2,7 @@
 import { act, createElement, type FC } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ListRange } from 'react-virtuoso';
+import { $isConnected } from 'services/events/stores';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getVideoPrefetchOptions, hasCachedVideoDTO, useRangeBasedImageFetching } from './useRangeBasedImageFetching';
@@ -19,6 +20,10 @@ const mocks = vi.hoisted(() => ({
   cacheLands: true,
   // When true, the mutation rejects, like a backend restart or a 502 from a reverse proxy.
   failFetches: false,
+  // When true, the mutation returns a promise the test rejects by hand, so a rejection can be
+  // delivered at a chosen moment (e.g. after unmount) rather than on the next microtask.
+  manualFailure: false,
+  rejectPending: [] as (() => void)[],
 }));
 
 vi.mock('app/store/storeHooks', () => {
@@ -33,6 +38,15 @@ vi.mock('features/gallery/store/types', () => ({
 vi.mock('services/api/endpoints/images', () => {
   const trigger = (arg: { image_names: string[] }) => {
     mocks.imageFetches.push(arg.image_names);
+    if (mocks.manualFailure) {
+      let reject!: () => void;
+      const pending = new Promise<never>((_, rej) => {
+        reject = () => rej(new Error('fetch failed'));
+      });
+      pending.catch(() => undefined);
+      mocks.rejectPending.push(reject);
+      return { unwrap: () => pending.then((r) => r) };
+    }
     // Like the real mutation: onQueryStarted upserts when the request fulfills, whether or not
     // the caller unwraps, and only the promise returned by unwrap() surfaces the rejection.
     const settled = mocks.failFetches
@@ -70,15 +84,24 @@ describe('useRangeBasedImageFetching', () => {
   let renderCount = 0;
   let hookReturn: ReturnType<typeof useRangeBasedImageFetching>;
 
+  // One stable component type, so re-rendering with new props updates the existing instance
+  // instead of remounting it — a remount would silently reset the state under test.
+  const Harness: FC<{ imageNames: string[]; enabled: boolean }> = ({ imageNames, enabled }) => {
+    renderCount++;
+    hookReturn = useRangeBasedImageFetching({ imageNames, enabled });
+    return null;
+  };
+
   const renderHook = (imageNames: string[], enabled: boolean) => {
-    const Harness: FC = () => {
-      renderCount++;
-      hookReturn = useRangeBasedImageFetching({ imageNames, enabled });
-      return null;
-    };
     root = createRoot(document.createElement('div'));
     act(() => {
-      root!.render(createElement(Harness));
+      root!.render(createElement(Harness, { imageNames, enabled }));
+    });
+  };
+
+  const rerenderHook = (imageNames: string[], enabled: boolean) => {
+    act(() => {
+      root!.render(createElement(Harness, { imageNames, enabled }));
     });
   };
 
@@ -108,7 +131,10 @@ describe('useRangeBasedImageFetching', () => {
     mocks.cachedImageNames = [];
     mocks.cacheLands = true;
     mocks.failFetches = false;
+    mocks.manualFailure = false;
+    mocks.rejectPending = [];
     renderCount = 0;
+    $isConnected.set(false);
   });
 
   afterEach(() => {
@@ -118,6 +144,7 @@ describe('useRangeBasedImageFetching', () => {
       });
       root = null;
     }
+    $isConnected.set(false);
     vi.useRealTimers();
   });
 
@@ -231,6 +258,91 @@ describe('useRangeBasedImageFetching', () => {
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(2_000);
     expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(fetchesAfterGiveUp + 3);
+  });
+
+  it('heals a grid that gave up when the socket reconnects, with no user input', async () => {
+    // Review finding: the retry budget ends ~31s after the first failure, but an InvokeAI restart
+    // (config load, DB migrations, model scan) routinely takes longer. For an idle user nothing
+    // else re-arms it — in production `socketConnected` only invalidates `FetchOnReconnect` when
+    // the queue status changed, and RTK Query's structural sharing hands back the same
+    // `imageNames` reference either way, so no dependency of the fetch effect changes and
+    // `enabled` (`!isLoading`) does not toggle on a refetch. Ranges abandoned by the exhausted
+    // budget are parked, not dropped, and the socket reconnect restores them.
+    $isConnected.set(true);
+    mocks.failFetches = true;
+    renderHook(IMAGE_NAMES, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+
+    // Backend goes down: the socket drops and the retry budget runs out while it is down.
+    $isConnected.set(false);
+    await advance(35_000);
+    const fetchesAfterGiveUp = mocks.imageFetches.length;
+    await advance(30_000);
+    expect(mocks.imageFetches.length).toBe(fetchesAfterGiveUp);
+    expect(mocks.cachedImageNames).toEqual([]);
+
+    // Backend comes back, well past the retry budget. No scroll, no change to imageNames.
+    mocks.failFetches = false;
+    act(() => {
+      $isConnected.set(true);
+    });
+    await advance(THROTTLE_MS * 4);
+
+    expect(mocks.cachedImageNames).toEqual(IMAGE_NAMES);
+  });
+
+  it('does not schedule a retry for a fetch that rejects after unmount', async () => {
+    // Review finding: the unmount cleanup clears the pending timer, but a mutation still in flight
+    // rejects afterwards, reaching onFetchFailure on a dead instance and arming a fresh timer of
+    // up to 16s that no cleanup will ever reach. Triggered by closing the gallery panel or
+    // switching tabs while the backend is down.
+    mocks.manualFailure = true;
+    renderHook(IMAGE_NAMES, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.rejectPending.length).toBeGreaterThan(0);
+
+    // Unmount with the request still in flight, then let it reject.
+    act(() => {
+      root!.unmount();
+    });
+    root = null;
+    const timersAfterUnmount = vi.getTimerCount();
+
+    for (const reject of mocks.rejectPending) {
+      reject();
+    }
+    // Deliver the rejection without advancing the clock, so a backoff timer armed by it (>=1s)
+    // is still pending and countable rather than already fired and cleared.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.getTimerCount()).toBe(timersAfterUnmount);
+  });
+
+  it('does not accumulate ranges reported while disabled', async () => {
+    // Review finding: the `!enabled` guard returned before the clear, so every range reported
+    // while disabled stayed in pendingRanges and the first enabled pass scanned all of them.
+    const imageNames = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png', 'g.png', 'h.png', 'i.png'];
+    renderHook(imageNames, false);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(THROTTLE_MS * 2);
+    scrollTo({ startIndex: 3, endIndex: 5 });
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.imageFetches).toEqual([]);
+
+    // Enable. In production `enabled` is `!isLoading`, so it flips as the names arrive — a new
+    // array identity, which is what re-runs the fetch effect (`throttledFetchItems` is
+    // referentially stable across callback changes, so `enabled` alone does not re-run it).
+    // The pass that follows must cover the last reported viewport (d-f) and nothing else: the
+    // earlier range (a-c), long scrolled past, must not still be sitting in pendingRanges.
+    rerenderHook([...imageNames], true);
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.imageFetches.flat().sort()).toEqual(['d.png', 'e.png', 'f.png']);
+
+    scrollTo({ startIndex: 6, endIndex: 8 });
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.imageFetches.flat().sort()).toEqual(['d.png', 'e.png', 'f.png', 'g.png', 'h.png', 'i.png']);
   });
 
   it('recovers a range that failed while the user was scrolling elsewhere', async () => {

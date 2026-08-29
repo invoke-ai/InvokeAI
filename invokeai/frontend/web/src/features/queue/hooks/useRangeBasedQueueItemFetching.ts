@@ -77,6 +77,10 @@ export const useRangeBasedQueueItemFetching = ({
   const fetchQueueItems = useCallback(
     (ranges: ListRange[], itemIds: number[]) => {
       if (!enabled) {
+        // Clear here too, for the same reason as the unconditional clear below: returning early
+        // while disabled let ranges pile up until `enabled` flipped, so the first enabled pass
+        // scanned every range reported during the disabled window instead of the viewport.
+        setPendingRanges(EMPTY_ARRAY);
         return;
       }
       const cachedItemIds = queueApi.util.selectCachedArgsForQuery(store.getState(), 'getQueueItemSummary');

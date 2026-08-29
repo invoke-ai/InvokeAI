@@ -65,6 +65,10 @@ export const useRangeBasedImageFetching = ({
   const fetchItems = useCallback(
     (ranges: ListRange[], allNames: string[]) => {
       if (!enabled) {
+        // Clear here too, for the same reason as the clear at the end of this callback: returning
+        // early while disabled let ranges pile up until `enabled` flipped, so the first enabled
+        // pass scanned every range reported during the disabled window instead of the viewport.
+        setPendingRanges(EMPTY_ARRAY);
         return;
       }
       const state = store.getState();

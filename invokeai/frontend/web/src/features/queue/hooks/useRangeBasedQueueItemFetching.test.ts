@@ -2,6 +2,7 @@
 import { act, createElement, type FC } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { ListRange } from 'react-virtuoso';
+import { $isConnected } from 'services/events/stores';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getItemIdBatches, getUncachedItemIds, useRangeBasedQueueItemFetching } from './useRangeBasedQueueItemFetching';
@@ -18,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   cacheLands: true,
   // When true, the mutation rejects, like a backend restart or a 502 from a reverse proxy.
   failFetches: false,
+  // When true, the mutation returns a promise the test rejects by hand, so a rejection can be
+  // delivered at a chosen moment (e.g. after unmount) rather than on the next microtask.
+  manualFailure: false,
+  rejectPending: [] as (() => void)[],
 }));
 
 vi.mock('app/store/storeHooks', () => {
@@ -28,6 +33,15 @@ vi.mock('app/store/storeHooks', () => {
 vi.mock('services/api/endpoints/queue', () => {
   const trigger = (arg: { item_ids: number[] }) => {
     mocks.queueFetches.push(arg.item_ids);
+    if (mocks.manualFailure) {
+      let reject!: () => void;
+      const pending = new Promise<never>((_, rej) => {
+        reject = () => rej(new Error('fetch failed'));
+      });
+      pending.catch(() => undefined);
+      mocks.rejectPending.push(reject);
+      return { unwrap: () => pending.then((r) => r) };
+    }
     // Like the real mutation: onQueryStarted upserts when the request fulfills, whether or not
     // the caller unwraps, and only the promise returned by unwrap() surfaces the rejection.
     const settled = mocks.failFetches
@@ -86,15 +100,24 @@ describe('useRangeBasedQueueItemFetching', () => {
   let renderCount = 0;
   let hookReturn: ReturnType<typeof useRangeBasedQueueItemFetching>;
 
+  // One stable component type, so re-rendering with new props updates the existing instance
+  // instead of remounting it — a remount would silently reset the state under test.
+  const Harness: FC<{ itemIds: number[]; enabled: boolean }> = ({ itemIds, enabled }) => {
+    renderCount++;
+    hookReturn = useRangeBasedQueueItemFetching({ itemIds, enabled });
+    return null;
+  };
+
   const renderHook = (itemIds: number[], enabled: boolean) => {
-    const Harness: FC = () => {
-      renderCount++;
-      hookReturn = useRangeBasedQueueItemFetching({ itemIds, enabled });
-      return null;
-    };
     root = createRoot(document.createElement('div'));
     act(() => {
-      root!.render(createElement(Harness));
+      root!.render(createElement(Harness, { itemIds, enabled }));
+    });
+  };
+
+  const rerenderHook = (itemIds: number[], enabled: boolean) => {
+    act(() => {
+      root!.render(createElement(Harness, { itemIds, enabled }));
     });
   };
 
@@ -124,7 +147,10 @@ describe('useRangeBasedQueueItemFetching', () => {
     mocks.cachedItemIds = [];
     mocks.cacheLands = true;
     mocks.failFetches = false;
+    mocks.manualFailure = false;
+    mocks.rejectPending = [];
     renderCount = 0;
+    $isConnected.set(false);
   });
 
   afterEach(() => {
@@ -134,7 +160,20 @@ describe('useRangeBasedQueueItemFetching', () => {
       });
       root = null;
     }
+    $isConnected.set(false);
     vi.useRealTimers();
+  });
+
+  it('does not loop when mounted with nothing to fetch', async () => {
+    // The clear at the end of the fetch callback is unconditional, so this hook now relies on the
+    // EMPTY_ARRAY identity for the nothing-to-do path that the old early return used to cover.
+    renderHook(ITEM_IDS, true);
+    await advance(THROTTLE_MS * 2);
+    const settledRenders = renderCount;
+
+    await advance(THROTTLE_MS * 10);
+    expect(renderCount).toBe(settledRenders);
+    expect(mocks.queueFetches).toEqual([]);
   });
 
   it('fetches uncached items for a reported range, then goes quiet', async () => {
@@ -234,6 +273,90 @@ describe('useRangeBasedQueueItemFetching', () => {
     scrollTo({ startIndex: 0, endIndex: 2 });
     await advance(2_000);
     expect(mocks.queueFetches.length).toBeGreaterThanOrEqual(fetchesAfterGiveUp + 3);
+  });
+
+  it('heals a list that gave up when the socket reconnects, with no user input', async () => {
+    // Review finding: the retry budget ends ~31s after the first failure, but an InvokeAI restart
+    // (config load, DB migrations, model scan) routinely takes longer. For an idle user nothing
+    // else re-arms it — `itemIds` keeps its identity through the reconnect refetch and `enabled`
+    // does not toggle — so without the reconnect signal the rows stayed placeholders until the
+    // user scrolled. Ranges abandoned by the exhausted budget are parked, not dropped, and the
+    // socket reconnect restores them.
+    $isConnected.set(true);
+    mocks.failFetches = true;
+    renderHook(ITEM_IDS, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+
+    // Backend goes down: the socket drops and the retry budget runs out while it is down.
+    $isConnected.set(false);
+    await advance(35_000);
+    const fetchesAfterGiveUp = mocks.queueFetches.length;
+    await advance(30_000);
+    expect(mocks.queueFetches.length).toBe(fetchesAfterGiveUp);
+    expect(mocks.cachedItemIds).toEqual([]);
+
+    // Backend comes back, well past the retry budget. No scroll, no change to itemIds.
+    mocks.failFetches = false;
+    act(() => {
+      $isConnected.set(true);
+    });
+    await advance(THROTTLE_MS * 4);
+
+    expect(mocks.cachedItemIds).toEqual(ITEM_IDS);
+  });
+
+  it('does not schedule a retry for a fetch that rejects after unmount', async () => {
+    // Review finding: the unmount cleanup clears the pending timer, but a mutation still in flight
+    // rejects afterwards, reaching onFetchFailure on a dead instance and arming a fresh timer of
+    // up to 16s that no cleanup will ever reach. Triggered by closing the queue tab while the
+    // backend is down.
+    mocks.manualFailure = true;
+    renderHook(ITEM_IDS, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.rejectPending.length).toBeGreaterThan(0);
+
+    // Unmount with the request still in flight, then let it reject.
+    act(() => {
+      root!.unmount();
+    });
+    root = null;
+    const timersAfterUnmount = vi.getTimerCount();
+
+    for (const reject of mocks.rejectPending) {
+      reject();
+    }
+    // Deliver the rejection without advancing the clock, so a backoff timer armed by it (>=1s)
+    // is still pending and countable rather than already fired and cleared.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(vi.getTimerCount()).toBe(timersAfterUnmount);
+  });
+
+  it('does not accumulate ranges reported while disabled', async () => {
+    // Review finding: the `!enabled` guard returned before the clear, so every range reported
+    // while disabled stayed in pendingRanges and the first enabled pass scanned all of them.
+    const itemIds = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    renderHook(itemIds, false);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(THROTTLE_MS * 2);
+    scrollTo({ startIndex: 3, endIndex: 5 });
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.queueFetches).toEqual([]);
+
+    // Enable. In production `enabled` is `!isLoading`, so it flips as the item ids arrive — a new
+    // array identity, which is what re-runs the fetch effect (`throttledFetchQueueItems` is
+    // referentially stable across callback changes, so `enabled` alone does not re-run it).
+    // The pass that follows must cover the last reported viewport (4-6) and nothing else: the
+    // earlier range (1-3), long scrolled past, must not still be sitting in pendingRanges.
+    rerenderHook([...itemIds], true);
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.queueFetches.flat().sort((a, b) => a - b)).toEqual([4, 5, 6]);
+
+    scrollTo({ startIndex: 6, endIndex: 8 });
+    await advance(THROTTLE_MS * 2);
+    expect(mocks.queueFetches.flat().sort((a, b) => a - b)).toEqual([4, 5, 6, 7, 8, 9]);
   });
 
   it('recovers a range that failed while the user was scrolling elsewhere', async () => {
