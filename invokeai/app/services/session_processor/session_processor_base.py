@@ -70,6 +70,17 @@ class SessionProcessorBase(ABC):
         """Gets the status of the session processor"""
         pass
 
+    @abstractmethod
+    def get_running_queue_item_owners(self) -> set[str]:
+        """Gets the user ids that own the queue items currently executing.
+
+        Used to re-derive authorization for work that is already running. A queue item is
+        not attached to a socket, so the owners of running items are not necessarily among
+        the connected users — an account can be deleted out-of-process while its only
+        evidence on this server is the node it is executing.
+        """
+        pass
+
 
 class OnBeforeRunNode(Protocol):
     def __call__(self, invocation: BaseInvocation, queue_item: SessionQueueItem) -> None:

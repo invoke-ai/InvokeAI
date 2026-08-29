@@ -61,9 +61,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #   separate index, so the launcher installs the default PyPI wheels.
 # - win32 has no rocm entry: PyTorch publishes no ROCm wheels for Windows, and
 #   the `rocm` extra in pyproject.toml is marked `sys_platform == 'linux'`.
+# - xpu is on both win32 and linux: PyTorch's XPU index publishes win_amd64 and
+#   linux-x86_64 wheels, which is exactly what the `xpu` extra's markers allow.
 REQUIRED_BACKENDS: dict[str, set[str]] = {
-    "win32": {"cpu", "cuda"},
-    "linux": {"cpu", "cuda", "rocm"},
+    "win32": {"cpu", "cuda", "xpu"},
+    "linux": {"cpu", "cuda", "rocm", "xpu"},
     "darwin": set(),
 }
 
