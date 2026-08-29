@@ -50,6 +50,9 @@ def disk_storage(tmp_path: Path) -> DiskImageFileStorage:
     # Mock the invoker for save() which needs compress_level
     mock_invoker = MagicMock()
     mock_invoker.services.configuration.pil_compress_level = 6
+    # Deletion asks the record store whether an image is still referenced; say yes unless a test
+    # says otherwise, so nothing here depends on a bare MagicMock happening to be truthy.
+    mock_invoker.services.image_records.exists.return_value = True
     storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
     return storage
 
@@ -530,3 +533,86 @@ class TestPendingDeleteJournal:
 
         assert disk_storage.get_path("kept.png").exists()
         assert disk_storage.get_path("kept.png", thumbnail=True).exists()
+
+
+class TestJournalDurability:
+    """The journal only makes a deletion recoverable if it outlives a power loss.
+
+    SQLite fsyncs the record deletion, so a journal that is merely written — and not fsynced, both
+    its manifest and its own directory entry in the output folder — can be lost while the record
+    stays deleted, which is exactly the orphan the journal exists to prevent.
+    """
+
+    def _record_fsyncs(self, monkeypatch) -> list[Path]:
+        fsynced: list[Path] = []
+        monkeypatch.setattr(
+            DiskImageFileStorage,
+            "_DiskImageFileStorage__fsync_directory",
+            staticmethod(lambda directory: fsynced.append(Path(directory))),
+        )
+        return fsynced
+
+    def test_begin_delete_fsyncs_the_journal_and_the_output_folder(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        fsynced = self._record_fsyncs(monkeypatch)
+
+        token = disk_storage.begin_delete([("img.png", "")])
+
+        assert Path(token.directory) in fsynced
+        assert disk_storage.image_root in [path.resolve() for path in fsynced]
+
+    def test_stage_delete_fsyncs_before_it_moves_the_files(self, disk_storage: DiskImageFileStorage, monkeypatch):
+        """The manifest has to be durable first, or a crash leaves staged files naming nothing."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="staged.png")
+        moved: list[str] = []
+        fsynced: list[Path] = []
+
+        def record_fsync(directory):
+            fsynced.append(Path(directory))
+
+        real_replace = Path.replace
+
+        def record_replace(self: Path, target):
+            moved.append(str(target))
+            assert fsynced, "the manifest was not made durable before the files were moved"
+            return real_replace(self, target)
+
+        monkeypatch.setattr(DiskImageFileStorage, "_DiskImageFileStorage__fsync_directory", staticmethod(record_fsync))
+        with patch.object(Path, "replace", record_replace):
+            token = disk_storage.stage_delete("staged.png")
+
+        assert moved
+        assert Path(token.directory) in fsynced
+        assert disk_storage.image_root in [path.resolve() for path in fsynced]
+
+
+class TestRecoveryToleratesStrayEntries:
+    """Recovery runs during start(); anything it cannot make sense of must not stop the app."""
+
+    def test_a_stray_file_does_not_stop_startup(self, disk_storage: DiskImageFileStorage):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+        (disk_storage.image_root / ".delete_stray").write_text("not a directory")
+
+        _restart(disk_storage, record_exists=True)
+
+        assert disk_storage.get_path("live.png").exists()
+
+    def test_a_journal_with_no_manifest_is_left_alone(self, disk_storage: DiskImageFileStorage):
+        """Its contents cannot be attributed to an image, so removing them would destroy data."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+        orphan_journal = disk_storage.image_root / ".delete_nomanifest"
+        orphan_journal.mkdir()
+        (orphan_journal / "0").write_bytes(b"staged image bytes")
+
+        _restart(disk_storage, record_exists=True)
+
+        assert (orphan_journal / "0").read_bytes() == b"staged image bytes"
+        assert disk_storage.get_path("live.png").exists()
+
+    def test_an_empty_journal_directory_is_removed(self, disk_storage: DiskImageFileStorage):
+        (disk_storage.image_root / ".delete_empty").mkdir()
+
+        _restart(disk_storage, record_exists=True)
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))

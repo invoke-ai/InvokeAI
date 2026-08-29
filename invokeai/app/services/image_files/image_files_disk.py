@@ -228,6 +228,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 manifest.write(json.dumps({"image_name": image_name, "image_subfolder": image_subfolder}))
                 manifest.flush()
                 os.fsync(manifest.fileno())
+            # The manifest has to be durable before the files move, or a crash can leave staged
+            # files in a directory that names nothing and recovery cannot put them back.
+            self.__persist_journal_directory(staging_dir)
             for index, source in enumerate(candidates):
                 with self.__cache_lock:
                     self.__cache.pop(source, None)
@@ -268,9 +271,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 manifest.write(json.dumps({"version": 2, "images": entries}))
                 manifest.flush()
                 os.fsync(manifest.fileno())
-            # Fsync the directory too: without it a crash can leave a journal directory whose
-            # manifest entry never reached the disk, which recovery cannot act on.
-            self.__fsync_directory(journal_dir)
+            self.__persist_journal_directory(journal_dir)
             return _PendingDelete(directory=journal_dir, images=[(name, subfolder) for name, subfolder in images])
         except Exception as e:
             shutil.rmtree(journal_dir, ignore_errors=True)
@@ -292,6 +293,12 @@ class DiskImageFileStorage(ImageFileStorageBase):
         if not isinstance(token, _StagedDelete):
             raise ImageFileDeleteException("Invalid staged-delete token")
         try:
+            # Purge the live paths as well as the staged copies. stage_delete() captures whatever
+            # was there at that instant, so a second deleter racing the first gets an empty token —
+            # and if that second one is the one whose record deletion succeeds, dropping its empty
+            # staging directory alone would strand the files the first deleter restores. Committing
+            # has to mean "no file for this image survives", whichever request moved them.
+            self.__purge_files(token.image_name, token.image_subfolder)
             shutil.rmtree(token.directory)
         except Exception as e:
             raise ImageFileDeleteException from e
@@ -358,6 +365,17 @@ class DiskImageFileStorage(ImageFileStorageBase):
         if record_exists:
             return
         self.__purge_files(image_name, image_subfolder)
+
+    def __persist_journal_directory(self, journal_dir: Path) -> None:
+        """Makes a journal directory and its manifest survive a power loss.
+
+        Both fsyncs are needed: the first commits ``manifest.json``'s entry inside the journal
+        directory, the second commits the journal directory's own entry in the output folder.
+        Without the second, the record deletion — which SQLite does fsync — can outlive the journal
+        that is supposed to make it recoverable.
+        """
+        self.__fsync_directory(journal_dir)
+        self.__fsync_directory(self.__output_folder)
 
     @staticmethod
     def __fsync_directory(directory: Path) -> None:
@@ -449,14 +467,19 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """
         logger = InvokeAILogger.get_logger()
         for journal_dir in sorted(self.__output_folder.glob(".delete_*")):
-            manifest_path = journal_dir / "manifest.json"
-            if not manifest_path.is_file():
-                # mkdtemp() ran but the manifest never landed, so this directory names nothing and
-                # there is nothing to reconcile. Only remove it when it is empty.
-                if not any(journal_dir.iterdir()):
-                    journal_dir.rmdir()
-                continue
             try:
+                manifest_path = journal_dir / "manifest.json"
+                if not manifest_path.is_file():
+                    # mkdtemp() ran but the manifest never landed, so this directory names nothing
+                    # and cannot be reconciled. Drop it when it is empty; otherwise say so, because
+                    # anything inside it is a staged file that can no longer be put back.
+                    if not journal_dir.is_dir():
+                        logger.warning(f"Ignoring unexpected entry in the outputs folder: {journal_dir}")
+                    elif not any(journal_dir.iterdir()):
+                        journal_dir.rmdir()
+                    else:
+                        logger.warning(f"Image deletion journal {journal_dir} has no manifest and cannot be recovered")
+                    continue
                 with open(manifest_path, encoding="utf-8") as manifest:
                     data = json.load(manifest)
                 for image_name, image_subfolder in self.__manifest_images(data):

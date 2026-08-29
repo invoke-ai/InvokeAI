@@ -106,24 +106,54 @@ class ImageService(ImageServiceABC):
             raise
         except ImageFileSaveException:
             self.__invoker.services.logger.error("Failed to save image file")
-            try:
-                self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
-            except Exception as cleanup_error:
-                self.__invoker.services.logger.error(
-                    f"Failed to clean up image files after save failure: {str(cleanup_error)}"
-                )
-            try:
-                # Deleting the record also removes any board association through the database
-                # foreign key cascade. Both cleanup operations are attempted independently.
-                self.__invoker.services.image_records.delete(image_name)
-            except Exception as cleanup_error:
-                self.__invoker.services.logger.error(
-                    f"Failed to clean up image record after save failure: {str(cleanup_error)}"
-                )
+            self.__clean_up_failed_save(image_name, image_subfolder)
             raise
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
             raise e
+
+    def __clean_up_failed_save(self, image_name: str, image_subfolder: str) -> None:
+        """Removes the half-created image left by a failed save, record first.
+
+        Record-then-files is the order every delete path uses, and it is load-bearing rather than
+        cosmetic: a concurrent deleter that has to roll back decides whether to restore an image's
+        files by asking whether its record is still there. Purging files while the record survives
+        would tell that deleter to put them back, stranding them once this cleanup finally removes
+        the record. The journal covers the window in between.
+        """
+        token: object | None = None
+        try:
+            token = self.__invoker.services.image_files.begin_delete([(image_name, image_subfolder)])
+        except Exception as cleanup_error:
+            self.__invoker.services.logger.error(
+                f"Failed to journal the cleanup of {image_name} after a save failure: {str(cleanup_error)}"
+            )
+        try:
+            # Deleting the record also removes any board association through the database foreign
+            # key cascade.
+            self.__invoker.services.image_records.delete(image_name)
+        except Exception as cleanup_error:
+            self.__invoker.services.logger.error(
+                f"Failed to clean up image record after save failure: {str(cleanup_error)}"
+            )
+            # The record survived, so the image is still referenced; its files must stay with it.
+            if token is not None:
+                try:
+                    self.__invoker.services.image_files.abandon_delete(token)
+                except Exception as journal_error:
+                    self.__invoker.services.logger.error(
+                        f"Failed to discard the delete journal for {image_name}: {str(journal_error)}"
+                    )
+            return
+        try:
+            if token is None:
+                self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
+            else:
+                self.__invoker.services.image_files.commit_delete(token)
+        except Exception as cleanup_error:
+            self.__invoker.services.logger.error(
+                f"Failed to clean up image files after save failure: {str(cleanup_error)}"
+            )
 
     def update(
         self,

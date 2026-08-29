@@ -917,3 +917,95 @@ class TestDeleteJournalSurvivesFailedPurges:
         assert storage.get_path("img.png", thumbnail=True).exists()
         assert records.get("img.png").image_name == "img.png"
         assert _staging_dirs(storage) == []
+
+
+class TestFailedSaveCleanup:
+    """A save that fails halfway must clean up record-first, like every other delete path.
+
+    The order is load-bearing: a concurrent deleter rolling back decides whether to restore an
+    image's files by asking whether its record is still there, so purging files while the record
+    survives would tell it to put them back and strand them (adversarial review, PR #9361).
+    """
+
+    def test_the_record_is_deleted_before_the_files_are_purged(self, image_service: ImageService) -> None:
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_files.save.side_effect = ImageFileSaveException()
+        order: list[str] = []
+        token = object()
+
+        def journal(images):
+            order.append("journal")
+            return token
+
+        invoker.services.image_files.begin_delete.side_effect = journal
+        invoker.services.image_records.delete.side_effect = lambda name: order.append("record")
+        invoker.services.image_files.commit_delete.side_effect = lambda t, image_names=None: order.append("purge")
+
+        with pytest.raises(ImageFileSaveException):
+            image_service.create(
+                image=Image.new("RGB", (8, 8)),
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=ImageCategory.GENERAL,
+            )
+
+        assert order == ["journal", "record", "purge"]
+        invoker.services.image_files.commit_delete.assert_called_once_with(token)
+
+    def test_a_surviving_record_keeps_its_files(self, image_service: ImageService) -> None:
+        """If the record cannot be deleted the image is still referenced, so nothing may be purged."""
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_files.save.side_effect = ImageFileSaveException()
+        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+
+        with pytest.raises(ImageFileSaveException):
+            image_service.create(
+                image=Image.new("RGB", (8, 8)),
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=ImageCategory.GENERAL,
+            )
+
+        invoker.services.image_files.commit_delete.assert_not_called()
+        invoker.services.image_files.delete.assert_not_called()
+        invoker.services.image_files.abandon_delete.assert_called_once_with(
+            invoker.services.image_files.begin_delete.return_value
+        )
+
+
+class TestConcurrentBoardDeleteAgainstRealRecords:
+    """delete_images_on_board() still stages, because its per-item contract needs a pre-flight move.
+    Two of them racing for one image must not strand it (adversarial review, PR #9361)."""
+
+    def test_committing_an_empty_token_still_purges_the_files(self, wired, monkeypatch) -> None:
+        """The loser moved the files aside; the winner staged nothing and removed the record.
+
+        The winner's commit is the only thing standing between the loser's restore and a permanent
+        orphan: by the time the loser rolls back, the record is still there, so its own re-check
+        tells it to keep the files it just put back.
+        """
+        svc, records, storage = wired
+        invoker = svc._ImageService__invoker  # type: ignore
+        _seed_record(records, "img.png", is_intermediate=False)
+        _save_image_file(storage, "img.png")
+        invoker.services.board_image_records.get_all_board_image_names_for_board.return_value = ["img.png"]
+
+        # The competing request wins the race to the files, so this delete stages an empty token.
+        competing = storage.stage_delete("img.png", "")
+        real_delete_many = records.delete_many
+
+        def competitor_rolls_back_then_delete(image_names: list[str]) -> None:
+            # The competing request's own record deletion failed, so it restores the files — while
+            # this record is still present, which is what makes its re-check keep them.
+            storage.rollback_delete(competing)
+            real_delete_many(image_names)
+
+        monkeypatch.setattr(records, "delete_many", competitor_rolls_back_then_delete)
+
+        deleted, failed = svc.delete_images_on_board("board-1")
+
+        assert deleted == ["img.png"]
+        assert failed == []
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("img.png")
+        assert not storage.get_path("img.png").exists()
+        assert not storage.get_path("img.png", thumbnail=True).exists()
+        assert _staging_dirs(storage) == []
