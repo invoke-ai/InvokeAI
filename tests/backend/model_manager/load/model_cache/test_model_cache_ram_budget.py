@@ -568,6 +568,121 @@ def test_shutdown_clears_holds_stranded_by_a_dead_worker(mock_logger):
     assert budget.total_in_use() == 0
 
 
+class _WorkerKill(BaseException):
+    """Deliberately not an ``Exception``: the deferred worker catches those per work item, so this
+    escapes its loop the way an asynchronously raised BaseException — or a failure of the queue's
+    own get() — would, i.e. the abnormal death the recovery path exists for."""
+
+
+def _kill_worker_abnormally(cache: ModelCache, record) -> threading.Thread:
+    """Kill the deferred worker without the orderly _DEFERRED_STOP, and wait for it to unwind."""
+    worker = cache._deferred_work_thread
+    assert worker is not None and worker.is_alive()
+    with patch.object(cache, "_release_abandoned_holder", side_effect=_WorkerKill):
+        cache._deferred_work_queue.put(model_cache_module._AbandonedHolderRelease(record, False, 0))
+        worker.join(timeout=10)
+    assert not worker.is_alive(), "the worker did not die"
+    return worker
+
+
+def test_post_shutdown_admission_gets_no_first_use_grace(mock_logger):
+    """put() after shutdown() must not arm the post-admission grace.
+
+    The grace's backstop releaser is the sweep at the top of the NEXT put(), and after shutdown no
+    further put() is guaranteed. A load cancelled between put() and the LoadedModel's construction
+    leaves no wrapper, hence no finalizer either — so an armed flag would stand for the life of the
+    process, hiding the record from every asynchronous eviction path while its bytes stay charged
+    to the shared budget."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("early", DummyModule())
+    _use_and_release(cache, "early")
+    cache.shutdown()
+    # The worker deliberately outlives shutdown(), so worker liveness is not what withholds the
+    # grace here.
+    assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
+
+    cache.put("late", DummyModule())  # ... and this load is cancelled before it ever calls get()
+    record = cache._cached_models["late"]
+    assert not record.awaiting_first_use, "a post-shutdown admission armed a grace nothing can release"
+    assert not record.in_first_use_window
+
+    # Unshielded, so the asynchronous paths can take the abandoned record back.
+    assert cache.evict_unlocked_for_peer(lambda: False) == 1
+    assert "late" not in cache._cached_models
+    assert store.refcount("late") == 0
+    assert budget.total_in_use() == 0
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_worker_death_after_shutdown_recovers_its_stranded_holds(mock_logger):
+    """A worker that dies *after* shutdown()'s liveness check must run the recovery itself.
+
+    shutdown() retains a record whose wrapper is still inside its get()->lock() window, counting on
+    the worker to carry the wrapper's abandonment release. If the worker then dies, that release is
+    dropped by the dead-thread dispatch check, no unlock() is coming for a never-locked holder, and
+    a shut-down cache takes no further admission to run the next-start recovery — so the record,
+    its shared-store reference and its budget bytes would be stranded for the life of the
+    process."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+    record = loaded_model._cache_record
+    assert record.first_use_holds == 1
+
+    # shutdown() sees a live worker, so it retains the held record for its holder.
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record
+    assert store.refcount("m") == 1
+
+    _kill_worker_abnormally(cache, record)
+
+    assert record.first_use_holds == 0, "the dying worker left its stranded hold standing"
+    assert "m" not in cache._cached_models, "a record nothing can ever release stayed resident"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+    assert cache._deferred_work_thread is None, "the dead worker was left in the slot as if healthy"
+
+    # The surviving wrapper is still live; dropping it must not disturb the settled accounting.
+    del loaded_model
+    gc.collect()
+    assert budget.total_in_use() == 0
+
+
+def test_dying_worker_recovery_leaves_a_replacement_workers_shields_alone(mock_logger):
+    """The dying worker's recovery is scoped by identity: once a replacement has taken the slot,
+    the shields standing are the replacement's, and _ensure_deferred_worker already cleared
+    whatever the dead thread stranded. A late unwind must not zero them."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.put("m", DummyModule())
+        _use_and_release(cache, "m")
+        loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+        record = loaded_model._cache_record
+        assert record.first_use_holds == 1
+
+        # A thread that is not the current worker reports its death.
+        cache._recover_from_dead_worker(threading.current_thread())
+        assert record.first_use_holds == 1, "an impostor's recovery zeroed the live worker's holds"
+        assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
+
+        # And the hold still works: shutdown() retains the record for its holder.
+        cache.shutdown()
+        assert cache._cached_models.get("m") is record
+        with loaded_model as _model:
+            pass
+        assert "m" not in cache._cached_models
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
 def test_dropped_cache_releases_shared_weights_on_collection(mock_logger):
     """A cache dropped without shutdown() must not strand its shared-weights references:
     the store's refcount and bytes — and therefore the budget total — must return to zero once the

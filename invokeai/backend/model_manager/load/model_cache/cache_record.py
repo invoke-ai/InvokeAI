@@ -34,8 +34,11 @@ class CacheRecord:
     # paths (make_room, drop_model) ignore it, and the next admission on the same cache clears
     # any flag still standing (see the sweep in ModelCache.put()), so a load that errors out
     # between put() and the LoadedModel's construction cannot dodge budget reconciles
-    # indefinitely. From the wrapper's construction on, the window is tracked by first_use_holds
-    # below, whose release is guaranteed by the wrapper's finalizer rather than by the sweep.
+    # indefinitely. That backstop is why the flag is withheld whenever it could outlive its
+    # releasers: an admission made with no deferred worker running, and one made after
+    # shutdown() — after which no further put() is guaranteed to run the sweep. From the
+    # wrapper's construction on, the window is tracked by first_use_holds below, whose release is
+    # guaranteed by the wrapper's finalizer rather than by the sweep.
     awaiting_first_use: bool = False
     # Count of live LoadedModel wrappers holding this record that have not yet locked it. Armed by
     # ModelCache.register_first_use_hold() (called from LoadedModelWithoutConfig.__init__) and
@@ -44,10 +47,10 @@ class CacheRecord:
     # by the next admission: a warm get()'s wrapper can legitimately sit un-entered across another
     # model's cold load (a node retrieves several models before entering their contexts), and its
     # finalizer guarantees the release the sweep exists to backstop. The only recovery sweep is
-    # ModelCache zeroing the counts after the deferred worker — the thread that carries
-    # finalizer-initiated releases — is found dead (at the next worker start, and at shutdown),
-    # since a release dispatched toward a dead worker may be dropped and would otherwise shield
-    # the record forever.
+    # ModelCache zeroing the counts once the deferred worker — the thread that carries
+    # finalizer-initiated releases — is gone (from inside the dying worker itself, and as a
+    # backstop at the next worker start and at shutdown), since a release dispatched toward a
+    # dead worker may be dropped and would otherwise shield the record forever.
     first_use_holds: int = 0
     # Bumped whenever stranded holds are zeroed (dead-worker recovery). Every hold release
     # carries the epoch it was armed under and is ignored across a bump: without this, a
