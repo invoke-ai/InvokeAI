@@ -1550,6 +1550,8 @@
         "currentImageDescription": "Displays the current image in the Node Editor",
         "downloadWorkflow": "Download Workflow JSON",
         "downloadWorkflowError": "Error downloading workflow",
+        "downloadWorkflowImage": "Download Workflow Image",
+        "downloadWorkflowImageError": "Error downloading workflow image",
         "edge": "Edge",
         "edit": "Edit",
         "editMode": "Edit in Workflow Editor",
