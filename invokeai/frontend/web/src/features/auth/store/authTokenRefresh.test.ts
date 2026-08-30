@@ -4,10 +4,15 @@ import {
   beginAuthTransition,
   captureAuthGeneration,
   createMediaAuthLock,
+  markTokenRefreshAccepted,
   runWithMediaAuthLock,
   shouldAcceptRefreshedToken,
   shouldEndSessionForUnauthorized,
+  shouldThrottleRefreshedToken,
 } from './authTokenRefresh';
+
+const tokenFor = (userId: string, nonce: number, epoch: number) =>
+  `header.${btoa(JSON.stringify({ user_id: userId, nonce, token_epoch: epoch }))}.signature`;
 
 describe('refreshed token acceptance', () => {
   beforeAll(() => {
@@ -58,6 +63,26 @@ describe('refreshed token acceptance', () => {
 
     expect(captureAuthGeneration()).toBe(0);
     expect(beginAuthTransition()).toBe(1);
+  });
+
+  it('does not throttle the replacement token that advances the current user revocation epoch', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    markTokenRefreshAccepted();
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 0), tokenFor('user', 2, 1))).toBe(false);
+
+    now.mockRestore();
+  });
+
+  it('keeps routine, cross-user, and unreadable replacements throttled', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(200_000);
+    markTokenRefreshAccepted();
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 1), tokenFor('user', 2, 1))).toBe(true);
+    expect(shouldThrottleRefreshedToken(tokenFor('user-a', 1, 0), tokenFor('user-b', 2, 1))).toBe(true);
+    expect(shouldThrottleRefreshedToken('opaque-old', 'opaque-new')).toBe(true);
+
+    now.mockRestore();
   });
 
   it('serializes media-cookie writes', async () => {
