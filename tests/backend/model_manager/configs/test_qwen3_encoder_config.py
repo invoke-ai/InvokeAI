@@ -15,6 +15,8 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
@@ -24,6 +26,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     _has_gemma2_keys,
     _has_qwen_vl_visual_tower,
 )
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 
 _OVERRIDE_FIELDS: dict[str, object] = {
     "hash": "blake3:fakehash",
@@ -145,3 +148,50 @@ def test_gguf_config_rejects_gemma_state_dict() -> None:
     }
     with pytest.raises(NotAMatchError, match="Gemma-2"):
         Qwen3Encoder_GGUF_Config._validate_looks_like_qwen3_model(mod)
+
+
+class TestShardedQwen3EncoderFolder:
+    """A sharded text_encoder folder must still identify as a Qwen3 encoder.
+
+    The starter-model download
+    `black-forest-labs/FLUX.2-klein-{4B,9B}::text_encoder+tokenizer` lands the encoder as several
+    `model-0000N-of-0000M.safetensors` shards. The SDNQ rejection guard used to call
+    `mod.load_state_dict()`, which raises ValueError ("Multiple weight files found") rather than a
+    NotAMatchError when a folder holds more than one weight file. That aborted this config's probe,
+    so the model was stored as `unknown`.
+    """
+
+    @staticmethod
+    def _make_sharded_encoder(root: Path, *, sdnq: bool = False) -> Path:
+        text_encoder = root / "text_encoder"
+        text_encoder.mkdir(parents=True)
+        _write_config(text_encoder / "config.json", hidden_size=4096, architecture="Qwen3ForCausalLM")
+
+        shards: list[dict[str, torch.Tensor]] = [
+            {"model.embed_tokens.weight": torch.zeros(8, 4096, dtype=torch.uint8 if sdnq else torch.float32)},
+            {"model.layers.0.self_attn.q_proj.weight": torch.zeros(8, 8, dtype=torch.uint8 if sdnq else torch.float32)},
+        ]
+        if sdnq:
+            shards[1]["model.layers.0.self_attn.q_proj.scale"] = torch.zeros(8, 1, dtype=torch.float32)
+
+        for i, shard in enumerate(shards, start=1):
+            save_file(shard, str(text_encoder / f"model-0000{i}-of-00002.safetensors"))
+
+        # Tokenizer files live in their own subfolder for the `text_encoder+tokenizer` download layout.
+        tokenizer = root / "tokenizer"
+        tokenizer.mkdir()
+        (tokenizer / "tokenizer_config.json").write_text("{}")
+        return root
+
+    def test_sharded_encoder_matches(self, tmp_path: Path) -> None:
+        root = self._make_sharded_encoder(tmp_path / "klein-9b-encoder")
+        config = Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+        assert config.type.value == "qwen3_encoder"
+        assert config.variant.value == "qwen3_8b"
+
+    def test_sharded_sdnq_encoder_is_still_rejected(self, tmp_path: Path) -> None:
+        """The shard-safe check must keep detecting SDNQ weight+scale pairs across shards."""
+        root = self._make_sharded_encoder(tmp_path / "klein-9b-encoder-sdnq", sdnq=True)
+        with pytest.raises(NotAMatchError, match="SDNQ"):
+            Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
