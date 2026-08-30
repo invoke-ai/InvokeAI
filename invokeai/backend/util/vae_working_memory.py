@@ -116,7 +116,11 @@ _FLUX2_VAE_SPATIAL_COMPRESSION = 8
 #                                     decode   encode   encode/decode
 #   cuDNN   RTX 4090, torch 2.7.1       2185     1072       0.49
 #   MIOpen  RX 9070 XT, torch 2.10      3453     2688       0.78
-#   MIOpen  RX 7900 XTX, torch 2.10    ~2433        -          -
+#   MIOpen  PRO W7900, torch 2.10       3525     2688       0.76
+#
+# Two AMD generations (RDNA3 and RDNA4), the same numbers: the encode column agrees to the byte and
+# the decode column to 2%. So this is MIOpen, not a per-card quirk, and the column below is fitted
+# to the larger with ~2% headroom.
 #
 # MIOpen's convolution workspaces are simply larger than cuDNN's. This is not the attention term --
 # it shows up identically on the fused path, and the implied constants are flat across resolution on
@@ -125,15 +129,14 @@ _FLUX2_VAE_SPATIAL_COMPRESSION = 8
 # architectural one, which is why the two operations carry their own numbers here instead of a ratio.
 #
 # Shipping the MIOpen numbers everywhere would add ~60% to every cuDNN decode for nothing, so the
-# constant follows the backend. The two AMD cards differ by 1.4x, so the MIOpen column is fitted to
-# the larger and over-reserves on the smaller; that is the safe direction.
+# constant follows the backend.
 #
 # Caveat for AMD users: `MIOPEN_FIND_MODE=2` selects convolution algorithms heuristically instead of
 # by benchmark, and measured a uniform 1.28x more memory at every resolution. It is not the default
 # and is not budgeted for here -- raise `device_working_mem_gb` if you set it.
 _FLUX2_VAE_SCALING_CONSTANTS: dict[str, dict[str, int]] = {
     "cudnn": {"decode": 2200, "encode": 1100},
-    "miopen": {"decode": 3500, "encode": 2750},
+    "miopen": {"decode": 3600, "encode": 2750},
 }
 
 
@@ -172,12 +175,13 @@ def estimate_vae_working_memory_flux2(
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
     512-wide head, and measured peak stays linear from 512 to 1536px). A build with no fused kernel
     for the shapes -- ROCm/gfx1100 reports ``math`` for this 512-wide head, though gfx1201 takes it
-    on flash, and MPS has no fused kernel at all -- materializes a (pixels/8)^2 score matrix on top
-    of the linear term: ~4.5GB at 1024px and ~21GB at 1536px. We ask torch which path applies rather
-    than assuming, so the estimate is right on all of them.
+    on flash, and MPS has no fused kernel at all -- materializes a (pixels/8)^2 score matrix, which
+    grows quadratically and overtakes the linear term somewhere past 1280px. We ask torch which path
+    applies rather than assuming, so the estimate is right on all of them.
 
     The two terms are independent: a build can have a fused kernel and still need the larger
-    convolution constant, which is exactly what gfx1201 does. (Unlike the transformer, this attention does not go through
+    convolution constant, which is exactly what gfx1201 does. They also do not add -- see the
+    ``max`` at the end of this function for why, and for the measurements behind it. (Unlike the transformer, this attention does not go through
     diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
     itself -- so torch's own answer is the whole answer here.)
 
@@ -211,7 +215,7 @@ def estimate_vae_working_memory_flux2(
         mid_block_seq_len = (out_h // _FLUX2_VAE_SPATIAL_COMPRESSION) * (out_w // _FLUX2_VAE_SPATIAL_COMPRESSION)
 
     working_memory *= batch_size
-    working_memory += sdpa_score_matrix_bytes(
+    score_matrix_bytes = sdpa_score_matrix_bytes(
         device=device,
         dtype=param.dtype,
         # The score matrix is (batch, heads, S, S); one head per sample prices the whole batch.
@@ -220,7 +224,26 @@ def estimate_vae_working_memory_flux2(
         seq_len=mid_block_seq_len,
     )
 
-    return int(working_memory)
+    # max, not sum: the two terms peak in different phases of the same forward. The mid-block sits at
+    # the 8x-downsampled bottleneck -- first in the decoder, last in the encoder -- so the full-
+    # resolution convolution feature maps that drive the linear term are not live while the score
+    # matrix is, and peak *reserved* is a high-water mark, not a running total. Measured (see the
+    # constants table above for the method): on gfx1100 and gfx1201 forcing `math` moves the measured
+    # peak by nothing at all up to 1024px, and the totals stay flat-linear in area either way. On
+    # CUDA the score matrix only pokes above the convolution peak at 1536px, and then by 2.6GB
+    # against the 21.5GB this term prices standalone, because the attention phase reuses blocks the
+    # allocator is already holding. Summing them reserved 11.1GB for a 1024px gfx1100 decode that
+    # measures 6.7GB; taking the max reserves 6.9GB.
+    #
+    # Where a max model is weakest is the crossover, where the two terms are near-equal and whatever
+    # overlap exists is no longer hidden. There is exactly one measured point like that: a 768px
+    # encode with cuDNN's linear constant and a materializing kernel measures 1.80GB against a
+    # 1.35GB max. It is not reachable as a shortfall, because the cache floors every reservation at
+    # `device_working_mem_gb` (3GB by default, see `ModelCache._get_vram_available`) and the whole
+    # crossover region sits under that floor. On the builds that really do materialize -- gfx1100 and
+    # gfx1201 -- the MIOpen constant keeps the linear term above the score term across the measured
+    # range, so the crossover does not arise there at all.
+    return int(max(working_memory, score_matrix_bytes))
 
 
 def estimate_vae_working_memory_anima(

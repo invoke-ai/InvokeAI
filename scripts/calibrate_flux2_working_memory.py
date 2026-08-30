@@ -265,8 +265,6 @@ def measure_vae(operation: str, px: int, dtype: torch.dtype, force_math: bool, v
         return row
 
     estimate = estimate_vae_working_memory_flux2(operation=operation, image_tensor=x, vae=vae, device=device)
-    # The estimate is linear_term + score_matrix. Back the score term out so the linear constant can
-    # be fitted on its own -- it is the one the 2200/1100 literals name.
     seq_len = (px // VAE_SPATIAL_COMPRESSION) ** 2
     score_bytes = sdpa_score_matrix_bytes(
         device=device, dtype=param.dtype, num_heads=1, head_dim=VAE_MID_BLOCK_HEAD_DIM, seq_len=seq_len
@@ -274,15 +272,19 @@ def measure_vae(operation: str, px: int, dtype: torch.dtype, force_math: bool, v
     if force_math and score_bytes == 0:
         # Fused here, so the estimator charged nothing -- but we forced math, so price it anyway.
         score_bytes = seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        estimate += score_bytes
+        estimate = max(estimate, score_bytes)
 
     return row | {
         "reserved_delta": peak,
         "estimate": estimate,
         "score_term": score_bytes,
-        # Only meaningful while the peak actually exceeds the score term. Where it does not, the
-        # additive (linear + score) model does not decompose on this build and the number is noise.
-        "implied_linear_constant": ((peak - score_bytes) / (px * px * element_size)) if peak > score_bytes else None,
+        # The whole measured peak over the pixel area, which is what the 2200/1100-style literals
+        # name. The score matrix is deliberately NOT backed out: the two terms peak in different
+        # phases of the forward, so the estimate takes the larger of them rather than the sum, and
+        # the convolution phase is what sets the high-water mark until the quadratic term overtakes
+        # it past ~1280px. Where `score_term` exceeds the measured peak, this column is not the
+        # quantity being fitted -- the score model is, and it is bounding rather than describing.
+        "implied_linear_constant": peak / (px * px * element_size),
         "covered": peak <= estimate,
     }
 
@@ -458,12 +460,12 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
     decode_k = _flux2_vae_scaling_constant("decode", torch.device("cuda"))
     encode_k = _flux2_vae_scaling_constant("encode", torch.device("cuda"))
     print(f"\n=== 3. VAE linear constants (this build selects {decode_k} decode / {encode_k} encode) ===")
-    print("`implied_k` backs the score-matrix term out, so it is comparable to those literals; fit the")
-    print("constant on the rows whose `math` column matches what this build really does (section 1).")
+    print("`implied_k` is the measured peak over pixel area, directly comparable to those literals;")
+    print("fit on the rows whose `math` column matches what this build really does (section 1).")
     print("`covered` is the question that matters: is the shipped estimate an upper bound here?")
     print("Caveat: forcing math on a build that HAS a fused kernel is not equivalent to a build that")
-    print("has none -- on CUDA the forced-math decode measures *below* the fused one, because the")
-    print("memory-efficient kernel's workspace is the larger term there. Only a real run on the")
+    print("has none -- on cuDNN the forced-math decode measures *below* the fused one until 1536px,")
+    print("because the memory-efficient kernel's workspace is the larger term. Only a real run on the")
     print("materializing build calibrates it.\n")
     print(
         f"{'op':7} {'px':>5} {'math':>5} {'measured(GiB)':>14} {'estimate(GiB)':>14} {'implied_k':>10} {'covered':>8}"
@@ -501,7 +503,9 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
                 if r["operation"] == operation
                 and r["force_math"] is force_math
                 and not r.get("oom")
-                and r["implied_linear_constant"]
+                # Skip rows where the score matrix, not the convolution phase, is what the estimate
+                # is bounding: there the linear constant is not the thing under test.
+                and r["score_term"] < r["reserved_delta"]
             ]
             if not ks:
                 continue
@@ -513,7 +517,10 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
         print("\n  Points the shipped estimate does NOT cover:")
         for r in short:
             gap = (r["reserved_delta"] - r["estimate"]) / GIB
-            print(f"    {r['operation']} {r['px']}px force_math={r['force_math']}: short by {gap:.2f} GiB")
+            # The cache never reserves less than `device_working_mem_gb`, so a point under that floor
+            # is not actually short in production.
+            floored = " (absorbed by the 3GB device_working_mem_gb floor)" if r["reserved_delta"] < 3 * GIB else ""
+            print(f"    {r['operation']} {r['px']}px force_math={r['force_math']}: short by {gap:.2f} GiB{floored}")
     return rows
 
 

@@ -354,6 +354,10 @@ class TestVaeConstantsFollowTheConvBackend:
         ("miopen", "decode", 512, 1.686),
         ("miopen", "decode", 768, 3.701),
         ("miopen", "decode", 1024, 6.578),
+        # PRO W7900 (gfx1100). Costs slightly more per pixel than gfx1201 and sets the column.
+        ("miopen", "decode", 512, 1.721),
+        ("miopen", "decode", 768, 3.781),
+        ("miopen", "decode", 1024, 6.703),
         ("miopen", "encode", 512, 1.312),
         ("miopen", "encode", 768, 2.953),
         ("miopen", "encode", 1024, 5.250),
@@ -381,7 +385,7 @@ class TestVaeConstantsFollowTheConvBackend:
             backend: consts["encode"] / consts["decode"] for backend, consts in _FLUX2_VAE_SCALING_CONSTANTS.items()
         }
         assert ratios["cudnn"] == pytest.approx(0.50, abs=0.02)
-        assert ratios["miopen"] == pytest.approx(0.79, abs=0.03)
+        assert ratios["miopen"] == pytest.approx(0.76, abs=0.03)
 
     def test_a_rocm_build_selects_the_miopen_column(self):
         """A HIP build reports `device.type == "cuda"`, so the torch build is the discriminator."""
@@ -408,7 +412,7 @@ class TestVaeConstantsFollowTheConvBackend:
             cuda = estimate()
 
         assert rocm > cuda
-        assert rocm / cuda == pytest.approx(3500 / 2200, rel=1e-3)
+        assert rocm / cuda == pytest.approx(3600 / 2200, rel=1e-3)
 
 
 class TestFlux2VaeBatchIsBudgeted:
@@ -463,13 +467,15 @@ class TestFlux2VaeBatchIsBudgeted:
         assert self._decode_estimate(3, px=1024, tile_size=512) == 3 * single
 
     def test_the_score_matrix_scales_with_the_batch(self):
-        """It is shaped (batch, heads, S, S), so where it is materialized at all it scales too."""
+        """It is shaped (batch, heads, S, S), so where it is materialized at all it scales with the
+        batch just as the linear term does -- and since both scale together, the larger of the two
+        stays the larger at every batch size."""
         tokens = 128 * 128
         score = tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
         linear = self._decode_estimate(1)  # fused: the spatial term on its own
         with _materializing():
-            assert self._decode_estimate(1, device=MATERIALIZING) == linear + score
-            assert self._decode_estimate(3, device=MATERIALIZING) == 3 * (linear + score)
+            assert self._decode_estimate(1, device=MATERIALIZING) == max(linear, score)
+            assert self._decode_estimate(3, device=MATERIALIZING) == 3 * max(linear, score)
 
 
 class TestFlux2VaeInvocationsRequestWorkingMemory:
@@ -695,6 +701,14 @@ def _materializing_probe(device_type, device_index, dtype, head_dim, has_attn_ma
     return head_dim > 128 or has_attn_mask
 
 
+class _null:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+
 def _materializing():
     return patch(
         "invokeai.backend.util.attention._torch_sdpa_materializes_score_matrix", side_effect=_materializing_probe
@@ -707,10 +721,15 @@ MATERIALIZING = torch.device("cuda")
 
 class TestMaterializedScoreMatrixIsBudgeted:
     """The linear estimates above assume SDPA never builds the O(S^2) score matrix. That is a
-    property of the *build*, not of FLUX.2: ROCm's fused kernels reject both the VAE's 512-wide
-    attention head and the dense additive mask regional prompting attaches, and fall back to
-    `math`. Where that happens the score matrix is the dominant term, so the estimate has to
-    include it -- otherwise the fix works on CUDA and still OOMs on ROCm.
+    property of the *build*, not of FLUX.2: some builds have no fused kernel for the VAE's 512-wide
+    head, or for the dense additive mask regional prompting attaches, and fall through to `math`.
+    Where that happens the score matrix eventually dominates, so the estimate has to account for it
+    -- otherwise the fix works on CUDA and still OOMs elsewhere.
+
+    How it accounts for it differs between the two estimators, and the difference is measured rather
+    than assumed. In the transformer the score matrix is live alongside the block activations, so it
+    adds. In the VAE the mid-block sits alone at the 8x-downsampled bottleneck, so the two peak in
+    different phases and the estimate takes the larger -- see `TestVaeTermsDoNotAdd`.
     """
 
     def _mock_bf16_vae(self):
@@ -732,55 +751,143 @@ class TestMaterializedScoreMatrixIsBudgeted:
     @pytest.mark.parametrize(
         "operation, px, tokens",
         [
-            ("decode", 1024, 128 * 128),
             ("decode", 1536, 192 * 192),
             ("encode", 1024, 128 * 128),
             ("encode", 1328, 166 * 166),
         ],
     )
-    def test_vae_estimate_gains_exactly_the_score_matrix(self, operation, px, tokens):
-        fused = self._vae_estimate(operation, px, device=FUSED)
+    def test_the_score_matrix_takes_over_where_it_is_the_larger_term(self, operation, px, tokens):
+        """Quadratic beats linear eventually. At these sizes it already has, so the estimate is the
+        score matrix exactly -- not the linear term, and not the two added together."""
         with _materializing():
             materializing = self._vae_estimate(operation, px, device=MATERIALIZING)
-        assert materializing - fused == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert materializing == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert materializing > self._vae_estimate(operation, px, device=FUSED)
 
     def test_mps_style_dispatch_failure_reserves_the_vae_score_matrix(self):
         """The MPS case end to end, through the real probe rather than a stand-in: on a device torch
-        cannot answer a dispatch query for, a 1024px decode has to come out ~3.5GB heavier than the
-        linear term. Reporting those devices as fused -- as this PR first did -- is what let the
-        decode be admitted to a card that could not run it."""
+        cannot answer a dispatch query for, the score matrix has to be priced. Reporting those
+        devices as fused -- as this PR first did -- is what let the decode be admitted to a card that
+        could not run it."""
         with patch("torch.ops.aten._fused_sdp_choice", side_effect=NotImplementedError("no MPS kernel")):
-            materializing = self._vae_estimate("decode", 1024, device=FUSED)
-        fused = self._vae_estimate("decode", 1024, device=FUSED)
+            materializing = self._vae_estimate("decode", 1536, device=FUSED)
+        fused = self._vae_estimate("decode", 1536, device=FUSED)
 
-        tokens = 128 * 128
-        assert materializing - fused == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        assert materializing - fused > 3 * GB
+        tokens = 192 * 192
+        assert materializing == tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert materializing > fused + 10 * GB
 
     def test_vae_score_matrix_dominates_at_high_resolution(self):
-        """The reviewer's case: a 1536px decode is ~9.6GB of linear activations on CUDA, and more
-        than that again in scores where SDPA has to materialize them. An estimate that omits the
-        term is not merely tight, it is wrong by a factor of three."""
+        """A 1536px decode is ~9.7GB of convolution activations on cuDNN, and more than twice that
+        again in scores where SDPA has to materialize them. An estimate that omits the term is not
+        merely tight, it is wrong by a factor of two."""
         with _materializing():
             materializing = self._vae_estimate("decode", 1536, device=MATERIALIZING)
-        assert materializing > 25 * GB
+        assert materializing > 20 * GB
         assert materializing > 2 * self._vae_estimate("decode", 1536, device=FUSED)
 
-    def test_tiled_vae_score_matrix_is_bounded_by_the_tile(self):
-        """Tiling already bounds the linear term; it must bound the quadratic one too, or the
-        reference-image encode would reserve as if it ran untiled."""
+    def test_tiling_makes_the_score_matrix_irrelevant(self):
+        """Tiling caps the mid-block sequence at (tile/8)^2, which drops the quadratic term far below
+        the tile's own linear cost -- so a tiled estimate is the linear term whether the build
+        materializes or not, and is flat across input sizes."""
         with _materializing():
             estimates = [
                 self._vae_estimate("encode", px, device=MATERIALIZING, tile_size=512) for px in (1024, 1328, 2024)
             ]
             untiled = self._vae_estimate("encode", 2024, device=MATERIALIZING)
         assert len(set(estimates)) == 1
-        tile_tokens = (512 // 8) ** 2
-        assert estimates[0] - self._vae_estimate("encode", 1024, device=FUSED, tile_size=512) == (
-            tile_tokens * tile_tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        )
-        # Tiling turns a 62GB reservation at the 2024px reference cap into under 1GB.
+        assert estimates[0] == self._vae_estimate("encode", 1024, device=FUSED, tile_size=512)
+        # Tiling turns a 100GB+ reservation at the 2024px reference cap into under 2GB.
         assert estimates[0] < untiled / 50
+
+
+class TestVaeTermsDoNotAdd:
+    """The two VAE terms peak in different phases of the same forward, so the estimate takes the
+    larger rather than the sum. The mid-block sits at the 8x-downsampled bottleneck -- first in the
+    decoder, last in the encoder -- so the full-resolution convolution feature maps that drive the
+    linear term are not live while the score matrix is, and peak *reserved* is a high-water mark.
+
+    Measured, decode, peak reserved, fresh process per point:
+
+        px      cuDNN fused   cuDNN forced-math   linear(2200)   score(17)
+        1024        4.229            3.527            4.30          4.25
+        1280        6.590            5.924            6.71         10.38
+        1536        9.353           11.965            9.67         21.52
+
+    Forcing math measures *below* the fused path until 1536px, and even there it exceeds it by
+    2.6GB against the 21.5GB the score term prices standalone -- the attention phase reuses blocks
+    the allocator is already holding. On gfx1100 and gfx1201, forcing math moves the measured peak
+    by nothing at all up to 1024px, and the totals stay flat-linear in area either way.
+
+    Summing the terms reserved 11.1GB for a 1024px gfx1100 decode that measures 6.7GB. Taking the
+    max reserves 6.8GB.
+    """
+
+    def _estimate(self, px, device, materializing):
+        vae = MagicMock(spec=AutoencoderKLFlux2)
+        vae.parameters.return_value = iter([torch.zeros(1, dtype=torch.bfloat16)])
+        with _materializing() if materializing else _null():
+            return estimate_vae_working_memory_flux2(
+                operation="decode", image_tensor=torch.zeros(1, 32, px // 8, px // 8), vae=vae, device=device
+            )
+
+    # (pixel size, measured GiB) for a decode on the PRO W7900. Its 512px point is what sets the
+    # MIOpen decode constant: implied 3525, where gfx1201 asks for only 3453.
+    MEASURED_W7900_DECODE = [(1024, 6.703), (768, 3.781), (512, 1.721)]
+
+    @pytest.mark.parametrize("px, measured_gib", MEASURED_W7900_DECODE)
+    def test_the_max_model_bounds_the_measured_miopen_peak(self, px, measured_gib):
+        linear = px * px * 2 * _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        score = (px // 8) ** 4 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert max(linear, score) >= measured_gib * GB
+        assert max(linear, score) <= 1.15 * measured_gib * GB
+
+    def test_the_sum_model_would_have_over_reserved_by_two_thirds(self):
+        """At 1024px the sum reserves 11.1GiB for a decode that measures 6.7 -- on a 16GB card that
+        is the difference between the transformer staying resident and being evicted."""
+        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["miopen"]["decode"]
+        score = 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert (linear + score) / (6.703 * GB) > 1.6
+        assert max(linear, score) / (6.703 * GB) < 1.15
+
+    def test_the_estimate_is_the_larger_term_not_the_sum(self):
+        """At 1024px the two are within 2% of each other on the cuDNN column, which makes this the
+        sharpest place to tell the models apart."""
+        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        score = 16384 * 16384 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        assert self._estimate(1024, MATERIALIZING, materializing=True) == max(linear, score)
+        assert self._estimate(1024, MATERIALIZING, materializing=True) < linear + score
+
+    # (operation, px, measured GiB) with cuDNN's linear constant and a materializing kernel -- the
+    # combination MPS lands in, and the only place the max model is not an upper bound on its own.
+    MEASURED_CUDNN_FORCED_MATH = [
+        ("encode", 512, 0.523),
+        ("encode", 768, 1.801),
+        ("encode", 1024, 4.072),
+        ("decode", 1024, 3.527),
+        ("decode", 1280, 5.924),
+        ("decode", 1536, 11.965),
+    ]
+
+    @pytest.mark.parametrize("operation, px, measured_gib", MEASURED_CUDNN_FORCED_MATH)
+    def test_the_working_memory_floor_covers_the_crossover(self, operation, px, measured_gib):
+        """A max model is weakest where the two terms are near-equal, and one measured point shows
+        it: a 768px encode wants 1.80GiB against a 1.35GiB max. It is not reachable as a shortfall,
+        because the cache floors every reservation at `device_working_mem_gb` and the whole crossover
+        region sits below that floor. Reproducible to three decimals across runs, so this is the
+        model's real shape, not noise -- which is why it is pinned rather than rounded away."""
+        constant = _FLUX2_VAE_SCALING_CONSTANTS["cudnn"][operation]
+        area = px * px if operation == "decode" else px * px
+        linear = area * 2 * constant
+        score = (px // 8) ** 4 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+        floored = max(max(linear, score), 3 * GB)  # what ModelCache._get_vram_available reserves
+        assert floored >= measured_gib * GB
+
+    def test_a_fused_build_is_unaffected(self):
+        """The max only ever removes reservation, never adds it: with no score matrix the estimate is
+        the linear term, exactly as before."""
+        linear = 1024 * 1024 * 2 * _FLUX2_VAE_SCALING_CONSTANTS["cudnn"]["decode"]
+        assert self._estimate(1024, FUSED, materializing=False) == linear
 
     def test_regional_prompting_adds_the_score_matrix(self):
         """The dense `S x S` additive bias is what pushes SDPA off its fused kernel. Budgeting only
