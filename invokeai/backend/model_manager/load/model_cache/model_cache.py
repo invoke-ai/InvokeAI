@@ -89,6 +89,69 @@ class _AbandonedHolderRelease(NamedTuple):
     hold_epoch: int
 
 
+class FirstUseClaim:
+    """Ownership of a first-use hold armed by `ModelCache.get_with_first_use_claim()`.
+
+    The hold is armed under the SAME lock acquisition as the lookup that produced the record,
+    which is what makes the shield gapless. Arming it from the LoadedModel constructor instead
+    (its original home) leaves the caller's whole get()->construct stretch unshielded, and that
+    stretch is not always a few instructions: the configured loader retrieves its record deep
+    inside `_load_and_cache` and does the shared-store shell registration and two returns before
+    `load_model` wraps it. An eviction landing in that gap — a shutdown sweep, a peer's reconcile
+    — detaches the record its holder is about to lock, releasing shared-store ownership while the
+    tensors live on, so a peer's reload of the key mints a duplicate canonical copy that the
+    budget counts once (JPPhoto review, 2026-08-30).
+
+    The claim releases its hold exactly once, whichever comes first:
+
+    - `release()`, called by the LoadedModel wrapper that adopted the claim when it reaches its
+      first lock (see `LoadedModelWithoutConfig._end_first_use_window`);
+    - its weakref finalizer, when the claim is dropped without that ever happening — with the
+      wrapper that adopted it (dropped un-entered), or with the frame that requested it, if the
+      load raised before any wrapper could be built. The finalizer route goes through
+      `ModelCache.release_first_use_grace`, so it never takes a lock on the collecting thread
+      (see that method), and it quotes the epoch the hold was armed under, so a hold that
+      dead-worker recovery already zeroed is never re-released against a successor hold.
+
+    An unadopted claim is therefore not a leak: dropping it is a complete release. That is what
+    lets the record be shielded from the moment it is looked up, before any wrapper exists to own
+    the shield.
+    """
+
+    def __init__(self, cache: "ModelCache", cache_entry: CacheRecord, hold_epoch: int) -> None:
+        self._cache = cache
+        self._cache_entry = cache_entry
+        self._hold_epoch = hold_epoch
+        # Seeded first so release() is well defined on a claim whose construction failed partway.
+        # It cannot make the construction atomic — weakref.finalize registers itself before it
+        # returns, so an async exception landing between that call and the store below leaves a
+        # live finalizer for a claim _claim_first_use is about to hand the hold back for, and that
+        # finalizer's later release is one this class cannot intercept. A one-bytecode window,
+        # unreachable without an asynchronous exception, and it costs at worst one holder's shield
+        # rather than a permanently shielded record.
+        self._finalizer: Optional[weakref.finalize] = None
+        # The finalizer's arguments keep the cache and the record alive for as long as the claim
+        # itself is — exactly the lifetime over which the release still has work to do.
+        self._finalizer = weakref.finalize(self, cache.release_first_use_grace, cache_entry, True, hold_epoch)
+        self._finalizer.atexit = False
+
+    def release(self) -> None:
+        """Release the hold now, synchronously. Idempotent.
+
+        Called from the adopting wrapper's first lock, which runs in an ordinary thread context
+        (never a finalizer), so the direct — locking — release is safe here.
+        """
+        finalizer, self._finalizer = self._finalizer, None
+        if finalizer is None:
+            return
+        if finalizer.detach() is None:
+            # Already dead or detached: a racing release() on this same claim has the hold.
+            # Releasing it again would decrement a hold armed by a different holder and unshield
+            # their window.
+            return
+        self._cache.release_first_use_hold(self._cache_entry, self._hold_epoch, admission_claim=self)
+
+
 def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queue: "queue.SimpleQueue[object]") -> None:
     """Drain one ModelCache's deferred-work queue until it is stopped or the cache is collected.
 
@@ -669,18 +732,36 @@ class ModelCache:
         #
         # Records still in use keep their references: entries locked by an in-flight generation
         # (Invoker.stop() stops the model manager before the session processor, whose workers are
-        # cancelled but not joined) and entries inside a first-use window — the put()->lock()
-        # admission grace, or a LoadedModel wrapper obtained from get() and not yet entered — are
-        # marked stale instead. The eventual release evicts them through this same path: unlock()
-        # once the generation lets go, or the wrapper's abandonment finalizer (via the deferred
-        # worker, see _release_abandoned_holder) if the wrapper is dropped without ever locking.
-        # Without the window check, shutdown() racing the gap between get() and the wrapper's
-        # __enter__() would evict the very record its holder is about to lock: the holder would
-        # proceed on a detached record (the tolerated issue-7513 path) whose shared-store
-        # ownership was just released, so a peer's reload of the same key would mint a duplicate
-        # canonical copy while the budget counted only one. A record never released keeps its
-        # bytes — and its accounting — until process exit, which is the truthful description of a
-        # model that really is still resident.
+        # cancelled but not joined) and entries a live LoadedModel wrapper has retrieved but not
+        # yet locked (first_use_holds) are marked stale instead. The eventual release evicts them
+        # through this same path: unlock() once the generation lets go, or the wrapper's
+        # abandonment finalizer (via the deferred worker, see _release_abandoned_holder) if the
+        # wrapper is dropped without ever locking. Without the window check, shutdown() racing the
+        # gap between the retrieval and the wrapper's __enter__() would evict the very record its
+        # holder is about to lock: the holder would proceed on a detached record (the tolerated
+        # issue-7513 path) whose shared-store ownership was just released, so a peer's reload of
+        # the same key would mint a duplicate canonical copy while the budget counted only one. A
+        # record never released keeps its bytes — and its accounting — until process exit, which
+        # is the truthful description of a model that really is still resident.
+
+        # An admission whose load never came back for it is NOT retained here, and needs no
+        # special case to avoid it: the loaders claim their admissions (put(claim_admission=True)),
+        # so a load cancelled or errored between its put() and its retrieval drops that claim by
+        # dying, and the claim's release — the same abandonment path a dropped LoadedModel takes —
+        # evicts the record with its shared-store reference and its budget bytes. Without it, the
+        # put()-set grace on such a record had no releaser left after shutdown (its other two are
+        # the loader's own get() -> lock() and the sweep at the top of the NEXT put(), which is no
+        # longer guaranteed to run), and the sweep below stale-RETAINED the record for the life of
+        # the cache object (JPPhoto review, 2026-08-30).
+        #
+        # Retiring the flag here instead — the obvious shortcut — is not safe: it is unowned, so
+        # a standing grace does not mean nobody is still working on the record. It is equally the
+        # state of a load still between its put() and its retrieval, and of a live un-entered
+        # LoadedModel wrapper whose hold a worker death zeroed. Evicting either would be the very
+        # accounting lie this method exists to avoid — the holder's local still holds the tensors
+        # whose shared-store ownership the eviction releases, so a peer's reload mints a duplicate
+        # canonical the budget counts once — on top of failing an in-flight load with an
+        # IndexError from a retrieval that no longer finds its own model.
         for cache_entry in list(self._cached_models.values()):
             if cache_entry.is_locked or cache_entry.in_first_use_window:
                 cache_entry.is_stale = True
@@ -690,8 +771,13 @@ class ModelCache:
     @synchronized
     @record_activity
     def put(
-        self, key: str, model: AnyModel, execution_device: Optional[torch.device] = None, prefetch: bool = False
-    ) -> None:
+        self,
+        key: str,
+        model: AnyModel,
+        execution_device: Optional[torch.device] = None,
+        prefetch: bool = False,
+        claim_admission: bool = False,
+    ) -> Optional[FirstUseClaim]:
         """Add a model to the cache.
 
         Args:
@@ -703,12 +789,20 @@ class ModelCache:
                 single-file pipeline load) and no loader will retrieve it after this call. It is
                 admitted without the post-admission grace, so budget reconciles may evict it
                 immediately.
+            claim_admission: Shield the new record with an owned first-use hold, alongside the
+                swept post-admission grace, and return the claim that owns it (None if no hold
+                could be armed, or if this call was a no-op because the key was already resident).
+                Every loader that is going to retrieve the record it just admitted should ask for
+                one and hold it until its retrieval has armed a claim of its own: an owned shield
+                cannot outlive its load, so a load that is cancelled or errors before its
+                retrieval releases the admission by dying, instead of leaving a grace standing
+                that nothing can clear (see shutdown()).
         """
         if key in self._cached_models:
             self._logger.debug(
                 f"Attempted to add model {key} ({model.__class__.__name__}), but it already exists in the cache. No action necessary."
             )
-            return
+            return None
 
         # Start (or revive) the worker before mutating cache state. Every deferred task concerns an
         # admitted record, so this makes later dispatch queue-only while avoiding a thread for an
@@ -819,6 +913,16 @@ class ModelCache:
         # whose loader is still between put() and get(), that get() raises rather than falling
         # back — the same trade the synchronous paths (make_room, drop_model) have always made
         # against this flag, taken here only for admissions into an already-shut-down cache.
+        #
+        # A claimed admission gets the grace too, but as a courtesy rather than a guarantee: what
+        # actually shields that window is the record's weak reference to the claim (see the
+        # arming at the end of this method, and CacheRecord.admission_claim_ref). Neither flag is
+        # dependable on its own here — _clear_stranded_first_use_holds zeroes every hold the
+        # moment the deferred worker dies, and the grace is unowned, so any other holder's
+        # abandonment or the next admission's sweep clears it on behalf of whoever ran. Shielding
+        # the window with either alone turns one of those ordinary events into a failed load: the
+        # record is evicted by the next reconcile while its loader still holds the tensors, and
+        # the loader's own retrieval then raises.
         worker_running = self._deferred_work_thread is not None and self._deferred_work_thread.is_alive()
         shutting_down = self._shutdown_event.is_set()
         cache_record = CacheRecord(
@@ -859,6 +963,33 @@ class ModelCache:
             # self here would be worse than useless: _make_room_internal already evicted
             # everything unlocked, so the only entry a self-reconcile could ever claim is the
             # model just admitted — evicting it out from under its own loader.)
+
+        # Shield the put() -> retrieval window with an owned hold on top of the grace above when
+        # the caller asked for one. The claim lives in the loader's frame, so a load cancelled or
+        # errored before its retrieval releases it by dying — which is what lets shutdown() retain
+        # a claimed admission for a load that is really still in flight (whose local still holds
+        # these very tensors) while retiring the unowned graces that nothing can release. The
+        # loader hands the shield over to its retrieval's own claim and drops this one.
+        #
+        # Armed last, once the admission is fully committed. _claim_first_use can raise
+        # (weakref.finalize allocates, and this cache runs at the RAM ceiling by design), and a
+        # raise between the record's insertion above and the budget accounting would leave a
+        # resident, store-owning record that the budget never counted — whose eventual eviction
+        # then debits bytes it never added, permanently stealing another record's charge (the
+        # debit is clamped to what this cache has tracked). Everything above this point is
+        # committed, so the worst a failure here costs is the shield: the record is an ordinary
+        # graced admission, exactly as if the caller had not asked to claim it.
+        if not claim_admission or prefetch:
+            return None
+        admission_claim = self._claim_first_use(cache_record)
+        if admission_claim is not None:
+            # The record's weak reference to the claim — not the hold, and not the grace — is what
+            # actually shields this window (see CacheRecord.admission_claim_ref): it expires with
+            # the loader's frame, so no event has to release it, and neither a worker death
+            # (which zeroes holds) nor another holder's abandonment (which clears the grace) can
+            # strip it while the load is still running.
+            cache_record.admission_claim_ref = weakref.ref(admission_claim)
+        return admission_claim
 
     def _warn_once(self, topic: str, device: torch.device, message: str) -> None:
         """Log `message` the first time `topic` arises for `device`.
@@ -1026,8 +1157,12 @@ class ModelCache:
 
     @synchronized
     def register_first_use_hold(self, cache_entry: CacheRecord) -> Optional[int]:
-        """Shield a record while a just-constructed LoadedModel wrapper is between get() and its
-        first lock. Returns the hold's epoch when armed, None when it could not be.
+        """Shield a record while a holder is between retrieving it and its first lock. Returns the
+        hold's epoch when armed, None when it could not be.
+
+        Normally reached through get_with_first_use_claim(), which arms the hold in the same lock
+        acquisition as the lookup; called directly only by a LoadedModel wrapper built from a
+        record that was retrieved with plain get().
 
         The eviction sweeps treat a held record like a locked one (see
         CacheRecord.in_first_use_window) — in particular, shutdown() retains it with its
@@ -1054,10 +1189,24 @@ class ModelCache:
         return cache_entry.first_use_holds_epoch
 
     @synchronized
-    def release_first_use_hold(self, cache_entry: CacheRecord, hold_epoch: int) -> None:
-        """Release a register_first_use_hold() hold whose wrapper reached its first lock."""
+    def release_first_use_hold(
+        self, cache_entry: CacheRecord, hold_epoch: int, admission_claim: Optional["FirstUseClaim"] = None
+    ) -> None:
+        """Release a register_first_use_hold() hold whose holder reached its first lock.
+
+        `admission_claim`, when given, is the claim doing the releasing: if the record still
+        points at it as its admission shield (CacheRecord.admission_claim_ref), that shield is
+        retired here too. The shield is object liveness, not claim validity, so without this a
+        spent claim would go on shielding the record for as long as the loader's frame — or the
+        traceback that captured it — kept the object alive, well past the retrieval it was meant
+        to cover.
+        """
         if cache_entry.first_use_holds > 0 and cache_entry.first_use_holds_epoch == hold_epoch:
             cache_entry.first_use_holds -= 1
+        if admission_claim is not None:
+            claim_ref = cache_entry.admission_claim_ref
+            if claim_ref is not None and claim_ref() is admission_claim:
+                cache_entry.admission_claim_ref = None
 
     def _clear_stranded_first_use_holds(self) -> None:
         """Zero every record's holds after the deferred worker is found dead. Caller must hold
@@ -1106,14 +1255,25 @@ class ModelCache:
         would instead unshield a load that is only midway between its put() and its get(), whose
         record a reconcile could then evict out from under it, turning a worker death into a
         failed load. After shutdown that backstop is gone (no further put() is guaranteed) and
-        put() no longer arms the grace at all, so what is lifted here is only a grace armed before
-        the shutdown and stale-retained by its sweep.
+        put() no longer arms the grace at all.
+
+        The same rule, for the same reason, applies to the admission shield a claimed put()
+        published (CacheRecord.admission_claim_ref). On a live cache it needs no recovery at all:
+        nothing has to release it, so a worker death cannot strand it — it expires by itself when
+        the loader's frame does, and the record becomes ordinarily evictable again. Once the cache
+        is shut down that is no longer enough: the record is stale, and the eviction its expiry
+        should trigger travels through the dead worker, so the shield would keep it (and its
+        shared-store reference, and its budget bytes) resident for the life of the process.
+        Retiring it lets _evict_stale_unshielded_entries reclaim it — the same trade this method
+        already makes for holds, and it costs the same thing: if the loader really is still
+        running, it falls back to the tolerated issue-7513 detached path.
         """
         self._clear_stranded_first_use_holds()
         if not self._shutdown_event.is_set():
             return
         for entry in self._cached_models.values():
             entry.awaiting_first_use = False
+            entry.admission_claim_ref = None
 
     def _evict_stale_unshielded_entries(self) -> None:
         """Evict records left stale with no lock and no first-use shield. Caller holds the lock.
@@ -1252,6 +1412,50 @@ class ModelCache:
             cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
 
         return cache_entry
+
+    @synchronized
+    def get_with_first_use_claim(
+        self, key: str, stats_name: Optional[str] = None
+    ) -> tuple[CacheRecord, Optional[FirstUseClaim]]:
+        """get(), with the retrieved record's first-use hold armed atomically with the lookup.
+
+        Every caller that is going to wrap the record in a LoadedModel should retrieve it through
+        this method rather than get(): the returned claim shields the record from the asynchronous
+        eviction sweeps for the whole stretch between the lookup and the wrapper's first lock,
+        with no unshielded gap at the front of it (see FirstUseClaim). Both calls below run under
+        this frame's lock acquisition, and the synchronized decorator's reconcile hook fires only
+        on the outermost frame, so no eviction can run between the lookup and the arming.
+
+        The claim must be handed to the wrapper
+        (`LoadedModelWithoutConfig(..., first_use_claim=claim)`) or simply dropped; either way its
+        hold is released exactly once and the caller has nothing to clean up.
+
+        Returns `(record, None)` when no hold could be armed — no deferred worker is running to
+        carry the claim's finalizer release, or an eviction already detached the record. The
+        caller is then exactly where it was before this method existed: the record may be evicted
+        under it, and lock() falls back to the tolerated issue-7513 detached path.
+
+        Raises IndexError if the model is not in the cache, exactly as get() does.
+        """
+        cache_entry = self.get(key, stats_name)
+        return cache_entry, self._claim_first_use(cache_entry)
+
+    def _claim_first_use(self, cache_entry: CacheRecord) -> Optional[FirstUseClaim]:
+        """Arm a first-use hold and wrap it in the claim that owns its release. Caller holds the
+        lock. Returns None when no hold could be armed."""
+        hold_epoch = self.register_first_use_hold(cache_entry)
+        if hold_epoch is None:
+            return None
+        try:
+            return FirstUseClaim(self, cache_entry, hold_epoch)
+        except BaseException:
+            # The hold is armed, but the object that was to carry its release does not exist —
+            # weakref.finalize() allocates, and this cache runs at the RAM ceiling by design. An
+            # orphaned hold is the one failure this whole mechanism must not produce: it shields
+            # its record from every eviction path, shutdown()'s sweep included, for the life of
+            # the process. Hand the hold back before letting the failure out.
+            self.release_first_use_hold(cache_entry, hold_epoch)
+            raise
 
     @synchronized
     @record_activity

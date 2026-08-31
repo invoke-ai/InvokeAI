@@ -284,6 +284,458 @@ def test_shutdown_retains_record_inside_get_to_lock_window(mock_logger):
         cache_b.shutdown()
 
 
+def test_shutdown_retains_a_claimed_admission_for_its_in_flight_load(mock_logger):
+    """A loader between its put() and its retrieval still holds the canonical tensors it just
+    admitted, so shutdown() must retain that record. Evicting it would release shared-store
+    ownership (and debit the budget) for bytes that are still resident — a peer's reload would
+    then mint a duplicate canonical the budget counts once — and would fail the in-flight load
+    with an IndexError from a retrieval that no longer finds its own model. Invoker.stop() stops
+    the model manager BEFORE the session processor, whose workers are cancelled but not joined,
+    so that load is genuinely still running."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        # The loader admits its model and still holds it; shutdown() lands before the retrieval.
+        admission_claim = cache_a.put("m", DummyModule(), claim_admission=True)
+        assert admission_claim is not None, "the admission was not claimable"
+        record = cache_a._cached_models["m"]
+        canonical_before = store.peek("m")
+        cache_a.shutdown()
+
+        assert cache_a._cached_models.get("m") is record, "shutdown() evicted a record mid-admission"
+        assert record.is_stale
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+
+        # A peer loading the key now adopts the same canonical rather than duplicating it.
+        cache_b.put("m", DummyModule())
+        _use_and_release(cache_b, "m")
+        assert store.peek("m") is canonical_before, "peer reload minted a duplicate canonical"
+        assert store.refcount("m") == 2
+
+        # The loader's retrieval still finds its model, and hands the shield to its own claim.
+        retrieved, first_use_claim = cache_a.get_with_first_use_claim("m")
+        assert retrieved is record
+        admission_claim.release()
+
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache_a, first_use_claim=first_use_claim)
+        with loaded_model as _model:
+            assert cache_a._cached_models.get("m") is record, "locked a detached record"
+        assert "m" not in cache_a._cached_models
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+    finally:
+        cache_b.shutdown()
+
+
+def test_a_cancelled_claimed_admission_is_evicted_at_shutdown(mock_logger):
+    """JPPhoto's report in its own order (2026-08-30): a load that admits a model and is then
+    cancelled before its retrieval leaves no wrapper, so no finalizer and no unlock() is ever
+    coming, and after shutdown no further put() is guaranteed to run the sweep that was the
+    put()-set grace's last backstop — the record, its shared-store reference and its budget charge
+    used to stand until the cache object was collected. The admission claim is what ends it:
+    dropping it releases the admission, so the shutdown sweep finds an ordinary idle record."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+    assert admission_claim is not None
+    record = cache._cached_models["m"]
+
+    del admission_claim  # the load is cancelled between its put() and its retrieval
+    gc.collect()
+    assert _wait_until(lambda: not record.in_first_use_window), "the cancelled admission stayed shielded"
+
+    cache.shutdown()
+    assert "m" not in cache._cached_models, "shutdown() retained an admission nothing can release"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_a_dropped_admission_claim_lets_shutdown_evict_its_record(mock_logger):
+    """The other half of the claimed admission: a load cancelled before its retrieval drops the
+    claim, and that release is what evicts the record the shutdown sweep retained for it — with
+    its shared-store reference and its budget bytes."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+    assert admission_claim is not None
+    record = cache._cached_models["m"]
+    assert record.first_use_holds == 1
+    assert record.awaiting_first_use, "a claimed admission keeps the grace as its dead-worker fallback"
+
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record
+
+    del admission_claim  # the load was cancelled before it could retrieve the model
+    gc.collect()
+    assert _wait_until(lambda: "m" not in cache._cached_models), "a cancelled admission stayed resident"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_a_dead_worker_falls_back_to_the_admission_grace(mock_logger):
+    """A claimed admission must keep the swept grace beside its hold. Dead-worker recovery zeroes
+    every hold — a hold whose finalizer-carried release was dropped would shield its record
+    forever — while it deliberately leaves a live cache's grace alone, whose backstop is the next
+    put()'s sweep rather than the worker. Shielding the admission window with the hold alone would
+    therefore turn a worker death into a failed load: the next reconcile evicts the record while
+    the loader still holds its tensors, and the loader's own retrieval raises."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+        assert admission_claim is not None
+        record = cache._cached_models["m"]
+        assert record.first_use_holds == 1 and record.awaiting_first_use
+
+        _kill_worker_abnormally(cache, record)
+        assert record.first_use_holds == 0, "premise broken: the recovery did not zero the hold"
+        assert record.awaiting_first_use, "the live cache's admission grace was lifted with the hold"
+
+        # An asynchronous eviction sweep must still skip the record, and the loader's retrieval
+        # must still find the model it admitted.
+        cache.evict_unlocked_for_peer(lambda: False)
+        assert "m" in cache._cached_models, "the admission was evicted out from under its loader"
+        assert store.refcount("m") == 1
+        retrieved, _claim = cache.get_with_first_use_claim("m")
+        assert retrieved is record
+    finally:
+        cache.shutdown()
+
+
+def test_a_failed_admission_claim_leaves_the_admission_fully_accounted(mock_logger, monkeypatch):
+    """The claim is armed only once put() has committed. A raise while arming must not leave a
+    resident, store-owning record that the budget never counted: the record's eventual eviction
+    would then debit bytes that were never added, and the debit is clamped to what this cache has
+    tracked — so it lands on a different, still-resident model's charge, permanently."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    # keep_ram_copy=False -> not deduplicated, so each model is charged to the non-shared total.
+    cache = _make_cache(store, budget, mock_logger, keep_ram_copy=False)
+
+    def boom(*args, **kwargs):
+        raise MemoryError("no room for the claim")
+
+    try:
+        cache.put("resident", DummyModule())
+        one_model = budget.total_in_use()
+        assert one_model > 0
+
+        monkeypatch.setattr(model_cache_module, "FirstUseClaim", boom)
+        with pytest.raises(MemoryError):
+            cache.put("claimed", DummyModule(), claim_admission=True)
+        monkeypatch.undo()
+
+        assert "claimed" in cache._cached_models, "premise: the admission itself completed"
+        assert budget.total_in_use() == 2 * one_model, "a resident admission went uncounted"
+
+        # Evicting it debits only its own bytes; the other model's charge survives.
+        cache._delete_cache_entry(cache._cached_models["claimed"])
+        assert budget.total_in_use() == one_model
+    finally:
+        monkeypatch.undo()
+        cache.shutdown()
+
+
+def test_shutdown_retains_a_mid_admission_record_after_a_worker_death_and_restart(mock_logger):
+    """Neither flag survives an ordinary sequence of events, so neither can be what shutdown()
+    keys its retention on. A worker death zeroes the admission's hold; a replacement worker
+    (started by any later retrieval or admission) then hides the death from shutdown()'s
+    dead-worker recovery, and that later admission's sweep clears the unowned grace. With both
+    gone, shutdown() must still retain the record on the strength of the live claim: its loader
+    has not come back yet and still holds these tensors."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+        assert admission_claim is not None
+        record = cache._cached_models["m"]
+        assert record.first_use_holds == 1 and record.awaiting_first_use
+
+        _kill_worker_abnormally(cache, record)
+        assert record.first_use_holds == 0, "premise broken: the recovery did not zero the hold"
+
+        # An unrelated admission restarts the worker — so shutdown() takes its live-worker path,
+        # skipping the dead-worker recovery — and its sweep clears the unowned grace.
+        cache.put("other", DummyModule())
+        assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
+        assert not record.awaiting_first_use, "premise broken: the sweep left the grace standing"
+
+        cache.shutdown()
+        assert cache._cached_models.get("m") is record, "shutdown() evicted a record mid-admission"
+        assert record.is_stale
+        assert store.refcount("m") == 1
+
+        # The loader comes back and finds its own model, as it would have before any of this.
+        retrieved, _claim = cache.get_with_first_use_claim("m")
+        assert retrieved is record
+    finally:
+        cache.shutdown()
+
+
+def test_a_live_admission_survives_both_unowned_shields_being_stripped(mock_logger):
+    """The same property against the asynchronous sweeps, isolated: with the hold zeroed and the
+    grace cleared — each by an event outside the loader's control — the record is still shielded
+    while its admission claim lives, and evicting it is only correct once that claim is gone."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+    assert admission_claim is not None
+    record = cache._cached_models["m"]
+
+    record.first_use_holds = 0  # as dead-worker recovery would leave it
+    record.awaiting_first_use = False  # as another holder's abandonment, or the next put(), would
+    assert record.in_first_use_window, "the live admission claim stopped shielding its record"
+
+    cache.evict_unlocked_for_peer(lambda: False)
+    assert "m" in cache._cached_models, "a peer eviction took the record out from under its loader"
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record, "shutdown() evicted a record mid-admission"
+
+    del admission_claim  # the load ends; only now is the record nobody's
+    gc.collect()
+    assert _wait_until(lambda: "m" not in cache._cached_models), "the finished admission stayed resident"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_shutdown_retains_an_un_entered_wrapper_whose_hold_a_worker_death_zeroed(mock_logger):
+    """The grace is unowned, so a standing one does not mean nobody is working on the record:
+    here it is the last shield of a live LoadedModel wrapper whose hold the dead-worker recovery
+    zeroed. shutdown() must not treat it as an orphan — evicting it releases shared-store
+    ownership while the wrapper still holds the tensors (so a peer's reload mints a duplicate
+    canonical the budget counts once) and leaves the wrapper locking a detached record."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        # An earlier, unrelated resident: admitted first, because a later put() would sweep the
+        # grace this test needs standing.
+        cache_a.put("other", DummyModule())
+        _use_and_release(cache_a, "other")
+
+        cache_a.put("m", DummyModule())
+        record, claim = cache_a.get_with_first_use_claim("m")
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache_a, first_use_claim=claim)
+        assert record.awaiting_first_use and record.first_use_holds == 1
+        canonical_before = store.peek("m")
+
+        _kill_worker_abnormally(cache_a, record)
+        assert record.first_use_holds == 0, "premise broken: the recovery did not zero the hold"
+        assert record.awaiting_first_use, "premise broken: a live cache's grace was lifted"
+
+        # A retrieval of the OTHER model restarts the worker (register_first_use_hold revives it),
+        # so shutdown() takes its live-worker path and never runs the dead-worker recovery — while
+        # our record keeps the grace as its only shield.
+        other_holder = cache_a.get_with_first_use_claim("other")
+        assert cache_a._deferred_work_thread is not None and cache_a._deferred_work_thread.is_alive()
+        assert record.first_use_holds == 0 and record.awaiting_first_use
+
+        cache_a.shutdown()
+        assert cache_a._cached_models.get("m") is record, "shutdown() evicted a live wrapper's record"
+        assert store.refcount("m") == 1
+
+        with loaded_model as _model:
+            assert cache_a._cached_models.get("m") is record, "locked a detached record"
+            cache_b.put("m", DummyModule())
+            _use_and_release(cache_b, "m")
+            assert store.peek("m") is canonical_before, "peer reload minted a duplicate canonical"
+        del other_holder
+    finally:
+        cache_b.shutdown()
+
+
+def test_a_dead_worker_reclaims_a_record_left_shielded_by_an_admission_claim(mock_logger):
+    """The admission shield needs no recovery on a live cache — nothing has to release it, so a
+    worker death cannot strand it. Once the cache is shut down it does: the record is stale, and
+    the eviction its expiry should trigger travels through the dead worker. The recovery must
+    therefore retire it, or the model, its shared-store reference and its budget bytes stay
+    resident for the life of the process."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+    assert admission_claim is not None
+    record = cache._cached_models["m"]
+
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record and record.is_stale
+
+    # The worker dies after shutdown, with the claim still alive: its own dying recovery is the
+    # last event this record will ever see.
+    _kill_worker_abnormally(cache, record)
+    assert "m" not in cache._cached_models, "a record shielded with nothing left to unshield it"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_releasing_an_admission_claim_retires_its_shield(mock_logger):
+    """The shield is the claim's liveness, so a spent claim must retire it explicitly: the loader
+    releases at its retrieval, but the object itself lives on to the end of its frame — or for as
+    long as a traceback holds that frame — and until then the record would stay invisible to every
+    asynchronous eviction path."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        admission_claim = cache.put("m", DummyModule(), claim_admission=True)
+        assert admission_claim is not None
+        record = cache._cached_models["m"]
+        assert record.admission_in_flight
+
+        # The loader retrieves, uses and releases the model; the claim object is still alive here.
+        _use_and_release(cache, "m")
+        admission_claim.release()
+        assert not record.admission_in_flight, "a spent claim went on shielding its record"
+        assert record.in_first_use_window is False
+
+        cache.evict_unlocked_for_peer(lambda: False)
+        assert "m" not in cache._cached_models, "a finished load's record stayed unreclaimable"
+        assert store.refcount("m") == 0
+        assert budget.total_in_use() == 0
+    finally:
+        cache.shutdown()
+
+
+def test_a_failed_claim_construction_does_not_strand_its_hold(mock_logger, monkeypatch):
+    """The hold is armed before the claim that owns its release exists. If constructing the claim
+    raises — it allocates a weakref.finalize, and this cache runs at the RAM ceiling by design —
+    the hold must be handed back: an orphaned hold shields its record from every eviction path,
+    make_room, drop_model and shutdown's sweep included, for the life of the process."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    record = cache._cached_models["m"]
+
+    def boom(*args, **kwargs):
+        raise MemoryError("no room for the claim")
+
+    monkeypatch.setattr(model_cache_module, "FirstUseClaim", boom)
+    with pytest.raises(MemoryError):
+        cache.get_with_first_use_claim("m")
+    monkeypatch.undo()
+
+    assert record.first_use_holds == 0, "a failed claim left its hold armed with no owner"
+    cache.shutdown()
+    assert "m" not in cache._cached_models
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_claim_shields_the_record_from_the_lookup_onward(mock_logger):
+    """The first-use hold must be armed by the lookup itself, not by the wrapper's constructor
+    (JPPhoto review, 2026-08-30). The stretch in between is not a few instructions — the
+    configured loader retrieves its record inside _load_and_cache and then does the shared-store
+    shell registration and two returns — and a shutdown landing there would evict the record its
+    holder is about to lock, releasing shared-store ownership while the tensors live on, so a
+    peer's reload of the key would mint a duplicate canonical copy the budget counts once."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.put("m", DummyModule())
+        _use_and_release(cache_a, "m")  # warm: past the admission grace, unlocked
+
+        # The retrieval a load is about to wrap; shutdown() lands before the wrapper exists.
+        record, claim = cache_a.get_with_first_use_claim("m")
+        assert claim is not None
+        assert record.first_use_holds == 1, "the lookup did not arm the shield"
+        canonical_before = store.peek("m")
+        cache_a.shutdown()
+
+        assert cache_a._cached_models.get("m") is record, "shutdown() evicted the record before its wrapper existed"
+        assert record.is_stale
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+
+        # The wrapper is built late, adopts the claim, and locks a still-attached record.
+        loaded_model = LoadedModelWithoutConfig(cache_record=record, cache=cache_a, first_use_claim=claim)
+        with loaded_model as _model:
+            assert cache_a._cached_models.get("m") is record, "locked a detached record"
+            cache_b.put("m", DummyModule())
+            _use_and_release(cache_b, "m")
+            assert store.peek("m") is canonical_before, "peer reload minted a duplicate canonical"
+            assert store.refcount("m") == 2
+            assert budget.total_in_use() == S
+
+        # Exiting the context is the record's last release: the shutdown's stale mark evicts it.
+        assert "m" not in cache_a._cached_models
+        assert store.refcount("m") == 1
+        assert budget.total_in_use() == S
+    finally:
+        cache_b.shutdown()
+
+
+def test_an_unadopted_claim_releases_its_hold_when_dropped(mock_logger):
+    """A claim is armed before any wrapper exists, so a load that raises in between must not leave
+    the hold standing: dropping the claim is itself a complete release, and on a shut-down cache
+    it evicts the record the sweep retained for it, with its accounting."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+
+    record, claim = cache.get_with_first_use_claim("m")
+    assert claim is not None and record.first_use_holds == 1
+
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record, "shutdown() evicted the record out from under its claim"
+
+    del claim  # the load raised before it could build a wrapper
+    gc.collect()
+    assert _wait_until(lambda: "m" not in cache._cached_models), "a dropped claim stranded its record"
+    assert record.first_use_holds == 0
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
+def test_a_spent_claim_cannot_consume_a_later_holders_hold(mock_logger):
+    """A claim releases exactly once. Once its wrapper has locked, the claim is spent, so its
+    later collection must not decrement a hold a different, still-live holder armed in the
+    meantime — that would unshield the second holder's window and let shutdown() evict the record
+    out from under it."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+
+    record, claim_a = cache.get_with_first_use_claim("m")
+    wrapper_a = LoadedModelWithoutConfig(cache_record=record, cache=cache, first_use_claim=claim_a)
+    with wrapper_a as _model:
+        pass
+    assert record.first_use_holds == 0, "the first lock did not release the adopted claim"
+
+    # Holder B arms a fresh hold on the same record.
+    record_b, claim_b = cache.get_with_first_use_claim("m")
+    assert record_b is record and record.first_use_holds == 1
+
+    del wrapper_a, claim_a
+    gc.collect()
+    assert not _wait_until(lambda: record.first_use_holds == 0, timeout=0.5), "a spent claim consumed a later hold"
+
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record, "shutdown() evicted the record out from under holder B"
+
+    del claim_b
+    gc.collect()
+    assert _wait_until(lambda: "m" not in cache._cached_models), "holder B's claim did not release"
+    assert store.refcount("m") == 0
+    assert budget.total_in_use() == 0
+
+
 def test_abandoned_holder_reaches_zero_after_shutdown(mock_logger):
     """A record retained by the shutdown sweep for a wrapper that is then dropped un-entered must
     still reach zero (JPPhoto review, 2026-08-13): no unlock() is ever coming, so the wrapper's
@@ -2522,6 +2974,12 @@ def test_admission_without_a_worker_gets_no_first_use_grace_or_holds(mock_logger
         loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("late"), cache=cache)
         assert record.first_use_holds == 0, "armed a hold no worker can ever release"
         assert loaded_model._first_use_finalizer is None
+
+        # Same for a retrieval that asks for a claim: there is nothing to carry its release.
+        record_again, claim = cache.get_with_first_use_claim("late")
+        assert record_again is record
+        assert claim is None, "armed a claim no worker can ever release"
+        assert record.first_use_holds == 0
 
         # Being unshielded, the record is reachable by the synchronous eviction path.
         cache._delete_cache_entry(record)

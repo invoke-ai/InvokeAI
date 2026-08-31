@@ -18,7 +18,11 @@ from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRe
 from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
     CachedModelWithPartialLoad,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK, ModelCache
+from invokeai.backend.model_manager.load.model_cache.model_cache import (
+    MODEL_LOAD_LOCK,
+    FirstUseClaim,
+    ModelCache,
+)
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
 
@@ -53,43 +57,76 @@ class LoadedModelWithoutConfig:
     do not have a state_dict, in which case this value will be None.
     """
 
-    def __init__(self, cache_record: CacheRecord, cache: ModelCache):
+    def __init__(self, cache_record: CacheRecord, cache: ModelCache, first_use_claim: Optional[FirstUseClaim] = None):
         self._cache_record = cache_record
         self._cache = cache
-        # Shield the record for the window between this wrapper's construction and its first
-        # lock: without it, an eviction sweep racing that gap — a peer's budget reconcile,
-        # another model's make-room, or the cache's shutdown() — would evict the record out from
-        # under this wrapper, detaching it from the cache's RAM accounting and (for shared
-        # weights) from store ownership while its tensors live on. The few instructions between
-        # get() returning and this constructor arming the hold remain unshielded — an eviction
-        # landing exactly there is the pre-existing, tolerated issue-7513 detached path, and
-        # register_first_use_hold declines to arm on a record that already lost that race. The
-        # hold is released exactly once: on the
-        # first lock (_end_first_use_window), or by the finalizer below if this wrapper is
-        # dropped without ever locking. The finalizer also covers the put()-set admission grace
-        # for a record whose hold could not be armed (no deferred worker running). Both release
-        # routes quote the epoch the hold was armed under, so a hold the cache's dead-worker
-        # recovery already zeroed is never re-released against a successor hold.
+        # The record must stay shielded from the eviction sweeps until this wrapper's first lock:
+        # without that, a sweep racing the window — a peer's budget reconcile, another model's
+        # make-room, or the cache's shutdown() — evicts the record out from under the wrapper,
+        # detaching it from the cache's RAM accounting and (for shared weights) from store
+        # ownership while its tensors live on, so a peer's reload of the key mints a duplicate
+        # canonical copy the budget counts once.
+        #
+        # `first_use_claim` is that shield, and callers should always supply one: it was armed by
+        # ModelCache.get_with_first_use_claim() under the same lock acquisition as the lookup, so
+        # the window is covered from its very first instruction. Adopting it is just holding the
+        # reference — its hold is released on the first lock (_end_first_use_window) or, if this
+        # wrapper is dropped un-entered, by the claim's own finalizer when it dies with us.
+        self._first_use_claim = first_use_claim
+        # Fallback for a record obtained through plain get() (or by a caller that could not get a
+        # claim): arm the hold here instead. The instructions between that get() returning and
+        # this constructor are then unshielded — an eviction landing exactly there is the
+        # pre-existing, tolerated issue-7513 detached path, and register_first_use_hold declines
+        # to arm on a record that already lost that race. The finalizer below also covers the
+        # put()-set admission grace for a record whose hold could not be armed (no deferred worker
+        # running). Both release routes quote the epoch the hold was armed under, so a hold the
+        # cache's dead-worker recovery already zeroed is never re-released against a successor.
         release_grace = getattr(cache, "release_first_use_grace", None)
         register_hold = getattr(cache, "register_first_use_hold", None)
         self._first_use_hold_epoch: Optional[int] = (
-            register_hold(cache_record) if register_hold is not None and release_grace is not None else None
+            register_hold(cache_record)
+            if first_use_claim is None and register_hold is not None and release_grace is not None
+            else None
         )
         self._first_use_finalizer = None
-        if release_grace is not None and (self._first_use_hold_epoch is not None or cache_record.awaiting_first_use):
-            self._first_use_finalizer = finalize(
-                self,
-                release_grace,
-                cache_record,
-                self._first_use_hold_epoch is not None,
-                self._first_use_hold_epoch if self._first_use_hold_epoch is not None else 0,
-            )
-            self._first_use_finalizer.atexit = False
+        try:
+            if (
+                first_use_claim is None
+                and release_grace is not None
+                and (self._first_use_hold_epoch is not None or cache_record.awaiting_first_use)
+            ):
+                self._first_use_finalizer = finalize(
+                    self,
+                    release_grace,
+                    cache_record,
+                    self._first_use_hold_epoch is not None,
+                    self._first_use_hold_epoch if self._first_use_hold_epoch is not None else 0,
+                )
+                self._first_use_finalizer.atexit = False
+        except BaseException:
+            # finalize() allocates, and the cache runs at the RAM ceiling by design. A hold armed
+            # above with no finalizer to carry its release would shield its record from every
+            # eviction path — shutdown()'s sweep included — for the life of the process. Detach
+            # first: a failure AFTER the finalizer was registered would otherwise leave it live,
+            # and its later release would double-decrement, consuming a hold that by then may
+            # belong to a different holder.
+            if self._first_use_finalizer is not None:
+                self._first_use_finalizer.detach()
+                self._first_use_finalizer = None
+            if self._first_use_hold_epoch is not None:
+                release_hold = getattr(cache, "release_first_use_hold", None)
+                if release_hold is not None:
+                    release_hold(cache_record, self._first_use_hold_epoch)
+                self._first_use_hold_epoch = None
+            raise
 
     def _end_first_use_window(self) -> None:
         """This wrapper's first lock ended its get()->lock() window: the record is now pinned by
         its lock count, so drop the abandonment finalizer and release the first-use hold. Runs at
         most once — later re-entries of the context manager find nothing to release."""
+        if self._first_use_claim is not None:
+            claim, self._first_use_claim = self._first_use_claim, None
+            claim.release()
         if self._first_use_finalizer is not None:
             self._first_use_finalizer.detach()
             self._first_use_finalizer = None
@@ -198,8 +235,14 @@ class LoadedModelWithoutConfig:
 class LoadedModel(LoadedModelWithoutConfig):
     """Context manager object that mediates transfer from RAM<->VRAM."""
 
-    def __init__(self, config: Optional[AnyModelConfig], cache_record: CacheRecord, cache: ModelCache):
-        super().__init__(cache_record=cache_record, cache=cache)
+    def __init__(
+        self,
+        config: Optional[AnyModelConfig],
+        cache_record: CacheRecord,
+        cache: ModelCache,
+        first_use_claim: Optional[FirstUseClaim] = None,
+    ):
+        super().__init__(cache_record=cache_record, cache=cache, first_use_claim=first_use_claim)
         self.config = config
 
 
