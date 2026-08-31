@@ -10,7 +10,7 @@ from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -203,7 +203,7 @@ class AnimaCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG)
 
-        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        skip_patterns = _model_declared_skip_patterns(model)
         # Layers the cast would dequantize anyway are folded here, scale applied, so the cast never
         # strips a scale that can no longer be put back.
         # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable

@@ -14,7 +14,11 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
-from invokeai.backend.model_manager.load.load_default import ModelLoader, _device_supports_fp8_storage
+from invokeai.backend.model_manager.load.load_default import (
+    ModelLoader,
+    _device_supports_fp8_storage,
+    _model_declared_skip_patterns,
+)
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -399,7 +403,7 @@ class Krea2CheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
 
-        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        skip_patterns = _model_declared_skip_patterns(model)
         # Scaled layers the cast would dequantize anyway (skip patterns, non-Linear weights) are
         # folded here, with their scale applied. Left to `cast_state_dict` they would be cast
         # *without* it and `attach_fp8_scales` would then skip them for no longer being fp8 —
@@ -427,6 +431,10 @@ class Krea2CheckpointModel(ModelLoader):
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
+        # `assign=True` aliases every param to its `sd` tensor. Drop the dict's references before
+        # the FP8 cast, or each param's `model_dtype` original stays reachable while its fp8 copy is
+        # allocated, overshooting the `make_room()` reservation above by ~50%.
+        sd.clear()
 
         if kept and not fp8_layers:
             # Raw fp8: no scales to attach, but say so — otherwise the tensor-core path is invisible,

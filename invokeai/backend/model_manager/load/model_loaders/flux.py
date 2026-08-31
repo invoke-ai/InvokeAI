@@ -62,7 +62,11 @@ from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_T5Encoder_Config,
 )
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base, VAE_Checkpoint_Flux2_Config
-from invokeai.backend.model_manager.load.load_default import ModelLoader, resolve_submodel_path
+from invokeai.backend.model_manager.load.load_default import (
+    ModelLoader,
+    _model_declared_skip_patterns,
+    resolve_submodel_path,
+)
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.flux2_state_dict_utils import (
     convert_flux2_bfl_to_diffusers,
@@ -767,7 +771,7 @@ class FluxCheckpointModel(ModelLoader):
             dequantize_fp8_scaled(sd, fp8_layers, torch.bfloat16)
             fp8_layers = {}
 
-        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        skip_patterns = _model_declared_skip_patterns(model)
         # Scaled layers that the cast would dequantize anyway are folded here, scale applied, so
         # `cast_state_dict` never strips a scale that can no longer be put back.
         # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
@@ -1174,7 +1178,7 @@ class Flux2CheckpointModel(ModelLoader):
         # take them (the scaled-fp8 path above has already folded any weight_scale it found). The
         # model's own precision-sensitive list is honored — see the Z-Image loader for why that is
         # a correctness requirement and not just a quality nicety.
-        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        skip_patterns = _model_declared_skip_patterns(model)
         # Scaled layers the cast would dequantize anyway are folded here, scale applied, so
         # `cast_state_dict` never strips a scale that can no longer be put back.
         fp8_layers = split_fp8_scaled_layers(

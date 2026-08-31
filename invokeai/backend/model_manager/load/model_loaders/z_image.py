@@ -24,7 +24,11 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_SDNQ_Config,
     Qwen3Encoder_SDNQ_Folder_Config,
 )
-from invokeai.backend.model_manager.load.load_default import ModelLoader, resolve_submodel_path
+from invokeai.backend.model_manager.load.load_default import (
+    ModelLoader,
+    _model_declared_skip_patterns,
+    resolve_submodel_path,
+)
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -549,7 +553,7 @@ class ZImageCheckpointModel(ModelLoader):
         # ["t_embedder", "cap_embedder"], and `TimestepEmbedder.forward` casts its activations to
         # `self.mlp[0].weight.dtype` — an fp8 weight there turns the activations fp8 and the forward
         # dies in `x.abs()`. Those layers must be dequantized even though the rest stays quantized.
-        skip_patterns = tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ())
+        skip_patterns = _model_declared_skip_patterns(model)
         # Scaled layers that the cast would dequantize anyway are folded here, scale applied, so
         # `cast_state_dict` never strips a scale it cannot put back.
         # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
@@ -570,6 +574,12 @@ class ZImageCheckpointModel(ModelLoader):
         )
 
         model.load_state_dict(sd, assign=True)
+        # `assign=True` aliases every param to its `sd` tensor, so the dict keeps the whole model
+        # alive a second time. The FP8 cast below allocates the fp8 copy per param while the
+        # `model_dtype` original is still reachable through `sd`, pushing peak RAM to ~1.5x what
+        # `make_room()` reserved above (~17.4GB actual vs ~11.5GB reserved for Z-Image). Dropping
+        # the dict's references lets each original free as soon as its param is cast.
+        sd.clear()
 
         if fp8_layers:
             attached = attach_fp8_scales(model, fp8_layers)
