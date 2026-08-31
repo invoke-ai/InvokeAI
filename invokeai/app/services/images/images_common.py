@@ -47,23 +47,28 @@ class ResultWithAffectedBoards(BaseModel):
 
 class DeleteImagesResult(ResultWithAffectedBoards):
     deleted_images: list[str] = Field(description="The names of the images that were deleted")
-    failed_images: list[str] = Field(
-        default_factory=list,
-        description="The names of authorized images that could not be deleted",
-    )
+    # Required, not defaulted: the client toasts off this field, and an optional one would reach
+    # it as `undefined`. Matches StarredImagesResult.
+    failed_images: list[str] = Field(description="The names of authorized images that could not be deleted")
 
 
 class StarredImagesResult(ResultWithAffectedBoards):
     starred_images: list[str] = Field(description="The names of the images that were starred")
+    failed_images: list[str] = Field(description="The names of images that were not starred")
 
 
 class UnstarredImagesResult(ResultWithAffectedBoards):
     unstarred_images: list[str] = Field(description="The names of the images that were unstarred")
+    failed_images: list[str] = Field(description="The names of images that were not unstarred")
 
 
 class AddImagesToBoardResult(ResultWithAffectedBoards):
     added_images: list[str] = Field(description="The image names that were added to the board")
+    # Required, not defaulted: the client toasts off this field, and an optional one would reach
+    # it as `undefined`. Matches StarredImagesResult.
+    failed_images: list[str] = Field(description="The names of authorized images that could not be added")
 
 
 class RemoveImagesFromBoardResult(ResultWithAffectedBoards):
     removed_images: list[str] = Field(description="The image names that were removed from their board")
+    failed_images: list[str] = Field(description="The names of authorized images that could not be removed")

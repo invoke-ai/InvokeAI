@@ -1,5 +1,6 @@
 import re
 from abc import ABC
+from collections.abc import Callable
 from pathlib import Path
 from typing import (
     Any,
@@ -47,6 +48,7 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
+from invokeai.backend.patches.lora_conversions.krea2_lora_constants import is_kohya_krea2_lora_key
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     detect_wan_lora_variant,
     has_non_wan_architecture_keys,
@@ -908,12 +910,15 @@ _LORA_PAIR_PARTNERS = {
 }
 
 
-def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
-    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to `prefixes`) has its
-    partner half present. Returns True when there are no such weights at all (nothing to invalidate)."""
+def _lora_weight_keys_are_all_paired(
+    state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None
+) -> bool:
+    """True if *every* lora_A/lora_B/lora_down/lora_up weight (optionally restricted to the keys `key_filter`
+    accepts) has its partner half present. Returns True when there are no such weights at all (nothing to
+    invalidate)."""
     string_keys = {key for key in state_dict if isinstance(key, str)}
     for key in string_keys:
-        if prefixes is not None and not key.startswith(prefixes):
+        if key_filter is not None and not key_filter(key):
             continue
         for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
             if key.endswith(suffix):
@@ -923,8 +928,9 @@ def _lora_weight_keys_are_all_paired(state_dict: dict[str | int, Any], prefixes:
     return True
 
 
-def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
-    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally under `prefixes`.
+def _has_complete_lora_pair(state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None) -> bool:
+    """True if at least one complete lora_A/B (or lora_down/up) pair exists, optionally restricted to the
+    keys `key_filter` accepts.
 
     Note this only requires a *complete* pair to exist; it does not by itself reject dangling halves
     elsewhere — callers pair it with :func:`_lora_weight_keys_are_all_paired` (over the whole state dict)
@@ -932,7 +938,7 @@ def _has_complete_lora_pair(state_dict: dict[str | int, Any], prefixes: tuple[st
     """
     string_keys = {key for key in state_dict if isinstance(key, str)}
     for key in string_keys:
-        if prefixes is not None and not key.startswith(prefixes):
+        if key_filter is not None and not key_filter(key):
             continue
         for suffix, partner_suffix in _LORA_PAIR_PARTNERS.items():
             if key.endswith(suffix) and f"{key[: -len(suffix)]}{partner_suffix}" in string_keys:
@@ -955,20 +961,22 @@ _LOKR_WEIGHT_SUFFIXES = (
 )
 
 
-def _has_lokr_layer(state_dict: dict[str | int, Any], prefixes: tuple[str, ...] | None = None) -> bool:
-    """True if the state dict contains at least one LoKr layer, optionally restricted to `prefixes`."""
+def _has_lokr_layer(state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None) -> bool:
+    """True if the state dict contains at least one LoKr layer, optionally restricted to the keys
+    `key_filter` accepts."""
     for key in state_dict:
         if not isinstance(key, str):
             continue
-        if prefixes is not None and not key.startswith(prefixes):
+        if key_filter is not None and not key_filter(key):
             continue
         if key.endswith(_LOKR_WEIGHT_SUFFIXES):
             return True
     return False
 
 
-# Layouts the converter understands for an explicit Krea-2 override (a transformer-only or text-encoder-only
-# LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under an explicit base).
+# Dotted layouts the converter understands for an explicit Krea-2 override (a transformer-only or
+# text-encoder-only LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under
+# an explicit base). The kohya/LyCORIS layout is deliberately absent - see `_key_is_supported_krea2_layout`.
 _KREA2_SUPPORTED_LORA_PREFIXES = (
     "transformer.transformer_blocks.",
     "transformer_blocks.",
@@ -982,20 +990,24 @@ _KREA2_SUPPORTED_LORA_PREFIXES = (
     "diffusion_model.tproj.",
     "diffusion_model.txtmlp.",
     "diffusion_model.last.linear.",
-    # kohya/LyCORIS flattens that same native layout into `lora_unet_<path>` (see
-    # krea2_lora_conversion_utils._maybe_convert_kohya_krea2_state_dict). Spelled out per top-level module
-    # rather than as a bare `lora_unet_`, which would match every other architecture's kohya LoRA too.
-    "lora_unet_blocks_",
-    "lora_unet_txtfusion_",
-    "lora_unet_first.",
-    "lora_unet_tmlp_",
-    "lora_unet_tproj_",
-    "lora_unet_txtmlp_",
-    "lora_unet_last_linear.",
     "base_model.model.transformer.transformer_blocks.",
     "text_encoder.",
     "base_model.model.text_encoder.",
 )
+
+
+def _key_is_supported_krea2_layout(key: str) -> bool:
+    """True if `key` names a module in a layout the Krea-2 converter can map.
+
+    The dotted layouts are matched by prefix. The kohya/LyCORIS layout is not, because its `lora_unet_`
+    spelling is shared: Wan writes `lora_unet_blocks_<idx>_...` and Anima `lora_unet_[llm_adapter_]blocks_
+    <idx>_...`, so per-module prefixes such as `lora_unet_blocks_` still sweep those files into the explicit
+    Krea-2 override, where they install and then silently no-op at generation time. Asking the converter's
+    own un-flattener whether the flattened path reconstructs to a Krea-2 module leaf rejects them, and as a
+    bonus accepts the doubled-separator spelling (`lora_unet__blocks_...`) that the converter tolerates but
+    no prefix spelled out (review 4888833569, notes 2 and 3).
+    """
+    return key.startswith(_KREA2_SUPPORTED_LORA_PREFIXES) or is_kohya_krea2_lora_key(key)
 
 
 class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -1011,8 +1023,8 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
         has_supported_explicit_pair = _has_complete_lora_pair(
-            state_dict, _KREA2_SUPPORTED_LORA_PREFIXES
-        ) or _has_lokr_layer(state_dict, _KREA2_SUPPORTED_LORA_PREFIXES)
+            state_dict, _key_is_supported_krea2_layout
+        ) or _has_lokr_layer(state_dict, _key_is_supported_krea2_layout)
         # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
         # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
         if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):

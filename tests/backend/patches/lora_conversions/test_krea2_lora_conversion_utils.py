@@ -50,6 +50,8 @@ def test_peft_dora_layer_preserves_magnitude_and_alpha() -> None:
     assert isinstance(layer, DoRALayer)
     assert layer._alpha == 1.0
     assert torch.equal(layer.dora_scale, dora_scale)
+    # `.dora_scale` is the LyCORIS magnitude: it indexes the *input* dim.
+    assert layer.magnitude_is_out_dim is False
 
 
 def test_peft_layer_without_explicit_alpha_uses_rank_default() -> None:
@@ -96,6 +98,40 @@ def test_peft_dora_magnitude_vector_key_produces_dora_layer() -> None:
     layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
     assert isinstance(layer, DoRALayer)
     assert torch.equal(layer.dora_scale, magnitude)
+    # The PEFT magnitude indexes the *output* dim, unlike the LyCORIS `.dora_scale`.
+    assert layer.magnitude_is_out_dim is True
+
+
+def test_native_aitoolkit_dora_magnitude_key_produces_dora_layer() -> None:
+    # ai-toolkit (`network.type: dora`) writes native Krea-2 keys with a bare `.magnitude` suffix. Without an
+    # explicit mapping these fall through the suffix table and get grouped into a bogus `...attn` layer,
+    # raising "Unsupported lora format: dict_keys(['to_gate.magnitude', ...])" (issue #9515).
+    attn_magnitude = torch.full((4,), 3.0)
+    # A non-square layer: its magnitude has out_features entries while the LyCORIS convention would expect
+    # in_features, so a mis-oriented magnitude would blow up at patch time rather than silently.
+    ff_magnitude = torch.full((4,), 5.0)
+    state_dict = {
+        "diffusion_model.blocks.0.attn.wq.lora_A.weight": torch.ones(2, 4),
+        "diffusion_model.blocks.0.attn.wq.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.blocks.0.attn.wq.magnitude": attn_magnitude,
+        "diffusion_model.txtfusion.refiner_blocks.0.mlp.down.lora_A.weight": torch.ones(2, 8),
+        "diffusion_model.txtfusion.refiner_blocks.0.mlp.down.lora_B.weight": torch.ones(4, 2),
+        "diffusion_model.txtfusion.refiner_blocks.0.mlp.down.magnitude": ff_magnitude,
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    attn_layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"]
+    assert isinstance(attn_layer, DoRALayer)
+    assert torch.equal(attn_layer.dora_scale, attn_magnitude)
+    assert attn_layer.magnitude_is_out_dim is True
+
+    ff_layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.refiner_blocks.0.ff.down"]
+    assert isinstance(ff_layer, DoRALayer)
+    assert torch.equal(ff_layer.dora_scale, ff_magnitude)
+    assert ff_layer.magnitude_is_out_dim is True
+    # The magnitude must survive as a real DoRA layer, not leak into a bogus parent group.
+    assert not any(key.endswith(".attn") or key.endswith(".mlp") for key in model.layers)
 
 
 def test_conflicting_transformer_and_diffusion_model_aliases_raise() -> None:
