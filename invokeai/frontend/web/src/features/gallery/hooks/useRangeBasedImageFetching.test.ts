@@ -260,6 +260,34 @@ describe('useRangeBasedImageFetching', () => {
     expect(mocks.imageFetches.length).toBeGreaterThanOrEqual(fetchesAfterGiveUp + 3);
   });
 
+  it('restores parked ranges on the next scroll when the socket never dropped', async () => {
+    // Review finding (coverage): parked ranges are restored by three signals — a socket reconnect,
+    // a later success, and a fresh range report — but only the reconnect was pinned. `resumes
+    // retrying after giving up when the user scrolls` re-reports the *same* range, which
+    // `lastRange` re-fetches whether or not the parked set was restored, so deleting the restore
+    // from `resetRetryBudget` left the suite green. The distinction only shows for a range that is
+    // parked but no longer on screen, after a recovery the socket never observed — a transient 502
+    // from a reverse proxy, say, where the websocket stays up throughout and the reconnect path
+    // never fires.
+    const imageNames = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png', 'g.png', 'h.png', 'i.png'];
+    $isConnected.set(true);
+    mocks.failFetches = true;
+    renderHook(imageNames, true);
+    scrollTo({ startIndex: 0, endIndex: 2 });
+    await advance(35_000);
+    expect(mocks.cachedImageNames).toEqual([]);
+
+    // REST answers again with no socket transition, so the scroll is the only signal that can heal
+    // the parked range.
+    mocks.failFetches = false;
+    scrollTo({ startIndex: 6, endIndex: 8 });
+    await advance(THROTTLE_MS * 4);
+
+    // The rows the user scrolled past during the outage land along with the new viewport. Without
+    // the restore only g-i would be fetched and a-c would stay grey placeholders permanently.
+    expect([...mocks.cachedImageNames].sort()).toEqual(['a.png', 'b.png', 'c.png', 'g.png', 'h.png', 'i.png']);
+  });
+
   it('heals a grid that gave up when the socket reconnects, with no user input', async () => {
     // Review finding: the retry budget ends ~31s after the first failure, but an InvokeAI restart
     // (config load, DB migrations, model scan) routinely takes longer. For an idle user nothing
