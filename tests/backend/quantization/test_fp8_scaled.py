@@ -1170,3 +1170,123 @@ class TestExpandWeightScaleAxis:
 
         # Without the expansion this is a broadcast error, not merely a wrong number.
         assert (weight * expand_weight_scale(weight, torch.arange(4, dtype=torch.float32))).shape == (4, 2)
+
+
+class TestPredictionIsSplitAware:
+    """`make_room` runs before `split_fp8_scaled_layers`, so the prediction has to account for what
+    the split widens — not just for what the cast keeps.
+
+    `can_stay_quantized` knows nothing about the scale *layout*. A block-wise-scaled 2-D
+    `nn.Linear.weight` passes it, gets predicted at 1 byte/element, and is then dequantized to
+    `dtype` by the split at 2 — the reservation is half the truth, and on a real checkpoint using
+    that layout the shortfall is the whole quantized-Linear set.
+    """
+
+    def _model(self):
+        model = torch.nn.Sequential()
+        model.add_module("lin", torch.nn.Linear(16, 32))
+        return model
+
+    @pytest.mark.parametrize(
+        "label, scale, stays_fp8",
+        [
+            ("per-tensor", torch.tensor(2.0), True),
+            ("per-output-channel", torch.full((32,), 2.0), True),
+            ("block-wise", torch.full((8, 2), 2.0), False),
+        ],
+    )
+    def test_prediction_matches_the_bytes_left_after_split_and_cast(self, label, scale, stays_fp8):
+        model = self._model()
+        sd = {"lin.weight": torch.zeros(32, 16).to(FP8_DTYPE), "lin.weight_scale": scale}
+        layers = extract_fp8_scaled_layers(sd)
+
+        predicted = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers=layers)
+        remaining = split_fp8_scaled_layers(sd, layers, torch.bfloat16, model=model)
+        cast_state_dict(sd, torch.bfloat16, keep_fp8=True, model=model)
+        actual = sum(t.nelement() * t.element_size() for t in sd.values())
+
+        assert predicted == actual, f"{label}: reserved {predicted}, needed {actual}"
+        assert bool(remaining) is stays_fp8
+        assert (sd["lin.weight"].dtype is FP8_DTYPE) is stays_fp8
+
+    def test_without_the_mapping_the_block_wise_layer_is_under_counted(self):
+        """The regression itself: omitting `scaled_layers` reverts to the weaker predicate."""
+        model = self._model()
+        sd = {"lin.weight": torch.zeros(32, 16).to(FP8_DTYPE), "lin.weight_scale": torch.full((8, 2), 2.0)}
+        layers = extract_fp8_scaled_layers(sd)
+
+        blind = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model)
+        aware = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers=layers)
+        assert aware == 2 * blind
+
+    def test_raw_fp8_without_any_scale_is_unaffected(self):
+        """A weight with no `weight_scale` has no layout to reject; it stays fp8 either way."""
+        model = self._model()
+        sd = {"lin.weight": torch.zeros(32, 16).to(FP8_DTYPE)}
+        with_map = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers={})
+        without = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model)
+        assert with_map == without == 32 * 16
+
+
+class TestQwen3VlStyleSplit:
+    """Pins the helper contract the Qwen3-VL encoder switched to.
+
+    Its old per-key `if dtype is not FP8_DTYPE` loop kept *every* fp8 tensor quantized. The three
+    things that got wrong are all visible without any `transformers` dependency, against a stub
+    module tree.
+    """
+
+    def _model(self):
+        model = torch.nn.Module()
+        model.add_module("norm", torch.nn.LayerNorm(32))
+        model.add_module("lin", torch.nn.Linear(16, 32))
+        model.add_module("plain", torch.nn.Linear(16, 32))
+        return model
+
+    def test_scaled_norm_is_folded_and_block_wise_linear_is_dropped(self):
+        model = self._model()
+        norm_scale = torch.tensor(4.0)
+        sd = {
+            # A 1-D fp8 norm carrying a scale: not a matmul weight, so it must be folded, not kept.
+            "norm.weight": torch.ones(32).to(FP8_DTYPE),
+            "norm.weight_scale": norm_scale,
+            # A Linear whose scale layout `scaled_mm` cannot apply: folded too.
+            "lin.weight": torch.ones(32, 16).to(FP8_DTYPE),
+            "lin.weight_scale": torch.full((8, 2), 2.0),
+            # A Linear the matmul can take: survives, and is what `attach_fp8_scales` gets.
+            "plain.weight": torch.ones(32, 16).to(FP8_DTYPE),
+            "plain.weight_scale": torch.tensor(3.0),
+        }
+        layers = extract_fp8_scaled_layers(sd)
+        assert set(layers) == {"norm", "lin", "plain"}
+
+        remaining = split_fp8_scaled_layers(sd, layers, torch.bfloat16, model=model)
+        cast_state_dict(sd, torch.bfloat16, keep_fp8=True, model=model)
+
+        assert set(remaining) == {"plain"}, "only the matmul-usable Linear may keep its scale"
+        # The norm was dequantized *with* its scale applied — the old loop left it as raw fp8 codes.
+        assert sd["norm.weight"].dtype is torch.bfloat16
+        assert torch.allclose(sd["norm.weight"], torch.full((32,), 4.0, dtype=torch.bfloat16))
+        assert sd["lin.weight"].dtype is torch.bfloat16
+        assert sd["plain.weight"].dtype is FP8_DTYPE
+
+    def test_e5m2_scaled_weight_keeps_its_scale_on_the_way_down(self):
+        """Only e4m3fn may stay quantized, so an e5m2 weight must be folded rather than cast bare."""
+        model = self._model()
+        sd = {
+            "plain.weight": torch.ones(32, 16).to(torch.float8_e5m2),
+            "plain.weight_scale": torch.tensor(3.0),
+        }
+        layers = extract_fp8_scaled_layers(sd)
+        remaining = split_fp8_scaled_layers(sd, layers, torch.bfloat16, model=model)
+
+        assert remaining == {}
+        assert torch.allclose(sd["plain.weight"], torch.full((32, 16), 3.0, dtype=torch.bfloat16))
+
+
+class TestMalformedWeightScale:
+    def test_a_1d_scale_of_the_wrong_length_is_reported_not_broadcast(self):
+        """Neither per-tensor nor per-output-channel. Left to torch, the multiply raises "size of
+        tensor a (32) must match tensor b (7)" from inside the fold, naming neither layer nor file."""
+        with pytest.raises(ValueError, match="neither per-tensor nor per-output-channel"):
+            expand_weight_scale(torch.ones(32, 16), torch.full((7,), 2.0))

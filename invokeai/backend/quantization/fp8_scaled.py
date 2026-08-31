@@ -409,6 +409,17 @@ def expand_weight_scale(weight: torch.Tensor, scale: torch.Tensor) -> torch.Tens
     if scale.numel() == 1:
         return scale
     if scale.dim() <= 1:
+        if scale.numel() != weight.shape[0]:
+            # A 1-D scale is per-output-channel by definition, so any other length means the file
+            # does not describe this weight — most likely a block-wise scale flattened by the
+            # producer, whose block structure is not recoverable from the tensor alone. Say so:
+            # left to broadcast, torch raises "size of tensor a (32) must match tensor b (7)" from
+            # inside the multiply, which names neither the layer nor the file.
+            raise ValueError(
+                f"fp8 weight_scale has {scale.numel()} entries but the weight has {weight.shape[0]} output "
+                "channels; the scale is neither per-tensor nor per-output-channel and cannot be applied. "
+                "The checkpoint's quantization metadata appears to be malformed."
+            )
         return scale.reshape(-1, *([1] * (weight.dim() - 1)))
     for dim in range(weight.dim()):
         if dim < scale.dim() and scale.shape[dim] != weight.shape[dim]:
@@ -779,6 +790,38 @@ def can_stay_quantized(
     )
 
 
+def scaled_layer_for(key: Any, scaled_layers: Mapping[str, "Fp8ScaledLayer"] | None) -> "Fp8ScaledLayer | None":
+    """The recovered scale for the module whose ``.weight`` this key is, if there is one."""
+    if not scaled_layers or not isinstance(key, str) or not key.endswith(".weight"):
+        return None
+    return scaled_layers.get(key[: -len(".weight")])
+
+
+def survives_split_and_cast(
+    key: str,
+    tensor: Any,
+    model: torch.nn.Module | None,
+    skip_patterns: Iterable[str] = (),
+    layer: "Fp8ScaledLayer | None" = None,
+) -> bool:
+    """Whether this entry is *still* fp8 after both :func:`split_fp8_scaled_layers` and
+    :func:`cast_state_dict` have run over it.
+
+    :func:`can_stay_quantized` answers only for the cast. The split applies one filter more — a
+    scale layout :func:`scaled_mm_linear` cannot use — so a block-wise-scaled 2-D Linear weight
+    passes ``can_stay_quantized`` and is nonetheless widened to ``dtype``. Predicting RAM with the
+    weaker predicate therefore charges 1 byte/element for a tensor that ends up at 2, and the loaders
+    reserve half of what they need. This is the predicate both the split and the prediction use, so
+    the two cannot drift.
+
+    ``layer`` is None for a raw fp8 weight (no ``weight_scale`` at all); there is no layout to
+    reject, and the tensor-core path takes it with unit scaling.
+    """
+    if not can_stay_quantized(key, tensor, model, skip_patterns):
+        return False
+    return layer is None or is_matmul_usable_scale(tensor, layer.weight_scale)
+
+
 def _is_castable_float(tensor: Any) -> bool:
     """Whether ``tensor`` is a floating-point payload that may be cast to the compute dtype."""
     is_floating_point = getattr(tensor, "is_floating_point", None)
@@ -834,19 +877,27 @@ def predict_cast_state_dict_size(
     keep_fp8: bool,
     model: torch.nn.Module | None = None,
     skip_patterns: Iterable[str] = (),
+    scaled_layers: Mapping[str, Fp8ScaledLayer] | None = None,
 ) -> int:
-    """Bytes the state dict will occupy once :func:`cast_state_dict` has run over it.
+    """Bytes the state dict will occupy once the split and :func:`cast_state_dict` have run over it.
 
     Loaders call this to size their ``make_room()`` reservation. Charging 1 byte/element for every
     fp8 tensor is wrong in the direction that hurts: only 2-D ``nn.Linear`` weights outside the skip
     patterns stay quantized, and everything else — biases, norms, learned pad tokens, the
     deliberately-dequantized precision-sensitive Linears — lands at ``dtype.itemsize``. On a
     checkpoint that quantized all 453 of its tensors that under-count is most of the difference.
+
+    ``scaled_layers`` is the mapping the caller is about to hand :func:`split_fp8_scaled_layers`.
+    Pass it: the reservation is made *before* the split (so the split's own fp32 transient lands on
+    a reserved cache), and the split widens every layer whose scale layout ``scaled_mm`` cannot
+    apply. Without the mapping those layers are predicted at 1 byte/element and arrive at 2 — on a
+    block-wise-scaled checkpoint that is the entire quantized-Linear set.
     """
     patterns = tuple(skip_patterns)
     total = 0
     for key, tensor in sd.items():
-        if (keep_fp8 and can_stay_quantized(key, tensor, model, patterns)) or not _is_castable_float(tensor):
+        stays = keep_fp8 and survives_split_and_cast(key, tensor, model, patterns, scaled_layer_for(key, scaled_layers))
+        if stays or not _is_castable_float(tensor):
             total += tensor.nelement() * tensor.element_size()
         else:
             total += tensor.nelement() * dtype.itemsize
@@ -877,9 +928,10 @@ def split_fp8_scaled_layers(
 
     A scale layout :func:`scaled_mm_linear` cannot apply — block-wise, or a vector that does not
     match the weight's row count — is dequantized here too. Left quantized it would fail inside the
-    kernel mid-generation instead. Doing it here rather than in :func:`can_stay_quantized` keeps the
-    RAM accounting honest: every caller runs this before
-    :func:`predict_cast_state_dict_size`, so the prediction sees the already-widened tensor.
+    kernel mid-generation instead. That filter lives here rather than in :func:`can_stay_quantized`
+    because it needs the recovered scale, which the cast never sees. The RAM prediction runs
+    *before* this function, so it has to account for the same widening — it does, via the shared
+    :func:`survives_split_and_cast`, provided the caller passes it ``scaled_layers``.
 
     ``float8_e5m2`` layers land here by way of :func:`can_stay_quantized`, which admits only
     ``float8_e4m3fn`` — they are dequantized *with* their scale applied rather than losing it.
@@ -890,11 +942,7 @@ def split_fp8_scaled_layers(
     for path, layer in layers.items():
         key = f"{path}.weight"
         tensor = sd.get(key)
-        if (
-            tensor is not None
-            and can_stay_quantized(key, tensor, model, patterns)
-            and is_matmul_usable_scale(tensor, layer.weight_scale)
-        ):
+        if tensor is not None and survives_split_and_cast(key, tensor, model, patterns, layer):
             usable[path] = layer
         else:
             unusable[path] = layer

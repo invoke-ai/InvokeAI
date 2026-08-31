@@ -776,11 +776,17 @@ class FluxCheckpointModel(ModelLoader):
         # `cast_state_dict` never strips a scale that can no longer be put back.
         # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
         # subset through fp32, so reserving afterwards lets that transient peak land on an
-        # unreserved cache. The prediction is unaffected by the split -- it applies the same
-        # `can_stay_quantized` predicate, so those layers are already counted at `dtype.itemsize`.
+        # unreserved cache. `scaled_layers` is what keeps that honest: the split also widens layers
+        # whose scale layout `scaled_mm` cannot apply, and without the mapping the prediction would
+        # charge those 1 byte/element and arrive at 2.
         self._ram_cache.make_room(
             predict_cast_state_dict_size(
-                sd, torch.bfloat16, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns
+                sd,
+                torch.bfloat16,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                scaled_layers=fp8_layers,
             )
         )
 

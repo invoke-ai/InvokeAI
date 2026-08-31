@@ -558,10 +558,18 @@ class ZImageCheckpointModel(ModelLoader):
         # `cast_state_dict` never strips a scale it cannot put back.
         # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
         # subset through fp32, so reserving afterwards lets that transient peak land on an
-        # unreserved cache. The prediction is unaffected by the split -- it applies the same
-        # `can_stay_quantized` predicate, so those layers are already counted at `dtype.itemsize`.
+        # unreserved cache. `scaled_layers` is what keeps that honest: the split also widens layers
+        # whose scale layout `scaled_mm` cannot apply, and without the mapping the prediction would
+        # charge those 1 byte/element and arrive at 2.
         self._ram_cache.make_room(
-            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            predict_cast_state_dict_size(
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                scaled_layers=fp8_layers,
+            )
         )
 
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
@@ -1018,6 +1026,37 @@ class ZImageControlCheckpointModel(ModelLoader):
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.Checkpoint)
+def _fold_comfy_scaled_weights(sd: dict[str, Any], dtype: torch.dtype) -> int:
+    """Fold every ComfyUI-style ``weight_scale`` into its weight, in place. Returns how many.
+
+    ComfyUI stores quantized weights with accompanying scale factors (``layer.weight`` quantized,
+    ``layer.weight_scale`` the factor, both spellings), so ``dequantized = weight * weight_scale``.
+    See https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md.
+
+    A named function rather than a loop inside the loader so the scale-axis contract below is
+    reachable from a test. `expand_weight_scale` handles all three layouts (per-tensor,
+    per-output-channel, block-wise); the local loop this replaced left a 1-D per-channel scale
+    untouched, and ``(out, in) * (out,)`` then broadcasts on the *last* axis — scaling input
+    channels instead of output channels, which is a shape error on a non-square weight and a
+    silently wrong weight on a square one.
+
+    The multiply runs in float32 for precision but each result is stored as ``dtype`` immediately,
+    so the whole model is never materialized in float32: holding every dequantized weight at fp32
+    until the caller's later cast quadruples the per-parameter cost (4 bytes vs 1 on disk) and
+    dominates the cold-load RAM peak — enough to swap a 32 GB machine. Same fix as in the FLUX.2
+    and Krea-2 loaders.
+    """
+    folded = 0
+    for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
+        # Float8 needs `.float()`; torch has no direct type promotion for it.
+        weight_float = sd[weight_key].float()
+        scale = expand_weight_scale(weight_float, sd[scale_key].float())
+        sd[weight_key] = (weight_float * scale).to(dtype)
+        del weight_float
+        folded += 1
+    return folded
+
+
 class Qwen3EncoderCheckpointLoader(ModelLoader):
     """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format)."""
 
@@ -1082,32 +1121,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         # Dequantization formula: dequantized = weight.to(dtype) * weight_scale
         # Reference: https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md
         original_key_count = len(sd)
-        dequantized_count = 0
-
-        # Both spellings, because the metadata strip below removes both.
-        for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
-            weight = sd[weight_key]
-            scale = sd[scale_key]
-            # Dequantize: convert to float and multiply by scale
-            # Handle block-wise quantization (e.g., FP4 with block_size=8)
-            # where scale has shape [weight_dim / block_size, ...]
-            # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
-            # as PyTorch doesn't support direct type promotion for Float8 types
-            weight_float = weight.float()
-            # `expand_weight_scale` handles all three layouts (per-tensor, per-output-channel,
-            # block-wise). The local loop it replaces left a 1-D per-channel scale untouched, and
-            # `(out, in) * (out,)` then broadcasts on the *last* axis -- scaling input channels
-            # instead of output channels, which is wrong on a square weight and a shape error on
-            # any other.
-            scale = expand_weight_scale(weight_float, scale.float())
-            # Multiply in float32 for precision, but store the compute dtype immediately so the
-            # *whole model* is never materialized in float32. Keeping every dequantized weight as
-            # float32 until the caller's later cast quadruples the per-parameter cost (4 bytes vs
-            # 1 on disk) and dominates the cold-load RAM peak — enough to swap a 32 GB machine.
-            # Same fix as in the FLUX.2 and Krea-2 loaders.
-            sd[weight_key] = (weight_float * scale).to(model_dtype)
-            del weight_float
-            dequantized_count += 1
+        dequantized_count = _fold_comfy_scaled_weights(sd, model_dtype)
 
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI quantized weights")

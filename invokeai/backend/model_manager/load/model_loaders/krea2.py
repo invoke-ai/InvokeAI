@@ -411,10 +411,18 @@ class Krea2CheckpointModel(ModelLoader):
         # ordinary quantized Linears in a ComfyUI export and match the model's `time_embed` pattern.
         # Reserve before the split, not after: `split_fp8_scaled_layers` dequantizes its unusable
         # subset through fp32, so reserving afterwards lets that transient peak land on an
-        # unreserved cache. The prediction is unaffected by the split -- it applies the same
-        # `can_stay_quantized` predicate, so those layers are already counted at `dtype.itemsize`.
+        # unreserved cache. `scaled_layers` is what keeps that honest: the split also widens layers
+        # whose scale layout `scaled_mm` cannot apply, and without the mapping the prediction would
+        # charge those 1 byte/element and arrive at 2.
         self._ram_cache.make_room(
-            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
+            predict_cast_state_dict_size(
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                scaled_layers=fp8_layers,
+            )
         )
 
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
@@ -712,7 +720,12 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         source_is_fp8 = bool(fp8_layers) or any(
             getattr(t, "dtype", None) in (torch.float8_e4m3fn, torch.float8_e5m2) for t in sd.values()
         )
-        if fp8_layers and not should_keep_fp8_weights(target_device):
+        # Resolved once. `device_supports_fp8_matmul` deliberately does not cache an inconclusive
+        # probe, so two calls can disagree: a transient failure here followed by a success below
+        # would leave the scales already folded while the raw Linears stay quantized, i.e. the
+        # encoder silently on the storage path with the matmul log line never printed.
+        keep_matmul_fp8 = should_keep_fp8_weights(target_device)
+        if fp8_layers and not keep_matmul_fp8:
             # Legacy behavior: fold the scales into the weights. Without the fp8 matmul, staying
             # quantized would save VRAM but cost speed, so the two are tied to the same setting.
             dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
@@ -734,11 +747,18 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         #
         # `split_fp8_scaled_layers` applies exactly those filters and dequantizes the affected
         # layers *with* their scale, so what remains is what the matmul can actually consume.
-        keep_fp8 = should_keep_fp8_weights(target_device)
+        # The storage path below re-quantizes to fp8 anyway, so casting the raw fp8 Linears to
+        # `model_dtype` here would double both this reservation and the host-RAM peak (~4.4 -> ~8.9
+        # GiB on the 4B encoder) for a round trip that ends where it started -- e4m3fn is a subset
+        # of bf16, so it is value-exact. Keep them for either consumer.
+        use_fp8_storage = source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger)
+        keep_fp8 = keep_matmul_fp8 or use_fp8_storage
         # Reserve before the split: it dequantizes its unusable subset through fp32, so reserving
-        # afterwards lets that transient peak land on an unreserved cache. The prediction is
-        # unaffected -- it applies the same `can_stay_quantized` predicate.
-        self._ram_cache.make_room(predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model))
+        # afterwards lets that transient peak land on an unreserved cache. `scaled_layers` keeps the
+        # prediction in step with the split's own scale-layout filter.
+        self._ram_cache.make_room(
+            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, scaled_layers=fp8_layers)
+        )
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model)
         cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model)
 
@@ -785,7 +805,7 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         # excludes text encoders (and the config has no fp8_storage toggle), so apply the hook-based
         # casting directly here. This roughly halves the encoder's resident VRAM (~8.9GB bf16 ->
         # ~4.4GB), which avoids partial-load thrashing when it shares the GPU with a large transformer.
-        if source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger):
+        if use_fp8_storage:
             # `model.dtype` now reports the float8 storage dtype; `_apply_fp8_to_nn_module` records
             # the real compute dtype so callers can recover it via `get_model_compute_dtype`.
             self._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=model_dtype)
