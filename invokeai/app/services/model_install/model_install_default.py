@@ -1503,14 +1503,37 @@ class ModelInstallService(ModelInstallServiceBase):
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
 
+    @staticmethod
+    def _tmpdir_has_recoverable_data(download_job: MultiFileDownloadJob) -> bool:
+        """Return True if any part has completed or left a non-empty resumable partial."""
+        for part in download_job.download_parts:
+            if part.dest.is_file():
+                return True
+            if part.download_path is not None:
+                in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
+                try:
+                    if in_progress_path.exists() and in_progress_path.stat().st_size > 0:
+                        return True
+                except OSError:
+                    continue
+        return False
+
     def _download_error_callback(self, download_job: MultiFileDownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 assert excp is not None
-                self._set_error(install_job, excp)
-                self._download_queue.cancel_job(download_job)
-                if install_job._install_tmpdir is not None:
-                    self._safe_rmtree(install_job._install_tmpdir, self._logger)
+                if install_job._install_tmpdir is not None and self._tmpdir_has_recoverable_data(download_job):
+                    # A single part failure (a transient HTTP 5xx, a sidecar rename race) must not
+                    # discard completed parts and resumable partials. Mirror the pause path: mark
+                    # the install paused and persist the marker so the tmpdir survives the startup
+                    # dangling-dir sweep and restart_failed()/resume_job() can recover the failed parts.
+                    install_job.status = InstallStatus.PAUSED
+                    self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                else:
+                    self._set_error(install_job, excp)
+                    self._download_queue.cancel_job(download_job)
+                    if install_job._install_tmpdir is not None:
+                        self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
