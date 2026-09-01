@@ -11,7 +11,7 @@ from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import 
 
 
 def test_pinned_diffusers_exposes_existing_and_krea_model_contracts() -> None:
-    assert Version(diffusers.__version__) == Version("0.39.0")
+    assert Version(diffusers.__version__) == Version("0.40.0")
 
     expected_symbols = (
         "AutoencoderKLFlux2",

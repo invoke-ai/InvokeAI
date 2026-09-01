@@ -70,11 +70,109 @@ def test_explicit_krea2_override_accepts_kohya_transformer_only_lora(_raise_if_n
 
 @patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
 def test_explicit_krea2_override_still_rejects_a_foreign_kohya_lora(_raise_if_not_file) -> None:
-    """The new `lora_unet_` entries are per-module, so another architecture's kohya LoRA is not swept in."""
+    """A kohya key whose flattened path does not reconstruct to a Krea-2 module is not swept in."""
     mod = MagicMock()
     mod.load_state_dict.return_value = {
         "lora_unet_double_blocks_0_img_attn_proj.lora_down.weight": object(),
         "lora_unet_double_blocks_0_img_attn_proj.lora_up.weight": object(),
+    }
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+# Wan and Anima flatten their kohya module paths under the very same `lora_unet_blocks_<idx>_` spelling as
+# Krea-2 (wan_lora_conversion_utils._KOHYA_KEY_REGEX, anima_lora_constants._KOHYA_ANIMA_RE). Matching that as
+# a prefix accepted a mislabeled Wan/Anima file under the explicit Krea-2 override, where it installed and
+# then silently no-op'd at generation time - every layer warn-skipped, because the un-flattener rejects
+# `self_attn`/`cross_attn`/`mlp_layer0` (review 4888833569, note 2).
+_FOREIGN_KOHYA_MODULES = [
+    "blocks_0_self_attn_q",  # Wan
+    "blocks_0_cross_attn_k",  # Wan
+    "blocks_0_ffn_0",  # Wan
+    "blocks_0_mlp_layer0",  # Anima
+    "blocks_0_adaln_modulation_1",  # Anima
+    "llm_adapter_blocks_0_self_attn_q_proj",  # Anima
+]
+
+
+@pytest.mark.parametrize("kohya_module", _FOREIGN_KOHYA_MODULES)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_rejects_foreign_lora_unet_blocks_lora(_raise_if_not_file, kohya_module: str) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        f"lora_unet_{kohya_module}.lora_down.weight": object(),
+        f"lora_unet_{kohya_module}.lora_up.weight": object(),
+    }
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+
+# The converter deliberately tolerates the doubled separator some writers emit
+# (test_kohya_flattened_krea2_keys_tolerate_doubled_separator), but no `lora_unet_` prefix spelled it out, so
+# this transformer-only adapter could not be installed at all (review 4888833569, note 3).
+@pytest.mark.parametrize(
+    "kohya_module",
+    [
+        "blocks_0_attn_wq",
+        "txtfusion_refiner_blocks_1_mlp_up",
+        "tproj_1",
+        "last_linear",
+    ],
+)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_doubled_separator_kohya_lora(_raise_if_not_file, kohya_module: str) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        f"lora_unet__{kohya_module}.lora_down.weight": object(),
+        f"lora_unet__{kohya_module}.lora_up.weight": object(),
+    }
+
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+    assert config.base is BaseModelType.Krea2
+
+
+# The same module vocabulary in the single-separator spelling, to pin that the un-flattener - not a prefix
+# list - is what admits a kohya adapter now.
+@pytest.mark.parametrize(
+    "kohya_module",
+    [
+        "blocks_0_attn_wq",
+        "blocks_0_mlp_down",
+        "txtfusion_layerwise_blocks_2_attn_gate",
+        "txtfusion_projector",
+        "first",
+        "tmlp_0",
+        "tproj_1",
+        "txtmlp_3",
+        "last_linear",
+    ],
+)
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_every_kohya_module(_raise_if_not_file, kohya_module: str) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        f"lora_unet_{kohya_module}.lora_down.weight": object(),
+        f"lora_unet_{kohya_module}.lora_up.weight": object(),
+    }
+
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
+
+    assert config.base is BaseModelType.Krea2
+
+
+# `tmlp`/`tproj`/`txtmlp` are nn.Sequential stages where only some positions hold a Linear. The parsing tree
+# lists those positions literally, so an adapter on an activation index is not a Krea-2 module and must not
+# install - the converter would leave its keys untouched and the layer would warn-skip.
+@pytest.mark.parametrize("kohya_module", ["tmlp_1", "tproj_0", "txtmlp_2"])
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_rejects_non_linear_sequential_index(_raise_if_not_file, kohya_module: str) -> None:
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        f"lora_unet_{kohya_module}.lora_down.weight": object(),
+        f"lora_unet_{kohya_module}.lora_up.weight": object(),
     }
 
     with pytest.raises(NotAMatchError):

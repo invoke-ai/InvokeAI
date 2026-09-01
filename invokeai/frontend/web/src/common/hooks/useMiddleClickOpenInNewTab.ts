@@ -1,5 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
+import { openMediaInNewTab } from 'common/util/openMediaInNewTab';
 import { selectSystemShouldUseMiddleClickToOpenInNewTab } from 'features/system/store/systemSlice';
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
