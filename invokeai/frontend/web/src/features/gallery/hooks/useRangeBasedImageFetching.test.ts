@@ -331,9 +331,10 @@ describe('useRangeBasedImageFetching', () => {
     // it looks harmless while the rows do land in the cache — the follow-up pass finds nothing to
     // request — but a name the server never returns is uncached on every pass, so a parked set
     // that outlived its restore would be re-fetched by every later success.
+    const imageNames = ['a.png', 'b.png', 'c.png', 'd.png', 'e.png', 'f.png', 'g.png', 'h.png', 'i.png'];
     $isConnected.set(true);
     mocks.failFetches = true;
-    renderHook(IMAGE_NAMES, true);
+    renderHook(imageNames, true);
     scrollTo({ startIndex: 0, endIndex: 2 });
     $isConnected.set(false);
     await advance(35_000);
@@ -350,6 +351,18 @@ describe('useRangeBasedImageFetching', () => {
     const fetchesAfterHeal = mocks.imageFetches.length;
     await advance(60_000);
     expect(mocks.imageFetches.length).toBe(fetchesAfterHeal);
+
+    // Review finding (coverage): the settle assertion above cannot see a parked set that outlived
+    // its restore. With no further signal, a second restore would re-install the same array
+    // reference into pendingRanges while it holds EMPTY_ARRAY — React bails out, the effect never
+    // re-runs, and the fetch count stays flat whether or not the set was cleared. A scroll to a
+    // disjoint range can see it: its resetRetryBudget restores whatever is still parked, so the
+    // stale range would ride along on every later scroll, re-requesting rows the user left behind
+    // for the lifetime of the grid — a slower version of the request stream this PR removes.
+    scrollTo({ startIndex: 6, endIndex: 8 });
+    await advance(THROTTLE_MS * 4);
+    const namesRequestedAfterScroll = new Set(mocks.imageFetches.slice(fetchesAfterHeal).flat());
+    expect([...namesRequestedAfterScroll].sort()).toEqual(['g.png', 'h.png', 'i.png']);
   });
 
   it('does not turn a flapping socket into a request stream', async () => {
