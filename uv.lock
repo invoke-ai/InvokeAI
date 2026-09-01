@@ -47,7 +47,7 @@ conflicts = [[
 
 [manifest]
 overrides = [{ name = "opencv-python", marker = "sys_platform == 'never'" }]
-excludes = [{ package = { name = "compel" }, dependencies = ["notebook"] }]
+excludes = ["notebook"]
 
 [[package]]
 name = "absl-py"
