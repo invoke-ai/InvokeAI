@@ -156,6 +156,63 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
     r"^proj_out$",
 )
 
+# Model formats whose weights are already quantized. FP8 storage is meaningless for them (the
+# payload is packed integers, not values we may re-encode) and actively harmful — see
+# `_should_use_fp8`. Declared as strings to keep this module free of a taxonomy import at module
+# scope; compared against `config.format`, which is a `ModelFormat` str-enum. Must list every
+# quantized member of `ModelFormat`; `test_quantized_format_set_matches_the_taxonomy` pins the
+# strings to the enum so a rename cannot silently disable the check.
+_QUANTIZED_MODEL_FORMATS: frozenset[str] = frozenset(
+    {
+        "gguf_quantized",
+        "bnb_quantized_nf4b",
+        "bnb_quantized_int8b",
+        "sdnq_quantized",
+    }
+)
+
+
+def _is_quantized_param(param: torch.nn.Parameter) -> bool:
+    """Whether `param` holds a quantized payload that must not be re-encoded as FP8.
+
+    Two signals, both observed in practice:
+
+    - Not floating point. bnb's NF4/INT8 weights are packed `uint8` (and `bnb.nn.LinearNF4`
+      subclasses `nn.Linear`, so a class check alone does not catch them). Casting those to float8
+      succeeds silently and the layer then returns finite garbage.
+    - A `torch.Tensor` *subclass*, e.g. `GGMLTensor`, which keeps its quantized payload plus
+      metadata and rejects dtype changes outright.
+    """
+    return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
+
+
+def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
+    """The precision-sensitive modules a model declares for itself, as skip patterns.
+
+    Diffusers' `enable_layerwise_casting()` unions two class attributes before casting:
+    `_skip_layerwise_casting_patterns` and `_keep_in_fp32_modules`. We no longer call it (see
+    `_apply_fp8_layerwise_casting`), so we have to read both ourselves — this is not cosmetic.
+    Z-Image's `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to
+    it; with an fp8 weight the input becomes float8 before our pre-hook can restore the weight, and
+    `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
+    `['t_embedder', 'cap_embedder']` for that model.
+
+    `_keep_in_fp32_modules` protects nothing extra on any model we currently load — verified on
+    Krea-2, Wan 14B, Z-Image and FLUX.1. Wan's `time_embedder` sits under `condition_embedder`,
+    which its `_skip_layerwise_casting_patterns` already names; `scale_shift_table` is a bare
+    Parameter, not a castable layer; and Krea-2's entries are all `norm*`, already covered by
+    `_FP8_DEFAULT_SKIP_PATTERNS`. It is read anyway so the next model to declare one does not lose
+    it silently.
+    """
+    patterns: list[str] = []
+    for attr in ("_skip_layerwise_casting_patterns", "_keep_in_fp32_modules"):
+        declared = getattr(model, attr, None) or ()
+        # Diffusers stores these as lists of strings, but a subclass could set a bare string.
+        if isinstance(declared, str):
+            declared = (declared,)
+        patterns.extend(p for p in declared if isinstance(p, str) and p not in patterns)
+    return tuple(patterns)
+
 
 # The construction path is not thread-safe on its own; it monkey-patches process-global torch state
 # (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
@@ -344,11 +401,18 @@ class ModelLoader(ModelLoaderBase):
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        # Z-Image has dtype mismatch issues with diffusers' layerwise casting
-        # (skipped modules produce bf16, hooked modules expect fp16).
-        from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+        from invokeai.backend.model_manager.taxonomy import ModelType
 
-        if hasattr(config, "base") and config.base == BaseModelType.ZImage:
+        # Already-quantized models are excluded. Their weights are packed integer payloads, not
+        # values we may re-encode, and casting them is not a no-op:
+        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly`.
+        #   - bnb NF4 corrupts *silently* — `bnb.nn.LinearNF4` subclasses `nn.Linear`, so the packed
+        #     uint8 payload is cast to float8, inference still returns finite numbers, and the model
+        #     just produces garbage.
+        # No quantized-format loader calls `_apply_fp8_layerwise_casting` today, so this is a guard
+        # against the next loader that gets wired up (they are being added one model at a time)
+        # rather than a fix for a live crash.
+        if hasattr(config, "format") and config.format in _QUANTIZED_MODEL_FORMATS:
             return False
 
         # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
@@ -430,7 +494,12 @@ class ModelLoader(ModelLoaderBase):
         # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
         # `forward`, so `CustomLinear.forward` is still reached.
         if isinstance(model, torch.nn.Module):
-            self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=storage_dtype,
+                compute_dtype=compute_dtype,
+                extra_skip_patterns=_model_declared_skip_patterns(model),
+            )
         else:
             return model
 
@@ -443,7 +512,12 @@ class ModelLoader(ModelLoaderBase):
         return model
 
     @staticmethod
-    def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
+    def _apply_fp8_to_nn_module(
+        model: torch.nn.Module,
+        storage_dtype: torch.dtype,
+        compute_dtype: torch.dtype,
+        extra_skip_patterns: tuple[str, ...] = (),
+    ) -> None:
         """Apply FP8 layerwise casting to a plain nn.Module.
 
         Mirrors diffusers' `apply_layerwise_casting` semantics: only the layer classes in
@@ -452,6 +526,15 @@ class ModelLoader(ModelLoaderBase):
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
 
+        `extra_skip_patterns` carries the model's own declared exclusions (see
+        `_model_declared_skip_patterns`), which are model-specific and cannot be inferred from
+        layer types or generic name patterns.
+
+        Modules holding already-quantized weights are skipped regardless of their class. This is a
+        backstop behind the format check in `_should_use_fp8`, which cannot see quantization that
+        is not reflected in the model's format (e.g. a `diffusers`-format checkpoint whose weights
+        were quantized by an external tool).
+
         Records the compute dtype on the model. After the cast, `model.dtype` reports the float8
         storage dtype, which must never be used to create or cast tensors — torch has no arithmetic
         kernels for it (see `get_model_compute_dtype`). The marker is set here rather than at the
@@ -459,13 +542,16 @@ class ModelLoader(ModelLoaderBase):
         """
         set_fp8_compute_dtype(model, compute_dtype)
 
+        skip_patterns = _FP8_DEFAULT_SKIP_PATTERNS + tuple(extra_skip_patterns)
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
-            if any(re.search(pattern, module_name) for pattern in _FP8_DEFAULT_SKIP_PATTERNS):
+            if any(re.search(pattern, module_name) for pattern in skip_patterns):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
+                continue
+            if any(_is_quantized_param(p) for p in params):
                 continue
 
             for param in params:
