@@ -19,9 +19,6 @@ def hidiffusion_patch(
     has_controlnet: bool = False,
     is_controlnet_text_to_image: bool = False,
     is_inpainting_task: bool | None = None,
-    use_aggressive_raunet: bool | None = None,
-    denoising_start: float = 0.0,
-    denoising_end: float = 1.0,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
     from invokeai.backend.hidiffusion.hidiffusion import apply_hidiffusion, remove_hidiffusion
@@ -101,9 +98,6 @@ def hidiffusion_patch(
             is_controlnet_text_to_image=is_controlnet_text_to_image,
             generator=generator,
             is_inpainting_task=is_inpainting_task,
-            use_aggressive_raunet=use_aggressive_raunet,
-            denoising_start=denoising_start,
-            denoising_end=denoising_end,
         )
         yield
     finally:

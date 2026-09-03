@@ -2187,22 +2187,22 @@
         "hidiffusionRatiosAuto": {
             "heading": "HiDiffusion: Automatic Ratios",
             "paragraphs": [
-                "Uses the model- and resolution-specific T1 and T2 ratios recommended by HiDiffusion.",
-                "Disable this to set explicit ratio overrides below."
+                "Uses HiDiffusion's original model- and resolution-specific presets behind the scenes.",
+                "Your manual T1 and T2 slider values are preserved when this is enabled, so you can switch back without re-entering them."
             ]
         },
         "hidiffusionT1Ratio": {
             "heading": "HiDiffusion: T1 Ratio",
             "paragraphs": [
-                "Controls the early switch point for HiDiffusion (T1).",
-                "Lower values switch earlier; higher values preserve global structure longer."
+                "Controls how long the primary RAU-Net stage remains active. At extreme resolutions, this is the later of the two RAU-Net cutoffs.",
+                "The T1 name follows the upstream code key; lower values switch earlier."
             ]
         },
         "hidiffusionT2Ratio": {
             "heading": "HiDiffusion: T2 Ratio",
             "paragraphs": [
-                "Controls the late switch point for HiDiffusion (T2).",
-                "Higher values keep the second RAU-Net resolution-aware stage active longer."
+                "Controls the additional extreme-resolution RAU-Net stage. When both stages are active, T2 is the earlier cutoff despite its name.",
+                "The T2 name follows the upstream code key. T2 cannot exceed T1; excessive values can reduce pose and background diversity or introduce artifacts."
             ]
         },
         "clipSkip": {

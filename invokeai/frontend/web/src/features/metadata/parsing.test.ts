@@ -1,5 +1,6 @@
 import type { AppStore } from 'app/store/store';
 import {
+  setHiDiffusionAutoRatios,
   setHiDiffusionEnabled,
   setHiDiffusionT1Ratio,
   setHiDiffusionT2Ratio,
@@ -176,18 +177,36 @@ describe('HiDiffusion metadata parsing', () => {
     ImageMetadataHandlers.HiDiffusionT1Ratio.recall(t1, store);
     ImageMetadataHandlers.HiDiffusionT2Ratio.recall(t2, store);
 
-    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionT1Ratio(null));
-    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionT2Ratio(null));
+    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionAutoRatios(true));
+    expect(store.dispatch).not.toHaveBeenCalledWith(setHiDiffusionT1Ratio(expect.anything()));
+    expect(store.dispatch).not.toHaveBeenCalledWith(setHiDiffusionT2Ratio(expect.anything()));
+  });
+
+  it('recalls numeric ratios as manual thresholds', async () => {
+    const store = createStore();
+    const metadata = { hidiffusion_t1_ratio: 0.65, hidiffusion_t2_ratio: 0.2 };
+
+    const t1 = await parseMetadataHandler(metadata, ImageMetadataHandlers.HiDiffusionT1Ratio, store);
+    const t2 = await parseMetadataHandler(metadata, ImageMetadataHandlers.HiDiffusionT2Ratio, store);
+    ImageMetadataHandlers.HiDiffusionT1Ratio.recall(t1, store);
+    ImageMetadataHandlers.HiDiffusionT2Ratio.recall(t2, store);
+
+    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionAutoRatios(false));
+    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionT1Ratio(0.65));
+    expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionT2Ratio(0.2));
   });
 
   it('disables HiDiffusion when recalling all metadata from an older image', async () => {
     let hiDiffusionEnabled = true;
-    let hiDiffusionT1Ratio: number | null = 0.8;
-    let hiDiffusionT2Ratio: number | null = 0.6;
+    let hiDiffusionAutoRatios = false;
+    let hiDiffusionT1Ratio = 0.8;
+    let hiDiffusionT2Ratio = 0.6;
     const store = {
       dispatch: vi.fn((action) => {
         if (action.type === setHiDiffusionEnabled.type) {
           hiDiffusionEnabled = action.payload;
+        } else if (action.type === setHiDiffusionAutoRatios.type) {
+          hiDiffusionAutoRatios = action.payload;
         } else if (action.type === setHiDiffusionT1Ratio.type) {
           hiDiffusionT1Ratio = action.payload;
         } else if (action.type === setHiDiffusionT2Ratio.type) {
@@ -216,7 +235,8 @@ describe('HiDiffusion metadata parsing', () => {
 
     expect(store.dispatch).toHaveBeenCalledWith(setHiDiffusionEnabled(false));
     expect(hiDiffusionEnabled).toBe(false);
-    expect(hiDiffusionT1Ratio).toBeNull();
-    expect(hiDiffusionT2Ratio).toBeNull();
+    expect(hiDiffusionAutoRatios).toBe(true);
+    expect(hiDiffusionT1Ratio).toBe(0.8);
+    expect(hiDiffusionT2Ratio).toBe(0.6);
   });
 });

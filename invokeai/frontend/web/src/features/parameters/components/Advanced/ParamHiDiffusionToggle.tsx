@@ -2,11 +2,13 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, Switch }
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
+  selectHiDiffusionAutoRatios,
   selectHiDiffusionEnabled,
   selectHiDiffusionRauNetEnabled,
   selectHiDiffusionT1Ratio,
   selectHiDiffusionT2Ratio,
   selectHiDiffusionWindowAttnEnabled,
+  setHiDiffusionAutoRatios,
   setHiDiffusionEnabled,
   setHiDiffusionRauNetEnabled,
   setHiDiffusionT1Ratio,
@@ -121,21 +123,13 @@ const RATIO_CONSTRAINTS = {
 export const ParamHiDiffusionAutoRatiosToggle = memo(() => {
   const hiDiffusionEnabled = useAppSelector(selectHiDiffusionEnabled);
   const hiDiffusionRauNetEnabled = useAppSelector(selectHiDiffusionRauNetEnabled);
-  const hiDiffusionT1Ratio = useAppSelector(selectHiDiffusionT1Ratio);
-  const hiDiffusionT2Ratio = useAppSelector(selectHiDiffusionT2Ratio);
+  const hiDiffusionAutoRatios = useAppSelector(selectHiDiffusionAutoRatios);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const isAutomatic = hiDiffusionT1Ratio === null && hiDiffusionT2Ratio === null;
 
   const onChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
-      if (event.target.checked) {
-        dispatch(setHiDiffusionT1Ratio(null));
-        dispatch(setHiDiffusionT2Ratio(null));
-      } else {
-        dispatch(setHiDiffusionT1Ratio(RATIO_CONSTRAINTS.t1.initial));
-        dispatch(setHiDiffusionT2Ratio(RATIO_CONSTRAINTS.t2.initial));
-      }
+      dispatch(setHiDiffusionAutoRatios(event.target.checked));
     },
     [dispatch]
   );
@@ -148,7 +142,7 @@ export const ParamHiDiffusionAutoRatiosToggle = memo(() => {
         </FormLabel>
       </InformationalPopover>
       <Switch
-        isChecked={isAutomatic}
+        isChecked={hiDiffusionAutoRatios}
         isDisabled={!hiDiffusionEnabled || !hiDiffusionRauNetEnabled}
         onChange={onChange}
       />
@@ -161,18 +155,25 @@ ParamHiDiffusionAutoRatiosToggle.displayName = 'ParamHiDiffusionAutoRatiosToggle
 export const ParamHiDiffusionT1Ratio = memo(() => {
   const hiDiffusionEnabled = useAppSelector(selectHiDiffusionEnabled);
   const hiDiffusionRauNetEnabled = useAppSelector(selectHiDiffusionRauNetEnabled);
+  const hiDiffusionAutoRatios = useAppSelector(selectHiDiffusionAutoRatios);
   const hiDiffusionT1Ratio = useAppSelector(selectHiDiffusionT1Ratio);
   const hiDiffusionT2Ratio = useAppSelector(selectHiDiffusionT2Ratio);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const onChange = useCallback((value: number) => dispatch(setHiDiffusionT1Ratio(value)), [dispatch]);
+  const onChange = useCallback(
+    (value: number) => {
+      dispatch(setHiDiffusionT1Ratio(value));
+      if (hiDiffusionT2Ratio > value) {
+        dispatch(setHiDiffusionT2Ratio(value));
+      }
+    },
+    [dispatch, hiDiffusionT2Ratio]
+  );
 
   return (
     <FormControl
-      isDisabled={
-        !hiDiffusionEnabled || !hiDiffusionRauNetEnabled || (hiDiffusionT1Ratio === null && hiDiffusionT2Ratio === null)
-      }
+      isDisabled={!hiDiffusionEnabled || !hiDiffusionRauNetEnabled || hiDiffusionAutoRatios}
       gridColumn="1 / -1"
     >
       <InformationalPopover feature="hidiffusionT1Ratio">
@@ -181,7 +182,7 @@ export const ParamHiDiffusionT1Ratio = memo(() => {
         </FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        value={hiDiffusionT1Ratio ?? RATIO_CONSTRAINTS.t1.initial}
+        value={hiDiffusionT1Ratio}
         defaultValue={RATIO_CONSTRAINTS.t1.initial}
         min={RATIO_CONSTRAINTS.t1.sliderMin}
         max={RATIO_CONSTRAINTS.t1.sliderMax}
@@ -191,7 +192,7 @@ export const ParamHiDiffusionT1Ratio = memo(() => {
         marks
       />
       <CompositeNumberInput
-        value={hiDiffusionT1Ratio ?? RATIO_CONSTRAINTS.t1.initial}
+        value={hiDiffusionT1Ratio}
         defaultValue={RATIO_CONSTRAINTS.t1.initial}
         min={RATIO_CONSTRAINTS.t1.numberInputMin}
         max={RATIO_CONSTRAINTS.t1.numberInputMax}
@@ -208,6 +209,7 @@ ParamHiDiffusionT1Ratio.displayName = 'ParamHiDiffusionT1Ratio';
 export const ParamHiDiffusionT2Ratio = memo(() => {
   const hiDiffusionEnabled = useAppSelector(selectHiDiffusionEnabled);
   const hiDiffusionRauNetEnabled = useAppSelector(selectHiDiffusionRauNetEnabled);
+  const hiDiffusionAutoRatios = useAppSelector(selectHiDiffusionAutoRatios);
   const hiDiffusionT1Ratio = useAppSelector(selectHiDiffusionT1Ratio);
   const hiDiffusionT2Ratio = useAppSelector(selectHiDiffusionT2Ratio);
   const dispatch = useAppDispatch();
@@ -217,9 +219,7 @@ export const ParamHiDiffusionT2Ratio = memo(() => {
 
   return (
     <FormControl
-      isDisabled={
-        !hiDiffusionEnabled || !hiDiffusionRauNetEnabled || (hiDiffusionT1Ratio === null && hiDiffusionT2Ratio === null)
-      }
+      isDisabled={!hiDiffusionEnabled || !hiDiffusionRauNetEnabled || hiDiffusionAutoRatios}
       gridColumn="1 / -1"
     >
       <InformationalPopover feature="hidiffusionT2Ratio">
@@ -228,20 +228,20 @@ export const ParamHiDiffusionT2Ratio = memo(() => {
         </FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        value={hiDiffusionT2Ratio ?? RATIO_CONSTRAINTS.t2.initial}
+        value={hiDiffusionT2Ratio}
         defaultValue={RATIO_CONSTRAINTS.t2.initial}
         min={RATIO_CONSTRAINTS.t2.sliderMin}
-        max={RATIO_CONSTRAINTS.t2.sliderMax}
+        max={hiDiffusionT1Ratio}
         step={RATIO_CONSTRAINTS.t2.coarseStep}
         fineStep={RATIO_CONSTRAINTS.t2.fineStep}
         onChange={onChange}
         marks
       />
       <CompositeNumberInput
-        value={hiDiffusionT2Ratio ?? RATIO_CONSTRAINTS.t2.initial}
+        value={hiDiffusionT2Ratio}
         defaultValue={RATIO_CONSTRAINTS.t2.initial}
         min={RATIO_CONSTRAINTS.t2.numberInputMin}
-        max={RATIO_CONSTRAINTS.t2.numberInputMax}
+        max={hiDiffusionT1Ratio}
         step={RATIO_CONSTRAINTS.t2.coarseStep}
         fineStep={RATIO_CONSTRAINTS.t2.fineStep}
         onChange={onChange}

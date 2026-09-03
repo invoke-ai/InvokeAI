@@ -16,7 +16,7 @@ from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSingle
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from PIL import Image
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
@@ -247,6 +247,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if v < 1:
                 raise ValueError("cfg_scale must be greater than 1")
         return v
+
+    @model_validator(mode="after")
+    def validate_hidiffusion_ratio_order(self):
+        if (
+            self.hidiffusion_t1_ratio is not None
+            and self.hidiffusion_t2_ratio is not None
+            and self.hidiffusion_t2_ratio > self.hidiffusion_t1_ratio
+        ):
+            raise ValueError("HiDiffusion T2 ratio must be less than or equal to the T1 ratio")
+        return self
 
     @staticmethod
     def _get_text_embeddings_and_masks(
@@ -927,9 +937,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
                     is_inpainting_task=self.denoise_mask is not None,
-                    use_aggressive_raunet=False,
-                    denoising_start=self.denoising_start,
-                    denoising_end=self.denoising_end,
                 )
             )
 
@@ -1162,9 +1169,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
                     is_inpainting_task=self.denoise_mask is not None,
-                    use_aggressive_raunet=False,
-                    denoising_start=self.denoising_start,
-                    denoising_end=self.denoising_end,
                 )
                 if self.hidiffusion
                 else nullcontext()

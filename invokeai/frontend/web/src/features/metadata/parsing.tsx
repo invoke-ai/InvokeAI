@@ -44,6 +44,7 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setHiDiffusionAutoRatios,
   setHiDiffusionEnabled,
   setHiDiffusionRauNetEnabled,
   setHiDiffusionT1Ratio,
@@ -801,7 +802,10 @@ const HiDiffusionT1Ratio: SingleMetadataHandler<number | null> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setHiDiffusionT1Ratio(value));
+    store.dispatch(setHiDiffusionAutoRatios(value === null));
+    if (value !== null) {
+      store.dispatch(setHiDiffusionT1Ratio(value));
+    }
   },
   i18nKey: 'metadata.hiDiffusionT1Ratio',
   LabelComponent: MetadataLabel,
@@ -819,7 +823,10 @@ const HiDiffusionT2Ratio: SingleMetadataHandler<number | null> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setHiDiffusionT2Ratio(value));
+    store.dispatch(setHiDiffusionAutoRatios(value === null));
+    if (value !== null) {
+      store.dispatch(setHiDiffusionT2Ratio(value));
+    }
   },
   i18nKey: 'metadata.hiDiffusionT2Ratio',
   LabelComponent: MetadataLabel,
