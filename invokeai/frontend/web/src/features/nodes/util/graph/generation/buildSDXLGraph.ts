@@ -20,6 +20,7 @@ import { addSeamless } from 'features/nodes/util/graph/generation/addSeamless';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { getRandDeviceMetadata } from 'features/nodes/util/graph/generation/randDeviceMetadata';
 import {
   getOriginalAndScaledSizesForOtherModes,
   getOriginalAndScaledSizesForTextToImage,
@@ -53,6 +54,11 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const {
     cfgScale: cfg_scale,
     cfgRescaleMultiplier: cfg_rescale_multiplier,
+    hiDiffusionEnabled,
+    hiDiffusionRauNetEnabled,
+    hiDiffusionT1Ratio,
+    hiDiffusionT2Ratio,
+    hiDiffusionWindowAttnEnabled,
     scheduler,
     steps,
     shouldUseCpuNoise,
@@ -113,6 +119,11 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     id: getPrefixedId('denoise_latents'),
     cfg_scale,
     cfg_rescale_multiplier,
+    hidiffusion: hiDiffusionEnabled,
+    hidiffusion_raunet: hiDiffusionRauNetEnabled,
+    hidiffusion_window_attn: hiDiffusionWindowAttnEnabled,
+    hidiffusion_t1_ratio: hiDiffusionEnabled ? hiDiffusionT1Ratio : undefined,
+    hidiffusion_t2_ratio: hiDiffusionEnabled ? hiDiffusionT2Ratio : undefined,
     scheduler,
     steps,
   });
@@ -155,8 +166,13 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     cfg_scale,
     cfg_rescale_multiplier,
     model: Graph.getModelMetadataField(model),
+    hidiffusion: hiDiffusionEnabled,
+    hidiffusion_raunet: hiDiffusionRauNetEnabled,
+    hidiffusion_window_attn: hiDiffusionWindowAttnEnabled,
+    hidiffusion_t1_ratio: hiDiffusionT1Ratio,
+    hidiffusion_t2_ratio: hiDiffusionT2Ratio,
     steps,
-    rand_device: shouldUseCpuNoise ? 'cpu' : 'cuda',
+    rand_device: getRandDeviceMetadata(state, shouldUseCpuNoise),
     scheduler,
     vae: vae ?? undefined,
   });

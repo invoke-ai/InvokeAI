@@ -21,6 +21,7 @@ from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
 
 
 @invocation(
@@ -49,7 +50,14 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         Input latents should already be in the correct space after BN denormalization
         was applied in the denoiser. The VAE expects (B, 32, H, W) format.
         """
-        with vae_info.model_on_device() as (_, vae):
+        # Decoding at FLUX.2 resolutions costs multiple GB of activations (~4.3GB at 1024x1024),
+        # far above the default working memory the cache would otherwise reserve. Tell it up front so
+        # it offloads enough of the (possibly still resident) transformer to leave room.
+        estimated_working_memory = estimate_vae_working_memory_flux2(
+            operation="decode", image_tensor=latents, vae=vae_info.model, device=vae_info.compute_device
+        )
+
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             vae_dtype = next(iter(vae.parameters())).dtype
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
             # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would

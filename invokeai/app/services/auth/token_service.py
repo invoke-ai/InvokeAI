@@ -22,6 +22,12 @@ class TokenData(BaseModel):
     email: str
     is_admin: bool
     remember_me: bool = False
+    # Revocation epoch copied from the user record when the token was minted. A token
+    # whose epoch no longer matches the record is rejected, which is how a password
+    # change invalidates sessions a JWT would otherwise keep alive until expiry.
+    # Defaults to 0 so tokens issued before this claim existed keep working against
+    # records that have never been bumped.
+    token_epoch: int = 0
 
 
 def set_jwt_secret(secret: str) -> None:

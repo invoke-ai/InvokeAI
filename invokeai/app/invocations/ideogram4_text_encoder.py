@@ -21,6 +21,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     category="conditioning",
     version="1.0.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class Ideogram4TextEncoderInvocation(BaseInvocation):
     """Encodes a prompt for Ideogram 4 using the Qwen3-VL encoder.

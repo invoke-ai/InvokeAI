@@ -9,7 +9,12 @@ from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.cogview4_denoise import CogView4DenoiseInvocation
 from invokeai.app.invocations.flux2_denoise import Flux2DenoiseInvocation
 from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.metadata_linked import FluxDenoiseLatentsMetaInvocation, ZImageDenoiseMetaInvocation
+from invokeai.app.invocations.metadata_linked import (
+    AnimaDenoiseMetaInvocation,
+    DenoiseLatentsMetaInvocation,
+    FluxDenoiseLatentsMetaInvocation,
+    ZImageDenoiseMetaInvocation,
+)
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3_denoise import SD3DenoiseInvocation
 from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
@@ -390,6 +395,133 @@ def test_z_image_metadata_ignores_external_noise_seed_when_noise_not_used():
         result = invocation.invoke(mock_context)
 
     assert result.metadata.root["seed"] == 999
+
+
+def test_anima_metadata_ignores_external_noise_seed_when_noise_not_used():
+    invocation = AnimaDenoiseMetaInvocation.model_construct(
+        width=64,
+        height=64,
+        steps=30,
+        guidance_scale=4.5,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        scheduler="euler",
+        latents=MagicMock(latents_name="latents"),
+        transformer=MagicMock(transformer="transformer", loras=[]),
+        noise=MagicMock(seed=123),
+        seed=999,
+        add_noise=False,
+        vae=None,
+        qwen3_encoder=None,
+    )
+    mock_context = MagicMock()
+    output = LatentsOutput.build("latents", torch.zeros(1, 16, 8, 8), seed=None)
+
+    with patch("invokeai.app.invocations.metadata_linked.AnimaDenoiseInvocation.invoke", return_value=output):
+        result = invocation.invoke(mock_context)
+
+    assert result.metadata.root["seed"] == 999
+
+
+def test_anima_metadata_matches_the_recall_contract():
+    """The keys this node writes are what the gallery's recall handlers read.
+
+    Anima's CFG must land in `cfg_scale` (not `guidance`, which is FLUX's guidance-embeds scale and is
+    recalled into a different param), and the standalone VAE / Qwen3 encoder must be recorded, since
+    unlike SD or FLUX they cannot be derived from the transformer field.
+    """
+    invocation = AnimaDenoiseMetaInvocation.model_construct(
+        width=64,
+        height=64,
+        steps=30,
+        guidance_scale=4.5,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        scheduler="dpmpp_2m",
+        latents=None,
+        transformer=SimpleNamespace(transformer="anima-main-model", loras=[]),
+        noise=MagicMock(seed=123),
+        seed=999,
+        add_noise=True,
+        vae=SimpleNamespace(vae="anima-vae"),
+        qwen3_encoder=SimpleNamespace(text_encoder="anima-qwen3-encoder"),
+    )
+    mock_context = MagicMock()
+    output = LatentsOutput.build("latents", torch.zeros(1, 16, 8, 8), seed=None)
+
+    with patch("invokeai.app.invocations.metadata_linked.AnimaDenoiseInvocation.invoke", return_value=output):
+        result = invocation.invoke(mock_context)
+
+    md = result.metadata.root
+    assert md["cfg_scale"] == 4.5
+    assert "guidance" not in md
+    assert md["model"] == "anima-main-model"
+    assert md["vae"] == "anima-vae"
+    assert md["qwen3_encoder"] == "anima-qwen3-encoder"
+    assert md["scheduler"] == "dpmpp_2m"
+    assert md["steps"] == 30
+    assert md["seed"] == 123
+    assert md["width"] == 64
+    assert md["height"] == 64
+
+
+def test_anima_metadata_omits_unconnected_standalone_components():
+    """Both component inputs are optional - an unconnected one must not write a null into metadata,
+    which the recall handlers would then try (and fail) to resolve as a model."""
+    invocation = AnimaDenoiseMetaInvocation.model_construct(
+        width=64,
+        height=64,
+        steps=30,
+        guidance_scale=4.5,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        scheduler="euler",
+        latents=None,
+        transformer=SimpleNamespace(transformer="anima-main-model", loras=[]),
+        noise=MagicMock(seed=123),
+        seed=999,
+        add_noise=True,
+        vae=None,
+        qwen3_encoder=None,
+    )
+    mock_context = MagicMock()
+    output = LatentsOutput.build("latents", torch.zeros(1, 16, 8, 8), seed=None)
+
+    with patch("invokeai.app.invocations.metadata_linked.AnimaDenoiseInvocation.invoke", return_value=output):
+        result = invocation.invoke(mock_context)
+
+    assert "vae" not in result.metadata.root
+    assert "qwen3_encoder" not in result.metadata.root
+
+
+def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
+    invocation = DenoiseLatentsMetaInvocation.model_construct(
+        width=64,
+        height=64,
+        steps=10,
+        cfg_scale=7.5,
+        cfg_rescale_multiplier=0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        scheduler="euler",
+        unet=SimpleNamespace(unet="main-model", loras=[]),
+        hidiffusion=False,
+        hidiffusion_raunet=False,
+        hidiffusion_window_attn=False,
+        hidiffusion_t1_ratio=0.25,
+        hidiffusion_t2_ratio=0.1,
+    )
+    mock_context = MagicMock()
+    output = LatentsOutput.build("latents", torch.zeros(1, 4, 8, 8), seed=None)
+
+    with patch("invokeai.app.invocations.metadata_linked.DenoiseLatentsInvocation.invoke", return_value=output):
+        result = invocation.invoke(mock_context)
+
+    assert result.metadata.root["hidiffusion"] is False
+    assert result.metadata.root["hidiffusion_raunet"] is False
+    assert result.metadata.root["hidiffusion_window_attn"] is False
+    assert result.metadata.root["hidiffusion_t1_ratio"] == 0.25
+    assert result.metadata.root["hidiffusion_t2_ratio"] == 0.1
 
 
 def _get_first_scheduler_sigma(

@@ -10,7 +10,7 @@ The API provides an OpenAPI schema and we generate TS types from it. They are st
 
 We use https://github.com/openapi-ts/openapi-typescript/ to generate the types.
 
-- Python script to outut the OpenAPI schema: scripts/generate_openapi_schema.py
+- Python script to output the OpenAPI schema: scripts/generate_openapi_schema.py
 - Node script to call openapi-typescript and generate the TS types: invokeai/frontend/web/scripts/typegen.js
 
 Pipe the output of the python script to the node script to update the types. There is a `make` target that does this in one fell swoop (after activating venv): `make frontend-typegen`

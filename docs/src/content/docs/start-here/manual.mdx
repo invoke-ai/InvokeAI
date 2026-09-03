@@ -90,7 +90,7 @@ The following commands vary depending on the version of Invoke being installed a
       - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
       - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
 
-  7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is acheived by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
+  7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is achieved by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
 
       :::note[Torch Backend Selection]
         Pick a torch backend only when it applies to your system. In all other cases, do not use a torch backend.
@@ -103,6 +103,12 @@ The following commands vary depending on the version of Invoke being installed a
               Use:
               ```sh
               --torch-backend=cu128
+              ```
+            </TabItem>
+            <TabItem label="Intel Arc GPU">
+              Use:
+              ```sh
+              --torch-backend=xpu
               ```
             </TabItem>
             <TabItem label="Other / no GPU">
@@ -130,6 +136,22 @@ The following commands vary depending on the version of Invoke being installed a
               Use:
               ```sh
               --torch-backend=rocm7.1
+              ```
+
+              :::caution[ROCm and torch 2.12]
+                The `rocm7.1` index currently defaults to torch 2.12.x, which has been reported to
+                break generation on ROCm ([#9410](https://github.com/invoke-ai/InvokeAI/issues/9410)).
+                Until that issue is closed, also constrain torch when installing:
+                ```sh
+                uv pip install <PACKAGE_SPECIFIER>==<VERSION> "torch<2.12" --python 3.12 --python-preference only-managed --torch-backend=rocm7.1 --force-reinstall
+                ```
+                This workaround applies to the reported ROCm case only.
+              :::
+            </TabItem>
+            <TabItem label="Linux + Intel Arc GPU">
+              Use:
+              ```sh
+              --torch-backend=xpu
               ```
             </TabItem>
             <TabItem label="All other cases">
@@ -181,7 +203,7 @@ The following commands vary depending on the version of Invoke being installed a
         </TabItem>
         <TabItem label="Linux/MacOS" icon="linux">
           ```bash
-          invokeai-web --root $Home/invokeai
+          invokeai-web --root ~/invokeai
           ```
         </TabItem>
       </Tabs>

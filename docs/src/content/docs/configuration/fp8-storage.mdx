@@ -11,7 +11,7 @@ FP8 Storage cuts a model's VRAM footprint roughly in half by keeping weights on 
 It pairs well with [Low-VRAM mode](/configuration/low-vram-mode/): low-VRAM mode streams layers between RAM and VRAM, while FP8 Storage shrinks the layers themselves.
 
 :::caution[For full precision models only]
-FP8 Storage only applies to **full precision** checkpoints (FP16 / BF16 / FP32). It is **silently a no-op** for already-quantized formats — **GGUF**, **NF4**, and **int8** checkpoints carry their own storage precision and the loader returns a different module type that the FP8 layer cast does not touch. If your model is already quantized, the toggle has no effect; use the full-precision variant of the model if you want to enable FP8 Storage.
+FP8 Storage only applies to **full precision** checkpoints (FP16 / BF16 / FP32). It is **silently a no-op** for already-quantized formats — **GGUF**, **NF4**, **int8**, and [**SDNQ**](/configuration/sdnq-quantization/) checkpoints carry their own storage precision and the loader returns a different module type that the FP8 layer cast does not touch. If your model is already quantized, the toggle has no effect; use the full-precision variant of the model if you want to enable FP8 Storage.
 :::
 
 ## Requirements
@@ -62,17 +62,32 @@ The setting takes effect on the next load. If the model is already in the cache,
 
 FP8 Storage is **only** applied to layers where the precision trade-off is acceptable:
 
-| Model type                    | FP8 applied?                           |
-| ----------------------------- | -------------------------------------- |
-| Main models (SD1, SD2, SDXL)  | Yes                                    |
-| FLUX.1 / FLUX.2 Klein         | Yes                                    |
-| ControlNet, T2I-Adapter       | Yes                                    |
-| VAE                           | No — visible decode-quality regression |
-| Text encoders, tokenizers     | No — small models, no benefit          |
-| Z-Image (any variant)         | No — dtype mismatch with skipped layers|
-| LoRA, ControlLoRA             | No — patched into base, not run alone  |
+| Model type                         | FP8 applied?                                    |
+| ---------------------------------- | ----------------------------------------------- |
+| Main models (SD1, SD2, SDXL)       | Yes                                             |
+| FLUX.1 / FLUX.2 Klein              | Yes                                             |
+| Z-Image, Anima, Krea-2, Qwen-Image | Yes                                             |
+| ControlNet, T2I-Adapter            | Yes                                             |
+| Wan                                | Not yet — the switch is shown but has no effect |
+| VAE                                | No — visible decode-quality regression          |
+| Text encoders, tokenizers          | No — small models, no benefit                   |
+| Anima ControlNet-LLLite            | No — adapter is only tens of MB                 |
+| LoRA, ControlLoRA                  | No — patched into base, not run alone           |
 
 Within a supported model, **norm layers, position/patch embeddings, and `proj_in`/`proj_out` are skipped** so precision-sensitive tiny learned scalars (e.g. FLUX `RMSNorm.scale`) aren't crushed to FP8. This mirrors the diffusers default skip list.
+
+**On top of that, each model's own declared exclusions are honored.** Architectures list their precision-sensitive modules themselves (diffusers calls these `_skip_layerwise_casting_patterns` and `_keep_in_fp32_modules`), and those layers stay at compute precision too. This matters where the generic patterns don't fit the architecture's naming, and it is not a nicety: Z-Image and Anima both name their timestep-embedding MLP `t_embedder`, which no generic pattern matches. Cast to FP8, Z-Image fails outright and Anima renders a heavily dithered image with no fine detail.
+
+The cost is a slightly smaller saving on the models that declare a lot. Measured against the generic defaults alone:
+
+| Model                     | Weights kept at compute precision                | Saving given up |
+| ------------------------- | ------------------------------------------------ | --------------- |
+| Krea-2                    | 39 M (`time_embed`)                              | ~38 MiB         |
+| Anima                     | 19 M (`t_embedder`, `x_embedder`, `final_layer`) | ~18 MiB         |
+| Wan 14B (not applied yet) | 232 M (`condition_embedder`, `patch_embedding`)  | ~221 MiB        |
+| FLUX.1, Qwen-Image        | 0                                                | 0               |
+
+Wan is listed for completeness only: no Wan loader applies FP8 Storage yet, so the switch has no effect on Wan models and there is nothing to budget for today.
 
 ## Quality trade-offs
 
@@ -102,7 +117,7 @@ The cache eviction is immediate for idle models, but **deferred until the next u
 
 If VRAM still hasn't dropped:
 
-- Check the InvokeAI log for `FP8 layerwise casting enabled for <model name>`. If the line isn't there, the model is on the exclusion list (VAE, text encoder, Z-Image, LoRA — see table above).
+- Check the InvokeAI log for `FP8 layerwise casting enabled for <model name>`. If the line isn't there, the model is on the exclusion list, or its loader does not apply FP8 yet (VAE, text encoder, LoRA, Wan — see table above).
 - Confirm you are on CUDA. FP8 Storage is silently disabled on CPU and MPS.
 
 ### Quality regression on a specific model

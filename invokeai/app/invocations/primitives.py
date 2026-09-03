@@ -535,8 +535,8 @@ class Krea2ConditioningOutput(BaseInvocationOutput):
     conditioning: Krea2ConditioningField = OutputField(description=FieldDescriptions.cond)
 
     @classmethod
-    def build(cls, conditioning_name: str) -> "Krea2ConditioningOutput":
-        return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name))
+    def build(cls, conditioning_name: str, mask: TensorField | None = None) -> "Krea2ConditioningOutput":
+        return cls(conditioning=Krea2ConditioningField(conditioning_name=conditioning_name, mask=mask))
 
 
 @invocation_output("anima_conditioning_output")

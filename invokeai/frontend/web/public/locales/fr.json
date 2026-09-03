@@ -276,7 +276,7 @@
         "spandrelImageToImage": "Image vers Image (Spandrel)",
         "t5Encoder": "Encodeur T5",
         "learnMoreAboutSupportedModels": "En savoir plus sur les modèles que nous prenons en charge",
-        "includesNModels": "Contient {{n}} modèles et leurs dépendances",
+        "includesNModels": "Contient {{n}} modèles et leurs dépendances.",
         "starterBundles": "Packs de démarrages",
         "starterBundleHelpText": "Installe facilement tous les modèles nécessaire pour démarrer avec un modèle de base, incluant un modèle principal, ControlNets, IP Adapters et plus encore. Choisir un pack igniorera tous les modèles déjà installés.",
         "installingXModels_one": "En cours d'installation de {{count}} modèle",
@@ -302,7 +302,7 @@
         "hfTokenLabel": "Token HuggingFace (Requis pour certains modèles)",
         "hfTokenHelperText": "Un token HF est requis pour utiliser certains modèles. Cliquez ici pour créer ou obtenir votre token.",
         "hfTokenInvalid": "Token HF invalide ou manquant",
-        "hfForbidden": "Vous n'avez pas accès à ce modèle HF.",
+        "hfForbidden": "Vous n'avez pas accès à ce modèle HF",
         "hfTokenInvalidErrorMessage2": "Mettre à jour dans le ",
         "controlLora": "Controle LoRA",
         "urlUnauthorizedErrorMessage2": "Découvrir comment ici.",
@@ -498,7 +498,6 @@
         "baseModelChanged": "Modèle de base changé",
         "problemSavingLayer": "Impossible d'enregistrer la couche",
         "linkCopied": "Lien copié",
-        "imagesWillBeAddedTo": "Les images Importées seront ajoutées au ressources de la Planche {{boardName}}.",
         "addedToUncategorized": "Ajouté aux ressources de la planche $t(boards.uncategorized)",
         "pasteSuccess": "Collé à {{destination}}",
         "pasteFailed": "Échec du collage",
@@ -1638,7 +1637,7 @@
         "generatorNoValues": "vide",
         "addItem": "Ajouter un élément",
         "specialDesc": "Cette invocation nécessite un traitement spécial dans l'application. Par exemple, les nœuds Batch sont utilisés pour mettre en file d'attente plusieurs graphes à partir d'un seul workflow.",
-        "unableToUpdateNode": "La mise à jour du nœud a échoué : nœud {{node}} de type {{type}} (peut nécessiter la suppression et la recréation).",
+        "unableToUpdateNode": "La mise à jour du nœud a échoué : nœud {{node}} de type {{type}} (peut nécessiter la suppression et la recréation)",
         "deletedMissingNodeFieldFormElement": "Champ de formulaire manquant supprimé : nœud {{nodeId}} champ {{fieldName}}",
         "nodeName": "Nom du nœud",
         "description": "Description",
@@ -1726,7 +1725,6 @@
     },
     "whatsNew": {
         "whatsNewInInvoke": "Quoi de neuf dans Invoke",
-        "watchRecentReleaseVideos": "Regarder les vidéos des dernières versions",
         "items": [
             "<StrongComponent>FLUX Guidage Régional (bêta)</StrongComponent> : Notre version bêta de FLUX Guidage Régional est en ligne pour le contrôle des prompt régionaux.",
             "Autres améliorations : mise en file d'attente par lots plus rapide, meilleur redimensionnement, sélecteur de couleurs amélioré et nœuds de métadonnées."
@@ -1912,7 +1910,6 @@
                 "label": "Aligner sur la grille"
             },
             "invertBrushSizeScrollDirection": "Inverser le défilement pour la taille du pinceau",
-            "pressureSensitivity": "Sensibilité à la pression",
             "preserveMask": {
                 "label": "Préserver la zone masquée",
                 "alert": "Préserver la zone masquée"
@@ -2131,7 +2128,7 @@
             "rgNegativePromptNotSupported": "Prompt négatif non pris en charge pour le modèle de base sélectionné",
             "ipAdapterIncompatibleBaseModel": "modèle de base d'image de référence incompatible",
             "controlAdapterNoModelSelected": "aucun modèle de couche de contrôle sélectionné",
-            "ipAdapterNoImageSelected": "Aucune image de référence sélectionnée."
+            "ipAdapterNoImageSelected": "Aucune image de référence sélectionnée"
         },
         "pasteTo": "Coller vers",
         "pasteToAssets": "Ressources",

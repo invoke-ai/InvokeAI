@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Optional, Protocol, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Literal, Optional, Protocol, TypeAlias, TypeVar
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
@@ -32,21 +32,29 @@ class EventBase(BaseModel):
     All other attributes should be defined as normal for a pydantic model.
 
     A timestamp is automatically added to the event when it is created.
+
+    Events that are dispatched only within the server and never reach clients should set
+    `__server_internal__ = True` to keep themselves out of the generated API schema.
     """
 
     __event_name__: ClassVar[str]
+    __server_internal__: ClassVar[bool] = False
     timestamp: int = Field(description="The timestamp of the event", default_factory=get_timestamp)
 
     model_config = ConfigDict(json_schema_serialization_defaults_required=True)
 
     @classmethod
     def get_events(cls) -> set[type["EventBase"]]:
-        """Get a set of all event models."""
+        """Get a set of all client-facing event models.
+
+        Consumed by the OpenAPI generator, so server-internal events are excluded — they
+        are not part of the client API surface.
+        """
 
         event_subclasses: set[type["EventBase"]] = set()
         for subclass in cls.__subclasses__():
             # We only want to include subclasses that are event models, not intermediary classes
-            if hasattr(subclass, "__event_name__"):
+            if hasattr(subclass, "__event_name__") and not subclass.__server_internal__:
                 event_subclasses.add(subclass)
             event_subclasses.update(subclass.get_events())
 
@@ -140,7 +148,7 @@ class InvocationProgressEvent(InvocationEventBase):
     )
     device: str | None = Field(
         default=None,
-        description="The device processing this session, e.g. 'cuda:1' (set only when running on a CUDA GPU)",
+        description="The device processing this session, e.g. 'cuda:1' (set only when running on a GPU)",
     )
 
     @classmethod
@@ -156,14 +164,18 @@ class InvocationProgressEvent(InvocationEventBase):
         # thread-local session device is temporarily re-pinned to a borrowed idle GPU during
         # offloaded encoder nodes, and using it here would make the UI's device badge jump to the
         # borrowed GPU and back within a single queue item.
-        device: str | None = queue_item.device if queue_item.device and queue_item.device.startswith("cuda") else None
+        device: str | None = (
+            queue_item.device if queue_item.device and queue_item.device.startswith(("cuda", "xpu")) else None
+        )
         if device is None:
             # Legacy single-device mode tags queue items with device=None; fall back to the worker
             # thread's pinned device (set via TorchDevice.set_session_device()).
             from invokeai.backend.util.devices import TorchDevice
 
             session_device = TorchDevice.get_session_device()
-            device = str(session_device) if session_device is not None and session_device.type == "cuda" else None
+            device = (
+                str(session_device) if session_device is not None and session_device.type in ("cuda", "xpu") else None
+            )
 
         return cls(
             queue_id=queue_item.queue_id,
@@ -812,6 +824,51 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
         )
 
 
+class LLMTaskEventBase(EventBase):
+    """Base class for LLM utility task events (expand-prompt, image-to-prompt).
+
+    These events are correlated to a specific HTTP request via a client-supplied
+    task_id and routed privately to the originating user so partial prompt content
+    is not broadcast.
+    """
+
+    task_id: str = Field(description="Client-supplied task ID correlating events to a single request")
+    user_id: str = Field(default="system", description="ID of the user who initiated the task")
+
+
+@payload_schema.register
+class LLMTaskProgressEvent(LLMTaskEventBase):
+    """Event model for llm_task_progress"""
+
+    __event_name__ = "llm_task_progress"
+
+    phase: Literal["loading_model", "generating"] = Field(description="Which phase of the task is in progress")
+    message: str = Field(description="A short message describing the current phase")
+    percentage: float | None = Field(
+        default=None, ge=0, le=1, description="Progress fraction in [0, 1]; omit for indeterminate progress"
+    )
+    current_tokens: int | None = Field(default=None, description="Number of tokens generated so far (generating phase)")
+    total_tokens: int | None = Field(
+        default=None, description="Max tokens the request will generate (generating phase)"
+    )
+
+
+@payload_schema.register
+class LLMTaskCompleteEvent(LLMTaskEventBase):
+    """Event model for llm_task_complete"""
+
+    __event_name__ = "llm_task_complete"
+
+
+@payload_schema.register
+class LLMTaskErrorEvent(LLMTaskEventBase):
+    """Event model for llm_task_error"""
+
+    __event_name__ = "llm_task_error"
+
+    error: str = Field(description="The error message")
+
+
 @payload_schema.register
 class RecallParametersUpdatedEvent(QueueEventBase):
     """Event model for recall_parameters_updated"""
@@ -824,3 +881,31 @@ class RecallParametersUpdatedEvent(QueueEventBase):
     @classmethod
     def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
         return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
+
+
+class UserAccessChangedEvent(EventBase):
+    """Event model for user_access_changed.
+
+    Emitted when a user's authorization state changes (role change, deactivation,
+    or deletion) so that live connections — e.g. open sockets — can be re-authorized
+    immediately instead of trusting connect-time claims until reconnect.
+
+    This event is server-internal: it is deliberately NOT registered with
+    `payload_schema`, is excluded from the generated API schema, and is never
+    emitted to clients.
+    """
+
+    __event_name__ = "user_access_changed"
+    __server_internal__ = True
+
+    user_id: str = Field(description="The ID of the affected user")
+    is_admin: bool = Field(description="Whether the user currently has admin privileges")
+    is_active: bool = Field(description="Whether the user account is currently active (False for deleted users)")
+    token_epoch: int = Field(
+        default=0,
+        description="The user's current token revocation epoch; sockets that authenticated under an older one are dropped",
+    )
+
+    @classmethod
+    def build(cls, user_id: str, is_admin: bool, is_active: bool, token_epoch: int = 0) -> "UserAccessChangedEvent":
+        return cls(user_id=user_id, is_admin=is_admin, is_active=is_active, token_epoch=token_epoch)

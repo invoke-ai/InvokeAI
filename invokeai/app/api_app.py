@@ -7,7 +7,6 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.security.utils import get_authorization_scheme_param
@@ -16,6 +15,7 @@ from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import invokeai.frontend.web as web_dir
@@ -28,7 +28,6 @@ from invokeai.app.api.routers import (
     boards,
     client_state,
     custom_nodes,
-    download_queue,
     gallery,
     image_moves,
     images,
@@ -75,9 +74,20 @@ async def lifespan(app: FastAPI):
     )
     logger.handle(record)
 
-    yield
-    # Shut down threads
-    ApiDependencies.shutdown()
+    # Re-derive open sockets' authorization from the database on a timer. This is what
+    # catches user changes made by another process — the `invoke-usermod` / `invoke-userdel`
+    # CLIs — which cannot raise an in-process event. `socket_io` is created further down
+    # this module and is bound by the time the app is served.
+    socket_io.start()
+
+    try:
+        yield
+    finally:
+        # In a `finally` so an exception propagating into the generator cannot leave the
+        # sweep running against a half-torn-down process, or skip the thread shutdown.
+        socket_io.stop()
+        # Shut down threads
+        ApiDependencies.shutdown()
 
 
 # Create the app
@@ -130,13 +140,32 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
 
                     token_data = verify_token(token)
                     if token_data is not None:
-                        # The user lookup is a synchronous SQLite query behind a
-                        # process-wide lock; run it off the event loop so a contended
-                        # lock (e.g. generation-result writes) can't stall every
-                        # concurrent request from inside this per-mutation middleware.
-                        user = await run_in_threadpool(ApiDependencies.invoker.services.users.get, token_data.user_id)
-                        if user is None or not user.is_active:
+                        # Decide through `resolve_authorized_user` rather than re-deriving
+                        # "is this token still honored" here. This middleware used to carry
+                        # its own copy of the exists/active/epoch checks, and a copy is how
+                        # a rule added later — the refusal of the internal `system` id —
+                        # reaches every other entry point but not this one, leaving a token
+                        # nothing will accept being renewed indefinitely anyway.
+                        #
+                        # Never refresh a token that is no longer honored. This runs after
+                        # the route, so an authenticated route has already rejected it — but
+                        # an unauthenticated route returning 2xx with a stale Bearer header
+                        # still reaches here, and minting from the current record would
+                        # launder a revoked token into a valid one.
+                        #
+                        # The lookup inside is a synchronous SQLite query behind a
+                        # process-wide lock; run it off the event loop so a contended lock
+                        # (e.g. generation-result writes) can't stall every concurrent
+                        # request from inside this per-mutation middleware.
+                        from invokeai.app.api.auth_dependencies import resolve_authorized_user
+
+                        user = await run_in_threadpool(resolve_authorized_user, token_data)
+                        if user is None:
                             return response
+                        # Mint the replacement from the *database* record, not the old
+                        # token's claims: otherwise a demoted administrator's stale is_admin
+                        # claim (and the media cookie carrying it) would be renewed
+                        # indefinitely by their own mutations.
                         # Use the remember_me claim from the token to determine the
                         # correct refresh duration. This avoids the bug where a 7-day
                         # token with <24h remaining would be silently downgraded to 1 day.
@@ -150,6 +179,7 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                             email=user.email,
                             is_admin=user.is_admin,
                             remember_me=token_data.remember_me,
+                            token_epoch=user.token_epoch,
                         )
                         new_token = create_access_token(refreshed_data, expires_delta)
                         response.headers["X-Refreshed-Token"] = new_token
@@ -157,6 +187,106 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                     pass  # Don't fail the request if token refresh fails
 
         return response
+
+
+# Response types worth compressing. Everything else is passed through untouched.
+#
+# This is an allowlist rather than a blocklist of media types on purpose: a type missing from
+# this list only loses compression it would barely have benefited from, whereas a binary type
+# missing from a blocklist costs real CPU on the event loop. The app serves a small, known set
+# of compressible things — the UI bundle, the API's JSON, SVG icons.
+COMPRESSIBLE_CONTENT_TYPES = (
+    "text/",
+    "application/json",
+    "application/javascript",
+    "application/xml",
+    "application/xhtml+xml",
+    "application/manifest+json",
+    "image/svg+xml",
+)
+
+# `text/` would otherwise match this, and compressing an event stream defeats its purpose by
+# withholding events until the compressor flushes. Starlette excludes it by default too.
+UNCOMPRESSIBLE_CONTENT_TYPES = ("text/event-stream",)
+
+
+def _is_compressible(content_type: str) -> bool:
+    if content_type.startswith(UNCOMPRESSIBLE_CONTENT_TYPES):
+        return False
+    return content_type.startswith(COMPRESSIBLE_CONTENT_TYPES)
+
+
+class _ContentTypeAwareGZipResponder(GZipResponder):
+    """Skips compression for response types that are already compressed.
+
+    `content_type_is_excluded` is computed when the response starts and only read once the
+    body arrives, so widening it right after the base class has set it is enough — no need to
+    reimplement Starlette's streaming/pathsend handling.
+    """
+
+    async def send_with_compression(self, message: Message) -> None:
+        await super().send_with_compression(message)
+        if message["type"] == "http.response.start" and not self.content_type_is_excluded:
+            self.content_type_is_excluded = not _is_compressible(
+                Headers(raw=message["headers"]).get("content-type", "")
+            )
+
+
+class ContentTypeAwareGZipMiddleware(GZipMiddleware):
+    """GZip, but only for content types that actually compress.
+
+    Starlette's GZipMiddleware compresses every response type except `text/event-stream`. The
+    gallery serves PNG, WebP and MP4 bytes, which are already compressed: a 3 MB PNG costs
+    ~52ms of event-loop time to gzip and comes back *larger* than it went in. With auto-switch
+    enabled the UI fetches the full image after every generated image, so that cost lands
+    repeatedly during a batch — exactly when the server can least afford to stall.
+
+    Lowering `compresslevel` does not help here: on incompressible input, level 1 costs
+    essentially the same as level 9 because deflate still has to scan the data. It does help a
+    great deal on the compressible path — see `configure_gzip`.
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        if "gzip" in Headers(scope=scope).get("Accept-Encoding", ""):
+            responder: ASGIApp = _ContentTypeAwareGZipResponder(
+                self.app, self.minimum_size, compresslevel=self.compresslevel
+            )
+        else:
+            responder = IdentityResponder(self.app, self.minimum_size)
+
+        await responder(scope, receive, send)
+
+
+# Responses below this are not worth a compression pass; the gzip framing alone is ~20 bytes.
+GZIP_MINIMUM_SIZE = 1000
+
+
+def configure_gzip(app: FastAPI, compresslevel: int) -> None:
+    """Install response compression, unless it is turned off.
+
+    Compression runs on the event loop, so its cost is not paid by the requesting client alone —
+    it stalls every other request and every socket.io event for its duration. That makes the
+    level a real trade-off rather than a free win.
+
+    Measured on the flat name list of a 200k-image library (8.48 MB of JSON): level 1 takes
+    16.4ms and returns 6.1% of the input, level 9 takes 90.2ms and returns 5.7%. Level 9 costs
+    5.5x the event-loop time for 0.4 percentage points of bandwidth, which is a poor deal for a
+    locally-served app. The default stays at 9 so behavior is unchanged for existing installs;
+    users who feel the stall on a large library can lower it.
+
+    A `compresslevel` of 0 means "no compression". The middleware is then left out entirely
+    rather than installed at level 0, so responses skip the responder altogether instead of
+    being buffered and re-emitted as a stored-only gzip stream. Deployments behind a proxy that
+    already compresses (nginx, Caddy) want this, both to avoid the duplicated work and because
+    the proxy can compress off the event loop.
+    """
+    if compresslevel <= 0:
+        return
+    app.add_middleware(ContentTypeAwareGZipMiddleware, minimum_size=GZIP_MINIMUM_SIZE, compresslevel=compresslevel)
 
 
 class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
@@ -198,8 +328,9 @@ def _identify_video_upload_user(scope: Scope) -> tuple[bool, str | None]:
     token_data = verify_token(token)
     if token_data is None:
         return False, None
-    user = ApiDependencies.invoker.services.users.get(token_data.user_id)
-    if user is None or not user.is_active:
+    from invokeai.app.api.auth_dependencies import resolve_authorized_user
+
+    if resolve_authorized_user(token_data) is None:
         return False, None
     return True, token_data.user_id
 
@@ -218,6 +349,28 @@ class VideoUploadLimitASGIMiddleware:
     chunked bodies that exceed the cap mid-stream, and bounds concurrent uploads
     both globally and per user (so one tenant's slow uploads cannot starve the
     others into 429s).
+
+    It also asks the server to close the connection on any response sent before the request
+    body has been read to completion. The leases below are released as soon as the app
+    returns, and the route answers plenty of requests without reading the body (a forbidden
+    board, a filename that isn't .mp4) — FastAPI's own query-param validation answers 422
+    before the route body runs at all. A client that kept streaming after such a response
+    would hold ingress with no slot charged against it, outside the 429 bound, the idle
+    timeout and the duration cap; closing ends that upload along with the response.
+
+    Whether the body was read is the only thing that can be known here, so any early answer
+    closes — including when the client had in fact already finished sending. That costs a
+    fresh connection per rejected upload, which is the conservative side to err on and is
+    what servers generally do when a response is sent without consuming the body.
+
+    Two limits worth knowing. Draining the body instead would also close the hole, but it
+    would pin one of the very few upload slots for the whole duration cap per rejection,
+    which is a cheaper denial of service than the hole it closes. And behind a reverse proxy
+    that buffers request bodies (nginx's default, per the multi-user admin guide) `Connection`
+    is hop-by-hop, so this only closes the proxy-to-app hop — there the proxy has already
+    absorbed the whole upload before the app is invoked, so the hole does not arise. Responses
+    generated above this middleware (Starlette's ServerErrorMiddleware 500) do not pass
+    through it; uvicorn closes the transport on those itself.
     """
 
     def __init__(
@@ -248,6 +401,11 @@ class VideoUploadLimitASGIMiddleware:
         if not (scope.get("method") == "POST" and route_path == "/api/v1/videos/upload"):
             return await self.app(scope, receive, send)
 
+        # `connection` is a hop-by-hop header and illegal in HTTP/2+, so every use below is
+        # gated on HTTP/1.
+        is_http1 = str(scope.get("http_version", "1.1")).startswith("1.")
+        close_header = {"connection": "close"} if is_http1 else {}
+
         per_user_key: str | None = None
         if self.identify_user is not None:
             identity = self.identify_user(scope)
@@ -258,7 +416,7 @@ class VideoUploadLimitASGIMiddleware:
                 response = JSONResponse(
                     {"detail": "Authentication required"},
                     status_code=401,
-                    headers={"WWW-Authenticate": "Bearer"},
+                    headers={"WWW-Authenticate": "Bearer", **close_header},
                 )
                 return await response(scope, receive, send)
 
@@ -267,6 +425,7 @@ class VideoUploadLimitASGIMiddleware:
             response = JSONResponse(
                 {"detail": f"Video upload exceeds maximum request size ({self.max_body_bytes} bytes)"},
                 status_code=413,
+                headers=close_header,
             )
             return await response(scope, receive, send)
 
@@ -274,7 +433,7 @@ class VideoUploadLimitASGIMiddleware:
             response = JSONResponse(
                 {"detail": "Too many concurrent video uploads; try again shortly"},
                 status_code=429,
-                headers={"Retry-After": "5"},
+                headers={"Retry-After": "5", **close_header},
             )
             return await response(scope, receive, send)
 
@@ -286,7 +445,7 @@ class VideoUploadLimitASGIMiddleware:
             response = JSONResponse(
                 {"detail": "Too many concurrent video uploads for this user; try again shortly"},
                 status_code=429,
-                headers={"Retry-After": "5"},
+                headers={"Retry-After": "5", **close_header},
             )
             return await response(scope, receive, send)
 
@@ -294,6 +453,13 @@ class VideoUploadLimitASGIMiddleware:
         if per_user_key is not None:
             self._active_by_user[per_user_key] = self._active_by_user.get(per_user_key, 0) + 1
         received = 0
+        # Only reading the body to its end proves the client has finished sending. This must
+        # NOT be seeded from Content-Length: h11 accepts `Content-Length: 0` alongside
+        # `Transfer-Encoding: chunked` (the chunked framing wins), so trusting the header let
+        # a client suppress the close and then stream indefinitely with no lease held and
+        # none of the caps below applying — they all live in limited_receive, which an app
+        # that answers early never calls again.
+        body_finished = False
         upload_started_at = asyncio.get_running_loop().time()
 
         async def limited_receive() -> Message:
@@ -301,10 +467,13 @@ class VideoUploadLimitASGIMiddleware:
             # streamed body and abort the request once it exceeds the cap, so the multipart
             # parser stops spooling. A clean 413 isn't possible mid-parse; the aborted
             # request surfaces to the client as a dropped connection.
-            nonlocal received
+            nonlocal received, body_finished
             remaining_duration = self.max_upload_duration_seconds - (
                 asyncio.get_running_loop().time() - upload_started_at
             )
+            # The three aborts below synthesize a disconnect precisely because the client is
+            # still uploading, so they deliberately leave body_finished alone: whatever the
+            # app answers must still close the connection.
             if remaining_duration <= 0:
                 return {"type": "http.disconnect"}
             try:
@@ -315,10 +484,24 @@ class VideoUploadLimitASGIMiddleware:
                 received += len(message.get("body", b""))
                 if received > self.max_body_bytes:
                     return {"type": "http.disconnect"}
+                if not message.get("more_body", False):
+                    body_finished = True
+            elif message["type"] == "http.disconnect":
+                # The client is already gone; there is nothing left to close.
+                body_finished = True
             return message
 
+        async def close_if_answered_early(message: Message) -> None:
+            # See the class docstring: answering before the body has been read to its end must
+            # not leave the client uploading into an already-sent response.
+            if message["type"] == "http.response.start" and not body_finished and is_http1:
+                headers = [(name, value) for name, value in message.get("headers", []) if name.lower() != b"connection"]
+                headers.append((b"connection", b"close"))
+                message = {**message, "headers": headers}
+            await send(message)
+
         try:
-            await self.app(scope, limited_receive, send)
+            await self.app(scope, limited_receive, close_if_answered_early)
         finally:
             self._active -= 1
             if per_user_key is not None:
@@ -400,7 +583,7 @@ app.add_middleware(
     expose_headers=["X-Refreshed-Token"],
 )
 
-app.add_middleware(GZipMiddleware, minimum_size=1000)
+configure_gzip(app, app_config.http_compression_level)
 
 
 # Include all routers
@@ -408,7 +591,6 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
-app.include_router(download_queue.download_queue_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(videos.videos_router, prefix="/api")

@@ -28,6 +28,104 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, set_fp8_compute_dtype
+
+# Probe results keyed by concrete device (e.g. "xpu:1"). float8 support is build/driver
+# dependent, so it is a per-device property: a discrete Arc may be paired with an integrated
+# GPU that answers differently, and keying on the device *type* would let whichever probed
+# first decide for both.
+_FP8_STORAGE_SUPPORTED: set[str] = set()
+
+# Devices whose probe failure has already been reported. Deliberately separate from the result
+# cache above: the probe is retried on every request (a failure may be transient), but repeating
+# the warning on every model load would bury the log.
+_FP8_PROBE_FAILURE_REPORTED: set[str] = set()
+
+
+def put_in_eval_mode(model: AnyModel) -> AnyModel:
+    """Put a freshly constructed model into inference mode.
+
+    Applied once here rather than in each loader, because it is the loaders that keep getting this
+    wrong and there are dozens of them. `from_pretrained` calls `.eval()` on what it returns, but a
+    great many loaders build the module themselves — `accelerate.init_empty_weights()` plus
+    `load_state_dict()` — which leaves `training` True. Anything dropout- or batchnorm-sensitive in
+    such a tree then behaves as if it were training, silently, during inference.
+
+    `_load_model` is the single construction choke point every loader passes through, so covering it
+    here also covers loaders that do not exist yet. `.eval()` is idempotent, so the loaders that
+    already call it are unaffected. Non-module returns (tokenizers, schedulers, IP-Adapter wrappers,
+    pipelines) pass through untouched.
+    """
+    if isinstance(model, torch.nn.Module):
+        model.eval()
+    return model
+
+
+def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, fallback: Path) -> Path:
+    """Where a pipeline component actually lives, preferring what identification recorded.
+
+    `model_index.json` names its components with arbitrary keys, and discovery stores the key it saw
+    in `submodels[...].path_or_prefix`. Reconstructing `model_path / "<slot name>"` at load time
+    instead assumes the key always equals the slot name, so a pipeline that calls its CLIP encoder
+    something else passes discovery and is then loaded from a directory that does not exist.
+
+    `fallback` is used when the config carries no such entry — configs persisted before submodel
+    discovery existed, and the layouts where the component folder *is* the model path.
+    """
+    discovered = (getattr(config, "submodels", None) or {}).get(submodel_type)
+    return Path(discovered.path_or_prefix) if discovered else fallback
+
+
+def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:
+    """Whether FP8 layerwise casting (float8 weight storage + upcast) is usable on this device.
+
+    The feature needs only float8 *storage* and casting to the compute dtype -- not native FP8
+    matmul -- so it holds on CUDA and, for current torch builds, on Intel XPU. XPU float8 support is
+    build/driver dependent ("emerging" on Xe2), so probe it rather than assume.
+
+    The probe allocates on the *given* device rather than an index-less ``"xpu"``, which would
+    resolve through the thread's current XPU device -- not necessarily the device the caller is
+    loading onto (see the idle-GPU encoder offload, which re-pins the session device).
+
+    The probe mirrors the runtime path rather than approximating it. At runtime the storage cast
+    happens on CPU (``_apply_fp8_to_nn_module`` runs while params are still CPU-resident), the fp8
+    tensor is then copied host->device, and the pre-hook upcasts fp8 -> compute_dtype on the
+    device. Probing all three steps on the device would pass on a build where the fp8 host->device
+    copy or a particular upcast fails, and then break at forward time.
+
+    Only successes are cached. The probe runs during a model load, i.e. exactly when the device
+    may be transiently out of memory, and a cached failure would silently disable FP8 for the
+    lifetime of the process with no remedy short of a restart.
+    """
+    if device.type == "cuda":
+        return True
+    if device.type != "xpu":
+        return False
+
+    device = TorchDevice.normalize(device)
+    key = str(device)
+    if key in _FP8_STORAGE_SUPPORTED:
+        return True
+
+    try:
+        # 1. Storage cast, on CPU, as _apply_fp8_to_nn_module does.
+        stored = torch.zeros(2).to(torch.float8_e4m3fn)
+        # 2. fp8 host->device copy.
+        stored = stored.to(device)
+        # 3. Pre-hook upcast, on device. Both targets are exercised: compute_dtype is bfloat16 for
+        #    several supported models (Krea-2, FLUX) and float16 for others, and a build can
+        #    support one without the other.
+        stored.to(torch.bfloat16)
+        stored.to(torch.float16)
+    except Exception as exc:
+        if logger is not None and key not in _FP8_PROBE_FAILURE_REPORTED:
+            _FP8_PROBE_FAILURE_REPORTED.add(key)
+            logger.warning(f"FP8 storage probe failed on {device} ({type(exc).__name__}: {exc}); not using FP8.")
+        return False
+
+    _FP8_STORAGE_SUPPORTED.add(key)
+    return True
+
 
 # Layer classes that benefit from FP8 storage. Mirrors diffusers'
 # `_GO_LC_SUPPORTED_PYTORCH_LAYERS` so the plain-nn.Module fallback path makes the same
@@ -57,6 +155,63 @@ _FP8_DEFAULT_SKIP_PATTERNS: tuple[str, ...] = (
     r"^proj_in$",
     r"^proj_out$",
 )
+
+# Model formats whose weights are already quantized. FP8 storage is meaningless for them (the
+# payload is packed integers, not values we may re-encode) and actively harmful — see
+# `_should_use_fp8`. Declared as strings to keep this module free of a taxonomy import at module
+# scope; compared against `config.format`, which is a `ModelFormat` str-enum. Must list every
+# quantized member of `ModelFormat`; `test_quantized_format_set_matches_the_taxonomy` pins the
+# strings to the enum so a rename cannot silently disable the check.
+_QUANTIZED_MODEL_FORMATS: frozenset[str] = frozenset(
+    {
+        "gguf_quantized",
+        "bnb_quantized_nf4b",
+        "bnb_quantized_int8b",
+        "sdnq_quantized",
+    }
+)
+
+
+def _is_quantized_param(param: torch.nn.Parameter) -> bool:
+    """Whether `param` holds a quantized payload that must not be re-encoded as FP8.
+
+    Two signals, both observed in practice:
+
+    - Not floating point. bnb's NF4/INT8 weights are packed `uint8` (and `bnb.nn.LinearNF4`
+      subclasses `nn.Linear`, so a class check alone does not catch them). Casting those to float8
+      succeeds silently and the layer then returns finite garbage.
+    - A `torch.Tensor` *subclass*, e.g. `GGMLTensor`, which keeps its quantized payload plus
+      metadata and rejects dtype changes outright.
+    """
+    return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
+
+
+def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
+    """The precision-sensitive modules a model declares for itself, as skip patterns.
+
+    Diffusers' `enable_layerwise_casting()` unions two class attributes before casting:
+    `_skip_layerwise_casting_patterns` and `_keep_in_fp32_modules`. We no longer call it (see
+    `_apply_fp8_layerwise_casting`), so we have to read both ourselves — this is not cosmetic.
+    Z-Image's `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to
+    it; with an fp8 weight the input becomes float8 before our pre-hook can restore the weight, and
+    `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
+    `['t_embedder', 'cap_embedder']` for that model.
+
+    `_keep_in_fp32_modules` protects nothing extra on any model we currently load — verified on
+    Krea-2, Wan 14B, Z-Image and FLUX.1. Wan's `time_embedder` sits under `condition_embedder`,
+    which its `_skip_layerwise_casting_patterns` already names; `scale_shift_table` is a bare
+    Parameter, not a castable layer; and Krea-2's entries are all `norm*`, already covered by
+    `_FP8_DEFAULT_SKIP_PATTERNS`. It is read anyway so the next model to declare one does not lose
+    it silently.
+    """
+    patterns: list[str] = []
+    for attr in ("_skip_layerwise_casting_patterns", "_keep_in_fp32_modules"):
+        declared = getattr(model, attr, None) or ()
+        # Diffusers stores these as lists of strings, but a subclass could set a bare string.
+        if isinstance(declared, str):
+            declared = (declared,)
+        patterns.extend(p for p in declared if isinstance(p, str) and p not in patterns)
+    return tuple(patterns)
 
 
 # The construction path is not thread-safe on its own; it monkey-patches process-global torch state
@@ -179,7 +334,7 @@ class ModelLoader(ModelLoaderBase):
                 self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
                 ram_after_room = MemorySnapshot.capture().process_ram if log_mem else 0
                 with skip_torch_weight_init():
-                    loaded_model = self._load_model(config, submodel_type)
+                    loaded_model = put_in_eval_mode(self._load_model(config, submodel_type))
                 if log_mem:
                     ram_peak = MemorySnapshot.capture().process_ram
                     self._logger.info(
@@ -222,23 +377,42 @@ class ModelLoader(ModelLoaderBase):
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
         """Get the size of the model on disk."""
+        # Size the folder the model will actually be loaded from. This has to track
+        # `resolve_submodel_path`, or a pipeline whose index calls its CLIP encoder `clip_encoder`
+        # gets sized at the non-existent `text_encoder/` — 0 bytes — and `make_room()` reserves
+        # nothing before a multi-GB component is read. The conventional case is unchanged: only a
+        # component recorded somewhere other than its slot name takes the branch below.
+        subfolder = submodel_type.value if submodel_type else None
+        if submodel_type is not None:
+            conventional = model_path / submodel_type.value
+            resolved = resolve_submodel_path(config, submodel_type, conventional)
+            if resolved != conventional:
+                try:
+                    subfolder = resolved.relative_to(model_path).as_posix()
+                except ValueError:
+                    # Recorded outside this model's directory — size that directory directly.
+                    model_path, subfolder = resolved, None
+
         return calc_model_size_by_fs(
             model_path=model_path,
-            subfolder=submodel_type.value if submodel_type else None,
+            subfolder=subfolder,
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        # FP8 storage only works on CUDA
-        if self._torch_device.type != "cuda":
-            return False
+        from invokeai.backend.model_manager.taxonomy import ModelType
 
-        # Z-Image has dtype mismatch issues with diffusers' layerwise casting
-        # (skipped modules produce bf16, hooked modules expect fp16).
-        from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
-
-        if hasattr(config, "base") and config.base == BaseModelType.ZImage:
+        # Already-quantized models are excluded. Their weights are packed integer payloads, not
+        # values we may re-encode, and casting them is not a no-op:
+        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly`.
+        #   - bnb NF4 corrupts *silently* — `bnb.nn.LinearNF4` subclasses `nn.Linear`, so the packed
+        #     uint8 payload is cast to float8, inference still returns finite numbers, and the model
+        #     just produces garbage.
+        # No quantized-format loader calls `_apply_fp8_layerwise_casting` today, so this is a guard
+        # against the next loader that gets wired up (they are being added one model at a time)
+        # rather than a fix for a live crash.
+        if hasattr(config, "format") and config.format in _QUANTIZED_MODEL_FORMATS:
             return False
 
         # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
@@ -277,7 +451,11 @@ class ModelLoader(ModelLoaderBase):
         # Check default_settings.fp8_storage (Main models, ControlNet)
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "fp8_storage") and config.default_settings.fp8_storage is True:
-                return True
+                # Device support is probed last, so it runs only for a model that actually wants
+                # FP8 -- not on the first load of any tokenizer/VAE/scheduler, and not on API or
+                # install threads, where it would force XPU lazy SYCL init on a thread that never
+                # generates.
+                return _device_supports_fp8_storage(self._torch_device, self._logger)
 
         return False
 
@@ -286,6 +464,12 @@ class ModelLoader(ModelLoaderBase):
     ) -> AnyModel:
         """Apply FP8 layerwise casting to a model if enabled in its config."""
         if not self._should_use_fp8(config, submodel_type):
+            return model
+
+        # The cast is not idempotent: on a second pass the first parameter is already fp8, so the
+        # compute dtype below would be derived as float8. The marker is set by
+        # `_apply_fp8_to_nn_module`, so its presence means this model has already been cast.
+        if isinstance(model, torch.nn.Module) and getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is not None:
             return model
 
         storage_dtype = torch.float8_e4m3fn
@@ -310,7 +494,12 @@ class ModelLoader(ModelLoaderBase):
         # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
         # `forward`, so `CustomLinear.forward` is still reached.
         if isinstance(model, torch.nn.Module):
-            self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
+            self._apply_fp8_to_nn_module(
+                model,
+                storage_dtype=storage_dtype,
+                compute_dtype=compute_dtype,
+                extra_skip_patterns=_model_declared_skip_patterns(model),
+            )
         else:
             return model
 
@@ -323,7 +512,12 @@ class ModelLoader(ModelLoaderBase):
         return model
 
     @staticmethod
-    def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
+    def _apply_fp8_to_nn_module(
+        model: torch.nn.Module,
+        storage_dtype: torch.dtype,
+        compute_dtype: torch.dtype,
+        extra_skip_patterns: tuple[str, ...] = (),
+    ) -> None:
         """Apply FP8 layerwise casting to a plain nn.Module.
 
         Mirrors diffusers' `apply_layerwise_casting` semantics: only the layer classes in
@@ -331,14 +525,33 @@ class ModelLoader(ModelLoaderBase):
         `_FP8_DEFAULT_SKIP_PATTERNS` (norm, pos_embed, patch_embed, proj_in/out) are skipped.
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
+
+        `extra_skip_patterns` carries the model's own declared exclusions (see
+        `_model_declared_skip_patterns`), which are model-specific and cannot be inferred from
+        layer types or generic name patterns.
+
+        Modules holding already-quantized weights are skipped regardless of their class. This is a
+        backstop behind the format check in `_should_use_fp8`, which cannot see quantization that
+        is not reflected in the model's format (e.g. a `diffusers`-format checkpoint whose weights
+        were quantized by an external tool).
+
+        Records the compute dtype on the model. After the cast, `model.dtype` reports the float8
+        storage dtype, which must never be used to create or cast tensors — torch has no arithmetic
+        kernels for it (see `get_model_compute_dtype`). The marker is set here rather than at the
+        call sites so a new caller cannot forget it.
         """
+        set_fp8_compute_dtype(model, compute_dtype)
+
+        skip_patterns = _FP8_DEFAULT_SKIP_PATTERNS + tuple(extra_skip_patterns)
         for module_name, module in model.named_modules():
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
-            if any(re.search(pattern, module_name) for pattern in _FP8_DEFAULT_SKIP_PATTERNS):
+            if any(re.search(pattern, module_name) for pattern in skip_patterns):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
+                continue
+            if any(_is_quantized_param(p) for p in params):
                 continue
 
             for param in params:

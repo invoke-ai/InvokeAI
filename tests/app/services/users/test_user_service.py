@@ -1,12 +1,14 @@
 """Tests for user service."""
 
+import threading
 from logging import Logger
 
 import pytest
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.users import users_default
 from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
-from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.users.users_default import USER_LOOKUP_CHUNK_SIZE, UserService
 
 
 @pytest.fixture
@@ -30,7 +32,8 @@ def db(logger: Logger) -> SqliteDatabase:
             is_active BOOLEAN NOT NULL DEFAULT TRUE,
             created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
             updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            last_login_at DATETIME
+            last_login_at DATETIME,
+            token_epoch INTEGER NOT NULL DEFAULT 0
         );
     """)
     db._conn.commit()
@@ -243,16 +246,73 @@ def test_create_admin(user_service: UserService):
 
 def test_create_admin_when_exists(user_service: UserService):
     """Test creating admin when one already exists."""
-    user_data = UserCreateRequest(
-        email="admin@example.com",
-        display_name="Admin User",
-        password="AdminPassword123",
+    user_service.create_admin(
+        UserCreateRequest(
+            email="admin@example.com",
+            display_name="Admin User",
+            password="AdminPassword123",
+        )
     )
 
-    user_service.create_admin(user_data)
+    # A *different* email, so this exercises the admin guard rather than the unique-email one.
+    with pytest.raises(ValueError, match="Admin user already exists"):
+        user_service.create_admin(
+            UserCreateRequest(
+                email="second-admin@example.com",
+                display_name="Second Admin",
+                password="AdminPassword123",
+            )
+        )
 
-    with pytest.raises(ValueError, match="already exists"):
-        user_service.create_admin(user_data)
+
+def test_concurrent_create_admin_creates_exactly_one_admin(user_service: UserService, monkeypatch):
+    """Two concurrent `POST /auth/setup` requests must not both create an administrator.
+
+    The route is unauthenticated during the first-run window and runs in the threadpool, so the
+    two requests really do interleave. Checking has_admin() in its own transaction before the
+    INSERT leaves a window in which both callers see no admin and both create one; the loser then
+    holds a persistent admin account instead of getting the intended 400.
+
+    The barrier models that interleaving deterministically: it releases both threads only once
+    both have passed every step preceding the write.
+    """
+    barrier = threading.Barrier(2, timeout=30)
+    real_hash_password = users_default.hash_password
+
+    def synchronized_hash_password(password: str) -> str:
+        barrier.wait()
+        return real_hash_password(password)
+
+    monkeypatch.setattr(users_default, "hash_password", synchronized_hash_password)
+
+    results: dict[int, object] = {}
+
+    def attempt(index: int) -> None:
+        try:
+            results[index] = user_service.create_admin(
+                UserCreateRequest(
+                    email=f"admin{index}@example.com",
+                    display_name=f"Admin {index}",
+                    password="AdminPassword123",
+                )
+            )
+        except ValueError as exc:
+            results[index] = exc
+
+    threads = [threading.Thread(target=attempt, args=(index,)) for index in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive()
+
+    created = [result for result in results.values() if not isinstance(result, ValueError)]
+    rejected = [result for result in results.values() if isinstance(result, ValueError)]
+
+    assert len(created) == 1, f"Both requests created an administrator: {results}"
+    assert len(rejected) == 1
+    assert "Admin user already exists" in str(rejected[0])
+    assert user_service.count_admins() == 1
 
 
 def test_list_users(user_service: UserService):
@@ -270,3 +330,58 @@ def test_list_users(user_service: UserService):
 
     limited_users = user_service.list_users(limit=2)
     assert len(limited_users) == 2
+
+
+def test_get_many_returns_users_keyed_by_id(user_service: UserService):
+    """Batch lookup: dedups input, keys by user_id, and omits unknown ids."""
+    created = [
+        user_service.create(
+            UserCreateRequest(
+                email=f"batch{index}@example.com",
+                display_name=f"Batch User {index}",
+                password="TestPassword123",
+            )
+        )
+        for index in range(3)
+    ]
+
+    requested = [created[0].user_id, created[1].user_id, created[0].user_id, "does-not-exist"]
+    users = user_service.get_many(requested)
+
+    assert set(users) == {created[0].user_id, created[1].user_id}
+    assert users[created[0].user_id].email == "batch0@example.com"
+    assert users[created[1].user_id].display_name == "Batch User 1"
+
+
+def test_get_many_agrees_with_get_after_a_password_rotation(user_service: UserService):
+    """Every projection that yields a `UserDTO` must select the same columns.
+
+    `get_many` selected all of them but `token_epoch`, so the DTO fell back to the model
+    default of 0 — the value a never-rotated account has, which makes a revoked epoch
+    indistinguishable from a fresh one in any caller that reads it from a bulk lookup.
+    """
+    user = user_service.create(
+        UserCreateRequest(email="rotated@example.com", display_name="Rotated", password="TestPassword123")
+    )
+    user_service.update(user.user_id, UserUpdateRequest(password="DifferentPassword456"))
+
+    single = user_service.get(user.user_id)
+    assert single is not None
+    assert single.token_epoch > 0, "precondition: rotating the password advances the epoch"
+    assert user_service.get_many([user.user_id])[user.user_id] == single
+
+
+def test_get_many_with_no_ids_returns_empty(user_service: UserService):
+    assert user_service.get_many([]) == {}
+
+
+def test_get_many_chunks_beyond_sqlite_parameter_limit(user_service: UserService):
+    """More ids than SQLite's bound-parameter limit must not raise."""
+    user = user_service.create(
+        UserCreateRequest(email="chunked@example.com", display_name="Chunked", password="TestPassword123")
+    )
+    ids = [f"missing-{index}" for index in range(USER_LOOKUP_CHUNK_SIZE * 2 + 5)] + [user.user_id]
+
+    users = user_service.get_many(ids)
+
+    assert set(users) == {user.user_id}
