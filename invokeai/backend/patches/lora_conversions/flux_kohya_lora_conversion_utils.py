@@ -99,6 +99,9 @@ def lora_model_from_flux_kohya_state_dict(state_dict: Dict[str, torch.Tensor]) -
         (FLUX_LORA_T5_PREFIX, t5_grouped_sd),
     ]:
         for layer_key, layer_state_dict in grouped_sd.items():
+            for source_key in ("magnitude", "lora_magnitude_vector.weight"):
+                if source_key in layer_state_dict:
+                    layer_state_dict["dora_magnitude"] = layer_state_dict.pop(source_key)
             layers[model_prefix + layer_key] = any_lora_layer_from_state_dict(layer_state_dict)
 
     # Create and return the LoRAModelRaw.

@@ -1,6 +1,7 @@
 import pytest
 import torch
 
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
@@ -92,3 +93,19 @@ def test_lora_model_from_flux_diffusers_state_dict_extra_keys_error():
     # Check that an error is raised.
     with pytest.raises(AssertionError):
         lora_model_from_flux_diffusers_state_dict(state_dict, alpha=8.0)
+
+
+@pytest.mark.parametrize("magnitude_suffix", ["magnitude", "lora_magnitude_vector.weight"])
+def test_lora_model_from_flux_diffusers_dora_magnitude(magnitude_suffix: str):
+    prefix = "transformer.transformer_blocks.0.attn.to_out.0"
+    state_dict = {
+        f"{prefix}.lora_A.weight": torch.zeros(2, 5),
+        f"{prefix}.lora_B.weight": torch.zeros(7, 2),
+        f"{prefix}.{magnitude_suffix}": torch.arange(1, 8, dtype=torch.float32),
+    }
+
+    model = lora_model_from_flux_diffusers_state_dict(state_dict, alpha=None)
+    layer = model.layers["lora_transformer-double_blocks.0.img_attn.proj"]
+
+    assert isinstance(layer, DoRALayer)
+    assert layer.magnitude_is_out_dim is True

@@ -140,10 +140,10 @@ def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
     from LoKR layers so they fall through to the LoKR handler instead.
     """
     has_lokr = "lokr_w1" in layer_dict or "lokr_w1_a" in layer_dict
-    has_dora = "dora_scale" in layer_dict
-    if has_lokr and has_dora:
-        layer_dict = {k: v for k, v in layer_dict.items() if k != "dora_scale"}
-        logger.warning("Stripped dora_scale from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
+    dora_keys = {"dora_scale", "dora_magnitude"}.intersection(layer_dict)
+    if has_lokr and dora_keys:
+        layer_dict = {k: v for k, v in layer_dict.items() if k not in dora_keys}
+        logger.warning("Stripped DoRA magnitude from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
     return any_lora_layer_from_state_dict(layer_dict)
 
 
@@ -154,6 +154,8 @@ _KOHYA_KNOWN_SUFFIXES = [
     ".lora_down.weight",
     ".lora_up.weight",
     ".dora_scale",
+    ".lora_magnitude_vector.weight",
+    ".magnitude",
     ".alpha",
 ]
 
@@ -197,6 +199,8 @@ def _group_keys_by_layer(
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
                 key_name = suffix[1:]  # Remove leading dot
+                if key_name in {"lora_magnitude_vector.weight", "magnitude"}:
+                    key_name = "dora_magnitude"
                 break
 
         if layer_name is None:
@@ -220,6 +224,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
         }
         if alpha is not None:
             values["alpha"] = torch.tensor(alpha)
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         return values
     elif "lora_down.weight" in layer_dict:
         return layer_dict

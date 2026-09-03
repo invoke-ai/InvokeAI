@@ -114,7 +114,8 @@ def _convert_kohya_format(state_dict: Dict[str, torch.Tensor], alpha: float | No
         if model_path is None:
             continue  # Skip unrecognized layers
 
-        layer = any_lora_layer_from_state_dict(layer_dict)
+        values = _normalize_lora_keys(layer_dict, alpha)
+        layer = any_lora_layer_from_state_dict(values)
         final_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}{model_path}"
         layers[final_key] = layer
 
@@ -146,6 +147,11 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
 
 def _normalize_lora_keys(layer_dict: dict[str, torch.Tensor], alpha: float | None) -> dict[str, torch.Tensor]:
     """Normalize LoRA key names to internal format."""
+    layer_dict = dict(layer_dict)
+    for source_key in ("lora_magnitude_vector.weight", "magnitude"):
+        if source_key in layer_dict:
+            layer_dict["dora_magnitude"] = layer_dict.pop(source_key)
+
     if "lora_A.weight" in layer_dict:
         values: dict[str, torch.Tensor] = {
             "lora_down.weight": layer_dict["lora_A.weight"],
@@ -153,6 +159,9 @@ def _normalize_lora_keys(layer_dict: dict[str, torch.Tensor], alpha: float | Non
         }
         if alpha is not None:
             values["alpha"] = torch.tensor(alpha)
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         return values
     elif "lora_down.weight" in layer_dict:
         return layer_dict
@@ -164,14 +173,16 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     """Group state dict keys by layer path."""
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
+    suffix_to_value_key = {
+        ".lora_A.weight": "lora_A.weight",
+        ".lora_B.weight": "lora_B.weight",
+        ".lora_down.weight": "lora_down.weight",
+        ".lora_up.weight": "lora_up.weight",
+        ".dora_scale": "dora_scale",
+        ".lora_magnitude_vector.weight": "dora_magnitude",
+        ".magnitude": "dora_magnitude",
+        ".alpha": "alpha",
+    }
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -179,10 +190,10 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
 
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in suffix_to_value_key.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]
+                key_name = value_key
                 break
 
         if layer_name is None:

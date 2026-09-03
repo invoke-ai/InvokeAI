@@ -1,7 +1,9 @@
 """Tests for Wan LoRA state-dict conversion to ModelPatchRaw."""
 
+import pytest
 import torch
 
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import WAN_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import (
     _kohya_layer_to_diffusers_path,
@@ -173,3 +175,22 @@ class TestLoRAModelFromStateDict:
     def test_empty_state_dict(self):
         patch = lora_model_from_wan_state_dict({})
         assert len(patch.layers) == 0
+
+    @pytest.mark.parametrize("magnitude_suffix", ["magnitude", "lora_magnitude_vector.weight"])
+    def test_peft_dora_magnitude_is_preserved(self, magnitude_suffix: str):
+        in_dim, out_dim, rank = 5, 7, 2
+        magnitude = torch.arange(1, out_dim + 1, dtype=torch.float32)
+        prefix = "diffusion_model.blocks.0.self_attn.q"
+        state_dict = {
+            f"{prefix}.lora_A.weight": torch.zeros(rank, in_dim),
+            f"{prefix}.lora_B.weight": torch.zeros(out_dim, rank),
+            f"{prefix}.{magnitude_suffix}": magnitude,
+        }
+
+        patch = lora_model_from_wan_state_dict(state_dict)
+        layer = patch.layers[f"{WAN_LORA_TRANSFORMER_PREFIX}blocks.0.attn1.to_q"]
+
+        assert isinstance(layer, DoRALayer)
+        assert layer.magnitude_is_out_dim is True
+        assert torch.equal(layer.dora_scale, magnitude)
+        assert layer.get_weight(torch.randn(out_dim, in_dim)).shape == (out_dim, in_dim)

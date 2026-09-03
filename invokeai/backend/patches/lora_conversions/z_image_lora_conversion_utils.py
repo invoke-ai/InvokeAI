@@ -201,6 +201,9 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
         }
         if alpha is not None:
             values["alpha"] = torch.tensor(alpha)
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in layer_dict:
+                values[magnitude_key] = layer_dict[magnitude_key]
         return values
     elif "lora_down.weight" in layer_dict:
         # Already in internal format
@@ -225,14 +228,16 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
 
     # Known suffixes that indicate the end of a layer name
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
+    suffix_to_value_key = {
+        ".lora_A.weight": "lora_A.weight",
+        ".lora_B.weight": "lora_B.weight",
+        ".lora_down.weight": "lora_down.weight",
+        ".lora_up.weight": "lora_up.weight",
+        ".dora_scale": "dora_scale",
+        ".lora_magnitude_vector.weight": "dora_magnitude",
+        ".magnitude": "dora_magnitude",
+        ".alpha": "alpha",
+    }
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -241,10 +246,10 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
         # Try to find a known suffix
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in suffix_to_value_key.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]  # Remove leading dot
+                key_name = value_key
                 break
 
         if layer_name is None:

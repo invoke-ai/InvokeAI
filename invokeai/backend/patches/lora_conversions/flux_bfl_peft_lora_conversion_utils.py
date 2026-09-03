@@ -53,7 +53,7 @@ _DOUBLE_BLOCK_RE = re.compile(r"^double_blocks\.(\d+)\.(.+)$")
 _SINGLE_BLOCK_RE = re.compile(r"^single_blocks\.(\d+)\.(.+)$")
 
 # Weight key suffixes used by PEFT LoRA in BFL format.
-_BFL_PEFT_LORA_SUFFIXES = ("lora_A.weight", "lora_B.weight")
+_BFL_PEFT_LORA_SUFFIXES = ("lora_A.weight", "lora_B.weight", "lora_magnitude_vector.weight", "magnitude")
 
 # Weight key suffixes used by LyCORIS algorithms (LoKR, LoHA, etc.) in BFL format.
 # These are single-component suffixes (no dot), unlike the two-component PEFT suffixes.
@@ -193,6 +193,8 @@ def lora_model_from_flux_bfl_peft_state_dict(
             grouped_state_dict[layer_name]["lora_down.weight"] = value
         elif suffix == "lora_B.weight":
             grouped_state_dict[layer_name]["lora_up.weight"] = value
+        elif suffix in ("lora_magnitude_vector.weight", "magnitude"):
+            grouped_state_dict[layer_name]["dora_magnitude"] = value
         else:
             grouped_state_dict[layer_name][suffix] = value
 
@@ -238,6 +240,8 @@ def lora_model_from_flux2_bfl_peft_state_dict(
             grouped_state_dict[layer_name]["lora_down.weight"] = value
         elif suffix == "lora_B.weight":
             grouped_state_dict[layer_name]["lora_up.weight"] = value
+        elif suffix in ("lora_magnitude_vector.weight", "magnitude"):
+            grouped_state_dict[layer_name]["dora_magnitude"] = value
         else:
             grouped_state_dict[layer_name][suffix] = value
 
@@ -347,18 +351,25 @@ def _split_qkv_lora(
     lora_down = layer_sd["lora_down.weight"]  # [rank, hidden]
     lora_up = layer_sd["lora_up.weight"]  # [3*hidden, rank]
     alpha = layer_sd.get("alpha")
+    dora_scale = layer_sd.get("dora_scale")
+    dora_magnitude = layer_sd.get("dora_magnitude")
 
     # Split lora_up into 3 equal parts along dim 0
     up_q, up_k, up_v = lora_up.chunk(3, dim=0)
+    magnitude_parts = dora_magnitude.chunk(3, dim=0) if dora_magnitude is not None else (None, None, None)
 
     result = []
-    for key, up_part in [(q_key, up_q), (k_key, up_k), (v_key, up_v)]:
+    for key, up_part, magnitude_part in zip((q_key, k_key, v_key), (up_q, up_k, up_v), magnitude_parts, strict=True):
         sd: dict[str, torch.Tensor] = {
             "lora_down.weight": lora_down.clone(),
             "lora_up.weight": up_part,
         }
         if alpha is not None:
             sd["alpha"] = alpha
+        if dora_scale is not None:
+            sd["dora_scale"] = dora_scale.clone()
+        if magnitude_part is not None:
+            sd["dora_magnitude"] = magnitude_part
         result.append((key, sd))
 
     return result
