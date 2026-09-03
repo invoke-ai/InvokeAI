@@ -30,8 +30,9 @@ def is_state_dict_likely_in_flux_aitoolkit_format(
     if not _has_flux_layer_structure(state_dict):
         return False
 
-    # AIToolkit only produces standard PEFT LoRA (lora_A.weight / lora_B.weight).
-    # Exclude LyCORIS algorithm variants (LoKR, LoHA, etc.) which use different weight key suffixes.
+    # AIToolkit produces standard PEFT LoRA (lora_A.weight / lora_B.weight) and DoRA
+    # magnitude sidecars. Exclude LyCORIS algorithm variants (LoKR, LoHA, etc.) which
+    # use different weight key suffixes.
     # These are handled by the BFL PEFT converter instead.
     _LYCORIS_SUFFIXES = (
         "lokr_w1",

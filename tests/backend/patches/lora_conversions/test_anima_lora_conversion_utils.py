@@ -1,6 +1,8 @@
 import pytest
 import torch
 
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     ANIMA_LORA_QWEN3_PREFIX,
     ANIMA_LORA_TRANSFORMER_PREFIX,
@@ -228,3 +230,37 @@ def test_empty_state_dict_returns_empty_model():
     """An empty state dict should produce a ModelPatchRaw with no layers."""
     lora_model = lora_model_from_anima_state_dict({})
     assert len(lora_model.layers) == 0
+
+
+@pytest.mark.parametrize("magnitude_suffix", ["magnitude", "lora_magnitude_vector.weight"])
+def test_peft_dora_magnitude_is_preserved(magnitude_suffix: str):
+    in_dim, out_dim, rank = 5, 7, 2
+    magnitude = torch.arange(1, out_dim + 1, dtype=torch.float32)
+    prefix = "diffusion_model.blocks.0.cross_attn.q_proj"
+    state_dict = {
+        f"{prefix}.lora_A.weight": torch.zeros(rank, in_dim),
+        f"{prefix}.lora_B.weight": torch.zeros(out_dim, rank),
+        f"{prefix}.{magnitude_suffix}": magnitude,
+    }
+
+    model = lora_model_from_anima_state_dict(state_dict)
+    layer = model.layers[f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.cross_attn.q_proj"]
+
+    assert isinstance(layer, DoRALayer)
+    assert layer.magnitude_is_out_dim is True
+    assert torch.equal(layer.dora_scale, magnitude)
+    assert layer.get_weight(torch.randn(out_dim, in_dim)).shape == (out_dim, in_dim)
+
+
+def test_lokr_dora_magnitude_is_stripped():
+    prefix = "diffusion_model.blocks.0.cross_attn.q_proj"
+    state_dict = {
+        f"{prefix}.lokr_w1": torch.zeros(2, 2),
+        f"{prefix}.lokr_w2": torch.zeros(3, 3),
+        f"{prefix}.magnitude": torch.ones(6),
+    }
+
+    model = lora_model_from_anima_state_dict(state_dict)
+    layer = model.layers[f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.0.cross_attn.q_proj"]
+
+    assert isinstance(layer, LoKRLayer)
