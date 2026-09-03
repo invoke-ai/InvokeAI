@@ -6,7 +6,7 @@ import itertools
 import re
 from logging import Logger
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import torch
 
@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, set_fp8_compute_dtype
 
@@ -472,6 +473,22 @@ class ModelLoader(ModelLoaderBase):
         if isinstance(model, torch.nn.Module) and getattr(model, FP8_COMPUTE_DTYPE_ATTR, None) is not None:
             return model
 
+        # A checkpoint that already ships fp8 weights is running (or is about to run) on the fp8
+        # tensor cores. Layerwise casting would install hooks that restore the compute dtype before
+        # every forward, so `CustomLinear._can_use_fp8_matmul` would no longer see an fp8 weight and
+        # would silently fall back to the dequantized path — the VRAM toggle would make the model
+        # *slower* with no indication why. Storage has nothing to add here anyway: the weights are
+        # already 1 byte per parameter.
+        if isinstance(model, torch.nn.Module) and should_keep_fp8_weights(self._torch_device):
+            already_fp8 = count_fp8_weights(model)
+            if already_fp8:
+                self._logger.info(
+                    f"FP8 storage skipped for {config.name}: {already_fp8} weight(s) are already fp8 and "
+                    "are being run on the fp8 tensor cores (fp8_compute). Layerwise casting would "
+                    "disable that matmul without saving any further VRAM."
+                )
+                return model
+
         storage_dtype = torch.float8_e4m3fn
         compute_dtype = self._torch_dtype
 
@@ -517,6 +534,7 @@ class ModelLoader(ModelLoaderBase):
         storage_dtype: torch.dtype,
         compute_dtype: torch.dtype,
         extra_skip_patterns: tuple[str, ...] = (),
+        skip: Optional[Callable[[str, torch.nn.Module], bool]] = None,
     ) -> None:
         """Apply FP8 layerwise casting to a plain nn.Module.
 
@@ -529,6 +547,12 @@ class ModelLoader(ModelLoaderBase):
         `extra_skip_patterns` carries the model's own declared exclusions (see
         `_model_declared_skip_patterns`), which are model-specific and cannot be inferred from
         layer types or generic name patterns.
+
+        `skip` excludes further modules by (dotted name, module). Its one caller uses it to leave
+        scaled-fp8 layers alone: those already hold fp8 weights plus a `weight_scale`, and the cast
+        hooks installed here would upcast them *without* applying that scale — a silently wrong
+        weight. Casting only the remainder lets a partly-quantized checkpoint (fp8 language model,
+        bf16 visual tower) end up fully fp8-resident.
 
         Modules holding already-quantized weights are skipped regardless of their class. This is a
         backstop behind the format check in `_should_use_fp8`, which cannot see quantization that
@@ -547,6 +571,8 @@ class ModelLoader(ModelLoaderBase):
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
             if any(re.search(pattern, module_name) for pattern in skip_patterns):
+                continue
+            if skip is not None and skip(module_name, module):
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
