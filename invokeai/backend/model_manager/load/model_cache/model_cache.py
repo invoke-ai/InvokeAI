@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import wraps
 from logging import Logger
-from typing import Any, Callable, Dict, Generator, List, Optional, Protocol
+from typing import Any, Callable, Dict, Generator, List, NamedTuple, Optional, Protocol
 
 import psutil
 import torch
@@ -58,6 +58,124 @@ _DEFERRED_RECONCILE = object()
 _DEFERRED_STOP = object()
 
 
+class _AbandonedHolderRelease(NamedTuple):
+    """Deferred-work item: a LoadedModel wrapper was dropped without ever locking its record.
+
+    `held_first_use` records whether that wrapper had armed a first-use hold (see
+    CacheRecord.first_use_holds), so the release decrements only what its own wrapper armed — a
+    grace-only wrapper (one constructed while no worker was running to arm a hold) must not
+    consume a hold that belongs to a different, still-live wrapper of the same record.
+    `hold_epoch` is the CacheRecord.first_use_holds_epoch the hold was armed under; a release
+    from before a dead-worker zeroing sweep must not decrement a hold armed after it.
+
+    The record is referenced WEAKLY. Only a worker drains this queue, and an item can outlive
+    every chance to be drained: _dispatch_deferred's liveness gate is unsynchronized, so a
+    finalizer that read the worker slot just before it was retired still enqueues against a thread
+    that is alive only because it is unwinding, and on a shut-down cache no replacement worker is
+    guaranteed to start and drain it. A strong reference would pin that record — and through it
+    the model's whole CPU state dict — for the life of the process, while the store and the budget
+    both report the bytes as released.
+
+    Resolving weakly costs nothing. While the release still has work to do, the record is the live
+    occupant of its key in _cached_models, which holds it strongly; and a record already dropped
+    from there is one _release_abandoned_holder can do nothing useful for — everything past its
+    identity check is gated on live occupancy, and the hold decrement above that check is inert on
+    a detached record, since a detached record is never re-attached (put() mints a fresh
+    CacheRecord) and every reader of first_use_holds is itself gated on occupancy.
+    """
+
+    cache_entry_ref: "weakref.ReferenceType[CacheRecord]"
+    held_first_use: bool
+    hold_epoch: int
+
+
+class FirstUseClaim:
+    """Ownership of a first-use hold armed by `ModelCache.get_with_first_use_claim()`.
+
+    The hold is armed under the SAME lock acquisition as the lookup that produced the record,
+    which is what makes the shield gapless. Arming it from the LoadedModel constructor instead
+    (its original home) leaves the caller's whole get()->construct stretch unshielded, and that
+    stretch is not always a few instructions: the configured loader retrieves its record deep
+    inside `_load_and_cache` and does the shared-store shell registration and two returns before
+    `load_model` wraps it. An eviction landing in that gap — a shutdown sweep, a peer's reconcile
+    — detaches the record its holder is about to lock, releasing shared-store ownership while the
+    tensors live on, so a peer's reload of the key mints a duplicate canonical copy that the
+    budget counts once (JPPhoto review, 2026-08-30).
+
+    The claim releases its hold exactly once, whichever comes first:
+
+    - `release()`, called by the LoadedModel wrapper that adopted the claim when it reaches its
+      first lock (see `LoadedModelWithoutConfig._end_first_use_window`);
+    - its weakref finalizer, when the claim is dropped without that ever happening — with the
+      wrapper that adopted it (dropped un-entered), or with the frame that requested it, if the
+      load raised before any wrapper could be built. The finalizer route goes through
+      `ModelCache.release_first_use_grace`, so it never takes a lock on the collecting thread
+      (see that method), and it quotes the epoch the hold was armed under, so a hold that
+      dead-worker recovery already zeroed is never re-released against a successor hold.
+
+    An unadopted claim is therefore not a leak: dropping it is a complete release. That is what
+    lets the record be shielded from the moment it is looked up, before any wrapper exists to own
+    the shield.
+
+    A claim can also be armed with NO hold (`hold_epoch=None`): that is what a lookup hands out
+    while no deferred worker is running to carry a hold's finalizer release (a worker that could
+    not be started under thread exhaustion). Such a claim has nothing to decrement, but it is
+    still the owner of its window in the two ways that matter without a worker. Published on the
+    record by a claimed put() (see CacheRecord.admission_claim_ref), it keeps the admission's
+    eviction sweeps honest about whether the admitting load is still running — a fact that needs
+    no releaser to stay true. And its finalizer still travels the abandonment route, which on a
+    stale record queues the eviction that stale-ness owes; the queue keeps that item even with no
+    worker to drain it, so whichever worker runs next reclaims the record (see _dispatch_deferred
+    and _release_abandoned_holder).
+
+    A put() into a shut-down cache with no worker is the one place this is NOT enough — no worker
+    is guaranteed to ever run to drain that kept item, and no later cache operation is guaranteed
+    either — so put() refuses that admission outright rather than minting a claim for it (see
+    ModelCache.put()). A hold-less claim therefore only ever shields a live cache's admission, or
+    a lookup (get_with_first_use_claim) of a record that is already resident — including one the
+    shutdown sweep retained, whose eventual eviction the kept queue item does drive.
+    """
+
+    def __init__(self, cache: "ModelCache", cache_entry: CacheRecord, hold_epoch: Optional[int]) -> None:
+        self._cache = cache
+        self._cache_entry = cache_entry
+        self._hold_epoch = hold_epoch
+        # Seeded first so release() is well defined on a claim whose construction failed partway.
+        # It cannot make the construction atomic — weakref.finalize registers itself before it
+        # returns, so an async exception landing between that call and the store below leaves a
+        # live finalizer for a claim _claim_first_use is about to hand the hold back for, and that
+        # finalizer's later release is one this class cannot intercept. A one-bytecode window,
+        # unreachable without an asynchronous exception, and it costs at worst one holder's shield
+        # rather than a permanently shielded record.
+        self._finalizer: Optional[weakref.finalize] = None
+        # The finalizer's arguments keep the cache and the record alive for as long as the claim
+        # itself is — exactly the lifetime over which the release still has work to do.
+        self._finalizer = weakref.finalize(
+            self,
+            cache.release_first_use_grace,
+            cache_entry,
+            hold_epoch is not None,
+            hold_epoch if hold_epoch is not None else 0,
+        )
+        self._finalizer.atexit = False
+
+    def release(self) -> None:
+        """Release the hold now, synchronously. Idempotent.
+
+        Called from the adopting wrapper's first lock, which runs in an ordinary thread context
+        (never a finalizer), so the direct — locking — release is safe here.
+        """
+        finalizer, self._finalizer = self._finalizer, None
+        if finalizer is None:
+            return
+        if finalizer.detach() is None:
+            # Already dead or detached: a racing release() on this same claim has the hold.
+            # Releasing it again would decrement a hold armed by a different holder and unshield
+            # their window.
+            return
+        self._cache.release_first_use_hold(self._cache_entry, self._hold_epoch, admission_claim=self)
+
+
 def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queue: "queue.SimpleQueue[object]") -> None:
     """Drain one ModelCache's deferred-work queue until it is stopped or the cache is collected.
 
@@ -68,35 +186,75 @@ def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queu
     `weakref.finalize` registered alongside this thread (see ModelCache._ensure_deferred_worker)
     pushes _DEFERRED_STOP when the cache is collected, so a parked worker wakes and exits rather
     than leaking a thread per abandoned cache.
+
+    The worker outlives shutdown() on purpose: a record retained by the shutdown sweep because a
+    live LoadedModel wrapper was still inside its get()->lock() window has no future unlock() if
+    that wrapper is dropped un-entered — the wrapper's finalizer, carried by this worker, is the
+    only thing left that can evict the record and release its shared weights and budget bytes.
+
+    An exit that is NOT one of those two orderly endings runs ModelCache._recover_from_dead_worker
+    before the thread unwinds. Every shield this queue exists to release is granted only while a
+    worker is alive, so a worker that stops without a successor leaves those shields with nothing
+    to lift them; recovering from inside the dying thread makes that recovery independent of a
+    later admission, which after shutdown() may never come.
     """
-    while True:
-        work = work_queue.get()
-        cache = None
-        try:
-            if work is _DEFERRED_STOP:
-                return
+    stopped_on_purpose = False
+    try:
+        while True:
+            work = work_queue.get()
+            cache = None
+            cache_entry = None
+            try:
+                if work is _DEFERRED_STOP:
+                    stopped_on_purpose = True
+                    return
+                cache = cache_ref()
+                if cache is None:
+                    # The cache was collected; nothing can ever need doing again.
+                    stopped_on_purpose = True
+                    return
+                if work is _DEFERRED_RECONCILE:
+                    cache._reconcile_budget_if_pending()
+                else:
+                    assert isinstance(work, _AbandonedHolderRelease)
+                    cache_entry = work.cache_entry_ref()
+                    if cache_entry is not None:
+                        # Dequeued means gone: whatever happens to this item from here on — the
+                        # handler raising, this thread dying inside it, a fork snapshotting it
+                        # mid-drain — it will never be queued again, so the coalescing gate it
+                        # closed (CacheRecord.abandonment_release_pending) must open now, not in
+                        # the handler and not in a recovery that a raise or a fork can skip. A
+                        # finalizer landing between here and the handler queues at most one
+                        # duplicate, which drains as a no-op.
+                        cache_entry.abandonment_release_pending = False
+                        cache._release_abandoned_holder(cache_entry, work.held_first_use, work.hold_epoch)
+            except Exception:
+                if cache is not None:
+                    cache._logger.exception("Error processing deferred model-cache work")
+            finally:
+                # Drop both references before blocking on the next get(): locals stay bound for as
+                # long as this frame lives. `work` may carry a CacheRecord, which transitively holds
+                # its model's CPU weights — and _release_abandoned_holder can evict that very
+                # record, removing it from the cache AND subtracting its bytes from the RamBudget,
+                # so holding it would leave the budget under-reporting a model that is still
+                # resident. `cache` must go for the same reason this function takes a weakref at
+                # all, and `cache_entry` is the strong reference the queue deliberately does not
+                # keep — parking on the next get() while still holding it would defeat the point.
+                work = None
+                cache = None
+                cache_entry = None
+    finally:
+        # Reached only for an abnormal end (a BaseException — including one raised asynchronously
+        # into this thread — or a failure of work_queue.get() itself). The two orderly exits above
+        # both mean no shield can outlive the worker: _DEFERRED_STOP is pushed by the
+        # cache-collection finalizer, and a collected cache has no records left to shield.
+        if not stopped_on_purpose:
             cache = cache_ref()
-            if cache is None:
-                # The cache was collected; nothing can ever need doing again.
-                return
-            if cache._shutdown_event.is_set():
-                continue
-            if work is _DEFERRED_RECONCILE:
-                cache._reconcile_budget_if_pending()
-            else:
-                assert isinstance(work, CacheRecord)
-                cache._release_first_use_grace(work)
-        except Exception:
             if cache is not None:
-                cache._logger.exception("Error processing deferred model-cache work")
-        finally:
-            # Drop both references before blocking on the next get(): locals stay bound for as long
-            # as this frame lives. `work` may be a CacheRecord, which transitively holds its model's
-            # CPU weights — and _release_first_use_grace's release hook can evict that very record,
-            # removing it from the cache AND subtracting its bytes from the RamBudget, so holding it
-            # would leave the budget under-reporting a model that is still resident. `cache` must go
-            # for the same reason this function takes a weakref at all.
-            work = None
+                try:
+                    cache._recover_from_dead_worker(threading.current_thread())
+                except Exception:
+                    cache._logger.exception("Error recovering from a dead model-cache deferred-work thread")
             cache = None
 
 
@@ -562,27 +720,109 @@ class ModelCache:
 
     @synchronized
     def shutdown(self) -> None:
-        """Shutdown the model cache, cancelling any pending timers."""
+        """Shutdown the model cache: cancel any pending timers and evict the resident records."""
         if self._shutdown_event.is_set():
             return
         self._shutdown_event.set()
-        self._deferred_work_queue.put(_DEFERRED_STOP)
+        # The deferred worker is deliberately NOT stopped here. The sweep below can only mark a
+        # record stale when something still references it, and one of those referents — a live
+        # LoadedModel wrapper that has not yet locked its record — may simply be dropped instead
+        # of used. Its finalizer-initiated release, carried by the worker, is then the only event
+        # left that can evict the record; stopping the worker at shutdown would strand such
+        # records (and their shared-store references and budget bytes) for the life of the
+        # process. The worker parks on its queue and is stopped by the cache-collection finalizer
+        # registered in _ensure_deferred_worker when the ModelCache itself is finally dropped.
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
             self._timeout_timer = None
-        # Release the resident records' shared-weights references now, synchronously. A shut-down
-        # cache serves no more loads, and waiting for collection would leave the store's refcounts
-        # (and canonical tensors) to the wrappers' finalizers — which only ENQUEUE, and at teardown
-        # there may be no later store operation to drain the queue. shutdown() runs in a normal
-        # thread context, so the direct (locking) release is safe here.
-        for cache_entry in self._cached_models.values():
-            cache_entry.cached_model.release_shared_weights()
+        # If no live worker remains, the shields it was carrying releases for have nothing left to
+        # lift them and would make the sweep below stale-retain their records forever: the
+        # wrappers' finalizer releases were (or will be) dropped by the dispatch check, and no
+        # unlock() is coming for a never-locked holder. Lift them now so the sweep can evict those
+        # records (see _recover_stranded_shields for the trade this takes).
+        #
+        # The condition is "no live worker", not "a dead thread still in the slot": a worker that
+        # ran its own dying recovery retires the slot, and an empty slot means just as surely that
+        # nothing is left to carry a release. Keying on the dead thread would skip this lift in
+        # exactly the case the dying recovery deliberately leaves for it — a grace it declined to
+        # touch because the cache was still live at the time.
+        if self._deferred_work_thread is None or not self._deferred_work_thread.is_alive():
+            self._recover_stranded_shields()
+        # Evict the resident records now rather than merely releasing their shared-store
+        # references. Releasing while retaining the records would make the accounting lie two
+        # ways: the store stops counting bytes whose tensors the retained wrappers still hold (so
+        # a post-shutdown load of the same key on a peer cache registers a duplicate canonical
+        # alongside the still-resident released copy), and a later eviction of such a record —
+        # put() after shutdown() is reachable, see the note in put() — reads uses_shared_weights
+        # as already-False and debits the non-shared budget for bytes that were admitted as
+        # shared. Routing through _delete_cache_entry() keeps store ownership until the record
+        # itself goes away, so the accounting stays truthful at every point. The release must be
+        # synchronous regardless: waiting for collection would leave the refcounts to the
+        # wrappers' finalizers — which only ENQUEUE, and at teardown there may be no later store
+        # operation to drain the queue. shutdown() runs in a normal thread context, so the direct
+        # (locking) release inside _delete_cache_entry() is safe here.
+        #
+        # Records still in use keep their references: entries locked by an in-flight generation
+        # (Invoker.stop() stops the model manager before the session processor, whose workers are
+        # cancelled but not joined) and entries a live LoadedModel wrapper has retrieved but not
+        # yet locked (first_use_holds) are marked stale instead. The eventual release evicts them
+        # through this same path: unlock() once the generation lets go, or the wrapper's
+        # abandonment finalizer (via the deferred worker, see _release_abandoned_holder) if the
+        # wrapper is dropped without ever locking. Without the window check, shutdown() racing the
+        # gap between the retrieval and the wrapper's __enter__() would evict the very record its
+        # holder is about to lock: the holder would proceed on a detached record (the tolerated
+        # issue-7513 path) whose shared-store ownership was just released, so a peer's reload of
+        # the same key would mint a duplicate canonical copy while the budget counted only one. A
+        # record never released keeps its bytes — and its accounting — until process exit, which
+        # is the truthful description of a model that really is still resident.
+
+        # An admission whose load never came back for it is NOT retained here, and needs no
+        # special case to avoid it: the loaders claim their admissions (put(claim_admission=True)),
+        # so a load cancelled or errored between its put() and its retrieval drops that claim by
+        # dying, and the claim's release — the same abandonment path a dropped LoadedModel takes —
+        # evicts the record with its shared-store reference and its budget bytes. Without it, the
+        # put()-set grace on such a record had no releaser left after shutdown (its other two are
+        # the loader's own get() -> lock() and the sweep at the top of the NEXT put(), which is no
+        # longer guaranteed to run), and the sweep below stale-RETAINED the record for the life of
+        # the cache object (JPPhoto review, 2026-08-30).
+        #
+        # Retiring the flag here instead — the obvious shortcut — is not safe: it is unowned, so
+        # a standing grace does not mean nobody is still working on the record. It is equally the
+        # state of a load still between its put() and its retrieval, and of a live un-entered
+        # LoadedModel wrapper whose hold a worker death zeroed. Evicting either would be the very
+        # accounting lie this method exists to avoid — the holder's local still holds the tensors
+        # whose shared-store ownership the eviction releases, so a peer's reload mints a duplicate
+        # canonical the budget counts once — on top of failing an in-flight load with an
+        # IndexError from a retrieval that no longer finds its own model.
+        #
+        # Marked stale BEFORE the shield is consulted, not after. A hold-less abandonment
+        # (release_first_use_grace) decides lock-free whether it owes the queue an eviction: it
+        # clears its grace, then reads is_stale, and queues nothing for a record that is not
+        # stale — the record is ordinarily evictable, so nothing is owed. Consulting the shield
+        # first and marking afterwards opens a two-step window that such a finalizer can land
+        # in: the shield is read as standing, the finalizer clears it and reads not-stale, and
+        # the mark then retains a record with no lock, no shield, no queued item and nothing
+        # left to evict it. Marking first closes it in both orders: a finalizer that reads the
+        # mark queues the eviction; one that read before it was written has already cleared its
+        # shield (the clear precedes the read), so the check below finds the record unshielded
+        # and evicts it here. The same holds for a claim dying concurrently — its weak reference
+        # is dead before its finalizer runs. A record evicted below carries a stale mark nobody
+        # will read; every later reader of a detached record is gated on identity first.
+        for cache_entry in list(self._cached_models.values()):
+            cache_entry.is_stale = True
+            if not (cache_entry.is_locked or cache_entry.in_first_use_window):
+                self._delete_cache_entry(cache_entry)
 
     @synchronized
     @record_activity
     def put(
-        self, key: str, model: AnyModel, execution_device: Optional[torch.device] = None, prefetch: bool = False
-    ) -> None:
+        self,
+        key: str,
+        model: AnyModel,
+        execution_device: Optional[torch.device] = None,
+        prefetch: bool = False,
+        claim_admission: bool = False,
+    ) -> Optional[FirstUseClaim]:
         """Add a model to the cache.
 
         Args:
@@ -593,13 +833,24 @@ class ModelCache:
             prefetch: The model is being cached opportunistically (e.g. the unused submodels of a
                 single-file pipeline load) and no loader will retrieve it after this call. It is
                 admitted without the post-admission grace, so budget reconciles may evict it
-                immediately.
+                immediately -- and it is refused outright once the cache has shut down, where
+                nothing is guaranteed to evict it either.
+            claim_admission: Shield the new record with an owned first-use hold, alongside the
+                swept post-admission grace, and return the claim that owns it (None only if this
+                call was a no-op because the key was already resident; a claim armed while no
+                worker could be started carries no hold, but still owns the window — see
+                FirstUseClaim).
+                Every loader that is going to retrieve the record it just admitted should ask for
+                one and hold it until its retrieval has armed a claim of its own: an owned shield
+                cannot outlive its load, so a load that is cancelled or errors before its
+                retrieval releases the admission by dying, instead of leaving a grace standing
+                that nothing can clear (see shutdown()).
         """
         if key in self._cached_models:
             self._logger.debug(
                 f"Attempted to add model {key} ({model.__class__.__name__}), but it already exists in the cache. No action necessary."
             )
-            return
+            return None
 
         # Start (or revive) the worker before mutating cache state. Every deferred task concerns an
         # admitted record, so this makes later dispatch queue-only while avoiding a thread for an
@@ -611,11 +862,87 @@ class ModelCache:
         # its final one, so a flag that survives to the next admission is stale — its loader
         # either errored out before retrieving the model or dropped the LoadedModel without ever
         # locking it. Clear such flags so an orphaned record cannot dodge budget reconciles
-        # indefinitely. (An entry retrieved but not yet locked loses its shield here; if a
-        # reconcile then evicts it, lock() falls back to the tolerated issue-7513 path and
+        # indefinitely. Only the put()-set grace is swept: an entry whose LoadedModel wrapper is
+        # already constructed is tracked by first_use_holds instead, which a concurrent cold load
+        # must NOT clear — a node may retrieve several models before entering any of their
+        # contexts — and whose release is guaranteed by the wrapper's finalizer rather than by
+        # this sweep. (An entry retrieved but with no wrapper hold yet loses its shield here; if
+        # a reconcile then evicts it, lock() falls back to the tolerated issue-7513 path and
         # proceeds on the detached record.)
         for stale_entry in self._cached_models.values():
             stale_entry.awaiting_first_use = False
+
+        # A shut-down cache that could not start a worker just now has no releaser to offer any
+        # new admission and no guarantee of a future cache operation to stand in for one: no
+        # worker to drain an abandonment release, and no later put() to run make_room or the
+        # sweep below. A record admitted here whose loader then dies before retrieving it — a
+        # claimed admission's claim dropped, a wrapper dropped un-entered — would be stale,
+        # unshielded and pinned, with its shared-store reference and budget bytes, for the life
+        # of the cache object; the queued abandonment release its finalizer leaves cannot help,
+        # because nothing will drain it (JPPhoto review, 2026-09-04). So every admission is
+        # refused in this state, the same standard the post-shutdown prefetch is already refused
+        # under below, and for the same reason. A load racing shutdown into a thread-exhausted
+        # process is failing regardless (its retrieval raises IndexError, exactly as a refused
+        # prefetch's would); refusing here trades that already-doomed load for the certainty that
+        # nothing is left pinned.
+        #
+        # First, though, reclaim any record ALREADY stranded this way — one admitted while a
+        # worker was alive, retained by the shutdown sweep for a live holder, then orphaned when
+        # that worker died with the holder's abandonment release undrained. This is the same
+        # terminal sweep the dying worker runs (_recover_from_dead_worker), making the same
+        # trade: a live un-entered wrapper whose hold the recovery above just zeroed loses its
+        # record here and falls back to the tolerated issue-7513 detached path, while a record
+        # whose admitting load is still running is owned by the loader's claim
+        # (CacheRecord.admission_claim_ref) and is left alone. It is run here, not in
+        # _ensure_deferred_worker's failure branch, because that branch also runs under
+        # register_first_use_hold in the same lock frame as a lookup, where the record just
+        # handed to the retriever is exactly what the sweep would evict; in put() the only record
+        # in anyone's hands is the one this call has not inserted yet (cold loads are serialized
+        # under MODEL_LOAD_LOCK's write lock, so no other load is between its own put() and its
+        # retrieval while this one runs).
+        if self._shutdown_event.is_set() and (
+            self._deferred_work_thread is None or not self._deferred_work_thread.is_alive()
+        ):
+            self._evict_stale_unshielded_entries()
+            self._logger.debug(
+                f"Refusing admission of {key} into a shut-down cache with no deferred worker: "
+                "nothing would be guaranteed to release it."
+            )
+            return None
+
+        # A prefetch admission into a cache that has already shut down has no *guaranteed*
+        # releaser -- the same standard the post-admission grace is withheld under, below.
+        # Prefetch is the promise that no loader will come back for this record, so there is no
+        # get() -> lock() -> unlock() to run the stale eviction below, no wrapper whose finalizer
+        # could carry an abandonment release, and no claim whose expiry could stand in for
+        # either. What is left are the paths that may or may not run -- another admission's
+        # make_room, a budget reconcile, a peer's eviction request, the eviction sweep of a worker
+        # death -- and after shutdown not one of them is guaranteed to come. The record is
+        # therefore reclaimable only by luck, and otherwise holds its model, its shared-store
+        # reference and its budget charge until the cache object is collected.
+        #
+        # Refusing costs only a reload. The sole caller (the single-file pipeline's submodel
+        # prefetch) takes the submodel it was actually asked for from the pipeline object, not
+        # from the cache, and discards the rest with the pipeline; a later load reads them from
+        # disk again.
+        #
+        # Placement, each bound of which is load-bearing:
+        # - after _ensure_deferred_worker() above, because a post-shutdown prefetch must still
+        #   revive the worker that carries the shutdown-retained records' abandonment releases;
+        # - after the stale-grace sweep above, because on a shut-down cache with a LIVE worker
+        #   that sweep is the only backstop a stale grace has left (shutdown() runs the recovery
+        #   only when no worker is alive), so returning above it would strand the very kind of
+        #   record this method is careful never to strand. (The worker-less shut-down case has
+        #   already returned above — every admission is refused there, prefetch included — so
+        #   this refusal only ever fires with a LIVE worker present.);
+        # - before _make_room_internal below, so nothing resident is evicted to house a model this
+        #   call is about to refuse.
+        if prefetch and self._shutdown_event.is_set():
+            self._logger.debug(
+                f"Refusing prefetch admission of {key} into a cache that has been shut down: "
+                "nothing will retrieve it, and nothing is guaranteed to release it."
+            )
+            return None
 
         size = calc_model_size_by_data(self._logger, model)
         self._make_room_internal(size)
@@ -684,17 +1011,53 @@ class ModelCache:
         # ordinarily evictable.
         #
         # Neither does an admission made while no deferred worker is running to release the grace
-        # if the loader abandons the model. Both states are reachable — put() after shutdown()
-        # (Invoker.stop() stops model_manager before session_processor, so an in-flight generation
-        # can land here), and a worker that could not be started under thread exhaustion — and in
-        # both the flag would never be cleared, leaving the record permanently invisible to every
-        # asynchronous eviction path while its bytes stay charged to the shared budget. Without the
-        # grace the record is merely ordinarily evictable; lock() still clears the flag on the
-        # normal path, so nothing changes when the worker is healthy.
+        # if the loader abandons the model (a worker that could not be started under thread
+        # exhaustion, or one lost to an unexpected error before this put()'s restart attempt
+        # could succeed): the flag would never be cleared, leaving the record permanently
+        # invisible to every asynchronous eviction path while its bytes stay charged to the
+        # shared budget. Without the grace the record is merely ordinarily evictable; lock()
+        # still clears the flag on the normal path, so nothing changes when the worker is
+        # healthy.
+        #
+        # Nor does an admission after shutdown() (Invoker.stop() stops model_manager before
+        # session_processor, so an in-flight generation can land here). The grace has exactly two
+        # releasers: the loader's own forward progress (get() -> lock(), or the wrapper's
+        # abandonment finalizer once one exists), and the sweep at the top of the NEXT put(). A
+        # load cancelled between this put() and the LoadedModel's construction — no wrapper, so no
+        # finalizer — depends entirely on that sweep, and after shutdown no further put() is
+        # guaranteed to come: the flag would stand for the life of the process, hiding the record
+        # from every asynchronous eviction path while its bytes stay charged to the shared budget.
+        # Withholding it costs only the shield: the record is ordinarily evictable, is_stale below
+        # makes its eventual release evict it, and a loader that does come back gets the same
+        # first_use_holds shield as any other wrapper. A loader that claimed its admission is
+        # covered between put() and get() regardless, by the claim it holds (see the arming at
+        # the end of this method) — a shield that needs no worker and no grace. An unclaimed
+        # admission is not: if an eviction wins the race to it while its loader is still between
+        # put() and get(), that get() raises rather than falling back — the same trade the
+        # synchronous paths (make_room, drop_model) have always made against this flag, taken
+        # here only for admissions into an already-shut-down cache.
+        #
+        # A claimed admission gets the grace too, but as a courtesy rather than a guarantee: what
+        # actually shields that window is the record's weak reference to the claim (see the
+        # arming at the end of this method, and CacheRecord.admission_claim_ref). Neither flag is
+        # dependable on its own here — _clear_stranded_first_use_holds zeroes every hold the
+        # moment the deferred worker dies, and the grace is unowned, so any other holder's
+        # abandonment or the next admission's sweep clears it on behalf of whoever ran. Shielding
+        # the window with either alone turns one of those ordinary events into a failed load: the
+        # record is evicted by the next reconcile while its loader still holds the tensors, and
+        # the loader's own retrieval then raises.
         worker_running = self._deferred_work_thread is not None and self._deferred_work_thread.is_alive()
+        shutting_down = self._shutdown_event.is_set()
         cache_record = CacheRecord(
-            key=key, cached_model=wrapped_model, awaiting_first_use=not prefetch and worker_running
+            key=key,
+            cached_model=wrapped_model,
+            awaiting_first_use=not prefetch and worker_running and not shutting_down,
         )
+        # An admission after shutdown() (reachable, see above) missed the shutdown sweep, so
+        # nothing would ever evict it: mark it stale at birth so its final release — unlock(), or
+        # the abandonment path — evicts it instead of leaving it resident until process exit.
+        if shutting_down:
+            cache_record.is_stale = True
         self._cached_models[key] = cache_record
         self._cache_stack.append(key)
         # Account this model's RAM in the global budget. Shared weights are tracked once by the
@@ -723,6 +1086,39 @@ class ModelCache:
             # self here would be worse than useless: _make_room_internal already evicted
             # everything unlocked, so the only entry a self-reconcile could ever claim is the
             # model just admitted — evicting it out from under its own loader.)
+
+        # Shield the put() -> retrieval window with an owned hold on top of the grace above when
+        # the caller asked for one. The claim lives in the loader's frame, so a load cancelled or
+        # errored before its retrieval releases it by dying — which is what lets shutdown() retain
+        # a claimed admission for a load that is really still in flight (whose local still holds
+        # these very tensors) while retiring the unowned graces that nothing can release. The
+        # loader hands the shield over to its retrieval's own claim and drops this one.
+        #
+        # Armed last, once the admission is fully committed. _claim_first_use can raise
+        # (weakref.finalize allocates, and this cache runs at the RAM ceiling by design), and a
+        # raise between the record's insertion above and the budget accounting would leave a
+        # resident, store-owning record that the budget never counted — whose eventual eviction
+        # then debits bytes it never added, permanently stealing another record's charge (the
+        # debit is clamped to what this cache has tracked). Everything above this point is
+        # committed, so the worst a failure here costs is the shield: the record is an ordinary
+        # graced admission, exactly as if the caller had not asked to claim it.
+        if not claim_admission or prefetch:
+            return None
+        admission_claim = self._claim_first_use(cache_record)
+        if admission_claim is not None:
+            # The record's weak reference to the claim — not the hold, and not the grace — is what
+            # actually shields this window (see CacheRecord.admission_claim_ref): it expires with
+            # the loader's frame, so no event has to release it, and neither a worker death
+            # (which zeroes holds) nor another holder's abandonment (which clears the grace) can
+            # strip it while the load is still running. On a LIVE cache the claim is minted even
+            # when no worker is running to carry a hold (a hold-less claim, hold_epoch=None): the
+            # record is not stale there, so it just becomes ordinary cache content once the load
+            # is done, and the ownership still keeps a concurrent worker-less admission's sweep
+            # from mistaking a running load for an abandoned one. On a shut-down worker-less
+            # cache the admission never reaches this point — it was refused above — so no
+            # unreleasable claimed record is ever created.
+            cache_record.admission_claim_ref = weakref.ref(admission_claim)
+        return admission_claim
 
     def _warn_once(self, topic: str, device: torch.device, message: str) -> None:
         """Log `message` the first time `topic` arises for `device`.
@@ -770,8 +1166,10 @@ class ModelCache:
             if self._ram_budget is not None and self._budget_reconcile_pending.is_set() and not self._lock._is_owned():
                 self._dispatch_deferred(_DEFERRED_RECONCILE)
 
-    def release_first_use_grace(self, cache_entry: CacheRecord) -> None:
-        """Make an abandoned, never-locked record available for budget eviction.
+    def release_first_use_grace(
+        self, cache_entry: CacheRecord, held_first_use: bool = False, hold_epoch: int = 0
+    ) -> None:
+        """Make an abandoned, never-locked record available for eviction again.
 
         Called from a `weakref.finalize` callback (see LoadedModelWithoutConfig), which runs at an
         arbitrary decref/garbage-collection point in an arbitrary thread. That thread may already
@@ -790,13 +1188,57 @@ class ModelCache:
         The work is therefore handed to the cache's background worker, exactly as
         cached_model_keys() does with its own reconcile. SimpleQueue.put() is reentrant and never
         waits on the cache, store or budget locks, so it is safe from a finalizer.
+
+        `held_first_use` says whether the dropped wrapper had armed a first-use hold (see
+        register_first_use_hold); the deferred release decrements only what that wrapper armed,
+        and only while `hold_epoch` still matches the record's — a hold zeroed by dead-worker
+        recovery must not be re-released against a successor hold.
+
+        A hold-less abandonment (a wrapper or claim built while no worker was running to arm a
+        hold) has nothing to decrement, and its two effects are handled differently:
+
+        - The grace is cleared HERE, lock-free. That is safe for the same reason the read below
+          is: the flag is monotonic (put() sets it on a brand-new record and nothing sets it
+          again), so a clear from any thread at any point is one the record's other releasers
+          would have made anyway, only later. Clearing it through the worker instead is what let
+          the queue grow without bound: while no worker could be started, every warm get() whose
+          wrapper was dropped un-entered enqueued one more item, and nothing short of a lock() or
+          another admission ever cleared the flag that kept them coming (JPPhoto review,
+          2026-09-04).
+        - The eviction a stale record owes still needs the cache lock, so it is queued — but at
+          most once per record (CacheRecord.abandonment_release_pending, re-opened by the worker
+          the moment it dequeues the item), since one queued eviction is as good as any number. A record that is not stale owes nothing: with the
+          grace cleared it is ordinarily evictable again. What may still be owed is a budget
+          reconcile that was waiting on exactly this record becoming evictable (a peer over the
+          shared cap asked this cache to shed, and the graced record was all it had): the drained
+          item used to run that reconcile from the worker's release hook, so the worker is still
+          woken for it — with a reconcile item, which _dispatch_deferred drops while no worker
+          runs, and which the next cache operation's release hook makes redundant anyway.
+
+        Hold-carrying releases are never coalesced. Each one retires exactly one hold, and their
+        count is bounded by the holds themselves, which are armed only while a worker is alive.
         """
-        # Unsynchronized read: the flag is monotonic (put() is the only writer that sets it, and
-        # only on a brand-new record), so a False reading is always final and there is nothing to
-        # release. Losing a race here at worst queues work that no-ops under the lock.
-        if not cache_entry.awaiting_first_use:
-            return
-        self._dispatch_deferred(cache_entry)
+        # Unsynchronized reads: awaiting_first_use and is_stale are both monotonic (put() is the
+        # only writer that sets the grace, and only on a brand-new record; is_stale is only ever
+        # set), and a caller passing held_first_use owns the hold it is releasing, so a
+        # nothing-to-release reading is final. Losing a race here at worst queues work that
+        # no-ops under the lock. The one ordering that matters is against the stale-marking
+        # sweep in shutdown(): the grace is cleared BEFORE is_stale is read, and shutdown()
+        # writes the mark BEFORE it consults the shield, so a not-stale reading here means the
+        # clear already preceded shutdown()'s look and the sweep itself evicts the record.
+        if not held_first_use:
+            cache_entry.awaiting_first_use = False
+            if not cache_entry.is_stale:
+                if self._ram_budget is not None and self._budget_reconcile_pending.is_set():
+                    self._dispatch_deferred(_DEFERRED_RECONCILE)
+                return
+            # Two finalizers racing this unsynchronized check can both pass it and queue two
+            # items; the second drains as a no-op. What matters is that a third cannot follow
+            # while one is still queued.
+            if cache_entry.abandonment_release_pending:
+                return
+            cache_entry.abandonment_release_pending = True
+        self._dispatch_deferred(_AbandonedHolderRelease(weakref.ref(cache_entry), held_first_use, hold_epoch))
 
     def _ensure_deferred_worker(self) -> None:
         """Start the background worker if it is not currently running. Caller must hold the lock.
@@ -808,14 +1250,19 @@ class ModelCache:
         record would keep shielding an idle cache from eviction, which is exactly the failure this
         mechanism exists to prevent.
 
-        Never revives the worker after shutdown(): that call's `_DEFERRED_STOP` is still queued, so
-        a new thread would consume it and exit immediately, and a shut-down cache has no deferred
-        work worth doing.
+        Revival applies after shutdown() too: the worker is what carries abandonment releases for
+        the records the shutdown sweep retained, so a post-shutdown admission must restore it the
+        same as any other.
         """
-        if self._shutdown_event.is_set():
-            return
         if self._deferred_work_thread is not None and self._deferred_work_thread.is_alive():
             return
+        # No worker is running. Recover unconditionally rather than only when a dead thread is
+        # still in the slot: the previous worker may have died without running its own recovery (a
+        # fork, or a death this call raced), or its recovery may have failed partway through and
+        # retired the slot on the way out. The sweep is idempotent and costs nothing on a cache
+        # that has no shields standing, so re-running it at every worker start is what makes a
+        # failed recovery retryable.
+        self._recover_stranded_shields()
         thread = threading.Thread(
             target=_run_deferred_work,
             args=(weakref.ref(self), self._deferred_work_queue),
@@ -827,9 +1274,17 @@ class ModelCache:
         except RuntimeError:
             # Thread/pid exhaustion (RLIMIT_NPROC, a container's pids.max). Deferred work is an
             # optimization, so it must not take the model load that this put() is completing down
-            # with it. _dispatch_deferred drops work while no worker is running, and the next put()
-            # both retries the start and clears stale grace flags itself, so no record can stay
+            # with it. _dispatch_deferred drops reconciles while no worker is running (it keeps
+            # abandonment releases, whose holders are already gone), and the next put() both
+            # retries the start and clears stale grace flags itself, so no record can stay
             # shielded from eviction indefinitely.
+            #
+            # Not evicted here, deliberately, even on a shut-down cache where a failed start means
+            # nothing is coming: this method also runs from register_first_use_hold, in the same
+            # lock frame as the lookup that just handed a record to its retriever, and that record
+            # — stale at birth after shutdown, with no hold this call could arm — is exactly what
+            # a sweep here would evict, out from under the caller. put() runs that sweep instead,
+            # where the only record in anyone's hands is the one it has not inserted yet.
             self._logger.warning(
                 "Could not start the model-cache deferred-work thread; deferred cache work is disabled until the "
                 "next model admission."
@@ -848,33 +1303,263 @@ class ModelCache:
 
         Neither caller may block: release_first_use_grace() runs inside a weakref finalizer (see its
         docstring) and cached_model_keys() has a no-stall contract. `SimpleQueue.put()` satisfies
-        both, but only the worker ever drains the queue, so enqueueing while no worker is running
-        would grow it without bound — and, for a CacheRecord, pin that model's CPU weights for the
-        life of the process. Drop the item instead.
+        both, and only the worker ever drains the queue, so what to do while no worker is running
+        differs by the kind of work.
 
-        Dropping loses nothing real, because put() only grants the first-use grace when a worker is
-        running to release it (see put()). So a dropped CacheRecord is one that was never shielded
-        from eviction in the first place, and a dropped reconcile is re-run by the synchronized
-        release hook of the next cache operation — put() additionally clears any stale grace flags
-        itself. What must never happen is a record that is shielded with nothing left to unshield
-        it; that is what the pairing of these two rules prevents.
+        A reconcile is dropped: cached_model_keys() can request one on every call, so keeping them
+        would grow the queue without bound, and the synchronized release hook of the next cache
+        operation re-runs it anyway.
 
-        A shutdown() landing between the check and the put() can still strand a single item in the
-        queue. The cache is being torn down at that point and the cost is bounded by one record, so
-        that race is tolerated rather than paid for with a lock this method cannot take.
+        An abandonment release is KEPT. Its holder is already gone — finalizers fire once — so no
+        lock, no unlock and no second finalizer is ever coming for that record; this item is the
+        only thing left that can retire it. Dropping it is what leaves a record the shutdown sweep
+        retained resident, stale and charged for the life of the process. No later sweep can repair
+        that, either: dead-worker recovery zeros the record's hold, and from that moment a record
+        whose holder is gone looks exactly like one a live wrapper is still holding, where
+        retention is not merely acceptable but required (evicting it would release shared-store
+        ownership while the tensors live on — see _evict_stale_unshielded_entries). Keeping the
+        item is what preserves that distinction: whichever worker runs next drains it, and
+        _release_abandoned_holder acts on the record's own evidence instead of on a guess.
+
+        The backlog this can build is bounded, in two parts. A hold-carrying item is one per hold
+        abandoned while no worker runs, and a hold is only ever armed while a worker is alive, so
+        those are capped by the holders that existed at the last worker's death. A hold-less item
+        is at most one per record between drains: release_first_use_grace clears the grace itself
+        and queues only the eviction a stale record owes, coalesced through
+        CacheRecord.abandonment_release_pending — so a warm get() whose wrapper is dropped
+        un-entered, repeated indefinitely under thread exhaustion, contributes one item, not one
+        per repetition. An item whose record has since gone drains as a no-op.
+
+        The shields themselves are still lifted by the dead-worker recovery rather than by this
+        queue — put()'s grace and register_first_use_hold's holds are both granted only while a
+        worker is running, and put() sweeps stale grace flags itself. What must never happen is a
+        record that is shielded with nothing left to unshield it; that is what the pairing of these
+        rules prevents.
+
+        The liveness gate is deliberately unsynchronized (a finalizer must not take the cache
+        lock), so it is only advisory: a caller that read the slot just before a dying worker
+        retired it still enqueues against a thread that is alive only because it is unwinding, and
+        and that item may never be drained — no replacement worker is guaranteed to start on a
+        shut-down cache. _AbandonedHolderRelease therefore holds its record weakly, so a stranded
+        item pins nothing. (One that IS drained later, by a replacement worker, is harmless: the
+        epoch bump from the recovery blocks its hold decrement, and its record is by then either
+        gone or past the point where clearing an orphaned grace matters.)
         """
-        if self._shutdown_event.is_set():
-            return
         thread = self._deferred_work_thread
         if thread is None or not thread.is_alive():
-            return
+            if not isinstance(work, _AbandonedHolderRelease):
+                return
         self._deferred_work_queue.put(work)
 
     @synchronized
-    def _release_first_use_grace(self, cache_entry: CacheRecord) -> None:
-        """Clear an abandoned record's grace, then let the release hook reconcile the budget."""
-        if self._cached_models.get(cache_entry.key) is cache_entry and not cache_entry.is_locked:
+    def register_first_use_hold(self, cache_entry: CacheRecord) -> Optional[int]:
+        """Shield a record while a holder is between retrieving it and its first lock. Returns the
+        hold's epoch when armed, None when it could not be.
+
+        Normally reached through get_with_first_use_claim(), which arms the hold in the same lock
+        acquisition as the lookup; called directly only by a LoadedModel wrapper built from a
+        record that was retrieved with plain get().
+
+        The eviction sweeps treat a held record like a locked one (see
+        CacheRecord.in_first_use_window) — in particular, shutdown() retains it with its
+        shared-store ownership and budget accounting intact instead of evicting it out from under
+        the holder. The caller (LoadedModelWithoutConfig) releases the hold exactly once: via
+        release_first_use_hold() on its first lock, or via its weakref finalizer if it is dropped
+        without ever locking — both quoting the returned epoch, so a hold that dead-worker
+        recovery already zeroed is never re-released against a successor (see
+        CacheRecord.first_use_holds_epoch). Because the finalizer route travels through the
+        deferred worker, the hold is only granted while a worker is running to carry it — the
+        same liveness gate as put()'s admission grace — after first attempting to revive a dead
+        worker, which also clears any holds stranded by the death (see _ensure_deferred_worker).
+
+        Not armed for a record that is no longer the occupant under its key: an eviction already
+        won the race against this wrapper's construction, the tolerated issue-7513 detached path
+        is already in effect, and a hold on a detached record shields nothing.
+        """
+        self._ensure_deferred_worker()
+        if self._deferred_work_thread is None or not self._deferred_work_thread.is_alive():
+            return None
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
+            return None
+        cache_entry.first_use_holds += 1
+        return cache_entry.first_use_holds_epoch
+
+    @synchronized
+    def release_first_use_hold(
+        self,
+        cache_entry: CacheRecord,
+        hold_epoch: Optional[int],
+        admission_claim: Optional["FirstUseClaim"] = None,
+    ) -> None:
+        """Release a register_first_use_hold() hold whose holder reached its first lock.
+
+        `hold_epoch` is None for a claim that was armed with no hold (see FirstUseClaim); there
+        is then nothing to decrement, and only the admission shield below is retired.
+
+        `admission_claim`, when given, is the claim doing the releasing: if the record still
+        points at it as its admission shield (CacheRecord.admission_claim_ref), that shield is
+        retired here too. The shield is object liveness, not claim validity, so without this a
+        spent claim would go on shielding the record for as long as the loader's frame — or the
+        traceback that captured it — kept the object alive, well past the retrieval it was meant
+        to cover.
+        """
+        if (
+            hold_epoch is not None
+            and cache_entry.first_use_holds > 0
+            and cache_entry.first_use_holds_epoch == hold_epoch
+        ):
+            cache_entry.first_use_holds -= 1
+        if admission_claim is not None:
+            claim_ref = cache_entry.admission_claim_ref
+            if claim_ref is not None and claim_ref() is admission_claim:
+                cache_entry.admission_claim_ref = None
+
+    def _clear_stranded_first_use_holds(self) -> None:
+        """Zero every record's holds after the deferred worker is found dead. Caller must hold
+        the cache lock.
+
+        A hold's finalizer-initiated release may have been dispatched toward the dead thread and
+        dropped — finalizers fire once, so a dropped release is never retried — and such a hold
+        would shield its record from every eviction path forever. Bumping the epoch makes the
+        surviving wrappers' own releases (and any release still sitting in the queue from before
+        the death) no-ops, so they cannot consume holds armed afresh under a later worker. A
+        still-live wrapper unshielded here merely falls back to the tolerated issue-7513 detached
+        path if an eviction actually races its lock, which is recoverable; a permanently shielded
+        record is not.
+        """
+        dropped: list[tuple[str, int]] = []
+        for entry in self._cached_models.values():
+            if entry.first_use_holds > 0:
+                dropped.append((entry.key, entry.first_use_holds))
+                entry.first_use_holds = 0
+                entry.first_use_holds_epoch += 1
+        # Report only once every record is actually unshielded. A logging handler that raises is
+        # one of the ways the worker dies in the first place (see _ensure_deferred_worker), and
+        # logging inside the loop would let that same handler abort this sweep partway through,
+        # leaving the records it had not reached shielded with nothing left to unshield them.
+        for key, count in dropped:
+            self._logger.warning(
+                f"Dropping {count} first-use hold(s) on cache entry {key}: the deferred-work thread died, "
+                "so their releases may have been lost."
+            )
+
+    def _recover_stranded_shields(self) -> None:
+        """Lift the first-use shields whose release depended on a deferred worker that is gone.
+        Caller must hold the cache lock. Does not evict — see _evict_stale_unshielded_entries.
+
+        Holds are always lifted: a hold's only releases are its wrapper's first lock and, if that
+        never comes, the finalizer-initiated release this worker carried. With the worker gone the
+        latter is dropped by _dispatch_deferred, and finalizers never fire twice, so a hold left
+        standing shields its record from every eviction path for the life of the process. A
+        wrapper unshielded here merely falls back to the tolerated issue-7513 detached path if an
+        eviction really does race its lock, which is recoverable; a permanently shielded record is
+        not.
+
+        The put()-set admission grace is lifted only once the cache is shut down, because only
+        then has it actually lost a releaser. On a live cache the grace's backstop is the sweep at
+        the top of the next put() — not the worker — and that sweep still runs; clearing it here
+        would instead unshield a load that is only midway between its put() and its get(), whose
+        record a reconcile could then evict out from under it, turning a worker death into a
+        failed load. After shutdown that backstop is gone (no further put() is guaranteed) and
+        put() no longer arms the grace at all.
+
+        The admission shield a claimed put() published (CacheRecord.admission_claim_ref) is never
+        touched here, shut down or not. Nothing has to release it, so a worker death cannot strand
+        it: it expires by itself when the loader's frame does. And unlike a hold, it cannot be
+        traded away for certainty — a claim that is still alive means a load that is still
+        between its put() and its retrieval, and evicting that record does not fall back to the
+        tolerated issue-7513 detached path; the retrieval raises and the load fails (JPPhoto
+        review, 2026-09-04). What a shut-down cache with a dead worker actually needs for such a
+        record is an eviction once the claim has died, and that no longer depends on this
+        worker: the claim's finalizer queues an abandonment release that _dispatch_deferred keeps
+        for whichever worker runs next, and every later admission that cannot start a worker
+        sweeps unowned stale records itself (see put()).
+        """
+        self._clear_stranded_first_use_holds()
+        if not self._shutdown_event.is_set():
+            return
+        for entry in self._cached_models.values():
+            entry.awaiting_first_use = False
+
+    def _evict_stale_unshielded_entries(self) -> None:
+        """Evict records left stale with no lock and no first-use shield. Caller holds the lock.
+
+        Only for a shut-down cache with no deferred worker — one that died, or one that could not
+        be started by the admission running this (see put()). A record the shutdown sweep marked
+        stale and retained *because* of a shield now has nothing left to evict it: the shield is
+        lifted, no unlock() is coming for a holder that never locked, no abandonment release can
+        be carried, and no further admission is guaranteed to run make_room. Before
+        shutdown this is deliberately not done — the ordinary eviction paths are all still
+        running, and evicting here would release a record's shared-store ownership while live
+        wrappers still hold its tensors, which is the accounting lie shutdown() itself refuses to
+        make (a peer's reload would mint a duplicate canonical while the budget counted one).
+        """
+        evicted = 0
+        for entry in list(self._cached_models.values()):
+            if entry.is_stale and not entry.is_locked and not entry.in_first_use_window:
+                self._logger.debug(
+                    f"Evicting stale cache entry {entry.key}: nothing is left to release it (no deferred worker)."
+                )
+                self._delete_cache_entry(entry)
+                evicted += 1
+        if evicted:
+            try:
+                gc.collect()
+                TorchDevice.empty_cache()
+            except Exception:
+                # Deferrable housekeeping: empty_cache() can raise from a sick CUDA context after
+                # an eviction, and this runs in a dying worker's last frame. The eviction itself
+                # is already done and must not be undone by a failure to hand memory back.
+                self._logger.exception("Error releasing device memory after a stranded-record eviction")
+
+    @synchronized
+    def _recover_from_dead_worker(self, worker: threading.Thread) -> None:
+        """Run stranded-shield recovery from inside the deferred worker as it dies abnormally.
+
+        The other two recovery sites both depend on something else happening first: the next
+        admission (_ensure_deferred_worker) or shutdown(). Neither is guaranteed — a cache that is
+        already shut down takes no more admissions, and shutdown()'s own liveness check passes if
+        the worker is still running at that moment and dies a moment later. That leaves the
+        records the shutdown sweep retained for a live holder shielded by holds nothing can
+        release. Recovering here makes the recovery a property of the death itself.
+        """
+        if self._deferred_work_thread is not worker:
+            # A replacement worker has already taken this slot, so the shields standing now were
+            # granted under it and are its to release. _ensure_deferred_worker cleared whatever
+            # this thread stranded when it started that replacement.
+            return
+        # Retire the slot first. This thread is still `is_alive()` while it unwinds its own frame,
+        # so a concurrent admission would otherwise read the worker as healthy and arm a shield
+        # that this recovery is about to zero. With the slot empty, put() withholds the grace and
+        # register_first_use_hold starts a replacement worker instead. (An unsynchronized
+        # _dispatch_deferred that read the slot just before this can still enqueue against the
+        # dying thread; that item is simply never drained, and _AbandonedHolderRelease holds its
+        # record weakly so it pins nothing.)
+        self._deferred_work_thread = None
+        self._recover_stranded_shields()
+        if self._shutdown_event.is_set():
+            self._evict_stale_unshielded_entries()
+
+    @synchronized
+    def _release_abandoned_holder(self, cache_entry: CacheRecord, held_first_use: bool, hold_epoch: int) -> None:
+        """Deferred-worker handler for a LoadedModel wrapper dropped without ever locking.
+
+        Releases whatever shield the wrapper held, then — if the abandoned record is stale
+        (shutdown() or drop_model() marked it while the wrapper kept it retained) and nothing else
+        holds it — evicts it here, because no unlock() is ever coming to run the usual
+        stale-eviction path. The synchronized release hook then reconciles the budget as usual.
+        """
+        if held_first_use and cache_entry.first_use_holds > 0 and cache_entry.first_use_holds_epoch == hold_epoch:
+            cache_entry.first_use_holds -= 1
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
+            return
+        if not cache_entry.is_locked:
             cache_entry.awaiting_first_use = False
+        if cache_entry.is_stale and not cache_entry.is_locked and not cache_entry.in_first_use_window:
+            self._delete_cache_entry(cache_entry)
+            gc.collect()
+            TorchDevice.empty_cache()
+            self._logger.debug(f"Evicted stale cache entry {cache_entry.key} after its holder was abandoned.")
 
     @synchronized
     def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
@@ -936,6 +1621,54 @@ class ModelCache:
             cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
 
         return cache_entry
+
+    @synchronized
+    def get_with_first_use_claim(
+        self, key: str, stats_name: Optional[str] = None
+    ) -> tuple[CacheRecord, Optional[FirstUseClaim]]:
+        """get(), with the retrieved record's first-use hold armed atomically with the lookup.
+
+        Every caller that is going to wrap the record in a LoadedModel should retrieve it through
+        this method rather than get(): the returned claim shields the record from the asynchronous
+        eviction sweeps for the whole stretch between the lookup and the wrapper's first lock,
+        with no unshielded gap at the front of it (see FirstUseClaim). Both calls below run under
+        this frame's lock acquisition, and the synchronized decorator's reconcile hook fires only
+        on the outermost frame, so no eviction can run between the lookup and the arming.
+
+        The claim must be handed to the wrapper
+        (`LoadedModelWithoutConfig(..., first_use_claim=claim)`) or simply dropped; either way its
+        hold is released exactly once and the caller has nothing to clean up.
+
+        While no deferred worker is running to carry a hold's finalizer release (one could not be
+        started under thread exhaustion), the claim is armed with no hold: it shields nothing
+        from the sweeps, so the caller is exactly where it was before this method existed — the
+        record may be evicted under it, and lock() falls back to the tolerated issue-7513
+        detached path — but it still owns the window in the sense that matters without a worker
+        (see FirstUseClaim). Returns `(record, None)` only when an eviction already detached the
+        record, which is the one case there is nothing left to own.
+
+        Raises IndexError if the model is not in the cache, exactly as get() does.
+        """
+        cache_entry = self.get(key, stats_name)
+        return cache_entry, self._claim_first_use(cache_entry)
+
+    def _claim_first_use(self, cache_entry: CacheRecord) -> Optional[FirstUseClaim]:
+        """Arm a first-use hold, if a worker is running to carry its release, and wrap it in the
+        claim that owns the window. Caller holds the lock. Returns None only for a record that is
+        no longer the occupant under its key."""
+        hold_epoch = self.register_first_use_hold(cache_entry)
+        if hold_epoch is None and self._cached_models.get(cache_entry.key) is not cache_entry:
+            return None
+        try:
+            return FirstUseClaim(self, cache_entry, hold_epoch)
+        except BaseException:
+            # The hold is armed, but the object that was to carry its release does not exist —
+            # weakref.finalize() allocates, and this cache runs at the RAM ceiling by design. An
+            # orphaned hold is the one failure this whole mechanism must not produce: it shields
+            # its record from every eviction path, shutdown()'s sweep included, for the life of
+            # the process. Hand the hold back before letting the failure out.
+            self.release_first_use_hold(cache_entry, hold_epoch)
+            raise
 
     @synchronized
     @record_activity
@@ -1030,7 +1763,22 @@ class ModelCache:
         # If `drop_model()` marked this entry stale (e.g. settings changed while a generation
         # was using it), evict now so the next load rebuilds with the new settings rather than
         # silently reusing the pre-change cached module.
-        if cache_entry.is_stale and not cache_entry.is_locked and cache_entry.key in self._cached_models:
+        # Identity check, not key membership: if this record was already detached (error-path
+        # delete) and the key re-admitted, the occupant is a different, non-stale record that must
+        # not be evicted — and no cleared-callback should fire for a no-op.
+        # A first-use hold defers the eviction the same way a lock does: another wrapper may
+        # already hold this record for its own upcoming lock, and evicting here would detach it
+        # mid-window. Whatever releases the hold — that holder's own unlock() after use, or the
+        # abandonment path (_release_abandoned_holder) — performs the stale eviction instead.
+        # (Only the hold half of the first-use window can be live here: awaiting_first_use is
+        # cleared by every lock entry point, and a brand-new record has no lockers before that,
+        # so no unlock() can observe it set.)
+        if (
+            cache_entry.is_stale
+            and not cache_entry.is_locked
+            and cache_entry.first_use_holds == 0
+            and self._cached_models.get(cache_entry.key) is cache_entry
+        ):
             bytes_freed = cache_entry.cached_model.total_bytes()
             self._delete_cache_entry(cache_entry)
             if self.stats:
@@ -1546,7 +2294,13 @@ class ModelCache:
             model_key = self._cache_stack[pos]
             cache_entry = self._cached_models[model_key]
 
-            if not cache_entry.is_locked:
+            # A first-use hold shields here too: a wrapper obtained warm can sit un-entered while
+            # another model's cold load makes room, and evicting its record would detach it from
+            # the holder about to lock it (see CacheRecord.first_use_holds). The put()-set grace
+            # deliberately does NOT shield from this path (matching its long-standing semantics):
+            # its releaser is the loader's own forward progress, not a finalizer, so an orphaned
+            # grace must stay reachable by the synchronous eviction paths.
+            if not cache_entry.is_locked and cache_entry.first_use_holds == 0:
                 ram_bytes_freed += cache_entry.cached_model.total_bytes()
                 self._logger.debug(
                     f"Dropping {model_key} from RAM cache to free {(cache_entry.cached_model.total_bytes() / MB):.2f}MB."
@@ -1632,7 +2386,7 @@ class ModelCache:
             pos = 0
             while pos < len(self._cache_stack) and not is_satisfied():
                 cache_entry = self._cached_models[self._cache_stack[pos]]
-                if cache_entry.is_locked or cache_entry.awaiting_first_use:
+                if cache_entry.is_locked or cache_entry.in_first_use_window:
                     pos += 1
                     continue
                 self._logger.debug(
@@ -1696,16 +2450,21 @@ class ModelCache:
                 if self._ram_budget.available() >= 0:
                     return
                 self._budget_reconcile_pending.set()
+            models_cleared = 0
+            # Acquire immediately before the try: a BaseException delivered between the two leaks
+            # the RLock, and a cache lock owned by a thread that is unwinding blocks every other
+            # thread for the life of the process. This narrows that window to the interpreter's
+            # own check between acquire() returning and SETUP_FINALLY rather than closing it —
+            # inherent to acquiring a lock without `with`, which the blocking flag rules out here.
             if not self._lock.acquire(blocking=blocking):
                 # Contended (non-blocking caller only): the holder releases through a reconcile
                 # hook, which re-runs this reconcile with the flag still set.
                 return
-            models_cleared = 0
             try:
                 pos = 0
                 while pos < len(self._cache_stack) and self._ram_budget.available() < 0:
                     cache_entry = self._cached_models[self._cache_stack[pos]]
-                    if cache_entry.is_locked or cache_entry.awaiting_first_use:
+                    if cache_entry.is_locked or cache_entry.in_first_use_window:
                         pos += 1
                         continue
                     self._logger.debug(
@@ -1727,31 +2486,39 @@ class ModelCache:
             # Satisfied: loop back to retire the flag via the guarded clear above.
 
     def _delete_cache_entry(self, cache_entry: CacheRecord) -> None:
-        """Delete cache_entry from the cache if it exists. No exception is thrown if it doesn't exist."""
-        was_present = cache_entry.key in self._cached_models
+        """Delete cache_entry from the cache if it is the record currently held under its key.
+        No exception is thrown if it is absent (or the key is now held by a different record)."""
+        # Identity, not key membership: a record can be deleted while still locked (the VRAM-move
+        # error paths) and the key re-admitted before the record's last unlock() runs the
+        # stale-eviction path. A key-only check would pop the NEW record from the cache — detaching
+        # it from all accounting — and, the old record's shared release having already happened,
+        # read uses_shared_weights as False and debit the non-shared budget for bytes that were
+        # admitted as shared. The identity guard makes a delete of a detached record a full no-op,
+        # which also keeps the release exactly-once for double-deletes (release_shared_weights is
+        # itself idempotent, but the budget debit is not).
+        if self._cached_models.get(cache_entry.key) is not cache_entry:
+            return
         self._cache_stack = [key for key in self._cache_stack if key != cache_entry.key]
-        self._cached_models.pop(cache_entry.key, None)
+        del self._cached_models[cache_entry.key]
         # Drop this device's reference to the shared canonical CPU weights so they can be freed once
-        # the last device releases them. Guard on was_present so a double-delete doesn't
-        # double-release (release_shared_weights is itself idempotent, but a re-added entry under the
-        # same key must not be released by a stale delete).
-        if was_present:
-            uses_shared = cache_entry.cached_model.uses_shared_weights
-            total_bytes = cache_entry.cached_model.total_bytes()
-            cache_entry.cached_model.release_shared_weights()
-            # Drop the matching non-shared contribution from the global budget (shared weights are
-            # released via the store above). Captured before release_shared_weights() flips the flag.
-            if self._ram_budget is not None and not uses_shared:
-                self._ram_budget.remove_non_shared(total_bytes, cache=self)
+        # the last device releases them.
+        uses_shared = cache_entry.cached_model.uses_shared_weights
+        total_bytes = cache_entry.cached_model.total_bytes()
+        cache_entry.cached_model.release_shared_weights()
+        # Drop the matching non-shared contribution from the global budget (shared weights are
+        # released via the store above). Captured before release_shared_weights() flips the flag.
+        if self._ram_budget is not None and not uses_shared:
+            self._ram_budget.remove_non_shared(total_bytes, cache=self)
 
     @synchronized
     def drop_model(self, model_key: str) -> int:
         """Drop all cache entries belonging to a model so the next load rebuilds them.
 
         Cache keys are `<model_key>` or `<model_key>:<submodel>` (see `get_model_cache_key`),
-        so a single model may have multiple entries. Locked entries are marked `is_stale` and
-        evicted by `unlock()` as soon as the last lock releases — without that, a setting
-        toggled during an in-flight generation would survive on the locked entry and quietly
+        so a single model may have multiple entries. Locked entries — and entries inside a
+        first-use window (a LoadedModel wrapper obtained but not yet locked) — are marked
+        `is_stale` and evicted as soon as the last lock (or the window) releases — without that,
+        a setting toggled during an in-flight generation would survive on the locked entry and quietly
         get reused by the next generation.
 
         Returns the number of entries immediately dropped (locked entries that are only marked
@@ -1765,7 +2532,12 @@ class ModelCache:
         dropped: list[CacheRecord] = []
         bytes_freed = 0
         for entry in matching:
-            if entry.is_locked:
+            # A record with a first-use hold is deferred exactly like a locked one: a live
+            # LoadedModel wrapper is about to lock it, and evicting now would detach the record
+            # mid-window. The stale mark makes the hold's release — unlock() after use, or the
+            # abandonment path — perform the eviction. (An orphaned put()-grace, by contrast,
+            # stays evictable here, as it always has been on the synchronous paths.)
+            if entry.is_locked or entry.first_use_holds > 0:
                 entry.is_stale = True
                 continue
             bytes_freed += entry.cached_model.total_bytes()
