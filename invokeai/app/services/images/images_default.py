@@ -1,3 +1,5 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Optional
 
 from PIL.Image import Image as PILImageType
@@ -34,6 +36,26 @@ class ImageService(ImageServiceABC):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
 
+    @contextmanager
+    def _image_mutation_lock(self) -> Iterator[None]:
+        """Holds the image-mutation lock across a delete unit.
+
+        Every delete here reads an image's subfolder and purges its files at that path after
+        the record is gone. A concurrent subfolder move that relocates files and repoints the
+        record mid-unit would leave the purge sweeping a path the files already left: permanent
+        orphans, unrecoverable because the record is gone and a clean purge drops the journal
+        (JPPhoto, PR #9361). The move service takes the same lock around each of its
+        plan-relocate-repoint cycles, so neither unit can observe the other half-done. With no
+        move service configured there is nothing to coordinate with. The lock is process-local:
+        two Invoke processes sharing one output folder and database are not serialized by it.
+        """
+        image_moves = getattr(self.__invoker.services, "image_moves", None)
+        if image_moves is None:
+            yield
+            return
+        with image_moves.image_mutation_lock():
+            yield
+
     def create(
         self,
         image: PILImageType,
@@ -64,39 +86,47 @@ class ImageService(ImageServiceABC):
         (width, height) = image.size
 
         try:
-            # TODO: Consider using a transaction here to ensure consistency between storage and database
-            self.__invoker.services.image_records.save(
-                # Non-nullable fields
-                image_name=image_name,
-                image_origin=image_origin,
-                image_category=image_category,
-                width=width,
-                height=height,
-                has_workflow=workflow is not None or graph is not None,
-                # Meta fields
-                is_intermediate=is_intermediate,
-                # Nullable fields
-                node_id=node_id,
-                metadata=metadata,
-                session_id=session_id,
-                user_id=user_id,
-                image_subfolder=image_subfolder,
-            )
-            if board_id is not None:
-                try:
-                    self.__invoker.services.board_image_records.add_image_to_board(
-                        board_id=board_id, image_name=image_name
-                    )
-                except Exception as e:
-                    self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
-            self.__invoker.services.image_files.save(
-                image_name=image_name,
-                image=image,
-                metadata=metadata,
-                workflow=workflow,
-                graph=graph,
-                image_subfolder=image_subfolder,
-            )
+            # The mutation lock spans the record write through the file write: the moment the
+            # record commits, the row is visible to the move service's planner, and a relocation
+            # that landed before the files did would leave the record naming a subfolder the
+            # files were never written to. Under the date strategy the two can disagree by a day
+            # (the strategy reads the local clock, the move target comes from the record's UTC
+            # created_at), so this is not a rare window. The failure cleanup below takes the
+            # lock again; the reentrant lock makes that safe.
+            with self._image_mutation_lock():
+                # TODO: Consider using a transaction here to ensure consistency between storage and database
+                self.__invoker.services.image_records.save(
+                    # Non-nullable fields
+                    image_name=image_name,
+                    image_origin=image_origin,
+                    image_category=image_category,
+                    width=width,
+                    height=height,
+                    has_workflow=workflow is not None or graph is not None,
+                    # Meta fields
+                    is_intermediate=is_intermediate,
+                    # Nullable fields
+                    node_id=node_id,
+                    metadata=metadata,
+                    session_id=session_id,
+                    user_id=user_id,
+                    image_subfolder=image_subfolder,
+                )
+                if board_id is not None:
+                    try:
+                        self.__invoker.services.board_image_records.add_image_to_board(
+                            board_id=board_id, image_name=image_name
+                        )
+                    except Exception as e:
+                        self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
+                self.__invoker.services.image_files.save(
+                    image_name=image_name,
+                    image=image,
+                    metadata=metadata,
+                    workflow=workflow,
+                    graph=graph,
+                    image_subfolder=image_subfolder,
+                )
             image_dto = self.get_dto(image_name)
 
             self._on_changed(image_dto)
@@ -121,39 +151,60 @@ class ImageService(ImageServiceABC):
         would tell that deleter to put them back, stranding them once this cleanup finally removes
         the record. The journal covers the window in between.
         """
-        token: object | None = None
-        try:
-            token = self.__invoker.services.image_files.begin_delete([(image_name, image_subfolder)])
-        except Exception as cleanup_error:
-            self.__invoker.services.logger.error(
-                f"Failed to journal the cleanup of {image_name} after a save failure: {str(cleanup_error)}"
-            )
-        try:
-            # Deleting the record also removes any board association through the database foreign
-            # key cascade.
-            self.__invoker.services.image_records.delete(image_name)
-        except Exception as cleanup_error:
-            self.__invoker.services.logger.error(
-                f"Failed to clean up image record after save failure: {str(cleanup_error)}"
-            )
-            # The record survived, so the image is still referenced; its files must stay with it.
-            if token is not None:
-                try:
-                    self.__invoker.services.image_files.abandon_delete(token)
-                except Exception as journal_error:
-                    self.__invoker.services.logger.error(
-                        f"Failed to discard the delete journal for {image_name}: {str(journal_error)}"
-                    )
-            return
-        try:
-            if token is None:
-                self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
-            else:
-                self.__invoker.services.image_files.commit_delete(token)
-        except Exception as cleanup_error:
-            self.__invoker.services.logger.error(
-                f"Failed to clean up image files after save failure: {str(cleanup_error)}"
-            )
+        with self._image_mutation_lock():
+            # A subfolder move that ran while the file save was failing may have relocated the
+            # just-saved record, and partial files can be left at either path. Journal both the
+            # captured subfolder and the one the record names now. A record that is already gone
+            # (a concurrent delete won the race) or a faulting record store leaves us only the
+            # captured subfolder, which is the best path known either way.
+            delete_subfolders = [image_subfolder]
+            try:
+                record = self.__invoker.services.image_records.get(image_name)
+                if record.image_subfolder != image_subfolder:
+                    delete_subfolders.append(record.image_subfolder)
+            except Exception as lookup_error:
+                # Best effort: a record-store fault here must not mask the ImageFileSaveException
+                # this cleanup is running for. We may then purge only the captured subfolder, so
+                # say so — if the record had been relocated, its files need a manual sweep.
+                self.__invoker.services.logger.warning(
+                    f"Could not confirm the subfolder of {image_name} during save-failure cleanup: {str(lookup_error)}"
+                )
+            token: object | None = None
+            try:
+                token = self.__invoker.services.image_files.begin_delete(
+                    [(image_name, subfolder) for subfolder in delete_subfolders]
+                )
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(
+                    f"Failed to journal the cleanup of {image_name} after a save failure: {str(cleanup_error)}"
+                )
+            try:
+                # Deleting the record also removes any board association through the database foreign
+                # key cascade.
+                self.__invoker.services.image_records.delete(image_name)
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(
+                    f"Failed to clean up image record after save failure: {str(cleanup_error)}"
+                )
+                # The record survived, so the image is still referenced; its files must stay with it.
+                if token is not None:
+                    try:
+                        self.__invoker.services.image_files.abandon_delete(token)
+                    except Exception as journal_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to discard the delete journal for {image_name}: {str(journal_error)}"
+                        )
+                return
+            try:
+                if token is None:
+                    for subfolder in delete_subfolders:
+                        self.__invoker.services.image_files.delete(image_name, image_subfolder=subfolder)
+                else:
+                    self.__invoker.services.image_files.commit_delete(token)
+            except Exception as cleanup_error:
+                self.__invoker.services.logger.error(
+                    f"Failed to clean up image files after save failure: {str(cleanup_error)}"
+                )
 
     def update(
         self,
@@ -325,94 +376,100 @@ class ImageService(ImageServiceABC):
         # that can outlive this call is a file nothing references — which the journal lets startup
         # recovery find and purge. Nothing is ever moved aside and put back, so a concurrent
         # deleter of the same image cannot resurrect files whose record has already been removed.
-        try:
-            record = self.__invoker.services.image_records.get(image_name)
-            token = self.__invoker.services.image_files.begin_delete([(image_name, record.image_subfolder)])
+        # The mutation lock spans the record read through the purge so a subfolder move cannot
+        # relocate the files between the two and leave the purge sweeping an abandoned path.
+        with self._image_mutation_lock():
             try:
-                self.__invoker.services.image_records.delete(image_name)
-            except Exception:
-                # The image is still live: drop the journal and leave its files alone.
+                record = self.__invoker.services.image_records.get(image_name)
+                token = self.__invoker.services.image_files.begin_delete([(image_name, record.image_subfolder)])
                 try:
-                    self.__invoker.services.image_files.abandon_delete(token)
-                except Exception as cleanup_error:
-                    self.__invoker.services.logger.error(
-                        f"Failed to discard the delete journal for {image_name}: {cleanup_error}"
-                    )
-                raise
-            try:
-                self.__invoker.services.image_files.commit_delete(token)
-            except Exception as cleanup_error:
-                # The record is committed as gone, so the delete succeeded. The journal stays
-                # behind and startup recovery purges the leftover files.
-                self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
-            self._on_deleted(image_name)
-        except ImageRecordNotFoundException:
-            # Already deleted by another request; nothing here failed, so nothing to log.
-            raise
-        except ImageRecordDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image record")
-            raise
-        except ImageFileDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image file")
-            raise
-        except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting image record and file")
-            raise e
-
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
-        try:
-            # When ``user_id`` is set the lookup filters to images owned by that user so the
-            # cascade doesn't destroy other users' contributions to a public/shared board.
-            image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
-                board_id,
-                categories=None,
-                is_intermediate=None,
-                user_id=user_id,
-            )
-            deleted_image_names: list[str] = []
-            failed_image_names: list[str] = []
-            staged_deletes: list[tuple[str, object]] = []
-            for image_name in image_names:
-                try:
-                    record = self.__invoker.services.image_records.get(image_name)
-                    token = self.__invoker.services.image_files.stage_delete(
-                        image_name, image_subfolder=record.image_subfolder
-                    )
-                    staged_deletes.append((image_name, token))
-                    deleted_image_names.append(image_name)
-                except Exception as e:
-                    failed_image_names.append(image_name)
-                    self.__invoker.services.logger.error(
-                        f"Failed to delete image file {image_name}; keeping record: {str(e)}"
-                    )
-            try:
-                self.__invoker.services.image_records.delete_many(deleted_image_names)
-            except Exception:
-                for image_name, token in staged_deletes:
+                    self.__invoker.services.image_records.delete(image_name)
+                except Exception:
+                    # The image is still live: drop the journal and leave its files alone.
                     try:
-                        self.__invoker.services.image_files.rollback_delete(token)
-                    except Exception as rollback_error:
+                        self.__invoker.services.image_files.abandon_delete(token)
+                    except Exception as cleanup_error:
                         self.__invoker.services.logger.error(
-                            f"Failed to restore staged image files for {image_name}: {rollback_error}"
+                            f"Failed to discard the delete journal for {image_name}: {cleanup_error}"
                         )
-                raise
-            for _, token in staged_deletes:
+                    raise
                 try:
                     self.__invoker.services.image_files.commit_delete(token)
                 except Exception as cleanup_error:
-                    self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
-            for image_name in deleted_image_names:
+                    # The record is committed as gone, so the delete succeeded. The journal stays
+                    # behind and startup recovery purges the leftover files.
+                    self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
                 self._on_deleted(image_name)
-            return deleted_image_names, failed_image_names
-        except ImageRecordDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image records")
-            raise
-        except ImageFileDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image files")
-            raise
-        except Exception as e:
-            self.__invoker.services.logger.error(f"Problem deleting image records and files: {str(e)}")
-            raise e
+            except ImageRecordNotFoundException:
+                # Already deleted by another request; nothing here failed, so nothing to log.
+                raise
+            except ImageRecordDeleteException:
+                self.__invoker.services.logger.error("Failed to delete image record")
+                raise
+            except ImageFileDeleteException:
+                self.__invoker.services.logger.error("Failed to delete image file")
+                raise
+            except Exception as e:
+                self.__invoker.services.logger.error("Problem deleting image record and file")
+                raise e
+
+    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+        # The mutation lock spans the per-image record reads through the purges and rollbacks so a
+        # subfolder move cannot relocate files between a record read and its stage or commit.
+        with self._image_mutation_lock():
+            try:
+                # When ``user_id`` is set the lookup filters to images owned by that user so the
+                # cascade doesn't destroy other users' contributions to a public/shared board.
+                image_names = self.__invoker.services.board_image_records.get_all_board_image_names_for_board(
+                    board_id,
+                    categories=None,
+                    is_intermediate=None,
+                    user_id=user_id,
+                )
+                deleted_image_names: list[str] = []
+                failed_image_names: list[str] = []
+                staged_deletes: list[tuple[str, object]] = []
+                for image_name in image_names:
+                    try:
+                        record = self.__invoker.services.image_records.get(image_name)
+                        token = self.__invoker.services.image_files.stage_delete(
+                            image_name, image_subfolder=record.image_subfolder
+                        )
+                        staged_deletes.append((image_name, token))
+                        deleted_image_names.append(image_name)
+                    except Exception as e:
+                        failed_image_names.append(image_name)
+                        self.__invoker.services.logger.error(
+                            f"Failed to delete image file {image_name}; keeping record: {str(e)}"
+                        )
+                try:
+                    self.__invoker.services.image_records.delete_many(deleted_image_names)
+                except Exception:
+                    for image_name, token in staged_deletes:
+                        try:
+                            self.__invoker.services.image_files.rollback_delete(token)
+                        except Exception as rollback_error:
+                            self.__invoker.services.logger.error(
+                                f"Failed to restore staged image files for {image_name}: {rollback_error}"
+                            )
+                    raise
+                for _, token in staged_deletes:
+                    try:
+                        self.__invoker.services.image_files.commit_delete(token)
+                    except Exception as cleanup_error:
+                        self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
+                for image_name in deleted_image_names:
+                    self._on_deleted(image_name)
+                return deleted_image_names, failed_image_names
+            except ImageRecordDeleteException:
+                self.__invoker.services.logger.error("Failed to delete image records")
+                raise
+            except ImageFileDeleteException:
+                self.__invoker.services.logger.error("Failed to delete image files")
+                raise
+            except Exception as e:
+                self.__invoker.services.logger.error(f"Problem deleting image records and files: {str(e)}")
+                raise e
 
     def delete_intermediates(self) -> int:
         # Records first, files second, with a durable journal spanning the two. An earlier revision
@@ -430,46 +487,51 @@ class ImageService(ImageServiceABC):
         # journal covers the window the reordering opens: if this process dies, or the filesystem
         # fails, between the commit and the purge, startup recovery finishes the purge for every
         # journalled image whose record is gone.
-        try:
-            image_name_subfolder_pairs = self.__invoker.services.image_records.get_intermediates()
-            if not image_name_subfolder_pairs:
-                return 0
-            subfolders = dict(image_name_subfolder_pairs)
-            token = self.__invoker.services.image_files.begin_delete(list(subfolders.items()))
+        #
+        # The mutation lock spans the snapshot through the purge so a subfolder move cannot
+        # relocate files between the two and leave the purge sweeping an abandoned path
+        # (JPPhoto, PR #9361).
+        with self._image_mutation_lock():
             try:
-                # Conditional on the row still being an intermediate: an image promoted between the
-                # snapshot above and this call keeps both its record and its files. Returns exactly
-                # the names this call removed (already-absent and promoted rows are excluded).
-                deleted_image_names = self.__invoker.services.image_records.delete_intermediates_by_names(
-                    list(subfolders.keys())
-                )
-            except Exception:
+                image_name_subfolder_pairs = self.__invoker.services.image_records.get_intermediates()
+                if not image_name_subfolder_pairs:
+                    return 0
+                subfolders = dict(image_name_subfolder_pairs)
+                token = self.__invoker.services.image_files.begin_delete(list(subfolders.items()))
                 try:
-                    self.__invoker.services.image_files.abandon_delete(token)
-                except Exception as cleanup_error:
-                    self.__invoker.services.logger.error(
-                        f"Failed to discard the intermediates delete journal: {cleanup_error}"
+                    # Conditional on the row still being an intermediate: an image promoted between the
+                    # snapshot above and this call keeps both its record and its files. Returns exactly
+                    # the names this call removed (already-absent and promoted rows are excluded).
+                    deleted_image_names = self.__invoker.services.image_records.delete_intermediates_by_names(
+                        list(subfolders.keys())
                     )
+                except Exception:
+                    try:
+                        self.__invoker.services.image_files.abandon_delete(token)
+                    except Exception as cleanup_error:
+                        self.__invoker.services.logger.error(
+                            f"Failed to discard the intermediates delete journal: {cleanup_error}"
+                        )
+                    raise
+                try:
+                    # Only the names whose records this call removed are purged; a promoted image keeps
+                    # its files. The journal still lists it, which is harmless — recovery re-checks
+                    # every entry against the record store and skips the ones that survived.
+                    self.__invoker.services.image_files.commit_delete(token, image_names=deleted_image_names)
+                except Exception as cleanup_error:
+                    # The records are committed as gone, so the deletion succeeded. A file that could
+                    # not be purged keeps its journal entry and is retried at the next startup; it must
+                    # neither fail the operation nor undo the committed deletions.
+                    self.__invoker.services.logger.error(f"Failed to purge intermediate image files: {cleanup_error}")
+                for image_name in deleted_image_names:
+                    self._on_deleted(image_name)
+                return len(deleted_image_names)
+            except ImageRecordDeleteException:
+                self.__invoker.services.logger.error("Failed to delete image records")
                 raise
-            try:
-                # Only the names whose records this call removed are purged; a promoted image keeps
-                # its files. The journal still lists it, which is harmless — recovery re-checks
-                # every entry against the record store and skips the ones that survived.
-                self.__invoker.services.image_files.commit_delete(token, image_names=deleted_image_names)
-            except Exception as cleanup_error:
-                # The records are committed as gone, so the deletion succeeded. A file that could
-                # not be purged keeps its journal entry and is retried at the next startup; it must
-                # neither fail the operation nor undo the committed deletions.
-                self.__invoker.services.logger.error(f"Failed to purge intermediate image files: {cleanup_error}")
-            for image_name in deleted_image_names:
-                self._on_deleted(image_name)
-            return len(deleted_image_names)
-        except ImageRecordDeleteException:
-            self.__invoker.services.logger.error("Failed to delete image records")
-            raise
-        except Exception as e:
-            self.__invoker.services.logger.error("Problem deleting intermediate image records and files")
-            raise e
+            except Exception as e:
+                self.__invoker.services.logger.error("Problem deleting intermediate image records and files")
+                raise e
 
     def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
         try:

@@ -5,6 +5,7 @@ silent-failure contract (Points 2 & 3 from PR review), and the transactional
 staged-deletion contracts of delete() and delete_intermediates().
 """
 
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -17,6 +18,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileSaveException,
 )
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_moves.image_moves_default import ImageMoveResult, ImageMoveService
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
@@ -412,9 +414,49 @@ def wired(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskI
     invoker.services.configuration.pil_compress_level = 1
     invoker.services.image_records = records
     invoker.services.image_files = storage
+    invoker.services.image_moves = None
     storage.start(invoker)
     svc.start(invoker)
     return svc, records, storage
+
+
+@pytest.fixture
+def wired_with_move_service(
+    tmp_path: Path,
+) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService]:
+    """ImageService and ImageMoveService wired to one real db and disk store, as production does."""
+    config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
+    logger = InvokeAILogger.get_logger(config=config)
+    db = create_mock_sqlite_database(config, logger)
+    records = SqliteImageRecordStorage(db=db)
+    storage = DiskImageFileStorage(tmp_path / "outputs")
+    moves = ImageMoveService(db=db, image_files=storage, config=config, logger=logger)
+
+    svc = ImageService()
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 1
+    invoker.services.image_records = records
+    invoker.services.image_files = storage
+    invoker.services.image_moves = moves
+    invoker.services.names.create_image_name.return_value = "raced.png"
+    invoker.services.urls.get_image_url.return_value = "/api/v1/images/i/raced.png"
+    invoker.services.board_image_records.get_board_for_image.return_value = None
+    storage.start(invoker)
+    svc.start(invoker)
+    return svc, records, storage, moves
+
+
+def _seed_record_at_subfolder(records: SqliteImageRecordStorage, name: str, image_subfolder: str) -> None:
+    records.save(
+        image_name=name,
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=64,
+        height=64,
+        has_workflow=False,
+        is_intermediate=True,
+        image_subfolder=image_subfolder,
+    )
 
 
 def _seed_record(records: SqliteImageRecordStorage, name: str, is_intermediate: bool = True) -> None:
@@ -1008,4 +1050,218 @@ class TestConcurrentBoardDeleteAgainstRealRecords:
             records.get("img.png")
         assert not storage.get_path("img.png").exists()
         assert not storage.get_path("img.png", thumbnail=True).exists()
+        assert _staging_dirs(storage) == []
+
+
+class TestDeleteVersusSubfolderMove:
+    """The image-mutation lock that serializes delete units against subfolder relocations.
+
+    A delete reads an image's subfolder, deletes its record, then purges its files at that
+    subfolder; a move relocates the files and repoints the record. If the two interleave, the
+    delete purges the path its snapshot named while the files sit at the new one — permanent
+    orphans, unrecoverable because the record is gone and a clean purge drops the journal
+    (JPPhoto, PR #9361). These tests drive both real services against one real db and disk
+    store and pin the serialization from both directions.
+    """
+
+    def test_move_cannot_interleave_with_delete_intermediates(
+        self,
+        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        monkeypatch,
+    ) -> None:
+        """While delete_intermediates() runs its unit, a concurrent move_all_images() must wait.
+
+        Without the lock the move relocates the image mid-delete and the delete's purge sweeps
+        the abandoned path: the files survive at the new subfolder with no record and no journal.
+        """
+        svc, records, storage, moves = wired_with_move_service
+        _seed_record_at_subfolder(records, "raced.png", "old")
+        _save_image_file(storage, "raced.png", image_subfolder="old")
+
+        delete_started = threading.Event()
+        delete_may_finish = threading.Event()
+        real_delete_by_names = records.delete_intermediates_by_names
+
+        def delete_after_pause(names: list[str]) -> list[str]:
+            delete_started.set()
+            assert delete_may_finish.wait(timeout=10), "the move never let the delete finish"
+            return real_delete_by_names(names)
+
+        monkeypatch.setattr(records, "delete_intermediates_by_names", delete_after_pause)
+
+        delete_thread = threading.Thread(target=svc.delete_intermediates)
+        delete_thread.start()
+        assert delete_started.wait(timeout=10), "the delete never reached its record deletion"
+
+        # The move finds the row (the delete has not removed it yet) and has a relocation to
+        # perform (the row says "old"; the strategy says the flat root). It must wait for the
+        # delete's unit instead of racing it.
+        move_result: list[object] = []
+        move_thread = threading.Thread(target=lambda: move_result.append(moves.move_all_images()))
+        move_thread.start()
+        move_thread.join(timeout=1.0)
+        assert move_thread.is_alive(), "move_all_images finished while a delete held the mutation lock"
+        assert storage.get_path("raced.png", image_subfolder="old").exists(), (
+            "the move relocated files while a delete was mid-unit"
+        )
+
+        delete_may_finish.set()
+        delete_thread.join(timeout=10)
+        move_thread.join(timeout=10)
+        assert not delete_thread.is_alive()
+        assert not move_thread.is_alive()
+
+        result = move_result[0]
+        assert isinstance(result, ImageMoveResult)
+        assert result.errors == 0
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("raced.png")
+        assert not storage.get_path("raced.png", image_subfolder="old").exists()
+        assert not storage.get_path("raced.png").exists()
+        assert not storage.get_path("raced.png", thumbnail=True).exists()
+        assert _staging_dirs(storage) == []
+
+    def test_move_holds_the_lock_across_its_batch_cycle(
+        self,
+        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+    ) -> None:
+        """While a move unit runs, a concurrent delete must wait for it rather than race it.
+
+        The lock is held across the whole plan-relocate-repoint cycle: nothing may be relocated
+        or repointed, and the cycle may not complete, while another party holds the lock.
+        """
+        svc, records, storage, moves = wired_with_move_service
+        _seed_record_at_subfolder(records, "moved.png", "old")
+        _save_image_file(storage, "moved.png", image_subfolder="old")
+
+        with moves.image_mutation_lock():
+            move_result: list[object] = []
+            move_thread = threading.Thread(target=lambda: move_result.append(moves.move_all_images()))
+            move_thread.start()
+            move_thread.join(timeout=1.0)
+            assert move_thread.is_alive(), "move_all_images completed while the mutation lock was held"
+            assert storage.get_path("moved.png", image_subfolder="old").exists()
+            assert records.get("moved.png").image_subfolder == "old"
+
+        move_thread.join(timeout=10)
+        assert not move_thread.is_alive()
+
+        result = move_result[0]
+        assert isinstance(result, ImageMoveResult)
+        assert (result.planned, result.committed, result.errors) == (1, 1, 0)
+        assert not storage.get_path("moved.png", image_subfolder="old").exists()
+        assert storage.get_path("moved.png").exists()
+        assert records.get("moved.png").image_subfolder == ""
+
+    def test_failed_save_cleanup_purges_the_relocated_subfolder_too(
+        self,
+        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+    ) -> None:
+        """A failed save whose record was relocated mid-save must not strand the moved files.
+
+        The cleanup captured the subfolder the save used, but a move that completed before the
+        cleanup began repointed the record; the purge has to cover the path the record names now
+        as well as the one the save wrote to.
+        """
+        svc, records, storage, moves = wired_with_move_service
+        _seed_record_at_subfolder(records, "failed.png", "old")
+        _save_image_file(storage, "failed.png", image_subfolder="old")
+
+        # A subfolder relocation completes before the cleanup runs: files moved, record repointed.
+        # Simulated directly — a real move job would leave item rows whose foreign key blocks the
+        # record delete, a pre-existing limitation on main unrelated to this lock.
+        old_image = storage.get_path("failed.png", image_subfolder="old")
+        old_thumbnail = storage.get_path("failed.png", thumbnail=True, image_subfolder="old")
+        new_image = storage.get_path("failed.png")
+        new_thumbnail = storage.get_path("failed.png", thumbnail=True)
+        new_image.parent.mkdir(parents=True, exist_ok=True)
+        new_thumbnail.parent.mkdir(parents=True, exist_ok=True)
+        old_image.replace(new_image)
+        old_thumbnail.replace(new_thumbnail)
+        with records._db.transaction() as cursor:
+            cursor.execute("UPDATE images SET image_subfolder = '' WHERE image_name = 'failed.png';")
+        assert records.get("failed.png").image_subfolder == ""
+
+        # The failed save's cleanup still holds the subfolder the save captured.
+        svc._ImageService__clean_up_failed_save("failed.png", "old")  # type: ignore[attr-defined]
+
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("failed.png")
+        assert not new_image.exists()
+        assert not new_thumbnail.exists()
+        assert not old_image.exists()
+        assert not old_thumbnail.exists()
+        assert _staging_dirs(storage) == []
+
+    def test_move_cannot_interleave_with_create(
+        self,
+        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        monkeypatch,
+    ) -> None:
+        """While create() runs its save unit, a concurrent move_all_images() must wait.
+
+        The record becomes visible to the move planner the moment it commits, but its files do
+        not exist until the save lands. Under the date strategy the two subfolders can even
+        disagree by a day — the strategy reads the local clock while the move target comes from
+        the record's UTC created_at — so a relocation landing mid-save leaves the record naming
+        a subfolder the files were never written to.
+        """
+        svc, records, storage, moves = wired_with_move_service
+
+        # The record this create() writes lands at a subfolder the move service's strategy
+        # (flat) does not consider final — the situation the date strategy produces on any
+        # non-UTC host. The subfolder directory must exist, or the move errors in preflight
+        # before it can repoint anything.
+        class _StaleSubfolderStrategy:
+            def get_subfolder(self, image_name, image_category, is_intermediate):
+                return "old"
+
+        monkeypatch.setattr(
+            "invokeai.app.services.images.images_default.create_subfolder_strategy",
+            lambda _strategy_name: _StaleSubfolderStrategy(),
+        )
+        storage.get_path("raced.png", image_subfolder="old").parent.mkdir(parents=True, exist_ok=True)
+
+        save_started = threading.Event()
+        save_may_finish = threading.Event()
+        real_save = storage.save
+
+        def save_then_pause(**kwargs):
+            save_started.set()
+            assert save_may_finish.wait(timeout=10), "the move never let the create finish"
+            real_save(**kwargs)
+
+        monkeypatch.setattr(storage, "save", save_then_pause)
+
+        create_thread = threading.Thread(
+            target=lambda: svc.create(
+                image=Image.new("RGB", (64, 64)),
+                image_origin=ResourceOrigin.EXTERNAL,
+                image_category=ImageCategory.GENERAL,
+            )
+        )
+        create_thread.start()
+        assert save_started.wait(timeout=10), "the create never reached its file save"
+        assert records.get("raced.png").image_subfolder == "old"
+
+        move_result: list[object] = []
+        move_thread = threading.Thread(target=lambda: move_result.append(moves.move_all_images()))
+        move_thread.start()
+        move_thread.join(timeout=1.0)
+        assert move_thread.is_alive(), "move_all_images completed while create() held the mutation lock"
+        assert records.get("raced.png").image_subfolder == "old", (
+            "the move repointed the record while create() was still writing its files"
+        )
+
+        save_may_finish.set()
+        create_thread.join(timeout=10)
+        move_thread.join(timeout=10)
+        assert not create_thread.is_alive()
+        assert not move_thread.is_alive()
+
+        # The move then relocates the completed image: the record and the files end up agreeing.
+        assert records.get("raced.png").image_subfolder == ""
+        assert storage.get_path("raced.png").exists()
+        assert not storage.get_path("raced.png", image_subfolder="old").exists()
+        assert storage.get_path("raced.png", thumbnail=True).exists()
         assert _staging_dirs(storage) == []
