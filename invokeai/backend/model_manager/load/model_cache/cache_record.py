@@ -83,13 +83,31 @@ class CacheRecord:
     # on the deferred worker, so dead-worker recovery must zero it — deliberately trading a live
     # holder's shield for the certainty that no record stays shielded forever. A weak reference
     # has neither problem: nothing has to release it, so nothing can release it early or fail to
-    # release it at all.
+    # release it at all. That is also why no recovery ever retires it, not even on a shut-down
+    # cache with a dead worker: a claim that is still alive means a load that is still between its
+    # put() and its retrieval, and evicting its record does not fall back to anything — the
+    # retrieval raises. What such a record needs once its claim has died is an eviction trigger,
+    # and that is supplied by the claim's finalizer (an abandonment release the queue keeps even
+    # with no worker to drain it) and by the sweep every later admission runs when no worker can
+    # be started (see ModelCache.put()).
     #
     # Only the asynchronous sweeps consult it, through in_first_use_window below. The synchronous
     # paths (make_room, drop_model, unlock's stale eviction) gate on first_use_holds alone and
     # have never honoured this window's flags — the trade documented on awaiting_first_use — so
     # they are unaffected either way.
     admission_claim_ref: Optional["weakref.ref"] = None
+    # Set, lock-free, by ModelCache.release_first_use_grace when a hold-less abandonment of this
+    # record (a wrapper or claim that never armed a first-use hold) finds it stale and queues the
+    # eviction that stale-ness now owes; cleared by the deferred worker the moment it dequeues that
+    # item — before the handler runs, so that neither a raise in the handler, nor the worker dying
+    # inside it, nor a fork can leave the gate closed with nothing queued behind it. Such
+    # abandonments carry nothing to decrement, so one queued
+    # item per record is as good as any number, and this flag is what bounds the queue while no
+    # worker is draining it: without it every warm get() whose wrapper is dropped un-entered
+    # would add an item that nothing removes (JPPhoto review, 2026-09-04). Hold-carrying
+    # releases are deliberately not coalesced — each one retires exactly one hold — and are
+    # bounded instead by the holds themselves, which are armed only while a worker is alive.
+    abandonment_release_pending: bool = False
 
     def lock(self) -> None:
         """Lock this record."""

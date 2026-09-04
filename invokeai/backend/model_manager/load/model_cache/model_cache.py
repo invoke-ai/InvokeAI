@@ -116,9 +116,20 @@ class FirstUseClaim:
     An unadopted claim is therefore not a leak: dropping it is a complete release. That is what
     lets the record be shielded from the moment it is looked up, before any wrapper exists to own
     the shield.
+
+    A claim can also be armed with NO hold (`hold_epoch=None`): that is what a lookup hands out
+    while no deferred worker is running to carry a hold's finalizer release (a worker that could
+    not be started under thread exhaustion, on a cache that may or may not have shut down). Such a
+    claim has nothing to decrement, but it is still the owner of its window in the two ways that
+    matter without a worker. Published on the record by a claimed put() (see
+    CacheRecord.admission_claim_ref), it keeps the admission's eviction sweeps honest about
+    whether the admitting load is still running — a fact that needs no releaser to stay true. And
+    its finalizer still travels the abandonment route, which on a stale record queues the eviction
+    that stale-ness owes; the queue keeps that item even with no worker to drain it, so whichever
+    worker runs next reclaims the record (see _dispatch_deferred and _release_abandoned_holder).
     """
 
-    def __init__(self, cache: "ModelCache", cache_entry: CacheRecord, hold_epoch: int) -> None:
+    def __init__(self, cache: "ModelCache", cache_entry: CacheRecord, hold_epoch: Optional[int]) -> None:
         self._cache = cache
         self._cache_entry = cache_entry
         self._hold_epoch = hold_epoch
@@ -132,7 +143,13 @@ class FirstUseClaim:
         self._finalizer: Optional[weakref.finalize] = None
         # The finalizer's arguments keep the cache and the record alive for as long as the claim
         # itself is — exactly the lifetime over which the release still has work to do.
-        self._finalizer = weakref.finalize(self, cache.release_first_use_grace, cache_entry, True, hold_epoch)
+        self._finalizer = weakref.finalize(
+            self,
+            cache.release_first_use_grace,
+            cache_entry,
+            hold_epoch is not None,
+            hold_epoch if hold_epoch is not None else 0,
+        )
         self._finalizer.atexit = False
 
     def release(self) -> None:
@@ -195,6 +212,14 @@ def _run_deferred_work(cache_ref: "weakref.ReferenceType[ModelCache]", work_queu
                     assert isinstance(work, _AbandonedHolderRelease)
                     cache_entry = work.cache_entry_ref()
                     if cache_entry is not None:
+                        # Dequeued means gone: whatever happens to this item from here on — the
+                        # handler raising, this thread dying inside it, a fork snapshotting it
+                        # mid-drain — it will never be queued again, so the coalescing gate it
+                        # closed (CacheRecord.abandonment_release_pending) must open now, not in
+                        # the handler and not in a recovery that a raise or a fork can skip. A
+                        # finalizer landing between here and the handler queues at most one
+                        # duplicate, which drains as a no-op.
+                        cache_entry.abandonment_release_pending = False
                         cache._release_abandoned_holder(cache_entry, work.held_first_use, work.hold_epoch)
             except Exception:
                 if cache is not None:
@@ -762,10 +787,23 @@ class ModelCache:
         # whose shared-store ownership the eviction releases, so a peer's reload mints a duplicate
         # canonical the budget counts once — on top of failing an in-flight load with an
         # IndexError from a retrieval that no longer finds its own model.
+        #
+        # Marked stale BEFORE the shield is consulted, not after. A hold-less abandonment
+        # (release_first_use_grace) decides lock-free whether it owes the queue an eviction: it
+        # clears its grace, then reads is_stale, and queues nothing for a record that is not
+        # stale — the record is ordinarily evictable, so nothing is owed. Consulting the shield
+        # first and marking afterwards opens a two-step window that such a finalizer can land
+        # in: the shield is read as standing, the finalizer clears it and reads not-stale, and
+        # the mark then retains a record with no lock, no shield, no queued item and nothing
+        # left to evict it. Marking first closes it in both orders: a finalizer that reads the
+        # mark queues the eviction; one that read before it was written has already cleared its
+        # shield (the clear precedes the read), so the check below finds the record unshielded
+        # and evicts it here. The same holds for a claim dying concurrently — its weak reference
+        # is dead before its finalizer runs. A record evicted below carries a stale mark nobody
+        # will read; every later reader of a detached record is gated on identity first.
         for cache_entry in list(self._cached_models.values()):
-            if cache_entry.is_locked or cache_entry.in_first_use_window:
-                cache_entry.is_stale = True
-            else:
+            cache_entry.is_stale = True
+            if not (cache_entry.is_locked or cache_entry.in_first_use_window):
                 self._delete_cache_entry(cache_entry)
 
     @synchronized
@@ -791,8 +829,10 @@ class ModelCache:
                 immediately -- and it is refused outright once the cache has shut down, where
                 nothing is guaranteed to evict it either.
             claim_admission: Shield the new record with an owned first-use hold, alongside the
-                swept post-admission grace, and return the claim that owns it (None if no hold
-                could be armed, or if this call was a no-op because the key was already resident).
+                swept post-admission grace, and return the claim that owns it (None only if this
+                call was a no-op because the key was already resident; a claim armed while no
+                worker could be started carries no hold, but still owns the window — see
+                FirstUseClaim).
                 Every loader that is going to retrieve the record it just admitted should ask for
                 one and hold it until its retrieval has armed a claim of its own: an owned shield
                 cannot outlive its load, so a load that is cancelled or errors before its
@@ -825,6 +865,30 @@ class ModelCache:
         for stale_entry in self._cached_models.values():
             stale_entry.awaiting_first_use = False
 
+        # On a shut-down cache that could not start a worker just now, nothing is guaranteed to
+        # come after this call: no worker to drain the abandonment releases the queue is keeping,
+        # and no further admission to run make_room. Records left stale with no lock and no
+        # shield — a post-shutdown admission whose claim has since died, a wrapper dropped
+        # un-entered under the same thread exhaustion — would otherwise stay resident, with
+        # their shared-store references and budget bytes, for the life of the cache object
+        # (JPPhoto review, 2026-09-04). This is the same terminal sweep the dying worker runs
+        # (_recover_from_dead_worker), for the same reason, and it makes the same trade: a live
+        # un-entered wrapper whose hold the recovery above just zeroed loses its record here and
+        # falls back to the tolerated issue-7513 detached path. What it never evicts is a record
+        # whose admitting load is still running — that window is owned by the loader's claim
+        # (CacheRecord.admission_claim_ref), which the recovery leaves alone.
+        #
+        # Here, and not in _ensure_deferred_worker's failure branch, because that method also
+        # runs under register_first_use_hold in the same lock frame as a lookup, where the record
+        # just handed to the retriever is exactly what this sweep would evict. In put() the only
+        # record in anyone's hands is the one this call has not inserted yet; cold loads are
+        # serialized under MODEL_LOAD_LOCK's write lock, so no other load is between its own
+        # put() and its retrieval while this one runs.
+        if self._shutdown_event.is_set() and (
+            self._deferred_work_thread is None or not self._deferred_work_thread.is_alive()
+        ):
+            self._evict_stale_unshielded_entries()
+
         # A prefetch admission into a cache that has already shut down has no *guaranteed*
         # releaser -- the same standard the post-admission grace is withheld under, below.
         # Prefetch is the promise that no loader will come back for this record, so there is no
@@ -847,7 +911,9 @@ class ModelCache:
         # - after the stale-grace sweep above, because on a shut-down cache with a LIVE worker
         #   that sweep is the only backstop a stale grace has left (shutdown() runs the recovery
         #   only when no worker is alive), so returning above it would strand the very kind of
-        #   record this method is careful never to strand;
+        #   record this method is careful never to strand — and after the unowned-stale sweep,
+        #   for the same reason with the worker dead: a refused prefetch is still an admission
+        #   attempt, and may be the last cache operation that ever runs;
         # - before _make_room_internal below, so nothing resident is evicted to house a model this
         #   call is about to refuse.
         if prefetch and self._shutdown_event.is_set():
@@ -942,10 +1008,13 @@ class ModelCache:
         # from every asynchronous eviction path while its bytes stay charged to the shared budget.
         # Withholding it costs only the shield: the record is ordinarily evictable, is_stale below
         # makes its eventual release evict it, and a loader that does come back gets the same
-        # first_use_holds shield as any other wrapper. If an eviction wins the race to a record
-        # whose loader is still between put() and get(), that get() raises rather than falling
-        # back — the same trade the synchronous paths (make_room, drop_model) have always made
-        # against this flag, taken here only for admissions into an already-shut-down cache.
+        # first_use_holds shield as any other wrapper. A loader that claimed its admission is
+        # covered between put() and get() regardless, by the claim it holds (see the arming at
+        # the end of this method) — a shield that needs no worker and no grace. An unclaimed
+        # admission is not: if an eviction wins the race to it while its loader is still between
+        # put() and get(), that get() raises rather than falling back — the same trade the
+        # synchronous paths (make_room, drop_model) have always made against this flag, taken
+        # here only for admissions into an already-shut-down cache.
         #
         # A claimed admission gets the grace too, but as a courtesy rather than a guarantee: what
         # actually shields that window is the record's weak reference to the claim (see the
@@ -1020,7 +1089,11 @@ class ModelCache:
             # actually shields this window (see CacheRecord.admission_claim_ref): it expires with
             # the loader's frame, so no event has to release it, and neither a worker death
             # (which zeroes holds) nor another holder's abandonment (which clears the grace) can
-            # strip it while the load is still running.
+            # strip it while the load is still running. That is also why the claim is minted even
+            # when no worker is running to carry a hold: the ownership is what a worker-less
+            # admission needs most, since without it the record is stale at birth (after
+            # shutdown), unshielded, and indistinguishable from one whose loader has already
+            # gone — which is what the unowned-stale sweep above evicts.
             cache_record.admission_claim_ref = weakref.ref(admission_claim)
         return admission_claim
 
@@ -1097,13 +1170,51 @@ class ModelCache:
         register_first_use_hold); the deferred release decrements only what that wrapper armed,
         and only while `hold_epoch` still matches the record's — a hold zeroed by dead-worker
         recovery must not be re-released against a successor hold.
+
+        A hold-less abandonment (a wrapper or claim built while no worker was running to arm a
+        hold) has nothing to decrement, and its two effects are handled differently:
+
+        - The grace is cleared HERE, lock-free. That is safe for the same reason the read below
+          is: the flag is monotonic (put() sets it on a brand-new record and nothing sets it
+          again), so a clear from any thread at any point is one the record's other releasers
+          would have made anyway, only later. Clearing it through the worker instead is what let
+          the queue grow without bound: while no worker could be started, every warm get() whose
+          wrapper was dropped un-entered enqueued one more item, and nothing short of a lock() or
+          another admission ever cleared the flag that kept them coming (JPPhoto review,
+          2026-09-04).
+        - The eviction a stale record owes still needs the cache lock, so it is queued — but at
+          most once per record (CacheRecord.abandonment_release_pending, re-opened by the worker
+          the moment it dequeues the item), since one queued eviction is as good as any number. A record that is not stale owes nothing: with the
+          grace cleared it is ordinarily evictable again. What may still be owed is a budget
+          reconcile that was waiting on exactly this record becoming evictable (a peer over the
+          shared cap asked this cache to shed, and the graced record was all it had): the drained
+          item used to run that reconcile from the worker's release hook, so the worker is still
+          woken for it — with a reconcile item, which _dispatch_deferred drops while no worker
+          runs, and which the next cache operation's release hook makes redundant anyway.
+
+        Hold-carrying releases are never coalesced. Each one retires exactly one hold, and their
+        count is bounded by the holds themselves, which are armed only while a worker is alive.
         """
-        # Unsynchronized reads: awaiting_first_use is monotonic (put() is the only writer that
-        # sets it, and only on a brand-new record) and a caller passing held_first_use owns the
-        # hold it is releasing, so a nothing-to-release reading is final. Losing a race here at
-        # worst queues work that no-ops under the lock.
-        if not held_first_use and not cache_entry.awaiting_first_use:
-            return
+        # Unsynchronized reads: awaiting_first_use and is_stale are both monotonic (put() is the
+        # only writer that sets the grace, and only on a brand-new record; is_stale is only ever
+        # set), and a caller passing held_first_use owns the hold it is releasing, so a
+        # nothing-to-release reading is final. Losing a race here at worst queues work that
+        # no-ops under the lock. The one ordering that matters is against the stale-marking
+        # sweep in shutdown(): the grace is cleared BEFORE is_stale is read, and shutdown()
+        # writes the mark BEFORE it consults the shield, so a not-stale reading here means the
+        # clear already preceded shutdown()'s look and the sweep itself evicts the record.
+        if not held_first_use:
+            cache_entry.awaiting_first_use = False
+            if not cache_entry.is_stale:
+                if self._ram_budget is not None and self._budget_reconcile_pending.is_set():
+                    self._dispatch_deferred(_DEFERRED_RECONCILE)
+                return
+            # Two finalizers racing this unsynchronized check can both pass it and queue two
+            # items; the second drains as a no-op. What matters is that a third cannot follow
+            # while one is still queued.
+            if cache_entry.abandonment_release_pending:
+                return
+            cache_entry.abandonment_release_pending = True
         self._dispatch_deferred(_AbandonedHolderRelease(weakref.ref(cache_entry), held_first_use, hold_epoch))
 
     def _ensure_deferred_worker(self) -> None:
@@ -1144,6 +1255,13 @@ class ModelCache:
             # abandonment releases, whose holders are already gone), and the next put() both
             # retries the start and clears stale grace flags itself, so no record can stay
             # shielded from eviction indefinitely.
+            #
+            # Not evicted here, deliberately, even on a shut-down cache where a failed start means
+            # nothing is coming: this method also runs from register_first_use_hold, in the same
+            # lock frame as the lookup that just handed a record to its retriever, and that record
+            # — stale at birth after shutdown, with no hold this call could arm — is exactly what
+            # a sweep here would evict, out from under the caller. put() runs that sweep instead,
+            # where the only record in anyone's hands is the one it has not inserted yet.
             self._logger.warning(
                 "Could not start the model-cache deferred-work thread; deferred cache work is disabled until the "
                 "next model admission."
@@ -1180,14 +1298,14 @@ class ModelCache:
         item is what preserves that distinction: whichever worker runs next drains it, and
         _release_abandoned_holder acts on the record's own evidence instead of on a guess.
 
-        The backlog this can build is one item -- a weak reference and two scalars -- per holder
-        abandoned while no worker runs, and an item whose record has since gone drains as a
-        no-op. Nothing caps that count directly, so the honest statement is that it is capped by
-        what re-enables the gate above it: a hold is only ever armed while a worker is alive, and
-        the only other thing that reaches this method is a wrapper abandoned while its record's
-        put()-set grace still stands -- a flag any lock() clears, and the sweep at the top of the
-        next put() clears for every record, including under the thread exhaustion that is the one
-        way a worker stays unstartable.
+        The backlog this can build is bounded, in two parts. A hold-carrying item is one per hold
+        abandoned while no worker runs, and a hold is only ever armed while a worker is alive, so
+        those are capped by the holders that existed at the last worker's death. A hold-less item
+        is at most one per record between drains: release_first_use_grace clears the grace itself
+        and queues only the eviction a stale record owes, coalesced through
+        CacheRecord.abandonment_release_pending — so a warm get() whose wrapper is dropped
+        un-entered, repeated indefinitely under thread exhaustion, contributes one item, not one
+        per repetition. An item whose record has since gone drains as a no-op.
 
         The shields themselves are still lifted by the dead-worker recovery rather than by this
         queue — put()'s grace and register_first_use_hold's holds are both granted only while a
@@ -1245,9 +1363,15 @@ class ModelCache:
 
     @synchronized
     def release_first_use_hold(
-        self, cache_entry: CacheRecord, hold_epoch: int, admission_claim: Optional["FirstUseClaim"] = None
+        self,
+        cache_entry: CacheRecord,
+        hold_epoch: Optional[int],
+        admission_claim: Optional["FirstUseClaim"] = None,
     ) -> None:
         """Release a register_first_use_hold() hold whose holder reached its first lock.
+
+        `hold_epoch` is None for a claim that was armed with no hold (see FirstUseClaim); there
+        is then nothing to decrement, and only the admission shield below is retired.
 
         `admission_claim`, when given, is the claim doing the releasing: if the record still
         points at it as its admission shield (CacheRecord.admission_claim_ref), that shield is
@@ -1256,7 +1380,11 @@ class ModelCache:
         traceback that captured it — kept the object alive, well past the retrieval it was meant
         to cover.
         """
-        if cache_entry.first_use_holds > 0 and cache_entry.first_use_holds_epoch == hold_epoch:
+        if (
+            hold_epoch is not None
+            and cache_entry.first_use_holds > 0
+            and cache_entry.first_use_holds_epoch == hold_epoch
+        ):
             cache_entry.first_use_holds -= 1
         if admission_claim is not None:
             claim_ref = cache_entry.admission_claim_ref
@@ -1312,31 +1440,32 @@ class ModelCache:
         failed load. After shutdown that backstop is gone (no further put() is guaranteed) and
         put() no longer arms the grace at all.
 
-        The same rule, for the same reason, applies to the admission shield a claimed put()
-        published (CacheRecord.admission_claim_ref). On a live cache it needs no recovery at all:
-        nothing has to release it, so a worker death cannot strand it — it expires by itself when
-        the loader's frame does, and the record becomes ordinarily evictable again. Once the cache
-        is shut down that is no longer enough: the record is stale, and the eviction its expiry
-        should trigger travels through the dead worker, so the shield would keep it (and its
-        shared-store reference, and its budget bytes) resident for the life of the process.
-        Retiring it lets _evict_stale_unshielded_entries reclaim it — the same trade this method
-        already makes for holds, and it costs the same thing: if the loader really is still
-        running, it falls back to the tolerated issue-7513 detached path.
+        The admission shield a claimed put() published (CacheRecord.admission_claim_ref) is never
+        touched here, shut down or not. Nothing has to release it, so a worker death cannot strand
+        it: it expires by itself when the loader's frame does. And unlike a hold, it cannot be
+        traded away for certainty — a claim that is still alive means a load that is still
+        between its put() and its retrieval, and evicting that record does not fall back to the
+        tolerated issue-7513 detached path; the retrieval raises and the load fails (JPPhoto
+        review, 2026-09-04). What a shut-down cache with a dead worker actually needs for such a
+        record is an eviction once the claim has died, and that no longer depends on this
+        worker: the claim's finalizer queues an abandonment release that _dispatch_deferred keeps
+        for whichever worker runs next, and every later admission that cannot start a worker
+        sweeps unowned stale records itself (see put()).
         """
         self._clear_stranded_first_use_holds()
         if not self._shutdown_event.is_set():
             return
         for entry in self._cached_models.values():
             entry.awaiting_first_use = False
-            entry.admission_claim_ref = None
 
     def _evict_stale_unshielded_entries(self) -> None:
         """Evict records left stale with no lock and no first-use shield. Caller holds the lock.
 
-        Only for a shut-down cache whose deferred worker has died. A record the shutdown sweep
-        marked stale and retained *because* of a shield now has nothing left to evict it: the
-        shield is lifted, no unlock() is coming for a holder that never locked, no abandonment
-        release can be carried, and no further admission is guaranteed to run make_room. Before
+        Only for a shut-down cache with no deferred worker — one that died, or one that could not
+        be started by the admission running this (see put()). A record the shutdown sweep marked
+        stale and retained *because* of a shield now has nothing left to evict it: the shield is
+        lifted, no unlock() is coming for a holder that never locked, no abandonment release can
+        be carried, and no further admission is guaranteed to run make_room. Before
         shutdown this is deliberately not done — the ordinary eviction paths are all still
         running, and evicting here would release a record's shared-store ownership while live
         wrappers still hold its tensors, which is the accounting lie shutdown() itself refuses to
@@ -1345,7 +1474,9 @@ class ModelCache:
         evicted = 0
         for entry in list(self._cached_models.values()):
             if entry.is_stale and not entry.is_locked and not entry.in_first_use_window:
-                self._logger.debug(f"Evicting stale cache entry {entry.key} stranded by the deferred worker's death.")
+                self._logger.debug(
+                    f"Evicting stale cache entry {entry.key}: nothing is left to release it (no deferred worker)."
+                )
                 self._delete_cache_entry(entry)
                 evicted += 1
         if evicted:
@@ -1485,10 +1616,13 @@ class ModelCache:
         (`LoadedModelWithoutConfig(..., first_use_claim=claim)`) or simply dropped; either way its
         hold is released exactly once and the caller has nothing to clean up.
 
-        Returns `(record, None)` when no hold could be armed — no deferred worker is running to
-        carry the claim's finalizer release, or an eviction already detached the record. The
-        caller is then exactly where it was before this method existed: the record may be evicted
-        under it, and lock() falls back to the tolerated issue-7513 detached path.
+        While no deferred worker is running to carry a hold's finalizer release (one could not be
+        started under thread exhaustion), the claim is armed with no hold: it shields nothing
+        from the sweeps, so the caller is exactly where it was before this method existed — the
+        record may be evicted under it, and lock() falls back to the tolerated issue-7513
+        detached path — but it still owns the window in the sense that matters without a worker
+        (see FirstUseClaim). Returns `(record, None)` only when an eviction already detached the
+        record, which is the one case there is nothing left to own.
 
         Raises IndexError if the model is not in the cache, exactly as get() does.
         """
@@ -1496,10 +1630,11 @@ class ModelCache:
         return cache_entry, self._claim_first_use(cache_entry)
 
     def _claim_first_use(self, cache_entry: CacheRecord) -> Optional[FirstUseClaim]:
-        """Arm a first-use hold and wrap it in the claim that owns its release. Caller holds the
-        lock. Returns None when no hold could be armed."""
+        """Arm a first-use hold, if a worker is running to carry its release, and wrap it in the
+        claim that owns the window. Caller holds the lock. Returns None only for a record that is
+        no longer the occupant under its key."""
         hold_epoch = self.register_first_use_hold(cache_entry)
-        if hold_epoch is None:
+        if hold_epoch is None and self._cached_models.get(cache_entry.key) is not cache_entry:
             return None
         try:
             return FirstUseClaim(self, cache_entry, hold_epoch)
