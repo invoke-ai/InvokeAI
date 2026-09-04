@@ -119,14 +119,21 @@ class FirstUseClaim:
 
     A claim can also be armed with NO hold (`hold_epoch=None`): that is what a lookup hands out
     while no deferred worker is running to carry a hold's finalizer release (a worker that could
-    not be started under thread exhaustion, on a cache that may or may not have shut down). Such a
-    claim has nothing to decrement, but it is still the owner of its window in the two ways that
-    matter without a worker. Published on the record by a claimed put() (see
-    CacheRecord.admission_claim_ref), it keeps the admission's eviction sweeps honest about
-    whether the admitting load is still running — a fact that needs no releaser to stay true. And
-    its finalizer still travels the abandonment route, which on a stale record queues the eviction
-    that stale-ness owes; the queue keeps that item even with no worker to drain it, so whichever
-    worker runs next reclaims the record (see _dispatch_deferred and _release_abandoned_holder).
+    not be started under thread exhaustion). Such a claim has nothing to decrement, but it is
+    still the owner of its window in the two ways that matter without a worker. Published on the
+    record by a claimed put() (see CacheRecord.admission_claim_ref), it keeps the admission's
+    eviction sweeps honest about whether the admitting load is still running — a fact that needs
+    no releaser to stay true. And its finalizer still travels the abandonment route, which on a
+    stale record queues the eviction that stale-ness owes; the queue keeps that item even with no
+    worker to drain it, so whichever worker runs next reclaims the record (see _dispatch_deferred
+    and _release_abandoned_holder).
+
+    A put() into a shut-down cache with no worker is the one place this is NOT enough — no worker
+    is guaranteed to ever run to drain that kept item, and no later cache operation is guaranteed
+    either — so put() refuses that admission outright rather than minting a claim for it (see
+    ModelCache.put()). A hold-less claim therefore only ever shields a live cache's admission, or
+    a lookup (get_with_first_use_claim) of a record that is already resident — including one the
+    shutdown sweep retained, whose eventual eviction the kept queue item does drive.
     """
 
     def __init__(self, cache: "ModelCache", cache_entry: CacheRecord, hold_epoch: Optional[int]) -> None:
@@ -865,29 +872,43 @@ class ModelCache:
         for stale_entry in self._cached_models.values():
             stale_entry.awaiting_first_use = False
 
-        # On a shut-down cache that could not start a worker just now, nothing is guaranteed to
-        # come after this call: no worker to drain the abandonment releases the queue is keeping,
-        # and no further admission to run make_room. Records left stale with no lock and no
-        # shield — a post-shutdown admission whose claim has since died, a wrapper dropped
-        # un-entered under the same thread exhaustion — would otherwise stay resident, with
-        # their shared-store references and budget bytes, for the life of the cache object
-        # (JPPhoto review, 2026-09-04). This is the same terminal sweep the dying worker runs
-        # (_recover_from_dead_worker), for the same reason, and it makes the same trade: a live
-        # un-entered wrapper whose hold the recovery above just zeroed loses its record here and
-        # falls back to the tolerated issue-7513 detached path. What it never evicts is a record
-        # whose admitting load is still running — that window is owned by the loader's claim
-        # (CacheRecord.admission_claim_ref), which the recovery leaves alone.
+        # A shut-down cache that could not start a worker just now has no releaser to offer any
+        # new admission and no guarantee of a future cache operation to stand in for one: no
+        # worker to drain an abandonment release, and no later put() to run make_room or the
+        # sweep below. A record admitted here whose loader then dies before retrieving it — a
+        # claimed admission's claim dropped, a wrapper dropped un-entered — would be stale,
+        # unshielded and pinned, with its shared-store reference and budget bytes, for the life
+        # of the cache object; the queued abandonment release its finalizer leaves cannot help,
+        # because nothing will drain it (JPPhoto review, 2026-09-04). So every admission is
+        # refused in this state, the same standard the post-shutdown prefetch is already refused
+        # under below, and for the same reason. A load racing shutdown into a thread-exhausted
+        # process is failing regardless (its retrieval raises IndexError, exactly as a refused
+        # prefetch's would); refusing here trades that already-doomed load for the certainty that
+        # nothing is left pinned.
         #
-        # Here, and not in _ensure_deferred_worker's failure branch, because that method also
-        # runs under register_first_use_hold in the same lock frame as a lookup, where the record
-        # just handed to the retriever is exactly what this sweep would evict. In put() the only
-        # record in anyone's hands is the one this call has not inserted yet; cold loads are
-        # serialized under MODEL_LOAD_LOCK's write lock, so no other load is between its own
-        # put() and its retrieval while this one runs.
+        # First, though, reclaim any record ALREADY stranded this way — one admitted while a
+        # worker was alive, retained by the shutdown sweep for a live holder, then orphaned when
+        # that worker died with the holder's abandonment release undrained. This is the same
+        # terminal sweep the dying worker runs (_recover_from_dead_worker), making the same
+        # trade: a live un-entered wrapper whose hold the recovery above just zeroed loses its
+        # record here and falls back to the tolerated issue-7513 detached path, while a record
+        # whose admitting load is still running is owned by the loader's claim
+        # (CacheRecord.admission_claim_ref) and is left alone. It is run here, not in
+        # _ensure_deferred_worker's failure branch, because that branch also runs under
+        # register_first_use_hold in the same lock frame as a lookup, where the record just
+        # handed to the retriever is exactly what the sweep would evict; in put() the only record
+        # in anyone's hands is the one this call has not inserted yet (cold loads are serialized
+        # under MODEL_LOAD_LOCK's write lock, so no other load is between its own put() and its
+        # retrieval while this one runs).
         if self._shutdown_event.is_set() and (
             self._deferred_work_thread is None or not self._deferred_work_thread.is_alive()
         ):
             self._evict_stale_unshielded_entries()
+            self._logger.debug(
+                f"Refusing admission of {key} into a shut-down cache with no deferred worker: "
+                "nothing would be guaranteed to release it."
+            )
+            return None
 
         # A prefetch admission into a cache that has already shut down has no *guaranteed*
         # releaser -- the same standard the post-admission grace is withheld under, below.
@@ -911,9 +932,9 @@ class ModelCache:
         # - after the stale-grace sweep above, because on a shut-down cache with a LIVE worker
         #   that sweep is the only backstop a stale grace has left (shutdown() runs the recovery
         #   only when no worker is alive), so returning above it would strand the very kind of
-        #   record this method is careful never to strand — and after the unowned-stale sweep,
-        #   for the same reason with the worker dead: a refused prefetch is still an admission
-        #   attempt, and may be the last cache operation that ever runs;
+        #   record this method is careful never to strand. (The worker-less shut-down case has
+        #   already returned above — every admission is refused there, prefetch included — so
+        #   this refusal only ever fires with a LIVE worker present.);
         # - before _make_room_internal below, so nothing resident is evicted to house a model this
         #   call is about to refuse.
         if prefetch and self._shutdown_event.is_set():
@@ -1089,11 +1110,13 @@ class ModelCache:
             # actually shields this window (see CacheRecord.admission_claim_ref): it expires with
             # the loader's frame, so no event has to release it, and neither a worker death
             # (which zeroes holds) nor another holder's abandonment (which clears the grace) can
-            # strip it while the load is still running. That is also why the claim is minted even
-            # when no worker is running to carry a hold: the ownership is what a worker-less
-            # admission needs most, since without it the record is stale at birth (after
-            # shutdown), unshielded, and indistinguishable from one whose loader has already
-            # gone — which is what the unowned-stale sweep above evicts.
+            # strip it while the load is still running. On a LIVE cache the claim is minted even
+            # when no worker is running to carry a hold (a hold-less claim, hold_epoch=None): the
+            # record is not stale there, so it just becomes ordinary cache content once the load
+            # is done, and the ownership still keeps a concurrent worker-less admission's sweep
+            # from mistaking a running load for an abandoned one. On a shut-down worker-less
+            # cache the admission never reaches this point — it was refused above — so no
+            # unreleasable claimed record is ever created.
             cache_record.admission_claim_ref = weakref.ref(admission_claim)
         return admission_claim
 

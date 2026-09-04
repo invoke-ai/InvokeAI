@@ -620,14 +620,23 @@ def test_a_claim_abandoned_after_shutdown_and_a_worker_death_is_reclaimed(mock_l
 
         if not replacement_starts:
             _fail_deferred_worker_starts(monkeypatch)
-        cache.put("next", DummyModule())
+        # With a startable worker "next" is admitted and its replacement drains the kept release;
+        # without one "next" is refused, but its terminal sweep reclaims the orphan all the same.
+        # Claimed, so a successful admission returns a (non-None) claim while a refusal returns
+        # None — a plain put() returns None either way and could not tell them apart.
+        result = cache.put("next", DummyModule(), claim_admission=True)
         if replacement_starts:
+            assert result is not None
+            result.release()
             assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
         else:
+            assert result is None, "a worker-less post-shutdown admission was not refused"
             assert cache._deferred_work_thread is None
         assert _wait_until(lambda: "m" not in cache._cached_models), "an unowned stale record was never reclaimed"
         assert _wait_until(lambda: store.refcount("m") == 0)
-        assert _wait_until(lambda: budget.total_in_use() == S)  # "next" alone
+        expected = S if replacement_starts else 0  # "next" is admitted only when a worker started
+        assert _wait_until(lambda: budget.total_in_use() == expected)
+        assert ("next" in cache._cached_models) is replacement_starts
     finally:
         monkeypatch.undo()
         cache.shutdown()
@@ -1660,12 +1669,15 @@ def _fail_deferred_worker_starts(monkeypatch) -> None:
     monkeypatch.setattr(threading.Thread, "start", fail_worker_start)
 
 
-def test_an_unowned_post_shutdown_admission_is_reclaimed_by_the_next_admission(mock_logger, monkeypatch):
-    """JPPhoto's round-6 blocker: with no worker startable, a post-shutdown put() whose load
-    then dies gets no hold, no grace, and no worker to drain anything — so nothing at all
-    reclaimed it, and a later (refused) prefetch left it exactly as it was. The sweep every
-    worker-less post-shutdown admission now runs must take it, with its store reference and
-    budget bytes."""
+def test_a_worker_less_post_shutdown_admission_is_refused(mock_logger, monkeypatch):
+    """JPPhoto round-7 blocker: a claimed admission into a shut-down cache with no startable
+    worker has no releaser — no worker to drain the eviction its finalizer queues, and no
+    guaranteed future cache operation to stand in for one — so a load that dies before
+    retrieving it pins the record, its store reference and its budget bytes for the life of the
+    cache object. Every admission is now refused in that state (claimed, plain, and prefetch),
+    so nothing that could be stranded is ever admitted. A load racing shutdown into a
+    thread-exhausted process is failing regardless: its retrieval raises IndexError, exactly as
+    a refused prefetch's would."""
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=10**12, shared_store=store)
     cache = _make_cache(store, budget, mock_logger)
@@ -1674,88 +1686,64 @@ def test_an_unowned_post_shutdown_admission_is_reclaimed_by_the_next_admission(m
         cache.shutdown()
         assert cache._deferred_work_thread is None
 
-        # The loader's frame dies with its claim before it ever retrieves the record.
-        cache.put("late", DummyModule(), claim_admission=True)
-        gc.collect()
-        record = cache._cached_models["late"]
-        assert record.is_stale and not record.in_first_use_window, "premise: stale, unowned, unshielded"
-        assert budget.total_in_use() == S
-
-        cache.put("prefetch", DummyModule(), prefetch=True)
-        assert "prefetch" not in cache._cached_models, "premise: the prefetch is refused"
-        assert "late" not in cache._cached_models, "a canceled post-shutdown load pinned its record"
-        assert cache._deferred_work_thread is None
-        assert store.refcount("late") == 0
+        assert cache.put("claimed", DummyModule(), claim_admission=True) is None
+        assert cache.put("plain", DummyModule()) is None
+        assert cache.put("prefetch", DummyModule(), prefetch=True) is None
+        assert cache._cached_models == {}, "an admission was accepted that nothing could release"
         assert budget.total_in_use() == 0
+
+        # The loader-style flow fails cleanly rather than corrupting state: put() returns None,
+        # and the retrieval that follows raises IndexError as it would for any missing key.
+        assert cache.put("m", DummyModule(), claim_admission=True) is None
+        with pytest.raises(IndexError):
+            cache.get_with_first_use_claim("m")
+        assert "m" not in cache._cached_models
+        assert budget.total_in_use() == 0
+
+        # The refusal is scoped to a DEAD worker: while the worker shutdown() kept is alive, the
+        # graceful path still admits and later cleans up (test_shutdown_retains_*), so this only
+        # ever fires under thread exhaustion.
     finally:
         monkeypatch.undo()
         cache.shutdown()
 
 
-def test_a_worker_less_post_shutdown_admission_stays_owned_while_its_load_runs(mock_logger, monkeypatch):
-    """The sweep above must not fire on a record whose admitting load is still running. Without
-    a worker there is no hold to arm, so the claim is armed with none — and it is the claim's
-    liveness, published on the record, that distinguishes this admission from the abandoned one
-    in the previous test. The load then completes normally and its own unlock() evicts the
-    stale record."""
+def test_a_refused_admission_still_runs_its_terminal_sweep(mock_logger, monkeypatch):
+    """Refusing a worker-less post-shutdown admission must not skip the terminal sweep it also
+    runs. A record admitted while a worker was alive and retained by the shutdown sweep for a
+    live wrapper is orphaned when the worker dies without recovery (its wrapper's abandonment
+    release queued toward the dead thread, never drained); the next admission's revival attempt
+    zeroes the stranded hold, and the sweep — which runs even though that admission is itself
+    refused — reclaims the now-unshielded stale record."""
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=10**12, shared_store=store)
     cache = _make_cache(store, budget, mock_logger)
     try:
+        cache.put("m", DummyModule())
+        record = _use_and_release(cache, "m")
+        wrapper = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+        assert record.first_use_holds == 1
+        cache.shutdown()  # worker alive -> m retained for its live wrapper
+        assert cache._cached_models.get("m") is record and record.is_stale
+
+        # Worker exits WITHOUT running its own recovery (an orderly stop models a fork / raced
+        # death: the slot still holds the now-dead thread, and the holds are NOT zeroed).
+        cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+        assert cache._deferred_work_thread is not None
+        cache._deferred_work_thread.join(timeout=10)
+        del wrapper
+        gc.collect()
+        assert cache._cached_models.get("m") is record, "premise: orphaned, nothing drained the release"
+        assert record.first_use_holds == 1, "premise: the orderly stop did not zero the hold"
+
+        # A later admission finds the worker unstartable: its _ensure_deferred_worker recovery
+        # zeroes the stranded hold, its terminal sweep reclaims m, and the admission is refused.
         _fail_deferred_worker_starts(monkeypatch)
-        cache.shutdown()
-
-        admission_claim = cache.put("m", DummyModule(), claim_admission=True)
-        assert admission_claim is not None, "a worker-less admission got no owner"
-        record = cache._cached_models["m"]
-        assert record.first_use_holds == 0, "armed a hold no worker can ever release"
-        assert record.admission_in_flight
-
-        # Another admission attempt (a refused prefetch) runs the sweep; the owned record survives.
-        cache.put("prefetch", DummyModule(), prefetch=True)
-        assert cache._cached_models.get("m") is record, "the sweep evicted a record whose load is still running"
-        assert store.refcount("m") == 1
-
-        retrieved, first_use_claim = cache.get_with_first_use_claim("m")
-        assert retrieved is record
-        assert first_use_claim is not None and record.first_use_holds == 0
-        admission_claim.release()
-        assert not record.admission_in_flight
-        with LoadedModelWithoutConfig(cache_record=retrieved, cache=cache, first_use_claim=first_use_claim) as _model:
-            pass
-        assert "m" not in cache._cached_models
+        assert cache.put("next", DummyModule(), claim_admission=True) is None
+        assert "m" not in cache._cached_models, "the refused admission skipped its terminal sweep"
+        assert "next" not in cache._cached_models
         assert store.refcount("m") == 0
         assert budget.total_in_use() == 0
-    finally:
-        monkeypatch.undo()
-        cache.shutdown()
-
-
-def test_a_hold_less_claim_still_queues_the_eviction_its_stale_record_owes(mock_logger, monkeypatch):
-    """A claim armed with no hold is not inert when dropped: on a stale record its finalizer
-    queues the eviction, and the queue keeps that item while no worker runs, so a replacement
-    worker started by a later admission reclaims the record without any synchronous sweep."""
-    store = SharedCpuWeightsStore()
-    budget = RamBudget(max_bytes=10**12, shared_store=store)
-    cache = _make_cache(store, budget, mock_logger)
-    try:
-        _fail_deferred_worker_starts(monkeypatch)
-        cache.shutdown()
-        claim = cache.put("m", DummyModule(), claim_admission=True)
-        assert claim is not None and claim._hold_epoch is None
-        record = cache._cached_models["m"]
-
-        del claim
-        assert _collect_until(lambda: not record.admission_in_flight)
-        assert cache._deferred_work_queue.qsize() == 1, "the hold-less claim's abandonment was not queued"
-        assert cache._cached_models.get("m") is record
-
-        # Thread starts work again; the next admission's replacement worker drains the kept item.
-        monkeypatch.undo()
-        cache.put("next", DummyModule())
-        assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
-        assert _wait_until(lambda: "m" not in cache._cached_models), "the kept release was never drained"
-        assert _wait_until(lambda: store.refcount("m") == 0)
     finally:
         monkeypatch.undo()
         cache.shutdown()
