@@ -48,6 +48,7 @@ def _make_record(
     image_name: str = "abc12345-test.png",
     image_subfolder: str = "",
     is_intermediate: bool = False,
+    starred: bool = False,
 ) -> ImageRecord:
     now = get_iso_timestamp()
     return ImageRecord(
@@ -59,7 +60,7 @@ def _make_record(
         created_at=now,
         updated_at=now,
         is_intermediate=is_intermediate,
-        starred=False,
+        starred=starred,
         has_workflow=False,
         image_subfolder=image_subfolder,
     )
@@ -306,11 +307,12 @@ class TestDeleteImagesOnBoardContract:
         # File staging succeeds for first, fails for second
         invoker.services.image_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
-        deleted, failed = image_service.delete_images_on_board("board-1")
+        deleted, failed, starred_skipped = image_service.delete_images_on_board("board-1")
 
         invoker.services.image_records.delete_many.assert_called_once_with(["good.png"])
         assert deleted == ["good.png"]
         assert failed == ["bad.png"]
+        assert starred_skipped == []
 
     def test_file_cleanup_failure_does_not_raise(self, image_service: ImageService):
         """File cleanup errors are swallowed, not propagated."""
@@ -321,11 +323,12 @@ class TestDeleteImagesOnBoardContract:
         invoker.services.image_records.get.return_value = record
         invoker.services.image_files.stage_delete.side_effect = Exception("permission denied")
 
-        deleted, failed = image_service.delete_images_on_board("board-1")
+        deleted, failed, starred_skipped = image_service.delete_images_on_board("board-1")
 
         invoker.services.image_records.delete_many.assert_called_once_with([])
         assert deleted == []
         assert failed == ["img.png"]
+        assert starred_skipped == []
 
     def test_record_lookup_failure_does_not_block_others(self, image_service: ImageService):
         """If getting the record for one image fails, other images are still processed."""
@@ -338,13 +341,14 @@ class TestDeleteImagesOnBoardContract:
         ok_record = _make_record(image_name="ok.png", image_subfolder="")
         invoker.services.image_records.get.side_effect = [Exception("not found"), ok_record]
 
-        deleted, failed = image_service.delete_images_on_board("board-1")
+        deleted, failed, starred_skipped = image_service.delete_images_on_board("board-1")
 
         # File staging was attempted for the second image only
         invoker.services.image_files.stage_delete.assert_called_once_with("ok.png", image_subfolder="")
         invoker.services.image_records.delete_many.assert_called_once_with(["ok.png"])
         assert deleted == ["ok.png"]
         assert failed == ["missing.png"]
+        assert starred_skipped == []
 
     def test_database_failure_restores_staged_files(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
@@ -359,3 +363,54 @@ class TestDeleteImagesOnBoardContract:
 
         invoker.services.image_files.rollback_delete.assert_called_once_with(token)
         invoker.services.image_files.commit_delete.assert_not_called()
+
+
+class TestStarredProtection:
+    def test_single_starred_image_is_deleted_by_default(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get.return_value = _make_record(starred=True)
+
+        was_deleted = image_service.delete("starred.png")
+
+        assert was_deleted is True
+        invoker.services.image_files.delete.assert_called_once()
+        invoker.services.image_records.delete.assert_called_once_with("starred.png")
+
+    def test_single_starred_image_is_preserved(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get.return_value = _make_record(starred=True)
+
+        was_deleted = image_service.delete("starred.png", delete_starred=False)
+
+        assert was_deleted is False
+        invoker.services.image_files.delete.assert_not_called()
+        invoker.services.image_records.delete.assert_not_called()
+
+    def test_single_unstarred_image_is_deleted_when_protected(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_records.get.return_value = _make_record(starred=False)
+
+        was_deleted = image_service.delete("normal.png", delete_starred=False)
+
+        assert was_deleted is True
+        invoker.services.image_files.delete.assert_called_once()
+        invoker.services.image_records.delete.assert_called_once_with("normal.png")
+
+    def test_board_delete_reports_protected_starred_images(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.board_image_records.get_all_board_image_names_for_board.return_value = [
+            "starred.png",
+            "normal.png",
+        ]
+        invoker.services.image_records.get.side_effect = [
+            _make_record(image_name="starred.png", starred=True),
+            _make_record(image_name="normal.png", starred=False),
+        ]
+
+        deleted, failed, starred_skipped = image_service.delete_images_on_board("board-1", delete_starred=False)
+
+        assert deleted == ["normal.png"]
+        assert failed == []
+        assert starred_skipped == ["starred.png"]
+        invoker.services.image_records.delete_many.assert_called_once_with(["normal.png"])
+        invoker.services.image_files.stage_delete.assert_called_once_with("normal.png", image_subfolder="")

@@ -289,11 +289,13 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.logger.error("Problem getting paginated video DTOs")
             raise e
 
-    def delete(self, video_name: str) -> None:
+    def delete(self, video_name: str, delete_starred: bool = True) -> bool:
         token: object | None = None
         record_deleted = False
         try:
             record = self.__invoker.services.video_records.get(video_name)
+            if not delete_starred and record.starred:
+                return False
             token = self.__invoker.services.video_files.stage_delete(video_name, video_subfolder=record.video_subfolder)
             self.__invoker.services.video_records.delete(video_name)
             record_deleted = True
@@ -302,6 +304,7 @@ class VideoService(VideoServiceABC):
             except Exception as cleanup_error:
                 self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
             self._on_deleted(video_name)
+            return True
         except VideoRecordDeleteException:
             if token is not None:
                 self.__invoker.services.video_files.rollback_delete(token)
@@ -319,7 +322,9 @@ class VideoService(VideoServiceABC):
             self.__invoker.services.logger.error("Problem deleting video record and file")
             raise e
 
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+    def delete_videos_on_board(
+        self, board_id: str, user_id: Optional[str] = None, delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
         try:
             # When ``user_id`` is set the lookup filters to videos owned by that user so the
             # cascade doesn't destroy other users' contributions to a public/shared board.
@@ -334,10 +339,14 @@ class VideoService(VideoServiceABC):
             # board_videos FK.
             deleted_video_names: list[str] = []
             failed_video_names: list[str] = []
+            starred_skipped_video_names: list[str] = []
             staged_deletes: list[tuple[str, object]] = []
             for video_name in video_names:
                 try:
                     record = self.__invoker.services.video_records.get(video_name)
+                    if not delete_starred and record.starred:
+                        starred_skipped_video_names.append(video_name)
+                        continue
                     token = self.__invoker.services.video_files.stage_delete(
                         video_name, video_subfolder=record.video_subfolder
                     )
@@ -366,7 +375,7 @@ class VideoService(VideoServiceABC):
                     self.__invoker.services.logger.error(f"Failed to purge staged video files: {cleanup_error}")
             for video_name in deleted_video_names:
                 self._on_deleted(video_name)
-            return deleted_video_names, failed_video_names
+            return deleted_video_names, failed_video_names, starred_skipped_video_names
         except VideoRecordDeleteException:
             self.__invoker.services.logger.error("Failed to delete video records")
             raise

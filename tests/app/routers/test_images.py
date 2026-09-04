@@ -87,6 +87,131 @@ def prepare_image_maintenance_test(monkeypatch: Any, mock_invoker: Invoker) -> N
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
 
 
+def prepare_starred_delete_test(
+    monkeypatch: Any,
+    mock_invoker: Invoker,
+    starred_names: set[str],
+    board_ids: dict[str, str | None],
+) -> None:
+    mock_deps = MockApiDependencies(mock_invoker)
+    mock_invoker.services.image_moves = MagicMock()
+    mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+    mock_invoker.services.board_image_records = MagicMock()
+    mock_invoker.services.board_image_records.get_board_for_image.side_effect = board_ids.__getitem__
+    mock_invoker.services.board_images = MagicMock()
+    mock_invoker.services.image_records.get = MagicMock(return_value=MagicMock())
+    mock_invoker.services.images = MagicMock()
+    mock_invoker.services.images.delete.side_effect = (
+        lambda image_name, delete_starred=True: delete_starred or image_name not in starred_names
+    )
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+
+def test_delete_starred_image_is_skipped_when_protected(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    image_name = "starred.png"
+    prepare_starred_delete_test(
+        monkeypatch,
+        mock_invoker,
+        starred_names={image_name},
+        board_ids={image_name: "board-id"},
+    )
+
+    response = client.delete(f"/api/v1/images/i/{image_name}", params={"delete_starred": False})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "deleted_images": [],
+        "failed_images": [],
+        "affected_boards": ["board-id"],
+        "starred_skipped": [image_name],
+    }
+    mock_invoker.services.images.delete.assert_called_once_with(image_name, delete_starred=False)
+
+
+def test_bulk_delete_only_deletes_unstarred_images_when_protected(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    starred_name = "starred.png"
+    unstarred_name = "unstarred.png"
+    prepare_starred_delete_test(
+        monkeypatch,
+        mock_invoker,
+        starred_names={starred_name},
+        board_ids={starred_name: "board-id", unstarred_name: "board-id"},
+    )
+
+    response = client.post(
+        "/api/v1/images/delete",
+        json={"image_names": [starred_name, unstarred_name], "delete_starred": False},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "deleted_images": [unstarred_name],
+        "failed_images": [],
+        "affected_boards": ["board-id"],
+        "starred_skipped": [starred_name],
+    }
+    assert mock_invoker.services.images.delete.call_count == 2
+    mock_invoker.services.images.delete.assert_any_call(starred_name, delete_starred=False)
+    mock_invoker.services.images.delete.assert_any_call(unstarred_name, delete_starred=False)
+
+
+def test_bulk_delete_deduplicates_image_names(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_starred_delete_test(
+        monkeypatch,
+        mock_invoker,
+        starred_names=set(),
+        board_ids={"duplicate.png": "board-id", "other.png": "board-id"},
+    )
+
+    response = client.post(
+        "/api/v1/images/delete",
+        json={"image_names": ["duplicate.png", "duplicate.png", "other.png"]},
+    )
+
+    assert response.status_code == 200
+    assert sorted(response.json()["deleted_images"]) == ["duplicate.png", "other.png"]
+    assert response.json()["failed_images"] == []
+    assert [call.args[0] for call in mock_invoker.services.images.delete.call_args_list] == [
+        "duplicate.png",
+        "other.png",
+    ]
+
+
+def test_delete_uncategorized_only_deletes_unstarred_images_when_protected(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    starred_name = "starred.png"
+    unstarred_name = "unstarred.png"
+    prepare_starred_delete_test(
+        monkeypatch,
+        mock_invoker,
+        starred_names={starred_name},
+        board_ids={starred_name: None, unstarred_name: None},
+    )
+    mock_invoker.services.board_images.get_all_board_image_names_for_board.return_value = [
+        starred_name,
+        unstarred_name,
+    ]
+
+    response = client.delete("/api/v1/images/uncategorized", params={"delete_starred": False})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "deleted_images": [unstarred_name],
+        "failed_images": [],
+        "affected_boards": ["none"],
+        "starred_skipped": [starred_name],
+    }
+    assert mock_invoker.services.images.delete.call_count == 2
+
+
 @pytest.mark.parametrize(
     ("method", "path", "json_body"),
     [
@@ -237,6 +362,7 @@ def prepare_image_batch_test(monkeypatch: Any, mock_invoker: Invoker) -> MagicMo
     monkeypatch.setattr(mock_invoker.services, "images", images_service)
     mock_invoker.services.image_moves = MagicMock()
     mock_invoker.services.image_moves.is_maintenance_active.return_value = False
+    monkeypatch.setattr(mock_invoker.services.image_records, "get", MagicMock(return_value=MagicMock()))
     monkeypatch.setattr(mock_invoker.services.board_image_records, "get_board_for_image", MagicMock(return_value=None))
 
     mock_deps = MockApiDependencies(mock_invoker)
@@ -343,33 +469,34 @@ def test_star_unstar_skips_names_deleted_mid_batch(
     assert body["failed_images"] == []
 
 
-@pytest.mark.parametrize("raise_from", ["get_dto", "delete"])
+@pytest.mark.parametrize("raise_from", ["record", "delete"])
 def test_delete_skips_names_deleted_mid_batch(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient, raise_from: str
 ) -> None:
     """Same for /delete: the caller asked for the image to be gone, and it is.
 
     Parametrized over both raise sites because the race window spans them: the loop reads the
-    DTO for its board id and only then deletes, and ImageService.delete re-reads the record, so
+    lightweight record and its board id and only then deletes, and ImageService.delete re-reads the record, so
     a name can vanish after the first read succeeds. The two sites answer differently on
     purpose, and the difference is what this asserts — see the branch below.
     """
     images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
 
-    def get_dto(image_name: str) -> MagicMock:
-        if image_name == "vanished.png" and raise_from == "get_dto":
+    def get_record(image_name: str) -> MagicMock:
+        if image_name == "vanished.png" and raise_from == "record":
             raise ImageRecordNotFoundException
-        dto = MagicMock()
-        # Distinct boards on purpose: sharing one would let the surviving image supply the
-        # vanished one's board, and the assertion below could not tell whether it was reported.
-        dto.board_id = "board-2" if image_name == "vanished.png" else "board-1"
-        return dto
+        return MagicMock()
 
-    def delete(image_name: str) -> None:
+    def delete(image_name: str, delete_starred: bool = True) -> bool:
+        del delete_starred
         if image_name == "vanished.png" and raise_from == "delete":
             raise ImageRecordNotFoundException
+        return True
 
-    images_service.get_dto.side_effect = get_dto
+    mock_invoker.services.image_records.get.side_effect = get_record
+    mock_invoker.services.board_image_records.get_board_for_image.side_effect = (
+        lambda image_name: "board-2" if image_name == "vanished.png" else "board-1"
+    )
     images_service.delete.side_effect = delete
 
     response = client.post("/api/v1/images/delete", json={"image_names": ["ok.png", "vanished.png"]})
@@ -399,12 +526,13 @@ def test_delete_does_not_report_a_name_that_never_existed(
     monkeypatch: Any, mock_invoker: Invoker, client: TestClient
 ) -> None:
     """The admin path specifically: the ownership check is a no-op that proves nothing."""
-    images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
+    prepare_image_batch_test(monkeypatch, mock_invoker)
 
-    def get_dto(image_name: str) -> MagicMock:
+    def get_record(image_name: str) -> MagicMock:
+        del image_name
         raise ImageRecordNotFoundException
 
-    images_service.get_dto.side_effect = get_dto
+    mock_invoker.services.image_records.get.side_effect = get_record
 
     response = client.post("/api/v1/images/delete", json={"image_names": ["never-existed.png"]})
 
@@ -447,13 +575,13 @@ def test_delete_still_reports_a_genuine_storage_failure(
     all. See test_image_records_get_does_not_disguise_a_storage_error_as_not_found.
     """
     images_service = prepare_image_batch_test(monkeypatch, mock_invoker)
-    dto = MagicMock()
-    dto.board_id = "board-1"
-    images_service.get_dto.return_value = dto
+    mock_invoker.services.board_image_records.get_board_for_image.return_value = "board-1"
 
-    def delete(image_name: str) -> None:
+    def delete(image_name: str, delete_starred: bool = True) -> bool:
+        del delete_starred
         if image_name == "broken.png":
             raise RuntimeError("storage is on fire")
+        return True
 
     images_service.delete.side_effect = delete
 
