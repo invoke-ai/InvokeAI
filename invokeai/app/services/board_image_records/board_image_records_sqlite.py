@@ -36,15 +36,24 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
     def remove_image_from_board(
         self,
         image_name: str,
-    ) -> None:
+        board_id: str,
+    ) -> int:
         with self._db.transaction() as cursor:
+            # Scoped to the board the caller was authorized against, not just the image. The
+            # routes read the image's board, authorize against *that* board, and only then
+            # remove; an unscoped DELETE would follow the image if it were moved in between,
+            # applying a decision taken about one board to a different one.
             cursor.execute(
                 """--sql
                 DELETE FROM board_images
-                WHERE image_name = ?;
+                WHERE image_name = ? AND board_id = ?;
                 """,
-                (image_name,),
+                (image_name, board_id),
             )
+            # The row count is the only signal that the scope held. Zero rows means the image
+            # left this board between the caller's read and this write — swallowing that lets
+            # the route report a removal that did not happen.
+            return cursor.rowcount
 
     def get_images_for_board(
         self,
@@ -169,7 +178,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 f"""--sql
                     SELECT COUNT(*)
                     FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
+                    -- Keep work proportional to this board's membership instead of allowing
+                    -- the gallery index to make images the outer loop for this query.
+                    CROSS JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,
@@ -188,7 +199,9 @@ class SqliteBoardImageRecordStorage(BoardImageRecordStorageBase):
                 f"""--sql
                     SELECT COUNT(*)
                     FROM board_images
-                    INNER JOIN images ON board_images.image_name = images.image_name
+                    -- Keep work proportional to this board's membership instead of allowing
+                    -- the gallery index to make images the outer loop for this query.
+                    CROSS JOIN images ON board_images.image_name = images.image_name
                     WHERE images.is_intermediate = FALSE AND images.image_category IN ( {placeholders} )
                     AND board_images.board_id = ?;
                     """,

@@ -28,19 +28,23 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         self._db = db
 
     def get(self, image_name: str) -> ImageRecord:
+        # A sqlite3.Error is deliberately NOT translated into ImageRecordNotFoundException.
+        # This used to be caught and re-raised as not-found, which made the exception mean
+        # "the row is absent, OR the database is locked/corrupt/unreadable". Callers that
+        # treat not-found as a benign outcome — the concurrent-deletion skips in the images
+        # and board_images batch routes — would then swallow a disk I/O error as a routine
+        # race and answer 200 with the name in no result list at all. Let the storage error
+        # propagate: ImageService logs it and the route reports it as a real failure.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    f"""--sql
-                    SELECT {IMAGE_DTO_COLS} FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                f"""--sql
+                SELECT {IMAGE_DTO_COLS} FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
         if not result:
             raise ImageRecordNotFoundException
@@ -61,21 +65,29 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 return None
             return cast(Optional[str], dict(result).get("user_id"))
 
-    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+    def exists(self, image_name: str) -> bool:
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT metadata FROM images
-                    WHERE image_name = ?;
-                    """,
-                    (image_name,),
-                )
+            cursor.execute(
+                """--sql
+                SELECT 1 FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+            return cursor.fetchone() is not None
 
-                result = cast(Optional[sqlite3.Row], cursor.fetchone())
+    def get_metadata(self, image_name: str) -> Optional[MetadataField]:
+        # See get(): a storage error must not masquerade as a missing row.
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT metadata FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
 
-            except sqlite3.Error as e:
-                raise ImageRecordNotFoundException from e
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
 
             if not result:
                 raise ImageRecordNotFoundException
@@ -458,7 +470,11 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
             if board_id == "none":
                 query_conditions += """--sql
-                AND board_images.board_id IS NULL
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM board_images
+                    WHERE board_images.image_name = images.image_name
+                )
                 """
                 # For uncategorized images, filter by user_id to ensure per-user isolation
                 # Admin users can see all uncategorized images from all users
@@ -469,7 +485,12 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                     query_params.append(user_id)
             elif board_id is not None:
                 query_conditions += """--sql
-                AND board_images.board_id = ?
+                AND EXISTS (
+                    SELECT 1
+                    FROM board_images
+                    WHERE board_images.image_name = images.image_name
+                    AND board_images.board_id = ?
+                )
                 """
                 query_params.append(board_id)
             elif user_id is not None and not is_admin:
@@ -496,7 +517,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 starred_count_query = f"""--sql
                 SELECT COUNT(*)
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE images.starred = TRUE AND (1=1{query_conditions})
                 """
                 cursor.execute(starred_count_query, query_params)
@@ -507,7 +527,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 names_query = f"""--sql
                 SELECT images.image_name
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1{query_conditions}
                 ORDER BY images.starred DESC, images.created_at {order_dir.value}
                 """
@@ -515,7 +534,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 names_query = f"""--sql
                 SELECT images.image_name
                 FROM images
-                LEFT JOIN board_images ON board_images.image_name = images.image_name
                 WHERE 1=1{query_conditions}
                 ORDER BY images.created_at {order_dir.value}
                 """

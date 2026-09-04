@@ -35,7 +35,7 @@ def _config(
     )
 
 
-def _invoke(
+def _prepare(
     main_config: SimpleNamespace,
     low_config: SimpleNamespace | None = None,
     component_config: SimpleNamespace | None = None,
@@ -44,13 +44,14 @@ def _invoke(
     vae_latent_channels: int | None = None,
     vae_config: SimpleNamespace | None = None,
     t5_config: SimpleNamespace | None = None,
-):
+    low_key: str = "low",
+) -> tuple[WanModelLoaderInvocation, MagicMock]:
     main = _model("main")
-    low = _model("low") if low_config is not None else None
+    low = _model(low_key) if low_config is not None else None
     context = MagicMock()
     configs = {"main": main_config}
     if low_config is not None:
-        configs["low"] = low_config
+        configs[low_key] = low_config
     component = _model("component") if component_config is not None else None
     if component_config is not None:
         configs["component"] = component_config
@@ -78,7 +79,16 @@ def _invoke(
         wan_t5_encoder_model=_model("t5"),
         component_source=component,
     )
+    return invocation, context
+
+
+def _invoke(*args, **kwargs):
+    invocation, context = _prepare(*args, **kwargs)
     return invocation.invoke(context)
+
+
+def _warnings(context: MagicMock) -> list[str]:
+    return [call.args[0] for call in context.logger.warning.call_args_list]
 
 
 @pytest.mark.parametrize("variant", [WanVariantType.T2V_A14B, WanVariantType.I2V_A14B])
@@ -108,14 +118,41 @@ def test_gguf_loader_accepts_valid_expert_pair_in_either_order(
             _config("low", WanVariantType.T2V_A14B, "high"),
         ),
         (
-            _config("main", WanVariantType.T2V_A14B, "high"),
-            _config("low", WanVariantType.T2V_A14B, "none"),
+            _config("main", WanVariantType.T2V_A14B, "low"),
+            _config("low", WanVariantType.T2V_A14B, "low"),
         ),
     ],
 )
 def test_gguf_loader_rejects_invalid_expert_pair(main_config: SimpleNamespace, low_config: SimpleNamespace) -> None:
     with pytest.raises(ValueError, match="expert|variant"):
         _invoke(main_config, low_config)
+
+
+@pytest.mark.parametrize(
+    "main_expert,low_expert,expected_high_key",
+    [
+        # The expert tag comes from a filename heuristic, so untagged community
+        # finetunes are common. The wiring is explicit intent: take the untagged
+        # file at its wired position, or as the complement of a tagged partner.
+        ("none", "none", "main"),
+        ("high", "none", "main"),
+        ("none", "low", "main"),
+        ("none", "high", "low"),
+        ("low", "none", "low"),
+    ],
+)
+def test_gguf_loader_falls_back_to_wiring_for_untagged_experts(
+    main_expert: str, low_expert: str, expected_high_key: str
+) -> None:
+    output = _invoke(
+        _config("main", WanVariantType.I2V_A14B, main_expert),
+        _config("low", WanVariantType.I2V_A14B, low_expert),
+    )
+
+    expected_low_key = "low" if expected_high_key == "main" else "main"
+    assert output.transformer.transformer.key == expected_high_key
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == expected_low_key
 
 
 @pytest.mark.parametrize("low_variant", [WanVariantType.TI2V_5B, WanVariantType.T2V_A14B])
@@ -131,10 +168,66 @@ def test_ti2v_5b_main_ignores_wired_low_noise_model(low_variant: WanVariantType)
     assert output.transformer.transformer_low_noise is None
 
 
-@pytest.mark.parametrize("expert", ["low", "none"])
-def test_gguf_loader_rejects_non_high_primary_without_pair(expert: str) -> None:
-    with pytest.raises(ValueError, match="high-noise"):
-        _invoke(_config("main", WanVariantType.T2V_A14B, expert))
+@pytest.mark.parametrize("expert", ["high", "low", "none"])
+def test_gguf_loader_runs_unpaired_primary_whatever_its_tag(expert: str) -> None:
+    """A single wired transformer is explicit intent just like a pair is, and the tag is
+    only a filename guess — so an unpaired A14B runs with a warning rather than aborting."""
+    invocation, context = _prepare(_config("main", WanVariantType.T2V_A14B, expert))
+    output = invocation.invoke(context)
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
+    assert any("only this one expert will run" in warning.lower() for warning in _warnings(context))
+
+
+def test_gguf_loader_hints_at_the_expert_swap_for_an_unpaired_low_noise_model() -> None:
+    invocation, context = _prepare(_config("main", WanVariantType.T2V_A14B, "low"))
+    invocation.invoke(context)
+
+    assert any("high-noise one is usually the better choice" in warning for warning in _warnings(context))
+
+
+def test_gguf_loader_rejects_the_same_model_in_both_transformer_slots() -> None:
+    """Wiring one model twice used to fail the {high, low} pair check. It must stay an error:
+    the denoiser would unload and reload the same multi-GB expert at every boundary crossing."""
+    main_config = _config("main", WanVariantType.T2V_A14B, "high")
+    with pytest.raises(ValueError, match="same model"):
+        _invoke(main_config, main_config, low_key="main")
+
+
+@pytest.mark.parametrize("main_expert,low_expert", [("low", "high"), ("low", "none"), ("none", "high")])
+def test_gguf_loader_warns_when_it_swaps_the_wired_experts(main_expert: str, low_expert: str) -> None:
+    """The swap overrides explicit wiring on the strength of a filename tag, so a mistagged
+    file must not invert the two experts silently."""
+    invocation, context = _prepare(
+        _config("main", WanVariantType.I2V_A14B, main_expert),
+        _config("low", WanVariantType.I2V_A14B, low_expert),
+    )
+    output = invocation.invoke(context)
+
+    assert output.transformer.transformer.key == "low"
+    assert any("swapped" in warning for warning in _warnings(context))
+
+
+@pytest.mark.parametrize("main_expert,low_expert", [("high", "low"), ("high", "none"), ("none", "low")])
+def test_gguf_loader_is_quiet_when_the_wiring_stands(main_expert: str, low_expert: str) -> None:
+    invocation, context = _prepare(
+        _config("main", WanVariantType.I2V_A14B, main_expert),
+        _config("low", WanVariantType.I2V_A14B, low_expert),
+    )
+    invocation.invoke(context)
+
+    assert _warnings(context) == []
+
+
+def test_gguf_loader_warns_when_neither_expert_is_tagged() -> None:
+    invocation, context = _prepare(
+        _config("main", WanVariantType.I2V_A14B, "none"),
+        _config("low", WanVariantType.I2V_A14B, "none"),
+    )
+    invocation.invoke(context)
+
+    assert any("Neither Wan A14B filename identifies its expert" in warning for warning in _warnings(context))
 
 
 @pytest.mark.parametrize(
@@ -319,3 +412,84 @@ def test_loader_rejects_forged_component_source_even_with_standalone_components(
                 type=ModelType.Main,
             ),
         )
+
+
+# --- Single-file safetensors checkpoints (#9463) ---------------------------------
+
+
+@pytest.mark.parametrize("variant", [WanVariantType.T2V_A14B, WanVariantType.I2V_A14B])
+def test_checkpoint_main_accepts_expert_pair(variant: WanVariantType) -> None:
+    output = _invoke(
+        _config("main", variant, "high", format=ModelFormat.Checkpoint),
+        _config("low", variant, "low", format=ModelFormat.Checkpoint),
+    )
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == "low"
+
+
+@pytest.mark.parametrize(
+    "main_format,low_format",
+    [
+        (ModelFormat.Checkpoint, ModelFormat.GGUFQuantized),
+        (ModelFormat.GGUFQuantized, ModelFormat.Checkpoint),
+    ],
+)
+def test_experts_may_mix_single_file_formats(main_format: ModelFormat, low_format: ModelFormat) -> None:
+    """Both single-file loaders produce a plain WanTransformer3DModel, so a GGUF
+    high-noise expert pairs fine with a safetensors low-noise one."""
+    output = _invoke(
+        _config("main", WanVariantType.T2V_A14B, "high", format=main_format),
+        _config("low", WanVariantType.T2V_A14B, "low", format=low_format),
+    )
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is not None
+    assert output.transformer.transformer_low_noise.key == "low"
+
+
+def test_checkpoint_ti2v_5b_runs_unpaired() -> None:
+    output = _invoke(_config("main", WanVariantType.TI2V_5B, "none", format=ModelFormat.Checkpoint))
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
+
+
+@pytest.mark.parametrize("expert", ["high", "low", "none"])
+def test_checkpoint_main_runs_unpaired_whatever_its_tag(expert: str) -> None:
+    """The checkpoint path takes the same wiring-first rule #9505 gave the GGUF path: a
+    single wired transformer is explicit intent, and the tag is only a filename guess.
+    Untagged community checkpoints are the common case this branch exists to support, so
+    they must not be fatal here when the paired path accepts them."""
+    invocation, context = _prepare(_config("main", WanVariantType.T2V_A14B, expert, format=ModelFormat.Checkpoint))
+    output = invocation.invoke(context)
+
+    assert output.transformer.transformer.key == "main"
+    assert output.transformer.transformer_low_noise is None
+    assert any("only this one expert will run" in warning.lower() for warning in _warnings(context))
+
+
+def test_low_noise_slot_rejects_a_diffusers_model() -> None:
+    with pytest.raises(ValueError, match="single-file"):
+        _invoke(
+            _config("main", WanVariantType.T2V_A14B, "high", format=ModelFormat.Checkpoint),
+            _config("low", WanVariantType.T2V_A14B, "low", format=ModelFormat.Diffusers),
+        )
+
+
+def test_checkpoint_main_uses_component_source_boundary() -> None:
+    output = _invoke(
+        _config("main", WanVariantType.T2V_A14B, "high", format=ModelFormat.Checkpoint),
+        _config("low", WanVariantType.T2V_A14B, "low", format=ModelFormat.Checkpoint),
+        _config(
+            "component",
+            WanVariantType.T2V_A14B,
+            "none",
+            format=ModelFormat.Diffusers,
+            has_dual_expert=True,
+            boundary_ratio=0.5,
+        ),
+    )
+
+    assert output.transformer.boundary_ratio == 0.5

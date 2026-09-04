@@ -36,6 +36,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
@@ -438,7 +439,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # slower inference than direct patching, but is agnostic to the quantization format.
             if transformer_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 model_is_quantized = False
-            elif transformer_config.format in [ModelFormat.GGUFQuantized]:
+            elif transformer_config.format in [ModelFormat.GGUFQuantized, ModelFormat.SDNQQuantized]:
                 model_is_quantized = True
             else:
                 raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")
@@ -586,7 +587,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     timestep = torch.tensor([model_t], device=device, dtype=inference_dtype).expand(latents.shape[0])
 
                     # Run transformer for positive prediction
-                    latent_model_input = latents.to(transformer.dtype)
+                    # `transformer.dtype` is the float8 *storage* dtype once FP8 storage is on, and
+                    # torch has no arithmetic kernels for it (see `get_model_compute_dtype`).
+                    latent_model_input = latents.to(get_model_compute_dtype(transformer))
                     latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
                     latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
@@ -700,7 +703,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     # Run transformer for positive prediction
                     # Z-Image transformer expects: x as list of [C, 1, H, W] tensors, t, cap_feats as list
                     # Prepare latent input: [B, C, H, W] -> [B, C, 1, H, W] -> list of [C, 1, H, W]
-                    latent_model_input = latents.to(transformer.dtype)
+                    # See above: never build tensors from the float8 storage dtype.
+                    latent_model_input = latents.to(get_model_compute_dtype(transformer))
                     latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
                     latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
