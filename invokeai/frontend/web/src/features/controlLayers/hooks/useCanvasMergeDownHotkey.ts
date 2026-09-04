@@ -21,11 +21,9 @@ export const useCanvasMergeDownHotkey = () => {
       return;
     }
     isMergeInFlightRef.current = true;
-    void canvasManager.compositor
-      .mergeByEntityIdentifiers([entityIdentifierBelowThisOne, selectedEntityIdentifier], true)
-      .finally(() => {
-        isMergeInFlightRef.current = false;
-      });
+    void canvasManager.compositor.mergeDown(entityIdentifierBelowThisOne, selectedEntityIdentifier).finally(() => {
+      isMergeInFlightRef.current = false;
+    });
   }, [canvasManager.compositor, entityIdentifierBelowThisOne, selectedEntityIdentifier]);
 
   const isEnabled = useMemo(

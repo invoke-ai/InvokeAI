@@ -24,6 +24,9 @@ const zCanvasWorkflowIntegrationState = z.object({
 });
 
 type CanvasWorkflowIntegrationState = z.infer<typeof zCanvasWorkflowIntegrationState>;
+export type CanvasWorkflowSourceEntityIdentifier = CanvasEntityIdentifier<
+  'raster_layer' | 'control_layer' | 'regional_guidance' | 'inpaint_mask'
+>;
 
 const getInitialState = (): CanvasWorkflowIntegrationState => ({
   _version: 1,
@@ -41,7 +44,7 @@ const slice = createSlice({
   reducers: {
     canvasWorkflowIntegrationOpened: (
       state,
-      action: PayloadAction<{ sourceEntityIdentifier: CanvasEntityIdentifier }>
+      action: PayloadAction<{ sourceEntityIdentifier: CanvasWorkflowSourceEntityIdentifier }>
     ) => {
       state.isOpen = true;
       state.sourceEntityIdentifier = action.payload.sourceEntityIdentifier;

@@ -422,7 +422,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
    * Synchronizes the entity's objects with the canvas.
    */
   syncObjects = async () => {
-    this.$isEmpty.set(this.state.objects.length === 0);
+    this.$isEmpty.set('objects' in this.state ? this.state.objects.length === 0 : true);
     const didRender = await this.renderer.render();
     if (didRender) {
       // If the objects have changed, we need to recalculate the transformer's bounding box.
