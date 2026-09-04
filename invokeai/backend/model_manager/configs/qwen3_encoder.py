@@ -1,7 +1,10 @@
 import json
+from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
+from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -52,15 +55,42 @@ def _has_sdnq_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, SDNQTensor) for v in state_dict.values())
 
 
-def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
-    """Check if state dict has SDNQ-style keys (weight + scale pairs)."""
-    keys = {k for k in state_dict.keys() if isinstance(k, str)}
-    for key in keys:
+def _keys_look_sdnq(keys: Iterable[str]) -> bool:
+    """Check if a set of tensor names has SDNQ-style keys (weight + scale pairs)."""
+    key_set = {k for k in keys if isinstance(k, str)}
+    for key in key_set:
         if key.endswith(".weight"):
             base = key[:-7]
-            if f"{base}.scale" in keys:
+            if f"{base}.scale" in key_set:
                 return True
     return False
+
+
+def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict has SDNQ-style keys (weight + scale pairs)."""
+    return _keys_look_sdnq(k for k in state_dict.keys() if isinstance(k, str))
+
+
+def _files_look_sdnq_quantized(files: Iterable[Path]) -> bool:
+    """Best-effort SDNQ key check over safetensors files, safe for sharded checkpoints.
+
+    ``ModelOnDisk.load_state_dict()`` refuses to pick a file when a folder holds more than one weight
+    file, so calling it on a *sharded* encoder raises ValueError instead of a NotAMatchError - which
+    aborts identification for that config entirely. FLUX.2 Klein's ``text_encoder+tokenizer`` download
+    ships the Qwen3 encoder as 2-4 safetensors shards, so the SDNQ fallback must never go through
+    ``load_state_dict()``. We only need tensor *names* here, so read them from the safetensors headers:
+    cheap, per-shard, and no tensor data is materialized.
+    """
+    keys: set[str] = set()
+    for file in files:
+        if file.suffix != ".safetensors":
+            continue
+        try:
+            with safe_open(file, framework="pt", device="cpu") as f:
+                keys.update(f.keys())
+        except Exception:
+            continue
+    return _keys_look_sdnq(keys)
 
 
 def _has_t5_encoder_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -357,7 +387,7 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             if quant_config.get("quant_method") == "sdnq":
                 raise NotAMatchError("folder is SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
 
-        if _has_sdnq_keys(mod.load_state_dict()):
+        if _files_look_sdnq_quantized(mod.weight_files()):
             raise NotAMatchError("state dict looks SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
 
     @classmethod
@@ -539,11 +569,8 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
         # Fallback: check if safetensors files have SDNQ-style keys
         if not matched:
-            safetensors_files = list(mod.path.glob("*.safetensors"))
-            if safetensors_files:
-                state_dict = mod.load_state_dict()
-                if _has_sdnq_keys(state_dict):
-                    matched = True
+            if _files_look_sdnq_quantized(mod.path.glob("*.safetensors")):
+                matched = True
 
         if not matched:
             raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
