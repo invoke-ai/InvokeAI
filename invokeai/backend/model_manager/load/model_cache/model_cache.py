@@ -788,7 +788,8 @@ class ModelCache:
             prefetch: The model is being cached opportunistically (e.g. the unused submodels of a
                 single-file pipeline load) and no loader will retrieve it after this call. It is
                 admitted without the post-admission grace, so budget reconciles may evict it
-                immediately.
+                immediately -- and it is refused outright once the cache has shut down, where
+                nothing is guaranteed to evict it either.
             claim_admission: Shield the new record with an owned first-use hold, alongside the
                 swept post-admission grace, and return the claim that owns it (None if no hold
                 could be armed, or if this call was a no-op because the key was already resident).
@@ -823,6 +824,38 @@ class ModelCache:
         # proceeds on the detached record.)
         for stale_entry in self._cached_models.values():
             stale_entry.awaiting_first_use = False
+
+        # A prefetch admission into a cache that has already shut down has no *guaranteed*
+        # releaser -- the same standard the post-admission grace is withheld under, below.
+        # Prefetch is the promise that no loader will come back for this record, so there is no
+        # get() -> lock() -> unlock() to run the stale eviction below, no wrapper whose finalizer
+        # could carry an abandonment release, and no claim whose expiry could stand in for
+        # either. What is left are the paths that may or may not run -- another admission's
+        # make_room, a budget reconcile, a peer's eviction request, the eviction sweep of a worker
+        # death -- and after shutdown not one of them is guaranteed to come. The record is
+        # therefore reclaimable only by luck, and otherwise holds its model, its shared-store
+        # reference and its budget charge until the cache object is collected.
+        #
+        # Refusing costs only a reload. The sole caller (the single-file pipeline's submodel
+        # prefetch) takes the submodel it was actually asked for from the pipeline object, not
+        # from the cache, and discards the rest with the pipeline; a later load reads them from
+        # disk again.
+        #
+        # Placement, each bound of which is load-bearing:
+        # - after _ensure_deferred_worker() above, because a post-shutdown prefetch must still
+        #   revive the worker that carries the shutdown-retained records' abandonment releases;
+        # - after the stale-grace sweep above, because on a shut-down cache with a LIVE worker
+        #   that sweep is the only backstop a stale grace has left (shutdown() runs the recovery
+        #   only when no worker is alive), so returning above it would strand the very kind of
+        #   record this method is careful never to strand;
+        # - before _make_room_internal below, so nothing resident is evicted to house a model this
+        #   call is about to refuse.
+        if prefetch and self._shutdown_event.is_set():
+            self._logger.debug(
+                f"Refusing prefetch admission of {key} into a cache that has been shut down: "
+                "nothing will retrieve it, and nothing is guaranteed to release it."
+            )
+            return None
 
         size = calc_model_size_by_data(self._logger, model)
         self._make_room_internal(size)
@@ -1107,8 +1140,9 @@ class ModelCache:
         except RuntimeError:
             # Thread/pid exhaustion (RLIMIT_NPROC, a container's pids.max). Deferred work is an
             # optimization, so it must not take the model load that this put() is completing down
-            # with it. _dispatch_deferred drops work while no worker is running, and the next put()
-            # both retries the start and clears stale grace flags itself, so no record can stay
+            # with it. _dispatch_deferred drops reconciles while no worker is running (it keeps
+            # abandonment releases, whose holders are already gone), and the next put() both
+            # retries the start and clears stale grace flags itself, so no record can stay
             # shielded from eviction indefinitely.
             self._logger.warning(
                 "Could not start the model-cache deferred-work thread; deferred cache work is disabled until the "
@@ -1128,16 +1162,36 @@ class ModelCache:
 
         Neither caller may block: release_first_use_grace() runs inside a weakref finalizer (see its
         docstring) and cached_model_keys() has a no-stall contract. `SimpleQueue.put()` satisfies
-        both, but only the worker ever drains the queue, so enqueueing while no worker is running
-        would grow it without bound. Drop the item instead.
+        both, and only the worker ever drains the queue, so what to do while no worker is running
+        differs by the kind of work.
 
-        Dropping loses nothing irrecoverable, because the shields this queue releases are only
-        granted while a worker is running (put()'s grace and register_first_use_hold's holds are
-        both gated on worker liveness). A dropped release can therefore only belong to a shield
-        granted under a worker that has since died — and every dead-worker recovery zeros exactly
-        those holds (from the dying worker itself, and as a backstop at the next worker start and
-        at shutdown), while put() sweeps stale grace flags itself. A dropped reconcile is re-run by
-        the synchronized release hook of the next cache operation. What must never happen is a
+        A reconcile is dropped: cached_model_keys() can request one on every call, so keeping them
+        would grow the queue without bound, and the synchronized release hook of the next cache
+        operation re-runs it anyway.
+
+        An abandonment release is KEPT. Its holder is already gone — finalizers fire once — so no
+        lock, no unlock and no second finalizer is ever coming for that record; this item is the
+        only thing left that can retire it. Dropping it is what leaves a record the shutdown sweep
+        retained resident, stale and charged for the life of the process. No later sweep can repair
+        that, either: dead-worker recovery zeros the record's hold, and from that moment a record
+        whose holder is gone looks exactly like one a live wrapper is still holding, where
+        retention is not merely acceptable but required (evicting it would release shared-store
+        ownership while the tensors live on — see _evict_stale_unshielded_entries). Keeping the
+        item is what preserves that distinction: whichever worker runs next drains it, and
+        _release_abandoned_holder acts on the record's own evidence instead of on a guess.
+
+        The backlog this can build is one item -- a weak reference and two scalars -- per holder
+        abandoned while no worker runs, and an item whose record has since gone drains as a
+        no-op. Nothing caps that count directly, so the honest statement is that it is capped by
+        what re-enables the gate above it: a hold is only ever armed while a worker is alive, and
+        the only other thing that reaches this method is a wrapper abandoned while its record's
+        put()-set grace still stands -- a flag any lock() clears, and the sweep at the top of the
+        next put() clears for every record, including under the thread exhaustion that is the one
+        way a worker stays unstartable.
+
+        The shields themselves are still lifted by the dead-worker recovery rather than by this
+        queue — put()'s grace and register_first_use_hold's holds are both granted only while a
+        worker is running, and put() sweeps stale grace flags itself. What must never happen is a
         record that is shielded with nothing left to unshield it; that is what the pairing of these
         rules prevents.
 
@@ -1152,7 +1206,8 @@ class ModelCache:
         """
         thread = self._deferred_work_thread
         if thread is None or not thread.is_alive():
-            return
+            if not isinstance(work, _AbandonedHolderRelease):
+                return
         self._deferred_work_queue.put(work)
 
     @synchronized

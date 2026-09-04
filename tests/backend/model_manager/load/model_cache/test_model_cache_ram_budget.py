@@ -1304,6 +1304,47 @@ def test_queued_abandonment_release_does_not_pin_its_record(mock_logger):
         unblock.set()
 
 
+def test_post_shutdown_prefetch_admission_is_refused(mock_logger):
+    """A prefetch admission into a shut-down cache must not be admitted at all.
+
+    Prefetch means nothing will ever retrieve this record, so it has no releaser: no get() ->
+    lock() -> unlock() to run the stale eviction, no wrapper whose finalizer could carry an
+    abandonment release, and no claim to expire. Unlike an ordinary post-shutdown admission -- kept
+    because its loader really is still coming for it -- there is nobody to keep it for, so
+    admitting it would pin the model, its shared-store reference and its budget bytes until the
+    process exits."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("early", DummyModule())
+    _use_and_release(cache, "early")
+    cache.shutdown()
+    # The worker deliberately outlives shutdown(), so worker liveness is not what refuses this.
+    assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
+
+    cache.put("late", DummyModule(), prefetch=True)
+    assert "late" not in cache._cached_models, "a prefetch nothing can ever release was admitted"
+    assert store.refcount("late") == 0
+    assert budget.total_in_use() == 0
+
+    # The refusal is scoped to prefetch: an ordinary admission is still kept for the loader that
+    # is going to come back for it.
+    cache.put("in_flight", DummyModule())
+    assert "in_flight" in cache._cached_models
+
+    # And the refusal comes *after* the worker revival, not instead of it: a post-shutdown
+    # prefetch is still one of the events that restores the worker the shutdown-retained records
+    # depend on for their abandonment releases.
+    cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+    cache._deferred_work_thread.join(timeout=10)
+    assert not cache._deferred_work_thread.is_alive()
+    cache.put("later", DummyModule(), prefetch=True)
+    assert "later" not in cache._cached_models
+    assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive(), (
+        "a post-shutdown prefetch was refused before it could revive the worker"
+    )
+
+
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
 def test_shutdown_lifts_a_grace_the_dying_worker_left_standing(mock_logger):
     """The dying worker deliberately leaves a live cache's admission grace alone — the sweep at the
@@ -1363,6 +1404,152 @@ def test_worker_start_retries_a_recovery_that_failed_partway(mock_logger):
     cache.shutdown()
     assert "m" not in cache._cached_models
     assert store.refcount("m") == 0
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_abandonment_release_survives_the_worker_that_should_have_carried_it(mock_logger):
+    """A holder abandoned while no worker is running must still retire its record.
+
+    The holder is gone by then -- finalizers fire once -- so its release is the only thing left
+    that can evict the record: no lock, no unlock and no second finalizer is coming. Dropping it
+    strands a shutdown-retained record, resident and charged, for the life of the process, and no
+    later sweep can repair that: the dead-worker recovery zeroes the hold, after which this record
+    is indistinguishable from one a live wrapper is still holding (where retention is required --
+    see test_dead_worker_recovery_at_admission_keeps_a_retained_records_accounting). Keeping the
+    item is what preserves the distinction."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    loaded_model = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+    record = loaded_model._cache_record
+    assert record.first_use_holds == 1
+
+    # shutdown() retains the held record rather than evicting it out from under the live wrapper.
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record and record.is_stale
+
+    # The worker then dies without running its own recovery (a fork, or a death this raced), and
+    # the wrapper is dropped with no worker to carry its release.
+    cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+    assert cache._deferred_work_thread is not None
+    cache._deferred_work_thread.join(timeout=10)
+    del loaded_model
+    _collect_until(lambda: False)
+    assert cache._cached_models.get("m") is record, "premise broken: something else evicted it"
+
+    # The next admission starts a replacement worker, which drains the release that was kept.
+    cache.put("next", DummyModule())
+    assert _wait_until(lambda: "m" not in cache._cached_models), (
+        "the abandonment release was dropped, stranding a record nothing else can retire"
+    )
+    assert _wait_until(lambda: store.refcount("m") == 0)
+
+
+@pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
+def test_a_kept_release_respects_a_hold_armed_under_the_replacement_worker(mock_logger):
+    """The other half of the same rule: keeping the release must not become a licence to evict.
+
+    A kept item is drained by a worker that started long after it was enqueued, so it must act on
+    the record's evidence at drain time rather than on the state its holder left behind. Here a
+    second wrapper arms a fresh hold in the very `register_first_use_hold` frame that starts the
+    replacement worker -- so the drain cannot land between the recovery's zeroing and the new hold
+    -- and the drained release must leave that record alone. Retiring it would release
+    shared-store ownership while the tensors live on, which is the accounting lie that lets a
+    peer's reload mint a duplicate canonical the budget counts once.
+
+    What this does NOT claim is that a kept release protects every live holder. Once dead-worker
+    recovery has zeroed the holds and no wrapper has re-armed one, a record whose holder is gone
+    is indistinguishable from one a live wrapper is still holding, and the release evicts it --
+    the same trade _evict_stale_unshielded_entries already makes on the abnormal-death path, and
+    for the same reason: a permanently shielded record is worse than an unshielded one."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    cache.put("m", DummyModule())
+    _use_and_release(cache, "m")
+    wrapper_a = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+    record = wrapper_a._cache_record
+    assert record.first_use_holds == 1
+
+    cache.shutdown()
+    assert cache._cached_models.get("m") is record and record.is_stale
+
+    # The worker dies without running its own recovery, and wrapper A is dropped with no worker
+    # left to carry its release.
+    cache._deferred_work_queue.put(model_cache_module._DEFERRED_STOP)
+    assert cache._deferred_work_thread is not None
+    cache._deferred_work_thread.join(timeout=10)
+    del wrapper_a
+    _collect_until(lambda: False)
+    assert cache._deferred_work_queue.qsize() == 1, "the abandonment release was not kept"
+
+    # Observe the handler's completion rather than the queue's depth: the worker pops an item
+    # before _release_abandoned_holder (which is @synchronized) has acquired the cache lock, so
+    # an empty queue proves nothing about what the release did.
+    released = threading.Event()
+    real_release = cache._release_abandoned_holder
+
+    def _spy(cache_entry, held_first_use, hold_epoch):
+        try:
+            real_release(cache_entry, held_first_use, hold_epoch)
+        finally:
+            released.set()
+
+    cache._release_abandoned_holder = _spy
+
+    # register_first_use_hold is synchronized and starts the replacement worker itself, so the
+    # recovery's zeroing and wrapper B's hold happen in one lock acquisition.
+    wrapper_b = LoadedModelWithoutConfig(cache_record=cache.get("m"), cache=cache)
+    assert record.first_use_holds == 1, "premise broken: wrapper B never armed a hold"
+    assert released.wait(timeout=10), "the kept release was never drained"
+
+    assert cache._cached_models.get("m") is record, "a record a live wrapper still holds was retired"
+    assert store.refcount("m") == 1, "shared-store ownership was released while the tensors live on"
+
+    # And it still settles once that holder is done with it.
+    with wrapper_b as _model:
+        pass
+    assert _wait_until(lambda: "m" not in cache._cached_models)
+    assert _wait_until(lambda: store.refcount("m") == 0)
+
+
+def test_a_refused_prefetch_still_sweeps_an_orphaned_grace(mock_logger):
+    """Refusing a post-shutdown prefetch must not cost the sweep that put() runs on the way in.
+
+    On a shut-down cache with a LIVE worker that sweep is the only backstop a stale
+    post-admission grace has left: shutdown() runs _recover_stranded_shields() only when no
+    worker is alive, and no other path clears the flag. Returning above the sweep would therefore
+    trade an admitted-but-reclaimable record for a permanently shielded one -- a record no
+    reconcile, no peer eviction and no stale sweep can ever see again -- which is the failure this
+    whole mechanism exists to prevent."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 1.4), shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    # A load cancelled between put() and get(): the grace stands with no wrapper to release it.
+    cache.put("orphaned", DummyModule())
+    record = cache._cached_models["orphaned"]
+    assert record.awaiting_first_use
+
+    cache.shutdown()
+    # The worker is alive across shutdown(), so shutdown() itself does not lift the grace and the
+    # record is stale-retained inside its admission window.
+    assert cache._deferred_work_thread is not None and cache._deferred_work_thread.is_alive()
+    assert cache._cached_models.get("orphaned") is record and record.is_stale
+    assert record.awaiting_first_use
+
+    cache.put("late", DummyModule(), prefetch=True)
+    assert "late" not in cache._cached_models, "a prefetch nothing can ever release was admitted"
+    assert not record.awaiting_first_use, "the refused prefetch skipped the sweep the grace depends on"
+
+    # Unshielded, the stale record is reclaimable again by the ordinary asynchronous paths. A
+    # peer's admission overshoots the shared budget and asks this cache to reconcile.
+    budget.add_non_shared(S)
+    cache.request_budget_reconcile()
+    assert _wait_until(lambda: "orphaned" not in cache._cached_models)
+    assert _wait_until(lambda: store.refcount("orphaned") == 0)
+    assert _wait_until(lambda: budget.available() >= 0)
 
 
 def test_hold_recovery_unshields_every_record_before_reporting_any(mock_logger):
