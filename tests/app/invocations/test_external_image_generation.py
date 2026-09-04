@@ -4,7 +4,10 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-from invokeai.app.invocations.external_image_generation import OpenAIImageGenerationInvocation
+from invokeai.app.invocations.external_image_generation import (
+    FalImageGenerationInvocation,
+    OpenAIImageGenerationInvocation,
+)
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.external_generation.external_generation_common import (
@@ -84,6 +87,44 @@ def test_provider_specific_external_invocation_rejects_wrong_provider() -> None:
 
     with pytest.raises(ValueError, match="does not match node provider"):
         invocation.invoke(context)
+
+
+def test_fal_invocation_forwards_advanced_schema_options() -> None:
+    model_config = _build_model().model_copy(update={"provider_id": "fal", "provider_model_id": "fal-ai/custom"})
+    model_field = ModelIdentifierField.from_config(model_config)
+    generated_image = Image.new("RGB", (16, 16), color="black")
+    context = _build_context(model_config, generated_image)
+
+    invocation = FalImageGenerationInvocation(
+        id="fal_node",
+        model=model_field,
+        mode="txt2img",
+        prompt="A prompt",
+        advanced_options={"style": "cinematic", "num_inference_steps": 4},
+    )
+
+    invocation.invoke(context)
+
+    request = context._services.external_generation.generate.call_args[0][0]
+    assert request.provider_options == {"advanced": {"style": "cinematic", "num_inference_steps": 4}}
+
+
+def test_fal_invocation_requires_fal_model() -> None:
+    model_config = _build_model().model_copy(update={"provider_id": "fal", "provider_model_id": "fal-ai/flux/schnell"})
+    model_field = ModelIdentifierField.from_config(model_config)
+    generated_image = Image.new("RGB", (16, 16), color="black")
+    context = _build_context(model_config, generated_image)
+
+    invocation = FalImageGenerationInvocation(
+        id="fal_node",
+        model=model_field,
+        mode="txt2img",
+        prompt="A prompt",
+    )
+
+    invocation.invoke(context)
+
+    assert context._services.external_generation.generate.call_args[0][0].model.provider_id == "fal"
 
 
 def test_external_graph_execution_state_runs_node() -> None:

@@ -6,6 +6,7 @@ bundle exists, exposes both the diffusers and GGUF options, and that each GGUF e
 standalone dependencies so installing it also pulls the pieces needed to run it.
 """
 
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelDefaultSettings
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
@@ -22,6 +23,24 @@ from invokeai.backend.model_manager.taxonomy import (
 def _krea2_bundle_by_source() -> dict[str, StarterModel]:
     bundle = STARTER_BUNDLES[BaseModelType.Krea2]
     return {model.source: model for model in bundle.models}
+
+
+def test_fal_external_models_are_registered_with_canvas_capabilities() -> None:
+    models = {model.source: model for model in STARTER_MODELS if model.source.startswith("external://fal/")}
+
+    assert set(models) == {
+        "external://fal/fal-ai/flux/schnell",
+        "external://fal/fal-ai/flux/dev",
+        "external://fal/fal-ai/flux-pro/kontext",
+        "external://fal/fal-ai/flux-lora-fill",
+    }
+    assert models["external://fal/fal-ai/flux/schnell"].capabilities.modes == ["txt2img"]
+    assert models["external://fal/fal-ai/flux-pro/kontext"].capabilities.modes == ["img2img"]
+    assert models["external://fal/fal-ai/flux-pro/kontext"].capabilities.input_image_required_for == ["img2img"]
+    fill = models["external://fal/fal-ai/flux-lora-fill"]
+    assert fill.capabilities.modes == ["inpaint"]
+    assert fill.capabilities.mask_format == "binary"
+    assert fill.default_settings == ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1)
 
 
 def test_krea2_bundle_is_registered() -> None:
