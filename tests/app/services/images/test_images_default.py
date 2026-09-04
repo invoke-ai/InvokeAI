@@ -5,6 +5,9 @@ silent-failure contract (Points 2 & 3 from PR review), and the transactional
 staged-deletion contracts of delete() and delete_intermediates().
 """
 
+import errno
+import os
+import stat
 import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -399,6 +402,18 @@ def _save_image_file(storage: DiskImageFileStorage, image_name: str, image_subfo
 
 def _staging_dirs(storage: DiskImageFileStorage) -> list[Path]:
     return list(storage.image_root.glob(".delete_*"))
+
+
+def _failing_directory_fsync(error_number: int):
+    """An ``os.fsync`` that fails for directory descriptors only; file fsyncs still work."""
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(error_number, os.strerror(error_number))
+        real_fsync(fd)
+
+    return fsync
 
 
 @pytest.fixture
@@ -1011,6 +1026,67 @@ class TestFailedSaveCleanup:
         invoker.services.image_files.abandon_delete.assert_called_once_with(
             invoker.services.image_files.begin_delete.return_value
         )
+
+    def test_the_record_is_kept_when_the_cleanup_cannot_be_journaled(self, image_service: ImageService) -> None:
+        """No durable journal, no record deletion. Removing the record and purging blind would fail
+        at the same journal step and leave whatever survived the save as an orphan nothing can find;
+        a surviving record is what lets a later delete find and clear it."""
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.image_files.save.side_effect = ImageFileSaveException()
+        invoker.services.image_files.begin_delete.side_effect = ImageFileDeleteException("fsync: I/O error")
+
+        with pytest.raises(ImageFileSaveException):
+            image_service.create(
+                image=Image.new("RGB", (8, 8)),
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=ImageCategory.GENERAL,
+            )
+
+        invoker.services.image_records.delete.assert_not_called()
+        invoker.services.image_files.commit_delete.assert_not_called()
+        invoker.services.image_files.delete.assert_not_called()
+
+    @pytest.mark.skipif(os.name == "nt", reason="Windows cannot open a directory for fsync")
+    def test_a_leftover_file_is_never_orphaned_without_a_journal(
+        self,
+        real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+    ) -> None:
+        """Real storage, real records: the save leaves a file behind and the disk refuses to make
+        the cleanup journal durable. The record must survive, and an ordinary delete once the disk
+        is healthy must be able to clear the whole image."""
+        service, records, storage = real_image_service
+        # save() removes only what it created, so a file that already sits at the image's path is
+        # what survives a failed save.
+        leftover = storage.get_path("uploaded.png")
+        leftover.parent.mkdir(parents=True, exist_ok=True)
+        leftover.write_bytes(b"pre-existing")
+        broken_thumbnail = MagicMock()
+        broken_thumbnail.save.side_effect = OSError("thumbnail filesystem failure")
+
+        with (
+            patch(
+                "invokeai.app.services.image_files.image_files_disk.make_thumbnail",
+                return_value=broken_thumbnail,
+            ),
+            patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)),
+            pytest.raises(ImageFileSaveException),
+        ):
+            service.create(
+                image=Image.new("RGB", (32, 32), "red"),
+                image_origin=ResourceOrigin.EXTERNAL,
+                image_category=ImageCategory.GENERAL,
+            )
+
+        assert records.get("uploaded.png").image_name == "uploaded.png"
+        assert leftover.exists()
+        assert _staging_dirs(storage) == []
+
+        service.delete("uploaded.png")
+
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("uploaded.png")
+        assert not leftover.exists()
+        assert _staging_dirs(storage) == []
 
 
 class TestConcurrentBoardDeleteAgainstRealRecords:

@@ -149,7 +149,10 @@ class ImageService(ImageServiceABC):
         cosmetic: a concurrent deleter that has to roll back decides whether to restore an image's
         files by asking whether its record is still there. Purging files while the record survives
         would tell that deleter to put them back, stranding them once this cleanup finally removes
-        the record. The journal covers the window in between.
+        the record. The journal covers the window in between — and, like every other delete path,
+        the record is only removed once that journal is durable. If it cannot be, the half-created
+        image is left whole: its record marks the files for a later delete to find, whereas a record
+        removed without a journal would leave them orphaned for good.
         """
         with self._image_mutation_lock():
             # A subfolder move that ran while the file save was failing may have relocated the
@@ -169,15 +172,19 @@ class ImageService(ImageServiceABC):
                 self.__invoker.services.logger.warning(
                     f"Could not confirm the subfolder of {image_name} during save-failure cleanup: {str(lookup_error)}"
                 )
-            token: object | None = None
             try:
                 token = self.__invoker.services.image_files.begin_delete(
                     [(image_name, subfolder) for subfolder in delete_subfolders]
                 )
             except Exception as cleanup_error:
+                # No durable journal, no record deletion: the record is what keeps these files
+                # findable. Deleting it and then purging blind would fail at the same journal step
+                # and leave whatever survived the save as an orphan nothing can recover.
                 self.__invoker.services.logger.error(
-                    f"Failed to journal the cleanup of {image_name} after a save failure: {str(cleanup_error)}"
+                    f"Failed to journal the cleanup of {image_name} after a save failure; leaving the image in place "
+                    f"for a later delete: {str(cleanup_error)}"
                 )
+                return
             try:
                 # Deleting the record also removes any board association through the database foreign
                 # key cascade.
@@ -187,20 +194,15 @@ class ImageService(ImageServiceABC):
                     f"Failed to clean up image record after save failure: {str(cleanup_error)}"
                 )
                 # The record survived, so the image is still referenced; its files must stay with it.
-                if token is not None:
-                    try:
-                        self.__invoker.services.image_files.abandon_delete(token)
-                    except Exception as journal_error:
-                        self.__invoker.services.logger.error(
-                            f"Failed to discard the delete journal for {image_name}: {str(journal_error)}"
-                        )
+                try:
+                    self.__invoker.services.image_files.abandon_delete(token)
+                except Exception as journal_error:
+                    self.__invoker.services.logger.error(
+                        f"Failed to discard the delete journal for {image_name}: {str(journal_error)}"
+                    )
                 return
             try:
-                if token is None:
-                    for subfolder in delete_subfolders:
-                        self.__invoker.services.image_files.delete(image_name, image_subfolder=subfolder)
-                else:
-                    self.__invoker.services.image_files.commit_delete(token)
+                self.__invoker.services.image_files.commit_delete(token)
             except Exception as cleanup_error:
                 self.__invoker.services.logger.error(
                     f"Failed to clean up image files after save failure: {str(cleanup_error)}"
