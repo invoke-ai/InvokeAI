@@ -1,4 +1,5 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
+import errno
 import io
 import json
 import os
@@ -6,7 +7,7 @@ import shutil
 import tempfile
 import threading
 import zlib
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
@@ -299,6 +300,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # staging directory alone would strand the files the first deleter restores. Committing
             # has to mean "no file for this image survives", whichever request moved them.
             self.__purge_files(token.image_name, token.image_subfolder)
+            self.__persist_purges([(token.image_name, token.image_subfolder)])
             shutil.rmtree(token.directory)
         except Exception as e:
             raise ImageFileDeleteException from e
@@ -308,18 +310,25 @@ class DiskImageFileStorage(ImageFileStorageBase):
         # still lists every candidate, which is harmless because recovery re-checks each one against
         # the record store and skips any that survived.
         selected = image_names if image_names is None else set(image_names)
+        purged: list[tuple[str, str]] = []
         failures: list[str] = []
         for image_name, image_subfolder in token.images:
             if selected is not None and image_name not in selected:
                 continue
             try:
                 self.__purge_files(image_name, image_subfolder)
+                purged.append((image_name, image_subfolder))
             except OSError as e:
                 failures.append(f"{image_name}: {e}")
         if failures:
             # Leave the journal in place so the next startup retries every entry whose record is
             # gone. Removing it here would turn a transient storage error into a permanent orphan.
             raise ImageFileDeleteException(f"Failed to purge deleted image files: {'; '.join(failures)}")
+        try:
+            self.__persist_purges(purged)
+        except OSError as e:
+            # Same rule: the journal is the only thing that can redo a purge the disk lost.
+            raise ImageFileDeleteException(f"Failed to make the purge of deleted image files durable: {e}") from e
         shutil.rmtree(token.directory, ignore_errors=True)
 
     def rollback_delete(self, token: object) -> None:
@@ -337,6 +346,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # have been purged before this restore, and a record already absent means the purge
             # either found nothing or is still to come — either way the files must go.
             self.__purge_if_record_absent(token.image_name, token.image_subfolder)
+            self.__persist_purges([(token.image_name, token.image_subfolder)])
             shutil.rmtree(token.directory, ignore_errors=True)
         except Exception as e:
             raise ImageFileDeleteException from e
@@ -372,22 +382,47 @@ class DiskImageFileStorage(ImageFileStorageBase):
         Both fsyncs are needed: the first commits ``manifest.json``'s entry inside the journal
         directory, the second commits the journal directory's own entry in the output folder.
         Without the second, the record deletion — which SQLite does fsync — can outlive the journal
-        that is supposed to make it recoverable.
+        that is supposed to make it recoverable. A sync that fails propagates for the same reason:
+        a journal whose durability is unknown must not license a record deletion.
         """
         self.__fsync_directory(journal_dir)
         self.__fsync_directory(self.__output_folder)
 
+    def __persist_purges(self, images: Iterable[tuple[str, str]]) -> None:
+        """Makes the removal (or restoration) of these images' files survive a power loss.
+
+        Runs before the journal that names them is dropped. Unlinks and renames live in the parent
+        directories' entries, and nothing else syncs those; a filesystem that persists the
+        journal's removal ahead of them would bring the files back with no journal left to find
+        them by. Raises ``OSError`` when a sync fails, so the caller keeps the journal.
+        """
+        parents: dict[Path, None] = {}
+        for image_name, image_subfolder in images:
+            for path in self.__delete_candidates(image_name, image_subfolder):
+                parents[path.parent] = None
+        for parent in parents:
+            # A parent that no longer exists has no entries to make durable.
+            self.__fsync_directory(parent, missing_ok=True)
+
     @staticmethod
-    def __fsync_directory(directory: Path) -> None:
-        try:
-            dir_fd = os.open(directory, os.O_RDONLY)
-        except OSError:
-            # Windows cannot open a directory for fsync; the manifest write above is all we get.
+    def __fsync_directory(directory: Path, missing_ok: bool = False) -> None:
+        if os.name == "nt":
+            # Windows cannot open a directory for fsync; the manifest write is all we get.
             return
         try:
+            dir_fd = os.open(directory, os.O_RDONLY)
+        except (FileNotFoundError, NotADirectoryError):
+            if missing_ok:
+                return
+            raise
+        try:
             os.fsync(dir_fd)
-        except OSError:
-            pass
+        except OSError as e:
+            # Some filesystems cannot sync a directory at all and say so with one of these; there is
+            # nothing more to be had from them. Anything else (EIO, ENOSPC, ...) means the entries
+            # may not be on disk, and the caller must not proceed as if they were.
+            if e.errno not in (errno.EINVAL, errno.ENOTSUP, errno.EOPNOTSUPP, errno.ENOSYS, errno.EBADF):
+                raise
         finally:
             os.close(dir_fd)
 
@@ -483,7 +518,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 with open(manifest_path, encoding="utf-8") as manifest:
                     data = json.load(manifest)
                 records = self.__invoker.services.image_records
-                for image_name, image_subfolder in self.__manifest_images(data):
+                images = self.__manifest_images(data)
+                for image_name, image_subfolder in images:
                     if records.exists(image_name):
                         # Put back whatever stage_delete() moved aside. Only a single-image journal
                         # ever holds staged files, at indices 0 and 1; a pending-delete journal
@@ -506,6 +542,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
                         if not restored or records.exists(image_name):
                             continue
                     self.__purge_files(image_name, image_subfolder)
+                # Every restore and purge above must be on disk before the journal that could redo
+                # them is gone. A failed sync propagates and keeps the journal for the next startup.
+                self.__persist_purges(images)
                 shutil.rmtree(journal_dir, ignore_errors=True)
             except Exception as error:
                 # Includes a record-store fault: leave the journal for the next startup rather than

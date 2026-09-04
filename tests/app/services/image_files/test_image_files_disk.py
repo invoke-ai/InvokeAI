@@ -1,5 +1,9 @@
+import errno
 import hashlib
+import os
 import platform
+import shutil
+import stat
 import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -19,6 +23,21 @@ def _restart(storage: DiskImageFileStorage, record_exists: bool) -> DiskImageFil
     restarted = DiskImageFileStorage(storage.image_root)
     restarted.start(invoker)
     return restarted
+
+
+posix_only = pytest.mark.skipif(os.name == "nt", reason="Windows cannot open a directory for fsync")
+
+
+def _failing_directory_fsync(error_number: int):
+    """An ``os.fsync`` that fails for directory descriptors only; file fsyncs still work."""
+    real_fsync = os.fsync
+
+    def fsync(fd: int) -> None:
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            raise OSError(error_number, os.strerror(error_number))
+        real_fsync(fd)
+
+    return fsync
 
 
 @pytest.fixture
@@ -601,7 +620,7 @@ class TestJournalDurability:
         monkeypatch.setattr(
             DiskImageFileStorage,
             "_DiskImageFileStorage__fsync_directory",
-            staticmethod(lambda directory: fsynced.append(Path(directory))),
+            staticmethod(lambda directory, **_: fsynced.append(Path(directory))),
         )
         return fsynced
 
@@ -638,6 +657,193 @@ class TestJournalDurability:
         assert moved
         assert Path(token.directory) in fsynced
         assert disk_storage.image_root in [path.resolve() for path in fsynced]
+
+    @posix_only
+    def test_begin_delete_fails_when_the_journal_cannot_be_made_durable(self, disk_storage: DiskImageFileStorage):
+        """A journal whose durability is unknown must not license a record deletion: the caller
+        deletes records straight after this returns, so the failure has to surface here."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.begin_delete([("live.png", "")])
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+        assert disk_storage.get_path("live.png").exists()
+        assert disk_storage.get_path("live.png", thumbnail=True).exists()
+
+    @posix_only
+    def test_stage_delete_fails_before_moving_anything_when_the_journal_cannot_be_made_durable(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="live.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.stage_delete("live.png")
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+        assert disk_storage.get_path("live.png").exists()
+        assert disk_storage.get_path("live.png", thumbnail=True).exists()
+
+    @posix_only
+    @pytest.mark.parametrize("error_number", [errno.EINVAL, errno.ENOTSUP])
+    def test_a_filesystem_that_cannot_sync_directories_is_not_a_failure(
+        self, disk_storage: DiskImageFileStorage, error_number: int
+    ):
+        """Some filesystems refuse directory fsync outright; there is nothing more to be had from
+        them, and refusing every delete on such a volume would be worse than the risk."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(error_number)):
+            token = disk_storage.begin_delete([("gone.png", "")])
+            disk_storage.commit_delete(token)
+
+        assert not disk_storage.get_path("gone.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestPurgeDurability:
+    """The journal may only be dropped once the purge it describes is on disk.
+
+    Unlinks live in the parent directories' entries and nothing else syncs those. A filesystem that
+    persists the journal's removal ahead of the unlinks brings the files back after a power loss
+    with no journal left to find them by — the permanent orphan the journal exists to prevent.
+    """
+
+    SUBFOLDER = "2026/09/04"
+
+    def _parents(self, disk_storage: DiskImageFileStorage, image_name: str) -> set[Path]:
+        return {
+            disk_storage.get_path(image_name, image_subfolder=self.SUBFOLDER).parent.resolve(),
+            disk_storage.get_path(image_name, thumbnail=True, image_subfolder=self.SUBFOLDER).parent.resolve(),
+        }
+
+    def _assert_parents_synced_before_journal_removal(self, disk_storage, monkeypatch, image_name: str):
+        """Returns the list the patched fsync records into; rmtree of the journal asserts on it."""
+        fsynced: list[Path] = []
+        monkeypatch.setattr(
+            DiskImageFileStorage,
+            "_DiskImageFileStorage__fsync_directory",
+            staticmethod(lambda directory, **_: fsynced.append(Path(directory).resolve())),
+        )
+        real_rmtree = shutil.rmtree
+        parents = self._parents(disk_storage, image_name)
+
+        def rmtree(path, *args, **kwargs):
+            if Path(path).name.startswith(".delete_"):
+                assert parents <= set(fsynced), "the journal was dropped before the purge was made durable"
+            return real_rmtree(path, *args, **kwargs)
+
+        monkeypatch.setattr(shutil, "rmtree", rmtree)
+        return fsynced
+
+    def test_pending_commit_syncs_the_purged_directories_before_dropping_the_journal(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "gone.png")
+
+        disk_storage.commit_delete(token)
+
+        assert self._parents(disk_storage, "gone.png") <= set(fsynced)
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_staged_commit_syncs_the_purged_directories_before_dropping_the_journal(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.stage_delete("gone.png", image_subfolder=self.SUBFOLDER)
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "gone.png")
+
+        disk_storage.commit_delete(token)
+
+        assert self._parents(disk_storage, "gone.png") <= set(fsynced)
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_rollback_syncs_the_restored_directories_before_dropping_the_journal(
+        self, disk_storage: DiskImageFileStorage, monkeypatch
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="back.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.stage_delete("back.png", image_subfolder=self.SUBFOLDER)
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "back.png")
+
+        disk_storage.rollback_delete(token)
+
+        assert self._parents(disk_storage, "back.png") <= set(fsynced)
+        assert disk_storage.get_path("back.png", image_subfolder=self.SUBFOLDER).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_syncs_before_dropping_a_recovered_journal(self, disk_storage: DiskImageFileStorage, monkeypatch):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="orphan.png", image_subfolder=self.SUBFOLDER)
+        disk_storage.begin_delete([("orphan.png", self.SUBFOLDER)])
+        fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "orphan.png")
+
+        _restart(disk_storage, record_exists=False)
+
+        assert self._parents(disk_storage, "orphan.png") <= set(fsynced)
+        assert not disk_storage.get_path("orphan.png", image_subfolder=self.SUBFOLDER).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    @posix_only
+    def test_commit_keeps_the_journal_when_the_purge_cannot_be_made_durable(self, disk_storage: DiskImageFileStorage):
+        """The records are already gone, so the journal is the only thing that can redo a purge the
+        disk lost. It stays, and the next startup finishes the job."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        token = disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not disk_storage.get_path("gone.png", image_subfolder=self.SUBFOLDER).exists()
+        assert not disk_storage.get_path("gone.png", thumbnail=True, image_subfolder=self.SUBFOLDER).exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    @posix_only
+    def test_staged_commit_keeps_the_journal_when_the_purge_cannot_be_made_durable(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png")
+        token = disk_storage.stage_delete("gone.png")
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not disk_storage.get_path("gone.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    @posix_only
+    def test_startup_keeps_the_journal_when_the_purge_cannot_be_made_durable(self, disk_storage: DiskImageFileStorage):
+        """Injected fsync failure at the recovery step itself: the journal must survive that
+        startup and be finished by the next one."""
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="orphan.png")
+        disk_storage.begin_delete([("orphan.png", "")])
+
+        with patch.object(os, "fsync", _failing_directory_fsync(errno.EIO)):
+            _restart(disk_storage, record_exists=False)
+
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not disk_storage.get_path("orphan.png").exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_a_subfolder_that_no_longer_exists_does_not_block_the_commit(self, disk_storage: DiskImageFileStorage):
+        """A journal can name a subfolder whose directory is gone entirely (moved or already purged);
+        there are no entries there to make durable, so the commit completes."""
+        token = disk_storage.begin_delete([("ghost.png", "never/made")])
+
+        disk_storage.commit_delete(token)
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))
 
 
 class TestRecoveryToleratesStrayEntries:
