@@ -1,8 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
+import type { BaseQueryApi } from '@reduxjs/toolkit/query';
+import { tokenRefreshed } from 'features/auth/store/authSlice';
+import { markTokenRefreshAccepted } from 'features/auth/store/authTokenRefresh';
 import { authApi } from 'services/api/endpoints/auth';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api } from '..';
+import { api, buildV1Url, dynamicBaseQuery } from '..';
 
 /**
  * `dynamicBaseQuery` reads the bearer token out of localStorage, and `getDeploymentBaseUrl`
@@ -32,6 +35,51 @@ const buildStore = () =>
     reducer: { [api.reducerPath]: api.reducer },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(api.middleware),
   });
+
+const tokenFor = (nonce: number, epoch: number) =>
+  `header.${btoa(JSON.stringify({ user_id: 'user-1', nonce, token_epoch: epoch }))}.signature`;
+
+describe('refreshed token acceptance', () => {
+  it('accepts an epoch-changing replacement inside the routine refresh throttle window', async () => {
+    const requestToken = tokenFor(1, 0);
+    const refreshedToken = tokenFor(2, 1);
+    localStorage.setItem('auth_token', requestToken);
+    markTokenRefreshAccepted();
+
+    const dispatch = vi.fn();
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (url.endsWith('/api/v1/auth/media-cookie')) {
+        expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${refreshedToken}`);
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.resolve(
+        new Response('{}', {
+          headers: { 'content-type': 'application/json', 'X-Refreshed-Token': refreshedToken },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await dynamicBaseQuery(
+      buildV1Url('images/i/example.png'),
+      {
+        dispatch,
+        getState: () => ({}),
+        signal: new AbortController().signal,
+        abort: () => {},
+        endpoint: 'getImageDTO',
+        type: 'query',
+        forced: false,
+        extra: undefined,
+      } as unknown as BaseQueryApi,
+      {}
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(dispatch).toHaveBeenCalledWith(tokenRefreshed(refreshedToken));
+  });
+});
 
 describe('getCurrentUser', () => {
   it('does not let a replacement session read the 401 of the token it replaced', async () => {
