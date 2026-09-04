@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import io
 import time
-from typing import Any
+from dataclasses import dataclass
+from math import gcd
+from typing import Any, Literal
 
 import requests
 from PIL import Image
@@ -28,6 +30,78 @@ _DOWNLOAD_MAX_BYTES = 32 * 1024 * 1024
 _SUCCESS_STATUSES = {"completed", "succeeded"}
 _FAILURE_STATUSES = {"canceled", "cancelled", "failed"}
 
+# Atlas Cloud fronts many image models behind one endpoint, but their request schemas
+# differ: output dimensions arrive as an explicit "size" string, a named "image_size"
+# preset, or an "aspect_ratio", and batch size is spelled "num_images", "n", or is not
+# supported at all. Recording those differences per model keeps each starter model's
+# payload valid for the model it targets. Models absent from this table fall back to
+# the explicit-size schema used by most Atlas Cloud image models, so custom installs
+# via `external://atlascloud/<model_id>` keep working.
+_SizeStyle = Literal["size", "image_size", "aspect_ratio"]
+
+# Size presets spelled the way the upstream models spell them. Note that `portrait_3_4`
+# and `portrait_4_3` both describe a 3:4 portrait: the prefix fixes the orientation, not
+# the order of the digits.
+_STANDARD_SIZE_PRESETS = (
+    "square_hd",
+    "square",
+    "portrait_3_4",
+    "portrait_9_16",
+    "landscape_4_3",
+    "landscape_16_9",
+)
+_HIDREAM_SIZE_PRESETS = (
+    "square_hd",
+    "square",
+    "portrait_4_3",
+    "portrait_16_9",
+    "landscape_4_3",
+    "landscape_16_9",
+)
+
+
+@dataclass(frozen=True)
+class _AtlasModelSchema:
+    """Request fields accepted by a single Atlas Cloud image model."""
+
+    size_style: _SizeStyle = "size"
+    size_presets: tuple[str, ...] = ()
+    num_images_field: str | None = "num_images"
+    supports_seed: bool = True
+    resolution_field: str | None = None
+
+
+_DEFAULT_MODEL_SCHEMA = _AtlasModelSchema()
+
+_MODEL_SCHEMAS: dict[str, _AtlasModelSchema] = {
+    # Explicit "<width>*<height>" size string
+    "black-forest-labs/flux-schnell": _AtlasModelSchema(),
+    "black-forest-labs/flux-dev": _AtlasModelSchema(),
+    "black-forest-labs/flux-2-pro/text-to-image": _AtlasModelSchema(num_images_field=None),
+    "qwen-image-3.0/text-to-image": _AtlasModelSchema(num_images_field="n"),
+    "z-image/turbo": _AtlasModelSchema(num_images_field=None),
+    "microsoft/mai-image-2.5/text-to-image": _AtlasModelSchema(num_images_field=None, supports_seed=False),
+    # Named "image_size" preset
+    "ideogram/v4/turbo/text-to-image": _AtlasModelSchema(
+        size_style="image_size", size_presets=_STANDARD_SIZE_PRESETS, num_images_field=None
+    ),
+    "ideogram/v4/quality/text-to-image": _AtlasModelSchema(
+        size_style="image_size", size_presets=_STANDARD_SIZE_PRESETS, num_images_field=None
+    ),
+    "krea-2-turbo/text-to-image": _AtlasModelSchema(size_style="image_size", size_presets=_STANDARD_SIZE_PRESETS),
+    "hidream-o1-1.5/text-to-image": _AtlasModelSchema(
+        size_style="image_size",
+        size_presets=_HIDREAM_SIZE_PRESETS,
+        num_images_field=None,
+        supports_seed=False,
+    ),
+    # "aspect_ratio" string
+    "xai/grok-imagine-image-2.0/text-to-image": _AtlasModelSchema(size_style="aspect_ratio", supports_seed=False),
+    "google/nano-banana-2/text-to-image": _AtlasModelSchema(
+        size_style="aspect_ratio", num_images_field=None, resolution_field="resolution"
+    ),
+}
+
 
 class AtlasCloudProvider(ExternalProvider):
     provider_id = "atlascloud"
@@ -45,14 +119,7 @@ class AtlasCloudProvider(ExternalProvider):
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
-        payload: dict[str, object] = {
-            "model": request.model.provider_model_id,
-            "prompt": request.prompt,
-            "size": f"{request.width}*{request.height}",
-            "num_images": request.num_images,
-        }
-        if request.seed is not None:
-            payload["seed"] = request.seed
+        payload = self._build_payload(request)
 
         submit_url = f"{base_url}/api/v1/model/generateImage"
         try:
@@ -89,6 +156,35 @@ class AtlasCloudProvider(ExternalProvider):
                 "status": str(completed.get("status", "succeeded")),
             },
         )
+
+    def _build_payload(self, request: ExternalGenerationRequest) -> dict[str, object]:
+        """Build a submission payload using the request fields the target model accepts."""
+        model_id = request.model.provider_model_id
+        schema = _MODEL_SCHEMAS.get(model_id, _DEFAULT_MODEL_SCHEMA)
+        payload: dict[str, object] = {"model": model_id, "prompt": request.prompt}
+
+        if schema.size_style == "size":
+            payload["size"] = f"{request.width}*{request.height}"
+        elif schema.size_style == "image_size":
+            payload["image_size"] = _select_size_preset(request.width, request.height, schema.size_presets)
+        else:
+            aspect_ratio = _select_aspect_ratio(
+                request.width, request.height, request.model.capabilities.allowed_aspect_ratios
+            )
+            if aspect_ratio is not None:
+                payload["aspect_ratio"] = aspect_ratio
+
+        # Resolution presets are named "1K"/"2K"/"4K" in Invoke and lowercase upstream.
+        if schema.resolution_field is not None and request.image_size is not None:
+            payload[schema.resolution_field] = request.image_size.lower()
+
+        if schema.num_images_field is not None:
+            payload[schema.num_images_field] = request.num_images
+
+        if schema.supports_seed and request.seed is not None:
+            payload["seed"] = request.seed
+
+        return payload
 
     def _poll_prediction(
         self,
@@ -208,3 +304,53 @@ def _parse_retry_after(value: str | None) -> float | None:
         return float(value)
     except ValueError:
         return None
+
+
+def _select_size_preset(width: int, height: int, presets: tuple[str, ...]) -> str:
+    """Pick the named size preset whose aspect ratio is closest to the requested one."""
+    if not presets:
+        presets = _STANDARD_SIZE_PRESETS
+    if height <= 0 or width <= 0:
+        return presets[0]
+    ratio = width / height
+    return min(presets, key=lambda preset: abs(_preset_ratio(preset) - ratio))
+
+
+def _preset_ratio(preset: str) -> float:
+    """Aspect ratio of a named size preset, e.g. `landscape_16_9` -> 16/9, `portrait_3_4` -> 3/4."""
+    parts = preset.split("_")
+    numbers = [int(part) for part in parts[1:] if part.isdigit()]
+    if len(numbers) != 2:
+        return 1.0  # `square` and `square_hd`
+    longer, shorter = max(numbers), min(numbers)
+    return longer / shorter if parts[0] == "landscape" else shorter / longer
+
+
+def _select_aspect_ratio(width: int, height: int, allowed: list[str] | None) -> str | None:
+    """Pick the closest allowed aspect ratio, falling back to the exact reduced ratio."""
+    if width <= 0 or height <= 0:
+        return None
+    divisor = gcd(width, height)
+    exact = f"{width // divisor}:{height // divisor}"
+    if not allowed:
+        return exact
+    ratio = width / height
+    candidates = [(value, _parse_ratio(value)) for value in allowed]
+    parsed = [(value, parsed_ratio) for value, parsed_ratio in candidates if parsed_ratio is not None]
+    if not parsed:
+        return exact
+    return min(parsed, key=lambda item: abs(item[1] - ratio))[0]
+
+
+def _parse_ratio(value: str) -> float | None:
+    if ":" not in value:
+        return None
+    left, right = value.split(":", 1)
+    try:
+        numerator = float(left)
+        denominator = float(right)
+    except ValueError:
+        return None
+    if denominator == 0:
+        return None
+    return numerator / denominator

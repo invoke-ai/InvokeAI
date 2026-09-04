@@ -14,6 +14,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.external_generation.providers.atlascloud import AtlasCloudProvider
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
 class DummyResponse:
@@ -66,6 +67,21 @@ def _model() -> ExternalApiModelConfig:
             supports_seed=True,
             max_images_per_request=4,
         ),
+    )
+
+
+def _starter_config(provider_model_id: str) -> ExternalApiModelConfig:
+    """Build a model config from the registered starter model, so payloads are checked
+    against the capabilities the app actually ships."""
+    source = f"external://atlascloud/{provider_model_id}"
+    starter = next(model for model in STARTER_MODELS if model.source == source)
+    assert starter.capabilities is not None
+    return ExternalApiModelConfig(
+        key=provider_model_id,
+        name=starter.name,
+        provider_id="atlascloud",
+        provider_model_id=provider_model_id,
+        capabilities=starter.capabilities,
     )
 
 
@@ -231,3 +247,159 @@ def test_atlascloud_requires_api_key() -> None:
 
     with pytest.raises(ExternalProviderRequestError, match="API key is not configured"):
         provider.generate(_request())
+
+
+def test_atlascloud_starter_models_cover_multiple_models() -> None:
+    atlas_models = [model for model in STARTER_MODELS if model.source.startswith("external://atlascloud/")]
+    assert len(atlas_models) > 1
+    sources = [model.source for model in atlas_models]
+    assert len(sources) == len(set(sources))
+    for model in atlas_models:
+        assert model.base is BaseModelType.External
+        assert model.type is ModelType.ExternalImageGenerator
+        assert model.format is ModelFormat.ExternalApi
+        assert model.capabilities is not None
+        assert model.capabilities.modes == ["txt2img"]
+
+
+@pytest.mark.parametrize(
+    "provider_model_id, num_images, expected_extra",
+    [
+        # Explicit "<width>*<height>" size string
+        ("black-forest-labs/flux-schnell", 2, {"size": "1024*768", "num_images": 2, "seed": 42}),
+        ("black-forest-labs/flux-dev", 2, {"size": "1024*768", "num_images": 2, "seed": 42}),
+        ("black-forest-labs/flux-2-pro/text-to-image", 1, {"size": "1024*768", "seed": 42}),
+        # Batch size is spelled "n" here
+        ("qwen-image-3.0/text-to-image", 2, {"size": "1024*768", "n": 2, "seed": 42}),
+        ("z-image/turbo", 1, {"size": "1024*768", "seed": 42}),
+        # No seed support upstream
+        ("microsoft/mai-image-2.5/text-to-image", 1, {"size": "1024*768"}),
+        # Named "image_size" preset
+        ("ideogram/v4/turbo/text-to-image", 1, {"image_size": "landscape_4_3", "seed": 42}),
+        ("ideogram/v4/quality/text-to-image", 1, {"image_size": "landscape_4_3", "seed": 42}),
+        ("krea-2-turbo/text-to-image", 2, {"image_size": "landscape_4_3", "num_images": 2, "seed": 42}),
+        ("hidream-o1-1.5/text-to-image", 1, {"image_size": "landscape_4_3"}),
+        # "aspect_ratio" string
+        ("xai/grok-imagine-image-2.0/text-to-image", 2, {"aspect_ratio": "4:3", "num_images": 2}),
+        ("google/nano-banana-2/text-to-image", 1, {"aspect_ratio": "4:3", "seed": 42}),
+    ],
+)
+def test_atlascloud_payload_matches_model_request_schema(
+    provider_model_id: str,
+    num_images: int,
+    expected_extra: dict[str, object],
+) -> None:
+    """Each model only receives the request fields its upstream schema accepts."""
+    provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    request = ExternalGenerationRequest(
+        model=_starter_config(provider_model_id),
+        mode="txt2img",
+        prompt="a blue square",
+        seed=42,
+        num_images=num_images,
+        width=1024,
+        height=768,
+        image_size=None,
+        init_image=None,
+        mask_image=None,
+        reference_images=[],
+        metadata=None,
+    )
+
+    payload = provider._build_payload(request)
+
+    assert payload == {"model": provider_model_id, "prompt": "a blue square", **expected_extra}
+
+
+def test_atlascloud_resolution_preset_is_forwarded_lowercase() -> None:
+    provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    request = ExternalGenerationRequest(
+        model=_starter_config("google/nano-banana-2/text-to-image"),
+        mode="txt2img",
+        prompt="a blue square",
+        seed=None,
+        num_images=1,
+        width=1024,
+        height=1024,
+        image_size="2K",
+        init_image=None,
+        mask_image=None,
+        reference_images=[],
+        metadata=None,
+    )
+
+    payload = provider._build_payload(request)
+
+    assert payload["aspect_ratio"] == "1:1"
+    assert payload["resolution"] == "2k"
+
+
+@pytest.mark.parametrize(
+    "provider_model_id, width, height, expected_preset",
+    [
+        ("ideogram/v4/turbo/text-to-image", 1024, 1024, "square_hd"),
+        ("ideogram/v4/turbo/text-to-image", 1920, 1080, "landscape_16_9"),
+        # `portrait_9_16` and `portrait_16_9` both mean a 9:16 portrait, so the digit
+        # order in the preset name must not flip the orientation.
+        ("ideogram/v4/turbo/text-to-image", 1080, 1920, "portrait_9_16"),
+        ("hidream-o1-1.5/text-to-image", 1080, 1920, "portrait_16_9"),
+        ("hidream-o1-1.5/text-to-image", 1920, 1080, "landscape_16_9"),
+    ],
+)
+def test_atlascloud_selects_closest_size_preset(
+    provider_model_id: str,
+    width: int,
+    height: int,
+    expected_preset: str,
+) -> None:
+    provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    request = ExternalGenerationRequest(
+        model=_starter_config(provider_model_id),
+        mode="txt2img",
+        prompt="a blue square",
+        seed=None,
+        num_images=1,
+        width=width,
+        height=height,
+        image_size=None,
+        init_image=None,
+        mask_image=None,
+        reference_images=[],
+        metadata=None,
+    )
+
+    assert provider._build_payload(request)["image_size"] == expected_preset
+
+
+def test_atlascloud_unknown_model_uses_explicit_size_schema() -> None:
+    """Custom installs via `external://atlascloud/<model_id>` keep working."""
+    provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    model = ExternalApiModelConfig(
+        key="custom",
+        name="Custom Atlas Cloud Model",
+        provider_id="atlascloud",
+        provider_model_id="vendor/some-unlisted-model",
+        capabilities=ExternalModelCapabilities(modes=["txt2img"], supports_seed=True),
+    )
+    request = ExternalGenerationRequest(
+        model=model,
+        mode="txt2img",
+        prompt="a blue square",
+        seed=7,
+        num_images=1,
+        width=512,
+        height=512,
+        image_size=None,
+        init_image=None,
+        mask_image=None,
+        reference_images=[],
+        metadata=None,
+    )
+
+    assert provider._build_payload(request) == {
+        "model": "vendor/some-unlisted-model",
+        "prompt": "a blue square",
+        "size": "512*512",
+        "num_images": 1,
+        "seed": 7,
+    }
