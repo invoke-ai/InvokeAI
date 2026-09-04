@@ -1,18 +1,10 @@
 from __future__ import annotations
 
-import copy
 import sys
 from contextlib import contextmanager
 from typing import Any, Optional
 
 import torch
-
-from invokeai.backend.hidiffusion.hidiffusion import (
-    switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
-)
-from invokeai.backend.hidiffusion.hidiffusion import (
-    text_to_img_controlnet_switching_threshold_ratio_dict as _text_to_img_controlnet_switching_threshold_ratio_dict,
-)
 
 
 @contextmanager
@@ -26,6 +18,10 @@ def hidiffusion_patch(
     generator: torch.Generator | None = None,
     has_controlnet: bool = False,
     is_controlnet_text_to_image: bool = False,
+    is_inpainting_task: bool | None = None,
+    use_aggressive_raunet: bool | None = None,
+    denoising_start: float = 0.0,
+    denoising_end: float = 1.0,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
     from invokeai.backend.hidiffusion.hidiffusion import apply_hidiffusion, remove_hidiffusion
@@ -70,14 +66,6 @@ def hidiffusion_patch(
 
     original_num_upsamplers = getattr(target, "num_upsamplers", None)
 
-    ratio_overrides = None
-    ratio_dicts = None
-    if t1_ratio is not None or t2_ratio is not None:
-        ratio_dicts = (
-            _switching_threshold_ratio_dict,
-            _text_to_img_controlnet_switching_threshold_ratio_dict,
-        )
-
     set_model_name_or_path = False
     set_config_name_or_path = False
     try:
@@ -103,26 +91,19 @@ def hidiffusion_patch(
         except Exception:
             pass
 
-        if ratio_dicts is not None:
-            ratio_overrides = (copy.deepcopy(ratio_dicts[0]), copy.deepcopy(ratio_dicts[1]))
-
-            def _apply_ratio_overrides(ratio_dict: dict) -> None:
-                for _, entry in ratio_dict.items():
-                    if t1_ratio is not None:
-                        entry["T1_ratio"] = t1_ratio
-                    if t2_ratio is not None and "T2_ratio" in entry:
-                        entry["T2_ratio"] = t2_ratio
-
-            _apply_ratio_overrides(ratio_dicts[0])
-            _apply_ratio_overrides(ratio_dicts[1])
-
         apply_hidiffusion(
             model,
             apply_raunet=apply_raunet,
             apply_window_attn=apply_window_attn,
+            t1_ratio=t1_ratio,
+            t2_ratio=t2_ratio,
             has_controlnet=has_controlnet,
             is_controlnet_text_to_image=is_controlnet_text_to_image,
             generator=generator,
+            is_inpainting_task=is_inpainting_task,
+            use_aggressive_raunet=use_aggressive_raunet,
+            denoising_start=denoising_start,
+            denoising_end=denoising_end,
         )
         yield
     finally:
@@ -133,11 +114,6 @@ def hidiffusion_patch(
         except Exception as error:
             if not had_active_exception:
                 teardown_error = error
-        if ratio_overrides is not None and ratio_dicts is not None:
-            ratio_dicts[0].clear()
-            ratio_dicts[0].update(ratio_overrides[0])
-            ratio_dicts[1].clear()
-            ratio_dicts[1].update(ratio_overrides[1])
         if original_num_upsamplers is not None:
             target.num_upsamplers = original_num_upsamplers
         if set_model_name_or_path:

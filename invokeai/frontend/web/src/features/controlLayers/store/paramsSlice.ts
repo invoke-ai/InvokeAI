@@ -182,10 +182,10 @@ const slice = createSlice({
     setHiDiffusionWindowAttnEnabled: (state, action: PayloadAction<boolean>) => {
       state.hiDiffusionWindowAttnEnabled = action.payload;
     },
-    setHiDiffusionT1Ratio: (state, action: PayloadAction<number>) => {
+    setHiDiffusionT1Ratio: (state, action: PayloadAction<number | null>) => {
       state.hiDiffusionT1Ratio = action.payload;
     },
-    setHiDiffusionT2Ratio: (state, action: PayloadAction<number>) => {
+    setHiDiffusionT2Ratio: (state, action: PayloadAction<number | null>) => {
       state.hiDiffusionT2Ratio = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
@@ -1161,6 +1161,15 @@ export const applyParamsVersionMigrations = (state: any): void => {
     state.pidDecoderModel = state.pidDecoderModel ?? null;
     state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
     state.pidSteps = state.pidSteps ?? 4;
+  }
+
+  if (state._version === 5) {
+    // v5 -> v6: numeric HiDiffusion defaults unintentionally overrode the library's
+    // resolution-aware presets. Treat the old default values as automatic thresholds while
+    // preserving values that users explicitly changed.
+    state._version = 6;
+    state.hiDiffusionT1Ratio = state.hiDiffusionT1Ratio === 0.4 ? null : state.hiDiffusionT1Ratio;
+    state.hiDiffusionT2Ratio = state.hiDiffusionT2Ratio === 0.0 ? null : state.hiDiffusionT2Ratio;
   }
 };
 

@@ -6,7 +6,10 @@ import pytest
 import torch
 
 from invokeai.backend.hidiffusion.hidiffusion import (
+    _get_switching_threshold_ratio,
     _resize_controlnet_residual,
+    _should_use_aggressive_raunet,
+    make_diffusers_downsampler_block,
     switching_threshold_ratio_dict,
     text_to_img_controlnet_switching_threshold_ratio_dict,
 )
@@ -256,16 +259,14 @@ def test_hidiffusion_patch_restores_state_when_apply_hidiffusion_raises():
     )
     hook = MagicMock()
 
-    def fake_apply_hidiffusion(patched_model, **_kwargs):
+    def fake_apply_hidiffusion(patched_model, **kwargs):
         assert patched_model._name_or_path == "patched-model-name"
         assert patched_model.config._name_or_path == "patched-model-name"
 
-        first_switching_entry = next(iter(switching_threshold_ratio_dict.values()))
-        first_controlnet_entry = next(iter(text_to_img_controlnet_switching_threshold_ratio_dict.values()))
-        assert first_switching_entry["T1_ratio"] == 0.25
-        assert first_switching_entry["T2_ratio"] == 0.1
-        assert first_controlnet_entry["T1_ratio"] == 0.25
-        assert first_controlnet_entry["T2_ratio"] == 0.1
+        assert kwargs["t1_ratio"] == 0.25
+        assert kwargs["t2_ratio"] == 0.1
+        assert switching_threshold_ratio_dict == original_switching
+        assert text_to_img_controlnet_switching_threshold_ratio_dict == original_controlnet
 
         patched_model.unet.num_upsamplers = 99
         patched_model.unet.layer.info = {"hooks": [hook]}
@@ -369,3 +370,144 @@ def test_hidiffusion_patch_removes_spoofed_name_from_config_internal_dict():
             assert config._internal_dict["_name_or_path"] == "patched-model-name"
 
     assert "_name_or_path" not in config._internal_dict
+
+
+def test_hidiffusion_ratio_overrides_are_isolated_between_overlapping_patches():
+    original_switching = copy.deepcopy(switching_threshold_ratio_dict)
+    original_controlnet = copy.deepcopy(text_to_img_controlnet_switching_threshold_ratio_dict)
+    first_model = SimpleNamespace(unet=DummyUNet())
+    second_model = SimpleNamespace(unet=DummyUNet())
+    applied_overrides: list[tuple[object, float | None, float | None]] = []
+
+    def fake_apply_hidiffusion(model, **kwargs):
+        applied_overrides.append((model, kwargs["t1_ratio"], kwargs["t2_ratio"]))
+
+    with (
+        patch("invokeai.backend.hidiffusion.hidiffusion.apply_hidiffusion", side_effect=fake_apply_hidiffusion),
+        patch("invokeai.backend.hidiffusion.hidiffusion.remove_hidiffusion"),
+    ):
+        first_patch = hidiffusion_patch(first_model, name_or_path="first", t1_ratio=0.2, t2_ratio=0.1)
+        second_patch = hidiffusion_patch(second_model, name_or_path="second", t1_ratio=0.8, t2_ratio=0.9)
+        first_patch.__enter__()
+        second_patch.__enter__()
+        first_patch.__exit__(None, None, None)
+        second_patch.__exit__(None, None, None)
+
+    assert applied_overrides == [(first_model, 0.2, 0.1), (second_model, 0.8, 0.9)]
+    assert switching_threshold_ratio_dict == original_switching
+    assert text_to_img_controlnet_switching_threshold_ratio_dict == original_controlnet
+
+
+def test_hidiffusion_patch_forwards_generation_context():
+    model = SimpleNamespace(unet=DummyUNet())
+
+    with (
+        patch("invokeai.backend.hidiffusion.hidiffusion.apply_hidiffusion") as mock_apply_hidiffusion,
+        patch("invokeai.backend.hidiffusion.hidiffusion.remove_hidiffusion"),
+    ):
+        with hidiffusion_patch(
+            model,
+            name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
+            is_inpainting_task=True,
+            use_aggressive_raunet=False,
+            denoising_start=0.6,
+            denoising_end=1.0,
+        ):
+            pass
+
+    kwargs = mock_apply_hidiffusion.call_args.kwargs
+    assert kwargs["is_inpainting_task"] is True
+    assert kwargs["use_aggressive_raunet"] is False
+    assert kwargs["denoising_start"] == 0.6
+    assert kwargs["denoising_end"] == 1.0
+
+
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end", "expected_ratio"),
+    [
+        (0.0, 1.0, 0.4),
+        (0.6, 1.0, 0.0),
+        (0.0, 0.2, 1.0),
+        (0.2, 0.6, 0.5),
+    ],
+)
+def test_hidiffusion_ratios_are_mapped_to_the_executed_denoising_range(
+    denoising_start: float, denoising_end: float, expected_ratio: float
+):
+    module = SimpleNamespace(
+        switching_threshold_ratio="T1_ratio",
+        info={
+            "switching_threshold_overrides": {"T1_ratio": None, "T2_ratio": None},
+            "denoising_start": denoising_start,
+            "denoising_end": denoising_end,
+        },
+    )
+
+    ratio = _get_switching_threshold_ratio(module, switching_threshold_ratio_dict, "sdxl_2048")
+
+    assert ratio == pytest.approx(expected_ratio)
+
+
+@pytest.mark.parametrize(
+    ("is_inpainting_task", "override", "expected"),
+    [
+        (False, False, False),
+        (True, True, True),
+        (True, None, False),
+        (False, None, True),
+    ],
+)
+def test_explicit_aggressive_raunet_setting_takes_precedence(
+    is_inpainting_task: bool, override: bool | None, expected: bool
+):
+    module = SimpleNamespace(
+        info={
+            "is_inpainting_task": is_inpainting_task,
+            "is_playground": False,
+            "use_aggressive_raunet": override,
+        }
+    )
+
+    assert _should_use_aggressive_raunet(module) is expected
+
+
+def test_sdxl_t2_override_controls_downsampler_at_2048_resolution():
+    patched_conv = make_diffusers_downsampler_block(torch.nn.Conv2d)
+    hidden_states = torch.arange(64, dtype=torch.float32).reshape(1, 1, 8, 8)
+
+    def run(t2_ratio: float) -> torch.Tensor:
+        module = patched_conv(1, 1, kernel_size=3, stride=2, padding=1, bias=False)
+        torch.nn.init.constant_(module.weight, 1.0)
+        module.info = {
+            "size": (256, 256),
+            "pipeline": SimpleNamespace(_num_timesteps=30),
+            "text_to_img_controlnet": False,
+            "is_inpainting_task": False,
+            "is_playground": False,
+            "switching_threshold_overrides": {"T1_ratio": None, "T2_ratio": t2_ratio},
+        }
+        module.model = "sdxl"
+        module.switching_threshold_ratio = "T2_ratio"
+        return module(hidden_states)
+
+    assert not torch.equal(run(0.0), run(1.0))
+
+
+def test_sdxl_automatic_ratios_preserve_extreme_resolution_preset():
+    patched_conv = make_diffusers_downsampler_block(torch.nn.Conv2d)
+    module = patched_conv(1, 1, kernel_size=3, stride=2, padding=1, bias=False)
+    module.info = {
+        "size": (512, 512),
+        "pipeline": SimpleNamespace(_num_timesteps=30),
+        "text_to_img_controlnet": False,
+        "is_inpainting_task": False,
+        "is_playground": False,
+        "switching_threshold_overrides": {"T1_ratio": None, "T2_ratio": None},
+    }
+    module.model = "sdxl"
+    module.switching_threshold_ratio = "T2_ratio"
+
+    module(torch.ones(1, 1, 8, 8))
+
+    assert module.T1_ratio == 0.3
+    assert module.T1 == 9

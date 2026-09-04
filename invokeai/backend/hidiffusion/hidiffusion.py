@@ -136,6 +136,32 @@ def _get_max_timesteps(info_dict: dict) -> int:
         return len(pipeline.scheduler.timesteps)
 
 
+def _get_switching_threshold_ratio(module: torch.nn.Module, presets: dict, preset_key: str) -> float:
+    """Resolve a threshold ratio for the executed part of the denoising schedule."""
+    override = module.info["switching_threshold_overrides"].get(module.switching_threshold_ratio)
+    full_schedule_ratio = override if override is not None else presets[preset_key][module.switching_threshold_ratio]
+
+    denoising_start = module.info.get("denoising_start", 0.0)
+    denoising_end = module.info.get("denoising_end", 1.0)
+    if denoising_end <= denoising_start:
+        return 0.0
+
+    executed_schedule_ratio = (full_schedule_ratio - denoising_start) / (denoising_end - denoising_start)
+    return max(0.0, min(1.0, executed_schedule_ratio))
+
+
+def _should_use_aggressive_raunet(module: torch.nn.Module) -> bool:
+    """Resolve whether RAU-Net should be activated after denoising has already started."""
+    override = module.info.get("use_aggressive_raunet")
+    if override is not None:
+        return override
+    if module.info["is_inpainting_task"]:
+        return inpainting_is_aggressive_raunet
+    if module.info["is_playground"]:
+        return playground_is_aggressive_raunet
+    return is_aggressive_raunet
+
+
 def make_diffusers_sdxl_controlnet_ppl(block_class):
     class sdxl_controlnet_ppl(block_class):
         # Save for unpatching later
@@ -1559,32 +1585,29 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
             ori_H, ori_W = self.info["size"]
             if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_1024")
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_2048")
             elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
                     if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, text_to_img_controlnet_switching_threshold_ratio_dict, "sdxl_2048"
+                        )
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, switching_threshold_ratio_dict, "sdxl_2048"
+                        )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
+                self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_turbo_1024")
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
-            if self.aggressive_raunet:
+            if self.aggressive_raunet and self.switching_threshold_ratio == "T1_ratio":
                 # self.T1_start = min(int(self.max_timestep * self.T1_ratio * 0.4), int(8/50 * self.max_timestep))
                 self.T1_start = int(aggressive_step / 50 * self.max_timestep)
                 self.T1_end = int(self.max_timestep * self.T1_ratio)
@@ -1693,33 +1716,30 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
             ori_H, ori_W = self.info["size"]
             if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_1024")
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_2048")
             elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
                     if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, text_to_img_controlnet_switching_threshold_ratio_dict, "sdxl_2048"
+                        )
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, switching_threshold_ratio_dict, "sdxl_2048"
+                        )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
 
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
+                self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_turbo_1024")
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
-            if self.aggressive_raunet:
+            if self.aggressive_raunet and self.switching_threshold_ratio == "T1_ratio":
                 # self.T1_start = min(int(self.max_timestep * self.T1_ratio * 0.4), int(8/50 * self.max_timestep))
                 self.T1_start = int(aggressive_step / 50 * self.max_timestep)
                 self.T1_end = int(self.max_timestep * self.T1_ratio)
@@ -1830,32 +1850,29 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
             ori_H, ori_W = self.info["size"]
             if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_1024")
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_2048")
             elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
                     if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, text_to_img_controlnet_switching_threshold_ratio_dict, "sdxl_2048"
+                        )
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, switching_threshold_ratio_dict, "sdxl_2048"
+                        )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
+                self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_turbo_1024")
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
-            if self.aggressive_raunet:
+            if self.aggressive_raunet and self.switching_threshold_ratio == "T1_ratio":
                 # self.T1 = min(int(self.max_timestep * self.T1_ratio), int(8/50 * self.max_timestep))
                 self.T1 = int(aggressive_step / 50 * self.max_timestep)
             else:
@@ -1911,32 +1928,29 @@ def make_diffusers_upsampler_block(block_class: Type[torch.nn.Module]) -> Type[t
             ori_H, ori_W = self.info["size"]
             if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_1024")
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sd15_2048")
             elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
                     if self.info["text_to_img_controlnet"]:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
-                            self.switching_threshold_ratio
-                        ]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, text_to_img_controlnet_switching_threshold_ratio_dict, "sdxl_2048"
+                        )
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
+                        self.T1_ratio = _get_switching_threshold_ratio(
+                            self, switching_threshold_ratio_dict, "sdxl_2048"
+                        )
 
-                    if self.info["is_inpainting_task"]:
-                        self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info["is_playground"]:
-                        self.aggressive_raunet = playground_is_aggressive_raunet
-                    else:
-                        self.aggressive_raunet = is_aggressive_raunet
+                    self.aggressive_raunet = _should_use_aggressive_raunet(self)
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+                    self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_4096")
             elif self.model == "sdxl_turbo":
-                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
+                self.T1_ratio = _get_switching_threshold_ratio(self, switching_threshold_ratio_dict, "sdxl_turbo_1024")
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
-            if self.aggressive_raunet:
+            if self.aggressive_raunet and self.switching_threshold_ratio == "T1_ratio":
                 # self.T1 = min(int(self.max_timestep * self.T1_ratio), int(8/50 * self.max_timestep))
                 self.T1 = int(aggressive_step / 50 * self.max_timestep)
             else:
@@ -2045,6 +2059,12 @@ def apply_hidiffusion(
     generator: torch.Generator | None = None,
     has_controlnet: bool = False,
     is_controlnet_text_to_image: bool = False,
+    t1_ratio: float | None = None,
+    t2_ratio: float | None = None,
+    is_inpainting_task: bool | None = None,
+    use_aggressive_raunet: bool | None = None,
+    denoising_start: float = 0.0,
+    denoising_end: float = 1.0,
 ):
     """
     model: diffusers model. We support SD 1.5, 2.1, XL, XL Turbo.
@@ -2120,14 +2140,19 @@ def apply_hidiffusion(
         elif set(sdxl_module_key) < set(diffusion_model_module_key):
             name_or_path = "stabilityai/stable-diffusion-xl-base-1.0"
 
+    detected_inpainting_task = model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values()
     diffusion_model.info = {
         "size": None,
         "upsample_size": None,
         "hooks": [],
         "text_to_img_controlnet": has_controlnet and is_controlnet_text_to_image,
-        "is_inpainting_task": model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values(),
+        "is_inpainting_task": detected_inpainting_task if is_inpainting_task is None else is_inpainting_task,
         "is_playground": is_playground,
+        "use_aggressive_raunet": use_aggressive_raunet,
+        "denoising_start": denoising_start,
+        "denoising_end": denoising_end,
         "pipeline": model,
+        "switching_threshold_overrides": {"T1_ratio": t1_ratio, "T2_ratio": t2_ratio},
     }
     model.info = diffusion_model.info
     hook_diffusion_model(diffusion_model)

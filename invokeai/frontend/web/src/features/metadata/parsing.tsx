@@ -787,12 +787,17 @@ const HiDiffusionWindowAttn: SingleMetadataHandler<boolean> = {
 //#endregion HiDiffusionWindowAttn
 
 //#region HiDiffusionT1Ratio
-const HiDiffusionT1Ratio: SingleMetadataHandler<number> = {
+const HiDiffusionRatioValue = ({ value }: SingleMetadataValueProps<number | null>) => {
+  const { t } = useTranslation();
+  return <MetadataPrimitiveValue value={value ?? t('common.auto')} />;
+};
+
+const HiDiffusionT1Ratio: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
   type: 'HiDiffusionT1Ratio',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'hidiffusion_t1_ratio');
-    const parsed = z.number().parse(raw);
+    const parsed = raw === undefined ? null : z.number().nullable().parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -800,17 +805,17 @@ const HiDiffusionT1Ratio: SingleMetadataHandler<number> = {
   },
   i18nKey: 'metadata.hiDiffusionT1Ratio',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: HiDiffusionRatioValue,
 };
 //#endregion HiDiffusionT1Ratio
 
 //#region HiDiffusionT2Ratio
-const HiDiffusionT2Ratio: SingleMetadataHandler<number> = {
+const HiDiffusionT2Ratio: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
   type: 'HiDiffusionT2Ratio',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'hidiffusion_t2_ratio');
-    const parsed = z.number().parse(raw);
+    const parsed = raw === undefined ? null : z.number().nullable().parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -818,7 +823,7 @@ const HiDiffusionT2Ratio: SingleMetadataHandler<number> = {
   },
   i18nKey: 'metadata.hiDiffusionT2Ratio',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: HiDiffusionRatioValue,
 };
 //#endregion HiDiffusionT2Ratio
 

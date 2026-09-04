@@ -19,7 +19,7 @@ class RegionalPromptData:
         regions: list[TextConditioningRegions],
         device: torch.device,
         dtype: torch.dtype,
-        max_downscale_factor: int = 8,
+        max_downscale_factor: int = 16,
     ):
         """Initialize a `RegionalPromptData` object.
         Args:
@@ -28,7 +28,7 @@ class RegionalPromptData:
             device (torch.device): The device to use for the attention masks.
             dtype (torch.dtype): The data type to use for the attention masks.
             max_downscale_factor: Spatial masks will be prepared for downscale factors from 1 to max_downscale_factor
-                in steps of 2x.
+                in steps of 2x. HiDiffusion's RAU-Net requires one level beyond the standard UNet's 8x downscale.
         """
         self._regions = regions
         self._device = device
@@ -41,7 +41,7 @@ class RegionalPromptData:
         self._negative_cross_attn_mask_score = -10000.0
 
     def _prepare_spatial_masks(
-        self, regions: list[TextConditioningRegions], max_downscale_factor: int = 8
+        self, regions: list[TextConditioningRegions], max_downscale_factor: int = 16
     ) -> list[dict[int, torch.Tensor]]:
         """Prepare the spatial masks for all downscaling factors."""
         # batch_masks_by_seq_len[b][s] contains the spatial masks for the b'th batch sample with a query sequence length

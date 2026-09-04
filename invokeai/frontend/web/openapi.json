@@ -24633,28 +24633,42 @@
             "type": "boolean"
           },
           "hidiffusion_t1_ratio": {
-            "default": 0.4,
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Override HiDiffusion early switch threshold (T1 ratio)",
             "field_kind": "input",
             "input": "any",
-            "maximum": 1,
-            "minimum": 0,
-            "orig_default": 0.4,
+            "orig_default": null,
             "orig_required": false,
-            "title": "HiDiffusion: T1 Ratio",
-            "type": "number"
+            "title": "HiDiffusion: T1 Ratio"
           },
           "hidiffusion_t2_ratio": {
-            "default": 0.0,
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Override HiDiffusion late switch threshold (T2 ratio)",
             "field_kind": "input",
             "input": "any",
-            "maximum": 1,
-            "minimum": 0,
-            "orig_default": 0.0,
+            "orig_default": null,
             "orig_required": false,
-            "title": "HiDiffusion: T2 Ratio",
-            "type": "number"
+            "title": "HiDiffusion: T2 Ratio"
           },
           "latents": {
             "anyOf": [
@@ -24702,7 +24716,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -25046,28 +25060,42 @@
             "type": "boolean"
           },
           "hidiffusion_t1_ratio": {
-            "default": 0.4,
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Override HiDiffusion early switch threshold (T1 ratio)",
             "field_kind": "input",
             "input": "any",
-            "maximum": 1,
-            "minimum": 0,
-            "orig_default": 0.4,
+            "orig_default": null,
             "orig_required": false,
-            "title": "HiDiffusion: T1 Ratio",
-            "type": "number"
+            "title": "HiDiffusion: T1 Ratio"
           },
           "hidiffusion_t2_ratio": {
-            "default": 0.0,
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Override HiDiffusion late switch threshold (T2 ratio)",
             "field_kind": "input",
             "input": "any",
-            "maximum": 1,
-            "minimum": 0,
-            "orig_default": 0.0,
+            "orig_default": null,
             "orig_required": false,
-            "title": "HiDiffusion: T2 Ratio",
-            "type": "number"
+            "title": "HiDiffusion: T2 Ratio"
           },
           "latents": {
             "anyOf": [
@@ -25115,7 +25143,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL + Metadata",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
