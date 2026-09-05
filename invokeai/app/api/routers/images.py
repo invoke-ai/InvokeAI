@@ -232,25 +232,35 @@ def delete_image(
     _assert_image_owner(image_name, current_user)
     assert_image_move_maintenance_inactive()
 
-    deleted_images: set[str] = set()
-    affected_boards: set[str] = set()
-
+    # Let service-level failures surface as errors rather than swallowing them and returning
+    # a success-shaped response. A previous version of this handler caught everything and
+    # returned an empty ``deleted_images`` list with HTTP 200; the frontend treated that as
+    # success and dropped the item from its cache even though the record was still live.
     try:
         image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
-        board_id = image_dto.board_id or "none"
-        ApiDependencies.invoker.services.images.delete(image_name)
-        deleted_images.add(image_name)
-        affected_boards.add(board_id)
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found")
     except Exception:
-        # TODO: Does this need any exception handling at all?
-        pass
+        # A record/URL/board lookup failure for an image that does exist is a server fault, not a
+        # missing image — reporting it as 404 would tell the frontend to drop a live item.
+        raise HTTPException(status_code=500, detail="Failed to delete image")
+
+    board_id = image_dto.board_id or "none"
+    try:
+        ApiDependencies.invoker.services.images.delete(image_name)
+    except ImageRecordNotFoundException:
+        # Another request deleted the image between the lookup above and the service call. The
+        # image is gone, which is what the client asked for — answer as the lookup would have.
+        raise HTTPException(status_code=404, detail="Image not found")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to delete image")
 
     return DeleteImagesResult(
-        deleted_images=list(deleted_images),
-        # Single-image route: the swallowed failure above already leaves deleted_images empty,
-        # which is how this route has always reported it.
+        deleted_images=[image_name],
+        # Every failure path above raises, so a returned result always describes a completed
+        # delete; nothing can land in ``failed_images``.
         failed_images=[],
-        affected_boards=list(affected_boards),
+        affected_boards=[board_id],
     )
 
 

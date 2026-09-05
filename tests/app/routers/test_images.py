@@ -228,6 +228,181 @@ def test_get_bulk_download_image_image_deleted_after_response(
     assert not (tmp_path / "test.zip").exists()
 
 
+# ── Transactional single-image deletion (DELETE /api/v1/images/i/{image_name}) ──
+
+
+def prepare_delete_image_test(monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path):
+    """Wire the delete route to a real ImageService + real DiskImageFileStorage + real SQLite records."""
+    from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers._access.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.image_move_maintenance.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+
+    mock_invoker.services.urls = MagicMock()
+    mock_invoker.services.urls.get_image_url.return_value = "http://localhost/img.png"
+
+    storage = DiskImageFileStorage(tmp_path / "outputs")
+    mock_invoker.services.image_files = storage
+    storage.start(mock_invoker)
+    mock_invoker.services.images.start(mock_invoker)
+    return storage
+
+
+def _save_deletable_image(mock_invoker: Invoker, storage, image_name: str) -> None:
+    from PIL import Image
+
+    from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+
+    mock_invoker.services.image_records.save(
+        image_name=image_name,
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=64,
+        height=64,
+        has_workflow=False,
+    )
+    storage.save(image=Image.new("RGB", (64, 64)), image_name=image_name)
+
+
+def test_delete_image_success_deletes_files_and_record(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
+
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response["deleted_images"] == ["del.png"]
+    assert json_response["affected_boards"] == ["none"]
+    assert not storage.get_path("del.png").exists()
+    assert not storage.get_path("del.png", thumbnail=True).exists()
+    with pytest.raises(ImageRecordNotFoundException):
+        mock_invoker.services.image_records.get("del.png")
+    assert list(storage.image_root.glob(".delete_*")) == []
+
+
+def test_delete_image_not_found_returns_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+
+    response = client.delete("/api/v1/images/i/does-not-exist.png")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Image not found"
+
+
+def test_delete_image_deleted_mid_request_returns_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    """An image deleted between the DTO lookup and the service delete is gone, not a server fault.
+
+    Answering 500 here sent the client a failure toast for a postcondition that already held
+    (JPPhoto, PR #9361 round 4).
+    """
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+    real_get_dto = mock_invoker.services.images.get_dto
+
+    def get_dto_then_lose_the_race(image_name: str):
+        dto = real_get_dto(image_name)
+        # Another request completes its delete before this one reaches the service.
+        mock_invoker.services.image_records.delete(image_name)
+        return dto
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", get_dto_then_lose_the_race)
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Image not found"
+    assert list(storage.image_root.glob(".delete_*")) == []
+
+
+def test_delete_image_lookup_failure_returns_500_not_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    """A DTO lookup that fails for a reason other than a missing record is a 500, not a 404.
+
+    Reporting it as 404 would tell the frontend the image is gone and drop a live item from its cache.
+    """
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    def failing_get_dto(image_name: str):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_dto", failing_get_dto)
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete image"
+    # Nothing was touched: the record and its files are intact.
+    assert storage.get_path("del.png").exists()
+    assert mock_invoker.services.image_records.get("del.png").image_name == "del.png"
+
+
+def test_delete_image_db_fault_during_lookup_returns_500_not_404(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    """A database fault while reading the record is a 500, driven through the real record store.
+
+    The store used to convert every ``sqlite3.Error`` into ``ImageRecordNotFoundException``, which
+    made a database fault indistinguishable from a missing image and produced a 404 for a live one.
+    This drives the real store rather than stubbing it, so the store's translation is what is under
+    test — stubbing ``get`` would bypass the very code that used to be wrong.
+    """
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    # Break the table out from under the query. Any sqlite3.Error would do; this one is deterministic.
+    records = mock_invoker.services.image_records
+    records._db._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+    try:
+        response = client.delete("/api/v1/images/i/del.png")
+    finally:
+        records._db._conn.execute("ALTER TABLE images_moved RENAME TO images;")
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete image"
+    # The image is still there once the database recovers.
+    assert records.get("del.png").image_name == "del.png"
+    assert storage.get_path("del.png").exists()
+
+
+def test_delete_image_db_failure_returns_500_and_restores_files(
+    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+) -> None:
+    from invokeai.app.services.image_records.image_records_common import ImageRecordDeleteException
+
+    storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
+    _save_deletable_image(mock_invoker, storage, "del.png")
+
+    def failing_delete(image_name: str) -> None:
+        raise ImageRecordDeleteException()
+
+    monkeypatch.setattr(mock_invoker.services.image_records, "delete", failing_delete)
+
+    response = client.delete("/api/v1/images/i/del.png")
+
+    # The route must report the failure, not a success-shaped empty payload.
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Failed to delete image"
+    # The staged files must be rolled back: image and thumbnail restored, record intact.
+    assert storage.get_path("del.png").exists()
+    assert storage.get_path("del.png", thumbnail=True).exists()
+    assert mock_invoker.services.image_records.get("del.png").image_name == "del.png"
+    assert list(storage.image_root.glob(".delete_*")) == []
+
+
 def prepare_image_batch_test(monkeypatch: Any, mock_invoker: Invoker) -> MagicMock:
     """Wires the image router to a MagicMock image service with maintenance inactive.
 
