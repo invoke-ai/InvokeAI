@@ -1,4 +1,5 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { useIsRegionFocused } from 'common/hooks/focus';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
@@ -9,12 +10,15 @@ export const ToolColorPickerButton = memo(() => {
   const { t } = useTranslation();
   const isSelected = useToolIsSelected('colorPicker');
   const selectColorPicker = useSelectTool('colorPicker');
+  const isGalleryFocused = useIsRegionFocused('gallery');
+  const isViewerFocused = useIsRegionFocused('viewer');
 
   useRegisteredHotkeys({
     id: 'selectColorPickerTool',
     category: 'canvas',
     callback: selectColorPicker,
-    dependencies: [selectColorPicker],
+    options: { enabled: !isGalleryFocused && !isViewerFocused },
+    dependencies: [selectColorPicker, isGalleryFocused, isViewerFocused],
   });
 
   return (

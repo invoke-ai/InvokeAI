@@ -24,7 +24,9 @@ export const ToggleMetadataViewerButton = memo(() => {
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const imageDTO = useAppSelector(selectLastSelectedItem);
   const { t } = useTranslation();
+  const isGalleryFocused = useIsRegionFocused('gallery');
   const isViewerFocused = useIsRegionFocused('viewer');
+  const isMetadataHotkeyFocused = isGalleryFocused || isViewerFocused;
 
   const toggleMetadataViewer = useCallback(() => {
     dispatch(setShouldShowItemDetails(!shouldShowItemDetails));
@@ -34,8 +36,8 @@ export const ToggleMetadataViewerButton = memo(() => {
     id: 'toggleMetadata',
     category: 'viewer',
     callback: toggleMetadataViewer,
-    options: { enabled: isViewerFocused && !isDisabledOverride, preventDefault: true },
-    dependencies: [imageDTO, shouldShowItemDetails, isViewerFocused, isDisabledOverride],
+    options: { enabled: isMetadataHotkeyFocused && !isDisabledOverride, preventDefault: true },
+    dependencies: [imageDTO, shouldShowItemDetails, isMetadataHotkeyFocused, isDisabledOverride],
   });
 
   return (
