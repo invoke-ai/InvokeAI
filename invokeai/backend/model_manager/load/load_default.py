@@ -30,7 +30,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.fp8_scaled import count_fp8_weights, should_keep_fp8_weights
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, set_fp8_compute_dtype
+from invokeai.backend.util.fp8 import FP8_COMPUTE_DTYPE_ATTR, FP8_STORAGE_DTYPES, set_fp8_compute_dtype
 
 # Probe results keyed by concrete device (e.g. "xpu:1"). float8 support is build/driver
 # dependent, so it is a per-device property: a discrete Arc may be paired with an integrated
@@ -596,8 +596,20 @@ class ModelLoader(ModelLoaderBase):
             if not isinstance(module, _FP8_SUPPORTED_PYTORCH_LAYERS):
                 continue
             if any(re.search(pattern, module_name) for pattern in skip_patterns):
+                # A pattern skip means "this module computes in `compute_dtype`", so a weight that
+                # arrived already float8 contradicts it: nothing casts it back and no pre-hook is
+                # installed here, leaving the forward to run on raw fp8 codes. That is reachable
+                # whenever a loader keeps checkpoint fp8 weights and then asks for fp8 storage on
+                # the remainder (the Qwen3-VL encoder does exactly this), and it depends on a
+                # coincidence — that the loader's own skip list and this one never name the same
+                # Linear. Upcast instead of relying on that.
+                ModelLoader._restore_compute_dtype(module, compute_dtype)
                 continue
             if skip is not None and skip(module_name, module):
+                # A caller-supplied skip is different: its one user excludes scaled-fp8 layers,
+                # which are *meant* to stay quantized and go through `_scaled_mm` with their
+                # `weight_scale`. Upcasting those would drop the scale. Leave them exactly as they
+                # are.
                 continue
             params = list(module.parameters(recurse=False))
             if not params:
@@ -609,6 +621,17 @@ class ModelLoader(ModelLoaderBase):
                 param.data = param.data.to(storage_dtype)
 
             ModelLoader._wrap_forward_with_fp8_cast(module, storage_dtype, compute_dtype)
+
+    @staticmethod
+    def _restore_compute_dtype(module: torch.nn.Module, compute_dtype: torch.dtype) -> None:
+        """Cast a skipped module's float8 params back to the dtype it is expected to compute in.
+
+        Only float8 params are touched, and only the storage dtypes — a quantized param (GGUF, NF4,
+        bitsandbytes) is left to its own kernels.
+        """
+        for param in module.parameters(recurse=False):
+            if param.data.dtype in FP8_STORAGE_DTYPES and not _is_quantized_param(param):
+                param.data = param.data.to(compute_dtype)
 
     @staticmethod
     def _wrap_forward_with_fp8_cast(

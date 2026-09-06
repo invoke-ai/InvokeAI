@@ -760,6 +760,11 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
             predict_cast_state_dict_size(sd, model_dtype, keep_fp8=keep_fp8, model=model, scaled_layers=fp8_layers)
         )
         fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model)
+        # No `skip_patterns` here on purpose: this model declares none, and the storage pass below
+        # applies `_FP8_DEFAULT_SKIP_PATTERNS` itself. Those two lists used to have to not intersect
+        # on a 2-D Linear -- such a weight would arrive fp8 from the state dict, be skipped by the
+        # cast pass, and forward on raw fp8 codes. `_apply_fp8_to_nn_module` now restores the compute
+        # dtype on the modules it skips, so the two lists are independent again.
         cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model)
 
         model.load_state_dict(sd, assign=True, strict=False)

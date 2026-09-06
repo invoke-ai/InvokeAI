@@ -835,3 +835,77 @@ class TestApplyFp8SkipCallback:
 
         assert model.keep.weight.dtype is not torch.float8_e4m3fn
         assert model.cast.weight.dtype is torch.float8_e4m3fn
+
+
+class TestSkippedModulesNeverKeepCheckpointFp8:
+    """A pattern-skipped module must not be left holding float8 weights.
+
+    The cast pass installs the upcast pre-hook only on modules it casts. A module it *skips* keeps
+    whatever dtype it arrived with — fine when that is the compute dtype, silently fatal when the
+    loader kept the checkpoint's fp8 weights: no hook, no cast back, and the forward runs on raw fp8
+    codes. Reachable wherever a loader combines `keep_fp8` with fp8 storage on the remainder (the
+    Qwen3-VL encoder), and otherwise dependent on the loader's skip list and
+    `_FP8_DEFAULT_SKIP_PATTERNS` never naming the same Linear.
+    """
+
+    def _model(self) -> torch.nn.Module:
+        model = torch.nn.Module()
+        # `proj_out` is in `_FP8_DEFAULT_SKIP_PATTERNS`; `attn` is not.
+        model.add_module("proj_out", torch.nn.Linear(16, 32))
+        model.add_module("attn", torch.nn.Linear(16, 32))
+        return model
+
+    def test_a_pattern_skipped_module_is_restored_to_the_compute_dtype(self) -> None:
+        model = self._model()
+        # As a loader that kept checkpoint fp8 weights would hand it over.
+        model.proj_out.weight = torch.nn.Parameter(
+            torch.zeros(32, 16, dtype=torch.bfloat16).to(torch.float8_e4m3fn), requires_grad=False
+        )
+
+        ModelLoader._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+
+        assert model.proj_out.weight.dtype is torch.bfloat16, "skipped module left computing on fp8 codes"
+        assert model.attn.weight.dtype is torch.float8_e4m3fn
+
+    def test_an_extra_skip_pattern_gets_the_same_treatment(self) -> None:
+        model = self._model()
+        model.attn.weight = torch.nn.Parameter(
+            torch.zeros(32, 16, dtype=torch.bfloat16).to(torch.float8_e4m3fn), requires_grad=False
+        )
+
+        ModelLoader._apply_fp8_to_nn_module(
+            model,
+            storage_dtype=torch.float8_e4m3fn,
+            compute_dtype=torch.bfloat16,
+            extra_skip_patterns=("attn",),
+        )
+
+        assert model.attn.weight.dtype is torch.bfloat16
+
+    def test_a_full_precision_skipped_module_is_untouched(self) -> None:
+        """The restore must not disturb the ordinary case it shares a branch with."""
+        model = self._model()
+        model.proj_out.weight = torch.nn.Parameter(torch.zeros(32, 16, dtype=torch.float32), requires_grad=False)
+
+        ModelLoader._apply_fp8_to_nn_module(model, storage_dtype=torch.float8_e4m3fn, compute_dtype=torch.bfloat16)
+
+        assert model.proj_out.weight.dtype is torch.float32
+
+    def test_a_caller_skipped_scaled_layer_keeps_its_fp8_weight(self) -> None:
+        """The `skip=` callback means the opposite of a pattern skip: its one caller excludes
+        scaled-fp8 layers, which stay quantized and go through `_scaled_mm` with their
+        `weight_scale`. Upcasting those would drop the scale."""
+        model = self._model()
+        model.attn.weight = torch.nn.Parameter(
+            torch.zeros(32, 16, dtype=torch.bfloat16).to(torch.float8_e4m3fn), requires_grad=False
+        )
+        model.attn.weight_scale = torch.tensor(2.0)
+
+        ModelLoader._apply_fp8_to_nn_module(
+            model,
+            storage_dtype=torch.float8_e4m3fn,
+            compute_dtype=torch.bfloat16,
+            skip=lambda _name, module: getattr(module, "weight_scale", None) is not None,
+        )
+
+        assert model.attn.weight.dtype is torch.float8_e4m3fn

@@ -1025,7 +1025,6 @@ class ZImageControlCheckpointModel(ModelLoader):
         return model
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.Checkpoint)
 def _fold_comfy_scaled_weights(sd: dict[str, Any], dtype: torch.dtype) -> int:
     """Fold every ComfyUI-style ``weight_scale`` into its weight, in place. Returns how many.
 
@@ -1057,6 +1056,7 @@ def _fold_comfy_scaled_weights(sd: dict[str, Any], dtype: torch.dtype) -> int:
     return folded
 
 
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.Checkpoint)
 class Qwen3EncoderCheckpointLoader(ModelLoader):
     """Class to load single-file Qwen3 Encoder models for Z-Image (safetensors format)."""
 
