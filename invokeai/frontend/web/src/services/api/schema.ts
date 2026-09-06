@@ -9327,13 +9327,13 @@ export type components = {
             hidiffusion_window_attn?: boolean;
             /**
              * HiDiffusion: T1 Ratio
-             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @description Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.
              * @default null
              */
             hidiffusion_t1_ratio?: number | null;
             /**
              * HiDiffusion: T2 Ratio
-             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @description Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.
              * @default null
              */
             hidiffusion_t2_ratio?: number | null;
@@ -9475,13 +9475,13 @@ export type components = {
             hidiffusion_window_attn?: boolean;
             /**
              * HiDiffusion: T1 Ratio
-             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @description Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.
              * @default null
              */
             hidiffusion_t1_ratio?: number | null;
             /**
              * HiDiffusion: T2 Ratio
-             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @description Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.
              * @default null
              */
             hidiffusion_t2_ratio?: number | null;
