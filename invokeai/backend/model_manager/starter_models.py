@@ -2278,9 +2278,94 @@ ideogram_4_fp8 = StarterModel(
 )
 # endregion
 
+FAL_IMAGE_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+FAL_IMAGE_ASPECT_RATIO_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "4:3": ExternalImageSize(width=1152, height=864),
+    "3:4": ExternalImageSize(width=864, height=1152),
+    "16:9": ExternalImageSize(width=1280, height=720),
+    "9:16": ExternalImageSize(width=720, height=1280),
+}
+
+fal_flux_schnell = StarterModel(
+    name="FLUX.1 [schnell] (fal.ai)",
+    base=BaseModelType.External,
+    source="external://fal/fal-ai/flux/schnell",
+    description="fal.ai-hosted FLUX.1 [schnell] image generation. Requires a fal.ai API key; usage may incur provider-side costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=FAL_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=FAL_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+fal_flux_dev = StarterModel(
+    name="FLUX.1 [dev] (fal.ai)",
+    base=BaseModelType.External,
+    source="external://fal/fal-ai/flux/dev",
+    description="fal.ai-hosted FLUX.1 [dev] image generation. Requires a fal.ai API key; usage may incur provider-side costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=FAL_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=FAL_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+fal_flux_kontext = StarterModel(
+    name="FLUX.1 Kontext [pro] (fal.ai)",
+    base=BaseModelType.External,
+    source="external://fal/fal-ai/flux-pro/kontext",
+    description="fal.ai-hosted FLUX.1 Kontext [pro] image editing. Requires a fal.ai API key; usage may incur provider-side costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["img2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=FAL_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=FAL_IMAGE_ASPECT_RATIO_SIZES,
+        input_image_required_for=["img2img"],
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+fal_flux_fill = StarterModel(
+    name="FLUX.1 Fill (fal.ai)",
+    base=BaseModelType.External,
+    source="external://fal/fal-ai/flux-lora-fill",
+    description="fal.ai-hosted FLUX Fill image inpainting. Requires a fal.ai API key; usage may incur provider-side costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["inpaint"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=FAL_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=FAL_IMAGE_ASPECT_RATIO_SIZES,
+        mask_format="binary",
+        input_image_required_for=["inpaint"],
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
+    fal_flux_schnell,
+    fal_flux_dev,
+    fal_flux_kontext,
+    fal_flux_fill,
     flux_kontext_quantized,
     flux_schnell_quantized,
     flux_dev_quantized,

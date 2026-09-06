@@ -58,6 +58,7 @@ export type ExternalProviderConfigUpdate = {
   api_key?: string;
   base_url?: string | null;
 };
+export type FalCatalogModel = S['FalCatalogModelResponse'];
 export type UpdateModelBody = paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 
 const zResourceOrigin = z.enum(['internal', 'external']);

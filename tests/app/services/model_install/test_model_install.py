@@ -39,7 +39,7 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_install.model_install_default import TMPDIR_PREFIX
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
-from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelPanelSchema
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -235,6 +235,34 @@ def test_external_install(mm2_installer: ModelInstallServiceBase) -> None:
     assert job.config_out.base == BaseModelType.External
     assert job.config_out.type == ModelType.ExternalImageGenerator
     assert job.config_out.source_type == ModelSourceType.External
+
+
+def test_external_install_preserves_panel_schema(mm2_installer: ModelInstallServiceBase) -> None:
+    panel_schema = ExternalModelPanelSchema(image=[{"name": "dimensions"}])
+    job = mm2_installer.heuristic_import(
+        "external://fal/fal-ai/test",
+        config=ModelRecordChanges(panel_schema=panel_schema),
+    )
+
+    mm2_installer.wait_for_installs()
+
+    assert job.status == InstallStatus.COMPLETED
+    assert job.config_out is not None
+    assert isinstance(job.config_out, ExternalApiModelConfig)
+    assert job.config_out.panel_schema == panel_schema
+
+
+def test_external_install_preserves_source_url(mm2_installer: ModelInstallServiceBase) -> None:
+    job = mm2_installer.heuristic_import(
+        "external://fal/fal-ai/test",
+        config=ModelRecordChanges(source_url="https://fal.ai/models/fal-ai/test"),
+    )
+
+    mm2_installer.wait_for_installs()
+
+    assert job.status == InstallStatus.COMPLETED
+    assert job.config_out is not None
+    assert job.config_out.source_url == "https://fal.ai/models/fal-ai/test"
 
 
 def test_external_install_is_idempotent(mm2_installer: ModelInstallServiceBase) -> None:
