@@ -7,23 +7,45 @@ export function rehypePrefixBaseToRootLinks(options = {}) {
     }
 
     walk(tree, (node) => {
-      if (node.tagName !== 'a') {
+      if (node.type === 'element') {
+        if (node.tagName !== 'a') {
+          return;
+        }
+
+        const href = node.properties?.href;
+
+        if (typeof href === 'string') {
+          node.properties.href = prefixBase(href, base);
+        }
+
         return;
       }
 
-      const href = node.properties?.href;
+      // MDX components such as Starlight's <LinkButton>/<LinkCard> stay JSX nodes all the way
+      // through rehype rather than becoming `<a>` elements, and they pass `href` straight to the
+      // DOM without applying the base. Without this branch, a root-relative href written in MDX
+      // ships unprefixed and 404s on the GitHub Pages target.
+      if (node.type === 'mdxJsxFlowElement' || node.type === 'mdxJsxTextElement') {
+        for (const attribute of node.attributes ?? []) {
+          if (attribute?.type !== 'mdxJsxAttribute' || typeof attribute.value !== 'string') {
+            continue;
+          }
 
-      if (typeof href !== 'string') {
-        return;
+          if (attribute.name === 'href' || attribute.name === 'link') {
+            attribute.value = prefixBase(attribute.value, base);
+          }
+        }
       }
-
-      if (!href.startsWith('/') || href.startsWith('//') || href.startsWith(`${base}/`)) {
-        return;
-      }
-
-      node.properties.href = `${base}${href}`;
     });
   };
+}
+
+function prefixBase(href, base) {
+  if (!href.startsWith('/') || href.startsWith('//') || href === base || href.startsWith(`${base}/`)) {
+    return href;
+  }
+
+  return `${base}${href}`;
 }
 
 function walk(node, visitor) {
@@ -31,9 +53,7 @@ function walk(node, visitor) {
     return;
   }
 
-  if (node.type === 'element') {
-    visitor(node);
-  }
+  visitor(node);
 
   if (!Array.isArray(node.children)) {
     return;

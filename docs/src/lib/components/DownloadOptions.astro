@@ -1,7 +1,16 @@
 ---
 import { CardGrid, LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
 import { type StarlightIcon } from '@astrojs/starlight/types';
-import { withBase } from '../base-path';
+import { localizePath, withBase } from '../base-path';
+
+const t = Astro.locals.t;
+let locale: string | undefined;
+try {
+  locale = Astro.locals.starlightRoute.locale;
+} catch {
+  // Content is also rendered outside a Starlight route when generating llms-full.txt.
+  locale = undefined;
+}
 
 type LauncherDownloadOption = {
   icon: StarlightIcon;
@@ -13,59 +22,59 @@ type LauncherDownloadOption = {
 const launcherDownloadOptions: Record<string, LauncherDownloadOption> = {
   windows: {
     icon: 'seti:windows',
-    headline: 'Download for Windows',
-    note: 'Requires Windows 10 or later, and NVIDIA or AMD GPU.',
+    headline: t('download.windows.headline'),
+    note: t('download.windows.note'),
     launcherDownloadLink:
       'https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe',
-    launcherDownloadLabel: 'Download EXE',
+    launcherDownloadLabel: t('download.windows.action'),
   },
   macos: {
     icon: 'apple',
-    headline: 'Download for MacOS',
-    note: 'Requires Apple Silicon (M-Series). Not compatible with Intel.',
+    headline: t('download.macos.headline'),
+    note: t('download.macos.note'),
     launcherDownloadLink:
       'https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg',
-    launcherDownloadLabel: 'Download DMG',
+    launcherDownloadLabel: t('download.macos.action'),
   },
   linux: {
     icon: 'linux',
-    headline: 'Download for Linux',
-    note: 'Requires NVIDIA or AMD GPU. Compatible with most distributions.',
+    headline: t('download.linux.headline'),
+    note: t('download.linux.note'),
     launcherDownloadLink:
       'https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage',
-    launcherDownloadLabel: 'Download AppImage',
+    launcherDownloadLabel: t('download.linux.action'),
   },
 };
 
 const manualDownloadOptions = {
   github: {
-    headline: 'Download from GitHub',
-    description: 'For advanced users who want to set up Invoke manually or contribute to the project.',
+    headline: t('download.github.headline'),
+    description: t('download.github.description'),
     href: 'https://github.com/invoke-ai/InvokeAI/releases',
   },
   docker: {
-    headline: 'Run with Docker',
-    description: 'For users who want to run Invoke without installing dependencies directly on their system.',
-    href: withBase('/configuration/docker/', import.meta.env.BASE_URL),
+    headline: t('download.docker.headline'),
+    description: t('download.docker.description'),
+    href: withBase(localizePath('/configuration/docker/', locale), import.meta.env.BASE_URL),
   },
 };
 
 const hostedOptions = {
   aibadgr: {
-     headline: 'Run on AI Badgr',
-     description: 'Run on the AI Badgr hosted GPU service',
-     href: 'https://aibadgr.com/gpu/launch?template=invokeai',
-   },
+    headline: t('download.aibadgr.headline'),
+    description: t('download.aibadgr.description'),
+    href: 'https://aibadgr.com/gpu/launch?template=invokeai',
+  },
   runpod: {
-     headline: 'Run on RunPod',
-     description: 'Run on the RunPod hosted GPU service',
-     href: 'https://www.runpod.io/blog/invoke-ai-stable-diffusion-runpod-nfz18',
-   },
+    headline: t('download.runpod.headline'),
+    description: t('download.runpod.description'),
+    href: 'https://www.runpod.io/blog/invoke-ai-stable-diffusion-runpod-nfz18',
+  },
   railway: {
-     headline: 'Run on Railway',
-     description: 'Run on the Railway hosted GPU service',
-     href: 'https://railway.com/deploy/invokeai',
-   },
+    headline: t('download.railway.headline'),
+    description: t('download.railway.description'),
+    href: 'https://railway.com/deploy/invokeai',
+  },
 };
 ---
 
@@ -99,7 +108,7 @@ const hostedOptions = {
 
   <!-- OR -->
   <div class="download-options__separator">
-    <span>OR</span>
+    <span>{t('download.separator')}</span>
   </div>
 
   <!-- Manual Options -->
@@ -113,8 +122,8 @@ const hostedOptions = {
 
   <!-- Hosted Options -->
   <div class="download-options__hosted">
-    <h3>Hosted Options</h3>
-    <p>For users who want to run Invoke on a hosted GPU service instead of their own hardware.</p>
+    <h3>{t('download.hosted.heading')}</h3>
+    <p>{t('download.hosted.description')}</p>
 
     <CardGrid>
       {

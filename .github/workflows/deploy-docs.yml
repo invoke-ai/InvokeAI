@@ -51,6 +51,7 @@ jobs:
           filters: |
             docs:
               - '.github/workflows/deploy-docs.yml'
+              - 'crowdin.yml'
               - 'docs/**'
               - 'scripts/generate_docs_json.py'
               - 'invokeai/app/**'
@@ -109,6 +110,10 @@ jobs:
       # Checks
       - name: verify generated docs data
         run: pnpm run check-docs-data
+        working-directory: docs
+
+      - name: test localization helpers
+        run: pnpm run test:localization
         working-directory: docs
 
       - name: build docs
