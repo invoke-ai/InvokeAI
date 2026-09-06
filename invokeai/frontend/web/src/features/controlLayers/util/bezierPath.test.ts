@@ -10,6 +10,7 @@ import {
   rectToBezierPoints,
   setBezierPointHandle,
   setBezierPointType,
+  setBezierPointTypes,
   smoothBezierPathPoints,
   splitBezierSegmentAt,
 } from './bezierPath';
@@ -259,6 +260,18 @@ describe('bezierPath utilities', () => {
     setBezierPointType(point, 'symmetric', 'outHandle');
 
     expect(point.type).toBe('symmetric');
+  });
+
+  it('assigns a point type to every selected point only', () => {
+    const points = [
+      { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: null, type: 'corner' as const },
+      { anchor: { x: 10, y: 0 }, inHandle: null, outHandle: null, type: 'corner' as const },
+      { anchor: { x: 20, y: 0 }, inHandle: null, outHandle: null, type: 'symmetric' as const },
+    ];
+
+    setBezierPointTypes(points, [0, 2], 'smooth');
+
+    expect(points.map((point) => point.type)).toEqual(['smooth', 'corner', 'smooth']);
   });
 
   it('smooths an open polyline without moving its anchors', () => {

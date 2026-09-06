@@ -53,7 +53,7 @@ export const VectorLayerEditFooter = memo(() => {
     const layer = canvas.vectorLayers.entities.find((entity) => entity.id === editSession.entityIdentifier.id);
     return Boolean(layer?.isEnabled && !layer.isLocked);
   });
-  const activePointType = useAppSelector((state) => {
+  const selectedPointType = useAppSelector((state): BezierPointType | 'mixed' | null => {
     if (!editSession || !editSession.activePathId || editSession.activePointIndex === null) {
       return null;
     }
@@ -61,7 +61,21 @@ export const VectorLayerEditFooter = memo(() => {
     const canvas = selectCanvasSlice(state);
     const layer = canvas.vectorLayers.entities.find((entity) => entity.id === editSession.entityIdentifier.id);
     const path = layer?.paths.find((path) => path.id === editSession.activePathId);
-    return path?.points[editSession.activePointIndex]?.type ?? null;
+    if (!path) {
+      return null;
+    }
+
+    const pointIndices =
+      editSession.selectedPointIndices.length > 0 ? editSession.selectedPointIndices : [editSession.activePointIndex];
+    const pointTypes = pointIndices.flatMap((pointIndex) => {
+      const point = path.points[pointIndex];
+      return point ? [point.type] : [];
+    });
+    const firstPointType = pointTypes[0];
+    if (!firstPointType) {
+      return null;
+    }
+    return pointTypes.every((pointType) => pointType === firstPointType) ? firstPointType : 'mixed';
   });
   const canSmoothActivePath = useAppSelector((state) => {
     if (!editSession?.activePathId) {
@@ -133,9 +147,13 @@ export const VectorLayerEditFooter = memo(() => {
           <Kbd fontSize="xs">{deletePathKeys.join('+')}</Kbd>
         </Flex>
       </Flex>
-      <FormControl isDisabled={!activePointType || !canMutateEditSession}>
+      <FormControl isDisabled={!selectedPointType || !canMutateEditSession}>
         <FormLabel m={0}>{t('controlLayers.vectorEdit.pointType')}</FormLabel>
-        <RadioGroup value={activePointType ?? undefined} onChange={onPointTypeChange} size="sm">
+        <RadioGroup
+          value={selectedPointType === 'mixed' ? '' : (selectedPointType ?? '')}
+          onChange={onPointTypeChange}
+          size="sm"
+        >
           <Flex alignItems="center" gap={4} color="base.300" wrap="wrap">
             <Radio value="corner">
               <Text>{t('controlLayers.vectorEdit.corner')}</Text>

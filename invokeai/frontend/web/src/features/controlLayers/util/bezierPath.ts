@@ -112,6 +112,22 @@ export const setBezierPointType = (
   syncOppositeHandleForPointType(point, sourceHandleType);
 };
 
+export const setBezierPointTypes = (
+  points: CanvasBezierPointState[],
+  pointIndices: number[],
+  type: BezierPointType,
+  preferredPointIndex?: number | null,
+  preferredHandleType?: BezierPointHandleType | null
+) => {
+  for (const pointIndex of new Set(pointIndices)) {
+    const point = points[pointIndex];
+    if (!point) {
+      continue;
+    }
+    setBezierPointType(point, type, pointIndex === preferredPointIndex ? preferredHandleType : null);
+  }
+};
+
 export const setBezierPointHandle = (
   point: CanvasBezierPointState,
   handleType: BezierPointHandleType,

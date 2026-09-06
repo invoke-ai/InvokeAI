@@ -18,7 +18,7 @@ import {
   getBezierPathHitSamplesPerSegment,
   getBezierPointPullHandleType,
   setBezierPointHandle,
-  setBezierPointType,
+  setBezierPointTypes,
   smoothBezierPathPoints,
   splitBezierSegmentAt,
 } from 'features/controlLayers/util/bezierPath';
@@ -351,12 +351,13 @@ export class CanvasPathToolModule extends CanvasModuleBase {
 
     const nextPaths = deepClone(activeEntity.state.paths);
     const path = nextPaths.find((candidate) => candidate.id === session.activePathId);
-    const bezierPoint = path?.points[session.activePointIndex];
-    if (!path || !bezierPoint) {
+    if (!path || !path.points[session.activePointIndex]) {
       return;
     }
 
-    setBezierPointType(bezierPoint, pointType, session.activeHandle);
+    const pointIndices =
+      session.selectedPointIndices.length > 0 ? session.selectedPointIndices : [session.activePointIndex];
+    setBezierPointTypes(path.points, pointIndices, pointType, session.activePointIndex, session.activeHandle);
     this.manager.stateApi.replaceVectorPaths({
       entityIdentifier: session.entityIdentifier,
       paths: nextPaths,
