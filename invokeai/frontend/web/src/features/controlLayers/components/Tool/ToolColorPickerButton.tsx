@@ -1,8 +1,8 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
-import { useIsRegionFocused } from 'common/hooks/focus';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo } from 'react';
+import { useSharedInfoHotkeyTarget } from 'features/system/components/HotkeysModal/useSharedInfoHotkeyTarget';
+import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyedropperBold } from 'react-icons/pi';
 
@@ -10,15 +10,15 @@ export const ToolColorPickerButton = memo(() => {
   const { t } = useTranslation();
   const isSelected = useToolIsSelected('colorPicker');
   const selectColorPicker = useSelectTool('colorPicker');
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isViewerFocused = useIsRegionFocused('viewer');
+  const hotkeyTarget = useSharedInfoHotkeyTarget();
+  const hotkeyOptions = useMemo(() => ({ enabled: hotkeyTarget === 'colorPicker' }), [hotkeyTarget]);
 
   useRegisteredHotkeys({
     id: 'selectColorPickerTool',
     category: 'canvas',
     callback: selectColorPicker,
-    options: { enabled: !isGalleryFocused && !isViewerFocused },
-    dependencies: [selectColorPicker, isGalleryFocused, isViewerFocused],
+    options: hotkeyOptions,
+    dependencies: [selectColorPicker, hotkeyTarget],
   });
 
   return (

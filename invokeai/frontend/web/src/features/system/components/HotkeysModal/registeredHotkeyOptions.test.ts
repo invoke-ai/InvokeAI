@@ -13,7 +13,7 @@ describe('getRegisteredHotkeyOptions', () => {
     const options: Options = { enabled: false, preventDefault: true };
     const isTextSessionActive = vi.fn(() => false);
 
-    expect(getRegisteredHotkeyOptions(options, isTextSessionActive)).toBe(options);
+    expect(getRegisteredHotkeyOptions(options, isTextSessionActive)).toEqual(options);
   });
 
   it('suppresses an enabled hotkey during an uncommitted canvas text session', () => {
@@ -21,6 +21,13 @@ describe('getRegisteredHotkeyOptions', () => {
 
     expect(typeof result.enabled).toBe('function');
     expect((result.enabled as EnabledPredicate)(event, hotkey)).toBe(false);
+  });
+
+  it('enables a hotkey with no configured enabled option outside a canvas text session', () => {
+    const result = getRegisteredHotkeyOptions({}, () => false);
+
+    expect(typeof result.enabled).toBe('function');
+    expect((result.enabled as EnabledPredicate)(event, hotkey)).toBe(true);
   });
 
   it('preserves a configured enabled predicate outside a canvas text session', () => {
