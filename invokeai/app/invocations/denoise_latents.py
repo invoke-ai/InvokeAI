@@ -16,7 +16,7 @@ from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSingle
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from PIL import Image
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
@@ -133,7 +133,7 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.6.0",
+    version="1.7.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -209,15 +209,15 @@ class DenoiseLatentsInvocation(BaseInvocation):
         description=FieldDescriptions.hidiffusion_window_attn,
         title="HiDiffusion: Window Attention",
     )
-    hidiffusion_t1_ratio: float = InputField(
-        default=0.4,
+    hidiffusion_t1_ratio: Optional[float] = InputField(
+        default=None,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t1_ratio,
         title="HiDiffusion: T1 Ratio",
     )
-    hidiffusion_t2_ratio: float = InputField(
-        default=0.0,
+    hidiffusion_t2_ratio: Optional[float] = InputField(
+        default=None,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t2_ratio,
@@ -247,6 +247,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if v < 1:
                 raise ValueError("cfg_scale must be greater than 1")
         return v
+
+    @model_validator(mode="after")
+    def validate_hidiffusion_ratio_order(self):
+        if (
+            self.hidiffusion_t1_ratio is not None
+            and self.hidiffusion_t2_ratio is not None
+            and self.hidiffusion_t2_ratio > self.hidiffusion_t1_ratio
+        ):
+            raise ValueError("HiDiffusion T2 ratio must be less than or equal to the T1 ratio")
+        return self
 
     @staticmethod
     def _get_text_embeddings_and_masks(
@@ -926,6 +936,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
+                    is_inpainting_task=self.denoise_mask is not None,
                 )
             )
 
@@ -1157,6 +1168,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     t1_ratio=self.hidiffusion_t1_ratio,
                     t2_ratio=self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
+                    is_inpainting_task=self.denoise_mask is not None,
                 )
                 if self.hidiffusion
                 else nullcontext()

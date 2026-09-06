@@ -817,7 +817,7 @@ const zPidMode = z.enum(['off', 'fit', 'native']);
 export type PidMode = z.infer<typeof zPidMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(5),
+  _version: z.literal(7),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -839,6 +839,7 @@ export const zParamsState = z.object({
   hiDiffusionEnabled: z.boolean().default(false),
   hiDiffusionRauNetEnabled: z.boolean().default(true),
   hiDiffusionWindowAttnEnabled: z.boolean().default(true),
+  hiDiffusionAutoRatios: z.boolean().default(true),
   hiDiffusionT1Ratio: z.number().default(0.4),
   hiDiffusionT2Ratio: z.number().default(0.0),
   iterations: z.number(),
@@ -965,7 +966,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 5,
+  _version: 7,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -983,6 +984,7 @@ export const getInitialParamsState = (): ParamsState => ({
   hiDiffusionEnabled: false,
   hiDiffusionRauNetEnabled: true,
   hiDiffusionWindowAttnEnabled: true,
+  hiDiffusionAutoRatios: true,
   hiDiffusionT1Ratio: 0.4,
   hiDiffusionT2Ratio: 0.0,
   iterations: 1,

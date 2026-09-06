@@ -78,6 +78,7 @@ export type Feature =
   | 'hidiffusion'
   | 'hidiffusionRauNet'
   | 'hidiffusionWindowAttn'
+  | 'hidiffusionRatiosAuto'
   | 'hidiffusionT1Ratio'
   | 'hidiffusionT2Ratio'
   | 'colorCompensation'
@@ -256,6 +257,7 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   hidiffusionRauNet: {},
   hidiffusionWindowAttn: {},
+  hidiffusionRatiosAuto: {},
   hidiffusionT1Ratio: {},
   hidiffusionT2Ratio: {},
 } as const;

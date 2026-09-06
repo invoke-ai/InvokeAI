@@ -6,7 +6,9 @@ from typing import Optional
 import torch
 from diffusers import UNet2DConditionModel
 
-from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase
+from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
+from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
+from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
 from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
@@ -22,6 +24,7 @@ class HiDiffusionExt(ExtensionBase):
         generator: torch.Generator | None = None,
         has_controlnet: bool = False,
         is_controlnet_text_to_image: bool = False,
+        is_inpainting_task: bool | None = None,
     ):
         super().__init__()
         self._name_or_path = name_or_path
@@ -29,9 +32,16 @@ class HiDiffusionExt(ExtensionBase):
         self._apply_window_attn = apply_window_attn
         self._has_controlnet = has_controlnet
         self._is_controlnet_text_to_image = is_controlnet_text_to_image
+        self._is_inpainting_task = is_inpainting_task
         self._t1_ratio = t1_ratio
         self._t2_ratio = t2_ratio
         self._generator = generator
+
+    @callback(ExtensionCallbackType.PRE_STEP, order=-1000)
+    def set_step_index(self, ctx: DenoiseContext) -> None:
+        """Keep HiDiffusion scheduling stable across all UNet forwards in one denoising step."""
+        if ctx.unet is not None and hasattr(ctx.unet, "info"):
+            ctx.unet.info["step_index"] = ctx.step_index
 
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
@@ -45,5 +55,6 @@ class HiDiffusionExt(ExtensionBase):
             t1_ratio=self._t1_ratio,
             t2_ratio=self._t2_ratio,
             generator=self._generator,
+            is_inpainting_task=self._is_inpainting_task,
         ):
             yield None
