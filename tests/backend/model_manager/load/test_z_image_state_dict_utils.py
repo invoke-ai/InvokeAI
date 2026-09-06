@@ -1,8 +1,12 @@
 """Unit tests for the Z-Image GGUF/ComfyUI -> diffusers state-dict converter."""
 
+import pytest
 import torch
 
-from invokeai.backend.model_manager.load.model_loaders.z_image import _convert_z_image_gguf_to_diffusers
+from invokeai.backend.model_manager.load.model_loaders.z_image import (
+    _convert_z_image_gguf_to_diffusers,
+    _remap_z_image_layer_paths,
+)
 from tests.backend.model_manager.load.state_dicts.utils import keys_to_mock_state_dict
 from tests.backend.model_manager.load.state_dicts.z_image_transformer_comfyui_keys import (
     state_dict_keys as z_image_keys,
@@ -64,3 +68,83 @@ class TestConvertZImageGgufToDiffusers:
         assert torch.allclose(out["blk.attention.to_q.weight"], qkv[0:2])
         assert torch.allclose(out["blk.attention.to_k.weight"], qkv[2:4])
         assert torch.allclose(out["blk.attention.to_v.weight"], qkv[4:6])
+
+
+class TestQkvQuantizationSideChannel:
+    """A scaled-fp8 checkpoint puts a `scale_weight` next to the fused `qkv.weight`.
+
+    Left on `...attention.qkv`, the recovered scale is keyed on a module path the diffusers model
+    does not have, so `attach_fp8_scales` finds nothing and the three split weights stay quantized
+    but *unscaled* — off by 1/weight_scale, with no error anywhere.
+    """
+
+    def test_per_tensor_scale_reaches_all_three_projections(self):
+        out = _convert_z_image_gguf_to_diffusers(
+            {
+                "blk.attention.qkv.weight": torch.arange(12, dtype=torch.float32).reshape(6, 2),
+                "blk.attention.qkv.scale_weight": torch.tensor(0.25),
+            }
+        )
+        assert not any(".attention.qkv." in k for k in out)
+        for name in ("to_q", "to_k", "to_v"):
+            assert torch.equal(out[f"blk.attention.{name}.scale_weight"], torch.tensor(0.25))
+
+    def test_per_channel_scale_is_split_like_the_weight(self):
+        out = _convert_z_image_gguf_to_diffusers(
+            {
+                "blk.attention.qkv.weight": torch.arange(12, dtype=torch.float32).reshape(6, 2),
+                "blk.attention.qkv.weight_scale": torch.arange(6, dtype=torch.float32),
+            }
+        )
+        assert torch.equal(out["blk.attention.to_q.weight_scale"], torch.tensor([0.0, 1.0]))
+        assert torch.equal(out["blk.attention.to_k.weight_scale"], torch.tensor([2.0, 3.0]))
+        assert torch.equal(out["blk.attention.to_v.weight_scale"], torch.tensor([4.0, 5.0]))
+
+    def test_marker_blob_is_copied_not_split(self):
+        # `.comfy_quant` is a 1-D JSON byte string describing the layer, not a per-channel vector.
+        blob = torch.frombuffer(b'{"format":"float8_e4m3fn"}', dtype=torch.uint8).clone()
+        out = _convert_z_image_gguf_to_diffusers(
+            {
+                "blk.attention.qkv.weight": torch.arange(12, dtype=torch.float32).reshape(6, 2),
+                "blk.attention.qkv.comfy_quant": blob,
+            }
+        )
+        for name in ("to_q", "to_k", "to_v"):
+            assert torch.equal(out[f"blk.attention.{name}.comfy_quant"], blob)
+
+    def test_unknown_suffix_is_left_alone(self):
+        out = _convert_z_image_gguf_to_diffusers(
+            {
+                "blk.attention.qkv.weight": torch.arange(12, dtype=torch.float32).reshape(6, 2),
+                "blk.attention.qkv.something_else": torch.tensor(1.0),
+            }
+        )
+        assert "blk.attention.qkv.something_else" in out
+
+    def test_undivisible_scale_is_rejected_rather_than_mis_split(self):
+        with pytest.raises(ValueError, match="Cannot split fused QKV quantization data"):
+            _convert_z_image_gguf_to_diffusers(
+                {
+                    "blk.attention.qkv.weight": torch.arange(12, dtype=torch.float32).reshape(6, 2),
+                    "blk.attention.qkv.weight_scale": torch.arange(4, dtype=torch.float32),
+                }
+            )
+
+
+class TestMetadataPathRemap:
+    """`_quantization_metadata` names layers in the checkpoint's scheme; the scales are recovered
+    after the rename, so the per-layer hints have to follow the same route."""
+
+    def test_renamed_layers_map_one_to_one(self):
+        mapping = _remap_z_image_layer_paths(["x_embedder", "final_layer.linear", "layers.0.attention.out"])
+        assert mapping["x_embedder"] == ["all_x_embedder.2-1"]
+        assert mapping["final_layer.linear"] == ["all_final_layer.2-1.linear"]
+        assert mapping["layers.0.attention.out"] == ["layers.0.attention.to_out.0"]
+
+    def test_fused_qkv_maps_to_all_three_projections(self):
+        mapping = _remap_z_image_layer_paths(["layers.0.attention.qkv"])
+        assert mapping["layers.0.attention.qkv"] == [
+            "layers.0.attention.to_q",
+            "layers.0.attention.to_k",
+            "layers.0.attention.to_v",
+        ]

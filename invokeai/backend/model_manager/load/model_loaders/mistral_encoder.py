@@ -37,6 +37,23 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import (
+    TRANSFORMER_KEY_PREFIXES,
+    attach_fp8_scales,
+    cast_state_dict,
+    expand_weight_scale,
+    extract_comfy_quant_hints,
+    extract_fp8_scaled_layers,
+    full_precision_hints_respected,
+    is_scale_metadata_key,
+    iter_weight_scale_pairs,
+    parse_quantization_metadata,
+    read_safetensors_metadata,
+    should_keep_fp8_weights,
+    split_fp8_scaled_layers,
+    strip_layer_path_prefix,
+    warn_on_unattached_scales,
+)
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
@@ -189,6 +206,13 @@ def _read_gguf_metadata_int(path: Path, key: str) -> int | None:
     return int(value) if isinstance(value, (int, float)) else None
 
 
+# Wrapper prefixes this loader strips from the state dict. Kept as a named constant because the
+# `_quantization_metadata` header names its layers *before* the strip, so the hints have to be
+# re-keyed with exactly the same list -- see `_load_text_encoder`. Restating it there would be a
+# second copy free to drift.
+MISTRAL_KEY_PREFIXES = ("text_encoder.", "language_model.")
+
+
 def _strip_known_prefixes(sd: dict[str, Any]) -> dict[str, Any]:
     """Strip wrapper prefixes used by some FLUX.2 single-file redistributions.
 
@@ -202,7 +226,7 @@ def _strip_known_prefixes(sd: dict[str, Any]) -> dict[str, Any]:
             out[key] = value
             continue
         new_key = key
-        for prefix in ("text_encoder.", "language_model."):
+        for prefix in MISTRAL_KEY_PREFIXES:
             if new_key.startswith(prefix):
                 new_key = new_key[len(prefix) :]
                 break
@@ -357,31 +381,25 @@ def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.
     24B fp8 encoder that difference is tens of GB — enough to OOM machines that can
     otherwise load the model.
     """
-    weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
     dequantized = 0
-    for scale_key in weight_scale_keys:
-        weight_key = scale_key[: -len(".weight_scale")] + ".weight"
-        if weight_key not in sd:
-            continue
+    for weight_key, scale_key in list(iter_weight_scale_pairs(sd)):
         weight = sd[weight_key].float()
-        scale = sd[scale_key].float()
-        if scale.shape != weight.shape and scale.numel() > 1:
-            for dim in range(len(weight.shape)):
-                if dim < len(scale.shape) and scale.shape[dim] != weight.shape[dim]:
-                    block = weight.shape[dim] // scale.shape[dim]
-                    if block > 1:
-                        scale = scale.repeat_interleave(block, dim=dim)
+        # `expand_weight_scale` rather than a local broadcast: a per-output-channel scale is 1-D of
+        # length `out`, and `(out, in) * (out,)` aligns on the *last* axis, so it scales input
+        # channels instead of output channels -- wrong on a square weight, a shape error otherwise.
+        scale = expand_weight_scale(weight, sd[scale_key].float())
         result = weight * scale
         sd[weight_key] = result.to(target_dtype) if target_dtype is not None else result
         dequantized += 1
     if dequantized:
         logger.info(f"Dequantized {dequantized} Comfy-Org-style quantized weights")
 
-    drop_suffixes = (".weight_scale", ".input_scale", ".scale")
+    # `is_scale_metadata_key` covers both spellings of the weight and input scales; `.scale` stays
+    # here because it is this producer's own spelling and is not a scaled-fp8 key.
     drop_keys = [
         k
         for k in sd.keys()
-        if isinstance(k, str) and (k.endswith(drop_suffixes) or "comfy_quant" in k or k.startswith("scaled_fp8"))
+        if isinstance(k, str) and (is_scale_metadata_key(k) or k.endswith(".scale") or k.startswith("scaled_fp8"))
     ]
     for k in drop_keys:
         del sd[k]
@@ -922,10 +940,41 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
-        sd = load_file(Path(config.path))
+        model_path = Path(config.path)
+        sd = load_file(model_path)
         sd = _strip_known_prefixes(sd)
-        # Dequantize straight to the compute dtype (per-tensor peak, not whole-dict fp32).
-        sd = _drop_quantization_metadata(sd, logger, target_dtype=model_dtype)
+
+        # These redistributions are ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`.
+        # Folding the scale doubles the encoder -- 16.8 GiB on disk becomes 32.3 GiB in bf16, which
+        # does not fit on a 24 GB card even on its own. Keeping the weights quantized is therefore
+        # not just a speed question here, it decides whether the model loads at all.
+        #
+        # Both key rewrites in this loader (`_strip_known_prefixes` above and
+        # `_convert_for_bare_mistral_model` below) are plain prefix operations, so a sibling
+        # `.weight_scale` travels with its weight automatically -- no fused projections to split.
+        keep_fp8 = should_keep_fp8_weights(target_device)
+        fp8_layers: dict[str, Any] = {}
+        if keep_fp8:
+            # This loader strips its own wrapper prefixes on top of the generic ones, so the hints
+            # need both lists. With only the generic tuple, a `language_model.`-prefixed
+            # redistribution keeps its hint names while the sd keys lose the prefix, and every
+            # `full_precision_matrix_mult` is silently ignored.
+            header_hints = strip_layer_path_prefix(
+                parse_quantization_metadata(read_safetensors_metadata(model_path, logger)),
+                prefixes=(*MISTRAL_KEY_PREFIXES, *TRANSFORMER_KEY_PREFIXES),
+            )
+            layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}
+            fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+        if not fp8_layers:
+            # Dequantize straight to the compute dtype (per-tensor peak, not whole-dict fp32).
+            sd = _drop_quantization_metadata(sd, logger, target_dtype=model_dtype)
+        else:
+            # `extract_fp8_scaled_layers` removes the keys it interprets, but this producer also
+            # emits `.scale` and `scaled_fp8*`, which it does not recognize. On the dequantizing
+            # path `_drop_quantization_metadata` takes those; here nothing did, so they reached
+            # `load_state_dict` and padded the "ignored N unexpected keys" line.
+            for k in [k for k in sd if isinstance(k, str) and (k.endswith(".scale") or k.startswith("scaled_fp8"))]:
+                del sd[k]
 
         mistral_config = _build_mistral_config(sd, torch_dtype=model_dtype)
         logger.info(
@@ -940,17 +989,21 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         for k in [k for k in sd.keys() if isinstance(k, str) and k.startswith("lm_head.")]:
             del sd[k]
 
-        # Cast remaining tensors to compute dtype before loading. Dequantized weights are
-        # already at model_dtype; this covers the un-quantized ones (norms, embeddings).
-        for k in list(sd.keys()):
-            if sd[k].dtype != model_dtype:
-                sd[k] = sd[k].to(model_dtype)
-
-        # Adapt CausalLM-prefixed keys for bare MistralModel.
+        # Adapt CausalLM-prefixed keys for bare MistralModel. The recovered scales are keyed on the
+        # checkpoint's paths, so they need the same `model.` strip or `attach_fp8_scales` resolves
+        # nothing and every weight stays quantized but unscaled.
         sd = _convert_for_bare_mistral_model(sd)
+        fp8_layers = {
+            (path[len("model.") :] if path.startswith("model.") else path): layer for path, layer in fp8_layers.items()
+        }
 
         with accelerate.init_empty_weights():
             model = MistralModel(mistral_config)
+
+        # Layers the cast would dequantize anyway are folded here, scale applied, so the cast never
+        # strips a scale that can no longer be put back.
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model)
+        cast_state_dict(sd, model_dtype, keep_fp8=bool(fp8_layers), model=model)
 
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         if unexpected:
@@ -978,6 +1031,19 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         _materialize_remaining_meta_tensors(model, model_dtype, logger)
         _strip_final_norm_for_cow(model, config.variant, logger)
         _warn_if_40_layer_mistral(config.variant, logger)
+
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            logger.info(
+                f"Mistral encoder: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, fp8_compute enabled)"
+            )
+            warn_on_unattached_scales(logger, "Mistral encoder", attached, fp8_layers)
+            marked = sum(1 for layer in fp8_layers.values() if layer.full_precision_matmul)
+            if marked and full_precision_hints_respected():
+                logger.info(
+                    f"Mistral encoder: {marked} of {len(fp8_layers)} layer(s) are marked "
+                    "full_precision_matrix_mult and will dequantize per forward."
+                )
 
         return model
 
