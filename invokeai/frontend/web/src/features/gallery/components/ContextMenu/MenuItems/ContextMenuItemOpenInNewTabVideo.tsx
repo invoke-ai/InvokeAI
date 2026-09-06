@@ -1,5 +1,5 @@
 import { MenuItem } from '@invoke-ai/ui-library';
-import { openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
+import { openMediaInNewTab } from 'common/util/openMediaInNewTab';
 import { useVideoDTOContext } from 'features/gallery/contexts/VideoDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
