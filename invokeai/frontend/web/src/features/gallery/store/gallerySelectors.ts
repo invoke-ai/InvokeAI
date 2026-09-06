@@ -91,6 +91,10 @@ export const selectGalleryImageMinimumWidth = createSelector(
 export const selectComparisonMode = createSelector(selectGallerySlice, (gallery) => gallery.comparisonMode);
 export const selectComparisonFit = createSelector(selectGallerySlice, (gallery) => gallery.comparisonFit);
 export const selectImageToCompare = createSelector(selectGallerySlice, (gallery) => gallery.imageToCompare);
+export const selectHasMetadataViewerItem = createSelector(
+  [selectLastSelectedItem, selectImageToCompare],
+  (lastSelectedItem, imageToCompare) => Boolean(lastSelectedItem && !imageToCompare)
+);
 export const selectAlwaysShouldImageSizeBadge = createSelector(
   selectGallerySlice,
   (gallery) => gallery.alwaysShowImageSizeBadge
