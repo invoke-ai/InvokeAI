@@ -211,6 +211,8 @@ def _normalize_lora_param_names(layer_dict: dict[str, torch.Tensor], alpha: floa
             values["alpha"] = layer_dict["alpha"]
         if "dora_scale" in layer_dict:
             values["dora_scale"] = layer_dict["dora_scale"]
+        if "dora_magnitude" in layer_dict:
+            values["dora_magnitude"] = layer_dict["dora_magnitude"]
         return values
     return layer_dict
 
@@ -219,14 +221,16 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     """Group state-dict keys by their layer path (everything before the LoRA-suffix tail)."""
     grouped: dict[str, dict[str, torch.Tensor]] = {}
 
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
+    suffix_to_value_key = {
+        ".lora_A.weight": "lora_A.weight",
+        ".lora_B.weight": "lora_B.weight",
+        ".lora_down.weight": "lora_down.weight",
+        ".lora_up.weight": "lora_up.weight",
+        ".dora_scale": "dora_scale",
+        ".lora_magnitude_vector.weight": "dora_magnitude",
+        ".magnitude": "dora_magnitude",
+        ".alpha": "alpha",
+    }
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -234,10 +238,10 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
 
         layer_name = None
         key_name = None
-        for suffix in known_suffixes:
+        for suffix, value_key in suffix_to_value_key.items():
             if key.endswith(suffix):
                 layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]  # drop leading dot
+                key_name = value_key
                 break
 
         if layer_name is None:

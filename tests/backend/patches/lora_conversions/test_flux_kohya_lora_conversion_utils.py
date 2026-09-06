@@ -5,6 +5,7 @@ import torch
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.util import get_flux_transformers_params
 from invokeai.backend.model_manager.taxonomy import FluxVariantType
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
     _convert_flux_transformer_kohya_state_dict_to_invoke_format,
     is_state_dict_likely_in_flux_kohya_format,
@@ -114,3 +115,17 @@ def test_lora_model_from_flux_kohya_state_dict(sd_keys: dict[str, list[int]]):
     lora_model_keys = set(lora_model.layers.keys())
     lora_model_keys = {k.replace(".", "_") for k in lora_model_keys}
     assert lora_model_keys == expected_layer_keys
+
+
+def test_lora_model_from_flux_kohya_dora_magnitude():
+    state_dict = {
+        "lora_unet_double_blocks_0_img_attn_proj.lora_down.weight": torch.zeros(2, 5),
+        "lora_unet_double_blocks_0_img_attn_proj.lora_up.weight": torch.zeros(7, 2),
+        "lora_unet_double_blocks_0_img_attn_proj.magnitude": torch.arange(1, 8, dtype=torch.float32),
+    }
+
+    model = lora_model_from_flux_kohya_state_dict(state_dict)
+    layer = model.layers["lora_transformer-double_blocks.0.img_attn.proj"]
+
+    assert isinstance(layer, DoRALayer)
+    assert layer.magnitude_is_out_dim is True

@@ -8,6 +8,17 @@ from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
+_LORA_SUFFIX_TO_VALUE_KEY = {
+    ".lora_A.weight": "lora_A.weight",
+    ".lora_B.weight": "lora_B.weight",
+    ".lora.down.weight": "lora.down.weight",
+    ".lora.up.weight": "lora.up.weight",
+    ".dora_scale": "dora_scale",
+    ".lora_magnitude_vector.weight": "dora_magnitude",
+    ".magnitude": "dora_magnitude",
+    ".alpha": "alpha",
+}
+
 
 def is_state_dict_likely_in_flux_diffusers_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely in the Diffusers FLUX LoRA format.
@@ -20,7 +31,14 @@ def is_state_dict_likely_in_flux_diffusers_format(state_dict: dict[str | int, to
     """
     # Check that all keys are LoRA weight keys (either PEFT or standard format).
     # Some LoRAs use a mix of formats (PEFT for some layers, standard for others).
-    _LORA_SUFFIXES = ("lora_A.weight", "lora_B.weight", "lora.down.weight", "lora.up.weight")
+    _LORA_SUFFIXES = (
+        "lora_A.weight",
+        "lora_B.weight",
+        "lora.down.weight",
+        "lora.up.weight",
+        "lora_magnitude_vector.weight",
+        "magnitude",
+    )
     all_keys_are_lora = all(k.endswith(_LORA_SUFFIXES) for k in state_dict.keys() if isinstance(k, str))
     if not all_keys_are_lora:
         return False
@@ -125,12 +143,22 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
         if "lora_A.weight" in src_layer_dict:
             # The LoRA keys are in PEFT format.
             values = {
-                "lora_down.weight": src_layer_dict.pop("lora_A.weight"),
-                "lora_up.weight": src_layer_dict.pop("lora_B.weight"),
+                "lora_down.weight": src_layer_dict["lora_A.weight"],
+                "lora_up.weight": src_layer_dict["lora_B.weight"],
             }
             if alpha is not None:
                 values["alpha"] = torch.tensor(alpha)
-            assert len(src_layer_dict) == 0
+            for value_key in ("alpha", "dora_scale", "dora_magnitude"):
+                if value_key in src_layer_dict and (value_key != "alpha" or alpha is None):
+                    values[value_key] = src_layer_dict[value_key]
+            unexpected_keys = set(src_layer_dict) - {
+                "lora_A.weight",
+                "lora_B.weight",
+                "alpha",
+                "dora_scale",
+                "dora_magnitude",
+            }
+            assert not unexpected_keys, f"Unexpected LoRA keys: {unexpected_keys}"
             return values
         else:
             # Assume that the LoRA keys are in Kohya format.
@@ -327,6 +355,13 @@ def lora_model_from_flux2_diffusers_state_dict(
         else:
             values = src_layer_dict
 
+        for source_key in ("lora_magnitude_vector.weight", "magnitude"):
+            if source_key in src_layer_dict:
+                values["dora_magnitude"] = src_layer_dict[source_key]
+        for magnitude_key in ("dora_scale", "dora_magnitude"):
+            if magnitude_key in src_layer_dict:
+                values[magnitude_key] = src_layer_dict[magnitude_key]
+
         if alpha is not None and "alpha" not in values:
             values["alpha"] = torch.tensor(alpha)
 
@@ -347,11 +382,19 @@ def _group_by_layer_mixed_format(state_dict: Dict[str, torch.Tensor]) -> dict[st
             continue
 
         # Determine suffix length based on the key ending
-        if key.endswith((".lora_A.weight", ".lora_B.weight")):
+        if key.endswith((".lora_A.weight", ".lora_B.weight", ".lora_magnitude_vector.weight")):
             # PEFT format: split off 2 parts (lora_A + weight)
             parts = key.rsplit(".", maxsplit=2)
             layer_name = parts[0]
             suffix = ".".join(parts[1:])
+            if suffix == "lora_magnitude_vector.weight":
+                suffix = "dora_magnitude"
+        elif key.endswith(".magnitude"):
+            layer_name = key[: -len(".magnitude")]
+            suffix = "dora_magnitude"
+        elif key.endswith(".dora_scale"):
+            layer_name = key[: -len(".dora_scale")]
+            suffix = "dora_scale"
         elif key.endswith((".lora.down.weight", ".lora.up.weight")):
             # Standard format: split off 3 parts (lora + down/up + weight)
             parts = key.rsplit(".", maxsplit=3)
@@ -374,10 +417,17 @@ def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, 
     """Groups the keys in the state dict by layer."""
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key in state_dict:
-        # Split the 'lora_A.weight' or 'lora_B.weight' suffix from the layer name.
-        parts = key.rsplit(".", maxsplit=2)
-        layer_name = parts[0]
-        key_name = ".".join(parts[1:])
+        layer_name = None
+        key_name = None
+        for suffix, value_key in _LORA_SUFFIX_TO_VALUE_KEY.items():
+            if key.endswith(suffix):
+                layer_name = key[: -len(suffix)]
+                key_name = value_key
+                break
+        if layer_name is None:
+            parts = key.rsplit(".", maxsplit=2)
+            layer_name = parts[0]
+            key_name = ".".join(parts[1:])
         if layer_name not in layer_dict:
             layer_dict[layer_name] = {}
         layer_dict[layer_name][key_name] = state_dict[key]

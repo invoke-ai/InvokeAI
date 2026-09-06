@@ -1,7 +1,9 @@
 """Tests for Qwen Image LoRA conversion utilities."""
 
+import pytest
 import torch
 
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
 )
@@ -115,6 +117,26 @@ def test_diffusers_with_transformer_prefix_strips_it():
 
     expected_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_k"
     assert expected_key in model.layers
+
+
+@pytest.mark.parametrize("magnitude_suffix", ["magnitude", "lora_magnitude_vector.weight"])
+def test_diffusers_dora_magnitude_is_preserved(magnitude_suffix: str):
+    in_dim, out_dim, rank = 5, 7, 2
+    magnitude = torch.arange(1, out_dim + 1, dtype=torch.float32)
+    prefix = "transformer.transformer_blocks.0.attn.to_q"
+    state_dict = {
+        f"{prefix}.lora_A.weight": torch.zeros(rank, in_dim),
+        f"{prefix}.lora_B.weight": torch.zeros(out_dim, rank),
+        f"{prefix}.{magnitude_suffix}": magnitude,
+    }
+
+    model = lora_model_from_qwen_image_state_dict(state_dict)
+    layer = model.layers[f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"]
+
+    assert isinstance(layer, DoRALayer)
+    assert layer.magnitude_is_out_dim is True
+    assert torch.equal(layer.dora_scale, magnitude)
+    assert layer.get_weight(torch.randn(out_dim, in_dim)).shape == (out_dim, in_dim)
 
 
 # ---- Unknown key handling tests ----

@@ -32,7 +32,13 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 _TRANSFORMER_PREFIX = "transformer."
 
 # Valid LoRA weight suffixes in this format.
-_LORA_SUFFIXES = ("lora_down.weight", "lora_up.weight", "alpha")
+_LORA_SUFFIXES = (
+    "lora_down.weight",
+    "lora_up.weight",
+    "alpha",
+    "lora_magnitude_vector.weight",
+    "magnitude",
+)
 
 # Regex to detect split QKV keys in double blocks: e.g. "double_blocks.0.img_attn.qkv.1"
 _SPLIT_QKV_RE = re.compile(r"^(double_blocks\.\d+\.(img_attn|txt_attn)\.qkv)\.\d+$")
@@ -111,6 +117,8 @@ def lora_model_from_flux_onetrainer_bfl_state_dict(state_dict: Dict[str, torch.T
 
         if layer_name not in grouped_state_dict:
             grouped_state_dict[layer_name] = {}
+        if suffix in ("magnitude", "lora_magnitude_vector.weight"):
+            suffix = "dora_magnitude"
         grouped_state_dict[layer_name][suffix] = value
 
     # Step 2: Build LoRA layers, merging split QKV and linear1.

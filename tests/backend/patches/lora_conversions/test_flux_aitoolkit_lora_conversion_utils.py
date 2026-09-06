@@ -1,9 +1,11 @@
 import accelerate
 import pytest
+import torch
 
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.util import get_flux_transformers_params
 from invokeai.backend.model_manager.taxonomy import FluxVariantType
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     _group_state_by_submodel,
     is_state_dict_likely_in_flux_aitoolkit_format,
@@ -64,3 +66,18 @@ def test_lora_model_from_flux_aitoolkit_state_dict():
     state_dict = keys_to_mock_state_dict(flux_aitoolkit_state_dict_keys)
 
     assert lora_model_from_flux_aitoolkit_state_dict(state_dict)
+
+
+@pytest.mark.parametrize("magnitude_suffix", ["magnitude", "lora_magnitude_vector.weight"])
+def test_lora_model_from_flux_aitoolkit_dora_magnitude(magnitude_suffix: str):
+    state_dict = {
+        "diffusion_model.double_blocks.0.img_attn.proj.lora_A.weight": torch.zeros(2, 5),
+        "diffusion_model.double_blocks.0.img_attn.proj.lora_B.weight": torch.zeros(7, 2),
+        f"diffusion_model.double_blocks.0.img_attn.proj.{magnitude_suffix}": torch.arange(1, 8, dtype=torch.float32),
+    }
+
+    model = lora_model_from_flux_aitoolkit_state_dict(state_dict)
+    layer = model.layers["lora_transformer-double_blocks.0.img_attn.proj"]
+
+    assert isinstance(layer, DoRALayer)
+    assert layer.magnitude_is_out_dim is True
