@@ -21,11 +21,17 @@ type CanvasToolModifierHintId =
   | 'altScaleFromCenter'
   | 'modFineGrid'
   | 'enterCommitText'
+  | 'enterFinishPath'
+  | 'enterApplyPathEdit'
   | 'shiftEnterNewLine'
   | 'escCancelText'
+  | 'escCancelPath'
+  | 'escCancelPathEdit'
   | 'modDragText'
   | 'shiftSnapRotation'
-  | 'arrowKeysNudgeSelection';
+  | 'arrowKeysNudgeSelection'
+  | 'shiftInsertPathPoint'
+  | 'modDeletePathPoint';
 
 type CanvasToolModifierHint = {
   id: CanvasToolModifierHintId;
@@ -101,6 +107,16 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['enter'],
     labelKey: 'controlLayers.modifierHints.labels.commitText',
   },
+  enterFinishPath: {
+    id: 'enterFinishPath',
+    keys: ['enter'],
+    labelKey: 'controlLayers.modifierHints.labels.finishPath',
+  },
+  enterApplyPathEdit: {
+    id: 'enterApplyPathEdit',
+    keys: ['enter'],
+    labelKey: 'controlLayers.modifierHints.labels.applyPathEdit',
+  },
   shiftEnterNewLine: {
     id: 'shiftEnterNewLine',
     keys: ['shift', 'enter'],
@@ -110,6 +126,16 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     id: 'escCancelText',
     keys: ['esc'],
     labelKey: 'controlLayers.modifierHints.labels.cancelText',
+  },
+  escCancelPath: {
+    id: 'escCancelPath',
+    keys: ['esc'],
+    labelKey: 'controlLayers.modifierHints.labels.cancelPath',
+  },
+  escCancelPathEdit: {
+    id: 'escCancelPathEdit',
+    keys: ['esc'],
+    labelKey: 'controlLayers.modifierHints.labels.cancelPathEdit',
   },
   modDragText: {
     id: 'modDragText',
@@ -126,6 +152,16 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['arrows'],
     labelKey: 'controlLayers.modifierHints.labels.nudgeSelection',
   },
+  shiftInsertPathPoint: {
+    id: 'shiftInsertPathPoint',
+    keys: ['shift'],
+    labelKey: 'controlLayers.modifierHints.labels.insertPathPoint',
+  },
+  modDeletePathPoint: {
+    id: 'modDeletePathPoint',
+    keys: ['mod'],
+    labelKey: 'controlLayers.modifierHints.labels.deletePathPoint',
+  },
 };
 
 type GetCanvasToolModifierHintsArg = {
@@ -135,6 +171,7 @@ type GetCanvasToolModifierHintsArg = {
   bboxAspectRatioLocked: boolean;
   hasActiveTextSession: boolean;
   isPrimaryPointerDown: boolean;
+  isEditingPathSession: boolean;
 };
 
 const mapHintIdsToHints = (hintIds: readonly CanvasToolModifierHintId[]): CanvasToolModifierHint[] =>
@@ -147,6 +184,7 @@ export const getCanvasToolModifierHintIds = ({
   bboxAspectRatioLocked,
   hasActiveTextSession,
   isPrimaryPointerDown,
+  isEditingPathSession,
 }: GetCanvasToolModifierHintsArg): CanvasToolModifierHintId[] => {
   // Resolver map: each tool returns the relevant hint ids based on the provided args.
   const TOOL_HINT_RESOLVERS: Record<
@@ -163,6 +201,17 @@ export const getCanvasToolModifierHintIds = ({
       'modFineGrid',
     ],
     move: () => ['arrowKeysNudgeSelection', 'modFineGrid', ...SHARED_HINT_IDS],
+    path: ({ isEditingPathSession }) =>
+      isEditingPathSession
+        ? [
+            'shiftInsertPathPoint',
+            'modDeletePathPoint',
+            'enterApplyPathEdit',
+            'escCancelPathEdit',
+            'spacePan',
+            'altPickColor',
+          ]
+        : ['shiftSnap45Degrees', 'enterFinishPath', 'escCancelPath', 'spacePan', 'altPickColor'],
     text: ({ hasActiveTextSession: active }) =>
       active
         ? ['enterCommitText', 'shiftEnterNewLine', 'escCancelText', 'modDragText', 'shiftSnapRotation']
@@ -200,6 +249,7 @@ export const getCanvasToolModifierHintIds = ({
       bboxAspectRatioLocked,
       hasActiveTextSession,
       isPrimaryPointerDown,
+      isEditingPathSession,
     })
   );
 };

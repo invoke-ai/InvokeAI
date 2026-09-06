@@ -4,6 +4,7 @@ import { ControlLayerEntityList } from 'features/controlLayers/components/Contro
 import { InpaintMaskList } from 'features/controlLayers/components/InpaintMask/InpaintMaskList';
 import { RasterLayerEntityList } from 'features/controlLayers/components/RasterLayer/RasterLayerEntityList';
 import { RegionalGuidanceEntityList } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceEntityList';
+import { VectorLayerEntityList } from 'features/controlLayers/components/VectorLayer/VectorLayerEntityList';
 import { memo } from 'react';
 
 export const CanvasEntityList = memo(() => {
@@ -12,6 +13,7 @@ export const CanvasEntityList = memo(() => {
       <Flex flexDir="column" gap={2} data-testid="control-layers-layer-list" w="full" h="full">
         <InpaintMaskList />
         <RegionalGuidanceEntityList />
+        <VectorLayerEntityList />
         <ControlLayerEntityList />
         <RasterLayerEntityList />
       </Flex>

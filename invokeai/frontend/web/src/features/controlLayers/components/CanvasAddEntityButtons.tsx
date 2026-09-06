@@ -6,6 +6,7 @@ import {
   useAddNewRegionalGuidanceWithARefImage,
   useAddRasterLayer,
   useAddRegionalGuidance,
+  useAddVectorLayer,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useIsEntityTypeEnabled } from 'features/controlLayers/hooks/useIsEntityTypeEnabled';
 import { memo } from 'react';
@@ -18,10 +19,12 @@ export const CanvasAddEntityButtons = memo(() => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
+  const addVectorLayer = useAddVectorLayer();
   const addRegionalReferenceImage = useAddNewRegionalGuidanceWithARefImage();
   const isRegionalGuidanceEnabled = useIsEntityTypeEnabled('regional_guidance');
   const isControlLayerEnabled = useIsEntityTypeEnabled('control_layer');
   const isInpaintLayerEnabled = useIsEntityTypeEnabled('inpaint_mask');
+  const isVectorLayerEnabled = useIsEntityTypeEnabled('vector_layer');
 
   return (
     <Flex w="full" h="full" justifyContent="center" gap={4}>
@@ -79,6 +82,16 @@ export const CanvasAddEntityButtons = memo(() => {
               {t('controlLayers.controlLayer')}
             </Button>
           </InformationalPopover>
+          <Button
+            size="sm"
+            variant="ghost"
+            justifyContent="flex-start"
+            leftIcon={<PiPlusBold />}
+            onClick={addVectorLayer}
+            isDisabled={!isVectorLayerEnabled}
+          >
+            {t('controlLayers.vectorLayer')}
+          </Button>
           <InformationalPopover feature="rasterLayer">
             <Button
               size="sm"

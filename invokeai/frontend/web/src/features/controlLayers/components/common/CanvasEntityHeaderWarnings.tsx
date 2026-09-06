@@ -14,6 +14,7 @@ import {
   getInpaintMaskWarnings,
   getRasterLayerWarnings,
   getRegionalGuidanceWarnings,
+  getVectorLayerWarnings,
 } from 'features/controlLayers/store/validators';
 import type { TFunction } from 'i18next';
 import { memo, useMemo } from 'react';
@@ -40,6 +41,8 @@ const buildSelectWarnings = (entityIdentifier: CanvasEntityIdentifier, t: TFunct
       warnings = getInpaintMaskWarnings(entity, model);
     } else if (entityType === 'raster_layer') {
       warnings = getRasterLayerWarnings(entity, model);
+    } else if (entityType === 'vector_layer') {
+      warnings = getVectorLayerWarnings(entity, model);
     } else if (entityType === 'reference_image') {
       warnings = getGlobalReferenceImageWarnings(entity, model);
     } else {

@@ -13,6 +13,8 @@ export const useEntityTypeIsHidden = (type: CanvasEntityIdentifier['type']): boo
             return canvas.controlLayers.isHidden;
           case 'raster_layer':
             return canvas.rasterLayers.isHidden;
+          case 'vector_layer':
+            return canvas.vectorLayers.isHidden;
           case 'inpaint_mask':
             return canvas.inpaintMasks.isHidden;
           case 'regional_guidance':
