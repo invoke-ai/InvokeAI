@@ -3218,6 +3218,7 @@
             "smoothSelectedPoints": "Selected Points",
             "deleteActivePathHint": "Delete active spline",
             "traceWidth": "Trace Width",
+            "taperEnds": "Taper Ends",
             "traceAll": "Trace All Paths",
             "fillClosedPaths": "Fill Closed Paths",
             "createInpaintMask": "Create Inpaint Mask"

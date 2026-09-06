@@ -3,9 +3,11 @@ import {
   CompositeSlider,
   Flex,
   FormControl,
-  IconButton,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
   NumberInput,
   NumberInputField,
+  NumberInputStepper,
   Popover,
   PopoverAnchor,
   PopoverArrow,
@@ -25,8 +27,7 @@ import {
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { FocusEvent, KeyboardEvent, PointerEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import { PiCaretDownBold } from 'react-icons/pi';
+import { MdKeyboardArrowDown, MdKeyboardArrowUp } from 'react-icons/md';
 
 import { useToolIsSelected } from './hooks';
 
@@ -114,7 +115,6 @@ const DropDownToolWidthPickerComponent = memo(
     onPointerUpCapture,
     onBlur,
   }: ToolWidthPickerComponentProps) => {
-    const { t } = useTranslation();
     const onChangeNumberInput = useCallback(
       (valueAsString: string, valueAsNumber: number) => {
         onChangeInput(valueAsNumber);
@@ -133,10 +133,11 @@ const DropDownToolWidthPickerComponent = memo(
               alignItems="center"
               min={1}
               max={600}
+              step={1}
               value={localValue}
               onChange={onChangeNumberInput}
               onBlur={onBlur}
-              w={isCompact ? 72 : 76}
+              w={28}
               format={formatPx}
               defaultValue={50}
               onKeyDown={onKeyDown}
@@ -144,18 +145,17 @@ const DropDownToolWidthPickerComponent = memo(
               onPointerUpCapture={onPointerUpCapture}
               clampValueOnBlur={false}
             >
-              <NumberInputField _focusVisible={{ zIndex: 0 }} aria-label={ariaLabel} title="" paddingInlineEnd={7} />
               <PopoverTrigger>
-                <IconButton
-                  aria-label={t('common.openSlider')}
-                  icon={<PiCaretDownBold />}
-                  size="sm"
-                  variant="link"
-                  position="absolute"
-                  insetInlineEnd={0}
-                  h="full"
-                />
+                <NumberInputField _focusVisible={{ zIndex: 0 }} aria-label={ariaLabel} title="" />
               </PopoverTrigger>
+              <NumberInputStepper>
+                <NumberIncrementStepper>
+                  <MdKeyboardArrowUp />
+                </NumberIncrementStepper>
+                <NumberDecrementStepper>
+                  <MdKeyboardArrowDown />
+                </NumberDecrementStepper>
+              </NumberInputStepper>
             </NumberInput>
           </PopoverAnchor>
         </FormControl>
@@ -286,13 +286,15 @@ export const ToolWidthPicker = memo(({ ariaLabel, mode = 'tool' }: ToolWidthPick
     return 0;
   }, [usesBrushWidth, usesEraserWidth, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
-  const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(mode === 'trace' ? 'slider' : null);
+  const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(
+    mode === 'trace' ? 'dropdown' : null
+  );
   const isTypingRef = useRef(false);
   const inputPollRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (mode === 'trace') {
-      setComponentType('slider');
+      setComponentType('dropdown');
       return;
     }
     const el = ref.current;

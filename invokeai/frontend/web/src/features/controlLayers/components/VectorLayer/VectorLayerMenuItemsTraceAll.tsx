@@ -2,9 +2,8 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
-import type { CanvasBrushLineState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
-import { approximateBezierPath } from 'features/controlLayers/util/bezierPath';
+import type { CanvasObjectState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
+import { buildVectorTraceObject } from 'features/controlLayers/util/vectorLayerTrace';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiWaveSineBold } from 'react-icons/pi';
@@ -31,24 +30,11 @@ export const VectorLayerMenuItemsTraceAll = memo(() => {
     }
 
     const color = canvasManager.stateApi.getCurrentColor();
-    const brushWidth = canvasManager.stateApi.getSettings().brushWidth;
+    const { brushWidth, traceTaperEnds } = canvasManager.stateApi.getSettings();
 
-    const objects: CanvasBrushLineState[] = paths.flatMap((path) => {
-      const coordinates = approximateBezierPath(path.points, path.isClosed);
-      if (coordinates.length < 2) {
-        return [];
-      }
-
-      return [
-        {
-          id: getPrefixedId('brush_line'),
-          type: 'brush_line',
-          strokeWidth: brushWidth,
-          points: coordinates.flatMap((coordinate) => [coordinate.x, coordinate.y]),
-          color,
-          clip: null,
-        },
-      ];
+    const objects: CanvasObjectState[] = paths.flatMap((path): CanvasObjectState[] => {
+      const object = buildVectorTraceObject(path, brushWidth, color, traceTaperEnds);
+      return object ? [object] : [];
     });
 
     if (objects.length === 0) {

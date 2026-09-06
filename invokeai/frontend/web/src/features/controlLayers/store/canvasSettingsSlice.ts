@@ -39,6 +39,10 @@ const zCanvasSettingsState = z.object({
    */
   brushWidth: z.int().gt(0),
   /**
+   * Whether traced open vector paths taper at both ends.
+   */
+  traceTaperEnds: z.boolean().default(false),
+  /**
    * The width of the eraser tool.
    */
   eraserWidth: z.int().gt(0),
@@ -141,6 +145,7 @@ const getInitialState = (): CanvasSettingsState => ({
   dynamicGrid: false,
   invertScrollForToolWidth: false,
   brushWidth: 50,
+  traceTaperEnds: false,
   eraserWidth: 50,
   activeColor: 'fgColor',
   bgColor: RGBA_BLACK,
@@ -182,6 +187,9 @@ const slice = createSlice({
     },
     settingsBrushWidthChanged: (state, action: PayloadAction<CanvasSettingsState['brushWidth']>) => {
       state.brushWidth = Math.round(action.payload);
+    },
+    settingsTraceTaperEndsToggled: (state) => {
+      state.traceTaperEnds = !state.traceTaperEnds;
     },
     settingsEraserWidthChanged: (state, action: PayloadAction<CanvasSettingsState['eraserWidth']>) => {
       state.eraserWidth = Math.round(action.payload);
@@ -279,6 +287,7 @@ export const {
   settingsDynamicGridToggled,
   settingsShowHUDToggled,
   settingsBrushWidthChanged,
+  settingsTraceTaperEndsToggled,
   settingsEraserWidthChanged,
   settingsActiveColorToggled,
   settingsBgColorChanged,
@@ -364,6 +373,7 @@ export const selectIsolatedStagingPreview = createCanvasSettingsSelector((settin
 export const selectIsolatedLayerPreview = createCanvasSettingsSelector((settings) => settings.isolatedLayerPreview);
 export const selectPressureAffectsWidth = createCanvasSettingsSelector((settings) => settings.pressureAffectsWidth);
 export const selectPressureAffectsOpacity = createCanvasSettingsSelector((settings) => settings.pressureAffectsOpacity);
+export const selectTraceTaperEnds = createCanvasSettingsSelector((settings) => settings.traceTaperEnds);
 export const selectRuleOfThirds = createCanvasSettingsSelector((settings) => settings.ruleOfThirds);
 export const selectSaveAllImagesToGallery = createCanvasSettingsSelector((settings) => settings.saveAllImagesToGallery);
 export const selectStagingAreaAutoSwitch = createCanvasSettingsSelector((settings) => settings.stagingAreaAutoSwitch);
