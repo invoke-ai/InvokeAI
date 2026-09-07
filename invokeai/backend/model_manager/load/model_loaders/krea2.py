@@ -409,7 +409,7 @@ class Krea2GGUFCheckpointModel(ModelLoader):
 
         model_path = Path(config.path)
         target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        compute_dtype = TorchDevice.choose_krea2_gguf_dtype(target_device)
 
         # GGMLTensor wrappers (kept on CPU; dequantized on-the-fly by the cache during inference).
         sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
