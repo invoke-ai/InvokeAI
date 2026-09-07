@@ -171,7 +171,22 @@ def is_state_dict_likely_krea2_lora(state_dict: dict[str | int, torch.Tensor]) -
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
     has_krea2_module = any(any(sig in k for sig in KREA2_TRANSFORMER_SIGNATURE_KEYS) for k in str_keys)
     has_lora_suffix = any(
-        k.endswith((".lora_A.weight", ".lora_B.weight", ".lora_down.weight", ".lora_up.weight")) for k in str_keys
+        k.endswith(
+            (
+                ".lora_A.weight",
+                ".lora_B.weight",
+                ".lora_down.weight",
+                ".lora_up.weight",
+                # LyCORIS LoKr (e.g. ai-toolkit Krea-2 adapters) stores Kronecker factors, not an A/B pair.
+                ".lokr_w1",
+                ".lokr_w2",
+                ".lokr_w1_a",
+                ".lokr_w1_b",
+                ".lokr_w2_a",
+                ".lokr_w2_b",
+            )
+        )
+        for k in str_keys
     )
     return has_krea2_module and has_lora_suffix
 
@@ -267,6 +282,9 @@ def _get_lora_layer_values(
 #     dim -> value key ``dora_magnitude``
 # Mapping them here lets a DoRA adapter (A/B + magnitude) load as a DoRALayer instead of being split into a
 # bogus, unrecognized layer.
+#
+# LyCORIS LoKr factors are passed through untouched: `any_lora_layer_from_state_dict` routes a values dict
+# containing `lokr_w1` / `lokr_w1_a` to LoKRLayer, so they only need to survive _group_by_layer intact.
 _SUFFIX_TO_VALUE_KEY = {
     ".lora_A.weight": "lora_A.weight",
     ".lora_B.weight": "lora_B.weight",
@@ -276,6 +294,13 @@ _SUFFIX_TO_VALUE_KEY = {
     ".lora_magnitude_vector.weight": "dora_magnitude",
     ".magnitude": "dora_magnitude",
     ".alpha": "alpha",
+    ".lokr_w1": "lokr_w1",
+    ".lokr_w2": "lokr_w2",
+    ".lokr_w1_a": "lokr_w1_a",
+    ".lokr_w1_b": "lokr_w1_b",
+    ".lokr_w2_a": "lokr_w2_a",
+    ".lokr_w2_b": "lokr_w2_b",
+    ".lokr_t2": "lokr_t2",
 }
 
 
