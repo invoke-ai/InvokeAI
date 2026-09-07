@@ -1,4 +1,5 @@
-from typing import Literal
+import traceback
+from typing import Any, Literal
 
 import torch
 from PIL import Image as PILImage
@@ -14,6 +15,8 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
@@ -38,6 +41,13 @@ _GENERATE_SYSTEM_PROMPT = (
     "text, spatial relationships of the objects and background:"
 )
 _GENERATE_DROP_IDX = 34
+
+# Fraction of the on-disk (bf16) encoder that stays resident after BitsAndBytes quantization. Linear weights
+# shrink to 8 or 4 bits, but embeddings, norms, biases and the (excluded) lm_head stay in bf16, and nf4 carries
+# per-block absmax scales, so the ratios sit above the pure 1/2 and 1/4. Over-estimating only offloads a little
+# more of the cached models to RAM, whereas under-estimating leaves the encoder without enough VRAM, so both
+# values are deliberately conservative.
+_QUANTIZED_SIZE_RATIO: dict[str, float] = {"int8": 0.6, "nf4": 0.4}
 
 _IMAGE_PLACEHOLDER = "<|vision_start|><|image_pad|><|vision_end|>"
 
@@ -212,43 +222,21 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                 padding=True,
                 return_tensors="pt",
             ).to(device=device)
-
-            outputs = text_encoder(
-                input_ids=model_inputs.input_ids,
-                attention_mask=model_inputs.attention_mask,
-                pixel_values=getattr(model_inputs, "pixel_values", None),
-                image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
-                output_hidden_states=True,
-            )
-
-            # Use last hidden state (matching diffusers pipeline)
-            hidden_states = outputs.hidden_states[-1]
-
-            # Extract valid (non-padding) tokens using the attention mask,
-            # then drop the system prompt prefix tokens.
-            # The drop index differs between edit mode (64) and generate mode (34).
-            drop_idx = _EDIT_DROP_IDX if images else _GENERATE_DROP_IDX
-
-            attn_mask = model_inputs.attention_mask
-            bool_mask = attn_mask.bool()
-            valid_lengths = bool_mask.sum(dim=1)
-            selected = hidden_states[bool_mask]
-            split_hidden = torch.split(selected, valid_lengths.tolist(), dim=0)
-
-            # Drop system prefix tokens and build padded output
-            trimmed = [h[drop_idx:] for h in split_hidden]
-            attn_mask_list = [torch.ones(h.size(0), dtype=torch.long, device=device) for h in trimmed]
-            max_seq_len = max(h.size(0) for h in trimmed)
-
-            prompt_embeds = torch.stack(
-                [torch.cat([h, h.new_zeros(max_seq_len - h.size(0), h.size(1))]) for h in trimmed]
-            )
-            encoder_attention_mask = torch.stack(
-                [torch.cat([m, m.new_zeros(max_seq_len - m.size(0))]) for m in attn_mask_list]
-            )
-
-            prompt_embeds = prompt_embeds.to(dtype=torch.bfloat16)
+            prompt_embeds, encoder_attention_mask = self._run_encoder(text_encoder, model_inputs, bool(images))
+        except BaseException as exc:
+            # The in-flight traceback references the forward's frames, and through their locals the model, so the
+            # release below would otherwise be a no-op on this path. Clearing the finished frames drops those
+            # references while keeping the traceback's line information for the error report.
+            traceback.clear_frames(exc.__traceback__)
+            raise
         finally:
+            # Drop this frame's references before `cleanup` runs: the quantized encoder is only released once
+            # nothing holds it, and `cleanup` calls empty_cache() right after. With the model still alive here,
+            # that empty_cache() ran too early and ~9 GB of encoder weights stayed *reserved* by torch after the
+            # node finished. The cache budgets from allocated + driver-free VRAM, so reserved-but-unused memory
+            # looked like it was in use and the next model (the transformer) was needlessly partial-loaded. The
+            # activations live in `_run_encoder`'s frame and are gone by now for the same reason.
+            del text_encoder
             if cleanup is not None:
                 cleanup()
 
@@ -257,6 +245,51 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             encoder_attention_mask = None
 
         return prompt_embeds, encoder_attention_mask
+
+    @staticmethod
+    def _run_encoder(
+        text_encoder: torch.nn.Module, model_inputs: Any, edit_mode: bool
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Run the encoder and build the padded embeddings + mask.
+
+        Kept out of `_encode` on purpose: the full-vocabulary logits and per-layer hidden states the forward returns
+        are only referenced by this frame, so they are released as soon as it returns (or is cleared on error),
+        before `_encode` empties the CUDA cache.
+        """
+        device = model_inputs.input_ids.device
+        outputs = text_encoder(
+            input_ids=model_inputs.input_ids,
+            attention_mask=model_inputs.attention_mask,
+            pixel_values=getattr(model_inputs, "pixel_values", None),
+            image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
+            output_hidden_states=True,
+        )
+
+        # Use last hidden state (matching diffusers pipeline)
+        hidden_states = outputs.hidden_states[-1]
+
+        # Extract valid (non-padding) tokens using the attention mask,
+        # then drop the system prompt prefix tokens.
+        # The drop index differs between edit mode (64) and generate mode (34).
+        drop_idx = _EDIT_DROP_IDX if edit_mode else _GENERATE_DROP_IDX
+
+        attn_mask = model_inputs.attention_mask
+        bool_mask = attn_mask.bool()
+        valid_lengths = bool_mask.sum(dim=1)
+        selected = hidden_states[bool_mask]
+        split_hidden = torch.split(selected, valid_lengths.tolist(), dim=0)
+
+        # Drop system prefix tokens and build padded output
+        trimmed = [h[drop_idx:] for h in split_hidden]
+        attn_mask_list = [torch.ones(h.size(0), dtype=torch.long, device=device) for h in trimmed]
+        max_seq_len = max(h.size(0) for h in trimmed)
+
+        prompt_embeds = torch.stack([torch.cat([h, h.new_zeros(max_seq_len - h.size(0), h.size(1))]) for h in trimmed])
+        encoder_attention_mask = torch.stack(
+            [torch.cat([m, m.new_zeros(max_seq_len - m.size(0))]) for m in attn_mask_list]
+        )
+
+        return prompt_embeds.to(dtype=torch.bfloat16), encoder_attention_mask
 
     def _load_cached_encoder(self, context: InvocationContext):
         """Load the text encoder through the model cache (no quantization)."""
@@ -277,6 +310,13 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         BnB-quantized models are pinned to GPU and can't be moved between devices,
         so they can't go through the standard model cache. The model is loaded fresh
         each time and freed after use via the cleanup callback.
+
+        Because the load bypasses the cache, it also bypasses the cache's usual
+        make-room-for-the-model-being-locked step, so this path has to ask the cache
+        for VRAM explicitly. Without that, whatever the resident transformer/VAE left
+        free is all the encoder gets: `device_map="auto"` then silently plans to spill
+        layers to the CPU, which BnB int8 refuses with "Some modules are dispatched on
+        the CPU or the disk" (issue #9147).
         """
         import gc
         import warnings
@@ -302,23 +342,34 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         else:  # int8
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
+        # Load onto this worker's execution device, never `device_map="auto"`: "auto" sizes its plan from whatever
+        # VRAM is free *right now* and quietly spills to the CPU when the cached models fill the card, and in
+        # multi-GPU mode it may also pick a device other than the one this worker is pinned to. With an explicit
+        # device, a genuine shortfall surfaces as a plain OOM instead of a misleading offload error.
+        device = TorchDevice.choose_torch_device()
+        quantized_bytes = int(calc_model_size_by_fs(encoder_path) * _QUANTIZED_SIZE_RATIO[self.quantization])
+
         context.util.signal_progress("Loading Qwen2.5-VL encoder (quantized)")
-        with warnings.catch_warnings():
-            # BnB int8 internally casts bfloat16→float16; the warning is harmless
-            warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
-            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                str(encoder_path),
-                quantization_config=bnb_config,
-                device_map="auto",
-                torch_dtype=torch.bfloat16,
-                local_files_only=True,
-            )
+        # Both the offload and the load below assign real parameters (`register_parameter` via `load_state_dict` /
+        # `setattr`), which a concurrent cache construction on another worker would hijack onto the meta device
+        # (see MODEL_LOAD_LOCK). Hold the read lock across them, like every other VRAM move, and take it *before*
+        # the cache lock that `make_room_in_vram` acquires, per the lock-ordering contract on MODEL_LOAD_LOCK.
+        with MODEL_LOAD_LOCK.read_lock():
+            context.models.make_room_in_vram(quantized_bytes)
+            with warnings.catch_warnings():
+                # BnB int8 internally casts bfloat16→float16; the warning is harmless
+                warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
+                text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    str(encoder_path),
+                    quantization_config=bnb_config,
+                    device_map={"": device},
+                    torch_dtype=torch.bfloat16,
+                    local_files_only=True,
+                )
 
-        device = next(text_encoder.parameters()).device
-
+        # Hand the model out without keeping a reference in this closure, so that once `_encode` drops its own the
+        # weights are actually free by the time empty_cache() runs.
         def cleanup():
-            nonlocal text_encoder
-            del text_encoder
             gc.collect()
             TorchDevice.empty_cache()
 
