@@ -46,5 +46,6 @@ export const zSystemState = z.object({
   shouldHighlightFocusedRegions: z.boolean(),
   shouldUseMiddleClickToOpenInNewTab: z.boolean(),
   prefersNumericAttentionWeights: z.boolean(),
+  shouldShowTokenCounter: z.boolean().default(false),
 });
 export type SystemState = z.infer<typeof zSystemState>;

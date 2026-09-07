@@ -42,6 +42,7 @@ import {
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
   selectSystemShouldShowInvocationProgressDetail,
+  selectSystemShouldShowTokenCounter,
   selectSystemShouldUseMiddleClickToOpenInNewTab,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
@@ -51,6 +52,7 @@ import {
   setShouldEnableModelDescriptions,
   setShouldHighlightFocusedRegions,
   setShouldShowInvocationProgressDetail,
+  setShouldShowTokenCounter,
   setShouldUseMiddleClickToOpenInNewTab,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
@@ -97,6 +99,7 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
   const pendingMaxQueueHistoryRef = useRef<number | null | undefined>(undefined);
 
   const prefersNumericAttentionWeights = useAppSelector(selectSystemPrefersNumericAttentionWeights);
+  const shouldShowTokenCounter = useAppSelector(selectSystemShouldShowTokenCounter);
   const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
   const shouldConfirmOnDelete = useAppSelector(selectSystemShouldConfirmOnDelete);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
@@ -258,6 +261,13 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
     [dispatch]
   );
 
+  const handleChangeShouldShowTokenCounter = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldShowTokenCounter(e.target.checked));
+    },
+    [dispatch]
+  );
+
   const handleChangeMaxQueueHistory = useCallback(
     (valueAsString: string) => {
       setMaxQueueHistoryInputState({ source: maxQueueHistory, value: valueAsString });
@@ -408,6 +418,10 @@ const SettingsModal = (props: { children: ReactElement<{ onClick?: () => void }>
                         isChecked={prefersNumericAttentionWeights}
                         onChange={handleChangePreferAttentionStyleNumeric}
                       />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.showTokenCounter', 'Show token counter')}</FormLabel>
+                      <Switch isChecked={shouldShowTokenCounter} onChange={handleChangeShouldShowTokenCounter} />
                     </FormControl>
                   </StickyScrollable>
 
