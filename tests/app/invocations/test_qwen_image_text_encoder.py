@@ -137,6 +137,10 @@ class TestResizeForVLEncoder:
         assert w > h  # should remain landscape
 
 
+def _model_load_lock_held() -> bool:
+    return MODEL_LOAD_LOCK._readers > 0 or MODEL_LOAD_LOCK._writer_active
+
+
 class TestQuantizedEncoderLoad:
     """The BitsAndBytes path bypasses the model cache, so it must ask the cache for VRAM itself and load onto the
     worker's execution device explicitly (issue #9147: `device_map="auto"` spilled to the CPU because the cached
@@ -169,7 +173,13 @@ class TestQuantizedEncoderLoad:
 
         context = MagicMock()
         context.models.get_absolute_path.return_value = model_root
-        context.models.make_room_in_vram.side_effect = lambda *a, **k: events.append("make_room") or 0
+
+        def make_room(*_args, **_kwargs):
+            # The offload is a VRAM move like any other, so it too must run under the model-load lock.
+            events.append("make_room" if _model_load_lock_held() else "make_room(unlocked)")
+            return 0
+
+        context.models.make_room_in_vram.side_effect = make_room
         return context
 
     @pytest.mark.parametrize(("quantization", "ratio"), [("int8", 0.6), ("nf4", 0.4)])
@@ -187,7 +197,7 @@ class TestQuantizedEncoderLoad:
             seen.update(kwargs)
             # The load must run under the model-load lock so a concurrent cache construction on another worker
             # cannot hijack its parameter assignment onto the meta device.
-            seen["locked"] = MODEL_LOAD_LOCK._readers > 0 or MODEL_LOAD_LOCK._writer_active
+            seen["locked"] = _model_load_lock_held()
             return fake_model
 
         with (

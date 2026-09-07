@@ -71,9 +71,57 @@ def _put(cache: ModelCache, key: str, size_bytes: int) -> None:
     cache.put(key, module)
 
 
-def test_offloads_unlocked_models_until_the_request_is_satisfied(cache: ModelCache):
-    """Models are offloaded smallest-first, and the loop stops as soon as enough VRAM is free - the larger
-    model that is not needed stays resident."""
+@pytest.fixture
+def gpu_accounting_cache(mock_logger):
+    """A cache whose execution device is a GPU as far as the policy is concerned, without touching a real one.
+
+    `_get_vram_available` needs an accelerator; the tests replace it (and the VRAM moves) with `_FakeVram`. Note that
+    `_FakeVram` reports freed memory immediately, which is the loop's *contract*; on real hardware the driver only
+    sees it after the trailing `empty_cache()`, so the loop there tends to offload every unlocked model.
+    """
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=mock_logger,
+    )
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM touch is patched out below
+    yield cache
+    cache._execution_device = torch.device("cpu")
+    cache.shutdown()
+
+
+def test_cpu_execution_device_is_a_no_op(cache: ModelCache):
+    """A CPU-only install has no VRAM to make room in. `_get_vram_available` raises for a cpu device, and the
+    quantized encoder path calls this on every run once anything is cached, so it must short-circuit."""
+    _put(cache, "resident", 40 * MB)
+
+    assert cache.make_room_in_vram(30 * MB) == 0
+    assert "resident" in cache._cached_models
+
+
+def test_offload_runs_under_the_cache_lock(gpu_accounting_cache: ModelCache):
+    """Out-of-cache callers race the session workers' own lock()/unlock(); the offload must own the cache lock."""
+    cache = gpu_accounting_cache
+    _put(cache, "resident", 40 * MB)
+    owned: list[bool] = []
+
+    def offload(vram_bytes_required, working_mem_bytes=None):
+        owned.append(cache._lock._is_owned())
+        return 0
+
+    with patch.object(cache, "_offload_unlocked_models", side_effect=offload):
+        cache.make_room_in_vram(30 * MB)
+
+    assert owned == [True]
+
+
+def test_offloads_unlocked_models_until_the_request_is_satisfied(gpu_accounting_cache: ModelCache):
+    """Models are offloaded smallest-first, and the loop stops once the availability check reports enough free
+    VRAM - the larger model that is not needed stays resident."""
+    cache = gpu_accounting_cache
     _put(cache, "small", 10 * MB)
     _put(cache, "medium", 20 * MB)
     _put(cache, "large", 40 * MB)
@@ -90,7 +138,8 @@ def test_offloads_unlocked_models_until_the_request_is_satisfied(cache: ModelCac
     assert vram.available == 35 * MB
 
 
-def test_locked_models_are_never_offloaded(cache: ModelCache):
+def test_locked_models_are_never_offloaded(gpu_accounting_cache: ModelCache):
+    cache = gpu_accounting_cache
     """A locked model is in use by another invocation; it must be skipped even when the request cannot otherwise
     be satisfied."""
     _put(cache, "in_use", 40 * MB)
@@ -108,7 +157,8 @@ def test_locked_models_are_never_offloaded(cache: ModelCache):
     assert freed == 10 * MB
 
 
-def test_no_op_when_enough_vram_is_already_free(cache: ModelCache):
+def test_no_op_when_enough_vram_is_already_free(gpu_accounting_cache: ModelCache):
+    cache = gpu_accounting_cache
     _put(cache, "resident", 40 * MB)
     vram = _FakeVram(available=50 * MB)
 
@@ -122,7 +172,8 @@ def test_no_op_when_enough_vram_is_already_free(cache: ModelCache):
     assert freed == 0
 
 
-def test_working_memory_is_forwarded_to_the_availability_check(cache: ModelCache):
+def test_working_memory_is_forwarded_to_the_availability_check(gpu_accounting_cache: ModelCache):
+    cache = gpu_accounting_cache
     """The caller's working memory must reach `_get_vram_available`, where it is floored at the configured default
     exactly as in `lock()`; otherwise the encoder's activations would have to fit in whatever is left over."""
     _put(cache, "resident", 40 * MB)

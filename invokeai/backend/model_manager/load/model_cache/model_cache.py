@@ -2759,13 +2759,17 @@ class ModelCache:
         which is where the cache normally makes room for the model being locked. Without an explicit request, the
         out-of-cache load only sees whatever VRAM the resident models happened to leave free.
 
-        The same policy as `lock()` is used (`_offload_unlocked_models`): models are (partially) offloaded to RAM,
-        smallest first, and kept in the cache so a later use re-streams weights instead of rebuilding from disk.
-        Locked (in-use) models are never touched. `working_mem_bytes` is the operation's working memory and is
-        floored at the configured default, exactly as in `lock()`.
+        The same policy as `lock()` is used (`_offload_unlocked_models`): unlocked models are offloaded to RAM until
+        the availability check is satisfied, and kept in the cache so a later use re-streams weights instead of
+        rebuilding from disk. Locked (in-use) models are never touched. `working_mem_bytes` is the operation's
+        working memory and is floored at the configured default, exactly as in `lock()`.
+
+        A CPU execution device has no VRAM to make room in, so the call is a no-op there (as `lock()` is).
 
         Returns the number of VRAM bytes freed based on believed model sizes.
         """
+        if self._execution_device.type == "cpu":
+            return 0
         return self._offload_unlocked_models(vram_bytes_needed, working_mem_bytes)
 
     @synchronized
