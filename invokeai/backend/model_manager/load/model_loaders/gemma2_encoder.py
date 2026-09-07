@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import AnyModel, BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 # llama.cpp GGUF tensor-name component -> Gemma2Model (decoder-only) component. PiD consumes only the
 # decoder stack, so we target Gemma2Model directly: no `model.` prefix and no lm_head. Gemma-2 has no
@@ -168,8 +169,7 @@ def load_gemma2_model_from_gguf(gguf_path: Path, compute_dtype: "torch.dtype") -
         model = Gemma2Model(gemma_config)
 
     _missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-    if unexpected:
-        raise RuntimeError(f"Unexpected keys loading Gemma-2 GGUF encoder: {unexpected[:10]}")
+    log_unexpected_keys("Gemma-2 GGUF encoder", unexpected)
 
     # Materialize the weights that cannot remain quantized:
     #  - the token embedding, because nn.Embedding needs indexed access, and

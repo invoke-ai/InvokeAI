@@ -31,6 +31,7 @@ from torch import Tensor
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 _PID_ACTIVATION_CHUNK_SIZE = 1024
 
@@ -268,16 +269,13 @@ def load_pid_decoder(state_dict: dict[Any, Tensor], backbone: BaseModelType) -> 
             + (f" (+ {len(not_strings) - 5} more)" if len(not_strings) > 5 else "")
         )
 
-    # strict=False so we can report missing and unexpected keys separately; both are fatal. The model
-    # cache builds loaders under `skip_torch_weight_init()`, which no-ops every `reset_parameters()`,
-    # so a key the checkpoint does not supply is left as uninitialised memory rather than a sane
-    # default — a partial checkpoint would decode to garbage / NaNs instead of failing.
+    # strict=False so we can report missing and unexpected keys separately. Missing keys are fatal:
+    # the model cache builds loaders under `skip_torch_weight_init()`, which no-ops every
+    # `reset_parameters()`, so a key the checkpoint does not supply is left as uninitialised memory
+    # rather than a sane default — a partial checkpoint would decode to garbage / NaNs instead of
+    # failing. Unexpected keys are exporter noise and are only logged (see `log_unexpected_keys`).
     missing, unexpected = net.load_state_dict(state_dict, strict=False)
-    if unexpected:
-        raise RuntimeError(
-            f"PiD checkpoint has unexpected keys not present in PidNet: {unexpected[:5]}"
-            + (f" (+ {len(unexpected) - 5} more)" if len(unexpected) > 5 else "")
-        )
+    log_unexpected_keys("PiD checkpoint", unexpected)
     if missing:
         lq = [k for k in missing if k.startswith("lq_proj.")]
         detail = (
