@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapsh
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
+    FirstUseClaim,
     ModelCache,
     get_model_cache_key,
 )
@@ -249,8 +250,13 @@ class ModelLoader(ModelLoaderBase):
         if not model_path.exists():
             raise FileNotFoundError(f"Files for model '{model_config.name}' not found at {model_path}")
 
-        cache_record = self._load_and_cache(model_config, submodel_type)
-        return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
+        cache_record, first_use_claim = self._load_and_cache(model_config, submodel_type)
+        return LoadedModel(
+            config=model_config,
+            cache_record=cache_record,
+            cache=self._ram_cache,
+            first_use_claim=first_use_claim,
+        )
 
     @property
     def ram_cache(self) -> ModelCache:
@@ -285,11 +291,23 @@ class ModelLoader(ModelLoaderBase):
 
         return None
 
-    def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> CacheRecord:
+    def _load_and_cache(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
+    ) -> tuple[CacheRecord, Optional[FirstUseClaim]]:
+        """Return the model's cache record together with the first-use claim shielding it.
+
+        The claim is armed inside the cache lookup itself (see ModelCache.get_with_first_use_claim)
+        and belongs to the LoadedModel this record is about to be wrapped in, which releases it at
+        its first lock. It is carried out of here rather than being armed at the wrapper's
+        construction so that the record cannot be evicted anywhere along the way — this method's
+        two returns, the shell registration below, and load_model()'s own frame. If the load
+        raises after the claim is armed, the claim dies with the frame that holds it and releases
+        the hold itself.
+        """
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         cache_key = get_model_cache_key(config.key, submodel_type)
         try:
-            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
         except IndexError:
             pass
 
@@ -308,7 +326,7 @@ class ModelLoader(ModelLoaderBase):
             # entry while we waited for the mutex. (Workers on other devices use a different cache,
             # so they will still miss here and construct their own copy — which is intended.)
             try:
-                return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+                return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
             except IndexError:
                 pass
 
@@ -354,15 +372,22 @@ class ModelLoader(ModelLoaderBase):
             # Determine execution device from model config, considering submodel type
             execution_device = self._get_execution_device(config, submodel_type)
 
-            self._ram_cache.put(
+            admission_claim = self._ram_cache.put(
                 cache_key,
                 model=loaded_model,
                 execution_device=execution_device,
+                claim_admission=True,
             )
-            # Retrieve immediately: the new record carries the cache's post-admission grace until
-            # it is locked, and keeping put() and get() adjacent means no failure in between can
-            # leave a graced record whose loader never comes back for it.
-            cache_record = self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            # Retrieve immediately, and hold the admission claim across the retrieval: the claim
+            # shields the new record until this frame's own claim takes over, so nothing — a peer's
+            # reconcile, another model's make-room, the cache's shutdown() — can evict the model
+            # this loader is still holding, and a load that dies in between releases the shield by
+            # dropping the claim rather than leaving a flag standing that nothing can clear.
+            cache_record, first_use_claim = self._ram_cache.get_with_first_use_claim(
+                key=cache_key, stats_name=stats_name
+            )
+            if admission_claim is not None:
+                admission_claim.release()
 
             # Register the shell only after put() has created the shared entry (via the wrapper's
             # acquire); it is dropped automatically when that entry's last reference is released.
@@ -371,7 +396,7 @@ class ModelLoader(ModelLoaderBase):
                 if shared_store is not None:
                     shared_store.set_shell(cache_key, shell_to_register)
 
-            return cache_record
+            return cache_record, first_use_claim
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
