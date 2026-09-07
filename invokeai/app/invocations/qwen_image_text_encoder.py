@@ -258,6 +258,12 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
             prompt_embeds = prompt_embeds.to(dtype=torch.bfloat16)
         finally:
+            # Drop this frame's references before `cleanup` runs: the quantized encoder is only released once
+            # nothing holds it, and `cleanup` calls empty_cache() right after its own `del`. With the model still
+            # alive here, that empty_cache() ran too early and ~9 GB of encoder weights stayed *reserved* by torch
+            # after the node finished. The cache budgets from allocated + driver-free VRAM, so reserved-but-unused
+            # memory looked like it was in use and the next model (the transformer) was needlessly partial-loaded.
+            del text_encoder
             if cleanup is not None:
                 cleanup()
 
@@ -343,9 +349,9 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                     local_files_only=True,
                 )
 
+        # Hand the model out without keeping a reference in this closure, so that once `_encode` drops its own the
+        # weights are actually free by the time empty_cache() runs.
         def cleanup():
-            nonlocal text_encoder
-            del text_encoder
             gc.collect()
             TorchDevice.empty_cache()
 

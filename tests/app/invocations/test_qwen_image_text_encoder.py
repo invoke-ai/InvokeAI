@@ -1,6 +1,7 @@
 """Tests for the Qwen Image text encoder prompt building and image resizing."""
 
 import json
+import weakref
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -11,6 +12,7 @@ from transformers import Qwen2_5_VLForConditionalGeneration
 
 from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
 from invokeai.app.invocations.qwen_image_text_encoder import (
+    _GENERATE_DROP_IDX,
     QwenImageTextEncoderInvocation,
     _build_prompt,
 )
@@ -221,3 +223,61 @@ class TestQuantizedEncoderLoad:
         cached.assert_called_once_with(context)
         from_pretrained.assert_not_called()
         context.models.make_room_in_vram.assert_not_called()
+
+
+class TestQuantizedEncoderRelease:
+    """The quantized encoder lives outside the cache, so `_encode` is its only owner. Its cleanup callback empties
+    the CUDA cache, which only returns the ~9 GB of encoder weights to the driver if nothing still references the
+    model at that point - otherwise they stay reserved by torch and the cache under-budgets the next load.
+    """
+
+    HIDDEN = 3584
+
+    class _FakeEncoder(torch.nn.Module):
+        def __init__(self, hidden: int):
+            super().__init__()
+            self.hidden = hidden
+
+        def forward(self, input_ids, attention_mask, **_):
+            hidden_states = torch.zeros(input_ids.shape[0], input_ids.shape[1], self.hidden)
+            return MagicMock(hidden_states=[hidden_states])
+
+    def test_encoder_is_released_before_cleanup_runs(self, tmp_path: Path):
+        model_root = tmp_path / "qwen-vl"
+        (model_root / "tokenizer").mkdir(parents=True)
+        context = MagicMock()
+        context.models.get_absolute_path.return_value = model_root
+
+        encoder = self._FakeEncoder(self.HIDDEN)
+        encoder_ref = weakref.ref(encoder)
+        alive_at_cleanup: list[bool] = []
+
+        def cleanup():
+            alive_at_cleanup.append(encoder_ref() is not None)
+
+        seq_len = _GENERATE_DROP_IDX + 5
+        model_inputs = MagicMock()
+        model_inputs.input_ids = torch.zeros(1, seq_len, dtype=torch.long)
+        model_inputs.attention_mask = torch.ones(1, seq_len, dtype=torch.long)
+        model_inputs.to.return_value = model_inputs
+        processor = MagicMock(return_value=model_inputs)
+
+        # Hand the encoder over through a one-shot side effect: a `return_value` tuple would keep the mock holding a
+        # strong reference of its own and mask the ownership being tested.
+        handoff = [encoder]
+        invocation = TestQuantizedEncoderLoad._make_invocation("int8")
+        with (
+            patch.object(
+                invocation,
+                "_load_quantized_encoder",
+                side_effect=lambda _ctx: (handoff.pop(), torch.device("cpu"), cleanup),
+            ),
+            patch("transformers.AutoTokenizer.from_pretrained", return_value=MagicMock()),
+            patch("transformers.Qwen2_5_VLProcessor", return_value=processor),
+        ):
+            del encoder  # `_encode` now holds the only strong reference
+            prompt_embeds, mask = invocation._encode(context, images=[])
+
+        assert alive_at_cleanup == [False], "cleanup ran while the encoder was still referenced"
+        assert prompt_embeds.shape == (1, 5, self.HIDDEN)
+        assert mask is None
