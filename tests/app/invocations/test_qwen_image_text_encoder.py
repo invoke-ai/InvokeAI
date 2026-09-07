@@ -1,6 +1,8 @@
 """Tests for the Qwen Image text encoder prompt building and image resizing."""
 
+import gc
 import json
+import traceback
 import weakref
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -252,17 +254,22 @@ class TestQuantizedEncoderRelease:
             hidden_states = torch.zeros(input_ids.shape[0], input_ids.shape[1], self.hidden)
             return MagicMock(hidden_states=[hidden_states])
 
-    def test_encoder_is_released_before_cleanup_runs(self, tmp_path: Path):
+    class _ExplodingEncoder(torch.nn.Module):
+        def forward(self, input_ids, attention_mask, **_):
+            raise RuntimeError("CUDA out of memory (simulated)")
+
+    def _run_encode(self, tmp_path: Path, encoder: torch.nn.Module, alive_at_cleanup: list[bool]):
+        """Run `_encode` as the sole owner of `encoder`, recording into `alive_at_cleanup` whether it was still alive
+        when cleanup ran (recorded through the argument so the record survives an `_encode` that raises)."""
         model_root = tmp_path / "qwen-vl"
-        (model_root / "tokenizer").mkdir(parents=True)
+        (model_root / "tokenizer").mkdir(parents=True, exist_ok=True)
         context = MagicMock()
         context.models.get_absolute_path.return_value = model_root
 
-        encoder = self._FakeEncoder(self.HIDDEN)
         encoder_ref = weakref.ref(encoder)
-        alive_at_cleanup: list[bool] = []
 
         def cleanup():
+            gc.collect()  # as production does; the frame local under test is a strong root gc cannot clear
             alive_at_cleanup.append(encoder_ref() is not None)
 
         seq_len = _GENERATE_DROP_IDX + 5
@@ -275,6 +282,7 @@ class TestQuantizedEncoderRelease:
         # Hand the encoder over through a one-shot side effect: a `return_value` tuple would keep the mock holding a
         # strong reference of its own and mask the ownership being tested.
         handoff = [encoder]
+        del encoder
         invocation = TestQuantizedEncoderLoad._make_invocation("int8")
         with (
             patch.object(
@@ -285,9 +293,23 @@ class TestQuantizedEncoderRelease:
             patch("transformers.AutoTokenizer.from_pretrained", return_value=MagicMock()),
             patch("transformers.Qwen2_5_VLProcessor", return_value=processor),
         ):
-            del encoder  # `_encode` now holds the only strong reference
-            prompt_embeds, mask = invocation._encode(context, images=[])
+            return invocation._encode(context, images=[])
+
+    def test_encoder_is_released_before_cleanup_runs(self, tmp_path: Path):
+        alive_at_cleanup: list[bool] = []
+        prompt_embeds, mask = self._run_encode(tmp_path, self._FakeEncoder(self.HIDDEN), alive_at_cleanup)
 
         assert alive_at_cleanup == [False], "cleanup ran while the encoder was still referenced"
         assert prompt_embeds.shape == (1, 5, self.HIDDEN)
         assert mask is None
+
+    def test_encoder_is_released_before_cleanup_runs_when_the_forward_raises(self, tmp_path: Path):
+        """An OOM inside the forward is the likeliest failure here. The in-flight traceback holds the forward's
+        frames, whose locals reference the model, so without clearing them the release is a no-op exactly when
+        VRAM is scarcest - and the next generation starts from a mis-budgeted cache."""
+        alive_at_cleanup: list[bool] = []
+        with pytest.raises(RuntimeError, match="simulated") as excinfo:
+            self._run_encode(tmp_path, self._ExplodingEncoder(), alive_at_cleanup)
+        assert alive_at_cleanup == [False], "cleanup ran while the traceback still referenced the encoder"
+        # The traceback is still useful for the error report: the raising line is intact.
+        assert "simulated" in "".join(traceback.format_tb(excinfo.tb))

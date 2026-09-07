@@ -1,4 +1,5 @@
-from typing import Literal
+import traceback
+from typing import Any, Literal
 
 import torch
 from PIL import Image as PILImage
@@ -221,48 +222,20 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
                 padding=True,
                 return_tensors="pt",
             ).to(device=device)
-
-            outputs = text_encoder(
-                input_ids=model_inputs.input_ids,
-                attention_mask=model_inputs.attention_mask,
-                pixel_values=getattr(model_inputs, "pixel_values", None),
-                image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
-                output_hidden_states=True,
-            )
-
-            # Use last hidden state (matching diffusers pipeline)
-            hidden_states = outputs.hidden_states[-1]
-
-            # Extract valid (non-padding) tokens using the attention mask,
-            # then drop the system prompt prefix tokens.
-            # The drop index differs between edit mode (64) and generate mode (34).
-            drop_idx = _EDIT_DROP_IDX if images else _GENERATE_DROP_IDX
-
-            attn_mask = model_inputs.attention_mask
-            bool_mask = attn_mask.bool()
-            valid_lengths = bool_mask.sum(dim=1)
-            selected = hidden_states[bool_mask]
-            split_hidden = torch.split(selected, valid_lengths.tolist(), dim=0)
-
-            # Drop system prefix tokens and build padded output
-            trimmed = [h[drop_idx:] for h in split_hidden]
-            attn_mask_list = [torch.ones(h.size(0), dtype=torch.long, device=device) for h in trimmed]
-            max_seq_len = max(h.size(0) for h in trimmed)
-
-            prompt_embeds = torch.stack(
-                [torch.cat([h, h.new_zeros(max_seq_len - h.size(0), h.size(1))]) for h in trimmed]
-            )
-            encoder_attention_mask = torch.stack(
-                [torch.cat([m, m.new_zeros(max_seq_len - m.size(0))]) for m in attn_mask_list]
-            )
-
-            prompt_embeds = prompt_embeds.to(dtype=torch.bfloat16)
+            prompt_embeds, encoder_attention_mask = self._run_encoder(text_encoder, model_inputs, bool(images))
+        except BaseException as exc:
+            # The in-flight traceback references the forward's frames, and through their locals the model, so the
+            # release below would otherwise be a no-op on this path. Clearing the finished frames drops those
+            # references while keeping the traceback's line information for the error report.
+            traceback.clear_frames(exc.__traceback__)
+            raise
         finally:
             # Drop this frame's references before `cleanup` runs: the quantized encoder is only released once
-            # nothing holds it, and `cleanup` calls empty_cache() right after its own `del`. With the model still
-            # alive here, that empty_cache() ran too early and ~9 GB of encoder weights stayed *reserved* by torch
-            # after the node finished. The cache budgets from allocated + driver-free VRAM, so reserved-but-unused
-            # memory looked like it was in use and the next model (the transformer) was needlessly partial-loaded.
+            # nothing holds it, and `cleanup` calls empty_cache() right after. With the model still alive here,
+            # that empty_cache() ran too early and ~9 GB of encoder weights stayed *reserved* by torch after the
+            # node finished. The cache budgets from allocated + driver-free VRAM, so reserved-but-unused memory
+            # looked like it was in use and the next model (the transformer) was needlessly partial-loaded. The
+            # activations live in `_run_encoder`'s frame and are gone by now for the same reason.
             del text_encoder
             if cleanup is not None:
                 cleanup()
@@ -272,6 +245,51 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             encoder_attention_mask = None
 
         return prompt_embeds, encoder_attention_mask
+
+    @staticmethod
+    def _run_encoder(
+        text_encoder: torch.nn.Module, model_inputs: Any, edit_mode: bool
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Run the encoder and build the padded embeddings + mask.
+
+        Kept out of `_encode` on purpose: the full-vocabulary logits and per-layer hidden states the forward returns
+        are only referenced by this frame, so they are released as soon as it returns (or is cleared on error),
+        before `_encode` empties the CUDA cache.
+        """
+        device = model_inputs.input_ids.device
+        outputs = text_encoder(
+            input_ids=model_inputs.input_ids,
+            attention_mask=model_inputs.attention_mask,
+            pixel_values=getattr(model_inputs, "pixel_values", None),
+            image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
+            output_hidden_states=True,
+        )
+
+        # Use last hidden state (matching diffusers pipeline)
+        hidden_states = outputs.hidden_states[-1]
+
+        # Extract valid (non-padding) tokens using the attention mask,
+        # then drop the system prompt prefix tokens.
+        # The drop index differs between edit mode (64) and generate mode (34).
+        drop_idx = _EDIT_DROP_IDX if edit_mode else _GENERATE_DROP_IDX
+
+        attn_mask = model_inputs.attention_mask
+        bool_mask = attn_mask.bool()
+        valid_lengths = bool_mask.sum(dim=1)
+        selected = hidden_states[bool_mask]
+        split_hidden = torch.split(selected, valid_lengths.tolist(), dim=0)
+
+        # Drop system prefix tokens and build padded output
+        trimmed = [h[drop_idx:] for h in split_hidden]
+        attn_mask_list = [torch.ones(h.size(0), dtype=torch.long, device=device) for h in trimmed]
+        max_seq_len = max(h.size(0) for h in trimmed)
+
+        prompt_embeds = torch.stack([torch.cat([h, h.new_zeros(max_seq_len - h.size(0), h.size(1))]) for h in trimmed])
+        encoder_attention_mask = torch.stack(
+            [torch.cat([m, m.new_zeros(max_seq_len - m.size(0))]) for m in attn_mask_list]
+        )
+
+        return prompt_embeds.to(dtype=torch.bfloat16), encoder_attention_mask
 
     def _load_cached_encoder(self, context: InvocationContext):
         """Load the text encoder through the model cache (no quantization)."""
