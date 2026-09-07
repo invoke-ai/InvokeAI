@@ -1,11 +1,22 @@
 """Tests for the Qwen Image text encoder prompt building and image resizing."""
 
-from PIL import Image
+import json
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
+import pytest
+import torch
+from PIL import Image
+from transformers import Qwen2_5_VLForConditionalGeneration
+
+from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
 from invokeai.app.invocations.qwen_image_text_encoder import (
     QwenImageTextEncoderInvocation,
     _build_prompt,
 )
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.util.devices import TorchDevice
 
 
 class TestBuildPrompt:
@@ -122,3 +133,91 @@ class TestResizeForVLEncoder:
         resized = QwenImageTextEncoderInvocation._resize_for_vl_encoder(img, target_pixels=512 * 512)
         w, h = resized.size
         assert w > h  # should remain landscape
+
+
+class TestQuantizedEncoderLoad:
+    """The BitsAndBytes path bypasses the model cache, so it must ask the cache for VRAM itself and load onto the
+    worker's execution device explicitly (issue #9147: `device_map="auto"` spilled to the CPU because the cached
+    transformer and VAE still filled the card, and BnB int8 refused to run that way).
+    """
+
+    TOTAL_SIZE = 16 * 2**30  # bf16 Qwen2.5-VL-7B on disk
+
+    @staticmethod
+    def _make_invocation(quantization: str) -> QwenImageTextEncoderInvocation:
+        encoder = ModelIdentifierField(
+            key="enc", hash="h", name="qwen-vl", base=BaseModelType.QwenImage, type=ModelType.QwenVLEncoder
+        )
+        return QwenImageTextEncoderInvocation(
+            prompt="a cat",
+            qwen_vl_encoder=QwenVLEncoderField(tokenizer=encoder, text_encoder=encoder),
+            quantization=quantization,
+        )
+
+    def _make_context(self, tmp_path: Path, events: list[str], single_file: bool = False) -> MagicMock:
+        if single_file:
+            model_root = tmp_path / "encoder.safetensors"
+            model_root.write_bytes(b"")
+        else:
+            model_root = tmp_path / "qwen-vl"
+            text_encoder_dir = model_root / "text_encoder"
+            text_encoder_dir.mkdir(parents=True)
+            index = {"metadata": {"total_size": self.TOTAL_SIZE}, "weight_map": {}}
+            (text_encoder_dir / "model.safetensors.index.json").write_text(json.dumps(index))
+
+        context = MagicMock()
+        context.models.get_absolute_path.return_value = model_root
+        context.models.make_room_in_vram.side_effect = lambda *a, **k: events.append("make_room") or 0
+        return context
+
+    @pytest.mark.parametrize(("quantization", "ratio"), [("int8", 0.6), ("nf4", 0.4)])
+    def test_makes_room_in_vram_before_loading_onto_the_execution_device(
+        self, tmp_path: Path, quantization: str, ratio: float
+    ):
+        events: list[str] = []
+        context = self._make_context(tmp_path, events)
+        fake_model = MagicMock()
+        device = torch.device("cuda:1")
+        seen: dict = {}
+
+        def fake_from_pretrained(path, **kwargs):
+            events.append("from_pretrained")
+            seen.update(kwargs)
+            # The load must run under the model-load lock so a concurrent cache construction on another worker
+            # cannot hijack its parameter assignment onto the meta device.
+            seen["locked"] = MODEL_LOAD_LOCK._readers > 0 or MODEL_LOAD_LOCK._writer_active
+            return fake_model
+
+        with (
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
+            patch.object(TorchDevice, "choose_torch_device", return_value=device),
+        ):
+            text_encoder, returned_device, cleanup = self._make_invocation(quantization)._load_quantized_encoder(
+                context
+            )
+
+        assert events == ["make_room", "from_pretrained"]
+        context.models.make_room_in_vram.assert_called_once_with(int(self.TOTAL_SIZE * ratio))
+        assert seen["device_map"] == {"": device}, "must never use device_map='auto'"
+        assert seen["locked"]
+        assert text_encoder is fake_model
+        assert returned_device == device
+        cleanup()
+
+    def test_single_file_checkpoint_falls_back_to_the_cache_without_making_room(self, tmp_path: Path):
+        """A single-file encoder cannot be BnB-quantized; it goes through the cache, which makes its own room."""
+        events: list[str] = []
+        context = self._make_context(tmp_path, events, single_file=True)
+        invocation = self._make_invocation("int8")
+        sentinel = (MagicMock(), torch.device("cuda"), None)
+
+        with (
+            patch.object(invocation, "_load_cached_encoder", return_value=sentinel) as cached,
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained") as from_pretrained,
+        ):
+            result = invocation._load_quantized_encoder(context)
+
+        assert result is sentinel
+        cached.assert_called_once_with(context)
+        from_pretrained.assert_not_called()
+        context.models.make_room_in_vram.assert_not_called()

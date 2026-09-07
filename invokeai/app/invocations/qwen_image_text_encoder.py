@@ -14,6 +14,8 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import QwenVLEncoderField
 from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
@@ -38,6 +40,13 @@ _GENERATE_SYSTEM_PROMPT = (
     "text, spatial relationships of the objects and background:"
 )
 _GENERATE_DROP_IDX = 34
+
+# Fraction of the on-disk (bf16) encoder that stays resident after BitsAndBytes quantization. Linear weights
+# shrink to 8 or 4 bits, but embeddings, norms, biases and the (excluded) lm_head stay in bf16, and nf4 carries
+# per-block absmax scales, so the ratios sit above the pure 1/2 and 1/4. Over-estimating only offloads a little
+# more of the cached models to RAM, whereas under-estimating leaves the encoder without enough VRAM, so both
+# values are deliberately conservative.
+_QUANTIZED_SIZE_RATIO: dict[str, float] = {"int8": 0.6, "nf4": 0.4}
 
 _IMAGE_PLACEHOLDER = "<|vision_start|><|image_pad|><|vision_end|>"
 
@@ -277,6 +286,13 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         BnB-quantized models are pinned to GPU and can't be moved between devices,
         so they can't go through the standard model cache. The model is loaded fresh
         each time and freed after use via the cleanup callback.
+
+        Because the load bypasses the cache, it also bypasses the cache's usual
+        make-room-for-the-model-being-locked step, so this path has to ask the cache
+        for VRAM explicitly. Without that, whatever the resident transformer/VAE left
+        free is all the encoder gets: `device_map="auto"` then silently plans to spill
+        layers to the CPU, which BnB int8 refuses with "Some modules are dispatched on
+        the CPU or the disk" (issue #9147).
         """
         import gc
         import warnings
@@ -302,19 +318,30 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         else:  # int8
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
-        context.util.signal_progress("Loading Qwen2.5-VL encoder (quantized)")
-        with warnings.catch_warnings():
-            # BnB int8 internally casts bfloat16→float16; the warning is harmless
-            warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
-            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                str(encoder_path),
-                quantization_config=bnb_config,
-                device_map="auto",
-                torch_dtype=torch.bfloat16,
-                local_files_only=True,
-            )
+        # Load onto this worker's execution device, never `device_map="auto"`: "auto" sizes its plan from whatever
+        # VRAM is free *right now* and quietly spills to the CPU when the cached models fill the card, and in
+        # multi-GPU mode it may also pick a device other than the one this worker is pinned to. With an explicit
+        # device, a genuine shortfall surfaces as a plain OOM instead of a misleading offload error.
+        device = TorchDevice.choose_torch_device()
+        quantized_bytes = int(calc_model_size_by_fs(encoder_path) * _QUANTIZED_SIZE_RATIO[self.quantization])
 
-        device = next(text_encoder.parameters()).device
+        context.util.signal_progress("Loading Qwen2.5-VL encoder (quantized)")
+        # Both the offload and the load below assign real parameters (`register_parameter` via `load_state_dict` /
+        # `setattr`), which a concurrent cache construction on another worker would hijack onto the meta device
+        # (see MODEL_LOAD_LOCK). Hold the read lock across them, like every other VRAM move, and take it *before*
+        # the cache lock that `make_room_in_vram` acquires, per the lock-ordering contract on MODEL_LOAD_LOCK.
+        with MODEL_LOAD_LOCK.read_lock():
+            context.models.make_room_in_vram(quantized_bytes)
+            with warnings.catch_warnings():
+                # BnB int8 internally casts bfloat16→float16; the warning is harmless
+                warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
+                text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    str(encoder_path),
+                    quantization_config=bnb_config,
+                    device_map={"": device},
+                    torch_dtype=torch.bfloat16,
+                    local_files_only=True,
+                )
 
         def cleanup():
             nonlocal text_encoder

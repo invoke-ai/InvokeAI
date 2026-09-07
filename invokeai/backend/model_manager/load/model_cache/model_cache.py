@@ -2750,6 +2750,25 @@ class ModelCache:
         return len(dropped)
 
     @synchronized
+    def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
+        """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
+
+        This is the entry point for code that has to put a model on the GPU *outside* the cache - e.g. a
+        BitsAndBytes-quantized text encoder, which is pinned to the device it was quantized on and so cannot be
+        managed by the cache. Such a load competes with cached models for VRAM, but never passes through `lock()`,
+        which is where the cache normally makes room for the model being locked. Without an explicit request, the
+        out-of-cache load only sees whatever VRAM the resident models happened to leave free.
+
+        The same policy as `lock()` is used (`_offload_unlocked_models`): models are (partially) offloaded to RAM,
+        smallest first, and kept in the cache so a later use re-streams weights instead of rebuilding from disk.
+        Locked (in-use) models are never touched. `working_mem_bytes` is the operation's working memory and is
+        floored at the configured default, exactly as in `lock()`.
+
+        Returns the number of VRAM bytes freed based on believed model sizes.
+        """
+        return self._offload_unlocked_models(vram_bytes_needed, working_mem_bytes)
+
+    @synchronized
     def offload_model_from_vram(self, model_key: str) -> int:
         """Move a model (and its submodels) from VRAM to RAM without dropping it from the cache.
 
