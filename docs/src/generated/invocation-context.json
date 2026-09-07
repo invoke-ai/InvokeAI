@@ -344,6 +344,27 @@
           "signature": "(source: str | AnyHttpUrl, loader: Optional[Callable[[Path], AnyModel]] = None) -> LoadedModelWithoutConfig"
         },
         {
+          "description": "Offload unlocked cached models from VRAM until `vram_bytes_needed` bytes are free on this thread's\nexecution device.\nUse this before placing a model on the GPU *outside* the model cache (e.g. a BitsAndBytes-quantized model\nthat cannot be moved between devices). Loads that go through `load()` never need this - the cache makes room\nfor them itself when they are locked - but an out-of-cache load competes with the cached models for VRAM\nand would otherwise only get whatever they happened to leave free.",
+          "name": "make_room_in_vram",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The VRAM footprint the caller is about to allocate.",
+              "name": "vram_bytes_needed",
+              "type": "int"
+            },
+            {
+              "default": "None",
+              "description": "Working memory to keep free on top of the model, floored at the configured default.",
+              "name": "working_mem_bytes",
+              "type": "Optional[int]"
+            }
+          ],
+          "return_type": "int",
+          "returns": "The number of VRAM bytes freed.",
+          "signature": "(vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int"
+        },
+        {
           "description": "Move a model (and all of its submodels) from VRAM to RAM, freeing its VRAM but keeping it cached.\nUse this when an invocation is done with a model for the rest of the run - e.g. a one-shot text encoder -\nso the next, larger load does not have to compete with it for VRAM. The model stays in the RAM cache, so\na subsequent load only re-streams it back to VRAM rather than rebuilding it from disk.",
           "name": "offload_from_vram",
           "parameters": [
