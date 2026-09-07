@@ -1,10 +1,8 @@
 import json
 from collections.abc import Iterable
-from pathlib import Path
 from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
-from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -17,6 +15,11 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.detection import (
+    folder_has_sdnq_marker,
+    safetensors_have_sdnq_keys,
+    safetensors_tensor_names,
+)
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 
 
@@ -55,42 +58,37 @@ def _has_sdnq_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, SDNQTensor) for v in state_dict.values())
 
 
-def _keys_look_sdnq(keys: Iterable[str]) -> bool:
-    """Check if a set of tensor names has SDNQ-style keys (weight + scale pairs)."""
-    key_set = {k for k in keys if isinstance(k, str)}
-    for key in key_set:
-        if key.endswith(".weight"):
-            base = key[:-7]
-            if f"{base}.scale" in key_set:
-                return True
-    return False
-
-
 def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict has SDNQ-style keys (weight + scale pairs)."""
-    return _keys_look_sdnq(k for k in state_dict.keys() if isinstance(k, str))
+    keys = {k for k in state_dict.keys() if isinstance(k, str)}
+    return any(key.endswith(".weight") and f"{key[: -len('.weight')]}.scale" in keys for key in keys)
 
 
-def _files_look_sdnq_quantized(files: Iterable[Path]) -> bool:
-    """Best-effort SDNQ key check over safetensors files, safe for sharded checkpoints.
+def _folder_tensor_names(mod: ModelOnDisk) -> set[str]:
+    """Tensor names declared by every safetensors shard under `mod.path`.
 
-    ``ModelOnDisk.load_state_dict()`` refuses to pick a file when a folder holds more than one weight
-    file, so calling it on a *sharded* encoder raises ValueError instead of a NotAMatchError - which
-    aborts identification for that config entirely. FLUX.2 Klein's ``text_encoder+tokenizer`` download
-    ships the Qwen3 encoder as 2-4 safetensors shards, so the SDNQ fallback must never go through
-    ``load_state_dict()``. We only need tensor *names* here, so read them from the safetensors headers:
-    cheap, per-shard, and no tensor data is materialized.
+    Folder probes must not go through ``ModelOnDisk.load_state_dict()``. It refuses to pick a file
+    when a folder holds more than one weight file and raises ``ValueError`` — not a
+    ``NotAMatchError`` — which aborts that config's probe rather than declining the model, so a
+    sharded encoder ends up stored as ``unknown``. Every folder-layout Qwen3 encoder we ship is
+    sharded: the FLUX.2 Klein 4B/9B and Z-Image ``text_encoder`` downloads are 2-4 shards each.
     """
-    keys: set[str] = set()
-    for file in files:
-        if file.suffix != ".safetensors":
-            continue
-        try:
-            with safe_open(file, framework="pt", device="cpu") as f:
-                keys.update(f.keys())
-        except Exception:
-            continue
-    return _keys_look_sdnq(keys)
+    return safetensors_tensor_names(mod.weight_files())
+
+
+def _folder_is_sdnq_quantized(mod: ModelOnDisk) -> bool:
+    """True if the Qwen3 encoder folder at `mod.path` holds SDNQ-quantized weights.
+
+    `Qwen3Encoder_Qwen3Encoder_Config` and `Qwen3Encoder_SDNQ_Folder_Config` must be mutually
+    exclusive: one rejects what the other requires. That only holds if both ask the *same* question,
+    so both call this. They used to ask different ones — the unquantized config looked for the marker
+    in `text_encoder/` as well and for keys across every shard, while the SDNQ config looked only at
+    the root and only at safetensors sitting directly in it. A markerless SDNQ encoder in the nested
+    `text_encoder/` layout was therefore rejected by *both* and stored as `unknown`.
+    """
+    if any(folder_has_sdnq_marker(folder) for folder in (mod.path, mod.path / "text_encoder")):
+        return True
+    return safetensors_have_sdnq_keys(mod.weight_files())
 
 
 def _has_t5_encoder_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -122,8 +120,8 @@ def _has_gemma2_keys(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
-def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
-    """Check if state dict bundles a Qwen-VL vision tower (Qwen2-VL / Qwen2.5-VL / Qwen3-VL).
+def _has_qwen_vl_visual_tower(tensor_names: Iterable[str | int]) -> bool:
+    """Check if the tensor names bundle a Qwen-VL vision tower (Qwen2-VL / Qwen2.5-VL / Qwen3-VL).
 
     VL encoders ship a visual tower alongside the language model, whereas a text-only Qwen3 encoder
     never does. A VL file otherwise satisfies the Qwen3 key heuristic (it has ``model.layers.*`` /
@@ -135,14 +133,17 @@ def _has_qwen_vl_visual_tower(state_dict: dict[str | int, Any]) -> bool:
     layout that ComfyUI single-file Qwen3-VL checkpoints use. Matching only bare ``visual.blocks.*``
     missed that layout, letting a single-file Qwen3-VL 4B encoder match both configs and get misrouted to
     the text-only Qwen3 type - silently breaking the single-file/GGUF Krea-2 encoder install path.
+
+    Takes any iterable of names so a folder probe can pass the union of its safetensors headers; a
+    state dict iterates over its keys, so existing call sites are unaffected.
     """
-    for key in state_dict.keys():
+    for key in tensor_names:
         if isinstance(key, str) and (key.startswith(("visual.", "model.visual.")) or ".visual." in key):
             return True
     return False
 
 
-def _has_qwen3_specific_keys(state_dict: dict[str | int, Any]) -> bool:
+def _has_qwen3_specific_keys(tensor_names: Iterable[str | int]) -> bool:
     """Check for Qwen3-only QK-normalization weights (``q_norm``/``k_norm`` per attention block).
 
     Qwen3 adds an RMSNorm on the query and key projections that Qwen2 does not have. A Qwen2
@@ -150,8 +151,11 @@ def _has_qwen3_specific_keys(state_dict: dict[str | int, Any]) -> bool:
     / ``model.embed_tokens.weight`` layout), so this is the discriminator that keeps a Qwen2 file
     from being accepted as a Qwen3 encoder the loader would fail to build. Covers both the
     PyTorch/diffusers naming and the llama.cpp/GGUF naming.
+
+    Takes any iterable of names, so a folder probe can pass safetensors header keys instead of a
+    state dict it cannot load.
     """
-    for key in state_dict.keys():
+    for key in tensor_names:
         if not isinstance(key, str):
             continue
         if ".self_attn.q_norm." in key or ".self_attn.k_norm." in key:
@@ -372,23 +376,10 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
 
     @classmethod
     def _reject_if_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
-        # Primary signal: quantization_config.json with quant_method="sdnq" (at root or in
-        # text_encoder/). Fallback: SDNQ-style weight+scale key pairs in the state dict. This mirrors
-        # the detection in Qwen3Encoder_SDNQ_Folder_Config so the two stay mutually exclusive.
-        for folder in (mod.path, mod.path / "text_encoder"):
-            quant_config_path = folder / "quantization_config.json"
-            if not quant_config_path.exists():
-                continue
-            try:
-                with open(quant_config_path, "r", encoding="utf-8") as f:
-                    quant_config = json.load(f)
-            except (json.JSONDecodeError, OSError):
-                continue
-            if quant_config.get("quant_method") == "sdnq":
-                raise NotAMatchError("folder is SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
-
-        if _files_look_sdnq_quantized(mod.weight_files()):
-            raise NotAMatchError("state dict looks SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
+        # Shared with Qwen3Encoder_SDNQ_Folder_Config so the two configs cannot both reject (or both
+        # accept) the same folder.
+        if _folder_is_sdnq_quantized(mod):
+            raise NotAMatchError("folder is SDNQ-quantized; use Qwen3Encoder_SDNQ_Folder_Config")
 
     @classmethod
     def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
@@ -557,22 +548,10 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        matched = False
-
-        # Check for quantization_config.json with quant_method="sdnq"
-        quant_config_path = mod.path / "quantization_config.json"
-        if quant_config_path.exists():
-            with open(quant_config_path, "r", encoding="utf-8") as f:
-                quant_config = json.load(f)
-            if quant_config.get("quant_method") == "sdnq":
-                matched = True
-
-        # Fallback: check if safetensors files have SDNQ-style keys
-        if not matched:
-            if _files_look_sdnq_quantized(mod.path.glob("*.safetensors")):
-                matched = True
-
-        if not matched:
+        # Shared with the rejection guard in Qwen3Encoder_Qwen3Encoder_Config: exactly one of the two
+        # configs claims a given folder. A corrupt or foreign quantization_config.json falls through
+        # to the key check there instead of aborting this probe with a JSONDecodeError.
+        if not _folder_is_sdnq_quantized(mod):
             raise NotAMatchError("directory does not look like an SDNQ-quantized Qwen3 encoder")
 
         # A root config.json next to tokenizer files is a complete causal LM (TextLLM), not a Qwen3
@@ -635,25 +614,22 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
                 "(only Qwen3ForCausalLM is supported)"
             )
 
-        # Fallback for folders without a usable config.json architecture: check the state dict. The
+        # Fallback for folders without a usable config.json architecture: check the tensor names. The
         # generic Qwen keys (model.layers. / model.embed_tokens.weight) are NOT enough — Qwen2 and
         # Qwen2-VL folders carry exactly the same ones, and the loader reconstructs a text-only
         # Qwen3ForCausalLM that fails on Qwen2's missing q/k-norm params and on Qwen-VL's visual
         # tower. Mirror the single-file path: reject a bundled visual tower and require the
         # Qwen3-only q/k-norm weights. An SDNQ transformer/VAE folder has transformer_blocks. /
-        # decoder. keys instead and is rejected by both checks. Loading the state dict can raise for
-        # sharded folders (multiple weight files), so treat that as "no usable signal" rather than
-        # letting it abort identification.
-        try:
-            state_dict = mod.load_state_dict()
-        except Exception:
-            state_dict = {}
+        # decoder. keys instead and is rejected by both checks. Names come from the safetensors
+        # headers because a sharded folder has no single state dict to load — that path used to
+        # yield no signal at all and reject every sharded markerless SDNQ encoder.
+        tensor_names = _folder_tensor_names(mod)
 
-        if _has_qwen_vl_visual_tower(state_dict):
+        if _has_qwen_vl_visual_tower(tensor_names):
             raise NotAMatchError(
                 "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
-        if _has_qwen3_specific_keys(state_dict):
+        if _has_qwen3_specific_keys(tensor_names):
             return
 
         raise NotAMatchError(

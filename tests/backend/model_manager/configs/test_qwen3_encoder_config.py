@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+    Qwen3Encoder_SDNQ_Folder_Config,
     _has_gemma2_keys,
     _has_qwen_vl_visual_tower,
 )
@@ -195,3 +196,99 @@ class TestShardedQwen3EncoderFolder:
         root = self._make_sharded_encoder(tmp_path / "klein-9b-encoder-sdnq", sdnq=True)
         with pytest.raises(NotAMatchError, match="SDNQ"):
             Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+    def test_folder_probe_never_loads_a_state_dict(self, tmp_path: Path) -> None:
+        """Identifying a folder encoder must not go through `load_state_dict()` at all.
+
+        A folder holding more than one weight file has no single state dict to load: the call raises
+        ValueError, which is not a NotAMatchError, and the probe is abandoned. Everything this config
+        needs is in `config.json` and the safetensors headers, so make the absence of that call a
+        property of the test suite rather than of today's implementation.
+        """
+        root = self._make_sharded_encoder(tmp_path / "klein-9b-encoder-nosd")
+
+        def _explode(*args: object, **kwargs: object) -> None:
+            raise AssertionError("identification must not load the state dict of a folder model")
+
+        with patch.object(ModelOnDisk, "load_state_dict", _explode):
+            config = Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+        assert config.variant.value == "qwen3_8b"
+
+
+class TestSdnqQwen3EncoderFolder:
+    """`Qwen3Encoder_Qwen3Encoder_Config` and `Qwen3Encoder_SDNQ_Folder_Config` must partition folders.
+
+    The two used to ask different questions about the same directory: the unquantized config looked
+    for the SDNQ marker in `text_encoder/` as well and for SDNQ keys across every shard, while the
+    SDNQ config looked only at the root and only at safetensors sitting directly in it. An SDNQ
+    encoder in the nested `text_encoder/` layout was therefore rejected by *both* - the exact shape
+    that lands a model in `unknown`.
+    """
+
+    @staticmethod
+    def _make_sdnq_encoder(root: Path, *, marker_in: str | None = None, architecture: str | None = None) -> Path:
+        text_encoder = root / "text_encoder"
+        text_encoder.mkdir(parents=True)
+
+        config: dict[str, object] = {"hidden_size": 4096}
+        if architecture is not None:
+            config["architectures"] = [architecture]
+        (text_encoder / "config.json").write_text(json.dumps(config))
+
+        # q_norm/k_norm are the Qwen3-only marker the config falls back to when config.json declares
+        # no architecture; they are split across shards on purpose.
+        save_file(
+            {"model.embed_tokens.weight": torch.zeros(8, 4096, dtype=torch.uint8)},
+            str(text_encoder / "model-00001-of-00002.safetensors"),
+        )
+        save_file(
+            {
+                "model.layers.0.self_attn.q_norm.weight": torch.zeros(8, 8, dtype=torch.uint8),
+                "model.layers.0.self_attn.q_norm.scale": torch.zeros(8, 1, dtype=torch.float32),
+            },
+            str(text_encoder / "model-00002-of-00002.safetensors"),
+        )
+
+        if marker_in is not None:
+            (root / marker_in / "quantization_config.json").write_text(json.dumps({"quant_method": "sdnq"}))
+        return root
+
+    def test_nested_markerless_sdnq_encoder_is_claimed(self, tmp_path: Path) -> None:
+        """Detected by key shape across the shards of `text_encoder/`, with no marker file at all."""
+        root = self._make_sdnq_encoder(tmp_path / "sdnq-nested", architecture="Qwen3ForCausalLM")
+
+        config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+        assert config.format.value == "sdnq_quantized"
+        assert config.variant.value == "qwen3_8b"
+        # ...and the unquantized config declines the same folder, so exactly one of them matches.
+        with pytest.raises(NotAMatchError, match="SDNQ"):
+            Qwen3Encoder_Qwen3Encoder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+    def test_marker_in_text_encoder_subfolder_is_honored(self, tmp_path: Path) -> None:
+        root = self._make_sdnq_encoder(
+            tmp_path / "sdnq-marker-nested", marker_in="text_encoder", architecture="Qwen3ForCausalLM"
+        )
+
+        config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+        assert config.format.value == "sdnq_quantized"
+
+    def test_unreadable_marker_falls_through_to_the_key_check(self, tmp_path: Path) -> None:
+        """A corrupt `quantization_config.json` used to abort this probe with a JSONDecodeError."""
+        root = self._make_sdnq_encoder(tmp_path / "sdnq-bad-marker", architecture="Qwen3ForCausalLM")
+        (root / "quantization_config.json").write_text("{not json")
+
+        config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+        assert config.format.value == "sdnq_quantized"
+
+    def test_sharded_folder_without_declared_architecture_is_claimed(self, tmp_path: Path) -> None:
+        """The Qwen3-only q_norm/k_norm fallback must read shard headers, not a single state dict.
+
+        With no `architectures` in config.json the config falls back to tensor names. Reading them
+        via `load_state_dict()` yielded nothing for a sharded folder, so this shape was rejected.
+        """
+        root = self._make_sdnq_encoder(tmp_path / "sdnq-no-arch")
+
+        config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+        assert config.format.value == "sdnq_quantized"
