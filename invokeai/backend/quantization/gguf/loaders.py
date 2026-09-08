@@ -1,7 +1,10 @@
 import gc
+import math
 from pathlib import Path
+from typing import Any
 
 import gguf
+import numpy as np
 import torch
 
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -39,6 +42,26 @@ class WrappedGGUFReader:
 ORIG_SHAPE_KEY_PREFIX = "comfy.gguf.orig_shape."
 
 
+def _coerce_dim(value: Any) -> int | None:
+    """Coerce a single value from a GGUF metadata array to a positive dimension, or None if it isn't one.
+
+    Metadata is untrusted input, so anything that is not a finite, integral, positive number is rejected rather
+    than silently truncated (``int(2.5) == 2``) or allowed to raise (``int(float("inf"))``).
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, np.integer)):
+        dim = int(value)
+    elif isinstance(value, (float, np.floating)):
+        value = float(value)
+        if not math.isfinite(value) or not value.is_integer():
+            return None
+        dim = int(value)
+    else:
+        return None
+    return dim if dim > 0 else None
+
+
 def _read_comfy_orig_shapes(reader: gguf.GGUFReader) -> dict[str, torch.Size]:
     """Read ComfyUI's ``comfy.gguf.orig_shape.<tensor name>`` metadata.
 
@@ -53,12 +76,16 @@ def _read_comfy_orig_shapes(reader: gguf.GGUFReader) -> dict[str, torch.Size]:
             continue
         tensor_name = key[len(ORIG_SHAPE_KEY_PREFIX) :]
         try:
-            dims = tuple(int(v) for v in field.contents())
-        except (TypeError, ValueError) as e:
+            contents = field.contents()
+        except Exception as e:
             logger.warning(f"Ignoring malformed GGUF metadata key {key!r}: {e}")
             continue
-        if not dims or any(d <= 0 for d in dims):
-            logger.warning(f"Ignoring malformed GGUF metadata key {key!r}: {dims}")
+        if not isinstance(contents, (list, tuple)):
+            logger.warning(f"Ignoring malformed GGUF metadata key {key!r}: expected an array, got {contents!r}")
+            continue
+        dims = tuple(_coerce_dim(v) for v in contents)
+        if not dims or any(d is None for d in dims):
+            logger.warning(f"Ignoring malformed GGUF metadata key {key!r}: {tuple(contents)!r}")
             continue
         orig_shapes[tensor_name] = torch.Size(dims)
     return orig_shapes
