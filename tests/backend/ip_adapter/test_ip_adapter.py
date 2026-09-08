@@ -48,10 +48,10 @@ def build_dummy_sd15_unet_input(torch_device):
     ],
 )
 @pytest.mark.slow
-def test_ip_adapter_unet_patch(model_params, model_installer, torch_device):
+def test_ip_adapter_unet_patch(model_params, mm2_model_manager, torch_device):
     """Smoke test that IP-Adapter weights can be loaded and used to patch a UNet."""
     ip_adapter_info = install_and_load_model(
-        model_installer=model_installer,
+        model_manager=mm2_model_manager,
         model_path_id_or_url=model_params["ip_adapter_model_id"],
         model_name=model_params["ip_adapter_model_name"],
         base_model=model_params["base_model"],
@@ -59,7 +59,7 @@ def test_ip_adapter_unet_patch(model_params, model_installer, torch_device):
     )
 
     unet_info = install_and_load_model(
-        model_installer=model_installer,
+        model_manager=mm2_model_manager,
         model_path_id_or_url=model_params["unet_model_id"],
         model_name=model_params["unet_model_name"],
         base_model=model_params["base_model"],
