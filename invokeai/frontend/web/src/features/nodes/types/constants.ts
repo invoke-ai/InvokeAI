@@ -11,6 +11,11 @@ export const HANDLE_TOOLTIP_OPEN_DELAY = 500;
 export const NODE_WIDTH = 320;
 
 /**
+ * The grid spacing used by the workflow editor and workflow image export.
+ */
+export const WORKFLOW_GRID_SIZE = 25;
+
+/**
  * This class name is special - reactflow uses it to identify the drag handle of a node,
  * applying the appropriate listeners to it.
  */

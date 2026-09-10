@@ -18,6 +18,7 @@ from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapsh
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
+    FirstUseClaim,
     ModelCache,
     get_model_cache_key,
 )
@@ -186,6 +187,34 @@ def _is_quantized_param(param: torch.nn.Parameter) -> bool:
     return not param.data.is_floating_point() or type(param.data) is not torch.Tensor
 
 
+def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
+    """The precision-sensitive modules a model declares for itself, as skip patterns.
+
+    Diffusers' `enable_layerwise_casting()` unions two class attributes before casting:
+    `_skip_layerwise_casting_patterns` and `_keep_in_fp32_modules`. We no longer call it (see
+    `_apply_fp8_layerwise_casting`), so we have to read both ourselves — this is not cosmetic.
+    Z-Image's `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to
+    it; with an fp8 weight the input becomes float8 before our pre-hook can restore the weight, and
+    `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
+    `['t_embedder', 'cap_embedder']` for that model.
+
+    `_keep_in_fp32_modules` protects nothing extra on any model we currently load — verified on
+    Krea-2, Wan 14B, Z-Image and FLUX.1. Wan's `time_embedder` sits under `condition_embedder`,
+    which its `_skip_layerwise_casting_patterns` already names; `scale_shift_table` is a bare
+    Parameter, not a castable layer; and Krea-2's entries are all `norm*`, already covered by
+    `_FP8_DEFAULT_SKIP_PATTERNS`. It is read anyway so the next model to declare one does not lose
+    it silently.
+    """
+    patterns: list[str] = []
+    for attr in ("_skip_layerwise_casting_patterns", "_keep_in_fp32_modules"):
+        declared = getattr(model, attr, None) or ()
+        # Diffusers stores these as lists of strings, but a subclass could set a bare string.
+        if isinstance(declared, str):
+            declared = (declared,)
+        patterns.extend(p for p in declared if isinstance(p, str) and p not in patterns)
+    return tuple(patterns)
+
+
 # The construction path is not thread-safe on its own; it monkey-patches process-global torch state
 # (see MODEL_LOAD_LOCK). Concurrent callers must hold the MODEL_LOAD_LOCK write lock (see
 # _load_and_cache).
@@ -221,8 +250,13 @@ class ModelLoader(ModelLoaderBase):
         if not model_path.exists():
             raise FileNotFoundError(f"Files for model '{model_config.name}' not found at {model_path}")
 
-        cache_record = self._load_and_cache(model_config, submodel_type)
-        return LoadedModel(config=model_config, cache_record=cache_record, cache=self._ram_cache)
+        cache_record, first_use_claim = self._load_and_cache(model_config, submodel_type)
+        return LoadedModel(
+            config=model_config,
+            cache_record=cache_record,
+            cache=self._ram_cache,
+            first_use_claim=first_use_claim,
+        )
 
     @property
     def ram_cache(self) -> ModelCache:
@@ -257,11 +291,23 @@ class ModelLoader(ModelLoaderBase):
 
         return None
 
-    def _load_and_cache(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> CacheRecord:
+    def _load_and_cache(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
+    ) -> tuple[CacheRecord, Optional[FirstUseClaim]]:
+        """Return the model's cache record together with the first-use claim shielding it.
+
+        The claim is armed inside the cache lookup itself (see ModelCache.get_with_first_use_claim)
+        and belongs to the LoadedModel this record is about to be wrapped in, which releases it at
+        its first lock. It is carried out of here rather than being armed at the wrapper's
+        construction so that the record cannot be evicted anywhere along the way — this method's
+        two returns, the shell registration below, and load_model()'s own frame. If the load
+        raises after the claim is armed, the claim dies with the frame that holds it and releases
+        the hold itself.
+        """
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         cache_key = get_model_cache_key(config.key, submodel_type)
         try:
-            return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
         except IndexError:
             pass
 
@@ -280,7 +326,7 @@ class ModelLoader(ModelLoaderBase):
             # entry while we waited for the mutex. (Workers on other devices use a different cache,
             # so they will still miss here and construct their own copy — which is intended.)
             try:
-                return self._ram_cache.get(key=cache_key, stats_name=stats_name)
+                return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
             except IndexError:
                 pass
 
@@ -326,15 +372,22 @@ class ModelLoader(ModelLoaderBase):
             # Determine execution device from model config, considering submodel type
             execution_device = self._get_execution_device(config, submodel_type)
 
-            self._ram_cache.put(
+            admission_claim = self._ram_cache.put(
                 cache_key,
                 model=loaded_model,
                 execution_device=execution_device,
+                claim_admission=True,
             )
-            # Retrieve immediately: the new record carries the cache's post-admission grace until
-            # it is locked, and keeping put() and get() adjacent means no failure in between can
-            # leave a graced record whose loader never comes back for it.
-            cache_record = self._ram_cache.get(key=cache_key, stats_name=stats_name)
+            # Retrieve immediately, and hold the admission claim across the retrieval: the claim
+            # shields the new record until this frame's own claim takes over, so nothing — a peer's
+            # reconcile, another model's make-room, the cache's shutdown() — can evict the model
+            # this loader is still holding, and a load that dies in between releases the shield by
+            # dropping the claim rather than leaving a flag standing that nothing can clear.
+            cache_record, first_use_claim = self._ram_cache.get_with_first_use_claim(
+                key=cache_key, stats_name=stats_name
+            )
+            if admission_claim is not None:
+                admission_claim.release()
 
             # Register the shell only after put() has created the shared entry (via the wrapper's
             # acquire); it is dropped automatically when that entry's last reference is released.
@@ -343,7 +396,7 @@ class ModelLoader(ModelLoaderBase):
                 if shared_store is not None:
                     shared_store.set_shell(cache_key, shell_to_register)
 
-            return cache_record
+            return cache_record, first_use_claim
 
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
@@ -466,18 +519,11 @@ class ModelLoader(ModelLoaderBase):
         # `register_forward_hook` path fires around `nn.Module._call_impl` without replacing
         # `forward`, so `CustomLinear.forward` is still reached.
         if isinstance(model, torch.nn.Module):
-            # Diffusers models declare their own precision-sensitive modules in
-            # `_skip_layerwise_casting_patterns`, and `enable_layerwise_casting()` honors them. Since
-            # we no longer call it, we have to apply that list ourselves — it is not cosmetic. Z-Image's
-            # `TimestepEmbedder.forward` reads `self.mlp[0].weight.dtype` and casts its *input* to it;
-            # with an fp8 weight the input becomes float8 before our pre-hook can restore the weight,
-            # and `F.linear` dies with `"addmm_cuda" not implemented for 'Float8_e4m3fn'`. Hence
-            # `['t_embedder', 'cap_embedder']` for that model.
             self._apply_fp8_to_nn_module(
                 model,
                 storage_dtype=storage_dtype,
                 compute_dtype=compute_dtype,
-                extra_skip_patterns=tuple(getattr(model, "_skip_layerwise_casting_patterns", None) or ()),
+                extra_skip_patterns=_model_declared_skip_patterns(model),
             )
         else:
             return model
@@ -505,8 +551,8 @@ class ModelLoader(ModelLoaderBase):
         Without the skip list, precision-sensitive tiny learned scalars (e.g. FLUX RMSNorm.scale)
         get crushed to FP8 and quality degrades noticeably.
 
-        `extra_skip_patterns` carries the model's own declared exclusions (diffusers'
-        `_skip_layerwise_casting_patterns`), which are model-specific and cannot be inferred from
+        `extra_skip_patterns` carries the model's own declared exclusions (see
+        `_model_declared_skip_patterns`), which are model-specific and cannot be inferred from
         layer types or generic name patterns.
 
         Modules holding already-quantized weights are skipped regardless of their class. This is a
