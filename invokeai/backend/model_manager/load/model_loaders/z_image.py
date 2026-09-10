@@ -39,6 +39,7 @@ from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
 
 
 def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
@@ -357,7 +358,7 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
                 axes_lens=[1024, 512, 512],
             )
 
-        model.load_state_dict(sd, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Z-Image transformer", assign=True)
         return model
 
 
@@ -481,7 +482,7 @@ class ZImageCheckpointModel(ModelLoader):
         for k in sd.keys():
             sd[k] = sd[k].to(model_dtype)
 
-        model.load_state_dict(sd, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Z-Image transformer checkpoint", assign=True)
         # `assign=True` aliases every param to its `sd` tensor, so the dict keeps the whole model
         # alive a second time. The FP8 cast below allocates the fp8 copy per param while the
         # `model_dtype` original is still reachable through `sd`, pushing peak RAM to ~1.5x what
@@ -580,7 +581,7 @@ class ZImageGGUFCheckpointModel(ModelLoader):
                 axes_lens=[1024, 512, 512],
             )
 
-        model.load_state_dict(sd, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Z-Image GGUF transformer checkpoint", assign=True)
         return model
 
 
@@ -643,11 +644,9 @@ class ZImageSDNQCheckpointModel(ModelLoader):
         sd = sdnq_sd_loader(te_dir, compute_dtype=compute_dtype)
         # Qwen3ForCausalLM may share lm_head.weight with model.embed_tokens.weight; missing keys
         # for that tie are expected and handled by re-sharing post-load.
-        missing, unexpected = model.load_state_dict(sd, assign=True, strict=False)
-        if unexpected:
-            raise ValueError(f"Unexpected keys loading SDNQ Qwen3 text encoder: {unexpected}")
-        if missing and missing != ["lm_head.weight"]:
-            raise ValueError(f"Unexpected missing keys loading SDNQ Qwen3 text encoder: {missing}")
+        missing = load_state_dict_ignoring_extras(
+            model, sd, source="SDNQ Qwen3 text encoder", assign=True, allowed_missing={"lm_head.weight"}
+        )
         if missing == ["lm_head.weight"]:
             model.lm_head.weight = model.model.embed_tokens.weight
         return model
@@ -717,7 +716,7 @@ class ZImageSDNQCheckpointModel(ModelLoader):
                 axes_lens=[1024, 512, 512],
             )
 
-        model.load_state_dict(sd, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="SDNQ Z-Image transformer checkpoint", assign=True)
         return model
 
     def _load_from_diffusers_folder(
@@ -899,6 +898,7 @@ class ZImageControlCheckpointModel(ModelLoader):
         # Load state dict with strict=False to handle missing keys like x_pad_token
         # Some control adapters may not include x_pad_token in their checkpoint
         missing_keys, unexpected_keys = model.load_state_dict(sd, assign=True, strict=False)
+        log_unexpected_keys("Z-Image ControlNet checkpoint", unexpected_keys)
 
         # Initialize x_pad_token if it was missing from the checkpoint
         if "x_pad_token" in missing_keys:
@@ -1124,7 +1124,9 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
 
         # Load the text model weights from checkpoint
         # assign=True replaces meta tensors with real ones from state dict
-        model.load_state_dict(sd, strict=False, assign=True)
+        load_state_dict_ignoring_extras(
+            model, sd, source="Qwen3 text encoder checkpoint", assign=True, allow_missing=True
+        )
 
         # Handle tied weights: lm_head shares weight with embed_tokens when tie_word_embeddings=True
         # This doesn't work automatically with init_empty_weights, so we need to manually tie them
@@ -1324,7 +1326,7 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
 
         # Load the GGUF weights with assign=True
         # GGMLTensor wrappers will be dequantized on-the-fly during inference
-        model.load_state_dict(sd, strict=False, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Qwen3 GGUF text encoder", assign=True, allow_missing=True)
 
         # Dequantize embed_tokens weight - embedding lookups require indexed access
         # which quantized GGMLTensors can't efficiently provide (no __torch_dispatch__ for embedding)

@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
 
 
 def _load_local_state_dict(folder: Path, basename: str) -> dict[str, torch.Tensor]:
@@ -133,7 +134,7 @@ class Ideogram4DiffusersModel(ModelLoader):
             with accelerate.init_empty_weights():
                 model: torch.nn.Module = Ideogram4Transformer(Ideogram4Config())
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=compute_dtype)
-            model.load_state_dict(sd, strict=True, assign=True)
+            load_state_dict_ignoring_extras(model, sd, source="Ideogram 4 nf4 transformer", assign=True)
             return model
 
         if is_fp8_state_dict(sd):
@@ -148,7 +149,7 @@ class Ideogram4DiffusersModel(ModelLoader):
         # Unquantized fallback.
         with accelerate.init_empty_weights():
             model = Ideogram4Transformer(Ideogram4Config())
-        model.load_state_dict(sd, strict=True, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Ideogram 4 transformer", assign=True)
         return model.to(compute_dtype)
 
     def _load_text_encoder(self, model_path: Path) -> AnyModel:
@@ -201,11 +202,10 @@ class Ideogram4DiffusersModel(ModelLoader):
                 model = quantize_model_nf4(model, modules_to_not_convert=set(), compute_dtype=compute_dtype)
 
         _, unexpected = model.load_state_dict(sd, strict=False, assign=True)
-        # Unexpected keys signal a wrong or contaminated checkpoint and must hard-fail. Missing keys are
-        # acceptable only for tied weights (resolved by _verify_encoder_fully_materialized via
+        # Extra keys are exporter noise, not a correctness signal - log them and move on. Missing keys
+        # are acceptable only for tied weights (resolved by _verify_encoder_fully_materialized via
         # tie_weights); any genuinely missing non-tied weight is caught there as a leftover meta tensor.
-        if unexpected:
-            raise RuntimeError(f"unexpected keys loading Ideogram 4 text encoder: {unexpected[:10]}")
+        log_unexpected_keys("Ideogram 4 text encoder", unexpected)
         _verify_encoder_fully_materialized(model, context="Ideogram 4 text encoder")
         if not is_bnb_nf4:
             model = model.to(compute_dtype)
@@ -225,6 +225,6 @@ class Ideogram4DiffusersModel(ModelLoader):
         sd = load_file(model_path / "vae" / "diffusion_pytorch_model.safetensors")
         sd = convert_diffusers_state_dict(sd)
         ae = AutoEncoder(AutoEncoderParams())
-        ae.load_state_dict(sd)
+        load_state_dict_ignoring_extras(ae, sd, source="Ideogram 4 VAE")
         ae.eval()
         return ae.to(model_dtype)

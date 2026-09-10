@@ -12,6 +12,7 @@ against transformers' own (fully dequantizing) GGUF loader.
 """
 
 import importlib
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -239,18 +240,36 @@ class TestNativeGgufLoad:
         # The projections were not dequantized in place by running the model.
         assert isinstance(model.layers[0].self_attn.q_proj.weight, GGMLTensor)
 
-    def test_unexpected_tensor_is_rejected(
-        self, monkeypatch: pytest.MonkeyPatch, tiny_gguf: dict[str, GGMLTensor]
+    def test_unexpected_tensor_is_ignored_and_logged_at_debug(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tiny_gguf: dict[str, GGMLTensor]
     ) -> None:
         """A tensor that maps cleanly but has no home in the configured model (here: a block beyond
-        `num_hidden_layers`) must fail loudly instead of being dropped."""
+        `num_hidden_layers`) is exporter noise, not a broken checkpoint: the load must succeed and
+        say so only at DEBUG (issue #9437)."""
         sd = dict(tiny_gguf) | {f"blk.{_LAYERS}.attn_q.weight": _q8(_HEADS * _HEAD_DIM, _HIDDEN)}
         monkeypatch.setattr(
             invokeai.backend.quantization.gguf.loaders, "gguf_sd_loader", lambda path, compute_dtype: sd
         )
 
-        with pytest.raises(RuntimeError, match="Unexpected keys"):
+        with caplog.at_level(logging.DEBUG, logger="invokeai.backend.util.state_dict_loading"):
+            model = load_gemma2_model_from_gguf(Path("unused.gguf"), torch.float32)
+
+        assert not any(p.is_meta for p in model.parameters())
+        assert f"layers.{_LAYERS}.self_attn.q_proj.weight" in caplog.text
+
+    def test_unexpected_tensor_is_silent_above_debug(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tiny_gguf: dict[str, GGMLTensor]
+    ) -> None:
+        """...and nothing at all at the default log level."""
+        sd = dict(tiny_gguf) | {f"blk.{_LAYERS}.attn_q.weight": _q8(_HEADS * _HEAD_DIM, _HIDDEN)}
+        monkeypatch.setattr(
+            invokeai.backend.quantization.gguf.loaders, "gguf_sd_loader", lambda path, compute_dtype: sd
+        )
+
+        with caplog.at_level(logging.INFO, logger="invokeai.backend.util.state_dict_loading"):
             load_gemma2_model_from_gguf(Path("unused.gguf"), torch.float32)
+
+        assert caplog.text == ""
 
 
 @pytest.mark.skipif(not os.environ.get(_LOCAL_GGUF_ENV_VAR), reason=f"set {_LOCAL_GGUF_ENV_VAR} to a Gemma-2-2b GGUF")

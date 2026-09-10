@@ -7,6 +7,8 @@ uses in ``model_loaders/ideogram4.py::_load_text_encoder``. These tests exercise
 tiny CPU model so the fp8 path has regression coverage without a multi-GB checkpoint.
 """
 
+import logging
+
 import accelerate
 import pytest
 import torch
@@ -102,8 +104,9 @@ def test_fp8_load_matches_loader_pattern() -> None:
     assert torch.allclose(out, expected, atol=1e-5, rtol=1e-4)
 
 
-def test_fp8_load_rejects_unexpected_keys() -> None:
-    """A key the model has no home for must fail loudly rather than load silently."""
+def test_fp8_load_ignores_unexpected_keys(caplog: pytest.LogCaptureFixture) -> None:
+    """A key the model has no home for is exporter noise: the load succeeds and only DEBUG says
+    anything about it (issue #9437)."""
     torch.manual_seed(1)
     compute_dtype = torch.float32
     ref = _TinyEncoder().to(compute_dtype).eval()
@@ -112,8 +115,14 @@ def test_fp8_load_rejects_unexpected_keys() -> None:
 
     model = _TinyEncoder().to(compute_dtype)
     swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
-    with pytest.raises(RuntimeError, match="unexpected keys"):
+    with caplog.at_level(logging.DEBUG, logger="invokeai.backend.util.state_dict_loading"):
         load_fp8_state_dict(model, sd, device=torch.device("cpu"), dtype=compute_dtype, strict=False)
+
+    assert "lin1.bogus_extra" in caplog.text
+
+    x = torch.randn(2, 8, dtype=compute_dtype)
+    with torch.no_grad():
+        assert torch.allclose(model(x), _dequant_reference(ref, sd, x), atol=1e-5, rtol=1e-4)
 
 
 def test_fp8_missing_key_strictness() -> None:
