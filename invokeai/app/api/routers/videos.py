@@ -215,8 +215,12 @@ class _VideoUploadStreamParser:
         self._header_value = bytearray()
         self._headers: dict[bytes, bytes] = {}
         self._part_name: Optional[bytes] = None
-        self._metadata_chunks: list[bytes] = []
-        self._metadata_size = 0
+        # A bytearray, not a list of per-callback chunks: the parser hands the metadata
+        # field over in whatever pieces the client sent it, and one `bytes` object per
+        # piece would let a client that dribbles the field in 2-byte pieces hold ~22x the
+        # size cap in memory. `len(self._metadata)` is the retained size, so the cap
+        # below bounds memory, not just payload.
+        self._metadata = bytearray()
         self.filename: Optional[str] = None
         self.content_type: Optional[str] = None
         self.metadata: Optional[str] = None
@@ -247,8 +251,7 @@ class _VideoUploadStreamParser:
         self._header_field = bytearray()
         self._header_value = bytearray()
         self._part_name = None
-        self._metadata_chunks = []
-        self._metadata_size = 0
+        self._metadata = bytearray()
 
     def _on_header_field(self, data: bytes, start: int, end: int) -> None:
         self._header_field.extend(data[start:end])
@@ -288,25 +291,23 @@ class _VideoUploadStreamParser:
                 )
             self._destination.write(chunk)
         elif self._part_name == b"metadata":
-            self._metadata_size += len(chunk)
-            if self._metadata_size > MAX_UPLOAD_METADATA_SIZE:
+            if len(self._metadata) + len(chunk) > MAX_UPLOAD_METADATA_SIZE:
                 raise HTTPException(
                     status_code=413,
                     detail=f"Video metadata exceeds maximum size ({MAX_UPLOAD_METADATA_SIZE} bytes)",
                 )
-            self._metadata_chunks.append(chunk)
+            self._metadata.extend(chunk)
         # Any other field is dropped rather than buffered: an unknown part must not be a
         # way to make the server hold arbitrary bytes in memory.
 
     def _on_part_end(self) -> None:
         if self._part_name == b"metadata":
             try:
-                self.metadata = b"".join(self._metadata_chunks).decode("utf-8")
+                self.metadata = self._metadata.decode("utf-8")
             except UnicodeDecodeError as error:
                 raise HTTPException(status_code=422, detail="Metadata must be UTF-8 encoded") from error
         self._part_name = None
-        self._metadata_chunks = []
-        self._metadata_size = 0
+        self._metadata = bytearray()
 
     def _on_end(self) -> None:
         self.saw_end = True
