@@ -946,6 +946,29 @@ def _has_complete_lora_pair(state_dict: dict[str | int, Any], key_filter: Callab
     return False
 
 
+def _has_complete_lokr_layer(
+    state_dict: dict[str | int, Any], key_filter: Callable[[str], bool] | None = None
+) -> bool:
+    """True if at least one complete LoKr layer exists (lokr_w1 + lokr_w2, or their factored variants).
+
+    A LoKr layer is complete when either:
+    - ``lokr_w1`` and ``lokr_w2`` share the same module prefix, or
+    - the factored form ``lokr_w1_a`` / ``lokr_w1_b`` (or ``lokr_w2_a`` / ``lokr_w2_b``) is present
+      alongside the corresponding direct ``lokr_w2`` / ``lokr_w1``.
+    """
+    string_keys = {key for key in state_dict if isinstance(key, str)}
+    prefixes_with_w1: set[str] = set()
+    prefixes_with_w2: set[str] = set()
+    for key in string_keys:
+        if key_filter is not None and not key_filter(key):
+            continue
+        if key.endswith(".lokr_w1") or key.endswith(".lokr_w1_a"):
+            prefixes_with_w1.add(key.rsplit(".", 1)[0])
+        if key.endswith(".lokr_w2") or key.endswith(".lokr_w2_a"):
+            prefixes_with_w2.add(key.rsplit(".", 1)[0])
+    return bool(prefixes_with_w1 & prefixes_with_w2)
+
+
 # Dotted layouts the converter understands for an explicit Krea-2 override (a transformer-only or
 # text-encoder-only LoRA that lacks the auto-detection text_fusion/time_mod_proj keys still installs under
 # an explicit base). The kohya/LyCORIS layout is deliberately absent - see `_key_is_supported_krea2_layout`.
@@ -994,7 +1017,9 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         state_dict = mod.load_state_dict()
         explicit_krea2_override = override_fields.get("base") is BaseModelType.Krea2
-        has_supported_explicit_pair = _has_complete_lora_pair(state_dict, _key_is_supported_krea2_layout)
+        has_supported_explicit_pair = _has_complete_lora_pair(
+            state_dict, _key_is_supported_krea2_layout
+        ) or _has_complete_lokr_layer(state_dict, _key_is_supported_krea2_layout)
         # Reject an orphaned half *anywhere* in the state dict (e.g. a dangling text_fusion half not under
         # the approved prefixes) — it would install here but fail during LoRA conversion at generation time.
         if explicit_krea2_override and has_supported_explicit_pair and _lora_weight_keys_are_all_paired(state_dict):
@@ -1007,13 +1032,17 @@ class LoRA_LyCORIS_Krea2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
         """Krea-2 LoRAs have keys like transformer.text_fusion.* / transformer.transformer_blocks.* with
-        a lora_A/lora_B (or lora_down/lora_up) suffix. The text-fusion stage is unique to Krea-2."""
+        a lora_A/lora_B (or lora_down/lora_up) suffix, or a LyCORIS LoKr layer (lokr_w1 + lokr_w2).
+        The text-fusion stage is unique to Krea-2."""
         state_dict = mod.load_state_dict()
-        # Require a *complete* lora_A/B (or lora_down/up) pair, not merely any lora/dora suffix: a file with
-        # only ``dora_scale`` and no A/B weights would pass a suffix check but fail later on missing weights.
-        if not (_has_krea2_lora_keys(state_dict) and _has_complete_lora_pair(state_dict)):
+        # Require a *complete* lora_A/B (or lora_down/up) pair, or a complete LoKr layer (lokr_w1 + lokr_w2).
+        # A file with only ``dora_scale`` and no A/B weights or LoKr weights would pass a suffix check but
+        # fail later on missing weights.
+        has_standard_pair = _has_krea2_lora_keys(state_dict) and _has_complete_lora_pair(state_dict)
+        has_lokr_layer = _has_krea2_lora_keys(state_dict) and _has_complete_lokr_layer(state_dict)
+        if not (has_standard_pair or has_lokr_layer):
             raise NotAMatchError(
-                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B or lora_down/up pair)"
+                "model does not match Krea-2 LoRA heuristics (no complete lora_A/B, lora_down/up, or lokr_w1/w2 layer)"
             )
         # Reject a file with an orphaned LoRA half (a valid layer plus a dangling lora_A/B/down/up); it
         # would install here but fail later during LoRA conversion.
