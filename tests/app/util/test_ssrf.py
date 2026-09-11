@@ -228,12 +228,19 @@ def test_guarded_session_is_installed_for_both_schemes():
         assert adapter.poolmanager.pool_classes_by_scheme["https"] is ssrf._GuardedHTTPSConnectionPool
 
 
-def test_guarded_session_applies_socket_guard_to_explicit_proxy(loopback_server: int):
+@pytest.mark.parametrize(
+    "target_url",
+    [
+        pytest.param("http://example.com/internal", id="http-proxy-request"),
+        pytest.param("https://example.com/internal", id="https-connect-tunnel"),
+    ],
+)
+def test_guarded_session_applies_socket_guard_to_explicit_proxy(loopback_server: int, target_url: str):
     """An explicit proxy must not bypass the connected-peer address check."""
     session = build_guarded_session(proxy=f"http://127.0.0.1:{loopback_server}")
     try:
         with pytest.raises(Exception) as excinfo:
-            session.get("http://example.com/internal", timeout=5)
+            session.get(target_url, timeout=5)
         assert _unsafe_in_chain(excinfo.value)
     finally:
         session.close()
