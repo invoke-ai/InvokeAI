@@ -11,11 +11,13 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
@@ -40,6 +42,7 @@ from invokeai.app.services.model_install.model_install_common import (
 from invokeai.app.services.model_install.model_install_default import TMPDIR_PREFIX
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -994,6 +997,54 @@ def test_restore_paused_hf_install_preserves_access_token(
         assert captured["access_token"] == access_token
     finally:
         shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restart_failed_uses_parts_created_before_download_started(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(
+        source=source.url,
+        dest=tmp_path / "model.safetensors",
+        canonical_url="https://cdn.example.com/model.safetensors",
+        etag='"model-etag"',
+        expected_total_bytes=8,
+    )
+    download_job = MultiFileDownloadJob(id=123, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(id=99999, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+
+    monkeypatch.setattr(mm2_installer, "_multifile_download", lambda **_: download_job)
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+    mm2_installer._enqueue_remote_download(
+        job=job,
+        source=source,
+        remote_files=[remote_file],
+        metadata=None,
+        destdir=tmp_path,
+    )
+
+    part.resume_required = True
+    mm2_installer._download_cancelled_callback(download_job)
+
+    assert job.status == InstallStatus.PAUSED
+    assert job.model_dump(mode="json")["download_parts"][0]["resume_required"] is True
+    marker = mm2_installer._read_install_marker(tmp_path)
+    assert marker is not None
+    assert marker["files"][0]["etag"] == '"model-etag"'
+    assert marker["files"][0]["resume_required"] is True
+    submit_multifile_download.assert_called_once_with(download_job)
+
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    enqueue_remote_download = MagicMock()
+    monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
+    mm2_installer.restart_failed(job)
+
+    assert job.status == InstallStatus.WAITING
+    enqueue_remote_download.assert_called_once()
+    assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
 
 
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
