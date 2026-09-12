@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config, Main_GGUF_Krea2_Config
 from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     Qwen3VLEncoder_Checkpoint_Config,
+    Qwen3VLEncoder_GGUF_Config,
     Qwen3VLEncoder_Qwen3VLEncoder_Config,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _device_supports_fp8_storage
@@ -502,6 +503,45 @@ def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
             _put_unique_key(out, "language_model." + key, v, source=k, source_of=source_of, what=what)
     return out
 
+def _remap_qwen3_text_gguf_keys(sd: dict[str, Any]) -> dict[str, Any]:
+    """Map llama.cpp Qwen3 GGUF keys to the Transformers Qwen3 causal-LM layout."""
+    import re
+
+    key_map = {
+        "attn_q": "self_attn.q_proj",
+        "attn_k": "self_attn.k_proj",
+        "attn_v": "self_attn.v_proj",
+        "attn_output": "self_attn.o_proj",
+        "attn_q_norm": "self_attn.q_norm",
+        "attn_k_norm": "self_attn.k_norm",
+        "ffn_gate": "mlp.gate_proj",
+        "ffn_up": "mlp.up_proj",
+        "ffn_down": "mlp.down_proj",
+        "attn_norm": "input_layernorm",
+        "ffn_norm": "post_attention_layernorm",
+    }
+    out: dict[str, Any] = {}
+    block_pattern = re.compile(r"^blk\.(\d+)\.(.+)$")
+    for key, value in sd.items():
+        if not isinstance(key, str):
+            out[key] = value
+            continue
+        match = block_pattern.match(key)
+        if match:
+            layer_index, rest = match.groups()
+            component, _, suffix = rest.partition(".")
+            mapped_component = key_map.get(component, component)
+            target_key = f"model.layers.{layer_index}.{mapped_component}"
+            out[f"{target_key}.{suffix}" if suffix else target_key] = value
+        elif key == "token_embd.weight":
+            out["model.embed_tokens.weight"] = value
+        elif key == "output_norm.weight":
+            out["model.norm.weight"] = value
+        elif key == "output.weight":
+            out["lm_head.weight"] = value
+        else:
+            out[key] = value
+    return out
 
 def _reject_incomplete_load(model: Any, *, what: str) -> None:
     """Raise if a ``load_state_dict(strict=False)`` left required tensors on the meta device.
@@ -622,4 +662,109 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
                 f"(storage=float8_e4m3fn, compute={model_dtype})."
             )
 
+        return model
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.GGUFQuantized)
+class Qwen3VLEncoderGGUFLoader(ModelLoader):
+    """Loads a GGUF Qwen3-VL encoder whose keys already match Qwen3VLModel."""
+
+    DEFAULT_HF_REPO = Qwen3VLEncoderCheckpointLoader.DEFAULT_HF_REPO
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Qwen3VLEncoder_GGUF_Config):
+            raise ValueError("Only Qwen3VLEncoder_GGUF_Config models are supported here.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return Qwen3VLEncoderCheckpointLoader._load_tokenizer(self)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are supported. "
+            f"Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_text_encoder(self, config: Qwen3VLEncoder_GGUF_Config) -> AnyModel:
+        import torch
+        from transformers import Qwen3Config, Qwen3ForCausalLM
+
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
+        sd = _remap_qwen3_text_gguf_keys(gguf_sd_loader(Path(config.path), compute_dtype=model_dtype))
+
+        layer_indices = [
+            int(key.split(".")[2])
+            for key in sd
+            if key.startswith("model.layers.") and key.split(".")[2].isdigit()
+        ]
+        layer_count = max(layer_indices, default=-1) + 1
+        embed_weight = sd.get("model.embed_tokens.weight")
+        q_proj_weight = sd.get("model.layers.1.self_attn.q_proj.weight")
+        if q_proj_weight is None:
+            q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
+        k_proj_weight = sd.get("model.layers.1.self_attn.k_proj.weight")
+        if k_proj_weight is None:
+            k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
+        gate_proj_weight = sd.get("model.layers.1.mlp.gate_proj.weight")
+        if gate_proj_weight is None:
+            gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
+        if embed_weight is None or q_proj_weight is None or k_proj_weight is None or gate_proj_weight is None:
+            raise RuntimeError("Qwen3 GGUF encoder is missing required embedding, attention, or MLP tensors")
+
+        embed_shape = getattr(embed_weight, "shape", getattr(embed_weight, "tensor_shape", None))
+        q_shape = getattr(q_proj_weight, "shape", getattr(q_proj_weight, "tensor_shape", None))
+        k_shape = getattr(k_proj_weight, "shape", getattr(k_proj_weight, "tensor_shape", None))
+        gate_shape = getattr(gate_proj_weight, "shape", getattr(gate_proj_weight, "tensor_shape", None))
+        head_dim = 128
+        qwen_config = Qwen3Config(
+            vocab_size=embed_shape[0],
+            hidden_size=k_shape[1],
+            intermediate_size=gate_shape[0],
+            num_hidden_layers=layer_count,
+            num_attention_heads=q_shape[0] // head_dim,
+            num_key_value_heads=k_shape[0] // head_dim,
+            head_dim=head_dim,
+            max_position_embeddings=40960,
+            rms_norm_eps=1e-6,
+            tie_word_embeddings=True,
+            rope_theta=1000000.0,
+            use_sliding_window=False,
+            attention_bias=False,
+            attention_dropout=0.0,
+            torch_dtype=model_dtype,
+        )
+        with accelerate.init_empty_weights():
+            model = Qwen3ForCausalLM(qwen_config)
+
+        # Keep GGMLTensor projections quantized. The model cache replaces Linear modules with its
+        # GGUF-aware implementations and dequantizes these weights only for the active operation.
+        model.load_state_dict(sd, assign=True, strict=False)
+
+        # Embedding lookup cannot operate on a quantized GGMLTensor, so materialize this one weight.
+        from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+        embed_tokens_weight = model.model.embed_tokens.weight
+        if isinstance(embed_tokens_weight, GGMLTensor):
+            model.model.embed_tokens.weight = torch.nn.Parameter(
+                embed_tokens_weight.get_dequantized_tensor(), requires_grad=False
+            )
+        if model.lm_head.weight.is_meta:
+            model.lm_head.weight = model.model.embed_tokens.weight
+
+        for name, buffer in list(model.named_buffers()):
+            if not buffer.is_meta or not name.endswith("inv_freq"):
+                continue
+            parent_name, buffer_name = name.rsplit(".", 1)
+            parent = model.get_submodule(parent_name)
+            base = float(qwen_config.rope_theta)
+            head_dim = qwen_config.head_dim or qwen_config.hidden_size // qwen_config.num_attention_heads
+            inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
+            parent.register_buffer(buffer_name, inv_freq.to(model_dtype), persistent=False)
+
+        _reject_incomplete_load(model, what="Qwen3 text-only GGUF encoder")
         return model
