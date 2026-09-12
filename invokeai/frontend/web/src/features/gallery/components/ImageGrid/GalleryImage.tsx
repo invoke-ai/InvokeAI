@@ -17,7 +17,12 @@ import { dndInputFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
 import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/GalleryItemHoverIcons';
 import { selectSelectedBoardId, selectSelection } from 'features/gallery/store/gallerySelectors';
-import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import {
+  imageSelected,
+  imageToCompareChanged,
+  selectGallerySlice,
+  selectionChanged,
+} from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
 import { isVideoName } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -46,7 +51,7 @@ const buildOnClick =
     if (itemNames.length === 0) {
       // Without an ordered list we can still honor a plain single-click.
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
-        dispatch(selectionChanged([imageName]));
+        dispatch(imageSelected(imageName));
       }
       return;
     }
@@ -80,7 +85,12 @@ const buildOnClick =
         dispatch(selectionChanged(uniq(selection.concat(imageName))));
       }
     } else {
-      dispatch(selectionChanged([imageName]));
+      // A plain click is the user picking one item, where the modifier branches above mutate the
+      // multi-selection. The distinction is load-bearing: the gallery selection source reads
+      // `imageSelected` as a pick (so a repeat click on the active item reveals it over the
+      // progress overlay) but deliberately does not read `selectionChanged`, whose mutations only
+      // count when they move the active item.
+      dispatch(imageSelected(imageName));
     }
   };
 

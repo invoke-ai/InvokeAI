@@ -26,6 +26,17 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def exists(self, image_name: str) -> bool:
+        """Reports whether the image row is present, without reading it.
+
+        Separate from `get` because the callers that need this are deciding whether something is
+        gone, and `get` cannot answer that alone: it also deserializes, so a row written by a
+        newer version -- an enum value this one does not know -- fails the same way a missing row
+        does. A storage error still propagates, because "could not look" is not "not there".
+        """
+        pass
+
+    @abstractmethod
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata'."""
         pass
@@ -70,8 +81,18 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete_intermediates(self) -> list[tuple[str, str]]:
-        """Deletes all intermediate image records, returning a list of (image_name, image_subfolder) tuples."""
+    def get_intermediates(self) -> list[tuple[str, str]]:
+        """Gets all intermediate image records as (image_name, image_subfolder) tuples, without deleting them."""
+        pass
+
+    @abstractmethod
+    def delete_intermediates_by_names(self, image_names: list[str]) -> list[str]:
+        """Deletes the named image records, skipping any that are no longer intermediates.
+
+        Returns the names whose records this call actually removed. Names that were already gone, and
+        names whose records survive because they are no longer intermediates, are both excluded, so a
+        caller purges the files of exactly the returned names and touches nothing else.
+        """
         pass
 
     @abstractmethod

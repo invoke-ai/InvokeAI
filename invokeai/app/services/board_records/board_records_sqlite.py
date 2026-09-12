@@ -58,20 +58,23 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         self,
         board_id: str,
     ) -> BoardRecord:
+        # A sqlite3.Error is deliberately NOT translated into BoardRecordNotFoundException.
+        # Translating it made the exception mean "no such board, OR the database is
+        # locked/corrupt/unreadable", and callers cannot tell those apart: the batch routes
+        # decide board write access off this read once per name, and a not-found answer there is
+        # a benign skip. A disk error would therefore drop names out of the response silently,
+        # reported neither as moved nor as failed. Mirrors ImageRecordStorage.get.
         with self._db.transaction() as cursor:
-            try:
-                cursor.execute(
-                    """--sql
-                    SELECT *
-                    FROM boards
-                    WHERE board_id = ?;
-                    """,
-                    (board_id,),
-                )
+            cursor.execute(
+                """--sql
+                SELECT *
+                FROM boards
+                WHERE board_id = ?;
+                """,
+                (board_id,),
+            )
 
-                result = cast(Union[sqlite3.Row, None], cursor.fetchone())
-            except sqlite3.Error as e:
-                raise BoardRecordNotFoundException from e
+            result = cast(Union[sqlite3.Row, None], cursor.fetchone())
         if result is None:
             raise BoardRecordNotFoundException
         return BoardRecord(**dict(result))

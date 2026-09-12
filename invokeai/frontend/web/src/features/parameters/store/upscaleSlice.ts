@@ -3,6 +3,7 @@ import { createSelector, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject } from 'es-toolkit';
+import { logout } from 'features/auth/store/authSlice';
 import type { ImageWithDims } from 'features/controlLayers/store/types';
 import { zImageWithDims } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -79,6 +80,12 @@ const slice = createSlice({
     tileOverlapChanged: (state, action: PayloadAction<number>) => {
       state.tileOverlap = action.payload;
     },
+  },
+  extraReducers(builder) {
+    // See canvasSlice: the upscale initial image is the fourth place `getImageUsage` tracks
+    // image references, and it is personal workspace state besides — a deliberate sign-out
+    // clears it for the next account. `sessionExpiredLogout` is deliberately not handled.
+    builder.addCase(logout, () => getInitialState());
   },
 });
 

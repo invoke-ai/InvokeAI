@@ -41,6 +41,7 @@ def test_basic_queue_download(tmp_path: Path, mm2_session: Session) -> None:
 
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.download(
@@ -67,6 +68,7 @@ def test_basic_queue_download(tmp_path: Path, mm2_session: Session) -> None:
 def test_errors(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
 
@@ -99,7 +101,7 @@ def test_completed_resume_with_416_promotes_in_progress_file(tmp_path: Path) -> 
         TestAdapter(b"", status=416, headers={"Content-Range": f"bytes */{len(content)}"}),
     )
     completed_files: list[bool] = []
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = queue.download(
@@ -127,7 +129,7 @@ def test_headerless_416_falls_back_to_recorded_size(tmp_path: Path) -> None:
 
     session = TestSession()
     session.mount(str(source), TestAdapter(b"", status=416))
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = DownloadJob(source=source, dest=destination, expected_total_bytes=len(content))
@@ -150,7 +152,7 @@ def test_headerless_416_without_recorded_size_pauses(tmp_path: Path) -> None:
 
     session = TestSession()
     session.mount(str(source), TestAdapter(b"", status=416))
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = queue.download(source=source, dest=destination)
@@ -176,7 +178,7 @@ def test_mismatched_416_resume_keeps_in_progress_file(tmp_path: Path) -> None:
         str(source),
         TestAdapter(b"", status=416, headers={"Content-Range": "bytes */8"}),
     )
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = queue.download(source=source, dest=destination)
@@ -194,7 +196,7 @@ def test_mismatched_416_resume_keeps_in_progress_file(tmp_path: Path) -> None:
 def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
     event_bus = TestEventService()
 
-    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True, event_bus=event_bus)
     queue.start()
     queue.download(
         source=AnyHttpUrl("http://www.civitai.com/models/12345"),
@@ -230,6 +232,7 @@ def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
 def test_broken_callbacks(tmp_path: Path, mm2_session: Session, capsys) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
 
@@ -262,7 +265,7 @@ def test_broken_callbacks(tmp_path: Path, mm2_session: Session, capsys) -> None:
 def test_cancel(tmp_path: Path, mm2_session: Session) -> None:
     event_bus = TestEventService()
 
-    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True, event_bus=event_bus)
     queue.start()
 
     cancelled = False
@@ -303,6 +306,7 @@ def test_multifile_download(tmp_path: Path, mm2_session: Session) -> None:
 
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.multifile_download(
@@ -343,6 +347,7 @@ def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
 
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     files = metadata.download_urls(session=mm2_session)
@@ -369,7 +374,7 @@ def test_multifile_download_error(tmp_path: Path, mm2_session: Session) -> None:
 def test_multifile_cancel(tmp_path: Path, mm2_session: Session, monkeypatch: Any) -> None:
     event_bus = TestEventService()
 
-    queue = DownloadQueueService(requests_session=mm2_session, event_bus=event_bus)
+    queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True, event_bus=event_bus)
     queue.start()
 
     cancelled = False
@@ -400,6 +405,7 @@ def test_multifile_cancel(tmp_path: Path, mm2_session: Session, monkeypatch: Any
 def test_multifile_onefile(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.multifile_download(
@@ -424,6 +430,7 @@ def test_multifile_download_with_relative_dest(tmp_path: Path, mm2_session: Sess
     monkeypatch.chdir(tmp_path)
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
     queue.start()
     job = queue.multifile_download(
@@ -448,6 +455,7 @@ def test_multifile_download_with_relative_dest(tmp_path: Path, mm2_session: Sess
 def test_multifile_no_rel_paths(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
 
     with pytest.raises(ValueError) as error:
@@ -461,6 +469,7 @@ def test_multifile_no_rel_paths(tmp_path: Path, mm2_session: Session) -> None:
 def test_multifile_no_parent_traversal_paths(tmp_path: Path, mm2_session: Session) -> None:
     queue = DownloadQueueService(
         requests_session=mm2_session,
+        requests_session_is_trusted=True,
     )
 
     with pytest.raises(ValueError) as error:
@@ -488,7 +497,7 @@ def test_tokens(tmp_path: Path, mm2_session: Session):
     with clear_config():
         config = get_config()
         config.remote_api_tokens = [URLRegexTokenPair(url_regex="civitai", token="cv_12345")]
-        queue = DownloadQueueService(requests_session=mm2_session)
+        queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
         queue.start()
         # this one has an access token assigned
         job1 = queue.download(
@@ -520,6 +529,44 @@ def test_production_queue_uses_guarded_session_by_default() -> None:
         assert queue._requests.trust_env is True
     finally:
         queue._requests.close()
+
+
+def test_caller_supplied_session_requires_explicit_trust() -> None:
+    config = InvokeAIAppConfig(allow_private_download_urls=False)
+    session = Session()
+    try:
+        with pytest.raises(ValueError, match="requests_session_is_trusted=True"):
+            DownloadQueueService(
+                app_config=config,
+                requests_session=session,
+            )
+    finally:
+        session.close()
+
+
+def test_caller_supplied_guarded_session_does_not_require_attestation() -> None:
+    session = ssrf.build_guarded_session()
+    try:
+        queue = DownloadQueueService(
+            app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+            requests_session=session,
+        )
+        assert queue._requests is session
+    finally:
+        session.close()
+
+
+def test_caller_supplied_session_accepts_explicit_trust() -> None:
+    session = Session()
+    try:
+        queue = DownloadQueueService(
+            app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+            requests_session=session,
+            requests_session_is_trusted=True,
+        )
+        assert queue._requests is session
+    finally:
+        session.close()
 
 
 def test_production_queue_allows_explicit_private_download_opt_in() -> None:
@@ -580,7 +627,7 @@ def test_download_refuses_non_public_source(tmp_path: Path) -> None:
     session = TestSession()
     session.mount(str(source), TestAdapter(b"secret", status=200))
 
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = queue.download(source=source, dest=tmp_path)
@@ -604,7 +651,7 @@ def test_download_refuses_redirect_to_non_public_address(tmp_path: Path) -> None
     )
     session.mount("http://169.254.169.254/", TestAdapter(b"cloud-credentials", status=200))
 
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = queue.download(source=source, dest=tmp_path)
@@ -618,7 +665,7 @@ def test_download_refuses_redirect_to_non_public_address(tmp_path: Path) -> None
 
 
 def test_rejected_redirect_closes_streamed_response() -> None:
-    queue = DownloadQueueService(requests_session=TestSession())
+    queue = DownloadQueueService(requests_session=TestSession(), requests_session_is_trusted=True)
     response = Response()
     response.status_code = 302
     response.url = "https://public.example/redirect"
@@ -646,7 +693,7 @@ def test_download_refuses_multi_hop_redirect_to_non_public_address(tmp_path: Pat
         TestAdapter(b"", status=302, headers={"Location": "http://169.254.169.254/latest/meta-data/"}),
     )
 
-    queue = DownloadQueueService(requests_session=session)
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
     queue.start()
     try:
         job = queue.download(source=source, dest=tmp_path)

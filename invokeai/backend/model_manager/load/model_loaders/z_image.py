@@ -482,6 +482,21 @@ class ZImageCheckpointModel(ModelLoader):
             sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True)
+        # `assign=True` aliases every param to its `sd` tensor, so the dict keeps the whole model
+        # alive a second time. The FP8 cast below allocates the fp8 copy per param while the
+        # `model_dtype` original is still reachable through `sd`, pushing peak RAM to ~1.5x what
+        # `make_room()` reserved above (~17.4GB actual vs ~11.5GB reserved for Z-Image). Dropping
+        # the dict's references lets each original free as soon as its param is cast.
+        sd.clear()
+
+        # Every param is uniform `model_dtype` at this point, so the layerwise cast has a single
+        # unambiguous compute dtype to restore to.
+        #
+        # Caveat, pre-existing and not addressed here: for a ComfyUI *scaled*-fp8 checkpoint the
+        # filter above drops `.scale_weight` / `scaled_fp8` without folding them in, so the raw fp8
+        # codes are cast to `model_dtype` unscaled and the model loads with wrong weights. That is a
+        # separate bug in the key filtering, not something this cast makes safe.
+        model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 

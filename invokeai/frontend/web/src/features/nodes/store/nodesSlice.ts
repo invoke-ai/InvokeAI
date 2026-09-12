@@ -14,6 +14,7 @@ import { applyEdgeChanges, applyNodeChanges, getConnectedEdges, getIncomers, get
 import type { SliceConfig } from 'app/store/types';
 import { deepClone } from 'common/util/deepClone';
 import { isPlainObject } from 'es-toolkit';
+import { logout } from 'features/auth/store/authSlice';
 import {
   addElement,
   removeElement,
@@ -800,6 +801,15 @@ const slice = createSlice({
     },
     undo: (state) => state,
     redo: (state) => state,
+  },
+  extraReducers(builder) {
+    // See canvasSlice: a deliberate sign-out clears personal workspace state for whoever uses
+    // this browser next, and node image fields are one of the places deleted-image references
+    // live. `sessionExpiredLogout` is deliberately not handled — a timeout must not destroy an
+    // unsaved workflow. History: this slice sets no `clearHistoryType`, so redux-undo's default
+    // clear-history action empties the stack; the store's account-change reducer dispatches it
+    // alongside this reset.
+    builder.addCase(logout, () => getInitialState());
   },
 });
 

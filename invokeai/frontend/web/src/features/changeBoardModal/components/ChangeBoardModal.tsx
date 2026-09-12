@@ -1,11 +1,14 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, ConfirmationAlertDialog, Flex, FormControl, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { captureAuthContext, isSameAuthContext } from 'features/auth/store/authTokenRefresh';
 import {
+  canRetainFailedSelection,
   changeBoardReset,
+  imagesToChangeSelected,
   isModalOpenChanged,
   selectChangeBoardModalSlice,
   videosToChangeSelected,
@@ -37,6 +40,7 @@ const selectIsModalOpen = createSelector(
 const ChangeBoardModal = () => {
   useAssertSingleton('ChangeBoardModal');
   const dispatch = useAppDispatch();
+  const store = useAppStore();
   const currentBoardId = useAppSelector(selectSelectedBoardId);
   const currentUser = useAppSelector(selectCurrentUser);
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>();
@@ -85,16 +89,25 @@ const ChangeBoardModal = () => {
       return;
     }
 
-    if (imagesToChange.length) {
-      if (selectedBoardId === 'none') {
-        removeImagesFromBoard({ image_names: imagesToChange });
-      } else {
-        addImagesToBoard({
-          image_names: imagesToChange,
-          board_id: selectedBoardId,
-        });
-      }
-    }
+    const authContext = captureAuthContext();
+
+    // Awaited, not fired and forgotten. The batch routes report per-name failures in
+    // `failed_images`, and accepting this dialog resets the selection on the way out
+    // (ConfirmationAlertDialog calls acceptCallback then onClose) — so the names that did not
+    // move used to be dropped along with the ones that did, leaving nothing to retry from.
+    //
+    // Per-name failures and whole-request failures are toasted by the endpoint itself. What is
+    // left to do here is keep names that need a retry selected.
+    const operationId = selectChangeBoardModalSlice(store.getState()).operation_id;
+    const failedImageNamesPromise: Promise<string[]> = !imagesToChange.length
+      ? Promise.resolve([])
+      : (selectedBoardId === 'none'
+          ? removeImagesFromBoard({ image_names: imagesToChange })
+          : addImagesToBoard({ image_names: imagesToChange, board_id: selectedBoardId })
+        )
+          .unwrap()
+          .then((result) => result.failed_images)
+          .catch(() => imagesToChange);
 
     const videoMutations: { videoName: string; promise: Promise<unknown> }[] = [];
     if (videosToChange.length) {
@@ -112,21 +125,65 @@ const ChangeBoardModal = () => {
       }
     }
 
-    const results = await Promise.allSettled(videoMutations.map(({ promise }) => promise));
+    // Both kinds go out together: the video routes take one name at a time, and serializing
+    // them behind the image batch would leave a large move waiting on the other's round trips.
+    const [failedImageNames, results] = await Promise.all([
+      failedImageNamesPromise,
+      Promise.allSettled(videoMutations.map(({ promise }) => promise)),
+    ]);
     const failed = results.filter((result) => result.status === 'rejected');
-    if (failed.length === 0) {
+    const isSameSession = isSameAuthContext(authContext);
+
+    // Reported ahead of the ownership guard below, not behind it. Nothing else reports a move
+    // made from this dialog: the video board routes carry no `onQueryStarted` and no
+    // `matchRejected` listener, unlike the image batch routes, and the one other emitter of this
+    // toast id — `settleVideoBoardMutations`, on the drag-and-drop path — only ever settles the
+    // mutations it fired itself. So behind the guard, opening and cancelling any second dialog
+    // while this move was in flight would leave the user with no notice at all that it failed.
+    // The guard exists to keep a stale write out of a shared slice, not to decide who gets told
+    // about a request they themselves started. Only the session check applies here: the failure
+    // belongs to whoever started the move, so it is not raised at whoever holds the tab after a
+    // logout.
+    if (failed.length > 0 && isSameSession) {
+      toast({
+        id: 'VIDEOS_FAILED_TO_MOVE',
+        title: t('toast.videosFailedToMove', { count: failed.length }),
+        status: 'warning',
+      });
+    }
+
+    // Checked before *any* of the writes below, the reset included: all of them land after an
+    // unbounded await, and the reset is as capable of clearing a selection that now belongs to
+    // someone else as the retain is of overwriting it.
+    if (!canRetainFailedSelection(selectChangeBoardModalSlice(store.getState()), operationId, isSameSession)) {
+      return;
+    }
+    if (failed.length === 0 && failedImageNames.length === 0) {
       dispatch(changeBoardReset());
+      return;
+    }
+    // Cleared before either reopen below. `selectedBoardId` is component state that the accept
+    // does not reset, and `options` drops whichever board is currently being viewed — so move a
+    // large selection to B, click into B to watch it arrive, and the dialog reopens showing the
+    // "select a board" placeholder while still armed for B. Move would then send the retry to a
+    // target the dialog is not showing. What the combobox displays has to be what Move uses.
+    setSelectedBoardId(null);
+    // At most one of these fires: the two selections are mutually exclusive by construction —
+    // imagesToChangeSelected clears video_names and videosToChangeSelected clears image_names,
+    // and every caller opens this dialog through one of them. Reopen the dialog so retained
+    // failures are actionable instead of inert state after the accept close.
+    if (failedImageNames.length > 0) {
+      dispatch(imagesToChangeSelected(failedImageNames));
+      dispatch(isModalOpenChanged(true));
+    }
+    if (failed.length === 0) {
       return;
     }
     const failedVideoNames = results.flatMap((result, index) =>
       result.status === 'rejected' && videoMutations[index] ? [videoMutations[index].videoName] : []
     );
     dispatch(videosToChangeSelected(failedVideoNames));
-    toast({
-      id: 'VIDEOS_FAILED_TO_MOVE',
-      title: t('toast.videosFailedToMove', { count: failed.length }),
-      status: 'warning',
-    });
+    dispatch(isModalOpenChanged(true));
   }, [
     addImagesToBoard,
     addVideoToBoard,
@@ -135,6 +192,7 @@ const ChangeBoardModal = () => {
     removeImagesFromBoard,
     removeVideoFromBoard,
     selectedBoardId,
+    store,
     t,
     videosToChange,
   ]);
