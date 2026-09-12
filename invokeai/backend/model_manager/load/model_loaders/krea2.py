@@ -694,7 +694,7 @@ class Qwen3VLEncoderGGUFLoader(ModelLoader):
         from transformers import Qwen3Config, Qwen3ForCausalLM
 
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
         sd = _remap_qwen3_text_gguf_keys(gguf_sd_loader(Path(config.path), compute_dtype=model_dtype))
 
         layer_indices = [
