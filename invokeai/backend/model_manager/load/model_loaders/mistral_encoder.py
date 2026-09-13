@@ -339,7 +339,7 @@ def _warn_if_40_layer_mistral(variant: MistralVariantType, logger: Any) -> None:
         "If this is NOT BFL's canonical FLUX.2-dev/text_encoder, expect degraded "
         "prompt adherence — upstream Mistral 3.1 / 3.2 weights (GGUFs from "
         "unsloth, gguf-org, etc.) are not what FLUX.2's joint attention was "
-        "trained against. Recommended encoders: Comfy-Org bf16/fp8/fp4 or "
+        "trained against. Recommended encoders: Comfy-Org bf16/fp8 or "
         "gguf-org cow-mistral3-small quants (all 30-layer cow distillation)."
     )
 
