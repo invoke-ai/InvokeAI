@@ -191,8 +191,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                   dispatch(
                     zImageQwen3EncoderModelSelected({
                       key: qwen3Encoder.key,
+                      hash: qwen3Encoder.hash,
                       name: qwen3Encoder.name,
                       base: qwen3Encoder.base,
+                      type: qwen3Encoder.type,
                     })
                   );
                 }

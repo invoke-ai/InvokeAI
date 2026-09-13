@@ -800,7 +800,15 @@ describe('modelSelected listener - Z-Image VAE defaulting', () => {
     const encoderDispatch = dispatched.find(
       (a) => a.type === zImageQwen3EncoderModelSelected.type && a.payload !== null
     );
-    expect(encoderDispatch!.payload).toMatchObject({ key: mockZImageQwen3Encoder.key });
+    // The full identifier: the slot's reducer parses with zModelIdentifierField, which silently drops a
+    // payload without `hash` and `type` - the slot then stayed empty despite the dispatch.
+    expect(encoderDispatch!.payload).toEqual({
+      key: mockZImageQwen3Encoder.key,
+      hash: mockZImageQwen3Encoder.hash,
+      name: mockZImageQwen3Encoder.name,
+      base: mockZImageQwen3Encoder.base,
+      type: mockZImageQwen3Encoder.type,
+    });
   });
 
   it('should not default the Z-Image encoder slot when the 4B pool is empty', () => {
