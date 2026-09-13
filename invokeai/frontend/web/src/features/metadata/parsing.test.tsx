@@ -872,6 +872,21 @@ describe('ImageMetadataHandlers — Anima / Z-Image / FLUX.1 recall gating', () 
       ).rejects.toThrow();
     });
 
+    // Klein 9B's 8B encoder is 4096 wide; Z-Image's caption embedder takes 2560 and fails at the first
+    // denoise step (#9526). A workflow-built Z-Image image can still record one.
+    it('rejects Klein 9Bs 8B encoder', async () => {
+      currentBase = 'z-image';
+      nextResolved = largeEncoder('qwen3_8b');
+      const store = makeStore();
+
+      await expect(
+        ImageMetadataHandlers.ZImageQwen3EncoderModel.parse(
+          { model: fakeMain('z-image'), qwen3_encoder: nextResolved },
+          store
+        )
+      ).rejects.toThrow();
+    });
+
     // This handler recalls into the Z-Image slots (and nulls zImageQwen3SourceModel). Anima and FLUX.2
     // Klein write the same metadata field, so without the base gate they would clobber those slots.
     it.each(['anima', 'flux2'])('rejects when the current base is %s', async (base) => {

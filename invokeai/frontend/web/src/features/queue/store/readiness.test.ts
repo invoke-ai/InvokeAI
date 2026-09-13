@@ -294,6 +294,7 @@ const buildZImageTabArg = (overrides: {
   zImageVaeModel?: unknown;
   zImageQwen3EncoderModel?: unknown;
   zImageQwen3SourceModel?: unknown;
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
 }) => ({
   isConnected: true,
   model: overrides.model ?? zImageGgufModel,
@@ -306,6 +307,7 @@ const buildZImageTabArg = (overrides: {
   refImages: baseRefImages,
   loras: [],
   dynamicPrompts: baseDynamicPrompts,
+  zImageQwen3EncoderConfig: overrides.zImageQwen3EncoderConfig ?? null,
   hasFlux2DiffusersVaeSource: false,
   hasFlux2DiffusersQwen3Source: false,
   hasFlux2DevDiffusersSource: false,
@@ -317,6 +319,9 @@ const hasZImageVaeReason = (reasons: { content: string }[]) =>
 
 const hasZImageQwen3Reason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('noZImageQwen3EncoderSourceSelected'));
+
+const hasZImageQwen3IncompatibleReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('zImageQwen3EncoderIncompatible'));
 
 describe('Z-Image readiness checks – generate tab', () => {
   it('no errors when main model is a self-contained SDNQ pipeline (no component source selected)', () => {
@@ -345,6 +350,32 @@ describe('Z-Image readiness checks – generate tab', () => {
     );
     expect(hasZImageVaeReason(reasons)).toBe(true);
     expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  // A slot persisted before the picker was narrowed to 4B encoders can still hold Klein 9B's 8B encoder.
+  // The picker no longer shows it, so without this check the slot looks empty yet generation fails with a
+  // 4096 vs 2560 shape mismatch (#9526).
+  it('errors when the standalone encoder is an 8B encoder', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageGgufModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_8b' } as AnyModelConfig,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('does not error when the standalone encoder is a 4B encoder', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageGgufModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_4b' } as AnyModelConfig,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(false);
   });
 
   it('does not treat a non-pipeline SDNQ model (no submodels) as self-contained', () => {

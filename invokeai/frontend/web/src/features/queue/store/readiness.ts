@@ -58,6 +58,7 @@ import {
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isWanSingleFileMainModelConfig,
+  isZImageQwen3EncoderModelConfig,
 } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
@@ -120,6 +121,17 @@ const selectWanWiredConfigs = (state: RootState) => {
   };
 };
 
+/** Resolve the standalone Z-Image encoder slot to its installed config. Null when the slot is empty or
+ *  points at a deleted model. A slot persisted before the picker was narrowed to 4B encoders can still
+ *  hold Klein 9B's 8B encoder, which Z-Image cannot consume (#9526). */
+const selectZImageQwen3EncoderConfig = (state: RootState) => {
+  const { zImageQwen3EncoderModel } = selectParamsSlice(state);
+  const query = selectModelConfigsQuery(state);
+  return zImageQwen3EncoderModel && query.data
+    ? (modelConfigsAdapterSelectors.selectById(query.data, zImageQwen3EncoderModel.key) ?? null)
+    : null;
+};
+
 const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
   const {
     tab,
@@ -160,6 +172,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       hasFlux2DiffusersQwen3Source,
       hasFlux2DevDiffusersSource,
       wanWiredConfigs: selectWanWiredConfigs(store.getState()),
+      zImageQwen3EncoderConfig: selectZImageQwen3EncoderConfig(store.getState()),
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'canvas') {
@@ -188,6 +201,7 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       hasFlux2DiffusersQwen3Source,
       hasFlux2DevDiffusersSource,
       wanWiredConfigs: selectWanWiredConfigs(store.getState()),
+      zImageQwen3EncoderConfig: selectZImageQwen3EncoderConfig(store.getState()),
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'workflows') {
@@ -347,6 +361,8 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
+  /** Resolved config of the standalone Z-Image encoder slot - see `selectZImageQwen3EncoderConfig`. */
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
   hasFlux2DevDiffusersSource: boolean;
@@ -366,6 +382,7 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     refImages,
     loras,
     dynamicPrompts,
+    zImageQwen3EncoderConfig,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
     hasFlux2DevDiffusersSource,
@@ -522,6 +539,8 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
       const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      } else if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
+        reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
       }
     }
     // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
@@ -746,6 +765,8 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsRasterizing: boolean;
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
+  /** Resolved config of the standalone Z-Image encoder slot - see `selectZImageQwen3EncoderConfig`. */
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
   hasFlux2DiffusersVaeSource: boolean;
   hasFlux2DiffusersQwen3Source: boolean;
   hasFlux2DevDiffusersSource: boolean;
@@ -771,6 +792,7 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsRasterizing,
     canvasIsCompositing,
     canvasIsSelectingObject,
+    zImageQwen3EncoderConfig,
     hasFlux2DiffusersVaeSource,
     hasFlux2DiffusersQwen3Source,
     hasFlux2DevDiffusersSource,
@@ -1277,6 +1299,8 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      } else if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
+        reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
       }
     }
     // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
