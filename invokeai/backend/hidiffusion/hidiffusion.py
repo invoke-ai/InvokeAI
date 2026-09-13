@@ -1,6 +1,5 @@
 import importlib.resources
 import math
-import warnings
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import diffusers
@@ -191,20 +190,34 @@ def _get_raunet_step_range(module: torch.nn.Module, height: int, width: int) -> 
 
     At ordinary SDXL resolutions, upstream uses the extra (T2-position) modules first, then the
     primary (T1-position) modules. A manual T2 override replaces upstream's fixed 8/50 boundary so
-    that InvokeAI's explicit T2 control remains effective.
+    that InvokeAI's explicit T2 control remains effective. Phase boundaries are defined against the
+    full denoising schedule and clipped to the partial range executed by img2img or inpainting.
     """
     ratio = _get_resolution_aware_switching_threshold_ratio(module, height, width)
-    start = 0
-    end = int(module.max_timestep * ratio)
+    phase_start = 0.0
+    phase_end = ratio
 
     if _uses_aggressive_raunet(module, height, width):
         t2_override = module.info["switching_threshold_overrides"].get("T2_ratio")
         early_ratio = aggressive_step / 50 if t2_override is None else t2_override
-        early_end = int(module.max_timestep * early_ratio)
         if module.switching_threshold_ratio == "T1_ratio":
-            start = early_end
+            phase_start = early_ratio
         else:
-            end = early_end
+            phase_end = early_ratio
+
+    denoising_start = module.info.get("denoising_start", 0.0)
+    denoising_end = module.info.get("denoising_end", 1.0)
+    denoising_span = denoising_end - denoising_start
+    if denoising_span <= 0:
+        return ratio, 0, 0
+
+    # T1/T2 are positions in the full denoising schedule, while img2img and inpainting execute only
+    # [denoising_start, denoising_end]. Intersect the global RAU-Net phase with that executed range,
+    # then convert the result to indices in the shortened local timestep list.
+    local_start_ratio = max(0.0, min(1.0, (phase_start - denoising_start) / denoising_span))
+    local_end_ratio = max(0.0, min(1.0, (phase_end - denoising_start) / denoising_span))
+    start = int(module.max_timestep * local_start_ratio)
+    end = int(module.max_timestep * local_end_ratio)
 
     return ratio, start, end
 
@@ -1422,22 +1435,6 @@ def make_diffusers_transformer_block(
                 """
                 B, N, C = x.shape
                 x = x.view(B, H, W, C)
-                if H % 2 != 0 or W % 2 != 0:
-                    warnings.warn(
-                        f"HiDiffusion Warning: The feature size is {(H, W)} and cannot be directly partitioned into windows. We interpolate the size to {(window_size[0] * 2, window_size[1] * 2)} "
-                        f"to enable the window partition. Even though the generation is OK, the image quality would be largely decreased. "
-                        f"We suggest removing window attention by setting apply_hidiffusion(pipe, apply_window_attn=False) for better image quality.",
-                        stacklevel=2,
-                    )
-                    x = (
-                        F.interpolate(
-                            x.permute(0, 3, 1, 2).contiguous(),
-                            size=(window_size[0] * 2, window_size[1] * 2),
-                            mode="bicubic",
-                        )
-                        .permute(0, 2, 3, 1)
-                        .contiguous()
-                    )
                 if type(shift_size) is list or type(shift_size) is tuple:
                     if shift_size[0] > 0:
                         x = torch.roll(x, shifts=(-shift_size[0], -shift_size[1]), dims=(1, 2))
@@ -1471,12 +1468,6 @@ def make_diffusers_transformer_block(
                 else:
                     if shift_size > 0:
                         x = torch.roll(x, shifts=(shift_size, shift_size), dims=(1, 2))
-                if H % 2 != 0 or W % 2 != 0:
-                    x = (
-                        F.interpolate(x.permute(0, 3, 1, 2).contiguous(), size=(H, W), mode="bicubic")
-                        .permute(0, 2, 3, 1)
-                        .contiguous()
-                    )
                 x = x.view(B, H * W, C)
                 return x
 
@@ -1506,35 +1497,36 @@ def make_diffusers_transformer_block(
             if self.pos_embed is not None:
                 norm_hidden_states = self.pos_embed(norm_hidden_states)
 
-            # MSW-MSA
-            logical_step = self.info.get("step_index")
-            if logical_step is None or self.__dict__.get("_hidiffusion_window_shift_step") != logical_step:
-                if generator is not None:
-                    rand_num = torch.rand(1, generator=generator, device=generator.device)
-                else:
-                    rand_num = torch.rand(1)
-                self._hidiffusion_window_shift_step = logical_step
-                self._hidiffusion_window_shift_bucket = min(int(rand_num.item() * 4), 3)
-
-            shift_bucket = self._hidiffusion_window_shift_bucket
-
             B, N, C = hidden_states.shape
             ori_H, ori_W = self.info["size"]
             downsample_ratio = round(((ori_H * ori_W) / N) ** 0.5)
             H, W = (math.ceil(ori_H / downsample_ratio), math.ceil(ori_W / downsample_ratio))
-            widow_size = (math.ceil(H / 2), math.ceil(W / 2))
-            if shift_bucket == 0:
-                shift_size = (0, 0)
-            elif shift_bucket == 1:
-                shift_size = (widow_size[0] // 4, widow_size[1] // 4)
-            elif shift_bucket == 2:
-                shift_size = (widow_size[0] // 4 * 2, widow_size[1] // 4 * 2)
-            else:
-                shift_size = (widow_size[0] // 4 * 3, widow_size[1] // 4 * 3)
-            norm_hidden_states = window_partition(norm_hidden_states, widow_size, shift_size, H, W)
             # 2. Prepare GLIGEN inputs
             cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
             gligen_kwargs = cross_attention_kwargs.pop("gligen", None)
+
+            use_window_attention = H % 2 == 0 and W % 2 == 0
+            if use_window_attention:
+                logical_step = self.info.get("step_index")
+                if logical_step is None or self.__dict__.get("_hidiffusion_window_shift_step") != logical_step:
+                    if generator is not None:
+                        rand_num = torch.rand(1, generator=generator, device=generator.device)
+                    else:
+                        rand_num = torch.rand(1)
+                    self._hidiffusion_window_shift_step = logical_step
+                    self._hidiffusion_window_shift_bucket = min(int(rand_num.item() * 4), 3)
+
+                shift_bucket = self._hidiffusion_window_shift_bucket
+                window_size = (H // 2, W // 2)
+                if shift_bucket == 0:
+                    shift_size = (0, 0)
+                elif shift_bucket == 1:
+                    shift_size = (window_size[0] // 4, window_size[1] // 4)
+                elif shift_bucket == 2:
+                    shift_size = (window_size[0] // 4 * 2, window_size[1] // 4 * 2)
+                else:
+                    shift_size = (window_size[0] // 4 * 3, window_size[1] // 4 * 3)
+                norm_hidden_states = window_partition(norm_hidden_states, window_size, shift_size, H, W)
 
             attn_output = self.attn1(
                 norm_hidden_states,
@@ -1547,7 +1539,8 @@ def make_diffusers_transformer_block(
             elif self.use_ada_layer_norm_single:
                 attn_output = gate_msa * attn_output
 
-            attn_output = window_reverse(attn_output, widow_size, H, W, shift_size)
+            if use_window_attention:
+                attn_output = window_reverse(attn_output, window_size, H, W, shift_size)
 
             hidden_states = attn_output + hidden_states
             if hidden_states.ndim == 4:
@@ -2002,6 +1995,8 @@ def apply_hidiffusion(
     t1_ratio: float | None = None,
     t2_ratio: float | None = None,
     is_inpainting_task: bool | None = None,
+    denoising_start: float = 0.0,
+    denoising_end: float = 1.0,
 ):
     """
     model: diffusers model. We support SD 1.5, 2.1, XL, XL Turbo.
@@ -2088,6 +2083,8 @@ def apply_hidiffusion(
         "step_index": None,
         "pipeline": model,
         "switching_threshold_overrides": {"T1_ratio": t1_ratio, "T2_ratio": t2_ratio},
+        "denoising_start": denoising_start,
+        "denoising_end": denoising_end,
     }
     model.info = diffusion_model.info
     hook_diffusion_model(diffusion_model)

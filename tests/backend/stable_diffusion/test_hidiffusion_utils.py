@@ -49,7 +49,12 @@ class ModelMixin(torch.nn.Module):
 
 
 class WindowMeanAttention(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.last_sequence_length: int | None = None
+
     def forward(self, hidden_states: torch.Tensor, **_kwargs):
+        self.last_sequence_length = hidden_states.shape[1]
         return hidden_states.mean(dim=1, keepdim=True).expand_as(hidden_states)
 
 
@@ -166,6 +171,34 @@ def test_hidiffusion_window_attention_reuses_shift_within_logical_step():
         model.info["step_index"] = 1
         model.transformer(hidden_states)
         assert not torch.equal(generator.get_state(), generator_state_after_first_forward)
+
+
+def test_hidiffusion_window_attention_falls_back_to_global_attention_for_odd_feature_maps():
+    module_keys = {
+        "down_module_key": [],
+        "down_module_key_extra": [],
+        "up_module_key": [],
+        "up_module_key_extra": [],
+        "windown_attn_module_key": ["transformer"],
+    }
+    model = WindowAttentionModelMixin()
+    hidden_states = torch.arange(15, dtype=torch.float32).reshape(1, 15, 1)
+
+    with (
+        patch("invokeai.backend.hidiffusion.hidiffusion.sd15_hidiffusion_key", return_value=module_keys),
+        hidiffusion_patch(
+            model,
+            name_or_path="runwayml/stable-diffusion-v1-5",
+            apply_raunet=False,
+            apply_window_attn=True,
+            generator=torch.Generator(device="cpu").manual_seed(1234),
+        ),
+    ):
+        model.info["size"] = (5, 3)
+        output = model.transformer(hidden_states)
+
+        assert output.shape == hidden_states.shape
+        assert model.transformer.attn1.last_sequence_length == 15
 
 
 @pytest.mark.parametrize("is_text_to_image", [False, True])
@@ -447,11 +480,15 @@ def test_hidiffusion_patch_forwards_generation_context():
             model,
             name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
             is_inpainting_task=True,
+            denoising_start=0.25,
+            denoising_end=0.75,
         ):
             pass
 
     kwargs = mock_apply_hidiffusion.call_args.kwargs
     assert kwargs["is_inpainting_task"] is True
+    assert kwargs["denoising_start"] == pytest.approx(0.25)
+    assert kwargs["denoising_end"] == pytest.approx(0.75)
 
 
 @pytest.mark.parametrize(
@@ -531,6 +568,45 @@ def test_hidiffusion_raunet_schedule_matches_upstream_stages(
     assert _get_raunet_step_range(module, *size) == expected
 
 
+@pytest.mark.parametrize(
+    ("threshold", "is_inpainting", "denoising_start", "denoising_end", "max_timestep", "expected"),
+    [
+        ("T1_ratio", True, 0.5, 1.0, 25, (0.4, 0, 0)),
+        ("T1_ratio", False, 0.5, 1.0, 25, (0.4, 0, 0)),
+        ("T2_ratio", False, 0.5, 1.0, 25, (0.0, 0, 0)),
+        ("T1_ratio", True, 0.2, 1.0, 40, (0.4, 0, 10)),
+        ("T1_ratio", False, 0.2, 1.0, 40, (0.4, 0, 10)),
+        ("T2_ratio", False, 0.2, 1.0, 40, (0.0, 0, 0)),
+        ("T1_ratio", True, 0.1, 0.2, 5, (0.4, 0, 5)),
+        ("T1_ratio", False, 0.0, 0.1, 5, (0.4, 5, 5)),
+        ("T2_ratio", False, 0.0, 0.1, 5, (0.0, 0, 5)),
+    ],
+)
+def test_hidiffusion_raunet_schedule_is_clipped_to_partial_denoising_range(
+    threshold: str,
+    is_inpainting: bool,
+    denoising_start: float,
+    denoising_end: float,
+    max_timestep: int,
+    expected: tuple[float, int, int],
+):
+    module = SimpleNamespace(
+        model="sdxl",
+        max_timestep=max_timestep,
+        switching_threshold_ratio=threshold,
+        info={
+            "switching_threshold_overrides": {"T1_ratio": None, "T2_ratio": None},
+            "text_to_img_controlnet": False,
+            "is_inpainting_task": is_inpainting,
+            "is_playground": False,
+            "denoising_start": denoising_start,
+            "denoising_end": denoising_end,
+        },
+    )
+
+    assert _get_raunet_step_range(module, 256, 256) == expected
+
+
 @pytest.mark.parametrize("t1_override", [None, 0.4])
 def test_hidiffusion_rejects_t2_above_the_resolved_t1(t1_override: float | None):
     module = SimpleNamespace(
@@ -589,6 +665,22 @@ def test_hidiffusion_extension_sets_logical_step_on_patched_unet():
     extension.set_step_index(ctx)
 
     assert unet.info["step_index"] == 3
+
+
+def test_hidiffusion_extension_forwards_partial_denoising_range():
+    extension = HiDiffusionExt(
+        name_or_path="runwayml/stable-diffusion-v1-5",
+        denoising_start=0.5,
+        denoising_end=0.9,
+    )
+
+    with patch("invokeai.backend.stable_diffusion.extensions.hidiffusion.hidiffusion_patch") as mock_patch:
+        with extension.patch_unet(MagicMock(), MagicMock()):
+            pass
+
+    kwargs = mock_patch.call_args.kwargs
+    assert kwargs["denoising_start"] == pytest.approx(0.5)
+    assert kwargs["denoising_end"] == pytest.approx(0.9)
 
 
 def test_t2i_adapter_residual_is_resized_for_active_raunet():

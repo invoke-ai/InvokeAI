@@ -35,7 +35,9 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 
 - **HiDiffusion: T2 Ratio**: Manually controls the end of the additional early RAU-Net stage. For ordinary SDXL generation, this also controls when the primary stage begins. When automatic ratios are enabled, the original implementation uses a fixed `8 / 50` boundary for this early stage at the 2048 preset. Excessive manual values can reduce pose and background diversity or introduce artifacts. T2 cannot exceed T1 and does not control window attention.
 
-The T1/T2 input names are retained for API compatibility with the upstream implementation's code keys. T2 is the earlier boundary and T1 is the later boundary; do not interpret the names as chronological order. With automatic ratios at the SDXL 2048 preset, the additional stage runs for the first 8 of every 50 denoising steps, the primary stage then runs until T1, and the ordinary UNet is used afterward. Inpainting follows the upstream non-aggressive schedule: its primary stage starts at the first denoising step.
+The T1/T2 input names are retained for API compatibility with the upstream implementation's code keys. T2 is the earlier boundary and T1 is the later boundary; do not interpret the names as chronological order. With automatic ratios at the SDXL 2048 preset, the additional stage runs for the first 8 of every 50 denoising steps, the primary stage then runs until T1, and the ordinary UNet is used afterward. Inpainting follows the upstream non-aggressive schedule and does not use the additional early stage.
+
+For img2img and inpainting, these phases retain their positions in the full denoising schedule. InvokeAI clips them to the portion selected by denoising strength instead of restarting HiDiffusion at the first remaining step. If denoising begins after T1, RAU-Net is not applied.
 
 ### Manual ratio constraint
 
@@ -48,5 +50,6 @@ The UI limits the maximum T2 value to the current T1 value. If T1 is reduced bel
 - Start around **1536–2048 px** for SDXL. Automatic ratios do not interpolate: the upstream 4096 preset is selected only when both image dimensions reach 4096 px (512 latent pixels). Test intermediate and non-square sizes explicitly before increasing either ratio manually.
 - Ordinary SDXL generation uses the upstream staged schedule: the additional RAU-Net path is active first, the primary path takes over at the early boundary, and the ordinary UNet takes over at T1. Inpainting does not use the initial aggressive stage.
 - HiDiffusion is applied only to the SDXL base denoise stage, not the optional refiner stage.
+- Window Attention falls back to ordinary global attention when a feature-map dimension cannot be divided into its 2x2 window layout. This avoids detail loss from resizing the feature map solely for window partitioning.
 - If results look worse, disable **Window Attention** first, then RAU‑Net.
 - Effects vary by scheduler and model; compare with the same seed for a fair test.

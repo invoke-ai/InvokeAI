@@ -25,6 +25,8 @@ class HiDiffusionExt(ExtensionBase):
         has_controlnet: bool = False,
         is_controlnet_text_to_image: bool = False,
         is_inpainting_task: bool | None = None,
+        denoising_start: float = 0.0,
+        denoising_end: float = 1.0,
     ):
         super().__init__()
         self._name_or_path = name_or_path
@@ -33,6 +35,8 @@ class HiDiffusionExt(ExtensionBase):
         self._has_controlnet = has_controlnet
         self._is_controlnet_text_to_image = is_controlnet_text_to_image
         self._is_inpainting_task = is_inpainting_task
+        self._denoising_start = denoising_start
+        self._denoising_end = denoising_end
         self._t1_ratio = t1_ratio
         self._t2_ratio = t2_ratio
         self._generator = generator
@@ -56,5 +60,7 @@ class HiDiffusionExt(ExtensionBase):
             t2_ratio=self._t2_ratio,
             generator=self._generator,
             is_inpainting_task=self._is_inpainting_task,
+            denoising_start=self._denoising_start,
+            denoising_end=self._denoising_end,
         ):
             yield None
