@@ -79,6 +79,41 @@ describe('refreshed token acceptance', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(dispatch).toHaveBeenCalledWith(tokenRefreshed(refreshedToken));
   });
+
+  it('keeps a same-epoch replacement inside the routine refresh throttle window', async () => {
+    const requestToken = tokenFor(1, 1);
+    const refreshedToken = tokenFor(2, 1);
+    localStorage.setItem('auth_token', requestToken);
+    markTokenRefreshAccepted();
+
+    const dispatch = vi.fn();
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response('{}', {
+          headers: { 'content-type': 'application/json', 'X-Refreshed-Token': refreshedToken },
+        })
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await dynamicBaseQuery(
+      buildV1Url('images/i/example.png'),
+      {
+        dispatch,
+        getState: () => ({}),
+        signal: new AbortController().signal,
+        abort: () => {},
+        endpoint: 'getImageDTO',
+        type: 'query',
+        forced: false,
+        extra: undefined,
+      } as unknown as BaseQueryApi,
+      {}
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
 });
 
 describe('getCurrentUser', () => {
