@@ -64,9 +64,10 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, modelsApi, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
+  selectAnimaCompatibleVAEModels,
   selectAnimaQwen3EncoderModels,
   selectAnimaVAEModels,
-  selectFluxVAEModels,
+  selectFlux1VAEModels,
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
   selectQwen3VLEncoderModels,
@@ -178,7 +179,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             } else {
               // Fallback: try to set Qwen3 Encoder + VAE
               const availableQwen3Encoders = selectQwen3EncoderModels(state);
-              const availableFluxVAEs = selectFluxVAEModels(state);
+              // FLUX.1 VAEs only - the Z-Image VAE picker is built from `isFlux1VAEModelConfig` and
+              // Z-Image cannot use a FLUX.2 VAE, so a wider flux+flux2 pool would default the slot to
+              // a model the user can neither see in the picker nor generate with.
+              const availableFluxVAEs = selectFlux1VAEModels(state);
 
               if (availableQwen3Encoders.length > 0 && availableFluxVAEs.length > 0) {
                 const qwen3Encoder = availableQwen3Encoders[0];
@@ -226,11 +230,15 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
 
           if (!hasValidConfig) {
             const availableQwen3Encoders = selectAnimaQwen3EncoderModels(state);
-            const availableAnimaVAEs = selectAnimaVAEModels(state);
+            const availableAnimaVAEs = selectAnimaCompatibleVAEModels(state);
 
             if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
               const qwen3Encoder = availableQwen3Encoders[0];
-              const fluxVAE = availableAnimaVAEs[0];
+              // Prefer a native Anima VAE. The compatible pool also contains FLUX and 16-channel Wan
+              // VAEs, which the Anima loader accepts as a *fallback* - anima_l2i decodes a FLUX VAE on a
+              // different code path entirely. The pool is ordered by model name, so picking [0] blindly
+              // would hand a FLUX VAE the default whenever it happens to sort first.
+              const animaVAE = selectAnimaVAEModels(state)[0] ?? availableAnimaVAEs[0];
 
               if (qwen3Encoder && !animaQwen3EncoderModel) {
                 dispatch(
@@ -243,14 +251,14 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                   })
                 );
               }
-              if (fluxVAE && !animaVaeModel) {
+              if (animaVAE && !animaVaeModel) {
                 dispatch(
                   animaVaeModelSelected({
-                    key: fluxVAE.key,
-                    hash: fluxVAE.hash,
-                    name: fluxVAE.name,
-                    base: fluxVAE.base,
-                    type: fluxVAE.type,
+                    key: animaVAE.key,
+                    hash: animaVAE.hash,
+                    name: animaVAE.name,
+                    base: animaVAE.base,
+                    type: animaVAE.type,
                   })
                 );
               }

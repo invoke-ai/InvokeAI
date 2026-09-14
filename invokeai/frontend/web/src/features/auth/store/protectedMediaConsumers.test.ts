@@ -31,10 +31,11 @@ describe('protected media consumers', () => {
     expect(source).not.toContain(rawUsage);
   });
 
-  it('waits for media-cookie self-heal before opening the video metadata link', () => {
+  it('opens the video metadata link through the shared direct opener', () => {
     const source = readConsumer('../../gallery/components/ImageMetadataViewer/VideoMetadataViewer.tsx');
 
     expect(source).toContain('openMediaInNewTab');
+    expect(source).toContain("from 'common/util/openMediaInNewTab'");
     expect(source).not.toContain('href={video.video_url}');
     expect(source).not.toContain('href={videoUrl}');
   });

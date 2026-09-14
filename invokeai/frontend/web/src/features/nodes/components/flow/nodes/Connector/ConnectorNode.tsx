@@ -120,9 +120,15 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
           justifyContent="center"
           borderRadius="full"
           bg={selected ? 'base.650' : 'base.700'}
+          data-connector-node-body="true"
         >
           <Box className="connector-border" />
-          <Icon as={PiDotOutlineFill} boxSize={5} color={selected ? 'base.50' : 'base.100'} />
+          <Icon
+            as={PiDotOutlineFill}
+            boxSize={5}
+            color={selected ? 'base.50' : 'base.100'}
+            data-connector-node-icon="true"
+          />
         </Box>
         <Handle
           className={NO_DRAG_CLASS}

@@ -1,13 +1,15 @@
 import os
 import tempfile
 import threading
+from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Sequence, cast
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
@@ -64,6 +66,10 @@ class ImageMoveQueueActive(Exception):
     pass
 
 
+class UnreadableImageError(Exception):
+    pass
+
+
 class ImageMoveService:
     def __init__(
         self,
@@ -81,6 +87,9 @@ class ImageMoveService:
         self._future: Future | None = None
         self._future_operation: ImageMoveBackgroundOperation | None = None
         self._last_background_error: str | None = None
+        # Serializes the move service's relocate-and-repoint units against the image delete
+        # units in ImageService. See image_mutation_lock() for the interleaving it prevents.
+        self._image_mutation_lock = threading.RLock()
         self._invoker = None
         self._session_queue = None
 
@@ -100,6 +109,27 @@ class ImageMoveService:
 
     def stop(self, *args, **kwargs) -> None:
         self._executor.shutdown(wait=True, cancel_futures=False)
+
+    @contextmanager
+    def image_mutation_lock(self) -> Iterator[None]:
+        """Serializes image delete units against subfolder relocation units.
+
+        An image delete reads an image's subfolder, deletes its record, then purges its files
+        at that subfolder. A move unit does the opposite: it relocates the files and repoints
+        the record. If the two interleave, the delete purges the path its snapshot named while
+        the files sit at the new one — permanent orphans, unrecoverable because the record is
+        gone and a clean purge drops the journal (JPPhoto, PR #9361). ``ImageService`` holds
+        this lock across each of its delete units, and the move service holds it across each
+        plan-relocate-repoint cycle below, so neither can observe the other half-done.
+
+        It is a reentrant lock because both sides run their units to completion in one thread;
+        nothing inside a unit may block on another thread that needs this lock. It is also
+        process-local: two Invoke processes sharing one output folder and database are not
+        serialized by it — the same limitation the route guard has, which the delete journal's
+        startup recovery re-check papers over for deletes.
+        """
+        with self._image_mutation_lock:
+            yield
 
     def start_background_move_all(self) -> ImageMoveBackgroundStatus:
         return self._start_background_operation("move_all", self.move_all_images, require_idle_queue=True)
@@ -200,27 +230,35 @@ class ImageMoveService:
         errors = recovered.errors
 
         while True:
-            moves, plan_errors = self._plan_batch(
-                last_image_name=last_image_name, limit=100, record_missing_errors=True
-            )
-            errors += plan_errors
-            if not moves:
-                next_name = self._next_image_name(last_image_name)
-                if next_name is None:
-                    break
-                last_image_name = next_name
-                continue
+            # The whole batch cycle — plan, journal the job, relocate files, repoint the
+            # records — holds the image-mutation lock. A delete interleaved inside the cycle
+            # would purge the path its snapshot named while this job's relocate-and-repoint
+            # landed mid-flight, stranding files at the new subfolder with no record and no
+            # journal (JPPhoto, PR #9361). Planning and creating the job are inside the lock
+            # too, so an item whose record a delete removes is never planned in the first
+            # place instead of failing the job after the fact.
+            with self.image_mutation_lock():
+                moves, plan_errors = self._plan_batch(
+                    last_image_name=last_image_name, limit=100, record_missing_errors=True
+                )
+                errors += plan_errors
+                if not moves:
+                    next_name = self._next_image_name(last_image_name)
+                    if next_name is None:
+                        break
+                    last_image_name = next_name
+                    continue
 
-            job_id = self.create_move_job(moves)
-            planned += len(moves)
-            try:
-                self.perform_filesystem_moves(job_id)
-                self.commit_database_updates(job_id)
-                committed += len(moves)
-            except Exception as e:
-                errors += 1
-                self.record_job_error_message(job_id, str(e))
-                raise
+                job_id = self.create_move_job(moves)
+                planned += len(moves)
+                try:
+                    self.perform_filesystem_moves(job_id)
+                    committed += self.commit_database_updates(job_id)
+                    errors += self._count_job_errors(job_id)
+                except Exception as e:
+                    errors += 1
+                    self.record_job_error_message(job_id, str(e))
+                    raise
             last_image_name = moves[-1].image_name
 
         return ImageMoveResult(planned=planned, committed=committed, errors=errors)
@@ -240,16 +278,22 @@ class ImageMoveService:
         errors = 0
         for job_id in job_ids:
             try:
-                self.complete_partial_filesystem_moves(job_id)
-                self.cleanup_empty_source_dirs(job_id)
-                self.commit_database_updates(job_id)
-                committed += len(self._get_items(job_id))
+                # Same unit as a live batch: finishing an interrupted relocation must not
+                # interleave with a concurrent delete, which would otherwise purge the path
+                # its snapshot named while the files land at the new one (JPPhoto, PR #9361).
+                with self.image_mutation_lock():
+                    self.complete_partial_filesystem_moves(job_id)
+                    self.cleanup_empty_source_dirs(job_id)
+                    committed += self.commit_database_updates(job_id)
             except Exception as e:
-                errors += 1
                 if self._is_unrecoverable_error(e):
                     self.mark_job_unrecoverable(job_id, str(e))
+                    errors += max(1, self._count_job_errors(job_id))
                 else:
+                    errors += 1
                     self.record_job_error_message(job_id, str(e))
+            else:
+                errors += self._count_job_errors(job_id)
         return ImageMoveResult(committed=committed, errors=errors)
 
     def plan_batch(self, last_image_name: str, limit: int) -> list[PlannedImageMove]:
@@ -463,66 +507,104 @@ class ImageMoveService:
         self._set_job_state(job_id, "moved")
 
     def complete_partial_filesystem_moves(self, job_id: int) -> None:
-        items = self._get_items(job_id)
+        items = self._get_items(job_id, include_terminal=False)
         if not items:
-            raise ValueError(f"Image move job {job_id} has no items")
+            if self._get_items(job_id):
+                return
+            raise RuntimeError(f"Image move job {job_id} has no items")
         for item in items:
-            old_path = self.image_files.get_path(item.image_name, image_subfolder=item.old_subfolder)
-            new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
-            old_thumbnail_path = self.image_files.get_path(
-                item.image_name, thumbnail=True, image_subfolder=item.old_subfolder
+            try:
+                self._complete_partial_filesystem_move(job_id, item)
+            except Exception as e:
+                if not self._is_unrecoverable_error(e):
+                    raise
+                self._reconcile_destination_subfolder(item)
+                self.mark_item_unrecoverable(job_id, item.image_name, f"{item.image_name}: {e}")
+                self._logger.error("Image move skipped unrecoverable item %s: %s", item.image_name, e)
+
+    def _complete_partial_filesystem_move(self, job_id: int, item: PlannedImageMove) -> None:
+        old_path = self.image_files.get_path(item.image_name, image_subfolder=item.old_subfolder)
+        new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
+        old_thumbnail_path = self.image_files.get_path(
+            item.image_name, thumbnail=True, image_subfolder=item.old_subfolder
+        )
+        new_thumbnail_path = self.image_files.get_path(
+            item.image_name, thumbnail=True, image_subfolder=item.new_subfolder
+        )
+        old_exists = old_path.exists()
+        new_exists = new_path.exists()
+        if old_exists and new_exists:
+            raise RuntimeError(f"Both old and new image files exist for {item.image_name}")
+        if not old_exists and not new_exists:
+            if item.is_intermediate:
+                self._mark_missing_intermediate_moved(
+                    job_id=job_id,
+                    image_name=item.image_name,
+                    old_path=old_path,
+                    new_path=new_path,
+                    old_thumbnail_path=old_thumbnail_path,
+                    new_thumbnail_path=new_thumbnail_path,
+                )
+                return
+            raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
+
+        old_thumbnail_exists = old_thumbnail_path.exists()
+        new_thumbnail_exists = new_thumbnail_path.exists()
+        if (
+            old_exists
+            and not new_exists
+            and (
+                (not old_thumbnail_exists and not new_thumbnail_exists)
+                or (old_thumbnail_exists and new_thumbnail_exists)
             )
-            new_thumbnail_path = self.image_files.get_path(
-                item.image_name, thumbnail=True, image_subfolder=item.new_subfolder
+        ):
+            # Generate the thumbnail while the source is still available. If this fails,
+            # leave the source untouched so transient failures can be retried and corrupt
+            # images can be repaired or removed by the operator.
+            self._regenerate_thumbnail(old_path, new_thumbnail_path)
+
+        if not old_exists and new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
+            self._regenerate_thumbnail(new_path, new_thumbnail_path)
+
+        if old_exists:
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(old_path, new_path)
+            self._fsync_file(new_path)
+            self._fsync_dir(new_path.parent)
+            self._fsync_dir(old_path.parent)
+
+        old_thumbnail_exists = old_thumbnail_path.exists()
+        new_thumbnail_exists = new_thumbnail_path.exists()
+        if old_thumbnail_exists and new_thumbnail_exists:
+            old_thumbnail_path.unlink()
+            self._fsync_dir(old_thumbnail_path.parent)
+        elif old_thumbnail_exists and not new_thumbnail_exists:
+            new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(old_thumbnail_path, new_thumbnail_path)
+            self._fsync_file(new_thumbnail_path)
+            self._fsync_dir(new_thumbnail_path.parent)
+            self._fsync_dir(old_thumbnail_path.parent)
+        elif not new_thumbnail_exists:
+            self._regenerate_thumbnail(new_path, new_thumbnail_path)
+
+        self.image_files.evict_cache_paths([old_path, new_path, old_thumbnail_path, new_thumbnail_path])
+        self.mark_item_moved(job_id, item.image_name)
+
+    def _reconcile_destination_subfolder(self, item: PlannedImageMove) -> None:
+        old_path = self.image_files.get_path(item.image_name, image_subfolder=item.old_subfolder)
+        new_path = self.image_files.get_path(item.image_name, image_subfolder=item.new_subfolder)
+        if old_path.exists() or not new_path.exists():
+            return
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE images
+                SET image_subfolder = ?
+                WHERE image_name = ?
+                  AND image_subfolder = ?;
+                """,
+                (item.new_subfolder, item.image_name, item.old_subfolder),
             )
-            old_exists = old_path.exists()
-            new_exists = new_path.exists()
-            if old_exists and new_exists:
-                raise RuntimeError(f"Both old and new image files exist for {item.image_name}")
-            if not old_exists and not new_exists:
-                if item.is_intermediate:
-                    self._mark_missing_intermediate_moved(
-                        job_id=job_id,
-                        image_name=item.image_name,
-                        old_path=old_path,
-                        new_path=new_path,
-                        old_thumbnail_path=old_thumbnail_path,
-                        new_thumbnail_path=new_thumbnail_path,
-                    )
-                    continue
-                raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
-
-            old_thumbnail_exists = old_thumbnail_path.exists()
-            new_thumbnail_exists = new_thumbnail_path.exists()
-            if old_exists and not new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
-                # Generate the thumbnail while the source is still available. If this fails,
-                # leave the source untouched so recovery can retry the complete operation.
-                self._regenerate_thumbnail(old_path, new_thumbnail_path)
-
-            if old_exists:
-                new_path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(old_path, new_path)
-                self._fsync_file(new_path)
-                self._fsync_dir(new_path.parent)
-                self._fsync_dir(old_path.parent)
-
-            old_thumbnail_exists = old_thumbnail_path.exists()
-            new_thumbnail_exists = new_thumbnail_path.exists()
-            if old_thumbnail_exists and new_thumbnail_exists:
-                self._regenerate_thumbnail(new_path, new_thumbnail_path)
-                old_thumbnail_path.unlink()
-                self._fsync_dir(old_thumbnail_path.parent)
-            elif old_thumbnail_exists and not new_thumbnail_exists:
-                new_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(old_thumbnail_path, new_thumbnail_path)
-                self._fsync_file(new_thumbnail_path)
-                self._fsync_dir(new_thumbnail_path.parent)
-                self._fsync_dir(old_thumbnail_path.parent)
-            elif not new_thumbnail_exists:
-                self._regenerate_thumbnail(new_path, new_thumbnail_path)
-
-            self.image_files.evict_cache_paths([old_path, new_path, old_thumbnail_path, new_thumbnail_path])
-            self.mark_item_moved(job_id, item.image_name)
 
     def cleanup_empty_source_dirs(self, job_id: int) -> None:
         for item in self._get_items(job_id):
@@ -535,7 +617,7 @@ class ImageMoveService:
                 self.image_files.thumbnail_root,
             )
 
-    def commit_database_updates(self, job_id: int) -> None:
+    def commit_database_updates(self, job_id: int) -> int:
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
@@ -567,6 +649,7 @@ class ImageMoveService:
                 FROM image_subfolder_move_items AS item
                 LEFT JOIN images ON images.image_name = item.image_name
                 WHERE item.job_id = ?
+                  AND item.state = 'moved'
                   AND (
                     images.image_name IS NULL
                     OR images.deleted_at IS NOT NULL
@@ -579,13 +662,44 @@ class ImageMoveService:
             if invalid_count:
                 raise RuntimeError(f"Image move job {job_id} failed commit validation")
             cursor.execute(
-                "UPDATE image_subfolder_move_items SET state = 'committed' WHERE job_id = ?;",
+                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE job_id = ? AND state = 'moved';",
                 (job_id,),
             )
+            moved_count = cast(int, cursor.fetchone()[0])
             cursor.execute(
-                "UPDATE image_subfolder_move_jobs SET state = 'committed', error_message = NULL WHERE id = ?;",
+                """--sql
+                SELECT error_message
+                FROM image_subfolder_move_items
+                WHERE job_id = ? AND state = 'error'
+                ORDER BY image_name;
+                """,
                 (job_id,),
             )
+            error_rows = cursor.fetchall()
+            error_messages = [cast(str, row[0]) for row in error_rows if row[0]]
+            cursor.execute(
+                "UPDATE image_subfolder_move_items SET state = 'committed' WHERE job_id = ? AND state = 'moved';",
+                (job_id,),
+            )
+            if not error_rows:
+                cursor.execute(
+                    "UPDATE image_subfolder_move_jobs SET state = 'committed', error_message = NULL WHERE id = ?;",
+                    (job_id,),
+                )
+            else:
+                cursor.execute(
+                    "UPDATE image_subfolder_move_jobs SET state = 'error', error_message = ? WHERE id = ?;",
+                    ("\n".join(error_messages) or "One or more image move items could not be completed", job_id),
+                )
+        return moved_count
+
+    def _count_job_errors(self, job_id: int) -> int:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE job_id = ? AND state = 'error';",
+                (job_id,),
+            )
+            return cast(int, cursor.fetchone()[0])
 
     def mark_item_moved(self, job_id: int, image_name: str) -> None:
         with self._db.transaction() as cursor:
@@ -599,6 +713,17 @@ class ImageMoveService:
             cursor.execute(
                 "UPDATE image_subfolder_move_jobs SET error_message = ? WHERE id = ?;",
                 (message, job_id),
+            )
+
+    def mark_item_unrecoverable(self, job_id: int, image_name: str, message: str) -> None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                UPDATE image_subfolder_move_items
+                SET state = 'error', error_message = ?
+                WHERE job_id = ? AND image_name = ?;
+                """,
+                (message, job_id, image_name),
             )
 
     def mark_job_unrecoverable(self, job_id: int, message: str) -> None:
@@ -657,17 +782,18 @@ class ImageMoveService:
             return f"{timestamp.year}/{timestamp.month:02d}/{timestamp.day:02d}"
         raise ValueError(f"Unknown image subfolder strategy: {strategy}")
 
-    def _get_items(self, job_id: int) -> list[PlannedImageMove]:
+    def _get_items(self, job_id: int, include_terminal: bool = True) -> list[PlannedImageMove]:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+            query = """--sql
                 SELECT image_name, old_subfolder, new_subfolder, is_intermediate
                 FROM image_subfolder_move_items
                 WHERE job_id = ?
-                ORDER BY image_name;
-                """,
-                (job_id,),
-            )
+            """
+            params: tuple[object, ...] = (job_id,)
+            if not include_terminal:
+                query += " AND state NOT IN ('committed', 'error')"
+            query += " ORDER BY image_name;"
+            cursor.execute(query, params)
             rows = cursor.fetchall()
         return [
             PlannedImageMove(
@@ -737,20 +863,23 @@ class ImageMoveService:
 
     def _regenerate_thumbnail(self, image_path: Path, thumbnail_path: Path) -> None:
         thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(image_path) as image:
-            thumbnail = make_thumbnail(image)
-            with tempfile.NamedTemporaryFile(
-                dir=thumbnail_path.parent, prefix=f".{thumbnail_path.name}.", suffix=".tmp", delete=False
-            ) as temp_file:
-                temp_path = Path(temp_file.name)
-            try:
-                thumbnail.save(temp_path, format="WEBP")
-                self._fsync_file(temp_path)
-                os.replace(temp_path, thumbnail_path)
-                self._fsync_file(thumbnail_path)
-                self._fsync_dir(thumbnail_path.parent)
-            finally:
-                temp_path.unlink(missing_ok=True)
+        try:
+            with Image.open(image_path) as image:
+                thumbnail = make_thumbnail(image)
+        except (UnidentifiedImageError, Image.DecompressionBombError, OSError) as e:
+            raise UnreadableImageError(f"Unable to decode image {image_path}: {e}") from e
+        with tempfile.NamedTemporaryFile(
+            dir=thumbnail_path.parent, prefix=f".{thumbnail_path.name}.", suffix=".tmp", delete=False
+        ) as temp_file:
+            temp_path = Path(temp_file.name)
+        try:
+            thumbnail.save(temp_path, format="WEBP")
+            self._fsync_file(temp_path)
+            os.replace(temp_path, thumbnail_path)
+            self._fsync_file(thumbnail_path)
+            self._fsync_dir(thumbnail_path.parent)
+        finally:
+            temp_path.unlink(missing_ok=True)
 
     def _mark_missing_intermediate_moved(
         self,
@@ -816,6 +945,8 @@ class ImageMoveService:
                 self._logger.debug("Unable to close directory fsync handle: %s: %s", path, e)
 
     def _is_unrecoverable_error(self, error: Exception) -> bool:
+        if isinstance(error, UnreadableImageError):
+            return True
         return isinstance(error, RuntimeError) and (
             str(error).startswith("Both old and new image files exist")
             or str(error).startswith("Neither old nor new image file exists")

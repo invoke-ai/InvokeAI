@@ -20,8 +20,15 @@ class BoardImageRecordStorageBase(ABC):
     def remove_image_from_board(
         self,
         image_name: str,
-    ) -> None:
-        """Removes an image from a board."""
+        board_id: str,
+    ) -> int:
+        """Removes an image from the given board. Returns the number of rows removed.
+
+        Scoped to a board on purpose: callers authorize against the board the image is on, and
+        that decision must not be applied to a different board if the image moves in between.
+        Zero rows means the scope did not hold — the image left the board between the caller's
+        read and this write — and the caller must not report a removal that did not happen.
+        """
         pass
 
     @abstractmethod

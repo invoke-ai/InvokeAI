@@ -48,9 +48,10 @@ const VideoFieldInputComponent = (props: FieldComponentProps<VideoFieldInputInst
     [field.name, nodeId]
   );
 
-  // If the referenced video was deleted while disconnected, drop the stale reference once
-  // we reconnect. Only a confirmed 404 means the video is gone — transient network, auth
-  // (401/403), or server (5xx) failures must not silently clear the user's input.
+  // If the referenced video was deleted while disconnected, drop the stale reference once we
+  // reconnect. Only a confirmed 404 counts: a 403 is a permission decision that can be reversed
+  // — a board flipped back to Shared — and the video behind it still exists, while a transient
+  // network failure or a 5xx says nothing at all. See `isVideoMissingError`.
   useEffect(() => {
     if (isConnected && isVideoMissingError(error)) {
       handleReset();

@@ -370,6 +370,10 @@ class Krea2CheckpointModel(ModelLoader):
 
         model.load_state_dict(sd, assign=True, strict=False)
         _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
+        # `assign=True` aliases every param to its `sd` tensor. Drop the dict's references before
+        # the FP8 cast, or each param's `model_dtype` original stays reachable while its fp8 copy is
+        # allocated, overshooting the `make_room()` reservation above by ~50%.
+        sd.clear()
         # Honor the fp8-storage setting (re-quantizes the dequantized weights to fp8-resident on CUDA).
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model

@@ -23,7 +23,7 @@ vi.mock('features/toast/toast', () => ({
 // Expose the built handlers and the completed-invocation tracking map that setEventListeners
 // hands to both the coordinator and the gallery handler, so tests can assert routing: own events
 // reach the own handler via the coordinator, foreign events reach only the foreign handler.
-const mockOnInvocationComplete = vi.fn();
+const mockOnInvocationComplete = Object.assign(vi.fn(), { dispose: vi.fn() });
 const mockOnForeignInvocationComplete = vi.fn();
 let capturedCompletedInvocationKeys: Map<number, Set<string>> | null = null;
 vi.mock('./onInvocationComplete', () => ({
@@ -588,6 +588,26 @@ describe('setEventListeners cross-user isolation', () => {
  * queue_item_status_changed, so queue_items_canceled is the only signal that pending items left
  * the queue. Regression: an admin's cancel-all-except-current left other users' badges stale.
  */
+describe('setEventListeners teardown', () => {
+  it('hands back a disposer that ends the completion handler session', () => {
+    // The completion handler can hold refetches for outputs of *this* socket's session, and they
+    // dispatch into whatever store is current when they fire — the next user's, after a logout or
+    // account switch. Nothing else in this suite exercises the returned value.
+    const socket = createMockSocket();
+    const store = { dispatch: vi.fn(), getState: vi.fn(() => ({})) };
+
+    const dispose = setEventListeners({
+      socket: socket as never,
+      store: store as never,
+      setIsConnected: vi.fn(),
+    });
+
+    expect(mockOnInvocationComplete.dispose).not.toHaveBeenCalled();
+    dispose();
+    expect(mockOnInvocationComplete.dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('setEventListeners queue_items_canceled', () => {
   const setup = () => {
     const socket = createMockSocket();

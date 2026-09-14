@@ -73,8 +73,12 @@ const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 /**
  * Sets up event listeners for the socketio client. Some components will set up their own listeners. These are the ones
  * that have app-wide implications.
+ *
+ * Returns a disposer. It must be called when this socket goes away — a reconnect with new auth, a
+ * logout, an account switch — because the completion handler can hold pending refetches for outputs
+ * of *this* session, and they dispatch into whatever store is current when they fire.
  */
-export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg) => {
+export const setEventListeners = ({ socket, store, setIsConnected }: SetEventListenersArg): (() => void) => {
   const { dispatch, getState } = store;
 
   const completedInvocationKeysByItemId = new Map<number, Set<string>>();
@@ -1041,4 +1045,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.warn({ data } as JsonObject, 'LLM task error');
     clearLLMTaskState(data.task_id);
   });
+
+  return () => {
+    // Ends this socket's session for the completion handler: its queued refetches are dropped, and
+    // anything it already has in flight is barred from dispatching into whatever session replaces
+    // this one.
+    onInvocationComplete.dispose();
+  };
 };

@@ -23,8 +23,10 @@ import torch
 from invokeai.backend.model_manager.load.load_default import (
     _FP8_PROBE_FAILURE_REPORTED,
     _FP8_STORAGE_SUPPORTED,
+    _QUANTIZED_MODEL_FORMATS,
     ModelLoader,
     _device_supports_fp8_storage,
+    _model_declared_skip_patterns,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_linear import (
     CustomLinear,
@@ -32,7 +34,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
 def _make_loader(device: str = "cuda") -> ModelLoader:
@@ -57,12 +59,22 @@ def _make_config(model_type: ModelType, fp8: bool, base: BaseModelType = BaseMod
     )
 
 
+def _make_quantized_config(fmt: ModelFormat = ModelFormat.GGUFQuantized):
+    """A config carrying a quantized `format`, which `_make_config` deliberately omits."""
+    config = _make_config(ModelType.Main, fp8=True)
+    config.format = fmt
+    return config
+
+
 @pytest.mark.parametrize(
     "config,submodel",
     [
         (_make_config(ModelType.VAE, fp8=True), None),
         (_make_config(ModelType.LoRA, fp8=True), None),
-        (_make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage), None),
+        # Z-Image used to be listed here. It is no longer excluded — see
+        # `test_should_use_fp8_allows_z_image` for why the exclusion became obsolete.
+        # A quantized model takes its place: its guard must also sit ahead of the device probe.
+        (_make_quantized_config(), None),
         (_make_config(ModelType.Main, fp8=True), SubModelType.Tokenizer),
         (_make_config(ModelType.Main, fp8=False), None),
     ],
@@ -313,6 +325,173 @@ def test_apply_fp8_to_nn_module_skips_unsupported_layer_types():
     assert model.rms.scale.dtype == compute_dtype
 
 
+def test_apply_fp8_to_nn_module_honors_extra_skip_patterns():
+    """A model's own `_skip_layerwise_casting_patterns` must be applied on top of our defaults."""
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Linear(4, 4)
+            self.attn = torch.nn.Linear(4, 4)
+
+    storage_dtype = torch.float16
+    compute_dtype = torch.float32
+    model = _Model()
+    for p in model.parameters():
+        p.data = p.data.to(compute_dtype)
+
+    ModelLoader._apply_fp8_to_nn_module(
+        model, storage_dtype, compute_dtype, extra_skip_patterns=("t_embedder", "cap_embedder")
+    )
+
+    assert model.attn.weight.dtype == storage_dtype
+    assert model.t_embedder.weight.dtype == compute_dtype
+
+
+def test_apply_fp8_layerwise_casting_passes_model_declared_skip_patterns():
+    """Regression test for Z-Image + fp8 crashing with
+    `RuntimeError: "addmm_cuda" not implemented for 'Float8_e4m3fn'`.
+
+    Diffusers models declare precision-sensitive modules in `_skip_layerwise_casting_patterns`, and
+    `enable_layerwise_casting()` honors them. Our hook-based replacement must read that list too —
+    it is not redundant with `_FP8_DEFAULT_SKIP_PATTERNS`. `ZImageTransformer2DModel` declares
+    `['t_embedder', 'cap_embedder']` because `TimestepEmbedder.forward` reads
+    `self.mlp[0].weight.dtype` and casts its *input* to it: with an fp8 weight the input becomes
+    float8 before the pre-hook restores the weight, and `F.linear` has no float8 kernel.
+    """
+
+    class _FakeZImage(torch.nn.Module):
+        _skip_layerwise_casting_patterns = ["t_embedder", "cap_embedder"]
+
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 4))
+            self.cap_embedder = torch.nn.Linear(4, 4)
+            self.layers = torch.nn.Linear(4, 4)
+
+    loader = _make_loader(device="cuda")
+    model = _FakeZImage().to(torch.bfloat16)
+
+    with patch.object(ModelLoader, "_should_use_fp8", return_value=True):
+        loader._apply_fp8_layerwise_casting(model, _make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage))
+
+    # The declared modules keep their compute dtype...
+    assert model.t_embedder[0].weight.dtype == torch.bfloat16
+    assert model.cap_embedder.weight.dtype == torch.bfloat16
+    # ...while everything else is stored in fp8, so the toggle still saves VRAM.
+    assert model.layers.weight.dtype == torch.float8_e4m3fn
+
+
+def test_anima_transformer_declares_t_embedder_skip():
+    """Regression guard for Anima + FP8 rendering a heavily dithered image.
+
+    `AnimaTransformer.t_embedder` produces the `adaln_lora` conditioning consumed by every block,
+    so casting it to FP8 corrupts every token of every block — verified against a bf16 run at the
+    same seed/steps/CFG. None of the generic `_FP8_DEFAULT_SKIP_PATTERNS` match it (this
+    architecture doesn't use diffusers' module names), so the model has to declare it itself.
+    """
+    from invokeai.backend.anima.anima_transformer import AnimaTransformer
+
+    assert "t_embedder" in AnimaTransformer._skip_layerwise_casting_patterns
+
+    # And the declared patterns actually reach the cast, matched against dotted module paths.
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.t_embedder = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 4))
+            self.blocks = torch.nn.Linear(4, 4)
+
+    model = _Model().to(torch.float32)
+    ModelLoader._apply_fp8_to_nn_module(
+        model,
+        storage_dtype=torch.float16,
+        compute_dtype=torch.float32,
+        extra_skip_patterns=tuple(AnimaTransformer._skip_layerwise_casting_patterns),
+    )
+
+    assert model.t_embedder[0].weight.dtype == torch.float32
+    assert model.blocks.weight.dtype == torch.float16
+
+
+@pytest.mark.parametrize(
+    "fmt",
+    [
+        ModelFormat.GGUFQuantized,
+        ModelFormat.BnbQuantizednf4b,
+        ModelFormat.BnbQuantizedLlmInt8b,
+        ModelFormat.SDNQQuantized,
+    ],
+)
+def test_should_use_fp8_excludes_quantized_formats(fmt: ModelFormat):
+    """Already-quantized weights must never be re-encoded as FP8.
+
+    Casting them is not a no-op: GGUF raises `Operation changed the dtype of GGMLTensor
+    unexpectedly`, and bnb NF4 corrupts silently (`bnb.nn.LinearNF4` subclasses `nn.Linear`, so its
+    packed uint8 payload is cast to float8 and inference then returns finite garbage).
+
+    Parametrized over `ModelFormat` members rather than raw strings: `_QUANTIZED_MODEL_FORMATS`
+    holds strings, so testing it with strings would pass even if the enum values drifted.
+    """
+    loader = _make_loader(device="cuda")
+    config = _make_config(ModelType.Main, fp8=True)
+    config.format = fmt
+    assert loader._should_use_fp8(config) is False
+
+
+def test_quantized_format_set_matches_the_taxonomy():
+    """Every entry in `_QUANTIZED_MODEL_FORMATS` must still name a real `ModelFormat` value.
+
+    The set is declared as raw strings to keep `load_default` free of a taxonomy import at module
+    scope, so nothing else stops a rename in `ModelFormat` from silently disabling the check —
+    `config.format` would simply never match again, and FP8 would be re-enabled for that format.
+    """
+    assert _QUANTIZED_MODEL_FORMATS <= {fmt.value for fmt in ModelFormat}
+
+
+def test_apply_fp8_skips_quantized_params_regardless_of_format():
+    """Backstop behind the format check, for quantization the model's format does not reveal
+    (e.g. a `diffusers`-format checkpoint quantized by an external tool).
+
+    Both signals are covered: a non-floating-point payload (bnb's packed uint8) and a
+    `torch.Tensor` subclass (GGUF's `GGMLTensor`).
+    """
+
+    class _FakeQuantTensor(torch.Tensor):
+        """Stands in for GGMLTensor: a Tensor subclass carrying a quantized payload."""
+
+    class _Model(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.packed = torch.nn.Linear(4, 4, bias=False)  # bnb-style uint8 payload
+            self.subclassed = torch.nn.Linear(4, 4, bias=False)  # GGUF-style tensor subclass
+            # NB: not `normal` — that would be caught by the `norm` skip pattern.
+            self.attn = torch.nn.Linear(4, 4, bias=False)
+
+    model = _Model().to(torch.bfloat16)
+    model.packed.weight = torch.nn.Parameter(torch.zeros(8, 1, dtype=torch.uint8), requires_grad=False)
+    model.subclassed.weight = torch.nn.Parameter(
+        torch.zeros(4, 4, dtype=torch.bfloat16).as_subclass(_FakeQuantTensor), requires_grad=False
+    )
+
+    ModelLoader._apply_fp8_to_nn_module(model, torch.float8_e4m3fn, torch.bfloat16)
+
+    assert model.packed.weight.dtype == torch.uint8
+    assert not model.packed._forward_pre_hooks, "a quantized layer must not get cast hooks either"
+    assert model.subclassed.weight.dtype == torch.bfloat16
+    assert not model.subclassed._forward_pre_hooks
+    # Control: an ordinary layer in the same model is still cast.
+    assert model.attn.weight.dtype == torch.float8_e4m3fn
+
+
+def test_should_use_fp8_allows_z_image():
+    """Z-Image was excluded while we used diffusers' `enable_layerwise_casting()` with the global
+    torch dtype (fp16) as compute dtype, which clashed with the model's bf16 weights. The compute
+    dtype now comes from the model itself, so the exclusion is obsolete.
+    """
+    loader = _make_loader(device="cuda")
+    assert loader._should_use_fp8(_make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage)) is True
+
+
 def test_wrap_forward_reaches_custom_linear_after_apply_custom_layers():
     """Production order: `_load_model` applies FP8 wrapping, THEN `ModelCache.put()` calls
     `apply_custom_layers_to_model` which constructs a NEW `CustomLinear` object via
@@ -514,3 +693,58 @@ def test_device_supports_fp8_storage_is_cached_per_device():
     # xpu:1 has not been probed, so a failing probe there must be observed, not short-circuited.
     with patch("torch.zeros", side_effect=RuntimeError("no float8 on this device")):
         assert _device_supports_fp8_storage(torch.device("xpu", 1)) is False
+
+
+def test_model_declared_skip_patterns_unions_both_diffusers_attributes():
+    """`enable_layerwise_casting()` unions `_skip_layerwise_casting_patterns` with
+    `_keep_in_fp32_modules`. We replaced that call with our own hook-based path, so we have to read
+    both — otherwise a model that declares only the latter loses its exclusions silently.
+    """
+
+    class _Model(torch.nn.Module):
+        _skip_layerwise_casting_patterns = ["t_embedder"]
+        _keep_in_fp32_modules = ["time_embedder"]
+
+    assert _model_declared_skip_patterns(_Model()) == ("t_embedder", "time_embedder")
+
+
+def test_model_declared_skip_patterns_tolerates_missing_and_odd_declarations():
+    """Most models declare neither attribute; diffusers sets them to `None` on some. A bare string
+    is accepted too, so a subclass that writes one instead of a list isn't silently expanded into
+    per-character patterns."""
+
+    class _Bare(torch.nn.Module):
+        pass
+
+    class _Nulls(torch.nn.Module):
+        _skip_layerwise_casting_patterns = None
+        _keep_in_fp32_modules = None
+
+    class _Strings(torch.nn.Module):
+        _keep_in_fp32_modules = "time_embedder"
+
+    assert _model_declared_skip_patterns(_Bare()) == ()
+    assert _model_declared_skip_patterns(_Nulls()) == ()
+    assert _model_declared_skip_patterns(_Strings()) == ("time_embedder",)
+
+
+def test_keep_in_fp32_modules_are_not_cast():
+    """End-to-end through the cast: a module named only by `_keep_in_fp32_modules` keeps its
+    compute dtype."""
+
+    class _Model(torch.nn.Module):
+        _keep_in_fp32_modules = ["time_embedder"]
+
+        def __init__(self):
+            super().__init__()
+            self.time_embedder = torch.nn.Linear(4, 4)
+            self.attn = torch.nn.Linear(4, 4)
+
+    loader = _make_loader(device="cuda")
+    model = _Model().to(torch.bfloat16)
+
+    with patch.object(ModelLoader, "_should_use_fp8", return_value=True):
+        loader._apply_fp8_layerwise_casting(model, _make_config(ModelType.Main, fp8=True))
+
+    assert model.time_embedder.weight.dtype == torch.bfloat16
+    assert model.attn.weight.dtype == torch.float8_e4m3fn

@@ -352,14 +352,13 @@ export const {
   useDeleteUncategorizedVideosMutation,
 } = videosApi;
 
+export const { useGetVideoMetadataQuery, useGetVideoWorkflowQuery, useLazyGetVideoWorkflowQuery } = videosApi;
+
 /** @knipignore Reserved for follow-up phases (bulk delete / intermediate toggle / video-only views).
  * useDeleteVideoMutation is here because the only call site uses videosApi.endpoints.deleteVideo.initiate
  * via the delete-video modal, but a future bulk/multi-select flow may want the React hook form. */
 export const {
   useListVideosQuery,
-  useGetVideoMetadataQuery,
-  useGetVideoWorkflowQuery,
-  useLazyGetVideoWorkflowQuery,
   useGetVideoNamesQuery,
   useDeleteVideoMutation,
   useDeleteVideosMutation,

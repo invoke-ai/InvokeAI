@@ -37,16 +37,6 @@ export const waitForMediaCookieSelfHeal = (): Promise<void> => {
   });
 };
 
-export const openMediaInNewTab = (url: string) => {
-  const tab = window.open('about:blank', '_blank');
-  if (tab) {
-    tab.opener = null;
-  }
-  void waitForMediaCookieSelfHeal().then(() => {
-    tab?.location.replace(url);
-  });
-};
-
 export const abortAndWaitForPendingRefreshes = async (pending: Set<PendingRefresh>) => {
   for (const refresh of pending) {
     refresh.abort();
