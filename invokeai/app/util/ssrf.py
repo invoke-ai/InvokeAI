@@ -275,6 +275,21 @@ class SsrfGuardedAdapter(HTTPAdapter):
             "https": _GuardedHTTPSConnectionPool,
         }
 
+    def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
+        """Install the socket guard on proxy pools as well as direct pools.
+
+        Requests creates proxy managers separately from the adapter's direct pool
+        manager. Without replacing their pool classes, an explicit download proxy
+        would use urllib3's ordinary connection classes and bypass the peer-address
+        check entirely.
+        """
+        manager = super().proxy_manager_for(proxy, **proxy_kwargs)
+        manager.pool_classes_by_scheme = {
+            "http": _GuardedHTTPConnectionPool,
+            "https": _GuardedHTTPSConnectionPool,
+        }
+        return manager
+
 
 class _SsrfGuardedSession(requests.Session):
     """Session that keeps Requests environment support but drops ambient proxies."""
