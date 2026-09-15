@@ -3,6 +3,7 @@ Test the model installer
 """
 
 import gc
+import json
 import platform
 import shutil
 import threading
@@ -14,8 +15,10 @@ from typing import Any, Dict
 
 import pytest
 from pydantic_core import Url
+from requests_testadapter import TestAdapter
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJobStatus
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
@@ -40,6 +43,7 @@ from invokeai.app.services.model_install.model_install_common import (
 from invokeai.app.services.model_install.model_install_default import TMPDIR_PREFIX
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -1031,6 +1035,111 @@ def test_other_error_during_install(
     assert job.errored
     assert job.error_type == "RuntimeError"
     assert job.error == "Test error"
+
+
+class SlowAdapter(TestAdapter):
+    """A TestAdapter that delays its response so the test can seed files deterministically."""
+
+    def __init__(self, stream, status=200, headers=None, delay: float = 2.0):
+        super().__init__(stream, status=status, headers=headers)
+        self.delay = delay
+
+    def send(self, request, **kwargs):
+        time.sleep(self.delay)
+        return super().send(request, **kwargs)
+
+
+GOOD_URL = "https://test.com/aaa_good_part.safetensors"
+BAD_URL = "https://test.com/zzz_bad_part.safetensors"
+
+
+def test_multifile_install_part_error_preserves_tmpdir(
+    mm2_installer: ModelInstallService, mm2_session, embedding_file: Path
+) -> None:
+    """Issue #9481: a single part error must not delete the whole install tmpdir.
+
+    If one file of a multi-file install fails after another part already
+    completed and a resumable partial exists, the tmpdir and its
+    completed/resumable data must survive so the install can be resumed.
+    """
+    good_data = embedding_file.read_bytes()
+
+    mm2_session.mount(
+        GOOD_URL,
+        SlowAdapter(
+            good_data,
+            headers={"Content-Type": "application/octet-stream", "Content-Length": len(good_data)},
+            delay=2.0,
+        ),
+    )
+    mm2_session.mount(
+        BAD_URL,
+        TestAdapter(
+            b"server error",
+            status=500,
+            headers={"Content-Type": "application/octet-stream", "Content-Length": 13},
+        ),
+    )
+
+    files = [
+        RemoteModelFile(url=Url(GOOD_URL), path=Path("good_part.safetensors"), size=len(good_data)),
+        RemoteModelFile(url=Url(BAD_URL), path=Path("bad_part.safetensors"), size=100),
+    ]
+
+    def _fake_remote_files(source):
+        return files, None
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", _fake_remote_files)
+    tmpdir: Path | None = None
+    partial_path: Path | None = None
+    try:
+        job = mm2_installer.import_model(URLModelSource(url=Url(GOOD_URL)))
+
+        # Seed a resumable partial for part 2 while part 1 is still downloading
+        # (part 1 is blocked for `delay` seconds inside SlowAdapter).
+        tmpdir = job._install_tmpdir
+        assert tmpdir is not None and tmpdir.exists()
+        partial_path = tmpdir / "bad_part.safetensors.downloading"
+        partial_path.write_bytes(b"partial-progress-bytes")
+
+        mm2_installer.wait_for_installs(timeout=15)
+        # wait_for_installs only waits until the download cache empties, which happens at the
+        # START of _download_error_callback (before _safe_rmtree). Join the download queue so the
+        # worker thread has fully executed the callback before we assert.
+        mm2_installer._download_queue.join()
+
+        assert tmpdir is not None and tmpdir.exists()
+        assert partial_path is not None
+
+        # (a) the install is paused & recoverable, not a terminal ERROR
+        assert job.status == InstallStatus.PAUSED
+
+        # (b) the failed part is marked ERROR
+        bad_part = next(part for part in job.download_parts if str(part.source) == BAD_URL)
+        assert bad_part.status == DownloadJobStatus.ERROR
+
+        # (c) the completed part's file still exists in the tmpdir
+        completed_file = tmpdir / "good_part.safetensors"
+        assert completed_file.exists(), f"completed part {completed_file} was deleted"
+
+        # (d) resumable partials (.downloading) survive
+        assert partial_path.exists(), f"resumable partial {partial_path} was deleted"
+
+        # (e) the install tmpdir itself still exists
+        assert tmpdir.exists(), f"install tmpdir {tmpdir} was deleted despite only one part failing"
+
+        # (f) the install marker records the paused status so the tmpdir survives the
+        # startup dangling-dir sweep and restart_failed()/resume_job() can recover.
+        marker_path = tmpdir / ".invokeai_install.json"
+        assert marker_path.exists(), "install marker was not written"
+        with open(marker_path, "rt", encoding="utf-8") as f:
+            marker = json.load(f)
+        assert marker["status"] == InstallStatus.PAUSED.value
+    finally:
+        monkeypatch.undo()
+        if tmpdir is not None and tmpdir.exists():
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 @pytest.mark.parametrize(
