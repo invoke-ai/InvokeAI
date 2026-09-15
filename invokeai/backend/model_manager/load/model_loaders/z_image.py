@@ -1592,9 +1592,9 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
             model = Qwen3ForCausalLM(qwen_config)
 
         # Load the SDNQ weights with assign=True. lm_head is tied to embed_tokens (re-shared below),
-        # so it is expected to be missing; any other missing key or any unexpected key (e.g. from an
-        # incompatible or contaminated export) must fail here. The later meta-parameter guard only
-        # catches missing required params, not unexpected ones.
+        # so it is expected to be missing; any other missing key (e.g. from a partial or incompatible
+        # export) must fail here. Unexpected keys are exporter noise and are only logged at DEBUG
+        # (see `raise_on_incomplete_sdnq_load`).
         missing, unexpected = model.load_state_dict(sd, strict=False, assign=True)
         raise_on_incomplete_sdnq_load("SDNQ Qwen3 encoder", missing, unexpected, allowed_missing={"lm_head.weight"})
 

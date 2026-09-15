@@ -185,7 +185,8 @@ class Ideogram4DiffusersModel(ModelLoader):
             # Weight-only fp8 (e4m3): build the empty architecture, swap the quantized Linears for
             # Fp8Linear (gated on a saved per-row scale), then load. Mirrors the transformer fp8 branch;
             # runs on any device. strict=False tolerates the tied embed weights transformers resolves
-            # itself; unexpected keys still raise. assign=True fills the meta params directly.
+            # itself; unexpected keys are logged at DEBUG and ignored (see `load_fp8_state_dict`).
+            # assign=True fills the meta params directly.
             with accelerate.init_empty_weights():
                 model: torch.nn.Module = AutoModel.from_config(cfg)
                 swap_linears_to_fp8(model, sd, compute_dtype=compute_dtype)
