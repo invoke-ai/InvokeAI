@@ -422,7 +422,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         vram_available: int | None = None
         state_dict: dict[str, torch.Tensor] | None = None
         try:
-            if quantized_bytes > 0:
+            # A CPU execution device has no VRAM to make room in (recent bitsandbytes can quantize on the CPU).
+            if quantized_bytes > 0 and device.type != "cpu":
                 with MODEL_LOAD_LOCK.read_lock():
                     vram_available = context.models.make_room_in_vram(quantized_bytes)
                 if vram_available < quantized_bytes:

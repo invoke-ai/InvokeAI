@@ -414,6 +414,27 @@ class TestQuantizedEncoderLoad:
         else:
             assert str(excinfo.value) == error_message, "only an OOM is re-described"
 
+    def test_cpu_execution_device_makes_no_room_and_logs_no_shortfall(self, tmp_path: Path):
+        """A CPU execution device has no VRAM to make room in (the cache's `make_room_in_vram` reports 0 there), and
+        recent bitsandbytes can quantize on the CPU, so the load proceeds without a spurious shortfall warning."""
+        events: list[str] = []
+        context, _ = self._make_context(tmp_path, events)
+        seen: dict = {}
+
+        def fake_from_pretrained(path, **kwargs):
+            seen.update(kwargs)
+            return MagicMock()
+
+        with (
+            patch.object(Qwen2_5_VLForConditionalGeneration, "from_pretrained", side_effect=fake_from_pretrained),
+            patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
+        ):
+            self._make_invocation("int8")._load_quantized_encoder(context)
+
+        context.models.make_room_in_vram.assert_not_called()
+        context.logger.warning.assert_not_called()
+        assert seen["device_map"] == {"": torch.device("cpu")}
+
     def test_unsizeable_checkpoint_warns_instead_of_silently_requesting_zero_bytes(self, tmp_path: Path):
         """`calc_model_size_by_fs` reports 0 for weights it cannot size, and a request for 0 bytes is a silent no-op
         that brings issue #9147 straight back. Such a checkpoint has no safetensors shards either, so transformers
@@ -469,6 +490,14 @@ def tiny_qwen_checkpoint(tmp_path_factory: pytest.TempPathFactory) -> Path:
     torch.manual_seed(0)
     Qwen2_5_VLForConditionalGeneration(_tiny_config()).to(torch.bfloat16).save_pretrained(path, safe_serialization=True)
     return path
+
+
+def _transformers_4_key(name: str) -> str:
+    """The key layout the Qwen-Image `text_encoder/` folders on disk use (they predate transformers 5)."""
+    for v5_prefix, v4_prefix in (("model.language_model.", "model."), ("model.visual.", "visual.")):
+        if name.startswith(v5_prefix):
+            return v4_prefix + name[len(v5_prefix) :]
+    return name
 
 
 class TestTransformersLoadPathAssumptions:
@@ -533,6 +562,24 @@ class TestTransformersLoadPathAssumptions:
 
         assert torch.bfloat16 in set_during_load, "the load no longer changes the process default dtype"
         assert torch.get_default_dtype() == torch.float32
+
+    def test_transformers_4_key_layout_is_converted_on_the_state_dict_path(self, tmp_path: Path):
+        """The checkpoints in production folders carry the transformers-4 names (`model.*`, `visual.*`); the
+        state-dict entry point must run the same key conversion the path-based load does, or unmatched weights
+        would be freshly initialised with only a load warning and the encoder would silently produce garbage."""
+        torch.manual_seed(0)
+        source = Qwen2_5_VLForConditionalGeneration(_tiny_config()).to(torch.bfloat16).state_dict()
+        v4_names = {_transformers_4_key(name) for name in source}
+        assert v4_names != set(source) and not any(name.startswith("model.language_model.") for name in v4_names)
+        _tiny_config().save_pretrained(tmp_path)
+        save_file(
+            {_transformers_4_key(name): tensor for name, tensor in source.items()}, tmp_path / "model.safetensors"
+        )
+
+        loaded = self._load(tmp_path).state_dict()
+
+        assert set(loaded) == set(source)
+        assert all(torch.equal(loaded[name], source[name]) for name in source)
 
 
 class TestQuantizedEncoderRelease:

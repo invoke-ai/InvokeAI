@@ -42,19 +42,17 @@ def cache(mock_logger):
 
 
 class _FakeVram:
-    """Simulates the execution device's free VRAM as the cache offloads models.
+    """Simulates the execution device's physically free VRAM as the cache offloads models.
 
-    `ModelCache._get_vram_available` needs a real accelerator, so the CPU-only tests below replace it with this
-    bookkeeping: `available` grows by whatever `_move_model_to_ram` reports freed.
+    `ModelCache._get_physical_vram_available` needs a real accelerator, so the CPU-only tests below replace it with
+    this bookkeeping: `available` grows by whatever `_move_model_to_ram` reports freed.
     """
 
     def __init__(self, available: int):
         self.available = available
-        self.working_mem_seen: list[int | None] = []
         self.moved: list[tuple[str, int]] = []
 
-    def get_vram_available(self, working_mem_bytes):
-        self.working_mem_seen.append(working_mem_bytes)
+    def get_physical_vram_available(self):
         return self.available
 
     def move_model_to_ram(self, cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
@@ -72,14 +70,7 @@ def _put(cache: ModelCache, key: str, size_bytes: int) -> None:
     cache.put(key, module)
 
 
-@pytest.fixture
-def gpu_accounting_cache(mock_logger):
-    """A cache whose execution device is a GPU as far as the policy is concerned, without touching a real one.
-
-    `_get_vram_available` needs an accelerator; the tests replace it (and the VRAM moves) with `_FakeVram`. Note that
-    `_FakeVram` reports freed memory immediately, which is the loop's *contract*; on real hardware the driver only
-    sees it after the trailing `empty_cache()`, so the loop there tends to offload every unlocked model.
-    """
+def _make_gpu_accounting_cache(mock_logger, **kwargs) -> ModelCache:
     cache = ModelCache(
         execution_device_working_mem_gb=1.0,
         enable_partial_loading=False,
@@ -87,8 +78,21 @@ def gpu_accounting_cache(mock_logger):
         execution_device="cpu",
         storage_device="cpu",
         logger=mock_logger,
+        **kwargs,
     )
-    cache._execution_device = torch.device("cuda")  # policy only; every VRAM touch is patched out below
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM touch is patched out in the tests
+    return cache
+
+
+@pytest.fixture
+def gpu_accounting_cache(mock_logger):
+    """A cache whose execution device is a GPU as far as the policy is concerned, without touching a real one.
+
+    `_get_physical_vram_available` needs an accelerator; the tests replace it (and the VRAM moves) with `_FakeVram`.
+    `_FakeVram` reports freed memory immediately, as the real measurement does through the allocator's
+    reserved-but-unallocated pool.
+    """
+    cache = _make_gpu_accounting_cache(mock_logger)
     yield cache
     cache._execution_device = torch.device("cpu")
     cache.shutdown()
@@ -109,11 +113,14 @@ def test_offload_runs_under_the_cache_lock(gpu_accounting_cache: ModelCache):
     _put(cache, "resident", 40 * MB)
     owned: list[bool] = []
 
-    def offload(vram_bytes_required, working_mem_bytes=None):
+    def offload(vram_bytes_required, working_mem_bytes=None, vram_available_fn=None):
         owned.append(cache._lock._is_owned())
         return 0
 
-    with patch.object(cache, "_offload_unlocked_models", side_effect=offload):
+    with (
+        patch.object(cache, "_offload_unlocked_models", side_effect=offload),
+        patch.object(cache, "_get_physical_vram_available", return_value=0),
+    ):
         cache.make_room_in_vram(30 * MB)
 
     assert owned == [True]
@@ -129,7 +136,7 @@ def test_offloads_unlocked_models_until_the_request_is_satisfied(gpu_accounting_
     vram = _FakeVram(available=5 * MB)
 
     with (
-        patch.object(cache, "_get_vram_available", side_effect=vram.get_vram_available),
+        patch.object(cache, "_get_physical_vram_available", side_effect=vram.get_physical_vram_available),
         patch.object(cache, "_move_model_to_ram", side_effect=vram.move_model_to_ram),
     ):
         available = cache.make_room_in_vram(30 * MB)
@@ -148,7 +155,7 @@ def test_locked_models_are_never_offloaded(gpu_accounting_cache: ModelCache):
     vram = _FakeVram(available=0)
 
     with (
-        patch.object(cache, "_get_vram_available", side_effect=vram.get_vram_available),
+        patch.object(cache, "_get_physical_vram_available", side_effect=vram.get_physical_vram_available),
         patch.object(cache, "_move_model_to_ram", side_effect=vram.move_model_to_ram),
     ):
         available = cache.make_room_in_vram(100 * MB)
@@ -163,7 +170,7 @@ def test_no_op_when_enough_vram_is_already_free(gpu_accounting_cache: ModelCache
     vram = _FakeVram(available=50 * MB)
 
     with (
-        patch.object(cache, "_get_vram_available", side_effect=vram.get_vram_available),
+        patch.object(cache, "_get_physical_vram_available", side_effect=vram.get_physical_vram_available),
         patch.object(cache, "_move_model_to_ram", side_effect=vram.move_model_to_ram),
     ):
         available = cache.make_room_in_vram(30 * MB)
@@ -173,9 +180,9 @@ def test_no_op_when_enough_vram_is_already_free(gpu_accounting_cache: ModelCache
 
 
 def test_reports_the_availability_re_measured_after_the_offloads_empty_cache(gpu_accounting_cache: ModelCache):
-    """The result is what the driver sees *after* the offload, not the believed sizes of the offloaded models: the
-    loop's own availability checks run before its trailing `empty_cache()`, so freed weights only show up in a
-    measurement taken after it (the same re-measurement `lock()` does before it decides how much to load)."""
+    """The result is a fresh measurement taken *after* the offload and its trailing `empty_cache()`, not the believed
+    sizes of the offloaded models nor the loop's last reading: whatever the driver reports at that point (here,
+    memory that only became visible at `empty_cache()`) is what the caller gets."""
     cache = gpu_accounting_cache
     _put(cache, "resident", 40 * MB)
     vram = _FakeVram(available=0)
@@ -189,7 +196,7 @@ def test_reports_the_availability_re_measured_after_the_offloads_empty_cache(gpu
         vram.available += 30 * MB  # now the driver sees (some of) it
 
     with (
-        patch.object(cache, "_get_vram_available", side_effect=vram.get_vram_available),
+        patch.object(cache, "_get_physical_vram_available", side_effect=vram.get_physical_vram_available),
         patch.object(cache, "_move_model_to_ram", side_effect=move_model_to_ram),
         patch.object(TorchDevice, "empty_cache", side_effect=empty_cache),
     ):
@@ -197,8 +204,29 @@ def test_reports_the_availability_re_measured_after_the_offloads_empty_cache(gpu
 
     assert [key for key, _ in vram.moved] == ["resident"]
     assert available == 30 * MB
-    # The configured working-memory reserve applies through the default (None) floor, exactly as in `lock()`.
-    assert vram.working_mem_seen and all(w is None for w in vram.working_mem_seen)
+
+
+def test_the_cache_vram_cap_does_not_apply_to_an_out_of_cache_load(mock_logger):
+    """`max_vram_cache_size_gb` caps what the *cache* may occupy. An out-of-cache model is not subject to it, so
+    the request is judged against physically free VRAM: with plenty of room on the card nothing is offloaded, and
+    the (negative, here) capped budget is not what gets reported back."""
+    cache = _make_gpu_accounting_cache(mock_logger, max_vram_cache_size_gb=0.5)
+    try:
+        _put(cache, "resident", 40 * MB)
+        vram = _FakeVram(available=50 * MB)
+        with (
+            patch.object(cache, "_get_physical_vram_available", side_effect=vram.get_physical_vram_available),
+            patch.object(cache, "_move_model_to_ram", side_effect=vram.move_model_to_ram),
+            patch.object(cache, "_get_vram_in_use", return_value=40 * MB),
+        ):
+            assert cache._get_vram_available(None) < 0  # the capped budget: cap (0.5 GB) - working mem (1 GB) - use
+            available = cache.make_room_in_vram(30 * MB)
+
+        assert vram.moved == []
+        assert available == 50 * MB
+    finally:
+        cache._execution_device = torch.device("cpu")
+        cache.shutdown()
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA is not available.")
@@ -229,9 +257,9 @@ def test_gpu_make_room_in_vram_actually_moves_weights_off_the_device(partial: bo
         _, total = torch.cuda.mem_get_info()
         available = cache.make_room_in_vram(2 * total)
 
-        # The answer is the re-measured availability (which cannot meet a request of twice the card).
+        # The answer is the re-measured physical availability (which cannot meet a request of twice the card).
         assert available < 2 * total
-        assert available == pytest.approx(cache._get_vram_available(None), abs=256 * MB)
+        assert available == pytest.approx(cache._get_physical_vram_available(), abs=256 * MB)
         assert all(p.device.type == "cpu" for p in idle.parameters())
         assert all(p.device.type == "cuda" for p in in_use.parameters())
         # Same policy as lock(): the entry is offloaded, not evicted, so the next use re-streams weights.
