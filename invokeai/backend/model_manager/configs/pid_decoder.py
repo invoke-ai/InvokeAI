@@ -137,9 +137,14 @@ def _raise_if_pid_net_contract_unmet(shapes: _Shapes, contract: Mapping[str, tup
     guarantee — loaders run under `skip_torch_weight_init()`, so a weight the checkpoint does not
     supply is uninitialised memory rather than a default.
 
-    Missing *and* unexpected keys are fatal here because both are fatal there, which is what makes
-    installation and loading accept the same set of files. A stricter installer cannot reject a file
-    that would have loaded: the loader already refuses everything rejected here.
+    Missing keys are fatal here because they are fatal there, which is what makes installation and
+    loading accept the same set of files. A stricter installer cannot reject a file that would have
+    loaded: the loader already refuses everything rejected here.
+
+    Extra keys are *not* fatal — `load_pid_decoder` ignores them (issue #9437), so rejecting them
+    here would refuse to install a file that loads fine. The one kind of extra key the loader still
+    cannot survive is a non-string one, which makes `nn.Module.load_state_dict` raise from inside
+    torch, so that is the extra this check keeps.
 
     `_LATENT_PROJ_KEY` is excluded from the shape comparison, and only from that: it is the one
     parameter whose shape legitimately varies by backbone, and its variable dimensions each have a
@@ -151,18 +156,18 @@ def _raise_if_pid_net_contract_unmet(shapes: _Shapes, contract: Mapping[str, tup
     # Both sorts take `key=str`: a bare checkpoint's keys need not all be strings (see
     # `strip_net_prefix`), and sorting a mixed set raises TypeError — which the factory answers with
     # the `Unknown_Config` registration these checks exist to prevent, so the crash fails as a silent
-    # accept rather than loudly. Only `unexpected` can hold one today; sorting both the same way keeps
-    # that from depending on which set is on which side of the subtraction.
+    # accept rather than loudly.
     if missing := sorted(contract.keys() - shapes.keys(), key=str):
         raise InvalidMatchError(
             f"PiD checkpoint is missing {len(missing)} of the weights required by PidNet; the file is "
             f"incomplete and cannot be used as a PiD decoder: {missing[:5]}{_and_more(missing)}"
         )
 
-    if unexpected := sorted(shapes.keys() - contract.keys(), key=str):
+    if not_strings := sorted((k for k in shapes if not isinstance(k, str)), key=str):
         raise InvalidMatchError(
-            f"PiD checkpoint has {len(unexpected)} keys PidNet does not expect, which `load_pid_decoder` "
-            f"rejects too: {unexpected[:5]}{_and_more(unexpected)}"
+            f"PiD checkpoint has {len(not_strings)} keys that are not strings and so cannot name a "
+            f"PidNet parameter, which `load_pid_decoder` rejects too: "
+            f"{not_strings[:5]}{_and_more(not_strings)}"
         )
 
     mismatched = [(k, shapes[k], want) for k, want in contract.items() if k != _LATENT_PROJ_KEY and shapes[k] != want]
