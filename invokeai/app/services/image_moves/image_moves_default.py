@@ -1,7 +1,9 @@
 import os
 import tempfile
 import threading
+from collections.abc import Iterator
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -85,6 +87,9 @@ class ImageMoveService:
         self._future: Future | None = None
         self._future_operation: ImageMoveBackgroundOperation | None = None
         self._last_background_error: str | None = None
+        # Serializes the move service's relocate-and-repoint units against the image delete
+        # units in ImageService. See image_mutation_lock() for the interleaving it prevents.
+        self._image_mutation_lock = threading.RLock()
         self._invoker = None
         self._session_queue = None
 
@@ -104,6 +109,27 @@ class ImageMoveService:
 
     def stop(self, *args, **kwargs) -> None:
         self._executor.shutdown(wait=True, cancel_futures=False)
+
+    @contextmanager
+    def image_mutation_lock(self) -> Iterator[None]:
+        """Serializes image delete units against subfolder relocation units.
+
+        An image delete reads an image's subfolder, deletes its record, then purges its files
+        at that subfolder. A move unit does the opposite: it relocates the files and repoints
+        the record. If the two interleave, the delete purges the path its snapshot named while
+        the files sit at the new one — permanent orphans, unrecoverable because the record is
+        gone and a clean purge drops the journal (JPPhoto, PR #9361). ``ImageService`` holds
+        this lock across each of its delete units, and the move service holds it across each
+        plan-relocate-repoint cycle below, so neither can observe the other half-done.
+
+        It is a reentrant lock because both sides run their units to completion in one thread;
+        nothing inside a unit may block on another thread that needs this lock. It is also
+        process-local: two Invoke processes sharing one output folder and database are not
+        serialized by it — the same limitation the route guard has, which the delete journal's
+        startup recovery re-check papers over for deletes.
+        """
+        with self._image_mutation_lock:
+            yield
 
     def start_background_move_all(self) -> ImageMoveBackgroundStatus:
         return self._start_background_operation("move_all", self.move_all_images, require_idle_queue=True)
@@ -204,27 +230,35 @@ class ImageMoveService:
         errors = recovered.errors
 
         while True:
-            moves, plan_errors = self._plan_batch(
-                last_image_name=last_image_name, limit=100, record_missing_errors=True
-            )
-            errors += plan_errors
-            if not moves:
-                next_name = self._next_image_name(last_image_name)
-                if next_name is None:
-                    break
-                last_image_name = next_name
-                continue
+            # The whole batch cycle — plan, journal the job, relocate files, repoint the
+            # records — holds the image-mutation lock. A delete interleaved inside the cycle
+            # would purge the path its snapshot named while this job's relocate-and-repoint
+            # landed mid-flight, stranding files at the new subfolder with no record and no
+            # journal (JPPhoto, PR #9361). Planning and creating the job are inside the lock
+            # too, so an item whose record a delete removes is never planned in the first
+            # place instead of failing the job after the fact.
+            with self.image_mutation_lock():
+                moves, plan_errors = self._plan_batch(
+                    last_image_name=last_image_name, limit=100, record_missing_errors=True
+                )
+                errors += plan_errors
+                if not moves:
+                    next_name = self._next_image_name(last_image_name)
+                    if next_name is None:
+                        break
+                    last_image_name = next_name
+                    continue
 
-            job_id = self.create_move_job(moves)
-            planned += len(moves)
-            try:
-                self.perform_filesystem_moves(job_id)
-                committed += self.commit_database_updates(job_id)
-                errors += self._count_job_errors(job_id)
-            except Exception as e:
-                errors += 1
-                self.record_job_error_message(job_id, str(e))
-                raise
+                job_id = self.create_move_job(moves)
+                planned += len(moves)
+                try:
+                    self.perform_filesystem_moves(job_id)
+                    committed += self.commit_database_updates(job_id)
+                    errors += self._count_job_errors(job_id)
+                except Exception as e:
+                    errors += 1
+                    self.record_job_error_message(job_id, str(e))
+                    raise
             last_image_name = moves[-1].image_name
 
         return ImageMoveResult(planned=planned, committed=committed, errors=errors)
@@ -244,9 +278,13 @@ class ImageMoveService:
         errors = 0
         for job_id in job_ids:
             try:
-                self.complete_partial_filesystem_moves(job_id)
-                self.cleanup_empty_source_dirs(job_id)
-                committed += self.commit_database_updates(job_id)
+                # Same unit as a live batch: finishing an interrupted relocation must not
+                # interleave with a concurrent delete, which would otherwise purge the path
+                # its snapshot named while the files land at the new one (JPPhoto, PR #9361).
+                with self.image_mutation_lock():
+                    self.complete_partial_filesystem_moves(job_id)
+                    self.cleanup_empty_source_dirs(job_id)
+                    committed += self.commit_database_updates(job_id)
             except Exception as e:
                 if self._is_unrecoverable_error(e):
                     self.mark_job_unrecoverable(job_id, str(e))
