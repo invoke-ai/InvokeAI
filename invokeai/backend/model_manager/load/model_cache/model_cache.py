@@ -2750,7 +2750,7 @@ class ModelCache:
         return len(dropped)
 
     @synchronized
-    def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
+    def make_room_in_vram(self, vram_bytes_needed: int) -> int:
         """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
 
         This is the entry point for code that has to put a model on the GPU *outside* the cache - e.g. a
@@ -2761,16 +2761,22 @@ class ModelCache:
 
         The same policy as `lock()` is used (`_offload_unlocked_models`): unlocked models are offloaded to RAM until
         the availability check is satisfied, and kept in the cache so a later use re-streams weights instead of
-        rebuilding from disk. Locked (in-use) models are never touched. `working_mem_bytes` is the operation's
-        working memory and is floored at the configured default, exactly as in `lock()`.
+        rebuilding from disk. Locked (in-use) models are never touched. The configured working-memory reserve is
+        kept free on top of the request, exactly as in `lock()`.
 
-        A CPU execution device has no VRAM to make room in, so the call is a no-op there (as `lock()` is).
+        A CPU execution device has no VRAM to make room in, so the call is a no-op there (as `lock()` is) and
+        reports 0.
 
-        Returns the number of VRAM bytes freed based on believed model sizes.
+        Returns the VRAM available to the caller *after* offloading, re-measured the way `lock()` re-measures it
+        (free VRAM less the working-memory reserve, so it can be negative) rather than the believed sizes of the
+        offloaded models: a locked model can leave the request unmet, and the driver only sees freed memory once
+        the offload's trailing `empty_cache()` has run. Callers compare it with `vram_bytes_needed` before they
+        allocate.
         """
         if self._execution_device.type == "cpu":
             return 0
-        return self._offload_unlocked_models(vram_bytes_needed, working_mem_bytes)
+        self._offload_unlocked_models(vram_bytes_needed)
+        return self._get_vram_available(None)
 
     @synchronized
     def offload_model_from_vram(self, model_key: str) -> int:

@@ -600,23 +600,25 @@ class ModelsInterface(InvocationContextInterface):
         key = identifier if isinstance(identifier, str) else identifier.key
         return self._services.model_manager.load.ram_cache.offload_model_from_vram(key)
 
-    def make_room_in_vram(self, vram_bytes_needed: int, working_mem_bytes: Optional[int] = None) -> int:
+    def make_room_in_vram(self, vram_bytes_needed: int) -> int:
         """Offload unlocked cached models from VRAM until `vram_bytes_needed` bytes are free on this thread's
         execution device.
 
         Use this before placing a model on the GPU *outside* the model cache (e.g. a BitsAndBytes-quantized model
         that cannot be moved between devices). Loads that go through `load()` never need this - the cache makes room
         for them itself when they are locked - but an out-of-cache load competes with the cached models for VRAM
-        and would otherwise only get whatever they happened to leave free.
+        and would otherwise only get whatever they happened to leave free. The configured working-memory reserve
+        is kept free on top of the request.
 
         Args:
             vram_bytes_needed: The VRAM footprint the caller is about to allocate.
-            working_mem_bytes: Working memory to keep free on top of the model, floored at the configured default.
 
         Returns:
-            The number of VRAM bytes freed.
+            The VRAM available after offloading, less the working-memory reserve (so it may be negative). Locked
+            (in-use) models are never offloaded, so the request is not guaranteed: compare the result with
+            `vram_bytes_needed` before allocating.
         """
-        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed, working_mem_bytes)
+        return self._services.model_manager.load.ram_cache.make_room_in_vram(vram_bytes_needed)
 
     @staticmethod
     def _raise_if_external(model: AnyModelConfig) -> None:
