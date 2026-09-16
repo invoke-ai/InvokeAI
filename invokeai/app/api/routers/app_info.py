@@ -102,6 +102,7 @@ class ExternalProviderConfigModel(BaseModel):
 
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "alibabacloud": ("external_alibabacloud_api_key", "external_alibabacloud_base_url"),
+    "atlascloud": ("external_atlascloud_api_key", "external_atlascloud_base_url"),
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
     "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
