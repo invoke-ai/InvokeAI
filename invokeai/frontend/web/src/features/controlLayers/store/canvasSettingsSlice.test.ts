@@ -7,6 +7,7 @@ import {
   canvasSettingsSliceConfig,
   settingsPressureAffectsOpacityToggled,
   settingsPressureAffectsWidthToggled,
+  settingsTraceTaperEndsToggled,
 } from './canvasSettingsSlice';
 
 describe('canvasSettingsSlice', () => {
@@ -30,6 +31,24 @@ describe('canvasSettingsSlice', () => {
     expect(pressureWidthDisabled.pressureAffectsOpacity).toBe(false);
     expect(pressureOpacityEnabled.pressureAffectsWidth).toBe(false);
     expect(pressureOpacityEnabled.pressureAffectsOpacity).toBe(true);
+  });
+
+  it('toggles tapered vector tracing independently', () => {
+    const state = canvasSettingsSliceConfig.getInitialState();
+
+    const result = reducer(state, settingsTraceTaperEndsToggled());
+
+    expect(state.traceTaperEnds).toBe(false);
+    expect(result.traceTaperEnds).toBe(true);
+  });
+
+  it('defaults tapered vector tracing off when migrating older settings', () => {
+    expect(migrate).toBeDefined();
+    const { traceTaperEnds: _traceTaperEnds, ...olderState } = canvasSettingsSliceConfig.getInitialState();
+
+    const result = migrate?.(olderState) as InitialState;
+
+    expect(result.traceTaperEnds).toBe(false);
   });
 
   it('migrates legacy pressureSensitivity to pressureAffectsWidth and leaves opacity disabled', () => {

@@ -1,6 +1,7 @@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
@@ -10,20 +11,32 @@ import { useCallback } from 'react';
 export function useCanvasDeleteLayerHotkey() {
   useAssertSingleton(useCanvasDeleteLayerHotkey.name);
   const dispatch = useAppDispatch();
+  const canvasManager = useCanvasManager();
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
 
-  const deleteSelectedLayer = useCallback(() => {
-    if (selectedEntityIdentifier === null || isBusy || getFocusedRegion() !== 'layers') {
+  const deleteSelected = useCallback(() => {
+    if (isBusy) {
       return;
     }
+
+    const pathTool = canvasManager.tool.tools.path;
+    if (pathTool.hasActiveEditSession()) {
+      pathTool.deleteActivePath();
+      return;
+    }
+
+    if (selectedEntityIdentifier === null || getFocusedRegion() !== 'layers') {
+      return;
+    }
+
     dispatch(entityDeleted({ entityIdentifier: selectedEntityIdentifier }));
-  }, [dispatch, isBusy, selectedEntityIdentifier]);
+  }, [canvasManager.tool.tools.path, dispatch, isBusy, selectedEntityIdentifier]);
 
   useRegisteredHotkeys({
     id: 'deleteSelected',
     category: 'canvas',
-    callback: deleteSelectedLayer,
-    dependencies: [deleteSelectedLayer],
+    callback: deleteSelected,
+    dependencies: [deleteSelected],
   });
 }

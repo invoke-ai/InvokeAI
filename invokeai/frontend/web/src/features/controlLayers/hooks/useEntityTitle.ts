@@ -32,6 +32,8 @@ export const useEntityTypeName = (type: CanvasEntityIdentifier['type']) => {
         return t('controlLayers.controlLayer');
       case 'raster_layer':
         return t('controlLayers.rasterLayer');
+      case 'vector_layer':
+        return t('controlLayers.vectorLayer');
       case 'regional_guidance':
         return t('controlLayers.regionalGuidance');
       default:

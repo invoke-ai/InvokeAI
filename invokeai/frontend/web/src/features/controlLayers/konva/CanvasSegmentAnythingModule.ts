@@ -1327,6 +1327,9 @@ export class CanvasSegmentAnythingModule extends CanvasModuleBase {
       case 'regional_guidance':
         this.manager.stateApi.addRegionalGuidance(arg);
         break;
+      case 'vector_layer':
+        this.log.warn('Saving segment results as a vector layer is not supported');
+        break;
       default:
         assert<Equals<typeof type, never>>(false);
     }

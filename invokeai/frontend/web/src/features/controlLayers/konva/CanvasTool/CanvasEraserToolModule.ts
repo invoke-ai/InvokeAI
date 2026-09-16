@@ -180,8 +180,13 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (selectedEntity.state.type === 'vector_layer') {
+      return;
+    }
+
+    const selectedEntityState = selectedEntity.state;
     const settings = this.manager.stateApi.getSettings();
-    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntityState.position);
     const alignedPoint = alignCoordForTool(normalizedPoint, settings.brushWidth);
 
     const shouldUsePressure =
@@ -195,7 +200,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
         points: [alignedPoint.x, alignedPoint.y, e.evt.pressure],
         strokeWidth: settings.eraserWidth,
         pressureAffectsWidth: settings.pressureAffectsWidth,
-        clip: this.parent.getClip(selectedEntity.state),
+        clip: this.parent.getClip(selectedEntityState),
       });
     } else {
       // Else, add the point without pressure
@@ -204,7 +209,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
         type: 'eraser_line',
         points: [alignedPoint.x, alignedPoint.y],
         strokeWidth: settings.eraserWidth,
-        clip: this.parent.getClip(selectedEntity.state),
+        clip: this.parent.getClip(selectedEntityState),
       });
     }
   };
@@ -234,9 +239,14 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (selectedEntity.state.type === 'vector_layer') {
+      return;
+    }
+
+    const selectedEntityState = selectedEntity.state;
     const settings = this.manager.stateApi.getSettings();
 
-    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntity.state.position);
+    const normalizedPoint = offsetCoord(cursorPos.relative, selectedEntityState.position);
 
     const shouldUsePressure =
       e.evt.pointerType === 'pen' && getShouldUsePressureForEraser(settings.pressureAffectsWidth);
@@ -244,7 +254,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
     if (shouldUsePressure) {
       // We need to get the last point of the last line to create a straight line if shift is held
       const lastLinePoint = getLastPointOfLastLineWithPressure(
-        selectedEntity.state.objects,
+        selectedEntityState.objects,
         'eraser_line_with_pressure'
       );
       const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
@@ -272,11 +282,11 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
         points,
         strokeWidth: settings.eraserWidth,
         pressureAffectsWidth: settings.pressureAffectsWidth,
-        clip: this.parent.getClip(selectedEntity.state),
+        clip: this.parent.getClip(selectedEntityState),
       });
     } else {
       // We need to get the last point of the last line to create a straight line if shift is held
-      const lastLinePoint = getLastPointOfLastLine(selectedEntity.state.objects, 'eraser_line');
+      const lastLinePoint = getLastPointOfLastLine(selectedEntityState.objects, 'eraser_line');
       const alignedPoint = alignCoordForTool(normalizedPoint, settings.eraserWidth);
 
       if (selectedEntity.bufferRenderer.hasBuffer()) {
@@ -297,7 +307,7 @@ export class CanvasEraserToolModule extends CanvasModuleBase {
         type: 'eraser_line',
         points,
         strokeWidth: settings.eraserWidth,
-        clip: this.parent.getClip(selectedEntity.state),
+        clip: this.parent.getClip(selectedEntityState),
       });
     }
   };

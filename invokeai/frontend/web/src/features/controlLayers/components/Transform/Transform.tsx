@@ -60,7 +60,7 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
         <CanvasOperationIsolatedLayerPreviewSwitch />
       </Flex>
 
-      <TransformSmoothingControls />
+      {adapter.state.type !== 'vector_layer' && <TransformSmoothingControls />}
 
       <TransformFitToBboxButtons adapter={adapter} />
 
