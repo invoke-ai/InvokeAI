@@ -182,6 +182,9 @@ const slice = createSlice({
     setHiDiffusionWindowAttnEnabled: (state, action: PayloadAction<boolean>) => {
       state.hiDiffusionWindowAttnEnabled = action.payload;
     },
+    setHiDiffusionAutoRatios: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionAutoRatios = action.payload;
+    },
     setHiDiffusionT1Ratio: (state, action: PayloadAction<number>) => {
       state.hiDiffusionT1Ratio = action.payload;
     },
@@ -895,6 +898,7 @@ export const {
   setHiDiffusionEnabled,
   setHiDiffusionRauNetEnabled,
   setHiDiffusionWindowAttnEnabled,
+  setHiDiffusionAutoRatios,
   setHiDiffusionT1Ratio,
   setHiDiffusionT2Ratio,
   setSeamlessXAxis,
@@ -1162,6 +1166,27 @@ export const applyParamsVersionMigrations = (state: any): void => {
     state.gemma2EncoderModel = state.gemma2EncoderModel ?? null;
     state.pidSteps = state.pidSteps ?? 4;
   }
+
+  if (state._version === 5) {
+    // v5 -> v6: numeric HiDiffusion defaults unintentionally overrode the library's
+    // resolution-aware presets. Treat the old default values as automatic thresholds while
+    // preserving values that users explicitly changed.
+    state._version = 6;
+    state.hiDiffusionT1Ratio = state.hiDiffusionT1Ratio === 0.4 ? null : state.hiDiffusionT1Ratio;
+    state.hiDiffusionT2Ratio = state.hiDiffusionT2Ratio === 0.0 ? null : state.hiDiffusionT2Ratio;
+  }
+
+  if (state._version === 6) {
+    // v6 -> v7: keep the automatic-ratio mode separate from the manual slider values. Older
+    // states used two null ratios to represent Auto, which erased the user's manual values every
+    // time the mode was enabled.
+    state._version = 7;
+    state.hiDiffusionAutoRatios =
+      (state.hiDiffusionT1Ratio === null || state.hiDiffusionT1Ratio === undefined) &&
+      (state.hiDiffusionT2Ratio === null || state.hiDiffusionT2Ratio === undefined);
+    state.hiDiffusionT1Ratio = state.hiDiffusionT1Ratio ?? 0.4;
+    state.hiDiffusionT2Ratio = state.hiDiffusionT2Ratio ?? 0.0;
+  }
 };
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -1277,6 +1302,7 @@ export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => 
 export const selectHiDiffusionEnabled = createParamsSelector((params) => params.hiDiffusionEnabled);
 export const selectHiDiffusionRauNetEnabled = createParamsSelector((params) => params.hiDiffusionRauNetEnabled);
 export const selectHiDiffusionWindowAttnEnabled = createParamsSelector((params) => params.hiDiffusionWindowAttnEnabled);
+export const selectHiDiffusionAutoRatios = createParamsSelector((params) => params.hiDiffusionAutoRatios);
 export const selectHiDiffusionT1Ratio = createParamsSelector((params) => params.hiDiffusionT1Ratio);
 export const selectHiDiffusionT2Ratio = createParamsSelector((params) => params.hiDiffusionT2Ratio);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);

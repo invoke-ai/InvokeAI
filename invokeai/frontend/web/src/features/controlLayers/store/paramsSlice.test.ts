@@ -23,6 +23,7 @@ import {
   selectModelSupportsRefImages,
   selectModelSupportsSeed,
   selectModelSupportsSteps,
+  setHiDiffusionAutoRatios,
   setIdeogram4Steps,
 } from './paramsSlice';
 import { getInitialParamsState, zParamsState } from './types';
@@ -172,8 +173,9 @@ describe('paramsSlice selectors for external models', () => {
  *     `animaT5EncoderModel`, since removed from the schema.
  *   - v4: the narrowest v4 blob is not a release at all — it is the one written by the build that did
  *     the bump, `1aeb05bbf0` (97 keys). Releases writing v4 start at v6.14.0-rc1.
- *   - v5: the current version, reached by the FLUX.2 [dev] merge `f10d2a4f5a`, which is also the
- *     build that wrote the narrowest v5 blob. Pinning the fixture at the bump commit is what keeps
+ *   - v5: reached by the FLUX.2 [dev] merge `f10d2a4f5a`, which is also the build that wrote the
+ *     narrowest v5 blob. The current v6 migration converts legacy HiDiffusion defaults to Auto.
+ *     Pinning the fixture at the v5 bump commit is what keeps
  *     the invariant below meaningful for the current tier: the version steps can never cover it (a
  *     v5 blob matches no branch), so every key added since the bump has to carry a zod default, and
  *     this entry is what proves it does.
@@ -806,6 +808,7 @@ const POST_V4_BUMP_DEFAULTED_KEYS = [
   'hiDiffusionEnabled',
   'hiDiffusionRauNetEnabled',
   'hiDiffusionWindowAttnEnabled',
+  'hiDiffusionAutoRatios',
   'hiDiffusionT1Ratio',
   'hiDiffusionT2Ratio',
 ] as const satisfies readonly (keyof typeof zParamsState.shape)[];
@@ -893,6 +896,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     delete v2State.hiDiffusionEnabled;
     delete v2State.hiDiffusionRauNetEnabled;
     delete v2State.hiDiffusionWindowAttnEnabled;
+    delete v2State.hiDiffusionAutoRatios;
     delete v2State.hiDiffusionT1Ratio;
     delete v2State.hiDiffusionT2Ratio;
 
@@ -900,12 +904,13 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     // v2 migrates all the way through the current chain (v2 -> v3 adds Qwen fields,
     // v3 -> v4 adds Krea-2 and PiD fields).
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.qwenImageQwenVLEncoderModel).toBeNull();
     expect(result.hiDiffusionEnabled).toBe(false);
     expect(result.hiDiffusionRauNetEnabled).toBe(true);
     expect(result.hiDiffusionWindowAttnEnabled).toBe(true);
+    expect(result.hiDiffusionAutoRatios).toBe(true);
     expect(result.hiDiffusionT1Ratio).toBe(0.4);
     expect(result.hiDiffusionT2Ratio).toBe(0.0);
     // Existing params should be preserved
@@ -914,6 +919,31 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.shouldRandomizeSeed).toBe(false);
     expect(result.dimensions.width).toBe(768);
     expect(result.dimensions.height).toBe(768);
+  });
+
+  it('migrates old HiDiffusion defaults to automatic ratios and preserves custom overrides', () => {
+    expect(migrate).toBeDefined();
+    const initial = getInitialParamsState();
+
+    const oldDefaults = migrate?.({
+      ...initial,
+      _version: 5,
+      hiDiffusionT1Ratio: 0.4,
+      hiDiffusionT2Ratio: 0.0,
+    }) as ReturnType<typeof getInitialParamsState>;
+    const customOverrides = migrate?.({
+      ...initial,
+      _version: 5,
+      hiDiffusionT1Ratio: 0.65,
+      hiDiffusionT2Ratio: 0.25,
+    }) as ReturnType<typeof getInitialParamsState>;
+
+    expect(oldDefaults.hiDiffusionAutoRatios).toBe(true);
+    expect(oldDefaults.hiDiffusionT1Ratio).toBe(0.4);
+    expect(oldDefaults.hiDiffusionT2Ratio).toBe(0.0);
+    expect(customOverrides.hiDiffusionAutoRatios).toBe(false);
+    expect(customOverrides.hiDiffusionT1Ratio).toBe(0.65);
+    expect(customOverrides.hiDiffusionT2Ratio).toBe(0.25);
   });
 
   it('merges the separate Klein / dev VAE slots into flux2VaeModel when migrating from v3', () => {
@@ -938,7 +968,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
     // The new standalone dev Mistral encoder slot must be seeded, not left undefined.
     expect(result.flux2DevMistralEncoderModel).toBeNull();
@@ -972,7 +1002,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.krea2VaeModel).toBeNull();
     expect(result.krea2Qwen3VlEncoderModel).toBeNull();
     expect(result.krea2SeedVarianceEnabled).toBe(false);
@@ -1006,7 +1036,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(mainV4State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('klein-vae');
     expect(result.flux2DevMistralEncoderModel).toBeNull();
     // main's own v4 values must survive untouched.
@@ -1034,7 +1064,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(devV4State) as ReturnType<typeof getInitialParamsState> & Record<string, unknown>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     // The branch's own v4 values must survive untouched.
     expect((result.flux2VaeModel as { key: string } | null)?.key).toBe('flux2-vae');
     expect(result.pidMode).toBe('off');
@@ -1091,7 +1121,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
       const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
 
-      expect(result._version).toBe(5);
+      expect(result._version).toBe(7);
       expect(result.positivePrompt).toBe('a fluffy cat');
       expect(result.seed).toBe(42);
       expect(result.shouldRandomizeSeed).toBe(false);
@@ -1139,7 +1169,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
       expect(
         backfilled,
-        version === getInitialParamsState()._version
+        Number(version) === getInitialParamsState()._version
           ? `Keys missing from a blob written at ${release}, the commit that bumped _version to ${version}. ` +
               `A blob already at the current version matches no branch in the migration chain, so no step can ` +
               `seed these — each needs a zod default, or upgrading throws in zParamsState.parse() and wipes ` +
@@ -1257,7 +1287,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.dimensions).toEqual(getInitialParamsState().dimensions);
     expect(result.positivePrompt).toBe('a fluffy cat');
     expect(result.seed).toBe(7);
@@ -1274,7 +1304,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.positivePromptHistory).toEqual([]);
     expect(result.qwenImageVaeModel).toBeNull();
     expect(result.wanVaeModel).toBeNull();
@@ -1284,18 +1314,18 @@ describe('paramsSliceConfig persisted state migration', () => {
   it('never repairs _version, so version detection cannot be bypassed', () => {
     // `_version` is the input to the version steps, so the net must leave it alone. If it repaired
     // it, any blob whose version is not the current literal — including one written by a *newer*
-    // build — would be silently stamped v5 having run no step, and its stale field values would be
+    // build — would be silently stamped with the current version having run no step, and its stale field values would be
     // accepted as current. Deliberately not routed through migrate(): the version steps normalise
     // `_version` before the net ever sees it, so only calling the net directly tests the guard.
     // The blob is otherwise complete (the current tier's key set), so `_version` is the only thing
     // the parse below can object to.
-    const blob = buildReleaseBlob('f10d2a4f5a', { _version: 6, positivePrompt: 'a fluffy cat' });
+    const blob = buildReleaseBlob('f10d2a4f5a', { _version: 8, positivePrompt: 'a fluffy cat' });
 
     const { backfilled, reset } = repairParamsState(blob);
 
     expect(backfilled).toEqual([]);
     expect(reset).toEqual([]);
-    expect(blob._version).toBe(6);
+    expect(blob._version).toBe(8);
     // Still fatal, which is the correct outcome for a downgrade: that slice really was written by a
     // schema this build does not know.
     expect(() => zParamsState.parse(blob)).toThrow();
@@ -1311,7 +1341,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(blob) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.positivePrompt).toBe('a fluffy cat');
     expect(result.seed).toBe(7);
     expect(result.dimensions).toBeDefined();
@@ -1328,7 +1358,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v3State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.wanTransformerLowNoise).toBeNull();
     expect(result.wanComponentSource).toBeNull();
     expect(result.wanVaeModel).toBeNull();
@@ -1350,7 +1380,7 @@ describe('paramsSliceConfig persisted state migration', () => {
 
     const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
 
-    expect(result._version).toBe(5);
+    expect(result._version).toBe(7);
     expect(result.fluxScheduler).toBe('euler');
     expect(result.zImageScheduler).toBe('euler');
     expect(result.colorCompensation).toBe(false);
@@ -1410,7 +1440,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect('hiDiffusionEnabled' in blob).toBe(false);
 
     applyParamsVersionMigrations(blob);
-    expect(blob._version).toBe(5);
+    expect(blob._version).toBe(7);
 
     // The value assertions below cannot, on their own, prove the defaults exist: three mechanisms
     // produce the identical values, so any two can hide the third being reverted. Parsing directly
@@ -1435,6 +1465,7 @@ describe('paramsSliceConfig persisted state migration', () => {
     expect(result.hiDiffusionEnabled).toBe(false);
     expect(result.hiDiffusionRauNetEnabled).toBe(true);
     expect(result.hiDiffusionWindowAttnEnabled).toBe(true);
+    expect(result.hiDiffusionAutoRatios).toBe(true);
     expect(result.hiDiffusionT1Ratio).toBe(0.4);
     expect(result.hiDiffusionT2Ratio).toBe(0.0);
     expect(result.positivePrompt).toBe('a fluffy cat');
@@ -1551,6 +1582,25 @@ describe('paramsSlice prompt history', () => {
       { positivePrompt: 'a cat', negativePrompt: 'blurry' },
     ]);
     expect(removed.positivePromptHistory).toEqual([{ positivePrompt: 'a cat', negativePrompt: 'low quality' }]);
+  });
+});
+
+describe('paramsSlice HiDiffusion automatic ratios', () => {
+  it('changes only the automatic mode and preserves manual slider values', () => {
+    const initial = {
+      ...getInitialParamsState(),
+      hiDiffusionAutoRatios: false,
+      hiDiffusionT1Ratio: 0.65,
+      hiDiffusionT2Ratio: 0.2,
+    };
+
+    const automatic = paramsSliceConfig.slice.reducer(initial, setHiDiffusionAutoRatios(true));
+    const manual = paramsSliceConfig.slice.reducer(automatic, setHiDiffusionAutoRatios(false));
+
+    expect(automatic.hiDiffusionT1Ratio).toBe(0.65);
+    expect(automatic.hiDiffusionT2Ratio).toBe(0.2);
+    expect(manual.hiDiffusionT1Ratio).toBe(0.65);
+    expect(manual.hiDiffusionT2Ratio).toBe(0.2);
   });
 });
 
