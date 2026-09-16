@@ -68,6 +68,8 @@ class InvokeAIDiffuserComponent:
         # control_data should be type List[ControlNetData]
         # this loop covers both ControlNet (one ControlNetData in list)
         #      and MultiControlNet (multiple ControlNetData in list)
+        if control_data is None:
+            return sample
         for _i, control_datum in enumerate(control_data):
             control_mode = control_datum.control_mode
             # soft_injection and cfg_injection are the two ControlNet control_mode booleans
@@ -83,13 +85,22 @@ class InvokeAIDiffuserComponent:
             last_control_step = math.ceil(control_datum.end_step_percent * total_step_count)
             # only apply controlnet if current step is within the controlnet's begin/end step range
             if step_index >= first_control_step and step_index <= last_control_step:
-                if cfg_injection:
-                    sample_model_input = sample
-                else:
-                    # expand the latents input to control model if doing classifier free guidance
-                    #    (which I think for now is always true, there is conditional elsewhere that stops execution if
-                    #     classifier_free_guidance is <= 1.0 ?)
-                    sample_model_input = torch.cat([sample] * 2)
+                # Build cross_attention_kwargs with controlnet residuals
+                cross_attention_kwargs = {
+                    "down_block_additional_residuals": down_block_res_samples,
+                    "mid_block_additional_residual": mid_block_res_sample,
+                    "controlnet_conditioning_scale": control_datum.control_weight,
+                    "soft_injection": soft_injection,
+                    "cfg_injection": cfg_injection,
+                }
+                # Call the model forward callback with the correct signature
+                # The callback may accept either (x, t, conditioning) or (x, t, conditioning, cross_attention_kwargs)
+                try:
+                    sample = self.model_forward_callback(sample, timestep, conditioning_data, cross_attention_kwargs)
+                except TypeError:
+                    # Fallback for older callback signature without cross_attention_kwargs
+                    sample = self.model_forward_callback(sample, timestep, conditioning_data)
+        return samplet = torch.cat([sample] * 2)
 
                 added_cond_kwargs = None
 
